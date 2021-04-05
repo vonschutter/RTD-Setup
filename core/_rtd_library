@@ -419,17 +419,21 @@ oem_register_all_tools ()
 #
 # End of Documentation
 
-	for d in $( ls -p ${_MODS_DIR}/ ) ; do
-		chmod +x ${_MODS_DIR}/$d/rtd*
-		pushd /bin
-			ln -f -s ${_MODS_DIR}/$d/${_TLA,,}*
-		popd
-	done
+	if [[ -z ${_MODS_DIR} ]] ; then
+		for d in $( ls -p ${_MODS_DIR}/ ) ; do
+			chmod +x ${_MODS_DIR}/$d/rtd*
+			pushd /bin
+				ln -f -s ${_MODS_DIR}/$d/${_TLA,,}* .
+			popd
+		done
 
-	pushd /bin
-		chmod +x ${_OEM_DIR}/core/*.sh
-		ln -f -s ${_OEM_DIR}/core/*.sh
-	popd
+		pushd /bin
+			chmod +x ${_OEM_DIR}/core/*.sh
+			ln -f -s ${_OEM_DIR}/core/*.sh
+		popd
+	else
+		write_error "Location variables not set!"
+	fi
 }
 
 
