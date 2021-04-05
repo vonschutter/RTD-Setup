@@ -493,11 +493,11 @@ recipe_Bundle:_Digital_Art_and_Imaging (){
 			# some small simple apps you will like...
 			check_dependencies snapd
 			# Feature rich screenshot tool and screenshot annotation tool. Great for support.
-			snap install screencloud		# Save your screenshot locally or upload it to the cloud! A link is automatically copied to your clipboard.
-			snap install flameshot			# A powerful open source screenshot and annotation tool for Linux, Flameshot has a varied set of markup tools available
-			snap install krita			# It is perfect for sketching and painting, and presents an end–to–end solution for creating digital painting files from scratch by masters.
-			snap install gimp			# Whether you are a graphic designer, photographer, illustrator, or scientist, GIMP provides you with sophisticated tools to get your job done.
-			snap install inkscape			# Inkscape is a Free and open source vector graphics editor.
+			snap install screencloud					# Save your screenshot locally or upload it to the cloud! A link is automatically copied to your clipboard.
+			snap install flameshot						# A powerful open source screenshot and annotation tool for Linux, Flameshot has a varied set of markup tools available
+			snap install krita						# It is perfect for sketching and painting, and presents an end–to–end solution for creating digital painting files from scratch by masters.
+			snap install gimp						# Whether you are a graphic designer, photographer, illustrator, or scientist, GIMP provides you with sophisticated tools to get your job done.
+			snap install inkscape						# Inkscape is a Free and open source vector graphics editor.
 
 }
 
@@ -512,7 +512,7 @@ recipe_Bundle:_OEM_restricted_fonts () {
 			done
 
 			7z e -y /opt/rtd/cache/True_Type_Font_Pack.7z -o/usr/share/fonts/truetype/oem/
-			Single_Remove_non_western_latin_fonts	# By default Ubuntu includes wierd fonts not used in the west.
+			Single_Remove_non_western_latin_fonts				# By default Ubuntu includes wierd fonts not used in the west.
 }
 
 
@@ -522,9 +522,9 @@ recipe_Bundle:_Secure_Communication () {
 			# and generally does not share keys with the vendor. Also, these apps are confined on the desktop
 			# meaning that they cannot access the wich is not granted explicitly.
 			ensure_snap_package_managment
-			snap install signal-desktop		# Encrypted person to person chat/call/conferencing
-			snap install telegram-desktop		# Encrypted chat, group commmunications
-			snap install electron-mail		# Uses protonmail.com (encrypted mail)
+			snap install signal-desktop					# Encrypted person to person chat/call/conferencing
+			snap install telegram-desktop					# Encrypted chat, group commmunications
+			snap install electron-mail					# Uses protonmail.com (encrypted mail)
 }
 
 
@@ -535,8 +535,8 @@ recipe_Bundle:_Social_Non_Secured_Communication () {
 			# for privacy, but may be encrypted. This software is often useful for legacy reasons
 			# or used for gaming.
 			ensure_snap_package_managment
-			snap install discord			# All-in-one voice and text chat for gamers that's free, secure, and works on both your desktop and phone.
-			Single_Install_Skype_Messenger		# Skype keeps the world talking. Say “hello” with an instant message, voice or video call
+			snap install discord						# All-in-one voice and text chat for gamers that's free, secure, and works on both your desktop and phone.
+			Single_Install_Skype_Messenger					# Skype keeps the world talking. Say “hello” with an instant message, voice or video call
 }
 
 
@@ -550,9 +550,9 @@ recipe_Bundle:_CLOUD_Storage ()
 			# to your content and Dropox must comply with US governemnt access requests. This
 			# includes the 5 eyes english speaking intelligence agencies cooperation and information
 			# sharing.
-			Single_Install_MEGA.nz_Encrypted_Cloud_Storage	# Secure cloud stirage
-			Single_Install_Dropbox_Corporate_Cloud_Storage	# Common cloud stirage
-			InstallSoftwareFromRepo gnome-documents		# Access to cloud stirage via online accounts in the distribution.
+			Single_Install_MEGA.nz_Encrypted_Cloud_Storage			# Secure cloud storage
+			Single_Install_Dropbox_Corporate_Cloud_Storage			# Common cloud storage (vandor has access to crypto keys)
+			InstallSoftwareFromRepo gnome-documents				# Access to cloud storage via online accounts in the distribution.
 }
 
 
@@ -565,12 +565,9 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 			# This may include some basic application seen as, well, basic, and shold always be there.
 			# This will also include som UI configuration and settings to improve usability,
 			# and the look and feel.
-			#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			#::::::::::::::                                          ::::::::::::::::::::::
-			#::::::::::::::          Desktop Settings                ::::::::::::::::::::::
-			#::::::::::::::                                          ::::::::::::::::::::::
-			#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
+			# [Task 1] Set basic locations files belonging to RTD Power Tools
+			# -------------------------------------------------------------------------------------------------------#
 			# Add several software items that are almost alwasys used
 			# in one way or another... These may be a dependency to others as well.
 			write_status "--- Adding some minor congiguration items for productivity..."
@@ -578,16 +575,36 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 			     InstallSoftwareFromRepo $i
 			done
 
-			# Ensure Flatpak support
+			# Ensure modern app distribution support
 			ensure_flatpak_pakage_managment
-
-			# Ensure Snap support
 			ensure_snap_package_managment
 
-			Single_Install_Windows_Subsystem_for_Linux	# Installs the ability to run Windows wrograms on Linux
-			Single_Install_Java_Runtime			# Installs Java, needed for cross platform software like Minecraft and others
+			rtd_oem_make_launchers
+			enable_firewall
+			Single_Install_Windows_Subsystem_for_Linux			# Installs the ability to run Windows wrograms on Linux
+			Single_Install_Java_Runtime					# Installs Java, needed for cross platform software like Minecraft and others
 
-			# Configure Desktop software managers depending on desktop used
+			# -------------------------------------------------------------------------------------------------------#
+
+
+			# [Task 2] Set basic locations files belonging to RTD Power Tools
+			# -------------------------------------------------------------------------------------------------------#
+			# Add launchers for some OEM apps (Internal function).
+			# Assuming a given folder structure: as part of /location/of/powertools/ <hierarchy>...
+			: ${_OEM_DIR:-"$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/../"}
+			CacheDir=${_OEM_DIR}/cache
+			WallPaperDir=${_OEM_DIR}/wallpaper
+			CustomSoundDir=${_OEM_DIR}/sound
+			ThemeDir=${_OEM_DIR}/themes
+			mkdir -p ${CacheDir}
+			chmod -R 755 "${WallPaperDir}"
+			chmod -R 755 "${CustomSoundDir}"
+
+			# -------------------------------------------------------------------------------------------------------#
+
+
+			# [Task 3] Configure Desktop software managers depending on desktop used
+			# -------------------------------------------------------------------------------------------------------#
 			case "$DESKTOP_SESSION" in
 				plasma )
 					check_dependencies plasma-discover
@@ -601,82 +618,65 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 					check_dependencies gnome-software-plugin-snap
 				;;
 			esac
+			# -------------------------------------------------------------------------------------------------------#
 
-			# Add launchers for some OEM apps (Internal function).
-			rtd_oem_make_launchers
+			# [Task 4] Configure relevant power management
+			# -------------------------------------------------------------------------------------------------------#
+			check_dependencies tuned
+			systemctl enable --now tuned
+			tuned-adm profile balanced
 
-			# enable_firewall
-			# Power managment profile
-			# check_dependencies tuned
-			# systemctl enable --now tuned
-			# tuned-adm profile balanced
-
-			# rtd_oem_check_splash () {
-			# 	if -f $1 ; then
-			# 		if cat $1 |grep "-desktop" ; then
-			# 			InstallSoftwareFromRepo splash && echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"'>> /etc/default/grub
-			# 			update-grub
-			# 		fi
-			# 	fi
-			# }
-			# # If this system was built using the RTD process and is debian based, use instructions in said file.
-			# rtd_oem_check_splash /opt/rtd/log/preseed.cfg
-			# rtd_oem_check_splash /root/original-ks.cfg
-
-			# Switch on graphical network managment if it is not already on.
-			# rtd_oem_turn_on_gui_network_management
+			rtd_oem_check_splash () {
+				if -f $1 ; then
+					if cat $1 |grep "-desktop" ; then
+						InstallSoftwareFromRepo splash && echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"'>> /etc/default/grub
+						update-grub
+					fi
+				fi
+			}
+			# If this system was built using the RTD process and is debian based, use instructions in said file.
+			rtd_oem_check_splash /opt/rtd/log/preseed.cfg
+			rtd_oem_check_splash /root/original-ks.cfg
 
 			#Tune to virtual machine guest or tune according to hardware type::
 			check_dependencies virt-what
 			check_dependencies laptop-detect
-			# if virt-what ; then
-			# 	echo "This is likely not running in a virtual machine."
-			# 	if laptop-detect ; then
-			# 		tuned-adm profile powersave
-			# 	else
-			# 		tuned-adm profile desktop
-			# 	fi
-			# else
-			# 	tuned-adm profile virtual-guest
-			# fi
+			if virt-what ; then
+				echo "This is likely not running in a virtual machine."
+				if laptop-detect ; then
+					tuned-adm profile powersave
+				else
+					tuned-adm profile desktop
+				fi
+			else
+				tuned-adm profile virtual-guest
+			fi
+			# -------------------------------------------------------------------------------------------------------#
 
+
+
+			# [Task 5] Configure UI Tweaks
+			# -------------------------------------------------------------------------------------------------------#
 			# Apply tweaks to the UI based on desktop active
 			if  ps -e |grep "gnome-shell"; then
 
-				# [Task 1] Configure Wallpapers for OEM look and feel.
+				# [Task 5.1] Configure Wallpapers for OEM look and feel.
 				# -------------------------------------------------------------------------------------------------------
 				write_information "Fonud the gnome UI on this system! Adding OEM customizations..."
 				# Configure Gnome for OEM look and feel. This is completely as desired.
 				# These setings will then be copied to the "/etsc/skel" directory where user templates
 				# are stored. This will allow new users to get the same themes and settings as the
-				# current user. This should likely only be done right after a PC has been installed
-				# otherwise all user configuration settings will be trasferred to any user
-				# subsequently created.
-				# Get wallpapers
-				OEMDir=/opt/rtd
-				CacheDir=${OEMDir}/cache
-				WallPaperDir=${OEMDir}/Wallpaper
-				CustomSoundDir=${OEMDir}/Sound
-				ThemeDir=${OEMDir}/Themes
+				# current user. This will not be done if the system was not built by the oem process.
 
-				check_dependencies git
-
-				mkdir -p ${CacheDir}
-				if [[ -d ${CacheDir}/RTD-Media ]] ; then rm -rf ${CacheDir}/RTD-Media ; fi
-				git clone https://github.com/vonschutter/RTD-Media.git ${CacheDir}/RTD-Media
-				rsync -va --delete-after ${CacheDir}/RTD-Media/* ${OEMDir}/
-				chmod -R 755 "${WallPaperDir}"
-				chmod -R 755 "${CustomSoundDir}"
-
-				# Register Wllpapers in Gnome
-				rtd_oem_register_wallpapers_for_gnome /opt/rtd/Wallpaper
+				# Register Wallpapers in Gnome
+				rtd_oem_register_wallpapers_for_gnome ${WallPaperDir}
 
 				# Set the default wallpaper...
-				run_command_in_gnome_user_session gsettings set org.gnome.desktop.background picture-uri file:///opt/rtd/Wallpaper/Wayland.jpg
+				run_command_in_gnome_user_session gsettings set org.gnome.desktop.background picture-uri file://${WallPaperDir}/Wayland.jpg
 				# -------------------------------------------------------------------------------------------------------
 
 
-				# [Task 2] Add extensions and UI theme components:
+				# [Task 5.2] Add extensions:
 				# -------------------------------------------------------------------------------------------------------
 				# To fully support themes and customixzations the Gnome environment requires extensions and
 				# theme modules "engines" that change the look and feel of buttons and widgets. Also, additional
@@ -692,8 +692,6 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 				InstallSoftwareFromRepo gnome-tweak
 
 				write_information "--- Optimizig look and feel of the desktop for productivity and aestetics..."
-
-				# Add Some basic extensions...
 				for i in gnome-shell-extensions \
 					gnome-shell-extension-appindicator \
 					gnome-shell-extension-suspend-button \
@@ -707,7 +705,11 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 				do
 					InstallSoftwareFromRepo $i
 				done
+				# -------------------------------------------------------------------------------------------------------
 
+
+				# [Task 5.3] Add cusom themes for gnome and snap:
+				# -------------------------------------------------------------------------------------------------------
 				# Installing dependencies for themes. If the package name was the same there would not
 				# need for this extra checking, but different distributions have different
 				# names for the same software. Therefore there is a need to check based on what
@@ -733,13 +735,6 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 				else
 					write_error "This option requires a supported package manager on your system (deb, zypper, dnf, pacman). Neiter was found!"
 				fi
-				# -------------------------------------------------------------------------------------------------------
-
-
-				# [Task 3] Add cusom themes for gnome and snap:
-				# -------------------------------------------------------------------------------------------------------
-				# Allow themes to be used in snapps...
-				ensure_snap_package_managment
 
 				# Install theme for a smooth mocka experience in UI (snap, gnome, and icons)...
 				snap install vimix-themes
@@ -773,7 +768,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 
 
 
-				# [Task 4] Add cusom tweaks to the behavvior of the gnome UI:
+				# [Task 5.4] Add cusom tweaks to the behavvior of the gnome UI:
 				# -------------------------------------------------------------------------------------------------------
 				# These common OEM tweaks are defind in the function "set_gnome_ui_common_tweaks_for_user" in the
 				# _rtd_library. The easiest is to simply use that. Naturally, any additional tweaks my be added in the
@@ -790,8 +785,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 				# -------------------------------------------------------------------------------------------------------
 
 
-
-				# [Task 5] copy configuration elements so that NEW users also get the tweaks:
+				# [Task 5.5] copy configuration elements so that NEW users also get the tweaks:
 				# -------------------------------------------------------------------------------------------------------
 				# If the system that this is run on was built using an unattended build it is reasonable to
 				# assume that the UI customizations should be implemented such that all new users will get
@@ -809,10 +803,8 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 			fi
 
 
-
 			if  ps -e |grep "plasmashell" ; then
 				echo "Detected KDE UI!"
-
 				# Download and Set Wallpaper...
 				CacheDir="${_RTDCACHE:="/opt/rtd/cache"}"
 				echo Downloading Wallpapers:

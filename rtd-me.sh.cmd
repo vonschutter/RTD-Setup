@@ -133,7 +133,7 @@ if [[ "$OSTYPE" == "linux-gnu" ]]; then
 			source ${_TLA}/core/_${_TLA}_library
 			oem_register_all_tools
 			ln -s ${_LOG_DIR} ${_OEM_DIR}/log
-			bash ${_CORE_DIR}/rtd-oem-linux-config.sh "$@" | tee ${_LOGFILE}
+			bash ${_TLA}/core/rtd-oem-linux-config.sh "$@" | tee ${_LOGFILE}
 		else
 			echo "Failed to retrieve instructions correctly! "
 			echo "Suggestion: check write permission in "/opt" or internet connectivity."
