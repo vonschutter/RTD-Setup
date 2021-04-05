@@ -113,8 +113,9 @@ task_setup_rtd_basics() {
 			then
 				echo "Instructions successfully retrieved..."
 				if [[ -d /opt/${_TLA,,}  ]] ; then
-					mv /opt/${_TLA,,} /opt/${_TLA,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup
-					compress_provided_items /opt/${_TLA,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup $$ rm .r /opt/${_TLA,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup
+					mv /opt/${_TLA,,} ${_BackupFolderName:="/opt/${_TLA,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"}
+					zip -m -r -5 ${_BackupFolderName}.zip  ${_BackupFolderName}
+					rm ${_BackupFolderName}
 					mv /opt/${_TLA,,}.tmp /opt/${_TLA,,}
 				fi
 				source /opt/${_TLA,,}/core/_rtd_library
