@@ -1,0 +1,59 @@
+#!/bin/bash
+#
+#::                                            A D M I N   C O M M A N D L E T
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::// Simple Admin Tool //::::::::::::::::::::::::::::::::::::::::// Ubuntu //:::::::
+#::
+#:: Author:   	SLS: Adapted from "unknown"
+#:: Version 	1.02
+#::
+#::
+#::	Purpose: The purpose of this script is to clear out unused PPA repositories.
+#::
+#::
+#::     Usage:	Simply execute this commandlet to list the PPA repositories and how many packages
+#:: 		are installed from each repository. To remove the unused repositories use the --delete option:
+#::
+#::     	rtd-ppa-checker --delete
+#::
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+#
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+check_rtd_library ()
+{
+        # Set library path if not defined:
+        scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+        rtd_library=${rtd_library:-"${scriptdir}/../../core/_rtd_library"}
+
+        if [[ -f ${rtd_library} ]]; then
+                source ${rtd_library}
+        elif [[ ! -f ${rtd_library} ]]; then
+                echo "RTD Functions not found... "
+                echo "Trying to retrieve them..."
+                wget https://github.com/vonschutter/RTD-Build/raw/master/System_Setup/_rtd_library
+                source ./_rtd_library
+        else
+                exit 1
+        fi
+}
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+check_rtd_library
+
+ensure_admin
+rtd_ppa_checker

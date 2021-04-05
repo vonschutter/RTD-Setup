@@ -1,0 +1,66 @@
+#!/bin/bash
+#
+#::             			A D M I N   C O M M A N D L E T
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::// Simple Admin Tool //::::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#::
+#:: Author:   	SLS
+#:: Version 	1.02
+#::
+#::
+#::	Purpose: The purpose of this script is to configure a Huion tablet.
+#::		 This is available for convenience only. Sucess may vary.
+#::
+#::     Usage:	Simply execute this commandlet to accomplish this task. No parameters required.
+#:: 		NOTE: Please refer to: https://www.huion.com/pen_tablet/
+#::
+#::
+#::
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+#
+#
+# This  script was originally developed for RuntimeData, a small OEM in Buffalo Center, IA.
+# This OEM and store nolonger exists as its owner has passed away.
+# This script is shared in the hopes that someone will find it useful.
+#
+# This script is intended to live in the ~/bin/ or /bin/ folder, alternatively in the $PATH.
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+check_rtd_library ()
+{
+        # Set library path if not defined:
+        scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+        rtd_library=${rtd_library:-"${scriptdir}/../../core/_rtd_library"}
+
+        if [[ -f ${rtd_library} ]]; then
+                source ${rtd_library}
+        elif [[ ! -f ${rtd_library} ]]; then
+                echo "RTD Functions not found... "
+                echo "Trying to retrieve them..."
+                wget https://github.com/vonschutter/RTD-Build/raw/master/System_Setup/_rtd_library
+                source ./_rtd_library
+        else
+                exit 1
+        fi
+}
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# Ensure access to the rtd library functions:
+check_rtd_library
+# Ensure elevated privs.
+ensure_admin
+# Attempt config of HUION:
+config_huion610

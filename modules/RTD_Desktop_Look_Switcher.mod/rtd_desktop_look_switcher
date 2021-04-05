@@ -1,0 +1,115 @@
+#!/bin/bash
+#
+#::             			A D M I N   T O O L
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::// Simple Admin Tool //::::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#::
+#:: Author:   	SLS
+#:: Version 	1.02
+#::
+#::
+#::	Purpose: The purpose of this script is to switch from one gnome desktop
+#::		 look and feel to another (Mac like, windows 10 like, original distro).
+#::
+#::     Usage:	Simply execute this commandlet to accomplish this task. No parameters required.
+#:: 		NOTE: Please refer to: https://www.huion.com/pen_tablet/
+#::
+#::
+#::
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+# This script is shared in the hopes that someone will find it useful.
+# For convenience and supportability most actions (work) is stored in a common library used bu multiple scripts.
+# To use these functions in the library, simply load the library using the "source" bash built in command. All
+# functions will then be available for use. This script demonstrates the simplicity of using these functions.
+#
+# This script is intended to live in the ~/bin/ or /bin/ folder, alternatively in the $PATH.
+# By default this script is placed in /opt/rtd/scrips/
+#
+# 1 - To see options to use the rtd library type: "bash _rtd_library --help"
+# 2 - To see usefull documentation on each function in this library: "bash _rtd_library --devhelp"
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+# This script requires the bash library "rtd library", so if it is not present;
+# a copy must be downloaded.
+check_rtd_library ()
+{
+        # Set library path if not defined:
+        rtd_library=${rtd_library:-"/opt/rtd/scripts/_rtd_library"}
+
+        if [[ -f ${rtd_library} ]]; then
+                source ${rtd_library}
+        elif [[ ! -f ${rtd_library} ]]; then
+                echo "RTD Functions not found... "
+                echo "Trying to retrieve them..."
+                wget https://github.com/vonschutter/RTD-Build/raw/master/System_Setup/_rtd_library
+                source ./_rtd_library
+        else
+                exit 1
+        fi
+}
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# Ensure access to the rtd library functions:
+check_rtd_library
+
+
+while true; do
+        exec 3>&1
+        DefaultDistro=$(hostnamectl |grep "Operating System" |cut -d: -f2)
+        DefaultTitle=$( basename $0 ) ; DefaultTitle=${DefaultTitle//-/ }
+        ProgressTXT="Working..."
+
+        selection=$(zenity --title="${DefaultTitle^^}" --list \
+        --text "        Select your prefferred style of desktop look below. Please NOTE: that the resulting look is just an
+        adjustment to look more like what you may be used to, and not a perfect replica of the original look.
+        Though some may say that the look and function this Gnome variant is an improvement over the originals.
+        " \
+        --height="${HEIGHT:-400}" --width="${WIDTH:-830}" \
+        --print-column=1 --column "Look" --column "Description" \
+        "Windows 10 Dark Mode" "Change the look of this desktop be more like Windows 10 Dark" \
+        "Windows 10 Light Mode" "Change the look of this desktop be more like Windows 10 Light" \
+        "Mac OS Bright" "Change the look of this desktop for be more like Apple's MAC OS" \
+        "Mac OS Dusk" "Change the look of this desktop for be more like Apple's MAC OS" \
+        "Crisp Day" "Crisp and clean proffessional business look (Tuned for day time)" \
+        "Crisp Evening" "Crisp and clean proffessional business look (Tuned for evening time)" \
+        "Moca Smooth" "A dark and chocolate smooth comfortable look" \
+        "${DefaultDistro/ /}" "The default look and feel of ${DefaultDistro/ /} (this distribution of Linux)" )
+        exit_status=$?
+
+        exec 3>&-
+        case $exit_status in
+                1) clear && echo [Cancel] && exit ;;
+                255) clear && echo [ESC] && exit ;;
+        esac
+
+        write_status "OK setting OEM theme: $selection"
+
+        case "$selection" in
+                "Windows 10 Dark Mode" ) set_gnome_ui_win10_tweaks_for_user Dark ;;
+                "Windows 10 Light Mode" ) set_gnome_ui_win10_tweaks_for_user Light ;;
+                "Mac OS Bright" ) set_gnome_ui_mac_tweaks_for_user Light  ;;
+                "Mac OS Dusk" ) set_gnome_ui_mac_tweaks_for_user Dark ;;
+                "Crisp Day" ) set_gnome_ui_corprate_crisp_tweaks_for_user Light ;;
+                "Crisp Evening" ) set_gnome_ui_corprate_crisp_tweaks_for_user Dark ;;
+                "Moca Smooth" ) set_gnome_ui_moca_tweaks_for_user ;;
+                "${DefaultDistro/ /}" ) dconf reset -f /org/gnome/desktop/  ;;
+                * )
+                # Trap unknown exit code...
+                exit
+                ;;
+        esac
+done

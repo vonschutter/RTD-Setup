@@ -1,0 +1,182 @@
+#!/bin/bash
+RTD_UPDATE_SELF_VERSION=1.0
+#::
+#::
+#:: 					Update RTD admin tools Task Sequence
+
+#::                                     A D M I N   C O M M A N D
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::// Simple Admin Tool //::::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Author(s):   	SLS, KLS, NB.  Buffalo Center, IA & Avarua, Cook Islands
+#:: Version:	1.00
+#::
+#::
+#:: Purpose: 	The purpose of the task sequence is to configure update the installed admin tools.
+#::
+#::
+#::		This task sequence should be executed on a PC with the the RTD OEM installation or configuration
+#::
+#::
+#::
+#:: Background: This system configuration and installation script was created to facilitate geting the latest simple
+#::             managment tools on to a computer already using the rtd tools.
+#::
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+#
+#
+#	RTD admin scrips are placed in /opt/rtd/scripts. Optionally scripts may use the common
+#	functions in _rtd_functions and _rtd_recipies.
+#	  _rtd_functions -- contain usefull admin functions for scripts, such as "how to install software" on different systems.
+#	  _rtd_recipies  -- contain software installation and configuration "recipies".
+#	Scripts may also be stand-alone if there is a reason for this.
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# Variables that govern the behavior or the script and location of files are
+BRAND=RTD
+
+# Ensure administrative privileges.
+[ "$UID" -eq 0 ] || echo -e $YELLOW "This script needs administrative access..." $ENDCOLOR
+[ "$UID" -eq 0 ] || exec sudo DISPLAY=$DISPLAY bash "$0" "$@"
+
+# Put a convenient link to the logs where logs are normally found...
+# capture the 3 first letters as org TLA (Three Letter Acronym)
+export _SCRIPTNAME=$(basename $0)
+export _TLA=${_SCRIPTNAME:0:3}
+export _LOG_DIR=/var/log/${_TLA}
+mkdir -p ${_LOG_DIR}
+
+# Set the GIT profile name to be used if not set elsewhere:
+export _GIT_PROFILE="${_GIT_PROFILE:-vonschutter}"
+
+# Location of base administrative scripts and command-lets to get.
+_src_url=https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git
+
+# Determine log file names for this session
+export _ERRLOGFILE=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-error.log
+export _LOGFILE${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log
+export _STATUSLOG=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-status.log
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+check_rtd_library ()
+{
+        # Set library path if not defined:
+        rtd_library=${rtd_library:-"/opt/${_TLA}/core/_rtd_library"}
+
+        if [[ -f ${rtd_library} ]]; then
+                source ${rtd_library}
+        elif [[ ! -f ${rtd_library} ]]; then
+                echo "RTD Functions not found... "
+                echo "Trying to retrieve them..."
+                wget ${_rtd_library:-"https://github.com/vonschutter/RTD-Setup/raw/master/core/_rtd_library"}
+                source ./_rtd_library
+        else
+                exit 1
+        fi
+}
+
+task_setup_rtd_basics() {
+	echo "Task: Attempting to get the latest RTD tools..."
+	if [[ "$OSTYPE" == "linux-gnu" ]]; then
+		echo "Linux OS Found: Attempting to get instructions for Linux..."
+		echo executing $0 >> ${_LOGFILE}
+		if ! hash git &>> ${_LOGFILE} ; then
+			for i in apt yum dnf zypper ; do $i -y install git | tee ${_LOGFILE} ; done
+		fi
+		git clone ${_src_url} /opt/${_TLA}.tmp | tee ${_LOGFILE}
+			if [ $? -eq 0 ]
+			then
+				echo "Instructions successfully retrieved..."
+				if [[ -d /opt/${_TLA}  ]] ; then
+					mv /opt/${_TLA} /opt/${_TLA}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup
+					mv /opt/${_TLA}.tmp /opt/${_TLA}
+				fi
+				source /opt/${_TLA}/core/_rtd_library
+				oem_register_all_tools
+				ln -s ${_LOG_DIR} ${_OEM_DIR}/log
+			else
+				echo "Failed to retrieve instructions correctly! "
+				echo "Suggestion: check write permission in "/opt" or internet connectivity."
+				exit 1
+			fi
+		exit $?
+	elif [[ "$OSTYPE" == "darwin"* ]]; then
+		echo "Mac OSX is currently not supported..."
+	elif [[ "$OSTYPE" == "cygwin" ]]; then
+		echo "CYGWIN is currently unsupported..."
+	elif [[ "$OSTYPE" == "msys" ]]; then
+		echo "Lightweight shell is currently unsupported... "
+	elif [[ "$OSTYPE" == "freebsd"* ]]; then
+		echo "Free BSD is currently unsupported... "
+	else
+	echo "This system is Unknown to this script"
+	fi
+	exit $?
+}
+
+
+
+
+rtd_wait_for_internet_availability () {
+	echo "Waiting for internet access..."
+	echo "NOTE: Free access to the internet is required to continue."
+	while ! ping -c 1 -W 1 8.8.8.8 &>/dev/null ; do
+		echo Waiting...
+		sleep 5
+	done
+}
+
+
+
+do_update ()
+{
+	rtd_wait_for_internet_availability
+	task_setup_rtd_basics && dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: DONE!" --msgbox "\nUpdating the ${BRAND} tools done!. \n\n Press OK to confirm." 20 80 ; clear|| dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: ERROR!" --msgbox "\nUpdating the ${BRAND} \Z1 FAILED!. \n\n Press OK to confirm." 20 80 ; clear
+	rtd_oem_make_launchers
+}
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Execute tasks                   ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# Using the common function library to elevate priviledges... This is only useful
+# is the script is not run via sudo to begin with...
+check_rtd_library
+ensure_admin
+
+if hash dialog ; then
+	if ( dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: NOTICE!" --yesno "\nMay I update the ${BRAND} OEM tools on your system now? Updating the ${BRAND} tools will ensure that the latest functionality and bug fixes are applied. \n\n Press OK to continue or NO to skip doing this." 20 80 ) ; then
+		clear && do_update
+	else
+		clear && exit
+	fi
+else
+	echo -e $YELLOW
+	echo "RTD Tools Updater Version $RTD_UPDATE_SELF_VERSION"
+	echo "Hello $SUDO_USER ... I am going to update the rtd tools on this"
+	echo " "
+	echo "To cancel this, just close the terminal or press "CRTL C"."
+	echo " "
+	read -p "Press [ ENTER ] to continue with update"
+	echo -e $ENDCOLOR
+	do_update
+fi
+
+
+

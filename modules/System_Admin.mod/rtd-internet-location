@@ -1,0 +1,64 @@
+#!/bin/bash
+#
+#::             			A D M I N   C O M M A N D
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::// Simple Admin Tool //::::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#::
+#:: Author:   	SLS
+#:: Version 	1.00
+#::
+#::	January 1 2019  - SLS
+#::		* File originally created.
+#::
+#::
+#::	Purpose: The purpose of the script is to find and display you internet location (geolocation)
+#:: 	 	 Executing this command will identify you external IP and where physically it is located.
+#::		 This is a useful function to quickly check if you VPN is working correctly.
+#::
+#::
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+check_rtd_library ()
+{
+        # Set library path if not defined:
+        scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+        rtd_library=${rtd_library:-"${scriptdir}/../../core/_rtd_library"}
+
+        if [[ -f ${rtd_library} ]]; then
+                source ${rtd_library}
+        elif [[ ! -f ${rtd_library} ]]; then
+                echo "RTD Functions not found... "
+                echo "Trying to retrieve them..."
+                wget https://github.com/vonschutter/RTD-Build/raw/master/System_Setup/_rtd_library
+                source ./_rtd_library
+        else
+                exit 1
+        fi
+}
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# Ensure access to the rtd library functions:
+check_rtd_library
+
+# This script relies on curl to send web content to standard out (screen)
+# so we need to ensure that this is available on the system.
+check_dependencies curl
+check_dependencies dnsutils
+
+result=$( curl ipinfo.io/$(dig +short myip.opendns.com @resolver1.opendns.com))
+display_result
+
+
