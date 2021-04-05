@@ -51,7 +51,7 @@ BRAND=RTD
 # capture the 3 first letters as org TLA (Three Letter Acronym)
 export _SCRIPTNAME=$(basename $0)
 export _TLA=${_SCRIPTNAME:0:3}
-export _LOG_DIR=/var/log/${_TLA}
+export _LOG_DIR=/var/log/${_TLA,,}
 mkdir -p ${_LOG_DIR}
 
 # Set the GIT profile name to be used if not set elsewhere:
@@ -74,7 +74,7 @@ export _STATUSLOG=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-status.log
 check_rtd_library ()
 {
         # Set library path if not defined:
-        rtd_library=${rtd_library:-"/opt/${_TLA}/core/_rtd_library"}
+        : ${rtd_library:="/opt/${_TLA,,}/core/_rtd_library"}
 
         if [[ -f ${rtd_library} ]]; then
                 source ${rtd_library}
@@ -112,7 +112,7 @@ task_setup_rtd_basics() {
 				echo "Suggestion: check write permission in "/opt" or internet connectivity."
 				exit 1
 			fi
-		exit $?
+		return $?
 	elif [[ "$OSTYPE" == "darwin"* ]]; then
 		echo "Mac OSX is currently not supported..."
 	elif [[ "$OSTYPE" == "cygwin" ]]; then
@@ -124,7 +124,7 @@ task_setup_rtd_basics() {
 	else
 	echo "This system is Unknown to this script"
 	fi
-	exit $?
+	return
 }
 
 

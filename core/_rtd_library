@@ -421,18 +421,17 @@ oem_register_all_tools ()
 
 	if [[ -n "${_MODS_DIR}" ]] ; then
 		for d in $( ls -p ${_MODS_DIR}/ ) ; do
+			write_status "Creating links to $d"
 			chmod +x ${_MODS_DIR}/$d/rtd*
-			pushd /bin
-				ln -f -s ${_MODS_DIR}/$d/${_TLA,,}* .
-			popd
+			ln -f -s ${_MODS_DIR}/$d/${_TLA,,}* -t /bin/
 		done
-
-		pushd /bin
-			chmod +x ${_OEM_DIR}/core/*.sh
-			ln -f -s ${_OEM_DIR}/core/*.sh .
-		popd
+		write_status "Creating links to ${_OEM_DIR}/core/*.sh"
+		chmod +x ${_OEM_DIR}/core/*.sh
+		ln -f -s ${_OEM_DIR}/core/*.sh -t /bin/
+		return
 	else
 		write_error "Location variables not set!"
+		return 1
 	fi
 }
 
