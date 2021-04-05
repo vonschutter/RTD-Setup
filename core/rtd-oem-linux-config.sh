@@ -78,8 +78,8 @@
 # Decide where to put log files.
 # Default: log in to the $_LOG_DIR location dated accordingly. If this is already set
 # we use the requested location.
-: "${_ERRLOGFILE:-${_LOG_DIR}/"$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-error.log"}" ; echo "$( basename $0): Errors will be logged to: ${_ERRLOGFILE}"
-: "${_LOGFILE:-"${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log"}" ; echo "$( basename $0): Logfile is set to: ${_LOGFILE}"
+: "${_ERRLOGFILE:=${_LOG_DIR}/"$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-error.log"}" ; echo "$( basename $0): Errors will be logged to: ${_ERRLOGFILE}"
+: "${_LOGFILE:="${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log"}" ; echo "$( basename $0): Logfile is set to: ${_LOGFILE}"
 
 # Normally all choices are checked. Pass the variable "false" to this script to default
 # to unchecked. If none is passed, a default will be used.
@@ -136,6 +136,19 @@ if [[ ! $UID -eq 0 ]]; then
 else
 	if  [[ -f "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_rtd_library ]]; then
 		source "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_rtd_library
+	elif source $(find /opt -name _rtd_library ) ; then
+		write_host -cyan "Libraries loaded"
+		write_status "Paths registered:
+		* # Root directory of tools: 		_OEM_DIR="${scriptdir%/*}"
+		* # Caching and download folder: 	_CACHE_DIR="${_OEM_DIR}/cache"
+		* # Location of oem wallpapers: 	_WALLPAPER_DIR="${_OEM_DIR}/wallpaper"
+		* # Location of custom sounds:		_CUSTOMSOUND_DIR="${_OEM_DIR}/sound"
+		* # Location of installable themes: 	_THEME_DIR="${_OEM_DIR}/themes"
+		* # Location of 3rd party apps:		_APP_DIR="${_OEM_DIR}/apps"
+		* # Location of extension modules:	_MODS_DIR="${_OEM_DIR}/modules"
+		* # Root tools folder: 			_CORE_DIR="${_OEM_DIR}/core"
+		* # Location of log files:		_LOG_DIR=/var/log/${_TLA,,}
+		"
 	else
 		echo -e "RTD functions NOT loaded!"
 		echo -e " "
