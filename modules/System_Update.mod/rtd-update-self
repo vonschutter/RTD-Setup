@@ -100,13 +100,13 @@ task_setup_rtd_basics() {
 			if [ $? -eq 0 ]
 			then
 				echo "Instructions successfully retrieved..."
-				if [[ -d /opt/${_TLA}  ]] ; then
-					mv /opt/${_TLA} /opt/${_TLA}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup
-					mv /opt/${_TLA}.tmp /opt/${_TLA}
+				if [[ -d /opt/${_TLA,,}  ]] ; then
+					mv /opt/${_TLA,,} /opt/${_TLA,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup
+					mv /opt/${_TLA,,}.tmp /opt/${_TLA,,}
 				fi
-				source /opt/${_TLA}/core/_rtd_library
+				source /opt/${_TLA,,}/core/_rtd_library
 				oem_register_all_tools
-				ln -s ${_LOG_DIR} ${_OEM_DIR}/log
+				ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
 			else
 				echo "Failed to retrieve instructions correctly! "
 				echo "Suggestion: check write permission in "/opt" or internet connectivity."
