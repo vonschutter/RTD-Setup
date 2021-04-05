@@ -130,7 +130,7 @@ if [[ "$OSTYPE" == "linux-gnu" ]]; then
 		if [ $? -eq 0 ]
 		then
 			echo "Instructions successfully retrieved..."
-			source ${_TLA}/core/_${_TLA}_library
+			source /opt/${_TLA}/core/_${_TLA}_library || exit 1
 			oem_register_all_tools
 			ln -s ${_LOG_DIR} ${_OEM_DIR}/log
 			bash /opt/${_TLA}/core/rtd-oem-linux-config.sh "$@" | tee ${_LOGFILE}
