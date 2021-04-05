@@ -73,24 +73,20 @@
 # Logically, this script will not run, ever, unless downloaded along with the functions and the
 # rtd software recipie book by rtd-me.sh, or on a RTD OEM system where these components would have been
 # downloaded by the preseed or kickstart process as part of the install.
-: "${_LOG_DIR:-"/var/log/rtd"}"
-if [ ! -f ${_LOG_DIR} ]; then mkdir -p ${_LOG_DIR} ; fi
+: "${_LOG_DIR:-"/var/log/rtd"}" ; mkdir -p ${_LOG_DIR}
 
 # Decide where to put log files.
 # Default: log in to the $_LOG_DIR location dated accordingly. If this is already set
 # we use the requested location.
-if [ -z "${_ERRLOGFILE}" ]; then _ERRLOGFILE=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-error.log ; else echo "	Errors will be logged to: '${_ERRLOGFILE}'"; fi
-if [ -z "${_LOGFILE}" ]; then _LOGFILE=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log ; else echo "	Logfile is set to: '${_LOGFILE}'"; fi
+: "${_ERRLOGFILE:-${_LOG_DIR}/"$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-error.log"}" ; echo "$( basenaame $0): Errors will be logged to: ${_ERRLOGFILE}"
+: "${_LOGFILE:-"${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log"}" ; echo "$( basenaame $0): Logfile is set to: ${_LOGFILE}"
 
 # Normally all choices are checked. Pass the variable "false" to this script to default
 # to unchecked. If none is passed, a default will be used.
 export zstatus="$1"
 
-
 # Set the background tilte:
 : "${_BACK_TITLE:-"RTD OEM Simple System Setup"}"
-
-
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::

@@ -718,11 +718,11 @@ rtd_oem_reset_default_environment_config ()
 # End of documentation
 
 	# Disable the automatically trying to install OEM software
-	[[ -f /etc/xdg/autostart/org.runtimedata.oem.cofig.desktop ]] && mv /etc/xdg/autostart/org.runtimedata.oem.cofig.desktop {_OEM_DIR}/cashe
-	[[ -f /etc/sudoers.d/99_sudo_include_file ]] && mv /etc/sudoers.d/99_sudo_include_file {_OEM_DIR}/scripts
-	cp /home/$SUDO_USER/.bashrc {_OEM_DIR}/scripts/bashrc
+	[[ -f /etc/xdg/autostart/org.runtimedata.oem.cofig.desktop ]] && mv /etc/xdg/autostart/org.runtimedata.oem.cofig.desktop ${_OEM_DIR}/cache
+	[[ -f /etc/sudoers.d/99_sudo_include_file ]] && mv /etc/sudoers.d/99_sudo_include_file ${_OEM_DIR}/cache
+	cp /home/${SUDO_USER}/.bashrc {_OEM_DIR}/cache/bashrc
 	# Keep ability for root to open dialog boxes for a user.
-	sed -i '/xhost\ local:root/d' /home/$SUDO_USER/.bashrc
+	sed -i '/xhost\ local:root/d' /home/${SUDO_USER}/.bashrc
 	toggle_oem_auto_login
 }
 
@@ -1010,8 +1010,10 @@ toggle_oem_auto_login()
 
 	if [[ -f /etc/lightdm/lightdm.conf ]]; then
 		if [[ -f /etc/lightdm/lightdm.conf.rtd-bak ]]; then
+			write_status "***** LightDM auto login is enabled: toggeling off... ******"
 			rm /etc/lightdm/lightdm.conf && mv /etc/lightdm/lightdm.conf.rtd-bak /etc/lightdm/lightdm.conf
 		else
+			write_status "***** LightDM auto login is disabled: toggeling on... ******"
 			cp /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.rtd-bak
 			cat > /etc/lightdm/lightdm.conf <<-OEM_LXDM_LOGIN_OPTION
 			# This configuration file was created by RTD Setup.
@@ -1028,8 +1030,10 @@ toggle_oem_auto_login()
 
 	if [[ -f /etc/sddm.conf ]]; then
 		if [[ -f /etc/sddm.conf.rtd-bak ]]; then
+			write_status "******* SDDM auto login is enabled: toggeling off... *******"
 			rm /etc/sddm.conf && mv /etc/sddm.conf.rtd-bak /etc/sddm.conf
 		else
+			write_status "******* SDDM auto login is disabled: toggeling on... *******"
 			cp /etc/sddm.conf /etc/sddm.conf.rtd-bak
 			cat > /etc/sddm.conf <<-OEM_SDDM_LOGIN_OPTION
 			cat << OEM_SDDM_LOGIN_OPTION >
@@ -1047,8 +1051,10 @@ toggle_oem_auto_login()
 
 	if [[ -f /etc/gdm3/daemon.conf ]]; then
 		if [[ -f /etc/gdm3/daemon.conf.rtd-bak ]]; then
+			write_status "******* GDM auto login is enabled: toggeling off... ********"
 			rm /etc/gdm3/daemon.conf && mv /etc/gdm3/daemon.conf.rtd-bak /etc/gdm3/daemon.conf
 		else
+			write_status "******* GDM auto login is disabled: toggeling on... ********"
 			cp /etc/gdm3/daemon.conf /etc/gdm3/daemon.conf.rtd-bak
 			cat >  /etc/gdm3/daemon.conf <<-OEM_GDM3_LOGIN_OPTION
 			# This configuration file was created by RTD Setup.
@@ -1065,7 +1071,7 @@ toggle_oem_auto_login()
 	fi
 
 	if [ ! -f /etc/systemd/system/getty@tty1.service.d/override.conf ]; then
-		write_status "***********  Updating Autologin information... ************ "
+		write_status "******* TTY auto login is disabled: toggeling on... ********"
 		mkdir -p /etc/systemd/system/getty@tty1.service.d
 		cat >  /etc/systemd/system/getty@tty1.service.d/override.conf <<-OEM_TTY_LOGIN_OPTION
 		"[Service]"
@@ -1074,7 +1080,8 @@ toggle_oem_auto_login()
 		"Type=idle"
 		OEM_TTY_LOGIN_OPTION
 	else
-		echo "/etc/systemd/system/getty@tty1.service.d/override.conf is already present... "
+		write_status "******* TTY auto login is enabled: toggeling off... ********"
+		rm /etc/systemd/system/getty@tty1.service.d/override.conf
 	fi
 }
 
