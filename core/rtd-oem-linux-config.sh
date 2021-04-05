@@ -78,8 +78,8 @@
 # Decide where to put log files.
 # Default: log in to the $_LOG_DIR location dated accordingly. If this is already set
 # we use the requested location.
-: "${_ERRLOGFILE:-${_LOG_DIR}/"$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-error.log"}" ; echo "$( basenaame $0): Errors will be logged to: ${_ERRLOGFILE}"
-: "${_LOGFILE:-"${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log"}" ; echo "$( basenaame $0): Logfile is set to: ${_LOGFILE}"
+: "${_ERRLOGFILE:-${_LOG_DIR}/"$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-error.log"}" ; echo "$( basename $0): Errors will be logged to: ${_ERRLOGFILE}"
+: "${_LOGFILE:-"${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log"}" ; echo "$( basename $0): Logfile is set to: ${_LOGFILE}"
 
 # Normally all choices are checked. Pass the variable "false" to this script to default
 # to unchecked. If none is passed, a default will be used.
