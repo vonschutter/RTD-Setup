@@ -123,7 +123,7 @@ export _STATUSLOG=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-status.log
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
 	echo "Linux OS Found: Attempting to get instructions for Linux..."
 	echo executing $0 >> ${_LOGFILE}
-	if ! hash git &>> ${_LOGFILE} ; then
+	if ! hash git ; then
 		for i in apt yum dnf zypper ; do $i -y install git | tee ${_LOGFILE} ; done
 	fi
 	git clone ${_src_url} /opt/${_TLA} | tee ${_LOGFILE}
