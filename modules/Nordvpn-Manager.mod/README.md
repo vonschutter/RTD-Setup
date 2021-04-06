@@ -1,5 +1,5 @@
 # RTD NordVPN Manager
-[Back](https://github.com/vonschutter/RTD-Setup/blob/main/README.md)
+[Back](https://github.com/vonschutter/RTD-Setup/blob/main/README.md)|
 
 ![RTD CMD](Media_files/header-time.jpg?raw=true "Header")
 
