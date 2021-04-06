@@ -24,6 +24,7 @@ If a graphical environment is not detected, the RTD System Configurator will int
 ![RTD Builder Screenshot 2](media_files/ScrTnGCombo.png?raw=true "Executing the Script")
 
 As promised, the rtd-me.sh.cmd script will run under windows as well. Simply download it and double click on it (you will be prompted to elevate privileges if needed). Please NOTE that at this time the windows functionality is roughly equivalent to the Linux twist, but will not prompt for anything, whereas for Linux the setup will pause for 60 seconds to allow for some selections. However, the script will optimize Windows by removing bloatware (Sponsored Software) and turning off services that most do not use to enhance both performance and security. Several useful and fun software titles are automatically added. The Windows changes are made with PowerShell.
+
 ![RTD Builder Screenshot 2](media_files/Scr11.png?raw=true "Executing the Script in Windows")
 
 # RTD-Me.sh.cmd
