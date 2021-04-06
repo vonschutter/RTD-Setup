@@ -32,7 +32,9 @@ To get these tools for yourself on Linux just copy and paste the line below in t
 ```
 wget https://github.com/vonschutter/RTD-Setup/raw/main/rtd-me.sh.cmd && bash ./rtd-me.sh.cmd
 ```
-If you are using Windows you may copy and paste the same in to your WSL window to use this in WSL. Since it does not make sense to use linux tools in Windows, the power tools themselves are not made available in the Windows environment; but, since the power tools do include an option for automatically building a Windows Desktop Virtual Machine (VDI); this part will be run for you by downloading and executing rtd-me.sh.cmd. 
+Please note that you will need elevated priviledges on the Linux system (root).
+
+If you are using Windows you may copy and paste the same in to your WSL window to use this in WSL. Since it does not make sense to use linux tools in Windows, the power tools themselves are not made available in the Windows environment; but, since the power tools do include an option for automatically building a Windows Desktop Virtual Machine (VDI); this part will be run for you by downloading and executing rtd-me.sh.cmd. Please note that you will need elevated privileges. 
 
 On Windows rtd-me.sh.cmd will automatically:
 - Add a proper package manager for you (chocolatey)
