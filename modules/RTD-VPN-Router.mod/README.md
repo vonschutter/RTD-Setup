@@ -26,8 +26,5 @@ Description | In this screen shot it is seen what the vpn router looks like in a
 ------------ | -------------
 VPN Router Running | ![RTD Builder Screenshot 2](Media_files/Scr1.png?raw=true "Executing the Script in a terminal")
 
-***
-![RTD Builder Screenshot 2](Media_files/Scr1.png?raw=true "Executing the Script in a terminal")
-***
 
 It would make me happy if any modification are shared back. 
