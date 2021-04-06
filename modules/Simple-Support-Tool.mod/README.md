@@ -1,7 +1,7 @@
 # Simple Server Support Tool
+< [Back](https://github.com/vonschutter/RTD-Setup/blob/main/README.md) | 
 
-![RTD SSST](Media_files/0-amalgam.png?raw=true "Main Window")
-
+![RTD Blind Install Media Header](Media_files/header-time.jpg "Executing the Script")
 
 ###	Purpose: To simplify support tasks 
 
@@ -11,6 +11,8 @@
 	- Cleanup/Report on PPA's
 	- Show systems physical location 
 	- Check if a password you intend to use is for sale on the Darknet
+
+![RTD SSST](Media_files/0-amalgam.png?raw=true "Main Window")
 
 You may can run the script on any remote Linux server to manage some common support tasks. This tools should work on any deb or rpm based system or any system that uses package kit to satisfy dependencies and update the system. It uses standard tools available in Lnux and in common repositories to manage the systems. 
 
