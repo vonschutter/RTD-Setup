@@ -42,12 +42,10 @@
 # a copy must be downloaded.
 check_rtd_library ()
 {
-	if  [[ -f "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_rtd_library ]]; then
-		source "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_rtd_library
-	elif [[ -f "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/_rtd_library ]] ; then
-		source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/_rtd_library
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
+		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library
 	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
-		echo "Using: $(find /opt -name _rtd_library |grep -v bakup )"
+		write_information "${FUNCNAME[0]} 2 Using: $(find /opt -name _rtd_library |grep -v bakup )"
 	else
 		echo -e "RTD functions NOT loaded!"
 		echo -e " "
@@ -55,17 +53,17 @@ check_rtd_library ()
 		echo -e "Quiting rather than cause potential damage..."
 		exit 1
 	fi
-	write_host -cyan "Libraries loaded"
+	write_host --cyan "Libraries loaded"
 	write_status "Paths registered:
-	* # Root directory of tools: 		_OEM_DIR="${scriptdir%/*}"
-	* # Caching and download folder: 	_CACHE_DIR="${_OEM_DIR}/cache"
-	* # Location of oem wallpapers: 	_WALLPAPER_DIR="${_OEM_DIR}/wallpaper"
-	* # Location of custom sounds:		_CUSTOMSOUND_DIR="${_OEM_DIR}/sound"
-	* # Location of installable themes: 	_THEME_DIR="${_OEM_DIR}/themes"
-	* # Location of 3rd party apps:		_APP_DIR="${_OEM_DIR}/apps"
-	* # Location of extension modules:	_MODS_DIR="${_OEM_DIR}/modules"
-	* # Root tools folder: 			_CORE_DIR="${_OEM_DIR}/core"
-	* # Location of log files:		_LOG_DIR=/var/log/${_TLA,,}
+	- Root directory of tools:              _OEM_DIR="${scriptdir%/*}"
+	- Caching and download folder:          _CACHE_DIR="${_OEM_DIR}/cache"
+	- Location of oem wallpapers:           _WALLPAPER_DIR="${_OEM_DIR}/wallpaper"
+	- Location of custom sounds:            _CUSTOMSOUND_DIR="${_OEM_DIR}/sound"
+	- Location of installable themes:       _THEME_DIR="${_OEM_DIR}/themes"
+	- Location of 3rd party apps:           _APP_DIR="${_OEM_DIR}/apps"
+	- Location of extension modules:        _MODS_DIR="${_OEM_DIR}/modules"
+	- Root tools folder:                    _CORE_DIR="${_OEM_DIR}/core"
+	- Location of log files:                _LOG_DIR=/var/log/${_TLA,,}
 	"
 }
 
@@ -113,14 +111,14 @@ while true; do
         write_status "OK setting OEM theme: $selection"
 
         case "$selection" in
-                "Windows 10 Dark Mode" ) set_gnome_ui_win10_tweaks_for_user Dark ;;
-                "Windows 10 Light Mode" ) set_gnome_ui_win10_tweaks_for_user Light ;;
-                "Mac OS Bright" ) set_gnome_ui_mac_tweaks_for_user Light  ;;
-                "Mac OS Dusk" ) set_gnome_ui_mac_tweaks_for_user Dark ;;
-                "Crisp Day" ) set_gnome_ui_corprate_crisp_tweaks_for_user Light ;;
-                "Crisp Evening" ) set_gnome_ui_corprate_crisp_tweaks_for_user Dark ;;
-                "Moca Smooth" ) set_gnome_ui_moca_tweaks_for_user ;;
-                "${DefaultDistro/ /}" ) dconf reset -f /org/gnome/desktop/  ;;
+                "Windows 10 Dark Mode" ) set_gnome_ui_win10_tweaks_for_user Dark ; notify-send --urgency=low "$selection set" ;;
+                "Windows 10 Light Mode" ) set_gnome_ui_win10_tweaks_for_user Light ; notify-send --urgency=low "$selection set" ;;
+                "Mac OS Bright" ) set_gnome_ui_mac_tweaks_for_user Light ; notify-send --urgency=low "$selection set"  ;;
+                "Mac OS Dusk" ) set_gnome_ui_mac_tweaks_for_user Dark ; notify-send --urgency=low "$selection set" ;;
+                "Crisp Day" ) set_gnome_ui_corprate_crisp_tweaks_for_user Light ; notify-send --urgency=low "$selection set" ;;
+                "Crisp Evening" ) set_gnome_ui_corprate_crisp_tweaks_for_user Dark ; notify-send --urgency=low "$selection set" ;;
+                "Moca Smooth" ) set_gnome_ui_moca_tweaks_for_user ; notify-send --urgency=low "$selection set" ;;
+                "${DefaultDistro/ /}" ) dconf reset -f /org/gnome/desktop/  ; notify-send --urgency=low "UI reset to: $selection" ;;
                 * )
                 # Trap unknown exit code...
                 exit
