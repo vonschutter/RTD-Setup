@@ -1,5 +1,5 @@
 # RTD Power Tools: 
-https://github.com/vonschutter/RTD-Setup/blob/main/modules/Minecraft-Server-Manager.mod/README.md
+[MinecraftServer](https://github.com/vonschutter/RTD-Setup/blob/main/modules/Minecraft-Server-Manager.mod/README.md)
 
 ![RTD Builder Screenshot](media_files/header-time.jpg "Executing the Script")
 
