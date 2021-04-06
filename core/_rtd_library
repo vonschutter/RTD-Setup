@@ -530,7 +530,7 @@ rtd_oem_make_launchers ()
 		Version=2.0
 		Name=RTD-Backup
 		Comment=RTD User home Backup Tool
-		Exec=${_MODS_DIR}/System_User_Backup.mod/rtd-oem-backup-linux-config.sh
+		Exec=${_MODS_DIR}/System_User_Backup.mod/rtd-oem-backup-linux-config
 		Path=${_MODS_DIR}/System_User_Backup.mod/
 		Icon=${_MODS_DIR}/System_User_Backup.mod/Media_files/sys0.ico
 		Terminal=true
@@ -567,10 +567,10 @@ rtd_oem_make_launchers ()
 		cat > /usr/share/applications/rtd-switch-desktop.desktop <<-EOF
 		[Desktop Entry]
 		Version=2.0
-		Name=RTD Switch Desktop
-		Comment=Change the overall look and feel of you desktop (be more like Windows or MAC)
-		Exec=${_MODS_DIR}/RTD_Desktop_Look_Switcher.mod/rtd-switch-desktop
-		Path=${_MODS_DIR}/RTD_Desktop_Look_Switcher.mod/scripts
+		Name=RTD UI Look Changer
+		Comment=Change the overall look and feel of your desktop (be more like Windows or MAC)
+		Exec=${_MODS_DIR}/RTD_Desktop_Look_Switcher.mod/rtd-desktop-look-switcher
+		Path=${_MODS_DIR}/RTD_Desktop_Look_Switcher.mod/
 		Icon=${_MODS_DIR}/RTD_Desktop_Look_Switcher.mod/Media_files/sys7.ico
 		Terminal=false
 		Type=Application
@@ -1776,8 +1776,11 @@ set_gnome_ui_mac_tweaks_for_user ()
 	set_gnome_ui_common_tweaks_for_user
 	write_status "Setting MAC like tweaks..."
 
-	OEM_Hint="	Please use the rtd-oem-linux-config.sh tool to add the OEM customizatons to this comuter
-		and run this tool again. The OEM customization include the themes needed to swich between these looks."
+	OEM_Hint="
+		Please use the rtd-oem-linux-config.sh tool to add the OEM customizatons to this computer
+		and run this tool again. The OEM customizations include the (Mojave) themes needed to swich
+		between these looks."
+
 	GNOME_TERMINAL_PROFILE=`gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}'`
 	UiTone=${1:-"Light"}
 
@@ -1861,8 +1864,11 @@ set_gnome_ui_win10_tweaks_for_user ()
 	# Apply common settings:
 	set_gnome_ui_common_tweaks_for_user
 	write_status "Setting Windows like tweaks..."
-	OEM_Hint="	Please use the rtd-oem-linux-config.sh tool to add the OEM customizatons to this comuter
-		and run this tool again. The OEM customization include the themes needed to swich between these looks."
+	OEM_Hint="
+		Please use the rtd-oem-linux-config.sh tool to add the OEM customizatons to this computer
+		and run this tool again. The OEM customizations include the (Windows-10 Light + Dark) themes
+		needed to swich between these looks."
+
 	GNOME_TERMINAL_PROFILE=`gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}'`
 	UiTone=${1:-"Light"}
 
@@ -1951,9 +1957,11 @@ set_gnome_ui_corprate_crisp_tweaks_for_user ()
 	# Apply common settings:
 	set_gnome_ui_common_tweaks_for_user
 	write_status "Setting Windows like tweaks..."
-	GNOME_TERMINAL_PROFILE=`gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}'`
-	OEM_Hint="	Please use the rtd-oem-linux-config.sh tool to add the OEM customizatons to this comuter
-		and run this tool again. The OEM customization include the themes needed to swich between these looks."
+	GNOME_TERMINAL_PROFILE="$(gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}')"
+	OEM_Hint="
+		Please use the rtd-oem-linux-config.sh tool to add the OEM customizatons to this computer
+		and run this tool again. The OEM customizations include the (Arc Light + Dark) themes
+		needed to swich between these looks."
 
 	UiTone=${1:-"Light"}
 
@@ -2049,8 +2057,10 @@ set_gnome_ui_moca_tweaks_for_user ()
 	set_gnome_ui_common_tweaks_for_user
 	write_status "Setting Windows like tweaks..."
 	GNOME_TERMINAL_PROFILE=`gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}'`
-	OEM_Hint="	Please use the rtd-oem-linux-config.sh tool to add the OEM customizatons to this comuter
-		and run this tool again. The OEM customization include the themes needed to swich between these looks."
+	OEM_Hint="
+		Please use the rtd-oem-linux-config.sh tool to add the OEM customizatons to this computer
+		and run this tool again. The OEM customizations include the (vimix) themes
+		needed to swich between these looks."
 
 	if [[ -d /usr/share/themes/vimix-dark-laptop ]] ; then
 		gsettings set org.gnome.desktop.interface gtk-theme 'vimix-dark-laptop'
@@ -3446,11 +3456,14 @@ list="$*"
 	else
 		SAVEIFS=$IFS
 		IFS=$(echo -en "\n\b")
-		echo "☕ Please be patient, Large sets of files may take serious time..."
+		write_information "☕ Please be patient, Large sets of files may take serious time..."
 
 		for line in $@ ;
 		do
-		7z a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=64m -ms=on -mhe=on $line.7z $line
+			case $line in
+				--noprompt ) echo sipp >/dev/null ;;
+				* ) 7z a -t7z -m0=lzma2 -mx=5 -mfb=64 -md=64m -ms=on -mhe=on $line.7z $line ;;
+			esac
 		done
 
 		IFS=$SAVEIFS
@@ -3464,7 +3477,11 @@ list="$*"
 		done
 		)
 		\n Please review the above: ⏫"
-		display_result "Done creating encrypted archives"
+		if echo ${@} |grep "--noprompt" ; then
+			echo $result
+		else
+			display_result "Done creating encrypted archives"
+		fi
 	fi
 }
 

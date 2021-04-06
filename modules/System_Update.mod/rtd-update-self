@@ -73,19 +73,26 @@ export _STATUSLOG=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-status.log
 
 check_rtd_library ()
 {
-	if  [[ -f "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_rtd_library ]]; then
-		source "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_rtd_library
-	elif [[ -f "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/_rtd_library ]] ; then
-		source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/_rtd_library
+	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
+		# Library found in relative path...
+		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library
 	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
-		echo "Using: $(find /opt -name _rtd_library |grep -v bakup )"
+		# Library not found in relative path: search the typical location...
+		write_information "${FUNCNAME[0]} 2 Using: $(find /opt -name _rtd_library |grep -v bakup )"
+	elif wget ${_src_url} ; then
+		# Critical failure: downloaded copy from github.com
+		source ./_rtd_library
 	else
+		# Abot condition: No mitigation steps worked.
 		echo -e "RTD functions NOT loaded!"
 		echo -e " "
 		echo -e "Cannot ensure that the correct functionality is available"
 		echo -e "Quiting rather than cause potential damage..."
 		exit 1
 	fi
+
 	write_host -cyan "Libraries loaded"
 	write_status "Paths registered:
 	- Root directory of tools: 		_OEM_DIR="${scriptdir%/*}"

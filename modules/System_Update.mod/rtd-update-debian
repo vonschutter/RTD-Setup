@@ -1,23 +1,47 @@
 #!/bin/bash
-PUBLICATION="RuntimeData Update Manager for Ubuntu"
-VERSION="1.13"
+#::                                      A D M I N   C O M M A N D
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::// Simple Compression Tool //::::::::::::::::::::::::::::::::::// Debian //::::::::
+#::
+#:: 	Author:   	SLS
+:	${PUBLICATION:="RuntimeData Update Manager for Ubuntu"}
+:	${VERSION:="1.13"}
+:	${GIT_Profile:=vonschutter}
+#::
+#::
+#::	Purpose: The purpose of this script is to update installed software from distribution reopositories.
+#::		 RTD Ubuntu + derivatives software update script
+#::
+#::	Usage:	Simply execute this script to accomplish this task. No parameters required.
+#::
+#::	Change Log:
+#::		- 2006.06.15: File originally created
+#::		- 2018.05.10: Expanded to support Flatpak and Snaps
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #
-#	RTD Ubuntu + derivatives software update script
+# This script is shared in the hopes that someone will find it useful.
+# For convenience and supportability most actions (work) is stored in a common library used bu multiple scripts.
+# To use these functions in the library, simply load the library using the "source" bash built in command. All
+# functions will then be available for use. This script demonstrates the simplicity of using these functions.
+#
+# This script is intended to live in the ~/bin/ or /bin/ folder, alternatively in the $PATH.
+# By default this script is placed in /opt/rtd/scrips/
+#
+# 1 - To see options to use the rtd library type: "bash _rtd_library --help"
+# 2 - To see usefull documentation on each function in this library: "bash _rtd_library --devhelp"
 #
 #
-# This system configuration and installation script was originally developed
-# for RuntimeData, a small OEM in Buffalo Center, IA. The purpose of the script
-# was to install and configure Ubuntu and Zorin OS PC's. This OEM and store nolonger
-# exists as its owner has passed away. This script is shared in the hopes that
-# someone will find it usefull.
 #
-# The purpose of this script is to update installed software from distribution reopositories.
-#
-###########################################################################
-##                                                                       ##
-##                       Set Environment                                 ##
-##                                                                       ##
-###########################################################################
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# Variables that govern the behavior or the script and location of files are
 # Test comment...
 # Set colors for prompting on screen.
 	YELLOW="\033[1;33m"
@@ -25,37 +49,37 @@ VERSION="1.13"
 	ENDCOLOR="\033[0m"
 	GREEN="\033[1;32m"
 	BLUE="\033[1;34m"
-	
+
 # Ensure administrative privileges.
-[ "$UID" -eq 0 ] && echo -e "Administrative Access OK" $ENDCOLOR || echo -e $YELLOW"This script needs administrative access..." $ENDCOLOR 
+[ "$UID" -eq 0 ] && echo -e "Administrative Access OK" $ENDCOLOR || echo -e $YELLOW"This script needs administrative access..." $ENDCOLOR
 [ "$UID" -eq 0 ] || exec sudo bash "$0" "$@"
 
-# Identify 
-# clear	
+# Identify
+# clear
 echo -e $GREEN"$PUBLICATION: Version $VERSION" $ENDCOLOR
 echo -e $GREEN"--------------------------------------------------------" $ENDCOLOR
 
-echo This tool makes it simple to update software from all channels 
+echo This tool makes it simple to update software from all channels
 echo available on the system at once. It will update via the native
 echo -e "package manager as well as newer formats like $YELLOW"snap"$ENDCOLOR and $YELLOW"flatpak"$ENDCOLOR..."
-echo " " 
+echo " "
 echo This update script supports the following instructions:
 echo " "
-echo -e " - $YELLOW"Default"$ENDCOLOR : Just running this script will update via all configured channels."	
+echo -e " - $YELLOW"Default"$ENDCOLOR : Just running this script will update via all configured channels."
 echo -e " - $YELLOW"update"$ENDCOLOR :  Parameter "update" will update the updater to the latest version. "
 echo -e " - $YELLOW"setup"$ENDCOLOR :   Parameter "setup" make sure that you are using all software channels "
 echo -e "      "
 echo " "
 
-if [ "$1" == "update" ]; then 
+if [ "$1" == "update" ]; then
        	INSTRUCTION=update_me
 fi
 
-if [ "$1" == "config" ]; then 
+if [ "$1" == "config" ]; then
        	INSTRUCTION=config_me
 fi
 
-if [ "$1" == "setup" ]; then 
+if [ "$1" == "setup" ]; then
        	INSTRUCTION=setup_me
 fi
 
@@ -75,7 +99,7 @@ else
    	source $FILE
    else
    	echo -e $RED"RTD Functions could NOT be loaded; You must use the native options to install software... "$ENDCOLOR
-   	exit 
+   	exit
    fi
 fi
 
@@ -112,7 +136,7 @@ echo "$DATE --- : $@" >> $0.log
 
 update_me ()
 {
-	# Documentation: Paths and the such... 
+	# Documentation: Paths and the such...
 	# "# arguments called with ---->  ${@}     "
 	# "# \$1 ---------------------->  $1       "
 	# "# \$2 ---------------------->  $2       "
@@ -121,7 +145,7 @@ update_me ()
 	# "# my name ------------------>  ${0##*/} "
         	rm $0.bak
 		mv $0 $0.bak
-                wget  --show-progress https://github.com/vonschutter/RTD-Build/raw/master/System_Update/${0##*/} -P ${0%/*} 
+                wget  --show-progress https://github.com/vonschutter/RTD-Build/raw/master/System_Update/${0##*/} -P ${0%/*}
                 chmod +x $0
 }
 
@@ -149,45 +173,45 @@ setup_me ()
 #
 #
 
-# Execute the fist instruction passed to this script... 
+# Execute the fist instruction passed to this script...
 if [ ! -z $INSTRUCTION ]; then
-	log_item The instruction $INSTRUCTION was given... 
+	log_item The instruction $INSTRUCTION was given...
 	$INSTRUCTION
 	exit
 else
-	log_item No instructions passed to $0... Continuing with default behavior. 
+	log_item No instructions passed to $0... Continuing with default behavior.
 fi
 
 echo -e $YELLOW"Updating installed software..." $ENDCOLOR
 # Updating software managed by distribution speciffic software manager...
-# Unless the RTD Functions are loaded, then use that. 
+# Unless the RTD Functions are loaded, then use that.
 	if [[ $RTDFUNCTOINS -eq 1 ]]; then
 		deb_software_task system_update
 	else
-		
+
 		deb_software_task apt-get update
 		UPGRADABLE=$(LANG=C apt-get upgrade -s |grep -P '^\d+ upgraded'|cut -d" " -f1)
 		if [ "$UPGRADABLE" -eq 0 ]; then
-			echo "--- $UPGRADABLE packages that need updates; Skipping update task... " 
+			echo "--- $UPGRADABLE packages that need updates; Skipping update task... "
 		else
-			echo $UPGRADABLE packages that need updates 
+			echo $UPGRADABLE packages that need updates
 			deb_software_task apt-get upgrade -y
 			deb_software_task apt-get autoremove -y
 			deb_software_task apt-get clean
 		fi
 	fi
-# updating snaps if snap is present on the system... 
+# updating snaps if snap is present on the system...
 if hash snap 2>/dev/null; then
 	  deb_software_task snap refresh
-	else 
+	else
 	  echo "--- snap software is not present on this system... skipping..."
 	fi
 
-# updating flatpacks if flatpack is present on system... 	
+# updating flatpacks if flatpack is present on system...
 if hash flatpak 2>/dev/null; then
 	  deb_software_task flatpak update --user --noninteractive -y
 	  deb_software_task flatpak update --system --noninteractive -y
-	else 
+	else
 	  echo "--- flatpak software is not present on this system... skipping..."
 	fi
 

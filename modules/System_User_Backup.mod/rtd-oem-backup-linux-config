@@ -5,19 +5,21 @@ VERSION="1.00"
 #::             RTD Ubuntu + derivatives backup script
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#:: Author:   	SLS 
 #::
+#::     Author:   	SLS
+#::     Version 	1.02
+:	${GIT_Profile:=vonschutter}
 #::
-#::	Purpose: The purpose of the script is to backup a users setings 
+#::	Purpose: The purpose of the script is to backup a users setings
 #::              and dokuments to some useful location.
 #::
 #:: This system configuration and installation script was originally developed
-#:: for RuntimeData, a small OEM in Buffalo Center, IA. 
+#:: for RuntimeData, a small OEM in Buffalo Center, IA.
 #::
-#:: RTD admin scrips are placed in /opt/rtd/scripts. This configuration script is mainly built to use 
-#:: functions in _rtd_functions and _rtd_recipies. 
-#::       _rtd_functions -- contain usefull admin functions for scripts, such as "how to install software" on different systems. 
-#::       
+#:: RTD admin scrips are placed in /opt/rtd/scripts. This configuration script is mainly built to use
+#:: functions in _rtd_functions and _rtd_recipies.
+#::       _rtd_functions -- contain usefull admin functions for scripts, such as "how to install software" on different systems.
+#::
 #::
 #::
 #::
@@ -33,18 +35,9 @@ VERSION="1.00"
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #
 # You may comment out or edit items as you deem necessary.
-# Ensure that the  RTD Functions are available and load them... 
+# Ensure that the  RTD Functions are available and load them...
 # This contains most of the intelligence used to perform this systems
-# maintenance. 
-# 
-# the RTD Functions contain useful task functions (example): 
-#  -  check_dependencies
-#  -  ensure_admin
-#
-_FILE=_rtd_functions
-_RTD_S_HOME=/opt/rtd/scripts
-unset rtd_oem_user_backup_destination
-source $_RTD_S_HOME/$_FILE
+# maintenance.
 
 
 # Set the background tilte:
@@ -53,19 +46,19 @@ BACKTITLE="$PUBLICATION"
 # Set the options to appear in the menu as choices:
 option_1="Gnome Desktop Setings"
 option_2="Gnome Credentials Manager"
-option_3="Remmina Configuration" 
-option_4="Users Private Themes" 
-option_5="Users Private Icons" 
-option_6="Users Private Fonts " 
-option_7="Users Private Documents" 
-option_8="Users Private Pictures" 
-option_9="Firefox Settings" 
-option_10="Chrome Settings"  
-option_11="All VirtualBox VMs" 
-option_12="Teamviewer Configuration" 
+option_3="Remmina Configuration"
+option_4="Users Private Themes"
+option_5="Users Private Icons"
+option_6="Users Private Fonts "
+option_7="Users Private Documents"
+option_8="Users Private Pictures"
+option_9="Firefox Settings"
+option_10="Chrome Settings"
+option_11="All VirtualBox VMs"
+option_12="Teamviewer Configuration"
 option_13="Backup entire HOME folder"
 option_14="Backup All Virtual Machines (KVM)"
-                   
+
 
 
 
@@ -75,15 +68,38 @@ option_14="Backup All Virtual Machines (KVM)"
 #::::::::::::::          Script Functions                ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#
+
+check_rtd_library ()
+{
+	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
+		# Library found in relative path...
+		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library
+	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
+		# Library not found in relative path: search the typical location...
+		write_information "${FUNCNAME[0]} 2 Using: $(find /opt -name _rtd_library |grep -v bakup )"
+	elif wget ${_src_url} ; then
+		# Critical failure: downloaded copy from github.com
+		source ./_rtd_library
+	else
+		# Abot condition: No mitigation steps worked.
+		echo -e "RTD functions NOT loaded!"
+		echo -e " "
+		echo -e "Cannot ensure that the correct functionality is available"
+		echo -e "Quiting rather than cause potential damage..."
+		exit 1
+	fi
+}
 
 
 
-# Function to request an encryption phrase. 
-# This prase will be used to encrypt the compressed archives. 
+
+# Function to request an encryption phrase.
+# This prase will be used to encrypt the compressed archives.
 zenity_ask_for_encryption_pass_phrase () {
 	check_dependencies zenity
-    	passtoken=$(zenity --title "Encryption Password" --password ) 
+    	passtoken=$(zenity --title "Encryption Password" --password )
     	if [[ -z "$passtoken" ]]; then
                 zenity --warning --text="Your settings likely contain sensitive information and should be encrypted! Please set a pass phrase"
 		zenity_ask_for_encryption_pass_phrase
@@ -92,7 +108,7 @@ zenity_ask_for_encryption_pass_phrase () {
 
 
 
-# Function to display the backup otions above. This is all done in a bit of a 
+# Function to display the backup otions above. This is all done in a bit of a
 # round about way... but the idea is to prepare this setup to be flexible
 # for the future so that you only have one place to list the option while
 # more than one gui toolkit (dialog, zenity, whiptail) depending on your environment.
@@ -121,40 +137,40 @@ zenity_show_list_of_user_backup_choices () {
 
 
 
-# Simple function to display a infromational notice when the tool is envoked. 
+# Simple function to display a infromational notice when the tool is envoked.
 rtd_oem_user_backup_info_notice() {
 
 	zenity --info --width=800 --height=400 --text="
 
-The RTD User Backup tool is a simple tool to allow anyone to backup important files and/or the entire home folder to an external USB drive as a backup ahead of re-installing a PC from scratch. 
+The RTD User Backup tool is a simple tool to allow anyone to backup important files and/or the entire home folder to an external USB drive as a backup ahead of re-installing a PC from scratch.
 
-It is highly recommended to encrypt all content so that is cannot easily be stolen. Do remember the password or you will never be able to access the backed-up content ever again. 
+It is highly recommended to encrypt all content so that is cannot easily be stolen. Do remember the password or you will never be able to access the backed-up content ever again.
 
-You will need the following: 
+You will need the following:
 1 - An external drive
 2 - A good password
 
-The RTD Backup tool will encrypt, compress and save all the information in the location provided. 
+The RTD Backup tool will encrypt, compress and save all the information in the location provided.
 	"
 }
 
 
 
-# Dialog to request the destination of where to store the compressed and encrypted archive. 
+# Dialog to request the destination of where to store the compressed and encrypted archive.
 rtd_oem_request_user_backup_destination() {
 	if [[ -z "$rtd_oem_user_backup_destination" ]]; then
 		export rtd_oem_user_backup_destination=$( zenity --width=800 --height=400 --text "$BACKTITLE" --file-selection --directory  )
 	elif [[ -n "$string" ]]; then
 		echo "Saving Backup to: $rtd_oem_user_backup_destination"
-	fi	
+	fi
 }
-	
+
 
 
 # Notify end user thes backup tasks are complete.
-rtd_oem_user_backup_info_notice_complete() { 
+rtd_oem_user_backup_info_notice_complete() {
 	zenity --info --width=800 --height=400 --text="
-Backup is complete. Please revise the list below. 
+Backup is complete. Please revise the list below.
 
 Backup archive(s) saved to:
 $rtd_oem_user_backup_destination
@@ -174,29 +190,29 @@ rtd_oem_cleanup() {
 }
 
 
-	
-# Function to execute the given backup and encryption task. Levels of compression and 
+
+# Function to execute the given backup and encryption task. Levels of compression and
 # other option may be set in the seting section of this script (tool)
 rtd_user_bak () {
-	rtd_oem_request_user_backup_destination 
-	echo ... > $rtd_oem_user_backup_destination/flg 
+	rtd_oem_request_user_backup_destination
+	echo ... > $rtd_oem_user_backup_destination/flg
 	if [[ -e $rtd_oem_user_backup_destination/flg ]]; then
 		rm $rtd_oem_user_backup_destination/flg
-		if [[ -d $2 ]]; then 
+		if [[ -d $2 ]]; then
 			7z a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=32m -ms=on -mhe=on -p$passtoken $rtd_oem_user_backup_destination/`whoami`-"$1"-`date -u --iso-8601`.7z "${@:2}"
-		else 
+		else
 			echo "Backup source $2 does not exist..."
-		fi 
-	else 
+		fi
+	else
 		zenity --info --width=800 --height=400 --text="$rtd_oem_user_backup_destination is not writable! Plese select another destination."
 		rtd_oem_request_user_backup_destination
 	fi
-}	
+}
 
 
-		
-# Function to do what the choices instruct. We read the output from 
-# the choices and execute commands that accomplish the task requested. 
+
+# Function to do what the choices instruct. We read the output from
+# the choices and execute commands that accomplish the task requested.
 do_instructions_from_choices (){
         IFS=$','
 	for choice in $choices
@@ -219,10 +235,10 @@ do_instructions_from_choices (){
 			echo $passtoken |sudo -S chmod 777 -R /var/lib/libvirt
 			rtd_user_bak "$option_14" /var/lib/libvirt
 			echo $passtoken |sudo -S  chmod 750 -R /var/lib/libvirt
-			echo $passtoken |sudo -S  chown -R libvirt-qemu /var/lib/libvirt 
+			echo $passtoken |sudo -S  chown -R libvirt-qemu /var/lib/libvirt
 		;;
 		esac
-	done  
+	done
 }
 
 
@@ -235,18 +251,19 @@ do_instructions_from_choices (){
 #
 #
 # Software and configuration selections dialog. This will present a number of OEM defaults
-# and other preferences that can be added to a system at will. To remove software it is 
+# and other preferences that can be added to a system at will. To remove software it is
 # recommended to use the native software tool (Gnome Software, Yast, or Discover).
 #
 # Option defaults may be set to "on" or "off"
 
 # "dialog" will be used to request interactive configuration...
-# Ensure that it is available: 
+# Ensure that it is available:
 trap "passtoken=nonsense" 0 1 2 5 15
+check_rtd_library
 rtd_oem_user_backup_info_notice
 zenity_ask_for_encryption_pass_phrase
 zenity_show_list_of_user_backup_choices
-do_instructions_from_choices 
+do_instructions_from_choices
 rtd_oem_user_backup_info_notice_complete
 
 
@@ -270,22 +287,22 @@ exit
 
 
 function fallback_show_list_of_user_backup_choices () {
-
+	check_rtd_library
         check_dependencies whiptail
         cmd=(whiptail --separate-output --backtitle "$BACKTITLE" --title "What to backup" --checklist "Please Select what you want to backup below:" 22 85 18 )
-        optionlist=( 1 "Gnome Setings" ON 
-                     2 "Gnome Credentials Manager" ON 
-                     3 "Remmina Configuration" ON 
-                     4 "Users Private Themes" ON 
-                     5 "Users Private Icons" ON 
-                     6 "Users Private Fonts " ON 
-                     7 "Users Private Documents" ON 
-                     8 "Users Private Pictures" ON 
-                     9 "Firefox Settings" ON 
-                     10 "Chrome Settings"  ON 
-                     11 "VirtualBox VM's (may be really large files and take time)" ON 
-                     12 "Teamviewer Configuration" ON 
-		     12 "Entire HOME Folder" ON 
+        optionlist=( 1 "Gnome Setings" ON
+                     2 "Gnome Credentials Manager" ON
+                     3 "Remmina Configuration" ON
+                     4 "Users Private Themes" ON
+                     5 "Users Private Icons" ON
+                     6 "Users Private Fonts " ON
+                     7 "Users Private Documents" ON
+                     8 "Users Private Pictures" ON
+                     9 "Firefox Settings" ON
+                     10 "Chrome Settings"  ON
+                     11 "VirtualBox VM's (may be really large files and take time)" ON
+                     12 "Teamviewer Configuration" ON
+		     12 "Entire HOME Folder" ON
                      )
 }
 

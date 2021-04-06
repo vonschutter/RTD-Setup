@@ -4,8 +4,9 @@
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::// Simple Compression Tool //::::::::::::::::::::::::::::::::::// Linux //::::::::
 #::
-#:: Author:   	SLS
-#:: Version 	1.02
+#::     Author:   	SLS
+#::     Version 	1.02
+:	${GIT_Profile:=vonschutter}
 #::
 #::
 #::	Purpose: To compress all files and folders provided as argument.
@@ -39,20 +40,25 @@
 
 check_rtd_library ()
 {
-        # Set library path if not defined:
-        scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-        rtd_library=${rtd_library:-"${scriptdir}/../../core/_rtd_library"}
+	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
 
-        if [[ -f ${rtd_library} ]]; then
-                source ${rtd_library}
-        elif [[ ! -f ${rtd_library} ]]; then
-                echo "RTD Functions not found... "
-                echo "Trying to retrieve them..."
-                wget https://github.com/vonschutter/RTD-Build/raw/master/System_Setup/_rtd_library
-                source ./_rtd_library
-        else
-                exit 1
-        fi
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
+		# Library found in relative path...
+		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library
+	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
+		# Library not found in relative path: search the typical location...
+		write_information "${FUNCNAME[0]} 2 Using: $(find /opt -name _rtd_library |grep -v bakup )"
+	elif wget ${_src_url} ; then
+		# Critical failure: downloaded copy from github.com
+		source ./_rtd_library
+	else
+		# Abot condition: No mitigation steps worked.
+		echo -e "RTD functions NOT loaded!"
+		echo -e " "
+		echo -e "Cannot ensure that the correct functionality is available"
+		echo -e "Quiting rather than cause potential damage..."
+		exit 1
+	fi
 }
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

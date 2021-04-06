@@ -1,94 +1,116 @@
 #!/bin/bash
-PUBLICATION="RuntimeData Update Manager for Ubuntu"
-VERSION="1.13"
-#
-#	RTD Ubuntu + derivatives software update script
-#
-#
-# This system configuration and installation script was originally developed
-# for RuntimeData, a small OEM in Buffalo Center, IA. The purpose of the script
-# was to install and configure Ubuntu and Zorin OS PC's. This OEM and store nolonger
-# exists as its owner has passed away. This script is shared in the hopes that
-# someone will find it usefull.
-#
-# The purpose of this script is to update installed software from distribution reopositories.
-#
-###########################################################################
-##                                                                       ##
-##                       Set Environment                                 ##
-##                                                                       ##
-###########################################################################
-# Test comment...
+#::                                      A D M I N   C O M M A N D
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::// Simple Compression Tool //::::::::::::::::::::::::::::::::::// Linux //::::::::
+#::
+#:: 	Author:   	SLS
+:	${PUBLICATION:="RuntimeData Update Manager for Linux"}
+:	${VERSION:="1.13"}
+:	${GIT_Profile:=vonschutter}
+#::
+#::
+#::	Purpose: The purpose of this script is to update installed software from distribution reopositories.
+#::		 Software update script for SUSE, Debian, RedHat based systems...
+#::
+#::	Usage:	Simply execute this script to accomplish this task. No parameters required.
+#::
+#::	Change Log:
+#::		- 2006.06.15: File originally created
+#::		- 2015.10.15: Expanded to support multiple distros
+#::		- 2018.05.10: Expanded to support Flatpak and Snaps
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# Variables that govern the behavior or the script and location of files are
+
 # Set colors for prompting on screen.
 	YELLOW="\033[1;33m"
 	RED="\033[1;31m"
 	ENDCOLOR="\033[0m"
 	GREEN="\033[1;32m"
 	BLUE="\033[1;34m"
-	
+
 # Ensure administrative privileges.
-[ "$UID" -eq 0 ] && echo -e "Administrative Access OK" $ENDCOLOR || echo -e $YELLOW"This script needs administrative access..." $ENDCOLOR 
+[ "$UID" -eq 0 ] && echo -e "Administrative Access OK" $ENDCOLOR || echo -e $YELLOW"This script needs administrative access..." $ENDCOLOR
 [ "$UID" -eq 0 ] || exec sudo bash "$0" "$@"
 
-# Identify 
-# clear	
+# Identify
+# clear
 echo -e $GREEN"$PUBLICATION: Version $VERSION" $ENDCOLOR
 echo -e $GREEN"--------------------------------------------------------" $ENDCOLOR
 
-echo This tool makes it simple to update software from all channels 
+echo This tool makes it simple to update software from all channels
 echo available on the system at once. It will update via the native
 echo -e "package manager as well as newer formats like $YELLOW"snap"$ENDCOLOR and $YELLOW"flatpak"$ENDCOLOR..."
-echo " " 
+echo " "
 echo This update script supports the following instructions:
 echo " "
-echo -e " - $YELLOW"Default"$ENDCOLOR : Just running this script will update via all configured channels."	
+echo -e " - $YELLOW"Default"$ENDCOLOR : Just running this script will update via all configured channels."
 echo -e " - $YELLOW"update"$ENDCOLOR :  Parameter "update" will update the updater to the latest version. "
 echo -e " - $YELLOW"setup"$ENDCOLOR :   Parameter "setup" make sure that you are using all software channels "
 echo -e "      "
 echo " "
 
-if [ "$1" == "update" ]; then 
+if [ "$1" == "update" ]; then
        	INSTRUCTION=update_me
 fi
 
-if [ "$1" == "config" ]; then 
+if [ "$1" == "config" ]; then
        	INSTRUCTION=config_me
 fi
 
-if [ "$1" == "setup" ]; then 
+if [ "$1" == "setup" ]; then
        	INSTRUCTION=setup_me
 fi
 
 
 
-# Enable RTD Functions...
-echo "Checking for RTD Functions..."
-FILE=/opt/rtd/scripts/_rtd_library
-if [ -f $FILE ]; then
-   echo -e $GREEN"RTD Functions are available: Loading them for use... " $ENDCOLOR
-   source $FILE
-else
-   echo "Cannot find RTD Functions... Attempting to get them online... "
-   wget -q --show-progress https://github.com/vonschutter/RTD-Build/raw/master/"${FILE##*/}" -P /opt/rtd/scripts
-   if [ -f $FILE ]; then
-   	echo -e $GREEN"RTD Functions are available: Loading them for use... " $ENDCOLOR
-   	source $FILE
-   else
-   	echo -e $RED"RTD Functions could NOT be loaded; You must use the native options to install software... "$ENDCOLOR
-   	exit 
-   fi
-fi
 
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
+check_rtd_library ()
+{
+	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
 
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
+		# Library found in relative path...
+		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library
+	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
+		# Library not found in relative path: search the typical location...
+		write_information "${FUNCNAME[0]} 2 Using: $(find /opt -name _rtd_library |grep -v bakup )"
+	elif wget ${_src_url} ; then
+		# Critical failure: downloaded copy from github.com
+		source ./_rtd_library
+	else
+		# Abot condition: No mitigation steps worked.
+		echo -e "RTD functions NOT loaded!"
+		echo -e " "
+		echo -e "Cannot ensure that the correct functionality is available"
+		echo -e "Quiting rather than cause potential damage..."
+		exit 1
+	fi
 
-
-###########################################################################
-##                                                                       ##
-##                         Functions                                     ##
-##                                                                       ##
-###########################################################################
-#
+	write_host -cyan "Libraries loaded"
+	write_status "Paths registered:
+	- Root directory of tools: 		_OEM_DIR="${scriptdir%/*}"
+	- Caching and download folder: 		_CACHE_DIR="${_OEM_DIR}/cache"
+	- Location of 3rd party apps:		_APP_DIR="${_OEM_DIR}/apps"
+	- Location of extension modules:	_MODS_DIR="${_OEM_DIR}/modules"
+	- Root tools folder: 			_CORE_DIR="${_OEM_DIR}/core"
+	- Location of log files:		_LOG_DIR=/var/log/${_TLA,,}
+	"
+}
 
 
 
@@ -103,16 +125,19 @@ echo "$DATE --- : $@" >> $0.log
 
 update_me ()
 {
-	rm $0.bak
-	mv $0 $0.bak
-        wget  --show-progress https://github.com/vonschutter/RTD-Build/raw/master/System_Update/${0##*/} -P ${0%/*} 
-        chmod +x $0
-        if [[ -e $0 ]]; then 
-        	return  0 
-        else
-        	cp $0.bak $0
-        	return 1 
-        fi 
+	if [[ -w $0 ]] ; then
+		rm $0.bak
+		mv $0 $0.bak
+		wget  --show-progress https://github.com/vonschutter/RTD-Setup/raw/main/modules/System_Update.mod/${0##*/} -P $0
+		chmod +x $0
+		if [[ -e $0 ]]; then
+			return  0
+		else
+			cp $0.bak $0
+			echo "Update failed: rolled back!"
+			return 1
+		fi
+	fi
 }
 
 
@@ -131,31 +156,26 @@ setup_me ()
 	check_dependencies  snapd
 }
 
-###########################################################################
-##                                                                       ##
-##                        Execute updates                                ##
-##                                                                       ##
-###########################################################################
-#
-#
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-# Execute the fist instruction passed to this script... 
+check_rtd_library
+
+# Execute the fist instruction passed to this script...
 if [ ! -z $INSTRUCTION ]; then
-	log_item The instruction $INSTRUCTION was given... 
+	log_item The instruction $INSTRUCTION was given...
 	$INSTRUCTION
 	exit
 else
-	log_item No instructions passed to $0... Continuing with default behavior. 
+	log_item No instructions passed to $0... Continuing with default behavior.
 fi
 
-write_status "Updating installed software..." 
+write_status "Updating installed software..."
 
 # Updating software managed by distribution speciffic software manager...
-# Unless the RTD Functions are loaded, then use that. 
+# Unless the RTD Functions are loaded, then use that.
 
 rtd_update_system
-
-
-
-
-

@@ -40,13 +40,22 @@
 
 # This script requires the bash library "rtd library", so if it is not present;
 # a copy must be downloaded.
+
 check_rtd_library ()
 {
+	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+
 	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
+		# Library found in relative path...
 		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library
 	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
+		# Library not found in relative path: search the typical location...
 		write_information "${FUNCNAME[0]} 2 Using: $(find /opt -name _rtd_library |grep -v bakup )"
+	elif wget ${_src_url} ; then
+		# Critical failure: downloaded copy from github.com
+		source ./_rtd_library
 	else
+		# Abot condition: No mitigation steps worked.
 		echo -e "RTD functions NOT loaded!"
 		echo -e " "
 		echo -e "Cannot ensure that the correct functionality is available"
@@ -66,6 +75,7 @@ check_rtd_library ()
 	- Location of log files:                _LOG_DIR=/var/log/${_TLA,,}
 	"
 }
+
 
 
 

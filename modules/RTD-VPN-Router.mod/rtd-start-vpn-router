@@ -3,10 +3,10 @@
 #::                                    VPN Server Firewall configuration script
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#:: Author:   	Stephan S. (Sweden)
+#:: Author:   	SLS
 #:: Verssion 1.06
 #::
-#::	Monday 27 November, 2017  - Stephan S.
+#::	Monday 27 November, 2017  - SLS.
 #::		* File originally created.
 #::		* Added setup actions to auto login and auto start router on reboot
 #::
@@ -18,7 +18,7 @@
 #:: 		If either of these are different on your system you must change these in the script.
 #::		The script will, however, try to identify the primary local newtork interface.
 #::
-#:: You may for exaple deploy a Debian based VM, and install your preferred VPN, run this script,
+#:: You may for example deploy a Debian based VM, and install your preferred VPN, run this script,
 #:: and then configure your client devices to (via DHCP) route all traffic through the VM's IP address.
 #:: This will ensure that all traffic from your LAN to the internet is anonymized, and that traffic is blocked if not.
 #::
@@ -32,9 +32,10 @@
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
+# Environment override setings:
 _LOCALINT=
-_VPNINT="tun0"
-_LOCALNET="192.168.1.0"
+_VPNINT=
+_LOCALNET=
 _LOCALSUB="24"
 _HOMEDIR="$HOME"
 
@@ -55,13 +56,13 @@ NORDVPN_RPM="https://repo.nordvpn.com/yum/nordvpn/centos/noarch/Packages/n/nordv
 find_active_newtork_interface (){
 	NETINT=$(ip addr | awk '/state UP/ {print $2}' |grep -v "br*" |grep -v "wlp*" | head --bytes -2 )
 	echo "Active network interface is: $NETINT"
-	"${_LOCALINT:-$NETINT}"
+	: "${_LOCALINT:=$NETINT}"
 }
 
 find_active_bridge_interface () {
 	# Discover if the appropriate VM net interface is (default or br'0 - n')
 	VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep tun ; else echo default;fi)"
-	"${_VPNINT:-$VIRT_NET}"
+	: "${_VPNINT:=$VIRT_NET}"
 }
 
 
