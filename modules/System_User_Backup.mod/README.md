@@ -36,7 +36,8 @@ Information displayed when the app is launched.
 **Backup Passphrase Prompt:**
 The too will insist that you provide a password to use as an encryption key for your backup. This s a requirement.
 you backup must be encrypted because the reason for using this tool is generally to manually bakup a users data to an 
-external device before reinstalling the Operating System on the same machine or to move from one computer to the next. 
+external device before reinstalling the Operating System on the same machine or to move from one computer to the next.
+
 ![link](/modules/System_User_Backup.mod/Media_files/Scr2-d.png "Tool Backup Passphrase Prompt")
 
 **Backup Choices**
