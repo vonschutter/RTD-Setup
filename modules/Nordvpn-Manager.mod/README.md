@@ -1,4 +1,4 @@
-![RTD CMD](Media_files/header-time.jpg?raw=true "Header")
+![RTD CMD](RTD-Setup/media_files/header-time.jpg?raw=true "Header")
 
 # RTD Nordvpn Manager
 [back](https://github.com/vonschutter/RTD-Setup/blob/main/README.md)
