@@ -32,7 +32,7 @@ As promised, the rtd-me.sh.cmd script will run under windows as well. Simply dow
 # RTD-Me.sh.cmd
 To get these tools for yourself on Linux just copy and paste the line below in to a terminal:
 
-```
+```bash
 wget https://github.com/vonschutter/RTD-Setup/raw/main/rtd-me.sh.cmd && bash ./rtd-me.sh.cmd
 ```
 Please note that you will need elevated priviledges on the Linux system (root).
