@@ -22,9 +22,8 @@ wget https://github.com/vonschutter/RTD-VPN-Router/raw/main/rtd-start-vpn-router
 ```
 In this screen shot it is seen what the vpn router looks like in a terminal. This can be on a remote machine or local terminal; if you are disconnected or close the terminal, you may reconnect by simply typing "byobu" on the same machine that the vpn was started. 
 
-```
+***
 ![RTD Builder Screenshot 2](Media_files/Scr1.png?raw=true "Executing the Script in a terminal")
-
-```
+***
 
 It would make me happy if any modification are shared back. 
