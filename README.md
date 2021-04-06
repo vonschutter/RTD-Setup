@@ -27,6 +27,20 @@ As promised, the rtd-me.sh.cmd script will run under windows as well. Simply dow
 ![RTD Builder Screenshot 2](media_files/Scr11.png?raw=true "Executing the Script in Windows")
 
 # RTD-Me.sh.cmd
+To get these tools for yourself on Linux just copy and paste the line below in to a terminal:
 
-It would make me happy if any modification are shared back. Please read the license file for details. 
+```
+wget https://github.com/vonschutter/RTD-Setup/raw/main/rtd-me.sh.cmd && bash ./rtd-me.sh.cmd
+```
+If you are using Windows you may copy and paste the same in to your WSL window to use this in WSL. Since it does not make sense to use linux tools in Windows the power tools themselves are not made available in the Windows environment; but, since the power tools do include an option for automatically building a Desktop Virtual Machine (VDI); this part will be run for you by downloading and executing rtd-me.sh.cmd. It will automatically:
+- Add a proper package manager for you (chocolatey)
+- Install some useful OSS software (Libre Office, Secure internet browsers and communication tools)
+- Debloat Windows (disabling services, telemetry, software not used)
+- Fix some minor security settings
 
+Download:
+```
+https://github.com/vonschutter/RTD-Setup/raw/main/rtd-me.sh.cmd
+```
+
+It would make me happy if any modifications are shared back, or if any suggestions could be shared. Please read the license file for details. 
