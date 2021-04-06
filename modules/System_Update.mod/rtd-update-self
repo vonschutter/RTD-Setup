@@ -58,7 +58,7 @@ mkdir -p ${_LOG_DIR}
 export _GIT_PROFILE="${_GIT_PROFILE:-vonschutter}"
 
 # Location of base administrative scripts and command-lets to get.
-_src_url=https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git
+_git_src_url=https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git
 
 # Determine log file names for this session
 export _ERRLOGFILE=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-error.log
@@ -70,6 +70,7 @@ export _STATUSLOG=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-status.log
 #::::::::::::::          Script Functions                ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 
 check_rtd_library ()
 {
@@ -115,7 +116,7 @@ task_setup_rtd_basics() {
 		if ! hash git &>> ${_LOGFILE} ; then
 			for i in apt yum dnf zypper ; do $i -y install git | tee ${_LOGFILE} ; done
 		fi
-		git clone ${_src_url} /opt/${_TLA,,}.tmp | tee ${_LOGFILE}
+		git clone --no-checkout --bare ${_git_src_url} /opt/${_TLA,,}.tmp | tee ${_LOGFILE}
 			if [ $? -eq 0 ]
 			then
 				echo "Instructions successfully retrieved..."
