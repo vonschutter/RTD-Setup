@@ -21,7 +21,10 @@ Please NOTE that this script is part of the RTD tools and requires the _rtd_libr
 ![RTD SSST](Media_files/11.png?raw=true "Main Window")
 This tool is documente as well as can be, and it should therefore, also serve as a good learning tool. It It may also easily be extended/modified to do whatever a sysadmin would like it to since it contains menu templates and is written in a moduar way. 
 ```
-Usage: run the script "bash /path/to/rtd" or if installed in the $PATH; by rtd simply type "rtd" in a terminal.
+# Usage: 
+bash /path/to/rtd-simple-support-tool" 
+# if in $PATH; simply type 
+rtd-simple-support-tool
 ```
 For more information please check our WIKI: 
 https://github.com/vonschutter/Simple-Server-Support-Tool/wiki
