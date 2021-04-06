@@ -1,5 +1,7 @@
 # RTD-VPN-Router
+< [Back](https://github.com/vonschutter/RTD-Setup/blob/main/README.md) | 
 
+![RTD Blind Install Media Header](Media_files/header-time.jpg "Executing the Script")
 The RTD-VPN-Router is a simple script that you can use on a server, old PC, or a virtual machine at home or at a small business. It will automatically configure and setup that machine as a VPN router. 
 
 After you have started the script you only have to direct all your traffic to the IP address of the VPN touter (the machine the script is running on) by updating the "gateway" of your DHCP service (usually on your internet router if you are a home user or small business). It is recommended that you set a static IP on the machine running the script or tell the router to always assigne the same IP to the PC used.
