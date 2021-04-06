@@ -1,3 +1,4 @@
+[Back](https://github.com/vonschutter/RTD-Setup/blob/main/README.md)
 # RTD Minecraft Server Manager
 ![RTD Blind Install Media Header](Media_files/header-time.jpg "Executing the Script")
 The minecraft server launcher script. Setting up your own Minecraft server on Ubuntu has never been easier! Just launch the script and it will do the rest! 
