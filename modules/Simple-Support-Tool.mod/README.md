@@ -23,8 +23,8 @@ This tool is documented as well as can be. It It may also easily be extended/mod
 
 ```bash
 # Usage: 
-bash /path/to/rtd-simple-support-tool" 
-# if in $PATH; simply type 
+bash /path/to/rtd-simple-support-tool
+# if in $PATH; simply type:
 rtd-simple-support-tool
 ```
 
