@@ -1,7 +1,7 @@
 # RTD Power Tools: 
 ![RTD Builder Screenshot](media_files/header-time.jpg "Executing the Script")
 
-These Power Tools are created to simplify the life of an enthusiast, a system administrator or developer. If you are the person who lives and breathes in the terminal and know every single system command in the back of your head like a reflex, and you don't mind typing several hundred character each time you want to, for example, build a VM to test your stuff; this may not be as valuable to you. The purpose of these tools are to expose common tasks and automate them so all you need to do is a few up/down arrows and selections.  Some tools included are (useable over an ssh connection):
+These Power Tools are created to simplify the life of an enthusiast, a system administrator or developer. If you are the person who lives and breathes in the terminal and know every single system command in the back of your head like a reflex, and you don't mind typing several hundred characters each time you want to, for example, build a VM to test your stuff; this may not be as valuable to you. The purpose of these tools are to expose common tasks and automate them so all you need to do is a few up/down arrows and selections.  Some tools included are (usable over an ssh connection):
 
 - Software Productivity Bundle installer (for tasks like 3D printing, office, secure internet communications etc.)
 - Global system update tool to update native packages, flatpaks, and snaps.
