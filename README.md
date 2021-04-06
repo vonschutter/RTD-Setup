@@ -47,5 +47,7 @@ Download:
 ```
 https://github.com/vonschutter/RTD-Setup/raw/main/rtd-me.sh.cmd
 ```
+Running RTD Power Tools to add software to WSL in Windows:
+![RTD Builder Screenshot 2](media_files/ScrWinWSL.png?raw=true "Executing the Script in WSL")
 
 It would make me happy if any modifications are shared back, or if any suggestions could be shared. Please read the license file for details. 
