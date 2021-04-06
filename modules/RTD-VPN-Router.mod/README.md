@@ -20,11 +20,12 @@ If you have not, Simply cut and paste this command in to a terminal on your comp
 wget https://github.com/vonschutter/RTD-VPN-Router/raw/main/rtd-start-vpn-router && bash ./rtd-start-vpn-router 
 
 ```
-In this screen shot it is seen what the vpn router looks like in a terminal. This can be on a remote machine or local terminal; if you are disconnected or close the terminal, you may reconnect by simply typing "byobu" on the same machine that the vpn was started. 
 
+
+Description | In this screen shot it is seen what the vpn router looks like in a terminal. This can be on a remote machine or local terminal; if you are disconnected or close the terminal, you may reconnect by simply typing "byobu" on the same machine that the vpn was started. 
 ------------ | -------------
-Content from cell 1 | ![RTD Builder Screenshot 2](Media_files/Scr1.png?raw=true "Executing the Script in a terminal")
-Content in the first column | Content in the second column
+VPN Router Running | ![RTD Builder Screenshot 2](Media_files/Scr1.png?raw=true "Executing the Script in a terminal")
+
 ***
 ![RTD Builder Screenshot 2](Media_files/Scr1.png?raw=true "Executing the Script in a terminal")
 ***
