@@ -15,7 +15,7 @@ If you have installed the RTD Power Tools (by running rtd-me.sh.cmd) simply type
 
 If you have not, Simply cut and paste this command in to a terminal on your computer. This script can run independently as a stand alone tool.  
 
-```
+```bash
 
 wget https://github.com/vonschutter/RTD-VPN-Router/raw/main/rtd-start-vpn-router && bash ./rtd-start-vpn-router 
 
