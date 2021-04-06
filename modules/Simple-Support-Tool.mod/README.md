@@ -1,4 +1,4 @@
-# Simple Server Support Tool
+# Simple Support Tool
 < [Back](https://github.com/vonschutter/RTD-Setup/blob/main/README.md) | 
 
 ![RTD Blind Install Media Header](Media_files/header-time.jpg "Executing the Script")
