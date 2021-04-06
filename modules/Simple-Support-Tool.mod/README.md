@@ -19,12 +19,12 @@ You may can run the script on any remote Linux server to manage some common supp
 Please NOTE that this script is part of the RTD tools and requires the _rtd_library to function properly. 
 
 ![RTD SSST](Media_files/11.png?raw=true "Main Window")
-This tool is documente as well as can be, and it should therefore, also serve as a good learning tool. It It may also easily be extended/modified to do whatever a sysadmin would like it to since it contains menu templates and is written in a moduar way. 
-```
+This tool is documented as well as can be. It It may also easily be extended/modified to do whatever a sysadmin would like it to since it contains menu templates and is written in a moduar way. 
+
+```bash
 # Usage: 
 bash /path/to/rtd-simple-support-tool" 
 # if in $PATH; simply type 
 rtd-simple-support-tool
 ```
-For more information please check our WIKI: 
-https://github.com/vonschutter/Simple-Server-Support-Tool/wiki
+
