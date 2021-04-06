@@ -98,7 +98,7 @@ mkdir -p ${_LOG_DIR}
 export _GIT_PROFILE="${_GIT_PROFILE:-vonschutter}"
 
 # Location of base administrative scripts and command-lets to get.
-_src_url=https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git
+_git_src_url=https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git
 
 # Determine log file names for this session
 export _ERRLOGFILE=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-error.log
@@ -123,17 +123,23 @@ export _STATUSLOG=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-status.log
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
 	echo "Linux OS Found: Attempting to get instructions for Linux..."
 	echo executing $0 >> ${_LOGFILE}
-	if ! hash git ; then
+	if ! hash git &>> ${_LOGFILE} ; then
 		for i in apt yum dnf zypper ; do $i -y install git | tee ${_LOGFILE} ; done
 	fi
-	git clone ${_src_url} /opt/${_TLA} | tee ${_LOGFILE}
+	git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp | tee ${_LOGFILE}
 		if [ $? -eq 0 ]
 		then
 			echo "Instructions successfully retrieved..."
-			source /opt/${_TLA}/core/_${_TLA}_library || exit 1
+			if [[ -d /opt/${_TLA,,}  ]] ; then
+				mv /opt/${_TLA,,} ${_BackupFolderName:="/opt/${_TLA,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"}
+				zip -m -r -5 ${_BackupFolderName}.zip  ${_BackupFolderName}
+				rm -r ${_BackupFolderName}
+			fi
+			mv /opt/${_TLA,,}.tmp /opt/${_TLA,,} ; rm -rf /opt/${_TLA,,}/.git
+			source /opt/${_TLA,,}/core/_rtd_library
 			oem_register_all_tools
 			ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
-			bash  ${_OEM_DIR}/core/rtd-oem-linux-config.sh "$@"
+			bash ${_OEM_DIR}/core/rtd-oem-linux-config.sh ${@}
 		else
 			echo "Failed to retrieve instructions correctly! "
 			echo "Suggestion: check write permission in "/opt" or internet connectivity."
@@ -152,8 +158,6 @@ else
        echo "This system is Unknown to this script"
 fi
 exit $?
-
-
 
 
 # -----------------------------------------------------------------------------------------------------------------------

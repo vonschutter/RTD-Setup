@@ -116,7 +116,7 @@ task_setup_rtd_basics() {
 		if ! hash git &>> ${_LOGFILE} ; then
 			for i in apt yum dnf zypper ; do $i -y install git | tee ${_LOGFILE} ; done
 		fi
-		git clone --no-checkout --bare ${_git_src_url} /opt/${_TLA,,}.tmp | tee ${_LOGFILE}
+		git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp | tee ${_LOGFILE}
 			if [ $? -eq 0 ]
 			then
 				echo "Instructions successfully retrieved..."
@@ -124,8 +124,8 @@ task_setup_rtd_basics() {
 					mv /opt/${_TLA,,} ${_BackupFolderName:="/opt/${_TLA,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"}
 					zip -m -r -5 ${_BackupFolderName}.zip  ${_BackupFolderName}
 					rm -r ${_BackupFolderName}
-					mv /opt/${_TLA,,}.tmp /opt/${_TLA,,} ; rm -rf /opt/${_TLA,,}/.git
 				fi
+				mv /opt/${_TLA,,}.tmp /opt/${_TLA,,} ; rm -rf /opt/${_TLA,,}/.git
 				source /opt/${_TLA,,}/core/_rtd_library
 				oem_register_all_tools
 				ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
