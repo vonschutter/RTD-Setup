@@ -115,7 +115,9 @@ task_setup_rtd_basics() {
 		echo "Linux OS Found: Attempting to get instructions for Linux..."
 		echo executing $0 >> ${_LOGFILE}
 		if ! hash git &>> ${_LOGFILE} ; then
-			for i in apt yum dnf zypper ; do $i -y install git | tee ${_LOGFILE} ; done
+			for i in apt yum dnf zypper ; do
+				if hash $i ; then $i -y install git | tee ${_LOGFILE} ; fi
+			done
 		fi
 		git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp | tee ${_LOGFILE}
 			if [ $? -eq 0 ]
