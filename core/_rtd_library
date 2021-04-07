@@ -1748,6 +1748,32 @@ set_gnome_ui_common_tweaks_for_user ()
 }
 
 
+
+oem_restart_gnome_shell_now ()
+{
+# Description:  Function to restartig the gnome UI, by reinitialising the shell.
+# 		Typically this is simple enough; BUT, the command does not always release... so here we are.
+#		This will issue the reset and move on...
+#
+# Usage:
+# oem_restart_gnome_shell_now
+#
+# Globals:
+# Arguments: none
+# Outputs:
+# Returns: Standard err for last task
+# End of documentation
+	restart_gnome_shell_now()
+	{
+	busctl --quiet --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'Meta.restart("Reloadig Gnome with the new settings...")'
+	}
+	restart_gnome_shell_now &
+}
+
+
+
+
+
 set_gnome_ui_tweak_no_media_error ()
 {
 # Description:  Function to handle missing media when attempting to set UI look to
@@ -1755,14 +1781,14 @@ set_gnome_ui_tweak_no_media_error ()
 #
 # Usage:
 # set_gnome_ui_tweak_no_media_error
-# set_gnome_ui_tweak_no_media_error
+# OEM_Hint="My custom mesage" ; set_gnome_ui_tweak_no_media_error
 #
 # Globals: ${OEM_Hint}
 # Arguments: none
 # Outputs:
 # Returns: Standard err for last task
 # End of documentation
-	: ${OEM_Hint:="There was a problem with finding themes, launch the bundle installer tool?"}
+	: ${OEM_Hint:="There was a problem with finding themes, launch the Bundle Installer Tool?"}
 
 	zenity --question --text "${OEM_Hint}" --width=600
 	case "$?" in
@@ -1771,6 +1797,11 @@ set_gnome_ui_tweak_no_media_error ()
 		* ) write_error "unknown response received!" ; return 1 ;;
 	esac
 }
+
+
+
+
+
 
 
 set_gnome_ui_mac_tweaks_for_user ()
@@ -1793,12 +1824,6 @@ set_gnome_ui_mac_tweaks_for_user ()
 	# Apply common settings:
 	set_gnome_ui_common_tweaks_for_user
 	write_status "Setting MAC like tweaks..."
-
-	OEM_Hint="
-		Theme files and backgrounds appear to be missing! These must be added. do you want me to run the OEM Software Bundle Choices Menu for you?
-		It is a tool to add the OEM customizatons and lots of other software to this computer.
-
-		The OEM customizations include the (Mojave) themes needed to swich to this look."
 
 	GNOME_TERMINAL_PROFILE=`gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}'`
 	UiTone=${1:-"Light"}
@@ -1859,8 +1884,7 @@ set_gnome_ui_mac_tweaks_for_user ()
 
 	# Restore Keyboard Layout (reset by gnome)
 	# gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
-	busctl --quiet --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'Meta.restart("Reloadig Gnome with the new settings...")'
-	return
+	oem_restart_gnome_shell_now
 }
 
 
@@ -1888,12 +1912,6 @@ set_gnome_ui_win10_tweaks_for_user ()
 	# Apply common settings:
 	set_gnome_ui_common_tweaks_for_user
 	write_status "Setting Windows like tweaks..."
-	OEM_Hint="
-		Theme files and backgrounds appear to be missing! These must be added. Do you want me to run the OEM Software Bundle Choices Menu for you?
-		It is a tool to add the OEM customizatons and lots of other software to this computer.
-
-		The OEM customizations include the (Windows-10 Light + Dark) themes
-		needed to swich between these looks."
 
 	GNOME_TERMINAL_PROFILE=`gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}'`
 	UiTone=${1:-"Light"}
@@ -1953,8 +1971,7 @@ set_gnome_ui_win10_tweaks_for_user ()
 
 	# Restore Keyboard Layout (reset by gnome)
 	# gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
-	busctl --quiet --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'Meta.restart("Reloadig Gnome with the new settings...")'
-	return
+	oem_restart_gnome_shell_now
 }
 
 
@@ -1984,11 +2001,6 @@ set_gnome_ui_corprate_crisp_tweaks_for_user ()
 	write_status "Setting Crisp like tweaks..."
 
 	GNOME_TERMINAL_PROFILE="$(gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}')"
-	OEM_Hint="
-		Theme files and backgrounds appear to be missing! These must be added. Do you want me to run the OEM Software Bundle Choices Menu for you?
-		It is a tool to add the OEM customizatons and lots of other software to this computer.
-
-		The OEM customizations include the (Arc Light + Dark) themes needed to swich between these looks."
 
 	UiTone=${1:-"Light"}
 
@@ -2051,8 +2063,7 @@ set_gnome_ui_corprate_crisp_tweaks_for_user ()
 
 	# Restore Keyboard Layout (reset by gnome)
 	# gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
-	busctl --quiet --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'Meta.restart("Reloadig Gnome with the new settings...")'
-	return
+	oem_restart_gnome_shell_now
 }
 
 
@@ -2084,11 +2095,6 @@ set_gnome_ui_moca_tweaks_for_user ()
 	write_status "Setting Eye strain saving tweaks..."
 
 	GNOME_TERMINAL_PROFILE=`gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}'`
-	OEM_Hint="
-		Theme files and backgrounds appear to be missing! These must be added. Do you want me to run the OEM Software Bundle Choices Menu for you?
-		it is a tool to add the OEM customizatons and lots of other software to this computer.
-
-		The OEM customizations include the (vimix) themes needed to swich between these looks."
 
 	if [[ -d /usr/share/themes/vimix-dark-laptop ]] ; then
 		gsettings set org.gnome.desktop.interface gtk-theme 'vimix-dark-laptop'
@@ -2132,8 +2138,7 @@ set_gnome_ui_moca_tweaks_for_user ()
 
 	# Restore Keyboard Layout (reset by gnome)
 	# gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
-	busctl --quiet --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'Meta.restart("Reloadig Gnome with the new settings...")'
-	return
+	oem_restart_gnome_shell_now
 }
 
 
