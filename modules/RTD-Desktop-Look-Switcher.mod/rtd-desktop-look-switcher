@@ -128,7 +128,14 @@ while true; do
                 "Crisp Day" ) set_gnome_ui_corprate_crisp_tweaks_for_user Light ; notify-send --urgency=low "$selection set" ;;
                 "Crisp Evening" ) set_gnome_ui_corprate_crisp_tweaks_for_user Dark ; notify-send --urgency=low "$selection set" ;;
                 "Moca Smooth" ) set_gnome_ui_moca_tweaks_for_user ; notify-send --urgency=low "$selection set" ;;
-                "${DefaultDistro/ /}" ) dconf reset -f /org/gnome/desktop/  ; notify-send --urgency=low "UI reset to: $selection" ;;
+                "${DefaultDistro/ /}" ) 
+			# Resetting deskop environment to distribution defaults!
+			KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
+			dconf reset -f /org/gnome/
+			busctl --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'Meta.restart("Reloadig Gnome with the new settings...")'
+			notify-send --urgency=low "UI reset to: $selection" 
+			gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
+			;;
                 * )
                 # Trap unknown exit code...
                 exit
