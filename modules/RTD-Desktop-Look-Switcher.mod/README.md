@@ -18,19 +18,9 @@ This is a tool to help users who come to Linux from a different OS. Currently th
 Refer to the install instructions of the [RTD Power Tools](https://github.com/vonschutter/RTD-Setup/blob/main/README.md)
 
 
-
-![RTD Desktop Look Changer ScreenShot](ScrWinLi.png "Windows Light")
-
-![RTD Desktop Look Changer ScreenShot](ScrWinDk.png "Windows Dark")
-
-![RTD Desktop Look Changer ScreenShot](ScrMacLi.png "Mac Light")
-
-![RTD Desktop Look Changer ScreenShot](ScrMacDk.png "Mac Dark")
-
-![RTD Desktop Look Changer ScreenShot](ScrProLi.png "Pro Light")
-
-![RTD Desktop Look Changer ScreenShot](ScrProDk.png "Pro Dark")
-
-![RTD Desktop Look Changer ScreenShot](ScrMocca.png "Mocca Smooth")
-
-![RTD Desktop Look Changer ScreenShot](ScrReset.png "Distributio Reset")
+Description | In this screen shot it is seen what the vpn router looks like in a terminal. This can be on a remote machine or local terminal; if you are disconnected or close the terminal, you may reconnect by simply typing "byobu" on the same machine that the vpn was started. 
+------------ | -------------
+![RTD Desktop Look Changer ScreenShot](ScrWinLi.png "Windows Light") | ![RTD Desktop Look Changer ScreenShot](ScrWinDk.png "Windows Dark")
+![RTD Desktop Look Changer ScreenShot](ScrMacLi.png "Mac Light") | ![RTD Desktop Look Changer ScreenShot](ScrMacDk.png "Mac Dark")
+![RTD Desktop Look Changer ScreenShot](ScrProLi.png "Pro Light") | ![RTD Desktop Look Changer ScreenShot](ScrProDk.png "Pro Dark")
+![RTD Desktop Look Changer ScreenShot](ScrMocca.png "Mocca Smooth") | ![RTD Desktop Look Changer ScreenShot](ScrReset.png "Distributio Reset")
