@@ -1748,7 +1748,29 @@ set_gnome_ui_common_tweaks_for_user ()
 }
 
 
+set_gnome_ui_tweak_no_media_error ()
+{
+# Description:  Function to handle missing media when attempting to set UI look to
+# 		resemble MAC/Windows/etc. for users accustomed to that.
+#
+# Usage:
+# set_gnome_ui_tweak_no_media_error
+# set_gnome_ui_tweak_no_media_error
+#
+# Globals: ${OEM_Hint}
+# Arguments: none
+# Outputs:
+# Returns: Standard err for last task
+# End of documentation
+	: ${OEM_Hint:="There was a problem with finding themes, launch the bundle installer tool?"}
 
+	ret=$(zenity --question --text "${OEM_Hint}" --width=600)
+	case ${ret} in
+		0 ) pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY ${_CORE_DIR}/rtd-oem-linux-config.sh ;;
+		1 ) return ;;
+		* ) write_error "unknown response received!" ; return 1 ;;
+	esac
+}
 
 
 set_gnome_ui_mac_tweaks_for_user ()
@@ -1773,34 +1795,43 @@ set_gnome_ui_mac_tweaks_for_user ()
 	write_status "Setting MAC like tweaks..."
 
 	OEM_Hint="
-		Please use the rtd-oem-linux-config.sh tool to add the OEM customizatons to this computer
-		and run this tool again. The OEM customizations include the (Mojave) themes needed to swich
-		between these looks."
+		Theme files and backgrounds appear to be missing! These must be added. do you want me to run the OEM Software Bundle Choices Menu for you?
+		It is a tool to add the OEM customizatons and lots of other software to this computer.
+
+		The OEM customizations include the (Mojave) themes needed to swich to this look."
 
 	GNOME_TERMINAL_PROFILE=`gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}'`
 	UiTone=${1:-"Light"}
 
 	case ${UiTone} in
 	Dark | dark )
-		if [[ -d /usr/share/themes/Windows-10-Dark ]] ; then
+		if [[ -d /usr/share/themes/Mojave-dark ]] ; then
 			gsettings set org.gnome.desktop.interface gtk-theme 'Mojave-dark'
 			gsettings set org.gnome.desktop.interface icon-theme 'McMojave-circle-dark'
 			gsettings set org.gnome.shell.extensions.user-theme name "Mojave-dark"
-			gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/MojaveNight.jpg
+			if [[ -f file://${_WALLPAPER_DIR}/MojaveNight.jpg ]]; then
+				gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/MojaveNight.jpg
+			else
+				set_gnome_ui_tweak_no_media_error
+			fi
 			#gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ theme-variant 'dark'
 		else
-			zenity --info --text "${OEM_Hint}" --width=600
+			set_gnome_ui_tweak_no_media_error
 		fi
 	;;
 	Light| light )
-		if [[ -d /usr/share/themes/Windows-10-Light ]] ; then
+		if [[ -d /usr/share/themes/Mojave-light ]] ; then
 			gsettings set org.gnome.desktop.interface gtk-theme 'Mojave-light'
 			gsettings set org.gnome.desktop.interface icon-theme 'McMojave-circle'
 			gsettings set org.gnome.shell.extensions.user-theme name "Mojave-light"
-			gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/MojaveDay.jpg
+			if [[ -f file://${_WALLPAPER_DIR}/MojaveDay.jpg ]]; then
+				gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/MojaveDay.jpg
+			else
+				set_gnome_ui_tweak_no_media_error
+			fi
 			#gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ theme-variant 'light'
 		else
-			zenity --info --text "${OEM_Hint}" --width=600
+			set_gnome_ui_tweak_no_media_error
 		fi
 	;;
 	esac
@@ -1858,8 +1889,10 @@ set_gnome_ui_win10_tweaks_for_user ()
 	set_gnome_ui_common_tweaks_for_user
 	write_status "Setting Windows like tweaks..."
 	OEM_Hint="
-		Please use the rtd-oem-linux-config.sh tool to add the OEM customizatons to this computer
-		and run this tool again. The OEM customizations include the (Windows-10 Light + Dark) themes
+		Theme files and backgrounds appear to be missing! These must be added. Do you want me to run the OEM Software Bundle Choices Menu for you?
+		It is a tool to add the OEM customizatons and lots of other software to this computer.
+
+		The OEM customizations include the (Windows-10 Light + Dark) themes
 		needed to swich between these looks."
 
 	GNOME_TERMINAL_PROFILE=`gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}'`
@@ -1872,7 +1905,7 @@ set_gnome_ui_win10_tweaks_for_user ()
 			gsettings set org.gnome.desktop.interface gtk-theme 'Windows-10-Dark'
 			gsettings set org.gnome.shell.extensions.user-theme name "Windows-10-Dark"
 		else
-			zenity --info --text "${OEM_Hint}" --width=600
+			set_gnome_ui_tweak_no_media_error
 		fi
 	;;
 	Light| light )
@@ -1880,7 +1913,7 @@ set_gnome_ui_win10_tweaks_for_user ()
 			gsettings set org.gnome.desktop.interface gtk-theme 'Windows-10-Light'
 			gsettings set org.gnome.shell.extensions.user-theme name "Windows-10-Light"
 		else
-			zenity --info --text "${OEM_Hint}" --width=600
+			set_gnome_ui_tweak_no_media_error
 		fi
 	;;
 	esac
@@ -1888,7 +1921,7 @@ set_gnome_ui_win10_tweaks_for_user ()
 	if [[ -d /usr/share/icons/Windows-10-Icons ]] ; then
 		gsettings set org.gnome.desktop.interface icon-theme 'Windows-10-Icons'
 	else
-			zenity --info --text "${OEM_Hint}" --width=600
+			set_gnome_ui_tweak_no_media_error
 	fi
 
 	# Set font
@@ -1952,32 +1985,33 @@ set_gnome_ui_corprate_crisp_tweaks_for_user ()
 
 	GNOME_TERMINAL_PROFILE="$(gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}')"
 	OEM_Hint="
-		Please use the rtd-oem-linux-config.sh tool to add the OEM customizatons to this computer
-		and run this tool again. The OEM customizations include the (Arc Light + Dark) themes
-		needed to swich between these looks."
+		Theme files and backgrounds appear to be missing! These must be added. Do you want me to run the OEM Software Bundle Choices Menu for you?
+		It is a tool to add the OEM customizatons and lots of other software to this computer.
+
+		The OEM customizations include the (Arc Light + Dark) themes needed to swich between these looks."
 
 	UiTone=${1:-"Light"}
 
 	# Gnome Shell Theming
 	case ${UiTone} in
 	Dark | dark )
-		if [[ -d /usr/share/themes/Windows-10-Dark ]] ; then
+		if [[ -d /usr/share/themes/Arc-Dark ]] ; then
 			gsettings set org.gnome.desktop.interface gtk-theme 'Arc-Dark'
 			gsettings set org.gnome.shell.extensions.user-theme name "Arc-Dark"
 			# Set wallpaper
 			gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/RTD_Wallpapers_HQ_Public_Domain_019.jpg
 		else
-			zenity --info --text "${OEM_Hint}" --width=600
+			set_gnome_ui_tweak_no_media_error
 		fi
 	;;
 	Light| light )
-		if [[ -d /usr/share/themes/Windows-10-Light ]] ; then
+		if [[ -d /usr/share/themes/Arc ]] ; then
 			gsettings set org.gnome.desktop.interface gtk-theme 'Arc'
 			gsettings set org.gnome.shell.extensions.user-theme name "Arc"
 			# Set wallpaper
 			gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/RTD_Wallpapers_HQ_Public_Domain_020.jpg
 		else
-			zenity --info --text "${OEM_Hint}" --width=600
+			set_gnome_ui_tweak_no_media_error
 		fi
 	;;
 	esac
@@ -1985,7 +2019,7 @@ set_gnome_ui_corprate_crisp_tweaks_for_user ()
 	if [[ -d /usr/share/icons/Arc ]] ; then
 		gsettings set org.gnome.desktop.interface icon-theme 'Arc'
 	else
-			zenity --info --text "${OEM_Hint}" --width=600
+			set_gnome_ui_tweak_no_media_error
 	fi
 
 	# Set font
@@ -2051,9 +2085,10 @@ set_gnome_ui_moca_tweaks_for_user ()
 
 	GNOME_TERMINAL_PROFILE=`gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}'`
 	OEM_Hint="
-		Please use the rtd-oem-linux-config.sh tool to add the OEM customizatons to this computer
-		and run this tool again. The OEM customizations include the (vimix) themes
-		needed to swich between these looks."
+		Theme files and backgrounds appear to be missing! These must be added. Do you want me to run the OEM Software Bundle Choices Menu for you?
+		it is a tool to add the OEM customizatons and lots of other software to this computer.
+
+		The OEM customizations include the (vimix) themes needed to swich between these looks."
 
 	if [[ -d /usr/share/themes/vimix-dark-laptop ]] ; then
 		gsettings set org.gnome.desktop.interface gtk-theme 'vimix-dark-laptop'
