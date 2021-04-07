@@ -1536,7 +1536,6 @@ set_gnome_ui_common_tweaks_for_user ()
 
 	write_status "Seting common OEM tweaks..."
 	# Terminal and Tilix Dark Theme
-		gsettings set com.gexperts.Tilix.Settings theme-variant 'dark'
 		GNOME_TERMINAL_PROFILE=`gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}'`
 		gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ theme-variant 'dark'
 		gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-transparent-background true
@@ -1767,10 +1766,7 @@ set_gnome_ui_mac_tweaks_for_user ()
 # End of documentation
 
 	# Save users keyboard preferences:
-	KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
-
-	# Reset Gnome UI environment:
-	# dconf reset -f /org/gnome/desktop/
+	# KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
 
 	# Apply common settings:
 	set_gnome_ui_common_tweaks_for_user
@@ -1833,8 +1829,9 @@ set_gnome_ui_mac_tweaks_for_user ()
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ scrollback-lines 10000
 
 	# Restore Keyboard Layout (reset by gnome)
-	gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
-	busctl --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'Meta.restart("Reloadig Gnome with the new settings...")'
+	# gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
+	busctl --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'Meta.restart("Reloadig Gnome with the new settings...")' &>/dev/null &
+	return
 }
 
 
@@ -1857,10 +1854,7 @@ set_gnome_ui_win10_tweaks_for_user ()
 # End of documentation
 	GIT_Profile=${GIT_Profile:-vonschutter}
 	# Save users keyboard preferences:
-	KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
-
-	# Reset Gnome UI environment:
-	# dconf reset -f /org/gnome/desktop/
+	# KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
 
 	# Apply common settings:
 	set_gnome_ui_common_tweaks_for_user
@@ -1927,8 +1921,9 @@ set_gnome_ui_win10_tweaks_for_user ()
 	gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/Redmond.png
 
 	# Restore Keyboard Layout (reset by gnome)
-	gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
-	busctl --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'Meta.restart("Reloadig Gnome with the new settings...")'
+	# gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
+	busctl --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'Meta.restart("Reloadig Gnome with the new settings...")' &>/dev/null &
+	return
 }
 
 
@@ -1951,14 +1946,12 @@ set_gnome_ui_corprate_crisp_tweaks_for_user ()
 # End of documentation
 	GIT_Profile=${GIT_Profile:-vonschutter}
 	# Save users keyboard preferences:
-	KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
-
-	# Reset Gnome UI environment:
-	# dconf reset -f /org/gnome/desktop/
+	# KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
 
 	# Apply common settings:
 	set_gnome_ui_common_tweaks_for_user
-	write_status "Setting Windows like tweaks..."
+	write_status "Setting Crisp like tweaks..."
+
 	GNOME_TERMINAL_PROFILE="$(gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}')"
 	OEM_Hint="
 		Please use the rtd-oem-linux-config.sh tool to add the OEM customizatons to this computer
@@ -2025,8 +2018,9 @@ set_gnome_ui_corprate_crisp_tweaks_for_user ()
 
 
 	# Restore Keyboard Layout (reset by gnome)
-	gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
-	busctl --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'Meta.restart("Reloadig Gnome with the new settings...")'
+	# gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
+	busctl --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'Meta.restart("Reloadig Gnome with the new settings...")' &>/dev/null &
+	return
 }
 
 
@@ -2051,14 +2045,12 @@ set_gnome_ui_moca_tweaks_for_user ()
 # End of documentation
 	GIT_Profile=${GIT_Profile:-vonschutter}
 	# Save users keyboard preferences:
-	KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
-
-	# Reset Gnome UI environment:
-	# dconf reset -f /org/gnome/desktop/
+	# KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
 
 	# Apply common settings:
 	set_gnome_ui_common_tweaks_for_user
-	write_status "Setting Windows like tweaks..."
+	write_status "Setting Eye strain saving tweaks..."
+
 	GNOME_TERMINAL_PROFILE=`gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}'`
 	OEM_Hint="
 		Please use the rtd-oem-linux-config.sh tool to add the OEM customizatons to this computer
@@ -2106,8 +2098,9 @@ set_gnome_ui_moca_tweaks_for_user ()
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ background-transparency-percent 20
 
 	# Restore Keyboard Layout (reset by gnome)
-	gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
-	busctl --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'Meta.restart("Reloadig Gnome with the new settings...")'
+	# gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
+	busctl --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'Meta.restart("Reloadig Gnome with the new settings...")' &>/dev/null &
+	return
 }
 
 
