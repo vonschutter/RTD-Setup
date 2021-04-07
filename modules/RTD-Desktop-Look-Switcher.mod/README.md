@@ -16,3 +16,21 @@ This is a tool to help users who come to Linux from a different OS. Currently th
 
 ## How to use this script. 
 Refer to the install instructions of the [RTD Power Tools](https://github.com/vonschutter/RTD-Setup/blob/main/README.md)
+
+
+
+![RTD Desktop Look Changer ScreenShot](ScrWinLi.png "Windows Light")
+
+![RTD Desktop Look Changer ScreenShot](ScrWinDk.png "Windows Dark")
+
+![RTD Desktop Look Changer ScreenShot](ScrMacLi.png "Mac Light")
+
+![RTD Desktop Look Changer ScreenShot](ScrMacDk.png "Mac Dark")
+
+![RTD Desktop Look Changer ScreenShot](ScrProLi.png "Pro Light")
+
+![RTD Desktop Look Changer ScreenShot](ScrProDk.png "Pro Dark")
+
+![RTD Desktop Look Changer ScreenShot](ScrMocca.png "Mocca Smooth")
+
+![RTD Desktop Look Changer ScreenShot](ScrReset.png "Distributio Reset")
