@@ -41,12 +41,6 @@ GIT_Profile=${GIT_Profile:-vonschutter}
 #::::::::::::::          Script Settings                 ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-# Variables that govern the behavior or the script and location of files are
-BRAND=RTD
-
-# Ensure administrative privileges.
-[ "$UID" -eq 0 ] || echo -e $YELLOW "This script needs administrative access..." $ENDCOLOR
-[ "$UID" -eq 0 ] || exec sudo DISPLAY=$DISPLAY bash "$0" "$@"
 
 # Put a convenient link to the logs where logs are normally found...
 # capture the 3 first letters as org TLA (Three Letter Acronym)
@@ -63,7 +57,7 @@ _git_src_url=https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git
 
 # Determine log file names for this session
 export _ERRLOGFILE=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-error.log
-export _LOGFILE${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log
+export _LOGFILE=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log
 export _STATUSLOG=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-status.log
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -95,7 +89,7 @@ check_rtd_library ()
 		exit 1
 	fi
 
-	write_host -cyan "Libraries loaded"
+	write_host --cyan "Libraries loaded"
 	write_status "Paths registered:
 	- Root directory of tools: 		_OEM_DIR="${scriptdir%/*}"
 	- Caching and download folder: 		_CACHE_DIR="${_OEM_DIR}/cache"
@@ -184,25 +178,33 @@ do_update ()
 # Using the common function library to elevate priviledges... This is only useful
 # is the script is not run via sudo to begin with...
 check_rtd_library
-ensure_admin
 
-if hash dialog ; then
-	if ( dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: NOTICE!" --yesno "\nMay I update the ${BRAND} OEM tools on your system now? Updating the ${BRAND} tools will ensure that the latest functionality and bug fixes are applied. \n\n Press OK to continue or NO to skip doing this." 20 80 ) ; then
-		clear && do_update
-	else
-		clear && exit
-	fi
+
+if [[ ${UID} -eq 0 ]] ; then
+	# Execute only in the case of elevated privileges:
+	oem_launch_me () {
+		if hash dialog ; then
+			if ( dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: NOTICE!" --yesno "\nMay I update the ${BRAND} OEM tools on your system now? Updating the ${BRAND} tools will ensure that the latest functionality and bug fixes are applied. \n\n Press OK to continue or NO to skip doing this." 20 80 ) ; then
+				clear && do_update
+			else
+				clear && exit
+			fi
+		else
+			echo -e $YELLOW
+			echo "RTD Tools Updater Version $RTD_UPDATE_SELF_VERSION"
+			echo "Hello $SUDO_USER ... I am going to update the rtd tools on this"
+			echo " "
+			echo "To cancel this, just close the terminal or press "CRTL C"."
+			echo " "
+			read -p "Press [ ENTER ] to continue with update"
+			echo -e $ENDCOLOR
+			do_update
+		fi
+	}
+	oem_launch_me | tee ${_LOGFILE}
 else
-	echo -e $YELLOW
-	echo "RTD Tools Updater Version $RTD_UPDATE_SELF_VERSION"
-	echo "Hello $SUDO_USER ... I am going to update the rtd tools on this"
-	echo " "
-	echo "To cancel this, just close the terminal or press "CRTL C"."
-	echo " "
-	read -p "Press [ ENTER ] to continue with update"
-	echo -e $ENDCOLOR
-	do_update
+	# If privileges are not elevated; then request elevation using the appropriate method:
+	_exec_local="$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/"$( basename ${0} )"
+	if echo $(systemctl get-default ) |grep graphical &>/dev/null ; then pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY ${_exec_local} ; else ensure_admin ; fi
+	exit
 fi
-
-
-
