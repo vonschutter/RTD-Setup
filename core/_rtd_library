@@ -2292,12 +2292,10 @@ ensure_admin ()
 #
 # End of documentation
 
-	_exec_local="$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/"$( basename ${0} )"
-
 	if [ ! "$UID" -eq 0 ]; then
 		if echo $(systemctl get-default ) |grep graphical &>/dev/null ; then
 			if xset q &>/dev/null; then xhost local:root ; fi
-			pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY ${_exec_local}
+			pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY ${0}
 		else
 			# Session is NOT priviledged; relaunch script with priviledges to do system admin...
 			write_information "Allowing root to display menus..."
@@ -2310,7 +2308,7 @@ ensure_admin ()
 					0)
 						export HISTIGNORE='*sudo -S*'
 						echo ${token} | sudo -S -v || ensure_admin
-						sudo DISPLAY=$DISPLAY /bin/bash ${_exec_local} $@ || rtd_oem_pause 1
+						sudo DISPLAY=$DISPLAY /bin/bash ${0} $@ || rtd_oem_pause 1
 					;;
 					1) echo "Request cancelled" ;;
 					255) echo "[esc] Request aborted" ;;
@@ -2320,7 +2318,7 @@ ensure_admin ()
 			else
 				write_warning "This script needs administrative access..."
 				if xset q &>/dev/null; then xhost local:root ; fi
-				sudo DISPLAY=$DISPLAY bash "${_exec_local}" "$@" || rtd_oem_pause 1
+				sudo DISPLAY=$DISPLAY bash "${0}" "$@" || rtd_oem_pause 1
 				exit
 			fi
 		fi
