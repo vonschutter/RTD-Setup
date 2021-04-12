@@ -1,6 +1,13 @@
 # RTD Power Tools:     <img src="media_files/WindowsLogo.png" width="32" height="32"> <img src="media_files/LinuxLogo.png" width="32" height="32">  <img src="media_files/UbuntuLogo.png" width="32" height="32">  <img src="media_files/RedHatLogo.png" width="32" height="32">  <img src="media_files/SuseLogo.png" width="32" height="32"> 
 [MinecraftServer](https://github.com/vonschutter/RTD-Setup/blob/main/modules/Minecraft-Server-Manager.mod/README.md) | [NordVPN_GUI](https://github.com/vonschutter/RTD-Setup/blob/main/modules/Nordvpn-Manager.mod/README.md) | [DesktopLookSwitcher](modules/RTD-Desktop-Look-Switcher.mod/README.md) | [Instant VPN Router](/modules/RTD-VPN-Router.mod/README.md) | [Simple Support Tool](/modules/Simple-Support-Tool.mod/README.md)
 
+img[src~="thumbnail"] {
+   width:150px;
+   height:100px;
+}
+img[src~="bordered"] {
+   border: 1px solid black;
+}
 
 ![RTD Builder Screenshot](media_files/header-time.jpg "Executing the Script")
 
@@ -24,7 +31,7 @@ The RTD Setup includes the **Software Bundle Installer** intended to facilitate 
 
 If a graphical environment is not detected, the RTD System Configurator will interpret this as it is being run on a server without a graphical environment and will offer to set up the productivity tools for that environment.
 
-![RTD Builder Screenshot 2](media_files/ScrTnGCombo.png?raw=true "Executing the Script")
+![RTD Builder Screenshot 2](media_files/ScrTnGCombo.png# thumbnail bordered")
 
 As promised, the rtd-me.sh.cmd script will run under windows as well. Simply download it and double click on it (you will be prompted to elevate privileges if needed). Please NOTE: that at this time the Windows functionality is roughly equivalent to the Linux **Software Bundle Installer**, but will not prompt for anything, whereas for Linux the setup will pause for 60 seconds to allow for some selections. However, the script will optimize Windows by removing bloatware (Sponsored Software) and turning off services that most do not use to enhance both performance and security. Several useful and fun software titles are automatically added (will not fill up your disk). The Windows changes are made with PowerShell.
 
