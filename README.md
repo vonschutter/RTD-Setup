@@ -1,7 +1,7 @@
 # RTD Power Tools:     <img src="media_files/WindowsLogo.png" width="32" height="32"> <img src="media_files/LinuxLogo.png" width="32" height="32">  <img src="media_files/UbuntuLogo.png" width="32" height="32">  <img src="media_files/RedHatLogo.png" width="32" height="32">  <img src="media_files/SuseLogo.png" width="32" height="32"> 
 [MinecraftServer](https://github.com/vonschutter/RTD-Setup/blob/main/modules/Minecraft-Server-Manager.mod/README.md) | [NordVPN_GUI](https://github.com/vonschutter/RTD-Setup/blob/main/modules/Nordvpn-Manager.mod/README.md) | [DesktopLookSwitcher](modules/RTD-Desktop-Look-Switcher.mod/README.md) | [Instant VPN Router](/modules/RTD-VPN-Router.mod/README.md) | [Simple Support Tool](/modules/Simple-Support-Tool.mod/README.md)
 
-img {border-radius: 8px;}
+
 ![RTD Builder Screenshot](media_files/header-time.jpg "Executing the Script")
 
 These Power Tools are created to simplify the life of an enthusiast, a system administrator or developer. If you are the person who lives and breathes in the terminal and know every single system command in the back of your head like a reflex, and you don't mind typing several hundred characters each time you want to, for example, build a VM to test your stuff; this may not be as valuable to you. The purpose of these tools are to expose common tasks and automate them so all you need to do is a few up/down arrows and selections.  Some tools included are (usable over an ssh connection):
