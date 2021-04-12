@@ -68,7 +68,7 @@ tell_info() {
 }
 
 tell_info							&>> $_LOGFILE
-task_setup_oem_run_once /opt/rtd/core/rtd-oem-linux-config.sh	&>> $_LOGFILE
+setup_oem_run_once /opt/rtd/core/rtd-oem-linux-config.sh	&>> $_LOGFILE
 set_enable_oem_elevated_privelege				&>> $_LOGFILE
 toggle_oem_auto_login						&>> $_LOGFILE
 oem_ensure_elevated_gui						&>> $_LOGFILE
