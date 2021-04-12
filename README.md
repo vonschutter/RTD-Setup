@@ -1,4 +1,4 @@
-# RTD Power Tools: <img src="media-files/WindowsLogo.png" width="48" height="48">
+# RTD Power Tools: <img src="media_files/WindowsLogo.png" width="48" height="48">
 [MinecraftServer](https://github.com/vonschutter/RTD-Setup/blob/main/modules/Minecraft-Server-Manager.mod/README.md) | [NordVPN_GUI](https://github.com/vonschutter/RTD-Setup/blob/main/modules/Nordvpn-Manager.mod/README.md) | [DesktopLookSwitcher](modules/RTD-Desktop-Look-Switcher.mod/README.md) | [Instant VPN Router](/modules/RTD-VPN-Router.mod/README.md) | [Simple Support Tool](/modules/Simple-Support-Tool.mod/README.md)
 
 ![RTD Builder Screenshot](media_files/header-time.jpg "Executing the Script")
