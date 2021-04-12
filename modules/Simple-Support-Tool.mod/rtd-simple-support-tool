@@ -1065,17 +1065,15 @@ case $1 in
 	;;
 	* )
 		if [[ "$TERM" == screen* ]]; then
-
 			rtd_oem_check_inet_access               # Confirm what to do if no internet access.
 			check_rtd_library                       # If the required system managment library available?
 			ensure_admin                            # Do we have admin priviledges?
-				if [ ! "$UID" -eq 0 ]; then
-					write_error "UID not 0!"
-					rtd_oem_pause 1
-				fi
-			check_menu_availability                 # Can we display menus and ask questions?
-			show_notice_on_fist_run                 # Is this the first time this is used on this computer?
-			show_main_menu                          # If all is OK, display the system admin menu!
+			if [ "$UID" -eq 0 ]; then
+				check_menu_availability                 # Can we display menus and ask questions?
+				show_notice_on_fist_run                 # Is this the first time this is used on this computer?
+				show_main_menu                          # If all is OK, display the system admin menu!
+			fi
+			exit
 		else
 			if hash byobu 2>/dev/null; then
 				byobu new-session -s "RTD Simple Server Support Tools" $0
@@ -1083,9 +1081,13 @@ case $1 in
 			else
 				rtd_oem_check_inet_access		# Confirm what to do if no internet access (internal).
 				check_rtd_library			# Ensure that the needed libraries are available.
-				check_dependencies byobu && echo -e "$RED" "A critical component needed for this script to work properly was attempted to be added... Attempting to run the script again"
-				su -c "$0 $*" "$SUDO_USER"
-				clear
+				ensure_admin                            # Do we have admin priviledges?
+				if [ "$UID" -eq 0 ]; then
+					check_dependencies byobu && echo -e "$RED" "A critical component needed for this script to work properly was attempted to be added... Attempting to run the script again"
+					su -c "$0 $*" "$SUDO_USER"
+					clear
+				fi
+				exit
 			fi
 		fi
 	;;
