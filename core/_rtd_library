@@ -2300,13 +2300,16 @@ ensure_admin ()
 
 	if [ ! "$UID" -eq 0 ]; then
 		if xset q &>/dev/null; then
+			# If X is running in this session then...
 			if echo $(systemctl get-default ) |grep graphical &>/dev/null ; then
+				# If we are a normal GUI w. systemd: elevate privs with normal GUI policy kit...
 				write_information "Allowing root to display menus..."
 				xhost local:root
 				write_information "Authenticating..."
 				pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY ${0}
 				exit
 			else
+				# If we are some other kind of archane GUI then...
 				write_information "Allowing root to display menus..."
 				xhost local:root
 				write_information "Checking for dialog..."
@@ -2325,6 +2328,7 @@ ensure_admin ()
 					esac
 					exit
 				else
+					# If we have some kind of X but not even "dialog" then...
 					write_information "Dialog not found..."
 					write_warning "This script needs administrative access..."
 					xhost local:root
@@ -2333,9 +2337,10 @@ ensure_admin ()
 				fi
 			fi
 		else
+			# If there is no X in this session...
 			write_information "No X server at \$DISPLAY [$DISPLAY]"
+			# Use dialog if possible, otherwise just terminal...
 			if hash dialog 2>/dev/null ; then
-				# find  a diferent way... tempfile not universal...
 				token=$(dialog --title "${Title:-"sudo"}" --backtitle "${BackTitle:-"$( basename $0 )"}" --insecure --stdout --passwordbox "\n This functionality requires elevated priviledges. \n Please provide your (sudo) password" 10 90)
 				ret=$? ; clear
 				case $ret in
@@ -6882,6 +6887,7 @@ rtd_oem_preseed_cfg_Addon_Tasks ()
 		# --------------------------------------------------- #
 		d-i preseed/late_command string \
 			in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
+			in-target /usr/bin/chmod +x /opt/rtd/core/rtd* ; \
 			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
 		 	cp /*.cfg /target/opt/rtd/ ; \
 			umount -l /media || echo "Empty" ; \
@@ -6892,6 +6898,7 @@ rtd_oem_preseed_cfg_Addon_Tasks ()
 		ubiquity ubiquity/success_command string \
 			in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd  ; \
 			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
+			in-target /usr/bin/chmod +x /opt/rtd/core/rtd* ; \
 		 	cp /*.cfg /target/opt/rtd/ ;\
 			echo "------  initial Setup Complete!  ------"
 
