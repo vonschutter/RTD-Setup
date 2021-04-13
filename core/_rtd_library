@@ -2299,13 +2299,41 @@ ensure_admin ()
 # End of documentation
 
 	if [ ! "$UID" -eq 0 ]; then
-		if echo $(systemctl get-default ) |grep graphical &>/dev/null ; then
-			if xset q &>/dev/null; then xhost local:root ; fi
-			pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY ${0}
+		if xset q &>/dev/null; then
+			if echo $(systemctl get-default ) |grep graphical &>/dev/null ; then
+				write_information "Allowing root to display menus..."
+				xhost local:root
+				write_information "Authenticating..."
+				pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY ${0}
+				exit
+			else
+				write_information "Allowing root to display menus..."
+				xhost local:root
+				write_information "Checking for dialog..."
+				if hash dialog 2>/dev/null ; then
+					token=$(dialog --title "${Title:-"sudo"}" --backtitle "${BackTitle:-"$( basename $0 )"}" --insecure --stdout --passwordbox "\n This functionality requires elevated priviledges. \n Please provide your (sudo) password" 10 90)
+					ret=$? ; clear
+					case $ret in
+						0)
+							export HISTIGNORE='*sudo -S*'
+							echo ${token} | sudo -S -v || ensure_admin
+							sudo DISPLAY=$DISPLAY /bin/bash ${0} $@ || rtd_oem_pause 1
+						;;
+						1) echo "Request cancelled" ;;
+						255) echo "[esc] Request aborted" ;;
+						* )  exit 1
+					esac
+					exit
+				else
+					write_information "Dialog not found..."
+					write_warning "This script needs administrative access..."
+					xhost local:root
+					sudo DISPLAY=$DISPLAY bash "${0}" "$@" || rtd_oem_pause 1
+					exit
+				fi
+			fi
 		else
-			# Session is NOT priviledged; relaunch script with priviledges to do system admin...
-			write_information "Allowing root to display menus..."
-			if xset q &>/dev/null; then xhost local:root ; fi
+			write_information "No X server at \$DISPLAY [$DISPLAY]"
 			if hash dialog 2>/dev/null ; then
 				# find  a diferent way... tempfile not universal...
 				token=$(dialog --title "${Title:-"sudo"}" --backtitle "${BackTitle:-"$( basename $0 )"}" --insecure --stdout --passwordbox "\n This functionality requires elevated priviledges. \n Please provide your (sudo) password" 10 90)
@@ -2323,7 +2351,6 @@ ensure_admin ()
 				exit
 			else
 				write_warning "This script needs administrative access..."
-				if xset q &>/dev/null; then xhost local:root ; fi
 				sudo DISPLAY=$DISPLAY bash "${0}" "$@" || rtd_oem_pause 1
 				exit
 			fi
@@ -2331,7 +2358,6 @@ ensure_admin ()
 	else
 		sudo sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
 	fi
-
 }
 
 
@@ -6854,20 +6880,17 @@ rtd_oem_preseed_cfg_Addon_Tasks ()
 		# --------------------------------------------------- #
 		# Default preseed Addon Tasks
 		# --------------------------------------------------- #
-		# End of documentation
 		d-i preseed/late_command string \
-			in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd
-		 	cp /cdrom/preseed.cfg /target/opt/rtd/ ;\
-		 	in-target bash /opt/rtd/core/rtd-oem-enable-config.sh ;\
+			in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd && /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh
+		 	cp /cdrom/*.cfg /target/opt/rtd/ ;\
 			umount -l /media || echo "Empty"; \
 			eject || true; \
 			echo "------  initial Setup Complete!  ------"
 
 		# for ubuntu to work...
 		ubiquity ubiquity/success_command string \
-			in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd
-		 	cp /cdrom/preseed.cfg /target/opt/rtd/ ;\
-		 	in-target bash /opt/rtd/core/rtd-oem-enable-config.sh ;\
+			in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd && /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh
+		 	cp /cdrom/*.cfg /target/opt/rtd/ ;\
 			echo "------  initial Setup Complete!  ------"
 
 		# Answer the last question
