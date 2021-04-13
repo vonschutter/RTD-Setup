@@ -953,7 +953,7 @@ display_spinner ()
 
 
 
-setup_oem_run_once() {
+toggle_oem_run_once() {
 # Task to run the OEM post configuaration on first login.
 # the OEM post configuration may allow for interaction if desired and would
 # best run on several distributions and in a full graphic environment.
@@ -966,20 +966,26 @@ setup_oem_run_once() {
 #
 # setup_oem_run_once /path/to/script.sh
 # End of documentation
-	cat > /etc/lightdm/lightdm.conf <<-CREATE_START_LINK
-	# This will automatically start the RuntTime Data OEM config options on
-	# the first login. Once run this launcher will be moved to the /opt/rtd folder
-	# so that subsequent logins will not be plagued by the OEM setup.
-	#
-	[Desktop Entry]
-	Type=Application
-	Exec=sudo $1
-	Terminal=true
-	Hidden=false
-	X-GNOME-Autostart-enabled=true
-	Name=RuntimeDataConfigurationMenu
-	Comment=OEM
-	CREATE_START_LINK
+
+	# If the launcher exists, delete it, else create it.
+	if [[ -e /etc/xdg/autostart/oem-run.desktop ]] ; then
+		rm /etc/xdg/autostart/oem-run.desktop
+	else
+		cat > /etc/xdg/autostart/oem-run.desktop <<-CREATE_START_LINK
+		# This will automatically start the RuntTime Data OEM config options on
+		# the first login. Once run this launcher will be moved to the /opt/rtd folder
+		# so that subsequent logins will not be plagued by the OEM setup.
+		#
+		[Desktop Entry]
+		Type=Application
+		Exec=sudo $1
+		Terminal=true
+		Hidden=false
+		X-GNOME-Autostart-enabled=true
+		Name=RuntimeData OEM Run
+		Comment=OEM
+		CREATE_START_LINK
+	fi
 }
 
 
