@@ -1027,7 +1027,7 @@ toggle_oem_auto_login()
 			# If this file is not there, then it wa not there to begin with
 			# and you can delete this file.
 			[SeatDefaults]
-			autologin-user=$SUDO_USER
+			autologin-user=${SUDO_USER:-"tangarora"}
 			autologin-user-timeout=0
 			OEM_LXDM_LOGIN_OPTION
 		fi
@@ -1048,7 +1048,7 @@ toggle_oem_auto_login()
 			# If this file is not there, then it wa not there to begin with
 			# and you can delete this file.
 			[Autologin]
-			User=$SUDO_USER
+			User=${SUDO_USER:-"tangarora"}
 			Session=plasma.desktop
 			OEM_SDDM_LOGIN_OPTION
 		fi
@@ -1069,7 +1069,7 @@ toggle_oem_auto_login()
 			# and you can delete this file.
 			[daemon]
 			AutomaticLoginEnable=True
-			AutomaticLogin=$SUDO_USER
+			AutomaticLogin=${SUDO_USER:-"tangarora"}
 			WaylandEnable=false
 			OEM_GDM3_LOGIN_OPTION
 		fi
@@ -1081,7 +1081,7 @@ toggle_oem_auto_login()
 		cat >  /etc/systemd/system/getty@tty1.service.d/override.conf <<-OEM_TTY_LOGIN_OPTION
 		"[Service]"
 		"ExecStart="
-		"ExecStart=-/sbin/agetty --noissue --autologin $SUDO_USER %I $TERM"
+		"ExecStart=-/sbin/agetty --noissue --autologin ${SUDO_USER:-"tangarora"} %I $TERM"
 		"Type=idle"
 		OEM_TTY_LOGIN_OPTION
 	else
@@ -1115,11 +1115,11 @@ set_oem_elevated_privilege_gui ()
 
 # End of documentation
 
-	echo "xhost local:root" >> /home/$_OEM_USER/.bashrc
+	echo "xhost local:root" >> /home/${_OEM_USER:-"tangarora"}/.bashrc
 
 	# Allows runing an X program as root
 	touch /root/.bashrc
-	echo "export XAUTHORITY=/home/$_OEM_USER/.Xauthority" >>/root/.bashrc
+	echo "export XAUTHORITY=/home/${_OEM_USER:-"tangarora"}/.Xauthority" >>/root/.bashrc
 }
 
 
@@ -1141,7 +1141,7 @@ set_enable_oem_elevated_privelege()
 # End of documentation
 	# Add instruction to a sudoers include file:
 	# This should be removed when OEM setup is complete as it would represent a back door...
-	echo "$SUDO_USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/99_sudo_include_file
+	echo "${SUDO_USER:-"tangarora"} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/99_sudo_include_file
 
 	# Check that your sudoers include file passed the visudo syntax checks:
 	sudo visudo -cf /etc/sudoers.d/99_sudo_include_file
