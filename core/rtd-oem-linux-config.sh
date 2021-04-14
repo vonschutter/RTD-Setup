@@ -73,7 +73,7 @@
 # Logically, this script will not run, ever, unless downloaded along with the functions and the
 # rtd software recipie book by rtd-me.sh, or on a RTD OEM system where these components would have been
 # downloaded by the preseed or kickstart process as part of the install.
-: "${_LOG_DIR:-"/var/log/rtd"}" ; mkdir -p ${_LOG_DIR}
+: "${_LOG_DIR:="/var/log/rtd"}" ; mkdir -p ${_LOG_DIR}
 
 # Decide where to put log files.
 # Default: log in to the $_LOG_DIR location dated accordingly. If this is already set

@@ -1001,7 +1001,8 @@ toggle_oem_auto_login()
 {
 # Description: Function to toggle auto login for admin purposes.
 # Call the function once to set auto login and call it again to
-# unset auto login.
+# unset auto login. This is usefult to do an administrative login interactively
+# and run configuration scripts (like for OEM setup, KVM automatic template generation)
 #
 # Globals:
 # Arguments: None
@@ -1012,7 +1013,7 @@ toggle_oem_auto_login()
 # toggle_oem_auto_login
 # End of documentation
 
-
+	# Toggle auto login for Light DM if present (Old Ubuntu, Mint?, Budgie? etc.)
 	if [[ -f /etc/lightdm/lightdm.conf ]]; then
 		if [[ -f /etc/lightdm/lightdm.conf.rtd-bak ]]; then
 			write_status "***** LightDM auto login is enabled: toggeling off... ******"
@@ -1033,6 +1034,7 @@ toggle_oem_auto_login()
 		fi
 	fi
 
+	# Toggle auto login for SDDM if present (Kubuntu, SUSE, KDE Based DE's)
 	if [[ -f /etc/sddm.conf ]]; then
 		if [[ -f /etc/sddm.conf.rtd-bak ]]; then
 			write_status "******* SDDM auto login is enabled: toggeling off... *******"
@@ -1054,12 +1056,13 @@ toggle_oem_auto_login()
 		fi
 	fi
 
+	# Toggle auto login for GDM3 if present (Ubuntu, Debian default etc.)
 	if [[ -f /etc/gdm3/daemon.conf ]]; then
 		if [[ -f /etc/gdm3/daemon.conf.rtd-bak ]]; then
-			write_status "******* GDM auto login is enabled: toggeling off... ********"
+			write_status "******* GDM3 auto login is enabled: toggeling off... *******"
 			rm /etc/gdm3/daemon.conf && mv /etc/gdm3/daemon.conf.rtd-bak /etc/gdm3/daemon.conf
 		else
-			write_status "******* GDM auto login is disabled: toggeling on... ********"
+			write_status "******* GDM3 auto login is disabled: toggeling on... *******"
 			cp /etc/gdm3/daemon.conf /etc/gdm3/daemon.conf.rtd-bak
 			cat >  /etc/gdm3/daemon.conf <<-OEM_GDM3_LOGIN_OPTION
 			# This configuration file was created by RTD Setup.
@@ -1075,6 +1078,39 @@ toggle_oem_auto_login()
 		fi
 	fi
 
+	# Toggle auto login for GDM per gnome standard (Fedora et. al.)
+	if [[ -f /etc/gdm/custom.conf ]]; then
+		if [[ -f /etc/gdm/custom.conf.rtd-bak ]]; then
+			write_status "******* GDM auto login is enabled: toggeling off... ********"
+			rm /etc/gdm/custom.conf && mv /etc/gdm/custom.conf.rtd-bak /etc/gdm/custom.conf
+		else
+			write_status "******* GDM auto login is disabled: toggeling on... ********"
+			cp /etc/gdm/custom.conf /etc/gdm/custom.conf.rtd-bak
+			cat >  /etc/gdm/custom.conf <<-OEM_GDM_LOGIN_OPTION
+			# This configuration file was created by RTD Setup.
+			# You may safely replace this file with the original backed up:
+			# /etc/gdm/custom.conf.rtd-bak
+			# If this file is not there, then it wa not there to begin with
+			# and you can delete this file.
+			# GDM configuration storage
+
+			[daemon]
+			WaylandEnable=false
+			AutomaticLoginEnable=True
+			AutomaticLogin=${SUDO_USER:-"tangarora"}
+
+			[security]
+
+			[xdmcp]
+
+			[chooser]
+
+			[debug]
+			OEM_GDM_LOGIN_OPTION
+		fi
+	fi
+
+	# Toggle auto login for Terminal target env. (no GUI).
 	if [ ! -f /etc/systemd/system/getty@tty1.service.d/override.conf ]; then
 		write_status "******* TTY auto login is disabled: toggeling on... ********"
 		mkdir -p /etc/systemd/system/getty@tty1.service.d
@@ -7507,8 +7543,8 @@ generate_fedora_ks_cfg_file ()
 		# Post-installation Script
 		%post --interpreter=/bin/bash
 		git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd
-		chmod 755 /opt/rtd/core/rtd-oem-task-sequence.sh
-		bash /opt/rtd/core/rtd-oem-task-sequence.sh
+		chmod 755 /opt/rtd/core/rtd-oem-enable-config.sh
+		bash /opt/rtd/core/rtd-oem-enable-config.sh
 		%end
 		KS_EOF
 		return
