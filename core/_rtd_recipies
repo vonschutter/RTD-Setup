@@ -471,21 +471,24 @@ recipe_Bundle:_Top_Curated_Games (){
 
 
 
-recipe_Bundle:_Admin_Tools (){
+recipe_Bundle:_Admin_Tools_and_Utilities (){
 			write_status "--- OEM System Administrative Tools..."
 			# Loop through each item in this list of software and perform an install
 			# using the relevant packaging system.
 			AdminToolsAppList="terminix nmap synaptic ssh gparted sshfs htop iftop nethogs vnstat ifstat dstat nload glances bmon \
 				vim vim-scripts gufw variety remmina remmina-plugin-exec remmina-plugin-secret remmina-plugin-vnc remmina-plugin-nx \
-				remmina-plugin-spice remmina-plugin-xdmcp remmina-plugin-rdp remmina-plugin-telepathy"
+				remmina-plugin-spice remmina-plugin-xdmcp remmina-plugin-rdp remmina-plugin-telepathy diodon polari filezilla tilix dialog p7zip byobu"
 
+			write_status "--- Adding some minor congiguration items for productivity..."
 			for i in ${AdminToolsAppList}
 			do
 			     InstallSoftwareFromRepo $i
 			done
 
-			Single_Install_Bleachbit_System_Cleaner
-			Single_Install_Remote_Desktop_by_Team_Viewer
+			Single_Install_Windows_Subsystem_for_Linux			# Installs the ability to run Windows wrograms on Linux
+			Single_Install_Java_Runtime					# Installs Java, needed for cross platform software like Minecraft and others
+			Single_Install_Bleachbit_System_Cleaner				# Install a system cleaner (disk space saver)
+			Single_Install_Remote_Desktop_by_Team_Viewer			# Teamviewer remote admin
 }
 
 
@@ -570,19 +573,12 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 			# -------------------------------------------------------------------------------------------------------#
 			# Add several software items that are almost alwasys used
 			# in one way or another... These may be a dependency to others as well.
-			write_status "--- Adding some minor congiguration items for productivity..."
-			for i in diodon polari filezilla tilix dialog p7zip byobu gnome-maps ; do
-			     InstallSoftwareFromRepo $i
-			done
 
 			# Ensure modern app distribution support
 			ensure_flatpak_pakage_managment
 			ensure_snap_package_managment
-
 			rtd_oem_make_launchers
 			enable_firewall
-			Single_Install_Windows_Subsystem_for_Linux			# Installs the ability to run Windows wrograms on Linux
-			Single_Install_Java_Runtime					# Installs Java, needed for cross platform software like Minecraft and others
 
 			# -------------------------------------------------------------------------------------------------------#
 
@@ -620,6 +616,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 			esac
 			# -------------------------------------------------------------------------------------------------------#
 
+
 			# [Task 4] Configure relevant power management
 			# -------------------------------------------------------------------------------------------------------#
 			check_dependencies tuned
@@ -652,7 +649,6 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 				tuned-adm profile virtual-guest
 			fi
 			# -------------------------------------------------------------------------------------------------------#
-
 
 
 			# [Task 5] Configure UI Tweaks
