@@ -7507,6 +7507,7 @@ generate_fedora_ks_cfg_file ()
 		# Post-installation Script
 		%post --interpreter=/bin/bash
 		git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd
+		chmod 755 /opt/rtd/core/rtd-oem-task-sequence.sh
 		bash /opt/rtd/core/rtd-oem-task-sequence.sh
 		%end
 		KS_EOF
@@ -7516,6 +7517,13 @@ generate_fedora_ks_cfg_file ()
 		return 1
 	fi
 }
+
+
+
+
+
+
+
 
 generate_autoyast_file ()
 {
@@ -7528,6 +7536,7 @@ generate_autoyast_file ()
 # End of documentation
 	FILE="$1"
 	CONFIG="$2"
+	write_host --cyan "Creating AUTOYAST Instructions (XML)"
 
 	cat >> ${FILE} <<-'AUTOYAST_EOF'
 		<?xml version="1.0"?>
