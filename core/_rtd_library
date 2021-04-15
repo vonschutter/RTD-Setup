@@ -511,6 +511,7 @@ rtd_oem_make_launchers ()
 		write_error "This function requires elevated privileges. Please elevate privileges prior to calling this function."
 		return 1
 	else
+		write_information "Creating ${_TLA} launchers..."
 		# Add launchers for some OEM apps.
 		cat > /usr/share/applications/rtd.desktop <<-EOF
 		[Desktop Entry]
@@ -923,7 +924,7 @@ display_spinner ()
 
 
 
-toggle_oem_run_once() {
+toggle_oem_run_once () {
 # Task to run the OEM post configuaration on first login.
 # the OEM post configuration may allow for interaction if desired and would
 # best run on several distributions and in a full graphic environment.
@@ -967,7 +968,7 @@ toggle_oem_run_once() {
 
 
 
-toggle_oem_auto_login()
+toggle_oem_auto_login ()
 {
 # Description: Function to toggle auto login for admin purposes.
 # Call the function once to set auto login and call it again to
@@ -7570,6 +7571,7 @@ generate_autoyast_file ()
 		<general>
 		<mode>
 			<confirm config:type="boolean">false</confirm>
+			<final_reboot config:type="boolean">true</final_reboot>
 		</mode>
 		</general>
 		<networking>
@@ -7578,6 +7580,11 @@ generate_autoyast_file ()
 		<deploy_image>
 			<image_installation config:type="boolean">true</image_installation>
 		</deploy_image>
+		<drive>
+		<partitions config:type="list">
+			<filesystem config:type="symbol">ext4</filesystem>
+		</partitions>
+		</drive>
 		<software>
 			<install_recommended config:type="boolean">true</install_recommended>
 			<patterns config:type="list">
@@ -7640,19 +7647,15 @@ generate_autoyast_file ()
 				<pattern>kde_utilities</pattern>
 				<pattern>kde_yast</pattern>
 				<pattern>laptop</pattern>
-				<pattern>multimedia</pattern>
-				<pattern>x11</pattern>
-				<pattern>x11_enhanced</pattern>
-				<pattern>x11_opt</pattern>
-				<pattern>x11_yast</pattern>
-				<pattern>yast2_basis</pattern>
 			</patterns>
 			<products config:type="list">
 				<product>openSUSE</product>
 			</products>
 		</software>
-
-
+		<login_settings>
+			<autologin_user>tangarora</autologin_user>
+			<password_less_login config:type="boolean">true</password_less_login>
+		</login_settings>
 		<services-manager>
 			<default_target>graphical</default_target>
 			<services>
@@ -7671,6 +7674,7 @@ generate_autoyast_file ()
 	git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd
 	chmod 755 /opt/rtd/core/rtd-oem-enable-config.sh
 	/opt/rtd/core/rtd-oem-enable-config.sh
+	cp *.xml /opt/rtd/
 				]]>
 				</source>
 				</script>
