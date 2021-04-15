@@ -1085,15 +1085,15 @@ toggle_oem_auto_login()
 	fi
 
 	# Special case for SUSE...
-	if [[ -f /etc/sysconfig/displaymanager ]] ; then
-		if [[ -f /etc/sysconfig/displaymanager.rtd-bak ]]; then
+	if [[ -e /etc/sysconfig/displaymanager ]] ; then
+		if [[ -e /etc/sysconfig/displaymanager.rtd-bak ]]; then
 			write_status "****** SUSE auto login is enabled: toggeling off... ********"
 			rm /etc/sysconfig/displaymanager && mv /etc/sysconfig/displaymanager.rtd-bak /etc/sysconfig/displaymanager
 		else
 			write_status "****** SUSE auto login is disabled: toggeling on... ********"
-			cp /etc/sysconfig/displaymanager /etc/sysconfig/displaymanager.rtd-bak
-			sed -i 's/DISPLAYMANAGER_AUTOLOGIN=""/DISPLAYMANAGER_AUTOLOGIN="tangarora"/' /etc/sysconfig/displaymanager
-			sed -i 's/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="no"/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"/' /etc/sysconfig/displaymanager
+			cp /etc/sysconfig/displaymanager /etc/sysconfig/displaymanager.rtd-bak || write_error "Could not backup: /etc/sysconfig/displaymanager! "
+			sed -i 's/DISPLAYMANAGER_AUTOLOGIN=""/DISPLAYMANAGER_AUTOLOGIN="tangarora"/' /etc/sysconfig/displaymanager || write_error "Could not write to file: /etc/sysconfig/displaymanager!"
+			sed -i 's/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="no"/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"/' /etc/sysconfig/displaymanager || write_error "Could not write to file: /etc/sysconfig/displaymanager!"
 		fi
 	fi
 
@@ -7651,10 +7651,17 @@ generate_autoyast_file ()
 				<product>openSUSE</product>
 			</products>
 		</software>
+
+
 		<services-manager>
-		<default_target>graphical</default_target>
+			<default_target>graphical</default_target>
+			<services>
+				<enable config:type="list">
+				<service>sshd</service>
+				<service>spice-vdagent</service>
+				</enable>
+			</services>
 		</services-manager>
-		<rerun config:type="boolean">true</rerun>
 		<scripts>
 			<init-scripts config:type="list">
 				<script>
