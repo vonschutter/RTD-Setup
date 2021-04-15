@@ -55,21 +55,36 @@ _OEM_USER=tangarora
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 tell_info() {
-	echo "starting post install tasks..."
-	echo "SYSTEM information:"
-	echo "File system information: "
+	echo "starting post install tasks on:  $( date )..."
+	echo "*** SYSTEM information:"
+	echo ************************************************************
+	lsusb
+	echo ************************************************************
+	lspci
+	echo ************************************************************
+	echo "*** File system information: "
+	echo ************************************************************
 	mount
-	echo "Block Devices: "
+	echo ************************************************************
+	swapon
+	echo ************************************************************
+	echo "*** Block Devices: "
+	echo ************************************************************
 	lsblk
-	echo "available space: "
+	echo ************************************************************
+	echo "*** available space: "
+	echo ************************************************************
 	df -h
-	echo "Process information: "
+	echo ************************************************************
+	echo "*** Process information: "
+	echo ************************************************************
 	ps aux
+	echo ************************************************************
 }
 
 tell_info							&>> $_LOGFILE
 toggle_oem_run_once "/opt/rtd/core/rtd-oem-linux-config.sh"	&>> $_LOGFILE
 set_enable_oem_elevated_privelege				&>> $_LOGFILE
 toggle_oem_auto_login						&>> $_LOGFILE
-oem_ensure_elevated_gui						&>> $_LOGFILE
+set_oem_elevated_privilege_gui					&>> $_LOGFILE
 

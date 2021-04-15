@@ -735,36 +735,6 @@ rtd_oem_reset_default_environment_config ()
 
 
 
-oem_ensure_elevated_gui ()
-{
-# Description: Some Debian and other Linux distribution do not allow gui apps to
-# be run when invoked by "sudo" or in a root (system elevated authority)
-# environment. To mitigate this some stemp may need to taken.
-# Will work on Slackware as well as Debian to give root permission to open X programs.
-#
-# Globals: $_OEM_USER
-# Arguments: None
-# Outputs: configures local X environment to allow root to show GUI apps
-# Returns:
-# Usage: task_oem_ensure_elevated_gui
-# End of documentation
-
-	echo "xhost local:root" >> /home/$_OEM_USER/.bashrc
-
-	# Allows runing an X program as root
-	touch /root/.bashrc
-	echo "export XAUTHORITY=/home/$_OEM_USER/.Xauthority" >>/root/.bashrc
-}
-
-
-
-
-
-
-
-
-
-
 
 
 rtd_wait_for_internet_availability ()
@@ -1004,13 +974,17 @@ toggle_oem_auto_login()
 # unset auto login. This is usefult to do an administrative login interactively
 # and run configuration scripts (like for OEM setup, KVM automatic template generation)
 #
+# This function will look for all the popular display managers adn common ways to configure
+# automatic login and set those. If auto login is already set, this funciton will unset the
+# automatic login.
+#
 # Globals:
 # Arguments: None
 # Outputs:
 # Returns:
-# Usage:
+# Usage:  toggle_oem_auto_login
 #
-# toggle_oem_auto_login
+#
 # End of documentation
 
 	# Toggle auto login for Light DM if present (Old Ubuntu, Mint?, Budgie? etc.)
@@ -1147,26 +1121,26 @@ toggle_oem_auto_login()
 
 
 
-
-
-
 set_oem_elevated_privilege_gui ()
 {
 # Description: Some Debian and other Linux distribution do not allow gui apps to
 # be run when invoked by "sudo" or in a root (system elevated authority)
 # environment. To mitigate this some stemp may need to taken.
 # Will work on Slackware as well as Debian to give root permission to open X programs.
-# Globals:
+#
+# Globals: $_OEM_USER
 # Arguments: None
-# Outputs:
+# Outputs: configures local X environment to allow root to show GUI apps
 # Returns:
-# Usage:
-
+# Usage: set_oem_elevated_privilege_gui
 # End of documentation
 
+	write_information "Editing bashrc: xhost local:root IN /home/${_OEM_USER}/.bashrc"
+	touch /home/${_OEM_USER}/.bashrc
 	echo "xhost local:root" >> /home/${_OEM_USER:-"tangarora"}/.bashrc
 
 	# Allows runing an X program as root
+	write_information "Editing bashrc: XAUTHORITY=/home/${_OEM_USER}/.Xauthority IN /root/.bashrc"
 	touch /root/.bashrc
 	echo "export XAUTHORITY=/home/${_OEM_USER:-"tangarora"}/.Xauthority" >>/root/.bashrc
 }
@@ -1188,7 +1162,8 @@ set_enable_oem_elevated_privelege()
 # Returns:
 # Usage:
 # End of documentation
-	# Add instruction to a sudoers include file:
+
+	write_information "Adding instruction to a sudoers include file: ${SUDO_USER:-"tangarora"} ALL=(ALL) NOPASSWD:ALL"
 	# This should be removed when OEM setup is complete as it would represent a back door...
 	echo "${SUDO_USER:-"tangarora"} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/99_sudo_include_file
 
@@ -7585,7 +7560,7 @@ generate_autoyast_file ()
 # End of documentation
 	FILE="$1"
 	CONFIG="$2"
-	write_host --cyan "Creating AUTOYAST Instructions (XML)"
+	write_host --cyan "Creating AUTOYAST Instructions (XML): ${FILE}"
 
 	cat >> ${FILE} <<-'AUTOYAST_EOF'
 	<?xml version="1.0"?>
@@ -7687,7 +7662,8 @@ generate_autoyast_file ()
 				<source><![CDATA[
 	#!/bin/bash
 	git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd
-	bash /opt/rtd/core/rtd-oem-enable-config.sh
+	chmod 755 /opt/rtd/core/rtd-oem-enable-config.sh
+	/opt/rtd/core/rtd-oem-enable-config.sh
 				]]>
 				</source>
 				</script>
