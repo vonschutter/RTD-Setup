@@ -1110,6 +1110,20 @@ toggle_oem_auto_login()
 		fi
 	fi
 
+	# Special case for SUSE...
+	if [[ -f /etc/sysconfig/displaymanager ]] ; then
+		if [[ -f /etc/sysconfig/displaymanager.rtd-bak ]]; then
+			write_status "****** SUSE auto login is enabled: toggeling off... ********"
+			rm /etc/sysconfig/displaymanager && mv /etc/sysconfig/displaymanager.rtd-bak /etc/sysconfig/displaymanager
+		else
+			write_status "****** SUSE auto login is disabled: toggeling on... ********"
+			cp /etc/sysconfig/displaymanager /etc/sysconfig/displaymanager.rtd-bak
+			_usr_reg="sed -i 's/DISPLAYMANAGER_AUTOLOGIN=""/DISPLAYMANAGER_AUTOLOGIN=${SUDO_USER:-"tangarora"}/' /etc/sysconfig/displaymanager"
+			${_usr_reg}
+			sed -i 's/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="no"/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"/' /etc/sysconfig/displaymanager
+		fi
+	fi
+
 	# Toggle auto login for Terminal target env. (no GUI).
 	if [ ! -f /etc/systemd/system/getty@tty1.service.d/override.conf ]; then
 		write_status "******* TTY auto login is disabled: toggeling on... ********"
@@ -7648,17 +7662,11 @@ generate_autoyast_file ()
 			</packages>
 			<patterns config:type="list">
 				<pattern>kde</pattern>
-				<pattern>kde_games</pattern>
-				<pattern>kde_internet</pattern>
-				<pattern>kde_multimedia</pattern>
 				<pattern>kde_plasma</pattern>
 				<pattern>kde_utilities</pattern>
-				<pattern>kde_utilities_opt</pattern>
 				<pattern>kde_yast</pattern>
 				<pattern>laptop</pattern>
 				<pattern>multimedia</pattern>
-				<pattern>multimedia_opt</pattern>
-				<pattern>office</pattern>
 				<pattern>x11</pattern>
 				<pattern>x11_enhanced</pattern>
 				<pattern>x11_opt</pattern>
