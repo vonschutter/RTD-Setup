@@ -979,6 +979,10 @@ toggle_oem_auto_login ()
 # automatic login and set those. If auto login is already set, this funciton will unset the
 # automatic login.
 #
+# The function will also check and apply SUSE speciffic configurations: it will not edit the
+# sddm.conf, gdm.conf, gdm3.conf, or lightdm.conf, instead, it modifies the suse speciffic
+# displaymanager file in /etc/sysconfig/.
+#
 # Globals:
 # Arguments: None
 # Outputs:
@@ -7576,6 +7580,9 @@ generate_autoyast_file ()
 	<mode>
 		<confirm config:type="boolean">false</confirm>
 		<final_reboot config:type="boolean">true</final_reboot>
+		<final_halt config:type="boolean">false</final_halt>
+		<halt config:type="boolean">false</halt>
+		<second_stage config:type="boolean">true</second_stage>
 	</mode>
 	<storage>
 	        <proposal>
@@ -7630,6 +7637,7 @@ generate_autoyast_file ()
 			<package>vim</package>
 			<package>spice-vdagent</package>
 			<package>git</package>
+			<package>libqt4</package>
 		</packages>
 		<patterns config:type="list">
 			<pattern>kde</pattern>

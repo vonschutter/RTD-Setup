@@ -607,6 +607,19 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 					check_dependencies plasma-discover-backend-flatpak
 					check_dependencies plasma-discover-backend-snap
 				;;
+				/usr/share/xsessions/default )
+					# Special case for suse again...
+					if cat /usr/share/xsessions/default |grep Plasma ; then
+						check_dependencies plasma-discover
+						check_dependencies plasma-discover-backend-flatpak
+						check_dependencies plasma-discover-backend-snap
+					else
+						snap install snap-store
+						check_dependencies gnome-software
+						check_dependencies gnome-software-plugin-flatpak
+						check_dependencies gnome-software-plugin-snap
+					fi
+				;;
 				* )
 					snap install snap-store
 					check_dependencies gnome-software
@@ -803,12 +816,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 				echo "Detected KDE UI!"
 				# Download and Set Wallpaper...
 				CacheDir="${_RTDCACHE:="/opt/rtd/cache"}"
-				echo Downloading Wallpapers:
-					mkdir -p ${CacheDir} && if [[ -e ${CacheDir}/master.zip ]] ; then rm ${CacheDir}/master.zip ; fi
-					wget -q --show-progress https://github.com/${GIT_Profile}/RTD-Media/archive/master.zip -P ${CacheDir} && unzip -q -o ${CacheDir}/master.zip -d ${CacheDir}
-					rm ${CacheDir}/master.zip
-					pushd ${CacheDir} && mv -f RTD-Media-master/Wallpaper .. && mv -f RTD-Media-master/Sound ..
-				rtd_oem_kde_set_wallpaper "${CacheDir}/Wayland.jpg"
+				rtd_oem_kde_set_wallpaper "${WallPaperDir}/Wayland.jpg"
 
 				lookandfeeltool -a 'org.kde.breezedark.desktop'
 
@@ -816,8 +824,8 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 				wget https://github.com/vinceliuice/vimix-kde/archive/master.zip  -P /opt/rtd/cache || write_error "Unable to download https://github.com/vinceliuice/vimix-kde/archive/master.zip"
 				unzip -o /opt/rtd/cache/master.zip -d /opt/rtd/cache && pushd /opt/rtd/cache/vimix-kde-master && ./install.sh && popd ; rm ${CacheDir}/master.zip
 
-				wget https://github.com/${GIT_Profile}/RTD-Media/raw/master/Themes/vimix-icon-themes.zip -P /opt/rtd/cache || write_error "Unable to download https://github.com/${GIT_Profile}/RTD-Media/raw/master/Themes/vimix-icon-themes.zip"
-				unzip -o /opt/rtd/cache/vimix-icon-themes.zip -d /opt/rtd/cache && pushd /opt/rtd/cache/vimix-icon-theme-master && ./install.sh && popd && popd && rm ${CacheDir}/master.zip
+				7z x  ${ThemeDir}/vimix-icon-themes.zip -o${ThemeDir} && pushd ${ThemeDir}/vimix-icon-theme-master && ./install.sh && popd
+				for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
 				lookandfeeltool -a  'com.github.vinceliuice.Vimix-Dark-Doder'
 			fi
 }
