@@ -12,7 +12,7 @@
 # :: 	Primary Author Source: 	https://github.com/Disassembler0/Win10-Initial-Setup-Script
 # :: 	Tweaked Source: 	https://gist.github.com/alirobe/7f3b34ad89a159e6daa1/
 # ::
-# :: 	This Script Souce:	https://github.com/vonschutter/RTD-Build
+# :: 	This Script Souce:	https://github.com/vonschutter/RTD-Setup
 # ::
 # :: Purpose: 	The purpose of the script is to:
 # ::		- Remove unnessesary software from Windows 10
@@ -24,7 +24,7 @@
 # ::
 # :: Background: This script is shared in the hopes that someone will find it usefull. To encourage sharing changes
 # :: 		 back to the source this script is released under the GPL v3. (see source location for details)
-# ::		 https://github.com/vonschutter/RTD-Build/raw/master/LICENSE.md
+# ::		 https://github.com/vonschutter/RTD-Setup/raw/master/LICENSE.md
 # ::
 # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -274,6 +274,13 @@ function OnlineInstallTask {
 	Write-Progress -Activity "-- $BRANDING OEM Software Tasks:" -CurrentOperation "$Title ..." -Status "Processing Software Deployment Instructions"
 	choco install $ChocoInstall -y -no-desktopshortcuts
 }
+
+
+Function Set-WallPaper($Value){
+ Set-ItemProperty -path 'HKCU:\Control Panel\Desktop\' -name wallpaper -value $value
+ rundll32.exe user32.dll, UpdatePerUserSystemParameters
+}
+
 
 Function RTDRegistryTweaks {
 	Write-Progress -Activity "Improving Windows Update to delay Feature updates and only install Security Updates" -Status "Processing"
@@ -2833,6 +2840,8 @@ If ($args) {
 
 # Call the desired tweak functions
 $tweaks | ForEach-Object { Invoke-Expression $_ } *>&1 | Out-File C:\setup.log
+
+# Set-WallPaper
 
 ### Restart Computer when all changes are made  ###
 If (([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator")) {

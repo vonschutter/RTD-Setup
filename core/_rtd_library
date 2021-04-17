@@ -5218,21 +5218,23 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 	# Discover if the appropriate VM net interface is (default or br'0 - n')
 	VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
 
-        # create image and run installer
-        "${BIN_VIRT_INSTALL}" --connect qemu:///system --name VDI_SUSE_"$CONFIG"_"$RANDOM" \
-                --vcpus "${2:-2}" \
-                --memory "${3:-2048}" \
-                --network "$VIRT_NET" \
-                --disk size="${4:-40}" \
-                --os-variant=opensusetumbleweed \
-                --initrd-inject="${PRESEED_FILE}" \
-                --location='http://download.opensuse.org/pub/opensuse/distribution/leap/15.2/repo/oss' \
-                --extra-args "AutoYaST=file:///$(basename $PRESEED_FILE)" \
-                --noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
+	# create image and run installer
+	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name VDI_SUSE_"$CONFIG"_"$RANDOM" \
+		--vcpus "${2:-2}" \
+		--memory "${3:-2048}" \
+		--network "$VIRT_NET" \
+		--disk size="${4:-40}" \
+		--os-variant=opensusetumbleweed \
+		--initrd-inject="${PRESEED_FILE}" \
+		--location='http://download.opensuse.org/pub/opensuse/distribution/leap/15.2/repo/oss' \
+		--extra-args "AutoYaST=file:///$(basename $PRESEED_FILE)" \
+		--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
+
+		# --location='http://download.opensuse.org/factory/repo/oss/'
+		# --location='http://download.opensuse.org/pub/opensuse/distribution/leap/15.2/repo/oss' \
 
 	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built. You may attach to this server and see the progress at IP: $(hostname -I))" 10 60
 
-	#  --location='http://download.opensuse.org/pub/opensuse/distribution/leap/15.0/repo/oss' \
 }
 
 
@@ -7564,123 +7566,109 @@ generate_autoyast_file ()
 	write_host --cyan "Creating AUTOYAST Instructions (XML): ${FILE}"
 
 	cat >> ${FILE} <<-'AUTOYAST_EOF'
-	<?xml version="1.0"?>
-		<!DOCTYPE profile>
-		<profile xmlns="http://www.suse.com/1.0/yast2ns"
-			xmlns:config="http://www.suse.com/1.0/configns">
-		<general>
-		<mode>
-			<confirm config:type="boolean">false</confirm>
-			<final_reboot config:type="boolean">true</final_reboot>
-		</mode>
-		</general>
-		<networking>
-			<keep_install_network config:type="boolean">true</keep_install_network>
-		</networking>
-		<deploy_image>
-			<image_installation config:type="boolean">true</image_installation>
-		</deploy_image>
-		<drive>
-		<partitions config:type="list">
-			<filesystem config:type="symbol">ext4</filesystem>
-		</partitions>
-		</drive>
-		<software>
-			<install_recommended config:type="boolean">true</install_recommended>
-			<patterns config:type="list">
-				<pattern>base</pattern>
-			</patterns>
-		</software>
-		<users config:type="list">
-			<user>
-				<encrypted config:type="boolean">true</encrypted>
-				<fullname>root</fullname>
-				<gid>0</gid>
-				<home>/root</home>
-				<home_btrfs_subvolume config:type="boolean">false</home_btrfs_subvolume>
-				<password_settings>
-					<expire/>
-					<flag/>
-					<inact/>
-					<max/>
-					<min/>
-					<warn/>
-				</password_settings>
-				<shell>/bin/bash</shell>
-				<uid>0</uid>
-				<user_password>$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1</user_password>
-				<username>root</username>
-			</user>
-			<user>
-				<encrypted config:type="boolean">true</encrypted>
-				<fullname>tangarora</fullname>
-				<gid>100</gid>
-				<home>/home/tangarora</home>
-				<home_btrfs_subvolume config:type="boolean">false</home_btrfs_subvolume>
-				<password_settings>
-					<expire/>
-					<flag/>
-					<inact/>
-					<max>99999</max>
-					<min>0</min>
-					<warn>7</warn>
-				</password_settings>
-				<shell>/bin/bash</shell>
-				<uid>1001</uid>
-				<user_password>$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1</user_password>
-				<username>tangarora</username>
-			</user>
-		</users>
-		<software>
-			<image/>
-			<install_recommended config:type="boolean">true</install_recommended>
-			<instsource/>
-			<packages config:type="list">
-				<package>wget</package>
-				<package>vim</package>
-				<package>spice-vdagent</package>
-				<package>git</package>
-			</packages>
-			<patterns config:type="list">
-				<pattern>kde</pattern>
-				<pattern>kde_plasma</pattern>
-				<pattern>kde_utilities</pattern>
-				<pattern>kde_yast</pattern>
-				<pattern>laptop</pattern>
-			</patterns>
-			<products config:type="list">
-				<product>openSUSE</product>
-			</products>
-		</software>
-		<login_settings>
-			<autologin_user>tangarora</autologin_user>
-			<password_less_login config:type="boolean">true</password_less_login>
-		</login_settings>
-		<services-manager>
-			<default_target>graphical</default_target>
-			<services>
-				<enable config:type="list">
-				<service>sshd</service>
-				<service>spice-vdagent</service>
-				</enable>
-			</services>
-		</services-manager>
-		<scripts>
-			<init-scripts config:type="list">
-				<script>
-				<interpreter>bash</interpreter>
-				<source><![CDATA[
-	#!/bin/bash
-	git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd
-	chmod 755 /opt/rtd/core/rtd-oem-enable-config.sh
-	/opt/rtd/core/rtd-oem-enable-config.sh
-	cp *.xml /opt/rtd/
-				]]>
-				</source>
-				</script>
-			</init-scripts>
-		</scripts>
-		</profile>
+<?xml version="1.0"?>
+	<!DOCTYPE profile>
+	<profile xmlns="http://www.suse.com/1.0/yast2ns"
+		xmlns:config="http://www.suse.com/1.0/configns">
+	<general>
+	<mode>
+		<confirm config:type="boolean">false</confirm>
+		<final_reboot config:type="boolean">true</final_reboot>
+	</mode>
+	<storage>
+	        <proposal>
+		        <lvm config:type="boolean">true</lvm>
+		        <windows_delete_mode config:type="symbol">all</windows_delete_mode>
+		        <linux_delete_mode config:type="symbol">all</linux_delete_mode>
+		        <other_delete_mode config:type="symbol">all</other_delete_mode>
+		        <encryption_password>letmein1234</encryption_password>
+	        </proposal>
+	</storage>
+	</general>
+	<networking>
+		<keep_install_network config:type="boolean">true</keep_install_network>
+	</networking>
+	<deploy_image>
+		<image_installation config:type="boolean">true</image_installation>
+	</deploy_image>
+	<software>
+		<install_recommended config:type="boolean">true</install_recommended>
+		<patterns config:type="list">
+			<pattern>base</pattern>
+		</patterns>
+	</software>
+	<users config:type="list">
+		<user>
+			<encrypted config:type="boolean">true</encrypted>
+			<fullname>root</fullname>
+			<gid>0</gid>
+			<home>/root</home>
+			<shell>/bin/bash</shell>
+			<uid>0</uid>
+			<user_password>$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1</user_password>
+			<username>root</username>
+		</user>
+		<user>
+			<encrypted config:type="boolean">true</encrypted>
+			<fullname>tangarora</fullname>
+			<gid>100</gid>
+			<home>/home/tangarora</home>
+			<shell>/bin/bash</shell>
+			<uid>1001</uid>
+			<user_password>$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1</user_password>
+			<username>tangarora</username>
+		</user>
+	</users>
+	<software>
+		<image/>
+		<install_recommended config:type="boolean">true</install_recommended>
+		<instsource/>
+		<packages config:type="list">
+			<package>wget</package>
+			<package>vim</package>
+			<package>spice-vdagent</package>
+			<package>git</package>
+		</packages>
+		<patterns config:type="list">
+			<pattern>kde</pattern>
+			<pattern>kde_plasma</pattern>
+			<pattern>kde_utilities</pattern>
+			<pattern>kde_yast</pattern>
+			<pattern>laptop</pattern>
+		</patterns>
+		<products config:type="list">
+			<product>openSUSE</product>
+		</products>
+	</software>
+	<login_settings>
+		<autologin_user>tangarora</autologin_user>
+		<password_less_login config:type="boolean">true</password_less_login>
+	</login_settings>
+	<services-manager>
+		<default_target>graphical</default_target>
+		<services>
+			<enable config:type="list">
+			<service>sshd</service>
+			<service>spice-vdagent</service>
+			</enable>
+		</services>
+	</services-manager>
+	<scripts>
+		<init-scripts config:type="list">
+			<script>
+			<interpreter>bash</interpreter>
+			<source><![CDATA[
+#!/bin/bash
+git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd
+chmod 755 /opt/rtd/core/rtd-oem-enable-config.sh
+/opt/rtd/core/rtd-oem-enable-config.sh
+cp *.xml /opt/rtd/
+			]]>
+			</source>
+			</script>
+		</init-scripts>
+	</scripts>
+	</profile>
 	AUTOYAST_EOF
 }
 
