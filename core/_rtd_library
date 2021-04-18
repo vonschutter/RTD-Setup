@@ -418,6 +418,10 @@ oem_register_all_tools ()
 # Dependencies: _locations
 #
 # End of Documentation
+	_bashrc="/home/${_OEM_USER:-"tangarora"}/.bashrc"
+
+	sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
+	if ! grep "xhost local:root" "${_bashrc}" ; then echo 'xhost local:root >/dev/null' >> "${_bashrc}" ; fi
 
 	if [[ -n "${_MODS_DIR}" ]] ; then
 		for d in $( ls -p ${_MODS_DIR}/ ) ; do
