@@ -3899,18 +3899,23 @@ ensure_snap_package_managment ()
 
 
 	if [[ $(echo "$OSTYPE" |grep "linux") ]]; then
-
+		ensure_admin
 		# these tests focus on the latest versions of the distros evaluated...
 		if hostnamectl |grep "SUSE" 2>/dev/null ; then
-			# Special case for suse
-			zypper addrepo --refresh https://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_$(cat /etc/os-release |grep VERSION_ID |cut -d= -f2|cut -d\" -f2) snappy
+			write_warning "${FUNCNAME[0]}: Special case for suse"
+			write_status "${FUNCNAME[0]}: Addign repository..."
+				zypper addrepo --refresh https://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_$(cat /etc/os-release |grep VERSION_ID |cut -d= -f2|cut -d\" -f2) snappy
+			write_status "${FUNCNAME[0]}: Importing GPG keys..."
+				zypper --gpg-auto-import-keys refresh
+			write_status "${FUNCNAME[0]}: Updating software repository indexes..."
+				zypper dup --from snappy
 			write_information "${FUNCNAME[0]}: Ensuring SNAP software distribution system is available..."
-			check_dependencies snapd || write_error "${FUNCNAME[0]}: Failed to satisfy dependecy SNAP!"
-			systemctl enable snapd ; systemctl start snapd ; systemctl status snapd
-			systemctl is-active --quiet snapd || return 1
+				check_dependencies snapd || write_error "${FUNCNAME[0]}: Failed to satisfy dependecy SNAP!"
+				systemctl enable snapd ; systemctl start snapd
+				systemctl is-active --quiet snapd || ( write "${FUNCNAME[0]}: Service snapd not started sucessfully!" ; return 1 )
 
 			if [[ -e /snap ]]; then
-				write_information "SNAP classic support present... "
+				write_information "${FUNCNAME[0]}: SNAP classic support present... "
 			else
 				ln -s /var/lib/snapd/snap /snap
 			fi
