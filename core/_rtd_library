@@ -7591,9 +7591,9 @@ generate_autoyast_file ()
 	FILE="$1"
 	CONFIG="$2"
 	write_host --cyan "Creating AUTOYAST Instructions (XML): ${FILE}"
-
-	cat >> ${FILE} <<-'AUTOYAST_EOF'
-<?xml version="1.0"?>
+	Preference_DiskEncryption_SUSE="$( [[ "$_EncryptDisk" == "YES" ]] && echo "<encryption_password>${PreferredDiskPassword:-"letmein1234"}</encryption_password>" )"
+	cat >> ${FILE} <<-AUTOYAST_EOF
+	<?xml version="1.0"?>
 	<!DOCTYPE profile>
 	<profile xmlns="http://www.suse.com/1.0/yast2ns"
 		xmlns:config="http://www.suse.com/1.0/configns">
@@ -7611,7 +7611,7 @@ generate_autoyast_file ()
 		        <windows_delete_mode config:type="symbol">all</windows_delete_mode>
 		        <linux_delete_mode config:type="symbol">all</linux_delete_mode>
 		        <other_delete_mode config:type="symbol">all</other_delete_mode>
-		        #<encryption_password>letmein1234</encryption_password>
+			${Preference_DiskEncryption_SUSE}
 	        </proposal>
 	</storage>
 	</general>
@@ -7689,11 +7689,11 @@ generate_autoyast_file ()
 			<script>
 			<interpreter>bash</interpreter>
 			<source><![CDATA[
-#!/bin/bash
-git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd
-chmod 755 /opt/rtd/core/rtd-oem-enable-config.sh
-/opt/rtd/core/rtd-oem-enable-config.sh
-cp *.xml /opt/rtd/
+	#!/bin/bash
+	git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd
+	chmod 755 /opt/rtd/core/rtd-oem-enable-config.sh
+	/opt/rtd/core/rtd-oem-enable-config.sh
+	cp *.xml /opt/rtd/
 			]]>
 			</source>
 			</script>
