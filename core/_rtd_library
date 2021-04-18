@@ -2323,6 +2323,15 @@ ensure_admin ()
 # Description: Function to elevate priviledges of script execution and to ensure administrative privileges
 # such that system wide settings or configuration may be done.
 #
+# This function evaluates and uses multiple ways to elevate priviledges based on the environment. In an
+# X session; and normal GUI w. systemd: elevate privs with normal GUI policy kit, otherwise try dialog
+# menu system and cached sudo, and finally fall back on good old sudo. Since scripts may be launched with
+# a GUI front (for user interaction) end and NO terminal; it is really preferable to display a proper
+# priviledge escalation propt in a GUI format and only use sudo in cases where there is a terminal or
+# no other option is present.
+#
+# Should the function not discover an X session, then dialog will be preferred over regular sudo.
+#
 # Globals: $UID
 # Arguments: None
 # Outputs: GUI
@@ -3842,10 +3851,10 @@ ensure_flatpak_package_managment ()
 # +-----------------------------------------------------+----------------+-------------+-----------------+
 # End of documentation
 
- End of documentation
+	ensure_admin
 	write_information "${FUNCNAME[0]}: Ensuring Flatpack software distribution system is available..."
-	check_dependencies flatpak || write_error "${FUNCNAME[0]}: Failed to satisfy dependecy flatpak!"
-	flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || write_error "${FUNCNAME[0]}: Failed to add flatpak repo!"
+		check_dependencies flatpak || write_error "${FUNCNAME[0]}: Failed to satisfy dependecy flatpak!"
+		flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || write_error "${FUNCNAME[0]}: Failed to add flatpak repo!"
 	return $?
 }
 
@@ -3976,7 +3985,7 @@ up2date ()
 # Returns:
 # Usage:
 # End of documentation
-
+	ensure_admin
 	write_status "Running up2date function:"
 
 	if hash pkcon 2>/dev/null; then
@@ -4080,6 +4089,7 @@ InstallSoftwareFromRepo ()
 # be an RPM or deb string, or even snap or flatpack. A preference order between package system and
 # snap or flatpack use.
 # End of documentation
+	ensure_admin
 	: ${_LOGFILE:="/var/log/rtd/$( basename "$0".log )"}
 	# Ask function how to install software...
 	set_install_command >>/dev/null 2>&1
@@ -4206,7 +4216,7 @@ check_dependencies ()
 # check_dependencies snapd
 #
 # End of documentation
-
+	ensure_admin
 	#---------------------------------------------------------------
 	write_status "Checking for script dependencies and install if not there..."
 	#---------------------------------------------------------------
@@ -4257,6 +4267,7 @@ rtd_ppa_checker ()
 # rtd_ppa_checker [] [--delete]
 #
 # End of documentation
+	ensure_admin
 	for f in /etc/apt/sources.list.d/*.list; do
 		grep -Po "(?<=^deb\s).*?(?=#|$)" "$f" | while read -r ENTRY ; do
 			echo "ENTRY: $ENTRY"
@@ -4317,7 +4328,7 @@ rtd_oem_release_upgrade ()
 # End of Documentation
 
 
-
+	ensure_admin
 	local set interactive=$1
 	unset result
 	TMP_DISC_DIR=$(mktemp -d )
@@ -4382,7 +4393,7 @@ rtd_oem_remove_non_western_latin_fonts ()
 #
 # The function will not return any sucess or failure codes. It will do its best and exit.
 # End of documentation
-
+	ensure_admin
 	font_list="fonts-kacst fonts-kacst-one fonts-khmeros-core fonts-lklug-sinhala fonts-lohit-guru fonts-guru fonts-nanum fonts-noto-cjk fonts-takao-pgothic fonts-tibetan-machine fonts-guru-extra \
 		fonts-lao fonts-sil-padauk fonts-sil-abyssinica fonts-tlwg-* fonts-beng fonts-beng-extra fonts-deva fonts-deva-extra fonts-gubbi fonts-gujr fonts-gujr-extra fonts-kalapi fonts-knda \
 		fonts-lohit-* fonts-orya* fonts-pagul fonts-sahadeva fonts-samyak-* fonts-sarai fonts-smc fonts-smc-* fonts-taml fonts-telu fonts-telu-extra"
@@ -4424,7 +4435,7 @@ rtd_oem_remove_software ()
 #
 # If a failure occurs this function will return a non "0" exit code. (1)
 # End of documentation
-
+	ensure_admin
 	if [[ $(echo $OSTYPE |grep "linux") ]]; then
 		echo "Trying to remove package $*"
 		if hash dnf 2>/dev/null; then
@@ -4484,7 +4495,7 @@ rtd_update_system ()
 # Returns:
 # Usage: z
 # End of documentation
-
+	ensure_admin
 	PUBLICATION="$BRANDING Update Manager for Linux"
 	VERSION="1.14 (built in)"
 
