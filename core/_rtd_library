@@ -4533,14 +4533,15 @@ rtd_update_system ()
 
 	write_status "updating snaps if snap is present on the system..."
 	if hash snap 2>/dev/null; then
-		snap refresh
+		rtd_software_task snap refresh
 	else
 		write_warning "--- snap software is not present on this system... skipping..."
 	fi
 
 	write_status "updating flatpacks if flatpack is present on system..."
 	if hash flatpak 2>/dev/null; then
-		flatpak update -y
+		rtd_software_task flatpak update --user --noninteractive -y
+		rtd_software_task flatpak update --system --noninteractive -y
 	else
 		write_warning "--- flatpak software is not present on this system... skipping..."
 	fi

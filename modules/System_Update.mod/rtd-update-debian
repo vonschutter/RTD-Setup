@@ -86,22 +86,36 @@ fi
 
 
 # Enable RTD Functions...
-echo "Checking for RTD Functions..."
-FILE=/opt/rtd/scripts/_rtd_library
-if [ -f $FILE ]; then
-   echo -e $GREEN"RTD Functions are available: Loading them for use... " $ENDCOLOR
-   source $FILE
-else
-   echo "Cannot find RTD Functions... Attempting to get them online... "
-   wget -q --show-progress https://github.com/vonschutter/RTD-Build/raw/master/"${FILE##*/}" -P /opt/rtd/scripts
-   if [ -f $FILE ]; then
-   	echo -e $GREEN"RTD Functions are available: Loading them for use... " $ENDCOLOR
-   	source $FILE
-   else
-   	echo -e $RED"RTD Functions could NOT be loaded; You must use the native options to install software... "$ENDCOLOR
-   	exit
-   fi
-fi
+	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
+		# Library found in relative path...
+		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library
+	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
+		# Library not found in relative path: search the typical location...
+		write_information "${FUNCNAME[0]} 2 Using: $(find /opt -name _rtd_library |grep -v bakup )"
+	elif wget ${_src_url} ; then
+		# Critical failure: downloaded copy from github.com
+		source ./_rtd_library
+	else
+		# Abot condition: No mitigation steps worked.
+		echo -e "RTD functions NOT loaded!"
+		echo -e " "
+		echo -e "Cannot ensure that the correct functionality is available"
+		echo -e "Quiting rather than cause potential damage..."
+		exit 1
+	fi
+
+	write_host --cyan "Libraries loaded"
+	write_status "Paths registered:
+	- Root directory of tools: 		_OEM_DIR="${scriptdir%/*}"
+	- Caching and download folder: 		_CACHE_DIR="${_OEM_DIR}/cache"
+	- Location of 3rd party apps:		_APP_DIR="${_OEM_DIR}/apps"
+	- Location of extension modules:	_MODS_DIR="${_OEM_DIR}/modules"
+	- Root tools folder: 			_CORE_DIR="${_OEM_DIR}/core"
+	- Location of log files:		_LOG_DIR=/var/log/${_TLA,,}
+	"
+
 
 
 
