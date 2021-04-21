@@ -828,15 +828,14 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 				CacheDir="${_RTDCACHE:="/opt/rtd/cache"}"
 				sudo -H -u $SUDO_USER DISPLAY=$DISPLAY source /opt/rtd/core/_rtd_library ; rtd_oem_kde_set_wallpaper "${WallPaperDir}/Wayland.jpg"
 
-				sudo -H -u $SUDO_USER DISPLAY=$DISPLAY lookandfeeltool -a 'org.kde.breezedark.desktop'
-
 				mkdir -p ${CacheDir} && if [[ -e ${CacheDir}/master.zip ]] ; then rm ${CacheDir}/master.zip ; fi || write_error "Unable to create ${CacheDir}"
 				wget https://github.com/vinceliuice/vimix-kde/archive/master.zip  -P /opt/rtd/cache || write_error "Unable to download https://github.com/vinceliuice/vimix-kde/archive/master.zip"
 				unzip -o /opt/rtd/cache/master.zip -d /opt/rtd/cache && pushd /opt/rtd/cache/vimix-kde-master && ./install.sh && popd ; rm ${CacheDir}/master.zip
 
 				7z x  ${ThemeDir}/vimix-icon-themes.zip -o${ThemeDir} && pushd ${ThemeDir}/vimix-icon-theme-master && ./install.sh && popd
 				for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
-				sudo -H -u $SUDO_USER DISPLAY=$DISPLAY lookandfeeltool -a  'com.github.vinceliuice.Vimix-Dark-Doder'
+
+				sudo -H -u $SUDO_USER DISPLAY=$DISPLAY lookandfeeltool -a 'org.kde.breezedark.desktop'
 			fi
 }
 

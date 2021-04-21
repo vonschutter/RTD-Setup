@@ -7591,7 +7591,13 @@ generate_autoyast_file ()
 	FILE="$1"
 	CONFIG="$2"
 	write_host --cyan "Creating AUTOYAST Instructions (XML): ${FILE}"
-	Preference_DiskEncryption_SUSE="$( [[ "$_EncryptDisk" == "YES" ]] && echo "<encryption_password>${PreferredDiskPassword:-"letmein1234"}</encryption_password>" )"
+
+	# Localized variables based on User preferences, but with suse speciffic defaults:
+	Preference_DiskEncryption_SUSE="$( [[ -n "${PreferredDiskPassword}" ]] && echo "<encryption_password>${PreferredDiskPassword:-"letmein1234"}</encryption_password>" )"
+	Preference_Password_SUSE=$( [[ -n "${PrefferredUserPassword}" ]] && echo "<user_password>${PrefferredUserPassword}</user_password>" || echo '<user_password>$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1</user_password>' )
+	Preference_Desktop_DE_SUSE=${_UserDesktopEnvironemtSelection:-"<pattern>kde</pattern>"}
+	Preference_InitialUser_SUSE="<username>${_OEM_USER:-"tangarora"}</username>"
+
 	cat >> ${FILE} <<-AUTOYAST_EOF
 	<?xml version="1.0"?>
 	<!DOCTYPE profile>
@@ -7604,6 +7610,7 @@ generate_autoyast_file ()
 		<final_halt config:type="boolean">false</final_halt>
 		<halt config:type="boolean">false</halt>
 		<second_stage config:type="boolean">true</second_stage>
+		<forceboot config:type="boolean">true</forceboot>
 	</mode>
 	<storage>
 	        <proposal>
@@ -7635,18 +7642,15 @@ generate_autoyast_file ()
 			<home>/root</home>
 			<shell>/bin/bash</shell>
 			<uid>0</uid>
-			<user_password>$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1</user_password>
+			${Preference_Password_SUSE}
 			<username>root</username>
 		</user>
 		<user>
 			<encrypted config:type="boolean">true</encrypted>
-			<fullname>tangarora</fullname>
-			<gid>100</gid>
-			<home>/home/tangarora</home>
+			<fullname>${_TLA:-"RTD"} User</fullname>
 			<shell>/bin/bash</shell>
-			<uid>1001</uid>
-			<user_password>$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1</user_password>
-			<username>tangarora</username>
+			${Preference_Password_SUSE}
+			${Preference_InitialUser_SUSE}
 		</user>
 	</users>
 	<software>
@@ -7661,11 +7665,7 @@ generate_autoyast_file ()
 			<package>libqt4</package>
 		</packages>
 		<patterns config:type="list">
-			<pattern>kde</pattern>
-			<pattern>kde_plasma</pattern>
-			<pattern>kde_utilities</pattern>
-			<pattern>kde_yast</pattern>
-			<pattern>laptop</pattern>
+			${Preference_Desktop_DE_SUSE}
 		</patterns>
 		<products config:type="list">
 			<product>openSUSE</product>
