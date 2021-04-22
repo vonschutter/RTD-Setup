@@ -1,4 +1,4 @@
-# RTD Power Tools:     <img src="media_files/WindowsLogo.png" width="32" height="32"> <img src="media_files/LinuxLogo.png" width="32" height="32">  <img src="media_files/UbuntuLogo.png" width="32" height="32">  <img src="media_files/RedHatLogo.png" width="32" height="32">  <img src="media_files/SuseLogo.png" width="32" height="32"> 
+# RTD Power Tools:     <img src="media_files/WindowsLogo.png" width="24" height="24"> <img src="media_files/LinuxLogo.png" width="24" height="24">  <img src="media_files/UbuntuLogo.png" width="24" height="24">  <img src="media_files/RedHatLogo.png" width="24" height="24">  <img src="media_files/SuseLogo.png" width="24" height="24"> 
 [MinecraftServer](https://github.com/vonschutter/RTD-Setup/blob/main/modules/Minecraft-Server-Manager.mod/README.md) | [NordVPN_GUI](https://github.com/vonschutter/RTD-Setup/blob/main/modules/Nordvpn-Manager.mod/README.md) | [DesktopLookSwitcher](modules/RTD-Desktop-Look-Switcher.mod/README.md) | [Instant VPN Router](/modules/RTD-VPN-Router.mod/README.md) | [Simple Support Tool](/modules/Simple-Support-Tool.mod/README.md)
 
 ![RTD Builder Screenshot](media_files/header-time.jpg "Executing the Script")
