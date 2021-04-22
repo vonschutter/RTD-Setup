@@ -7423,8 +7423,10 @@ generate_fedora_ks_cfg_file ()
 
 		# Keyboard layouts
 		keyboard --vckeymap=us --xlayouts='us'
+
 		# System language
 		lang en_US.UTF-8
+
 		# System timezone
 		timezone Europe/London --isUtc --ntpservers=0.pool.ntp.org
 
@@ -7433,6 +7435,7 @@ generate_fedora_ks_cfg_file ()
 
 		# Root password
 		rootpw $6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted
+
 		# User password
 		user --groups=wheel --name=tangarora --password=$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted
 
@@ -7447,7 +7450,6 @@ generate_fedora_ks_cfg_file ()
 		reboot
 
 		%packages --retries 5 --timeout 20
-		@^workstation-product-environment
 		openssh-server
 		spice-vdagent
 		%end
@@ -7474,8 +7476,10 @@ generate_fedora_ks_cfg_file ()
 
 		# Keyboard layouts
 		keyboard --vckeymap=us --xlayouts='us'
+
 		# System language
 		lang en_US.UTF-8
+
 		# System timezone
 		timezone Europe/London --isUtc --ntpservers=0.pool.ntp.org
 
@@ -7484,6 +7488,7 @@ generate_fedora_ks_cfg_file ()
 
 		# Root password
 		rootpw $6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted
+
 		# User password
 		user --groups=wheel --name=tangarora --password=$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted
 
@@ -7498,7 +7503,6 @@ generate_fedora_ks_cfg_file ()
 		reboot
 
 		%packages --retries 5 --timeout 20
-		@^workstation-product-environment
 		openssh-server
 		spice-vdagent
 		ansible
@@ -7522,22 +7526,24 @@ generate_fedora_ks_cfg_file ()
 		repo --name=rpmfusion-nonfree-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-updates-released-33&arch=x86_64" --cost=0
 		#repo --name=google-chrome --install --baseurl="https://dl.google.com/linux/chrome/rpm/stable/x86_64" --cost=0
 
-		# Run the Setup Agent on first boot
-		firstboot --enable
+		# Setup Agent on first boot
+		firstboot --disable
 
 		# Keyboard layouts
 		keyboard --vckeymap=us --xlayouts='us'
+
 		# System language
 		lang en_US.UTF-8
+
 		# System timezone
 		timezone Europe/London --isUtc --ntpservers=0.pool.ntp.org
 
 		# Network information
 		network --onboot=yes --bootproto=dhcp
-		#network --hostname=localhost.localdomain
 
 		# Root password
 		rootpw $6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted
+
 		# User password
 		user --groups=wheel --name=tangarora --password=$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted
 
@@ -7593,7 +7599,7 @@ generate_autoyast_file ()
 	write_host --cyan "Creating AUTOYAST Instructions (XML): ${FILE}"
 
 	# Localized variables based on User preferences, but with suse speciffic defaults:
-	Preference_DiskEncryption_SUSE="$( [[ -n "${PreferredDiskPassword}" ]] && echo "<encryption_password>${PreferredDiskPassword:-"letmein1234"}</encryption_password>" )"
+	Preference_DiskEncryption_SUSE="$( [[ "$_EncryptDisk" == "YES" ]] && echo "<encryption_password>${PreferredDiskPassword:-"letmein1234"}</encryption_password>" )"
 	Preference_Password_SUSE=$( [[ -n "${PrefferredUserPassword}" ]] && echo "<user_password>${PrefferredUserPassword}</user_password>" || echo '<user_password>$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1</user_password>' )
 	Preference_Desktop_DE_SUSE=${_UserDesktopEnvironemtSelection:-"<pattern>kde</pattern>"}
 	Preference_InitialUser_SUSE="<username>${_OEM_USER:-"tangarora"}</username>"

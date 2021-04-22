@@ -575,6 +575,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 			# in one way or another... These may be a dependency to others as well.
 			check_dependencies zip
 			check_dependencies p7zip
+			check_dependencies p7zip-plugins
 			# Ensure modern app distribution support
 			ensure_flatpak_pakage_managment
 			ensure_snap_package_managment
@@ -756,13 +757,13 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 				# Install theme for a smooth mocka experience in UI (snap, gnome, and icons)...
 				snap install vimix-themes
 					7z x ${ThemeDir}/vimix-gtk-themes.zip -o/usr/share/themes
-					7z x  ${ThemeDir}/vimix-icon-themes.zip -o${ThemeDir} && pushd ${ThemeDir}/vimix-icon-theme-master && ./install.sh && popd
+					7z x  ${ThemeDir}/vimix-icon-themes.zip -o${ThemeDir} && pushd ${ThemeDir}/vimix-icon-themes && ./install.sh && popd
 					for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
 
 				# Install theme for previous Apple users...
 				snap install mojave-themes
-					7z x ${ThemeDir}/Mojave-gtk-theme.zip -o${ThemeDir} && pushd ${ThemeDir}/Mojave-gtk-theme-master && ./install.sh && popd
-					7z x ${ThemeDir}/McMojave-circle.zip -o${ThemeDir} && pushd ${ThemeDir}/McMojave-circle-master && ./install.sh && popd
+					7z x ${ThemeDir}/Mojave-gtk-theme.zip -o${ThemeDir} && pushd ${ThemeDir}/Mojave-gtk-theme && ./install.sh && popd
+					7z x ${ThemeDir}/McMojave-circle.zip -o${ThemeDir} && pushd ${ThemeDir}/McMojave-circle && ./install.sh && popd
 					for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i mojave-themes:gtk-3-themes ; done
 
 				# Install Windows 10 Themes (Light and Dark) + icons
@@ -782,7 +783,6 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 				# Add a default Icon theme "Arc" fo a clean and crisp proffessional default look.
 				7z x ${ThemeDir}/Arc-icon-theme.zip -o${ThemeDir} && mv ${ThemeDir}/Arc-icon-theme /usr/share/icons/Arc
 				# -------------------------------------------------------------------------------------------------------
-
 
 
 				# [Task 5.4] Add cusom tweaks to the behavvior of the gnome UI:
