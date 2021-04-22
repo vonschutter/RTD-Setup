@@ -756,23 +756,23 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 
 				# Install theme for a smooth mocka experience in UI (snap, gnome, and icons)...
 				snap install vimix-themes
-					7z x ${ThemeDir}/vimix-gtk-themes.zip -o/usr/share/themes
-					7z x  ${ThemeDir}/vimix-icon-themes.zip -o${ThemeDir} && pushd ${ThemeDir}/vimix-icon-themes && ./install.sh && popd
+					7z x ${ThemeDir}/vimix-gtk-themes.7z -o/usr/share/themes
+					7z x  ${ThemeDir}/vimix-icon-themes.7z -o${ThemeDir} && pushd ${ThemeDir}/vimix-icon-themes && ./install.sh && popd
 					for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
 
 				# Install theme for previous Apple users...
 				snap install mojave-themes
-					7z x ${ThemeDir}/Mojave-gtk-theme.zip -o${ThemeDir} && pushd ${ThemeDir}/Mojave-gtk-theme && ./install.sh && popd
-					7z x ${ThemeDir}/McMojave-circle.zip -o${ThemeDir} && pushd ${ThemeDir}/McMojave-circle && ./install.sh && popd
+					7z x ${ThemeDir}/Mojave-gtk-theme.7z -o${ThemeDir} && pushd ${ThemeDir}/Mojave-gtk-theme && ./install.sh && popd
+					7z x ${ThemeDir}/McMojave-circle.7z -o${ThemeDir} && pushd ${ThemeDir}/McMojave-circle && ./install.sh && popd
 					for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i mojave-themes:gtk-3-themes ; done
 
 				# Install Windows 10 Themes (Light and Dark) + icons
-				7z x ${ThemeDir}/Windows-10-Light.zip -o/usr/share/themes
-				7z x ${ThemeDir}/Windows-10-Dark.zip -o/usr/share/themes
-				7z x ${ThemeDir}/Windows-10-Icons.zip -o/usr/share/icons
+				7z x ${ThemeDir}/Windows-10-Light.7z -o/usr/share/themes
+				7z x ${ThemeDir}/Windows-10-Dark.7z -o/usr/share/themes
+				7z x ${ThemeDir}/Windows-10-Icons.7z -o/usr/share/icons
 
 				# Install the Flattery icon theme...
-				7z x ${ThemeDir}/Flatery-icon-theme.zip -o/usr/share/icons
+				7z x ${ThemeDir}/Flatery-icon-theme.7z -o/usr/share/icons
 
 				# Install basic professional Arc and gnome default themes...
 				for i in numix-gtk-theme numix-icon-theme arc-theme
@@ -781,7 +781,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 				done
 
 				# Add a default Icon theme "Arc" fo a clean and crisp proffessional default look.
-				7z x ${ThemeDir}/Arc-icon-theme.zip -o${ThemeDir} && mv ${ThemeDir}/Arc-icon-theme /usr/share/icons/Arc
+				7z x ${ThemeDir}/Arc-icon-theme.7z -o${ThemeDir} && mv ${ThemeDir}/Arc-icon-theme /usr/share/icons/Arc
 				# -------------------------------------------------------------------------------------------------------
 
 
@@ -821,8 +821,6 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 
 
 			if  ps -e |grep "plasmashell" ; then
-				check_dependencies p7zip-full
-				check_dependencies zip
 
 				write_information "$($FUNCNAME[0]): Detected KDE UI!"
 				# Download and Set Wallpaper...
@@ -833,7 +831,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 				wget https://github.com/vinceliuice/vimix-kde/archive/master.zip  -P /opt/rtd/cache || write_error "Unable to download https://github.com/vinceliuice/vimix-kde/archive/master.zip"
 				unzip -o /opt/rtd/cache/master.zip -d /opt/rtd/cache && pushd /opt/rtd/cache/vimix-kde-master && ./install.sh && popd ; rm ${CacheDir}/master.zip
 
-				7z x  ${ThemeDir}/vimix-icon-themes.zip -o${ThemeDir} && pushd ${ThemeDir}/vimix-icon-theme-master && ./install.sh && popd
+				7z x  ${ThemeDir}/vimix-icon-themes.7z -o${ThemeDir} && pushd ${ThemeDir}/vimix-icon-themes && ./install.sh && popd
 				for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
 
 				sudo -H -u $SUDO_USER DISPLAY=$DISPLAY lookandfeeltool -a 'org.kde.breezedark.desktop'
