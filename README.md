@@ -28,8 +28,6 @@ As promised, the rtd-me.sh.cmd script will run under windows as well. Simply dow
 
 <img style="border-radius: 50%" src="media_files/Scr11.png" width="700" height="500"> 
 
-![RTD Builder Screenshot 2](media_files/Scr11.png?raw=true "Executing the Script in Windows")
-
 # RTD-Me.sh.cmd
 To get these tools for yourself on Linux just copy and paste the line below in to a terminal:
 
