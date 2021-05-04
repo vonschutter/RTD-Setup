@@ -6,7 +6,7 @@
 Would you like to feel more at home, or just like theming your desktop wverall? This is a simple tool to do that!
 
 ## Purpose:
-This is a tool to help users who come to Linux from a different OS. Currently there are a **looks** available:
+This is a tool to help users who come to Linux from a different OS. Currently there are the following **looks** available:
 
 - Windows 10 light (typical Windows 10 look)
 - Windows 10 Dark (dark Windows 10 look)
