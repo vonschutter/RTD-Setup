@@ -3970,7 +3970,7 @@ ensure_snap_package_managment ()
 
 
 
-up2date ()
+up_2_date ()
 {
 # Description: Function to simplify updating system completely. At present this function sets the
 # highest preference to use "pkcon", the command line interface of "Package Kit" since
@@ -5179,6 +5179,7 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
+	FedoraVersion=${FedoraVersion:="34"}
 
 	# Discover if the appropriate VM net interface is (default or br'0 - n')
 	VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
@@ -5191,14 +5192,12 @@ make_kvm_virtual_machine_now_from_fedora_org ()
                 --disk size="${4:-40}" \
 		--os-variant="${1:-fedora30}" \
                 --initrd-inject="${PRESEED_FILE}" \
-		--location='http://www.nic.funet.fi/pub/Linux/INSTALL/fedora/linux/releases/33/Everything/x86_64/os/' \
-		--extra-args "ks=file:/$(basename $PRESEED_FILE)" \
+		--location="http://www.nic.funet.fi/pub/Linux/INSTALL/fedora/linux/releases/${FedoraVersion}/Everything/x86_64/os/" \
+		--extra-args "inst.ks=file:/$(basename $PRESEED_FILE)" \
 		--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
 	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built. You may attach to this server and see the progress at IP: $(hostname -I))" 10 60
 
 }
-
-
 
 
 
@@ -5359,7 +5358,6 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 # If complete flexibility is needed simply use the virt-install binary and directly write the arguments.
 # Alternatively; edit the function with new defaults that suit the needs.
 # End of Documentation
-
 	count=1
 	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install
 	do
@@ -5386,9 +5384,52 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 		--extra-args "ks=file:/$(basename $PRESEED_FILE)" \
 		--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
 		#"$RTD_GUI" --backtitle "$BRANDING" --title "NOTICE!" --msgbox "ERROR: -- Building VM using $PRESEED_FILE and internal instruction: ks=file:/$(basename $PRESEED_FILE) Options given were: $1 $2 $3 $4" 10 60
-		# 		--initrd-inject="$TASK_FILE" \
 	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built. You may attach to this server and see the progress at IP: $(hostname -I))" 10 60
 }
+
+
+
+
+
+
+
+gen_cloudconfig (){
+CloudConfig=$( mktemp )
+PRESEED_FILE=${CloudConfig}
+
+cat >> ${CloudConfig} <<-'EOF'
+#cloud-config
+autoinstall:
+  debconf-selections: |
+    debconf-set partman-auto/disk $BOOTDEV;\
+    debconf-set grub-installer/bootdev $BOOTDEV;
+    tasksel tasksel/first multiselect ubuntu-desktop
+    in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd  ; \
+    in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
+    in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
+    cp /*.cfg /target/opt/rtd/ ;\
+    umount -l /media || echo "Empty" ; \
+    eject || true; \
+    echo "------  initial Setup Complete!  ------"
+    ubiquity ubiquity/success_command string \
+  identity:
+    hostname: RTD-Client
+    password: $6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1
+    realname: RTD User
+    username: tangarora
+  keyboard:
+    layout: se
+  locale: en_US.UTF-8
+  network:
+    ethernets:
+      manual: {}
+    version: 2
+  version: 1
+EOF
+
+}
+
+
 
 
 
@@ -5520,39 +5561,53 @@ make_kvm_virtual_machine_now_from_iso ()
 # Returns:
 # Usage:
 # End of Documentation
-
-	for i in qemu-utils qemu-kvm qemu-system-x86
+	gen_cloudconfig
+	RTD_GUI=dialog
+	count=1
+	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install
 	do
-		check_dependencies $i || $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "$i is missing from this computer; and I could not install it either..." 10 60
+		write_status "${count}	- Verifying dependencies ( ${i} )..."
+		check_dependencies $i &>/dev/null
+		count=$((count + 1))
 	done
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
-	: "${BIN_QEMU_IMG:=$(type -P qemu-img)}"
-	: "${BIN_KVM:=$(type -P kvm)}"
-	: "${BIN_QEMU_SYSTEM_X86_64:=$(type -P qemu-system-x86_64 )}"
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
+	: "${TARGET_ISO:="/var/lib/libvirt/boot/ubuntu-21.04-desktop-amd64.iso"}"
 
 	#Verify ISO presesnce
 		if [[ ! -f "$TARGET_ISO" ]]; then
-			$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "OOOPS! I cannot find the ISO image to build the VM... " 10 60
-			show_main_menu
+			$RTD_GUI --backtitle "${BRANDING:-"rtd"}" --title "NOTICE!" --msgbox "OOOPS! I cannot find the ISO image to build the VM... " 10 60
+			clear
 		fi
 	# Discover if the appropriate VM net interface is (default or br'0 - n')
 	VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
 
+	echo	"--vcpus ${2:-"2"}"
+	echo	"--memory ${3:-"2048"}"
+	echo	"--network ${VIRT_NET}"
+	echo	"--disk size=${4:-"30"}"
+	echo	"--os-variant=${1:-"ubuntu20.04"}"
+	echo	"--location=${TARGET_ISO}"
+	echo	"--cdrom=${TARGET_ISO}"
+	echo	"--initrd-inject=$PRESEED_FILE"
+	echo	"--extra-args ks=file:/$(basename $PRESEED_FILE)"
+
+
+
 	# create image and run installer
-	virt-install --name VM_Template_"$1"_"$RANDOM"
-		--vcpus "${"2"}" \
-		--memory "${"2048"}" \
+	"${BIN_VIRT_INSTALL}" --name VDI_Ubuntu_"$CONFIG"_"$RANDOM" \
+		--vcpus "${2:-2}" \
+		--memory "${3:-2048}" \
 		--network "${VIRT_NET}" \
+		--disk size="${4:-30}" \
+		--os-variant="${1:-debian10}" \
 		--cdrom="${TARGET_ISO}" \
-		--disk size="${"20"}" \
-		--os-variant="${1:-"debian10"}"
-	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built. You may attach to this server and see the progress at IP: $(hostname -I)" 10 60
+		--cloud-init meta-data=
+		--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
+	# $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built. You may attach to this server and see the progress at IP: $(hostname -I)" 10 60
+	# clear
 }
-
-
-
 
 
 
@@ -7401,22 +7456,25 @@ generate_fedora_ks_cfg_file ()
 # End of documentation
 	FILE="$1"
 	CONFIG="$2"
+	${FedoraVersion:="34"}
+
+		# repo --name=fedora-updates --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f${FedoraVersion}&arch=x86_64" --cost=0
+		# repo --name=rpmfusion-free --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-${FedoraVersion}&arch=x86_64" --includepkgs=rpmfusion-free-release
+		# repo --name=rpmfusion-free-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-updates-released-${FedoraVersion}&arch=x86_64" --cost=0
+		# repo --name=rpmfusion-nonfree --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-${FedoraVersion}&arch=x86_64" --includepkgs=rpmfusion-nonfree-release
+		# repo --name=rpmfusion-nonfree-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-updates-released-${FedoraVersion}&arch=x86_64" --cost=0
+		# repo --name=google-chrome --install --baseurl="https://dl.google.com/linux/chrome/rpm/stable/x86_64" --cost=0
 
 	if [[ "${CONFIG}" == "ssh-server" ]]; then
 		write_information "Selected configuration is ssh-server..."
-		cat >> ${FILE} <<-'KS_EOF'
+		cat >> ${FILE} <<-KS_EOF
 		# Generated by: generate_fedora_ks_cfg_file
 		# Choosing mode (graphical|text|cmdline [--non-interactive])
 		text
 
 		# Configure installation method
 		install
-		url --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-33&arch=x86_64"
-		repo --name=fedora-updates --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f33&arch=x86_64" --cost=0
-		repo --name=rpmfusion-free --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-33&arch=x86_64" --includepkgs=rpmfusion-free-release
-		repo --name=rpmfusion-free-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-updates-released-33&arch=x86_64" --cost=0
-		repo --name=rpmfusion-nonfree --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-33&arch=x86_64" --includepkgs=rpmfusion-nonfree-release
-		repo --name=rpmfusion-nonfree-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-updates-released-33&arch=x86_64" --cost=0
+		url --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-${FedoraVersion}&arch=x86_64"
 
 		# Run the Setup Agent on first boot
 		firstboot --enable
@@ -7457,19 +7515,14 @@ generate_fedora_ks_cfg_file ()
 		return
 	elif [[ "${CONFIG}" == "ansible-server" ]]; then
 		write_information "Selected configuration is ansible-server..."
-		cat >> ${FILE} <<-'KS_EOF'
+		cat >> ${FILE} <<-KS_EOF
 		# Generated by: generate_fedora_ks_cfg_file
 		# Choosing mode (graphical|text|cmdline [--non-interactive])
 		text
 
 		# Configure installation method
 		install
-		url --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-33&arch=x86_64"
-		repo --name=fedora-updates --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f33&arch=x86_64" --cost=0
-		repo --name=rpmfusion-free --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-33&arch=x86_64" --includepkgs=rpmfusion-free-release
-		repo --name=rpmfusion-free-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-updates-released-33&arch=x86_64" --cost=0
-		repo --name=rpmfusion-nonfree --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-33&arch=x86_64" --includepkgs=rpmfusion-nonfree-release
-		repo --name=rpmfusion-nonfree-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-updates-released-33&arch=x86_64" --cost=0
+		url --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-${FedoraVersion}&arch=x86_64"
 
 		# Run the Setup Agent on first boot
 		firstboot --enable
@@ -7511,50 +7564,28 @@ generate_fedora_ks_cfg_file ()
 		return
 	elif [[ "${CONFIG}" == "workstation" ]]; then
 		write_information "Selected configuration is workstation..."
-		cat >> ${FILE} <<-'KS_EOF'
+		cat >> ${FILE} <<-KS_EOF
 		# Generated by: generate_fedora_ks_cfg_file
 		# Choosing mode (graphical|text|cmdline [--non-interactive])
 		graphical
 
 		# Configure installation method
-		install
-		url --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-33&arch=x86_64"
-		repo --name=fedora-updates --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f33&arch=x86_64" --cost=0
-		repo --name=rpmfusion-free --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-33&arch=x86_64" --includepkgs=rpmfusion-free-release
-		repo --name=rpmfusion-free-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-updates-released-33&arch=x86_64" --cost=0
-		repo --name=rpmfusion-nonfree --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-33&arch=x86_64" --includepkgs=rpmfusion-nonfree-release
-		repo --name=rpmfusion-nonfree-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-updates-released-33&arch=x86_64" --cost=0
-		#repo --name=google-chrome --install --baseurl="https://dl.google.com/linux/chrome/rpm/stable/x86_64" --cost=0
+		# install
+		url --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-34&arch=x86_64"
 
 		# Setup Agent on first boot
 		firstboot --disable
-
-		# Keyboard layouts
-		keyboard --vckeymap=us --xlayouts='us'
-
-		# System language
+		keyboard --xlayouts='se'
 		lang en_US.UTF-8
-
-		# System timezone
 		timezone Europe/London --isUtc --ntpservers=0.pool.ntp.org
-
-		# Network information
 		network --onboot=yes --bootproto=dhcp
-
-		# Root password
 		rootpw $6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted
-
-		# User password
-		user --groups=wheel --name=tangarora --password=$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted
+		user --groups=wheel --name=tangarora --password=$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted --gecos="tangarora"
 
 		# Partition clearing information
 		zerombr
 		clearpart --all
-
-		# Disk partitioning information
 		autopart --nohome --encrypted --passphrase letmein1234
-
-		#Reboot the system after installation.
 		reboot
 
 		%packages --retries 5 --timeout 20
