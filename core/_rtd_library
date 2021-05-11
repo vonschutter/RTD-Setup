@@ -3700,10 +3700,11 @@ scan_for_malware ()
 
 	# First discover what menu system is installed. Some systems use "dialog" and
 	# other systems use whiptail for the terminal to show menus and dialogs.
-	check_menu_availability
-	for i in clamav clamav-freshclam clamscan clamtk clamtk-gnome ; do
-		check_dependencies $i
-	done
+
+	if ! type clamscan ; then
+		check_dependencies clamscan && exit
+	fi
+
 
 
 
@@ -5462,11 +5463,21 @@ make_kvm_virtual_machine_now_from_microsoft ()
 # Omitting any of the arguments will us the default instead.
 #
 # End of Documentation
-	CONFIG="Workstation"
-	: ${CONFIG:-"Workstation"}
+	write_status "Lookup specific binaries: use full path since they may just have been added and not in PATH yet."
+	count=1
+	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install
+	do
+		write_status "${count}	- Verifying dependencies ( ${i} )..."
+		check_dependencies $i &>/dev/null
+		count=$((count + 1))
+	done
 
-	# Provide Windows setup media:
-	WindowsMedia=/var/lib/libvirt/boot/Win10_English_x64.iso
+	: ${BIN_VIRT_INSTALL:="$(type -p virt-install)"}
+	: ${CONFIG:="Workstation"}
+	: ${WindowsMedia:="/var/lib/libvirt/boot/Win10_English_x64.iso"}
+	: ${WindowsInstructions:="/var/lib/libvirt/boot/win.img"}
+	: ${VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
+
 	write_information "Ensuring that install media is available to build a Windows VM..."
 	if [[ ! -e "${WindowsMedia}" ]]; then
 		if ( $RTD_GUI --backtitle "..$BRANDING" --title "Windows Install Media Needed" \
@@ -5485,9 +5496,6 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		fi
 	fi
 
-
-	# Provide Windows setup instructions:
-	WindowsInstructions=/var/lib/libvirt/boot/win.img
 	write_information "Ensuring that instructions are available to build a Windows VM..."
 	if [[ ! -e "${WindowsInstructions}" ]]; then
 		mkfs.msdos -C ${WindowsInstructions} 1440
@@ -5503,15 +5511,6 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		mcopy -i ${WindowsInstructions} ${TempFileOut}/rtd-me.sh.cmd ::/ || rtd_oem_pause 1
 		mcopy -i ${WindowsInstructions} ${TempFileOut}/autounattend.xml ::/ || rtd_oem_pause 1
 	fi
-
-	write_status "Lookup specific binaries: use full path since they may just have been added and not in PATH yet."
-
-	type -P kvm			>>/dev/null || check_dependencies qemu-kvm
-	type -p virt-install		>>/dev/null || check_dependencies virtinst
-	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
-
-	write_status "Discover if the appropriate VM net interface is (default or br'0 - n')..."
-	VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
 
 	write_status "Creating and starting Virtual machine... "
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name VDI_Windows10_"${CONFIG}"_"${RANDOM}" \
