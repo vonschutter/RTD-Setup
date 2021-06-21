@@ -5253,8 +5253,8 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 		--disk size="${4:-40}" \
 		--os-variant=opensusetumbleweed \
 		--initrd-inject="${PRESEED_FILE}" \
-		--location='http://download.opensuse.org/pub/opensuse/distribution/leap/15.2/repo/oss' \
-		--extra-args "AutoYaST=file:///$(basename $PRESEED_FILE)" \
+		--location='http://download.opensuse.org/pub/opensuse/distribution/leap/15.3/repo/oss' \
+		--extra-args "AutoYaST=file:///$(basename $PRESEED_FILE)"  YAST_SKIP_XML_VALIDATION =1 \
 		--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
 
 		# --location='http://download.opensuse.org/factory/repo/oss/'
@@ -7631,8 +7631,7 @@ generate_autoyast_file ()
 	cat >> ${FILE} <<-AUTOYAST_EOF
 	<?xml version="1.0"?>
 	<!DOCTYPE profile>
-	<profile xmlns="http://www.suse.com/1.0/yast2ns"
-		xmlns:config="http://www.suse.com/1.0/configns">
+	<profile xmlns="http://www.suse.com/1.0/yast2ns" xmlns:config="http://www.suse.com/1.0/configns">
 	<general>
 	<mode>
 		<confirm config:type="boolean">false</confirm>
@@ -7662,7 +7661,21 @@ generate_autoyast_file ()
 		<install_recommended config:type="boolean">true</install_recommended>
 		<patterns config:type="list">
 			<pattern>base</pattern>
+			${Preference_Desktop_DE_SUSE}
 		</patterns>
+		<image/>
+		<install_recommended config:type="boolean">true</install_recommended>
+		<instsource/>
+		<packages config:type="list">
+			<package>wget</package>
+			<package>vim</package>
+			<package>spice-vdagent</package>
+			<package>git</package>
+			<package>libqt4</package>
+		</packages>
+		<products config:type="list">
+			<product>openSUSE</product>
+		</products>
 	</software>
 	<users config:type="list">
 		<user>
@@ -7683,24 +7696,7 @@ generate_autoyast_file ()
 			${Preference_InitialUser_SUSE}
 		</user>
 	</users>
-	<software>
-		<image/>
-		<install_recommended config:type="boolean">true</install_recommended>
-		<instsource/>
-		<packages config:type="list">
-			<package>wget</package>
-			<package>vim</package>
-			<package>spice-vdagent</package>
-			<package>git</package>
-			<package>libqt4</package>
-		</packages>
-		<patterns config:type="list">
-			${Preference_Desktop_DE_SUSE}
-		</patterns>
-		<products config:type="list">
-			<product>openSUSE</product>
-		</products>
-	</software>
+
 	<login_settings>
 		<autologin_user>tangarora</autologin_user>
 		<password_less_login config:type="boolean">true</password_less_login>
