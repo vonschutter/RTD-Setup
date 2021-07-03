@@ -2347,7 +2347,7 @@ ensure_admin ()
 				write_information "Allowing root to display menus..."
 				xhost local:root
 				write_information "Authenticating..."
-				pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY ${0}
+				pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY SUDO_USER=$USER ${0}
 				exit
 			else
 				# If we are some other kind of archane GUI then...
@@ -2361,7 +2361,7 @@ ensure_admin ()
 						0)
 							export HISTIGNORE='*sudo -S*'
 							echo ${token} | sudo -S -v || ensure_admin
-							sudo DISPLAY=$DISPLAY /bin/bash ${0} $@ || rtd_oem_pause 1
+							sudo DISPLAY=$DISPLAY SUDO_USER=$USER /bin/bash ${0} $@ || rtd_oem_pause 1
 						;;
 						1) echo "Request cancelled" ;;
 						255) echo "[esc] Request aborted" ;;
@@ -2373,7 +2373,7 @@ ensure_admin ()
 					write_information "Dialog not found..."
 					write_warning "This script needs administrative access..."
 					xhost local:root
-					sudo DISPLAY=$DISPLAY bash "${0}" "$@" || rtd_oem_pause 1
+					sudo DISPLAY=$DISPLAY SUDO_USER=$USER bash "${0}" "$@" || rtd_oem_pause 1
 					exit
 				fi
 			fi
@@ -2388,7 +2388,7 @@ ensure_admin ()
 					0)
 						export HISTIGNORE='*sudo -S*'
 						echo ${token} | sudo -S -v || ensure_admin
-						sudo DISPLAY=$DISPLAY /bin/bash ${0} $@ || rtd_oem_pause 1
+						sudo DISPLAY=$DISPLAY SUDO_USER=$USER /bin/bash ${0} $@ || rtd_oem_pause 1
 					;;
 					1) echo "Request cancelled" ;;
 					255) echo "[esc] Request aborted" ;;
@@ -2397,7 +2397,7 @@ ensure_admin ()
 				exit
 			else
 				write_warning "This script needs administrative access..."
-				sudo DISPLAY=$DISPLAY bash "${0}" "$@" || rtd_oem_pause 1
+				sudo DISPLAY=$DISPLAY SUDO_USER=$USER bash "${0}" "$@" || rtd_oem_pause 1
 				exit
 			fi
 		fi
@@ -5254,7 +5254,7 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 		--os-variant=opensusetumbleweed \
 		--initrd-inject="${PRESEED_FILE}" \
 		--location='http://download.opensuse.org/pub/opensuse/distribution/leap/15.3/repo/oss' \
-		--extra-args "AutoYaST=file:///$(basename $PRESEED_FILE)"  YAST_SKIP_XML_VALIDATION =1 \
+		--extra-args "AutoYaST=file:///$(basename $PRESEED_FILE)"  YAST_SKIP_XML_VALIDATION=1 \
 		--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
 
 		# --location='http://download.opensuse.org/factory/repo/oss/'
@@ -5494,6 +5494,7 @@ make_kvm_virtual_machine_now_from_microsoft ()
 			else
 				write_error "Could not find the file: /home/$SUDO_USER/Downloads/Win*.iso "
 				rtd_oem_pause 1
+				return
 			fi
 		else
 			return
@@ -7671,10 +7672,9 @@ generate_autoyast_file ()
 			<package>vim</package>
 			<package>spice-vdagent</package>
 			<package>git</package>
-			<package>libqt4</package>
 		</packages>
 		<products config:type="list">
-			<product>openSUSE</product>
+			<product>Leap</product>
 		</products>
 	</software>
 	<users config:type="list">
@@ -7696,7 +7696,6 @@ generate_autoyast_file ()
 			${Preference_InitialUser_SUSE}
 		</user>
 	</users>
-
 	<login_settings>
 		<autologin_user>tangarora</autologin_user>
 		<password_less_login config:type="boolean">true</password_less_login>
