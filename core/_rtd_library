@@ -5469,7 +5469,7 @@ make_kvm_virtual_machine_now_from_microsoft ()
 # End of Documentation
 	write_status "Lookup specific binaries: use full path since they may just have been added and not in PATH yet."
 	count=1
-	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install
+	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install mtools
 	do
 		write_status "${count}	- Verifying dependencies ( ${i} )..."
 		check_dependencies $i &>/dev/null
@@ -5479,8 +5479,10 @@ make_kvm_virtual_machine_now_from_microsoft ()
 	: ${BIN_VIRT_INSTALL:="$(type -p virt-install)"}
 	: ${CONFIG:="Workstation"}
 	: ${WindowsMedia:="/var/lib/libvirt/boot/Win10_English_x64.iso"}
-	: ${WindowsInstructions:="/var/lib/libvirt/boot/win.img"}
+	: ${WindowsInstructions:="/var/lib/libvirt/boot/win$(date +%Y-%m-%d-%H-%M-%S-%s).img"}
 	: ${VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
+	: ${AutoUnattend="/tmp/autounattend.xml"}
+	: ${PostTasks="/tmp/rtd-me-sh.cmd"}
 
 	write_information "Ensuring that install media is available to build a Windows VM..."
 	if [[ ! -e "${WindowsMedia}" ]]; then
@@ -5490,7 +5492,7 @@ make_kvm_virtual_machine_now_from_microsoft ()
 			--yesno "Windows install media was not found where expected ${WindowsMedia%/*} \n Please place a copy of it in /home/$SUDO_USER/Downloads/ and press [ OK ] \n Please name it Win**something**.iso" 20 90 );
 		then
 			if $(ls /home/$SUDO_USER/Downloads/Win*.iso >/dev/null ) ; then
-				mv -v /home/$SUDO_USER/Downloads/Win*.iso /var/lib/libvirt/boot/Win10_English_x64.iso
+				mv -v /home/$SUDO_USER/Downloads/Win*.iso ${WindowsMedia}
 			else
 				write_error "Could not find the file: /home/$SUDO_USER/Downloads/Win*.iso "
 				rtd_oem_pause 1
@@ -5503,18 +5505,16 @@ make_kvm_virtual_machine_now_from_microsoft ()
 
 	write_information "Ensuring that instructions are available to build a Windows VM..."
 	if [[ ! -e "${WindowsInstructions}" ]]; then
-		mkfs.msdos -C ${WindowsInstructions} 1440
-		TempFileOut=$(mktemp -d )
-		generate_autounattend_xml "${TempFileOut}" || rtd_oem_pause 1
+		write_information "Generate Windows Instruction media..."
+		mkfs.msdos -C ${WindowsInstructions} 1440 || rtd_oem_pause 1
 
-		write_information "Get the latest bootstrap script if possible, otherwise generate one..."
-		if curl ipinfo.io &>/dev/null ; then
-			wget https://github.com/vonschutter/RTD-Build/raw/master/rtd-me.sh.cmd -P "${TempFileOut}" || generate_rtd_me_sh_cmd "${TempFileOut}"
-		else
-			generate_rtd_me_sh_cmd "${TempFileOut}"
-		fi
-		mcopy -i ${WindowsInstructions} ${TempFileOut}/rtd-me.sh.cmd ::/ || rtd_oem_pause 1
-		mcopy -i ${WindowsInstructions} ${TempFileOut}/autounattend.xml ::/ || rtd_oem_pause 1
+		write_information "Generate installations iinstructions for Windows..."
+		generate_autounattend_xml "${AutoUnattend}" || rtd_oem_pause 1
+
+		write_information "Generate post install bootstrap script..."
+		generate_rtd_me_sh_cmd ${PostTasks}
+		mcopy -i ${WindowsInstructions} ${PostTasks} ::/ || rtd_oem_pause 1
+		mcopy -i ${WindowsInstructions} ${AutoUnattend} ::/ || rtd_oem_pause 1
 	fi
 
 	write_status "Creating and starting Virtual machine... "
@@ -5805,7 +5805,7 @@ generate_rtd_me_sh_cmd ()
 # NOTE: This file is generated from this library to limit the dependecies on external downloads.
 # End of documentation
 
-	cat >> $1/rtd-me.sh.cmd <<-'EOF'
+	cat > $1 <<-'EOF'
 	#!/bin/bash
 	cls
 	:<<"::CMDLITERAL"
@@ -6091,17 +6091,7 @@ generate_autounattend_xml ()
 #
 # End of documentation
 
-	cat >> $1/autounattend.xml <<-'EOF'
-	<!--*************************************************
-	Windows 10 Answer File Generator
-	Created using Windows AFG found at:
-	;http://www.windowsafg.com
-
-	Installation Notes
-	Location: Virtualized
-	Notes: Enter your comments here...
-	**************************************************-->
-
+	cat > $1 <<-'EOF'
 	<?xml version="1.0" encoding="utf-8"?>
 	<unattend xmlns="urn:schemas-microsoft-com:unattend">
 	<settings pass="windowsPE">
