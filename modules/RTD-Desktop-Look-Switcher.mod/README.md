@@ -12,6 +12,7 @@ This is a tool to help users who come to Linux from a different OS. Currently th
 - Windows 10 Dark (dark Windows 10 look)
 - Mac OS Bright (Default Mac Look)
 - Mac OS Dusk (Dark Mac Look)
+- Crisp and Clean Look (Dark and Light)
 - Mocca Smooth (Smooth mocca/java look to help with eye strain)
 
 ## The Look:
