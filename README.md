@@ -19,7 +19,7 @@ Running the RTD-Setup (rtd-me.sh.cmd) will give you:
 - Instant VPN router setup
 - and more...
 
-Just type "rtd" and hit [TAB] once or twice to see all the tools available at the terminal. The main tool are available in the OEM or other category in the menu/launcher.
+Just type "rtd" and hit [TAB] once or twice to see all the tools available at the terminal. The main tools are available in the OEM or "other" category in the menu/launcher in Linux.
 
 The RTD Setup includes the **Software Bundle Installer** intended to facilitate adding optional software and optimizing configuration of a vanilla install of Ubuntu, Debian (or derivatives), SUSE, Fedora, CentOS based distribution as well as Windows. The bootstrap script (**rtd-me.sh.cmd**) will identify Linux/Mac/BSD/Windows versions and execute those configurations scripts if they are defined. The non Linux or Windows references are essentially empty in the bootstrap script at present, due to lack of testing equipment. However, most of the software intended for Windows and Mac are proprietary and may not be distributed so only freely available software is added. Please keep in mind that this does not mean that the Open Source Software (OSS), or any of the free software in the Windows or linux repositories is less capable. You may well be able to do just about anything with OSS that you can do with proprietary software. The OSS does have one advantage though: it is peer reviewed and will unlikely come with built in back doors (intended or otherwise).  
 
@@ -32,7 +32,7 @@ As promised, the rtd-me.sh.cmd script will run under windows as well. Simply dow
 
 <kbd> <img src="media_files/Scr11.png" > </kbd> 
 
-# RTD-Me.sh.cmd
+# How to Install RTD Power Tools:
 To get these tools for yourself on Linux just copy and paste the line below in to a terminal:
 
 ```bash
