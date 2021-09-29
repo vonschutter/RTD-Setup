@@ -24,6 +24,7 @@ Running the RTD-Setup (rtd-me.sh.cmd) will give you:
 Just type "rtd" and hit [TAB] once or twice to see all the tools available at the terminal. The main tools are available in the OEM or "other" category in the menu/launcher in Linux.
 <kbd> ![RTD Builder Screenshot 2](media_files/ScrRTDTerm.png) </kbd> 
 
+## On Linux
 The RTD Setup includes the **Software Bundle Installer** intended to facilitate adding optional software and optimizing configuration of a vanilla install of Ubuntu, Debian (or derivatives), SUSE, Fedora, CentOS based distribution as well as Windows. The bootstrap script (**rtd-me.sh.cmd**) will identify Linux/Mac/BSD/Windows versions and execute those configurations scripts if they are defined. The non Linux or Windows references are essentially empty in the bootstrap script at present, due to lack of testing equipment. However, most of the software intended for Windows and Mac are proprietary and may not be distributed so only freely available software is added. Please keep in mind that this does not mean that the Open Source Software (OSS), or any of the free software in the Windows or linux repositories is less capable. You may well be able to do just about anything with OSS that you can do with proprietary software. The OSS does have one advantage though: it is peer reviewed and will unlikely come with built in back doors (intended or otherwise).  
 
 Running "rtd-oem-linux-config.sh" (**Software Bundle Installer**) in Debian (also run when installing RTD Power Tools):
@@ -32,12 +33,16 @@ Running "rtd-oem-linux-config.sh" (**Software Bundle Installer**) in Debian (als
 If a graphical environment is not detected, the RTD System Configurator will interpret this as it is being run on a server without a graphical environment and will offer to set up the productivity tools for that environment.
 <kbd> ![RTD Builder Screenshot 2](media_files/ScrTermOEMSetup.png) </kbd> 
 
+## On Windows
 As promised, the rtd-me.sh.cmd script will run under windows as well. Simply download it and double click on it (you will be prompted to elevate privileges if needed). Please NOTE: that at this time the Windows functionality is roughly equivalent to the Linux **Software Bundle Installer**, but will not prompt for anything, whereas for Linux the setup will pause for 60 seconds to allow for some selections. However, the script will optimize Windows by removing bloatware (Sponsored Software) and turning off services that most do not use to enhance both performance and security. Several useful and fun software titles are automatically added (will not fill up your disk). The Windows changes are made with PowerShell.
 
 Running "rtd-oem-win10-config.ps1" (**Software Bundle Installer**) in Windows (also run when installing RTD Power Tools):
 <kbd> <img src="media_files/Scr11.png" > </kbd> 
 
 # How to Install RTD Power Tools:
+Getting the RTD power Tools has been made as easy as possible. The installation process simply involves downloading and running a single script. This script will make these tools available on you system with a minimum of questions. 
+
+## In Linux
 To get these tools for yourself on Linux just copy and paste the line below in to a terminal:
 
 ```bash
@@ -47,6 +52,7 @@ Please note that you will need elevated priviledges on the Linux system (root).
 
 If you are using Windows Subsystem for Linux (WSL) you may copy and paste the same in to your WSL terminal window to use this in WSL. 
 
+## In Windows
 If you want to run the **Software Bundle Installer** (and optimizer) in Windows 10; please use the link below to save the script locally. Since it does not make sense to use linux tools in Windows, the power tools themselves are not made available in the Windows environment; but, since the power tools do include an option for automatically building a Windows Desktop Virtual Machine (VDI) in Linux; the **Software Bundle Installer** for Windows will be run for you automatically inside the Virtual Machine by downloading and executing **rtd-me.sh.cmd** in the VM. 
 
 
