@@ -10,11 +10,11 @@ These Power Tools are created to simplify the life of an enthusiast, a system ad
 Running the RTD-Setup (rtd-me.sh.cmd) will give you:
 - Software Productivity Bundle installer (auto run the first time)
 - Global system update tool to update native packages, flatpaks, and snaps.
-- VM builder for Debian, Ubuntu, SUSE, Fedora, and Windows 10
+- Auto VM builder for Debian, Ubuntu, SUSE, Fedora, and Windows 10
 - Debian system cleanup tool
 - Add system to an on-premise Ubuntu Landscape Server
-- Installation media creator for Debian and Ubuntu Desktops
-- Installation media creator for Ubuntu, Debian and Minecraft servers
+- Desktop Installation media creator for Debian and Ubuntu Desktops
+- Server Installation media creator for Ubuntu, Debian and Minecraft servers
 - Viewing system information
 - Removing unused PPA repositories
 - Term GUI for NordVPN
