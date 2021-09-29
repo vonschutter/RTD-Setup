@@ -42,7 +42,7 @@ Running "rtd-oem-win10-config.ps1" (**Software Bundle Installer**) in Windows (a
 # How to Install RTD Power Tools:
 Getting the RTD power Tools has been made as easy as possible. The installation process simply involves downloading and running a single script. This script will make these tools available on you system with a minimum of questions. 
 
-## In Linux
+## Installing In Linux
 To get these tools for yourself on Linux just copy and paste the line below in to a terminal:
 
 ```bash
@@ -52,7 +52,7 @@ Please note that you will need elevated priviledges on the Linux system (root).
 
 If you are using Windows Subsystem for Linux (WSL) you may copy and paste the same in to your WSL terminal window to use this in WSL. 
 
-## In Windows
+## Installing In Windows
 If you want to run the **Software Bundle Installer** (and optimizer) in Windows 10; please use the link below to save the script locally. Since it does not make sense to use linux tools in Windows, the power tools themselves are not made available in the Windows environment; but, since the power tools do include an option for automatically building a Windows Desktop Virtual Machine (VDI) in Linux; the **Software Bundle Installer** for Windows will be run for you automatically inside the Virtual Machine by downloading and executing **rtd-me.sh.cmd** in the VM. 
 
 
