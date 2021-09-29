@@ -64,7 +64,7 @@ On Windows rtd-me.sh.cmd will automatically:
 - Make some UI Tweaks for better usability
 
 Download:
-[download this](rtd-me.sh.cmd)
+[download this](https://github.com/vonschutter/RTD-Setup/raw/main/rtd-me.sh.cmd)
 ```
 https://github.com/vonschutter/RTD-Setup/raw/main/rtd-me.sh.cmd
 ```
