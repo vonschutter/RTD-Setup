@@ -18,7 +18,14 @@ You may can run the script on any remote Linux server to manage some common supp
 
 Please NOTE that this script is part of the RTD tools and requires the _rtd_library to function properly. 
 
-<kbd> ![RTD SSST](Media_files/1-main_menu.png "Main Window") </kbd>
+<kbd> 
+	![RTD SSST](Media_files/1-main_menu.png)
+	![RTD SSST](Media_files/2-notice.png) 
+	![RTD SSST](Media_files/3-info.png) 
+	![RTD SSST](Media_files/4-softw.png) 
+	![RTD SSST](Media_files/5-vm4.png) 
+
+</kbd>
 This tool is documented as well as can be. It It may also easily be extended/modified to do whatever a sysadmin would like it to since it contains menu templates and is written in a moduar way. 
 
 ```bash
