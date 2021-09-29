@@ -19,25 +19,25 @@ You may can run the script on any remote Linux server to manage some common supp
 Please NOTE that this script is part of the RTD tools and requires the _rtd_library to function properly. 
 
 <kbd> 
-![RTD SSST](Media_files/1-main_menu.png)
+	![RTD SSST](Media_files/1-main_menu.png)
 
 </kbd>
 
 <kbd> 
-![RTD SSST](Media_files/2-notice.png) 
+	![RTD SSST](Media_files/2-notice.png) 
 </kbd>
 
 <kbd> 
-![RTD SSST](Media_files/3-info.png) 
+	![RTD SSST](Media_files/3-info.png) 
 </kbd>
 
 <kbd> 
-![RTD SSST](Media_files/4-softw.png) 
+	![RTD SSST](Media_files/4-softw.png) 
 
 </kbd>
 
 <kbd> 
-![RTD SSST](Media_files/5-vm4.png) 
+	![RTD SSST](Media_files/5-vm4.png) 
 
 </kbd>
 
