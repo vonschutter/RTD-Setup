@@ -22,6 +22,7 @@ Running the RTD-Setup (rtd-me.sh.cmd) will give you:
 - and more...
 
 Just type "rtd" and hit [TAB] once or twice to see all the tools available at the terminal. The main tools are available in the OEM or "other" category in the menu/launcher in Linux.
+
 <kbd> ![RTD Builder Screenshot 2](media_files/ScrRTDTerm.png) </kbd> 
 
 ## On Linux
