@@ -40,12 +40,17 @@
 # Variables that govern the behavior or the script and location of files are
 
 # Base folder structure for optional administrative commandlets and scripts:
-source /opt/rtd/core/_rtd_library
+# Put a convenient link to the logs where logs are normally found...
+# capture the 3 first letters as org TLA (Three Letter Acronym)
+export _SCRIPTNAME=$(basename $0)
+export _TLA=${_SCRIPTNAME:0:3}
+export _LOG_DIR=/var/log/${_TLA}
+mkdir -p ${_LOG_DIR}
+source /opt/${_TLA}/core/_rtd_library
 
 
 # Determine log file directory
-mkdir -p /var/log/rtd
-_LOGFILE=/var/log/rtd/$( basename $0).log
+_LOGFILE=${_LOG_DIR}/$( basename $0).log
 _OEM_USER=tangarora
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
