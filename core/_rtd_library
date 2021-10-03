@@ -4579,15 +4579,15 @@ rtd_update_system ()
 add_software_task ()
 {
 # Description: Display executed task and echo ON/NOK based on sucess
-# This function is created to reduce the terminal output and create a more poliches output of
+# This function is created to reduce the terminal output and create a more poliched output of
 # the tasks executed. This function has no idea shat it is doing, it will simply call the function
 # it was asked to call or execute the command ist was asked to, and echo OK or FAIL based on the
 # return code.
 # Globals:
-# Arguments: None
+# Arguments: function or command to execute 	
 # Outputs:
 # Returns:
-# Usage:
+# Usage: add_software_task function_name
 # End of documentation
 
 	PAD="---------------------------------------------------------"
@@ -4607,14 +4607,16 @@ add_software_task ()
 
 dl ()
 {
-# Description: Function by Nate Beaken to ease and make consistent the downloading of the non repository packages and
-# install them. It can install any package that Package Kit can manage (available on most Linux dists)
+# Description: Function by Nate Beaken to ease and make consistent the downloading of the non repository 
+# packages and install them. It can install any package that Package Kit can manage (available on most Linux dists)
 # It expects one parameter: the complete URL to download from.
 # Globals:
-# Arguments: None
+# Arguments: URL to rpm or deb file and possibly some other formats of distributions that use package kit. 
 # Outputs:
 # Returns: 0/1
-# Usage:
+# Usage: 
+# 	   dl https://download.teamviewer.com/download/linux/teamviewer_amd64.deb
+# 	   dl https://download.teamviewer.com/download/linux/teamviewer.x86_64.rpm
 # End of documentation
 
 	download_url="$1"
@@ -8311,7 +8313,7 @@ else
 				DisplayList=$(list_loaded_internal_functions --zformat)
 				IFS_SAV=$IFS
 				IFS=$(echo -en "\n\b")
-				selection=$(zenity --list --text="Select a function below, to see the function's documentation \n and usage:" --height="${HEIGHT:-600}" --width="${WIDTH:-800}" --print-column=2 --column="Number" --column="Function" --column="Description" ${DisplayList} )
+				selection=$(zenity --list --text="Select a function below, to see the function's documentation \n and usage:" --height="${HEIGHT:-600}" --width="${WIDTH:-1000}" --print-column=2 --column="Number" --column="Function" --column="Description" ${DisplayList} )
 				exit_status=$?
 				IFS=$IFS_SAV
 				exec 3>&-
@@ -8329,7 +8331,7 @@ else
 							[[ "$line" == *End*of*Documentation* ]]		&& printline="no"
 							[[ "$printline" == "yes" ]]			&& echo "$line" |grep "# " |cut -c 2-
 						done < $0 )
-						zenity --info --titlFe "RTD Functon: $selection" --text="$result" --height=600 --width=800
+						zenity --info --title "RTD Functon: $selection" --text="$result" --height=600 --width=800
 					;;
 					* )
 					# Trap unknown exit code...
