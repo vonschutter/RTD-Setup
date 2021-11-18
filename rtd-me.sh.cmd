@@ -27,6 +27,9 @@ echo				-	RTD System System Managment Bootstrap Script      -
 #::		the most popular operating systems around *NIX (MAC, Linux, BSD etc.) and
 #::		CMD (Windows NT, 2000, 2003, XP, Vista, 8, and 10).
 #::
+#:: NOTE:	To redirect this script to your own repository, simply rename the first 3 letters
+#::		to match the name of your repository ("TLA"-Setup), and set the _GIT_PROFILE variable 
+#::		to the repo user or org to override the default (git username)...
 #::
 #:: Background: This system configuration and installation script was originally developed
 #:: 		for RuntimeData, a small OEM in Buffalo Center, IA. The purpose of the script
@@ -68,11 +71,38 @@ echo				-	RTD System System Managment Bootstrap Script      -
 #	the table below may be used as appropriate:
 #
 #
+#				OUTPUT REDIRECTION TABLE
+#
+#		  || visible in terminal ||   visible in file   || existing
+#	  Syntax  ||  StdOut  |  StdErr  ||  StdOut  |  StdErr  ||   file
+#	==========++==========+==========++==========+==========++===========
+#	    >     ||    no    |   yes    ||   yes    |    no    || overwrite
+#	    >>    ||    no    |   yes    ||   yes    |    no    ||  append
+#	          ||          |          ||          |          ||
+#	   2>     ||   yes    |    no    ||    no    |   yes    || overwrite
+#	   2>>    ||   yes    |    no    ||    no    |   yes    ||  append
+#	          ||          |          ||          |          ||
+#	   &>     ||    no    |    no    ||   yes    |   yes    || overwrite
+#	   &>>    ||    no    |    no    ||   yes    |   yes    ||  append
+#	          ||          |          ||          |          ||
+#	 | tee    ||   yes    |   yes    ||   yes    |    no    || overwrite
+#	 | tee -a ||   yes    |   yes    ||   yes    |    no    ||  append
+#	          ||          |          ||          |          ||
+#	 n.e. (*) ||   yes    |   yes    ||    no    |   yes    || overwrite
+#	 n.e. (*) ||   yes    |   yes    ||    no    |   yes    ||  append
+#	          ||          |          ||          |          ||
+#	|& tee    ||   yes    |   yes    ||   yes    |   yes    || overwrite
+#	|& tee -a ||   yes    |   yes    ||   yes    |   yes    ||  append
+#
+#	The best solution is to redirect at the "wrapper" layer; a.k.a. the script that loads these functions
+#	and executes them. Simply use the "source" statement to pull in the "_rtd_library" and it will do the rest:
+#	you can now simply name each function herein that you wish to have installed on a wide range of distributions.
+#
 #	Our scripts are also structured in to three major sections: "settings", "functions", and "execute".
 #	Settings, contain configurable options for the script. Functions, contain all functions. Execute,
 #	contains all the actual logic and control of the script.
 #
-#	Conversion: All exported (global) variables are UPPER case, all temp,local or otherwise are lower case.
+#	Convention: All exported (global) variables are UPPER case, all temp,local or otherwise are lower case.
 #		    Also, all exported variables begin with "_" to avoid any conflict with system or shell variables.
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -81,7 +111,7 @@ echo				-	RTD System System Managment Bootstrap Script      -
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # Variables that govern the behavior or the script and location of files are
-# set here. There should be no reason to change any of this.
+# set here. There should be no reason to change any of this abcent strong preferences.
 
 # Ensure administrative privileges.
 [ "$UID" -eq 0 ] || echo -e $YELLOW "This script needs administrative access..." $ENDCOLOR
@@ -225,10 +255,10 @@ echo			-	RTD System System Managment Bootstrap Script      -
 	::::::::::::::::::::::::::::::::::::::::::::::::::::::
 	::
 	set temp=c:\rtd\temp
-	::if not exit %temp% md %temp%
-	::set _LOGDIR=c:\rtd\log
-	::if not exist %_LOGDIR% md %_OGDIR%
-	set _STAGE2LOC=https://github.com/vonschutter/RTD-Build/raw/master/System_Setup/
+	if not exit %temp% md %temp%
+	set _LOGDIR=c:\rtd\log
+	if not exist %_LOGDIR% md %_LOGDIR%
+	set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
 	set _STAGE2FILE=rtd-oem-win10-config.ps1
 	echo Stage 2 file is located at:
 	echo %_STAGE2LOC%\%_STAGE2FILE%
@@ -236,7 +266,7 @@ echo			-	RTD System System Managment Bootstrap Script      -
 
 :GetInterestingThigsToDoOnThisSystem
 	:: Given that Microsoft Windows has been detected and the CMD chell portion of this script is executed,
-	:: the second stage script must be downloaded from an online location. Depending on the version of windows
+	:: the second stage script must be downloaded from an online location. Depending on the version of Windows
 	:: there are different methods available to get and run remote files. All versions of Windows do not neccesarily
 	:: support powershell scripting. Therefore the base of this activity is coded in simple command CMD.EXE shell scripting
 	::
@@ -281,8 +311,8 @@ echo			-	RTD System System Managment Bootstrap Script      -
 
 
 :PS2
-	:: Procedure to get the second stage configuration script in all version of windows after 7.
-	:: These version of windows have a more modern version of PowerShell.
+	:: Procedure to get the second stage configuration script in all versions of Windows after 7.
+	:: These versions of Windows have a more modern version of PowerShell.
 	:: get stage 2 and run it...
 	echo Found %*
 	echo Fetching %_STAGE2FILE%...
@@ -294,22 +324,22 @@ echo			-	RTD System System Managment Bootstrap Script      -
 
 
 :CMD1
-	:: Pre windows 7 instruction go here...
+	:: Pre windows 7 instructions go here...
 	:: Windows NT, XP, and 2000 etc. do not have powershell and must find a different way to
 	:: fetch a script over the internet and execute it.
 	echo Detected %* ...
 	echo executing PRE Windows 7 instructions...
-
+	echo However, no instructions for Windows NT or 2000 are avaliable. 
 	goto end
 
 
 :BAT1
 	:: DOS Based instructions go here ...
-	:: Windows NT, XP, and 2000 etc. do not have powershell and must find a different way to
+	:: Windows 3.11 - ME etc. do not have powershell and must find a different way to
 	:: fetch a script over the internet and execute it.
 	echo Detected an ancient Microsoft OS...
-	echo executing DOS Based instructions...
-
+	echo Executing DOS Based instructions...
+	echo However, nothing for this has been created as DOS, Windows 3.11, 95, 98, ME are too ancient!
 	goto END
 
 
