@@ -7623,10 +7623,12 @@ generate_autoyast_file ()
 	Preference_InitialUser_SUSE="<username>${_OEM_USER:-"tangarora"}</username>"
 
 	cat >> ${FILE} <<-AUTOYAST_EOF
-	<?xml version="1.0"?>
-	<!DOCTYPE profile>
-	<profile xmlns="http://www.suse.com/1.0/yast2ns" xmlns:config="http://www.suse.com/1.0/configns">
-	<general>
+<?xml version="1.0"?>
+<!DOCTYPE profile>
+<profile
+	xmlns="http://www.suse.com/1.0/yast2ns" 
+	xmlns:config="http://www.suse.com/1.0/configns" >
+
 	<mode>
 		<confirm config:type="boolean">false</confirm>
 		<final_reboot config:type="boolean">true</final_reboot>
@@ -7635,41 +7637,45 @@ generate_autoyast_file ()
 		<second_stage config:type="boolean">true</second_stage>
 		<forceboot config:type="boolean">true</forceboot>
 	</mode>
+
 	<storage>
-	        <proposal>
-		        <lvm config:type="boolean">true</lvm>
-		        <windows_delete_mode config:type="symbol">all</windows_delete_mode>
-		        <linux_delete_mode config:type="symbol">all</linux_delete_mode>
-		        <other_delete_mode config:type="symbol">all</other_delete_mode>
-			${Preference_DiskEncryption_SUSE}
-	        </proposal>
+		<proposal>
+		<lvm config:type="boolean">true</lvm>
+		<windows_delete_mode config:type="symbol">all</windows_delete_mode>
+		<linux_delete_mode config:type="symbol">all</linux_delete_mode>
+		<other_delete_mode config:type="symbol">all</other_delete_mode>
+		${Preference_DiskEncryption_SUSE}
+		</proposal>
 	</storage>
-	</general>
+
 	<networking>
-		<keep_install_network config:type="boolean">true</keep_install_network>
+	<keep_install_network config:type="boolean">true</keep_install_network>
 	</networking>
+
 	<deploy_image>
-		<image_installation config:type="boolean">true</image_installation>
+	<image_installation config:type="boolean">true</image_installation>
 	</deploy_image>
+
 	<software>
 		<install_recommended config:type="boolean">true</install_recommended>
 		<patterns config:type="list">
 			<pattern>base</pattern>
 			${Preference_Desktop_DE_SUSE}
 		</patterns>
-		<image/>
-		<install_recommended config:type="boolean">true</install_recommended>
-		<instsource/>
+
 		<packages config:type="list">
 			<package>wget</package>
 			<package>vim</package>
 			<package>spice-vdagent</package>
 			<package>git</package>
 		</packages>
+
 		<products config:type="list">
-			<product>Leap</product>
+			<product>openSUSE</product>
 		</products>
+
 	</software>
+
 	<users config:type="list">
 		<user>
 			<encrypted config:type="boolean">true</encrypted>
@@ -7683,41 +7689,52 @@ generate_autoyast_file ()
 		</user>
 		<user>
 			<encrypted config:type="boolean">true</encrypted>
-			<fullname>${_TLA:-"RTD"} User</fullname>
+			<fullname>RTD User</fullname>
 			<shell>/bin/bash</shell>
 			${Preference_Password_SUSE}
 			${Preference_InitialUser_SUSE}
 		</user>
 	</users>
+
 	<login_settings>
 		<autologin_user>tangarora</autologin_user>
 		<password_less_login config:type="boolean">true</password_less_login>
 	</login_settings>
+
 	<services-manager>
 		<default_target>graphical</default_target>
 		<services>
 			<enable config:type="list">
-			<service>sshd</service>
-			<service>spice-vdagent</service>
+				<service>sshd</service>
+				<service>spice-vdagent</service>
 			</enable>
-		</services>
+		</services> 
 	</services-manager>
+
 	<scripts>
-		<init-scripts config:type="list">
-			<script>
-			<interpreter>bash</interpreter>
-			<source><![CDATA[
-	#!/bin/bash
-	git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd
-	chmod 755 /opt/rtd/core/rtd-oem-enable-config.sh
-	/opt/rtd/core/rtd-oem-enable-config.sh
-	cp *.xml /opt/rtd/
-			]]>
-			</source>
-			</script>
-		</init-scripts>
-	</scripts>
-	</profile>
+	    <init-scripts config:type="list">
+	      <script>
+		<source><![CDATA[
+#!/bin/bash
+git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd
+chmod 755 /opt/rtd/core/rtd-oem-enable-config.sh
+/opt/rtd/core/rtd-oem-enable-config.sh
+cp *.xml /opt/rtd/
+]]>
+		</source>
+	      </script>
+	    </init-scripts>
+	</scripts> 
+
+	<security>
+	  <permission_security>secure</permission_security>
+	  <selinux_mode>permissive</selinux_mode>
+	</security>
+
+</profile>
+
+
+
 	AUTOYAST_EOF
 }
 
