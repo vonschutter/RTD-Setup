@@ -4228,9 +4228,19 @@ check_dependencies ()
 		InstallSoftwareFromRepo $1
 		if [ $? != 0 ];
 		then
-			write_error "That install didn't work out so well."
-			write_error "Please manually try to add the software since I couldn't do it."
-			return 1
+			ensure_snap_package_managment
+			snap install $1 
+			if [ $? != 0 ];
+			then
+				ensure_flatpak_package_managment
+				flatpack install $1 -y
+				if [ $? != 0 ];
+				then
+					write_error "That install didn't work out so well."
+					write_error "Please manually try to add the software since I couldn't do it."
+					return 1
+				fi
+			fi
 		fi
 		echo "OK Done! Continuing..."
 	fi
@@ -4540,7 +4550,8 @@ rtd_update_system ()
 			write_information "There are $UPGRADABLE packages that need updates..."
 			rtd_software_task dpkg --configure -a
 			rtd_software_task apt-get upgrade -y
-			rtd_software_task apt-get autoremove -y
+			rtd_software_task apt-get full-upgrade -y
+			rtd_software_task apt-get --purge autoremove -y
 			rtd_software_task apt-get clean
 		fi
 	elif hash pkcon 2>/dev/null; then
@@ -4689,7 +4700,7 @@ display_software_installation_choices_gtk ()
 {
 # Function to display the software install otions. All software option are listed in
 # the _rtd_recipes recipe book. Leveraging all the useful function in _rtd_library.
-# NOTE: adding a function in _rtd_recipes named "recipes_* ()" will automaticall populete
+# NOTE: adding a function in _rtd_recipes named "recipes_* ()" will automaticall populate
 # the menu displayed to the user.
 #
 # Globals: ${_BACKTITLE} ${zstatus}
@@ -5318,7 +5329,7 @@ make_kvm_virtual_machine_now_from_debian_org ()
 		--memory "${3:-2048}" \
 		--network "$VIRT_NET" \
 		--location=http://ftp.us.debian.org/debian/dists/bullseye/main/installer-amd64/  \
-		--disk size="${4:-30}" \
+		--disk size="${4:-40}" \
 		--os-variant="${1:-debian10}" \
 		--initrd-inject="$PRESEED_FILE" \
 		--extra-args "ks=file:/$(basename $PRESEED_FILE)" \
