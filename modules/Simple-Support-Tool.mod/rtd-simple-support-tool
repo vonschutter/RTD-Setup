@@ -851,9 +851,12 @@ show_monitor_informaion_about_this_system () {
 			fi
 		;;
 		5 )
+			trap "return" SIGINT
 			dmesg --human --follow
+			read -p "Press [Enter] key to return to the main menu: "
 		;;
 		6 )
+			trap "return" SIGINT
 			if [[ -e /var/log/syslog ]]; then 
 				tail -f /var/log/syslog 
 			elif  [[ -e /var/log/messages ]]; then
@@ -861,6 +864,7 @@ show_monitor_informaion_about_this_system () {
 			else
 				write_warning "no relevant log file found" 
 			fi
+			read -p "Press [Enter] key to return to the main menu: "
 		;;
 		esac
 	done
