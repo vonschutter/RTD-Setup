@@ -254,10 +254,11 @@ echo			-	RTD System System Managment Bootstrap Script      -
 	::  ***             Settings               ***      ::
 	::::::::::::::::::::::::::::::::::::::::::::::::::::::
 	::
+	mkdir c:\rtd\temp
 	set temp=c:\rtd\temp
-	if not exit %temp% md %temp%
+	mkdir c:\rtd\log
 	set _LOGDIR=c:\rtd\log
-	if not exist %_LOGDIR% md %_LOGDIR%
+	md %_LOGDIR%
 	set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
 	set _STAGE2FILE=rtd-oem-win10-config.ps1
 	echo Stage 2 file is located at:
@@ -274,26 +275,26 @@ echo			-	RTD System System Managment Bootstrap Script      -
 	:: In this case it is easier to manage a straight table than a for loop or array:
 
 	:: DOS Based versions of Windows:
-	ver | find "4.0" > nul && goto BAT1 	rem Windows 95
-	ver | find "4.10" > nul && goto BAT1	rem Windows 98
-	ver | find "4.90" > nul && goto BAT1	rem Windows ME
+	ver | find "4.0" > %_LOGDIR%\%0.log && goto BAT1 	rem Windows 95
+	ver | find "4.10" > %_LOGDIR%\%0.log && goto BAT1	rem Windows 98
+	ver | find "4.90" > %_LOGDIR%\%0.log && goto BAT1	rem Windows ME
 
 	:: Windows 32 and 64 Bit versions:
-	ver | find "NT 4.0" > nul && call :CMD1 Windows NT 4.0
-	ver | find "5.0" > nul && call :CMD1 Windows 2000
-	ver | find "5.1" > nul && call :CMD1 Windows XP
-	ver | find "5.2" > nul && call :CMD1 Windows XP 64 Bit
-	ver | find "6.0" > nul && call :DispErr Vista is not supported!!!
-	ver | find "6.1" > nul && call :PS1 Windows 7
-	ver | find "6.2" > nul && call :PS2 Windows 8
-	ver | find "6.3" > nul && call :PS2 Windows 8
-	ver | find "6.3" > nul && call :PS2 Windows 8
-	ver | find "10.0" > nul && call :PS2 Windows 10
+	ver | find "NT 4.0" > %_LOGDIR%\%0.log && call :CMD1 Windows NT 4.0
+	ver | find "5.0" > %_LOGDIR%\%0.log && call :CMD1 Windows 2000
+	ver | find "5.1" > %_LOGDIR%\%0.log && call :CMD1 Windows XP
+	ver | find "5.2" > %_LOGDIR%\%0.log && call :CMD1 Windows XP 64 Bit
+	ver | find "6.0" > %_LOGDIR%\%0.log && call :DispErr Vista is not supported!!!
+	ver | find "6.1" > %_LOGDIR%\%0.log && call :PS1 Windows 7
+	ver | find "6.2" > %_LOGDIR%\%0.log && call :PS2 Windows 8
+	ver | find "6.3" > %_LOGDIR%\%0.log && call :PS2 Windows 8
+	ver | find "6.3" > %_LOGDIR%\%0.log && call :PS2 Windows 8
+	ver | find "10.0" > %_LOGDIR%\%0.log && call :PS2 Windows 10
 
 	:: Windows Server OS Versions:
-	ver | find "NT 6.2" > nul && call :PS2 Windows Server 2012
-	ver | find "NT 6.3" > nul && call :PS2 Windows Server 2012 R2
-	ver | find "NT 10.0" > nul && call :PS2 Windows Server 2016 and up...
+	ver | find "NT 6.2" > %_LOGDIR%\%0.log && call :PS2 Windows Server 2012
+	ver | find "NT 6.3" > %_LOGDIR%\%0.log && call :PS2 Windows Server 2012 R2
+	ver | find "NT 10.0" > %_LOGDIR%\%0.log && call :PS2 Windows Server 2016 and up...
 
 	goto end
 
