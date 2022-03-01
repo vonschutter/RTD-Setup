@@ -4229,7 +4229,7 @@ check_dependencies ()
 		if [ $? != 0 ];
 		then
 			ensure_snap_package_managment
-			snap install $1 
+			snap install $1
 			if [ $? != 0 ];
 			then
 				ensure_flatpak_package_managment
@@ -4624,6 +4624,9 @@ dl ()
 # Globals:
 # Arguments: URL to rpm or deb file and possibly some other formats of distributions that use package kit.
 # Outputs:
+# Depends:
+#           - Functions; write_error, check_dependencies
+#           - Software: wget, pkcon
 # Returns: 0/1
 # Usage:
 # 	   dl https://download.teamviewer.com/download/linux/teamviewer_amd64.deb
@@ -4636,9 +4639,13 @@ dl ()
 	echo  "${FUNCNAME[0]}: getting package ${download_url}..."
 	if hash wget ; then
 		fetch_file
-	else
-		check_dependencies wget
+	elif check_dependencies wget ; then
 		fetch_file
+	else
+		write_error "Unable to download requested file:  ${download_url}..."
+		write_error "Please check if wget is available since this is used to download files..."
+		write_error "You may also want to check that the internet is reachable from this computer?"
+		return 1
 	fi
 
 	echo "${FUNCNAME[0]}: Installing package $(basename ${download_url}) ..."
@@ -4700,7 +4707,7 @@ display_software_installation_choices_gtk ()
 {
 # Function to display the software install otions. All software option are listed in
 # the _rtd_recipes recipe book. Leveraging all the useful function in _rtd_library.
-# NOTE: adding a function in _rtd_recipes named "recipes_* ()" will automaticall populate
+# NOTE: adding a function in _rtd_recipes named "recipes_* ()" will automaticall populete
 # the menu displayed to the user.
 #
 # Globals: ${_BACKTITLE} ${zstatus}
@@ -5231,7 +5238,7 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 # Specifically, KVM lets you turn Linux into a hypervisor that allows a host machine to run multiple,
 # isolated virtual environments called guests or virtual machines (VMs). KVM is part of Linux.
 # For complete info: https://www.redhat.com/en/topics/virtualization/what-is-KVM
-# set -e
+#
 # Use the check_dependencies function to make sure the needed software is available.
 # Usage: Either simply call this function to use the defaults or:
 # Call this function with "function" "RAM_SIZE" "DISK_SIZE" "DISK_FORMAT" "DISK_FILE"
