@@ -3913,7 +3913,7 @@ ensure_snap_package_managment ()
 		# these tests focus on the latest versions of the distros evaluated...
 		if hostnamectl |grep "SUSE" 2>/dev/null ; then
 			write_warning "${FUNCNAME[0]}: Special case for suse"
-			write_status "${FUNCNAME[0]}: Addign repository..."
+			write_status "${FUNCNAME[0]}: Adding repository..."
 				zypper addrepo --refresh https://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_$(cat /etc/os-release |grep VERSION_ID |cut -d= -f2|cut -d\" -f2) snappy
 			write_status "${FUNCNAME[0]}: Importing GPG keys..."
 				zypper --gpg-auto-import-keys refresh
@@ -3983,8 +3983,8 @@ up_2_date ()
 # Globals:
 # Arguments: None
 # Outputs:
-# Returns:
-# Usage:
+# Returns: 0/1/3 where 1/0 = sucess/fail and 3 = package manager NOT found
+# Usage: up_2_date
 # End of documentation
 	ensure_admin
 	write_status "Running up2date function:"
@@ -4020,7 +4020,7 @@ is_software_package_installed ()
 # Globals:
 # Arguments: None
 # Outputs:
-# Returns:
+# Returns: 1/0 where 0 = package is installed/1 = package is NOT installed
 # Usage:
 # Call this function by:
 # is_software_package_installed "package name"
@@ -4030,7 +4030,7 @@ is_software_package_installed ()
 #
 # End of documentation
 
-	if hash yum 2>/dev/null; then
+	if hash dnf 2>/dev/null; then
 		rpm -q "$1" > /dev/null 2>&1 && return 0 || return 1
 	elif hash zypper 2>/dev/null; then
 		zypper -x se "$1" |grep 'status="installed"' > /dev/null 2>&1 && return 0 || return 1
@@ -4155,7 +4155,7 @@ set_install_command ()
 
 		if hash dnf 2>/dev/null; then
 			# Try dnf (RedHat, Cent OS, Fedora)
-			write_status "Setting install options for YUM"
+			write_status "Setting install options for DNF"
 			export _INSTCMD="sudo dnf -y  install"
 		elif hash zypper 2>/dev/null; then
 			# Try zypper (Open SUSE)
@@ -4206,15 +4206,14 @@ check_dependencies ()
 #
 # Globals:
 # Arguments: None
+# Dependencies: [flatpak; snap; or package manager]
+# Function Dependencies: ensure_admin, write_status, write_information, write_warning, write_error, is_software_package_installed,
+#                        InstallSoftwareFromRepo, ensure_snap_package_managment, ensure_flatpak_package_managment
 # Outputs:
-# Returns:
-# Usage:
+# Returns: 1/0
+# Usage: check_dependencies [packagename]
 #
-# check_dependencies [packagename]
-#
-# EXAMPLE:
-#
-# check_dependencies snapd
+# EXAMPLE: check_dependencies snapd
 #
 # End of documentation
 	ensure_admin
@@ -4363,7 +4362,25 @@ rtd_oem_release_upgrade ()
 			display_result "Release Upgrade Attempt Result: "
 		elif hostnamectl |grep "SUSE" 2>/dev/null ; then
 			write_warning "This REALLY may take some time, please be patient!"
-			zypper dup
+			cat /etc/os-release
+			write_information "these are the current repositories..."
+			zypper modifyrepo --enable repo-update
+			zypper repos --uri
+
+			SUSE_VER=$($RTD_GUI --title "Select Release Version of SUSE" --inputbox "Please pick an available Suse version by entering it below. For example type: 15.3  \n $picachu "  25 110 "15.3" 3>&1 1>&2 2>&3) ;clear
+			[ "${SUSE_VER}" ] || write_error "No verson selected for distribution upgrade -- Only running a regular update then... "
+
+			write_status "Checking if it is possible to upgrade to ${SUSE_VER}"
+			if zypper --releasever="${SUSE_VER}" lr -u ; then
+				zypper --releasever="${SUSE_VER}" ref
+				write_status "Attempting upgrade of system now..."
+				zypper --releasever="${SUSE_VER}" dup --force-resolution
+				read -p "$ERRMSG: Press  [ ENTER ] to REBOOT:"
+				reboot
+			else
+				write_error "It is not possible to upgrade to Open Suse ${SUSE_VER} since there does not appear to be a release server available for ${SUSE_VER}"
+				read -p "$ERRMSG: Press  [ ENTER ] to continue:"
+			fi
 		elif hostnamectl |grep "fedora" 2>/dev/null ; then
 			releasever=$($RTD_GUI --title "Fedora Upgrade Confirmation" --inputbox "Please enter the Fedora version you want to upgrade to. Please make sure that it has been published. You are currently using: $(hosnamectl)  only numbers are valid" 8 78  3>&1 1>&2 2>&3)
 			sudo dnf upgrade --refresh
