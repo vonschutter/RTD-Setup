@@ -150,7 +150,7 @@ export _STATUSLOG=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-status.log
 #:: In this case it is easier to manage a straight table than a for loop or array:
 
 
-if [[ "$OSTYPE" == "linux-gnu" ]]; then
+if echo "$OSTYPE" |grep "linux" ; then
 	echo "Linux OS Found: Attempting to get instructions for Linux..."
 	echo executing $0 >> ${_LOGFILE}
 	if ! hash git &>> ${_LOGFILE} ; then
