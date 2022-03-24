@@ -2402,7 +2402,12 @@ ensure_admin ()
 			fi
 		fi
 	else
-		sudo sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
+		if [[ ! -e /etc/pam.d/sudo ]] ; then
+			touch /etc/pam.d/sudo
+			echo 'session  optional       pam_xauth.so' > /etc/pam.d/sudo
+		else
+			sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
+		fi
 	fi
 }
 
@@ -5219,7 +5224,7 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
-	FedoraVersion=${FedoraVersion:-"34"}
+	FedoraVersion=${FedoraVersion:-"35"}
 
 	# Discover if the appropriate VM net interface is (default or br'0 - n')
 	VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
@@ -7486,7 +7491,7 @@ generate_fedora_ks_cfg_file ()
 # End of documentation
 	${FILE="$1"}
 	${CONFIG="$2"}
-	${FedoraVersion:-"34"}
+	${FedoraVersion:-"35"}
 
 		# repo --name=fedora-updates --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f${FedoraVersion}&arch=x86_64" --cost=0
 		# repo --name=rpmfusion-free --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-${FedoraVersion}&arch=x86_64" --includepkgs=rpmfusion-free-release
