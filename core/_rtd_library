@@ -4959,7 +4959,7 @@ rtd_setup_choices_term_fallback ()
 		for choice in $choices
 			do
 			    case $choice in
-				1) for i in netstat nmcli htop powertop iftop monit nethogs bmon darkstat ss mtr glances nmap iostat multitail ncdu multitail ; do InstallSoftwareFromRepo $i ; done ;;
+				1) for i in htop powertop iftop monit nethogs bmon darkstat mtr glances nmap multitail ncdu ; do InstallSoftwareFromRepo $i ; done ;;
 				2)  InstallSoftwareFromRepo alpine ;;
 				3)  InstallSoftwareFromRepo vim ;;
 				4)  InstallSoftwareFromRepo finch ;;
@@ -4976,7 +4976,7 @@ rtd_setup_choices_term_fallback ()
 				15) InstallSoftwareFromRepo openvpn ;;
 				16) InstallSoftwareFromRepo freesweep ;;
 				17) InstallSoftwareFromRepo bastet ;;
-				18) recipie_OEM_config ;;
+				18) echo 'export PS1="\[\033[35m\]\t\[\033[m\]-\[\033[36m\]\u\[\033[m\]@\[\033[32m\]\h:\[\033[33;1m\]\w\[\033[m\]\$ "' >> ~/.bashrc ;;
 			esac
 		done
 }
@@ -7489,16 +7489,17 @@ generate_fedora_ks_cfg_file ()
 # Returns: 0/1
 # Usage: generate_fedora_ks_cfg_file $(mktemp) workstation
 # End of documentation
-	${FILE="$1"}
-	${CONFIG="$2"}
-	${FedoraVersion:-"35"}
+	FILE=${FILE="$1"}
+	CONFIG=${CONFIG="$2"}
+	FedoraVersion=${FedoraVersion:-"35"}
+	write_host --cyan "Creating KS.CFG Instructions (txt): ${FILE}"
 
-		# repo --name=fedora-updates --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f${FedoraVersion}&arch=x86_64" --cost=0
-		# repo --name=rpmfusion-free --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-${FedoraVersion}&arch=x86_64" --includepkgs=rpmfusion-free-release
-		# repo --name=rpmfusion-free-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-updates-released-${FedoraVersion}&arch=x86_64" --cost=0
-		# repo --name=rpmfusion-nonfree --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-${FedoraVersion}&arch=x86_64" --includepkgs=rpmfusion-nonfree-release
-		# repo --name=rpmfusion-nonfree-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-updates-released-${FedoraVersion}&arch=x86_64" --cost=0
-		# repo --name=google-chrome --install --baseurl="https://dl.google.com/linux/chrome/rpm/stable/x86_64" --cost=0
+	# repo --name=fedora-updates --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f${FedoraVersion}&arch=x86_64" --cost=0
+	# repo --name=rpmfusion-free --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-${FedoraVersion}&arch=x86_64" --includepkgs=rpmfusion-free-release
+	# repo --name=rpmfusion-free-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-updates-released-${FedoraVersion}&arch=x86_64" --cost=0
+	# repo --name=rpmfusion-nonfree --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-${FedoraVersion}&arch=x86_64" --includepkgs=rpmfusion-nonfree-release
+	# repo --name=rpmfusion-nonfree-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-updates-released-${FedoraVersion}&arch=x86_64" --cost=0
+	# repo --name=google-chrome --install --baseurl="https://dl.google.com/linux/chrome/rpm/stable/x86_64" --cost=0
 
 	if [[ "${CONFIG}" == "ssh-server" ]]; then
 		write_information "Selected configuration is ssh-server..."
@@ -7508,7 +7509,6 @@ generate_fedora_ks_cfg_file ()
 		text
 
 		# Configure installation method
-		install
 		url --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-${FedoraVersion}&arch=x86_64"
 
 		# Run the Setup Agent on first boot
@@ -7553,7 +7553,6 @@ generate_fedora_ks_cfg_file ()
 		text
 
 		# Configure installation method
-		install
 		url --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-${FedoraVersion}&arch=x86_64"
 
 		# Run the Setup Agent on first boot
@@ -7599,7 +7598,6 @@ generate_fedora_ks_cfg_file ()
 		graphical
 
 		# Configure installation method
-		# install
 		url --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-${FedoraVersion}&arch=x86_64"
 
 		# Setup Agent on first boot
