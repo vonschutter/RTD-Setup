@@ -4860,25 +4860,20 @@ rtd_server_setup_choices_services ()
 
 					while true; do
 						exec 3>&1
-						selection=$($RTD_GUI \
-						--backtitle "$BRANDING" --title "Install Status"  --menu "I am done installing Minecraft Server. What do you want to do now? " "$HEIGHT" "$WIDTH" "$LIST_HEIGHT"  \
+						selection=$($RTD_GUI --backtitle "$BRANDING" --title "Install Status" --menu "I am done installing Minecraft Server. What do you want to do now? " "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
 						"1" "Run Minecratft Server now" \
 						"2" "Return to the Software and Role selection menus" \
 						"3" "Just Quit now. Minecraftt Server will start automatically after you reboot" \
 						2>&1 1>&3)
 						exit_status=$?
 						exec 3>&-
-						clear
 
 						case $exit_status in
-							"$DIALOG_CANCEL") return	;;
+							"$DIALOG_CANCEL") return ;;
 							"$DIALOG_ESC") return ;;
 						esac
 
 						case $selection in
-						0 )
-							echo "Program terminated by user..."
-						;;
 						1 )
 							sudo -H -u tangarora bash -c '~/minecraft-server'
 						;;
