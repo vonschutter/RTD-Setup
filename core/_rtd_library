@@ -4820,7 +4820,7 @@ rtd_server_setup_choices_services ()
 # End of documentation
 
 	# List Options to be available for choice in the RTD System Configurator...
-	cmd=(dialog --backtitle "RTD OEM System Builder Configuraton Menu" --title "Terminal Software Options Menu" --separate-output --checklist "We did not find a graphical interface. No matter, you can be productive in the cli environment. Please Select Software and Configuration below:" 22 85 16 )
+	cmd=(dialog --backtitle "${TLA} OEM System Configuraton Menu" --title "Server Role Options Menu" --separate-output --checklist "Please Select a role for this system below:" 22 85 16 )
 	options=(1 "Install Minecraft Server" off
 		 2 "Install LAMP Server" off
 		)
@@ -4864,33 +4864,33 @@ rtd_server_setup_choices_productivity ()
 # old CLI software! :)
 # End of documentation
 
-	cmd=(dialog --backtitle "RTD OEM System Builder Configuraton Menu" --title "Terminal Software Options Menu" --separate-output --checklist "We did not find a graphical interface. No matter, you can be productive in the cli environment. Please Select Software and Configuration below:" 22 85 16 )
+	cmd=(dialog --backtitle "${TLA} OEM System Configuraton Menu" --title "Terminal Productivity Software Options" --separate-output --checklist "We did not find a graphical interface. No matter, you can be productive in the cli environment. Please Select Software and Configuration below:" 22 85 16 )
 	options=(1 "Base RTD OEM Software" on
-		 2 "Alpine email client" on
-		 3 "Vim text editor" on
-		 4 "Finch multi protocol chat" on
-		 5 "Word Grinder word precessor" on
-		 6 "Spreadsheet Calculator" on
-		 7 "TPP Presentation Program" on
-		 8 "Midnight Commander file manager (Norton Commander)" on
-		 9 "Cmus Music Player" on
-		 10 "Byobu Terminal Window Manger" on
-		 11 "W3M web Browser" on
-		 12 "LYNX Web Browser" on
-		 13 "Mega.nz command line tools (Mega-CMD)" on
-		 14 "Rtorrent torrent download software" off
-		 15 "Install the OpenVpn client Software" on
-		 16 "Games: Freesweep mine sweep game" on
-		 17 "Games: Bastet Tetris Game" on
-		 18 "OEM Customizatons" on
+		2 "Alpine email client" on
+		3 "Vim text editor" on
+		4 "Finch multi protocol chat" on
+		5 "Word Grinder word precessor" on
+		6 "Spreadsheet Calculator" on
+		7 "TPP Presentation Program" on
+		8 "Midnight Commander file manager (Norton Commander)" on
+		9 "Cmus Music Player" on
+		10 "Byobu Terminal Window Manger" on
+		11 "W3M web Browser" on
+		12 "LYNX Web Browser" on
+		13 "Mega.nz command line tools (Mega-CMD)" on
+		14 "Rtorrent torrent download software" off
+		15 "Install the OpenVpn client Software" on
+		16 "Games: Freesweep mine sweep game" on
+		17 "Games: Bastet Tetris Game" on
+		18 "OEM Customizatons" on
 		)
 
 		choices=$("${cmd[@]}" "${options[@]}" 2>&1 >/dev/tty)
 		clear
 		for choice in $choices
 			do
-			    case $choice in
-				1) for i in netstat nmcli htop powertop iftop monit nethogs bmon darkstat ss mtr glances nmap iostat multitail ncdu multitail ; do InstallSoftwareFromRepo $i ; done ;;
+			case $choice in
+				1) for i in htop powertop iftop monit nethogs bmon darkstat mtr glances nmap multitail ncdu ; do InstallSoftwareFromRepo $i ; done ;;
 				2)  InstallSoftwareFromRepo alpine ;;
 				3)  InstallSoftwareFromRepo vim ;;
 				4)  InstallSoftwareFromRepo finch ;;
@@ -4902,12 +4902,12 @@ rtd_server_setup_choices_productivity ()
 				10) InstallSoftwareFromRepo byobu ;;
 				11) InstallSoftwareFromRepo w3m ;;
 				12) InstallSoftwareFromRepo lynx ;;
-				13) dl https://mega.nz/linux/MEGAsync/xUbuntu_19.04/amd64/megacmd-*.deb	;;
+				13) Single_Install_MEGA.nz_Encrypted_Cloud_Storage megacmd ;;
 				14) InstallSoftwareFromRepo rtorrent ;;
 				15) InstallSoftwareFromRepo openvpn ;;
 				16) InstallSoftwareFromRepo freesweep ;;
 				17) InstallSoftwareFromRepo bastet ;;
-				18) recipie_OEM_config ;;
+				18) echo 'export PS1="\[\033[35m\]\t\[\033[m\]-\[\033[36m\]\u\[\033[m\]@\[\033[32m\]\h:\[\033[33;1m\]\w\[\033[m\]\$ "' >> ~/.bashrc ;;
 			esac
 		done
 }
@@ -4917,7 +4917,7 @@ rtd_server_setup_choices_productivity ()
 
 
 
-rtd_setup_choices_term_fallback ()
+rtd_setup_choices_server ()
 {
 # Description: Function to display legacy installation options. This will install software that is usefull
 # on a really old system, or a remote system only accessible via SSH. This may be a good
@@ -4933,25 +4933,10 @@ rtd_setup_choices_term_fallback ()
 # End of documentation
 
 	# List Options to be available for choice in the RTD System Configurator...
-	cmd=(dialog --backtitle "RTD OEM System Builder Configuraton Menu" --title "Terminal Software Options Menu" --separate-output --checklist "We did not find a graphical interface. No matter, you can be productive in the cli environment. Please Select Software and Configuration below:" 22 85 16 )
-	options=(1 "Base RTD OEM Software" on
-		 2 "Alpine email client" on
-		 3 "Vim text editor" on
-		 4 "Finch multi protocol chat" on
-		 5 "Word Grinder word precessor" on
-		 6 "Spreadsheet Calculator" on
-		 7 "TPP Presentation Program" on
-		 8 "Midnight Commander file manager (Norton Commander)" on
-		 9 "Cmus Music Player" on
-		 10 "Byobu Terminal Window Manger" on
-		 11 "W3M web Browser" on
-		 12 "LYNX Web Browser" on
-		 13 "Mega.nz command line tools (Mega-CMD)" on
-		 14 "Rtorrent torrent download software" off
-		 15 "Install the OpenVpn client Software" on
-		 16 "Games: Freesweep mine sweep game" on
-		 17 "Games: Bastet Tetris Game" on
-		 18 "OEM Customizatons" on
+
+	cmd=(dialog --backtitle "${TLA} OEM System Configuraton Menu" --title "System Software Chooser" --separate-output --checklist "It looks like this is a server to me. Please Select a role for htis system below:" 22 85 16 )
+	options=(1 "Select terminal apps to install (i.e. vim, Lynx, Midnight Commander etc.)" off
+		 2 "Select Role (i.e. SSH server, Minecraft Server, etc.)" off
 		)
 
 		choices=$("${cmd[@]}" "${options[@]}" 2>&1 >/dev/tty)
@@ -4959,24 +4944,8 @@ rtd_setup_choices_term_fallback ()
 		for choice in $choices
 			do
 			    case $choice in
-				1) for i in htop powertop iftop monit nethogs bmon darkstat mtr glances nmap multitail ncdu ; do InstallSoftwareFromRepo $i ; done ;;
-				2)  InstallSoftwareFromRepo alpine ;;
-				3)  InstallSoftwareFromRepo vim ;;
-				4)  InstallSoftwareFromRepo finch ;;
-				5)  InstallSoftwareFromRepo wordgrinder ;;
-				6)  InstallSoftwareFromRepo sc ;;
-				7)  InstallSoftwareFromRepo tpp ;;
-				8)  InstallSoftwareFromRepo mc ;;
-				9)  InstallSoftwareFromRepo cmus ;;
-				10) InstallSoftwareFromRepo byobu ;;
-				11) InstallSoftwareFromRepo w3m ;;
-				12) InstallSoftwareFromRepo lynx ;;
-				13) dl https://mega.nz/linux/MEGAsync/xUbuntu_19.04/amd64/megacmd-*.deb	;;
-				14) InstallSoftwareFromRepo rtorrent ;;
-				15) InstallSoftwareFromRepo openvpn ;;
-				16) InstallSoftwareFromRepo freesweep ;;
-				17) InstallSoftwareFromRepo bastet ;;
-				18) echo 'export PS1="\[\033[35m\]\t\[\033[m\]-\[\033[36m\]\u\[\033[m\]@\[\033[32m\]\h:\[\033[33;1m\]\w\[\033[m\]\$ "' >> ~/.bashrc ;;
+				1)  rtd_server_setup_choices_productivity ;;
+				2)  rtd_server_setup_choices_services ;;
 			esac
 		done
 }

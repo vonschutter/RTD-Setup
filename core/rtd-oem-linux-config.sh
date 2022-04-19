@@ -166,7 +166,7 @@ else
 	if [[ -z "$(ps aux |grep X |grep  -v grep)" ]]; then
 		echo "No X server at \$DISPLAY [$DISPLAY]"
 		check_dependencies dialog
-		rtd_setup_choices_term_fallback
+		rtd_setup_choices_server
 	else
 		check_dependencies zenity || exit 1
 		display_software_installation_choices_gtk
