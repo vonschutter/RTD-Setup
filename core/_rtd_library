@@ -935,19 +935,27 @@ toggle_oem_run_once () {
 # best run on several distributions and in a full graphic environment.
 #
 # Globals:
-# Arguments: [file path]
+# Arguments: [script path] [optional:path to .desktop launcher]
 # Outputs:
 # Returns:
 # Usage:
 #
 # setup_oem_run_once /path/to/script.sh
 # End of documentation
-
+	_FILE=${2:-"/etc/xdg/autostart/oem-run.desktop"}
 	# If the launcher exists, delete it, else create it.
-	if [[ -e /etc/xdg/autostart/oem-run.desktop ]] ; then
-		rm /etc/xdg/autostart/oem-run.desktop
+	if [[ -e ${_FILE} ]] ; then
+		if [[ -w "${_FILE}" ]]
+		then
+			write_information "Removing execution on login of (${_FILE})"
+			rm ${_FILE}
+		else
+			write_warning "Write permission is NOT granted on ${_FILE}"
+			write_status "Requesting elevated privileges..."
+			sudo rm ${_FILE}
+		fi
 	else
-		cat > /etc/xdg/autostart/oem-run.desktop <<-CREATE_START_LINK
+		cat > ${_FILE} <<-CREATE_START_LINK
 		# This will automatically start the RuntTime Data OEM config options on
 		# the first login. Once run this launcher will be moved to the /opt/rtd folder
 		# so that subsequent logins will not be plagued by the OEM setup.
@@ -6465,7 +6473,27 @@ generate_autounattend_xml ()
 
 
 
+rtd_oem_preseed_ubuntu_cfg_KS_CFG_Options ()
+{
+# Description: generates a preseed section [Ubuntu only] (ks.cfg)
+# Globals: $PRESEED (filename)
+# Arguments: Where to place file (directory)
+# Outputs: one preseed file section
+# Returns: instruction for Ubuntu's convoluted support for both preseed and kickstart files.
+# Usage: rtd_oem_preseed_ubuntu_cfg_KS_CFG_Options "directory"
+# End of documentation
+	cat > $1/autoinstall.yaml <<-'EOF'
+#cloud-config
+autoinstall:
+  version: 1
+  identity:
+    hostname: ubuntu-server
+    password: "$6$exDY1mhS4KUYCE/2$zmn9ToZwTKLhCw.b4/b.ZRTIZM30JZ4QrOQ2aOXJ8yk96xpcCof0kxKwuX1kqLG/ygbJ1f8wxED22bTL4F46P0"
+    username: tangarora
+		# # --------------------------------------------------- #
 
+EOF
+}
 
 
 
