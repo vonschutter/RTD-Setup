@@ -9,7 +9,7 @@
 #::
 #::
 #::	Purpose: To enable configuration of a newly built linux install. This file will be referenced by
-#::		 either Debian setup (Debian , ubuntu, etc.), SUSE auto yast, or Anaconda (red Har, Fedora etc.).
+#::		 either Debian setup (Debian , ubuntu, etc.), SUSE auto yast, or Anaconda (red Hat, Fedora etc.).
 #::		 This script configures the system to auto login, and run the systen configuration choices menu.
 #::
 #::	Usage:	Simply execute this script to accomplish this task. No parameters required.
@@ -28,6 +28,8 @@
 #
 # This script is intended to live in the ~/bin/ or /bin/ folder, alternatively in the $PATH.
 # By default this script is placed in /opt/rtd/core/
+#
+# NOTE: this script is run by the power tools system setup and therefore the oem tools are asumed to be present.
 #
 # 1 - To see options to use the rtd library type: "bash _rtd_library --help"
 # 2 - To see usefull documentation on each function in this library: "bash _rtd_library --devhelp or --devhelp-gtk"
@@ -53,41 +55,15 @@ source /opt/${_TLA}/core/_rtd_library
 _LOGFILE=${_LOG_DIR}/$( basename $0).log
 _OEM_USER=tangarora
 
+
+
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::          Execute tasks                   ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-tell_info() {
-	echo "starting post install tasks on:  $( date )..."
-	echo "*** SYSTEM information:"
-	echo "************************************************************"
-	lsusb
-	echo "************************************************************"
-	lspci
-	echo "************************************************************"
-	echo "*** File system information: "
-	echo "************************************************************"
-	mount
-	echo "************************************************************"
-	swapon
-	echo "************************************************************"
-	echo "*** Block Devices: "
-	echo "************************************************************"
-	lsblk
-	echo "************************************************************"
-	echo "*** available space: "
-	echo "************************************************************"
-	df -h
-	echo "************************************************************"
-	echo "*** Process information: "
-	echo "************************************************************"
-	ps aux
-	echo "************************************************************"
-}
 
-tell_info							&>> $_LOGFILE
 toggle_oem_run_once "/opt/rtd/core/rtd-oem-linux-config.sh"	&>> $_LOGFILE
 set_enable_oem_elevated_privelege				&>> $_LOGFILE
 toggle_oem_auto_login						&>> $_LOGFILE
