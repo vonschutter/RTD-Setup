@@ -102,14 +102,14 @@ $tweaks = @(
 	"RTDRegistryTweaks",
 	"InstallVMSDriverTools"
 	"Install7Zip",
-	"InstallGameBundle",
+	#"InstallGameBundle",
 	"InstallDeveloperToolsBundle",
 	"InstallVLC",
 	"InstallPDFToolsBundle",
 	"InstallBrave",
 	"InstallFirefox",
-	"InstallLibreOffice",
-	"InstallRTDImageBundle",
+	#"InstallLibreOffice",
+	#"InstallRTDImageBundle",
 
 	###	Privacy Tweaks: Improve the Privacy of Using Windows
 	###	Please unsderstand that this is no guarantee of privacy
