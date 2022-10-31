@@ -65,7 +65,7 @@ _OEM_USER=tangarora
 
 
 toggle_oem_run_once "/opt/rtd/core/rtd-oem-linux-config.sh"	&>> $_LOGFILE
-set_enable_oem_elevated_privelege				&>> $_LOGFILE
+set_enable_oem_elevated_privelege	${_OEM_USER}		&>> $_LOGFILE
 toggle_oem_auto_login						&>> $_LOGFILE
 set_oem_elevated_privilege_gui					&>> $_LOGFILE
 rtd_oem_make_launchers						&>> $_LOGFILE
