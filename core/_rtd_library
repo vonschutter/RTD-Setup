@@ -5366,7 +5366,7 @@ make_kvm_virtual_machine_now_from_debian_org ()
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet, and set variables.
 	: "${bin_virt_install:=$(type -p virt-install)}"
 	: "${PRESEED_FILE:="$(make_preseed_cfg $( mktemp -d ) gnome-desktop)"}"
-	if echo "${CONFIG:="ssh-server"}" |grep server &>/dev/null ; then : "${SRVorVDI="server"}" ; else : "${SRVorVDI="desktop"}" ; fi
+	if echo "${CONFIG:="ssh-server"}" |grep server &>/dev/null ; then : local "${SRVorVDI="server"}" ; else : local "${SRVorVDI="desktop"}" ; fi
 
 
 	case "${SRVorVDI}" in
@@ -5417,6 +5417,7 @@ make_kvm_virtual_machine_now_from_debian_org ()
 
 	CONFIG=
 	PRESEED_FILE=
+	SRVorVDI=
 
 	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine (Debian VDI) is currently being built. You may attach to this server using 'virt-manager' and see the progress at IP: $(hostname -I))" 12 60
 }
@@ -7024,7 +7025,7 @@ rtd_oem_preseed_cfg_Package_Selection ()
 		# relevant chice of debian role using "sed" or similar.
 		# End of documentation
 		tasksel tasksel/first multiselect $2
-		d-i pkgsel/include string openssh-server virt-what curl wget spice-vdagent git
+		d-i pkgsel/include string openssh-server dialog virt-what curl wget spice-vdagent git
 
 		# Valid choices for pkgsel/upgrade are: safe-upgrade full-upgrade none
 		d-i pkgsel/upgrade select none
