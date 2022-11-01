@@ -1534,7 +1534,8 @@ make_preseed_cfg ()
 	PRESEED=preseed.cfg
 	PRESEED_FILE="$SAVETO/$PRESEED"
 	TASK_FILE="$SAVETO/task.sh"
-	echo "Writing installation instructions for [$CONFIG] in $SAVETO/$PRESEED"
+	echo "$PRESEED_FILE"
+
 	touch "$SAVETO/$PRESEED"
 
 	rtd_oem_preseed_cfg_Unattended_Install "$SAVETO"
@@ -2445,7 +2446,10 @@ rtd_oem_check_inet_access ()
 # End of documentation
 	_ARG=$1
 	if ! hash curl &>/dev/null; then
-		read -t 10 -p "N O T I C E ! --  Could not check for internet connectivity... Please install (curl) web crawler/downloader. Press [ENTER] to continue and [CTRL] + [C] to exit! Continuing in 10 seconds..."
+		read -t 10 -p "N O T I C E ! --
+		Could not check for internet connectivity...
+		Please install (curl) web crawler/downloader.
+		Press [ENTER] to continue and [CTRL] + [C] to exit! Continuing in 10 seconds..."
 	else
 		if [[ -z "$_ARG" ]]; then
 			curl ipinfo.io &>/dev/null || ( read -p "N O T I C E ! -- NO INTERNET ACCESS: This script may require access to the internet to work properly! Press [ENTER] to continue and [CTRL] + [C] to exit!  " )
@@ -3864,12 +3868,15 @@ ensure_flatpak_package_managment ()
 # | Plugins for Desktop App Store Software              | Yes            | Yes         | No              |
 # +-----------------------------------------------------+----------------+-------------+-----------------+
 # End of documentation
-
-	ensure_admin
-	write_information "${FUNCNAME[0]}: Ensuring Flatpack software distribution system is available..."
-		check_dependencies flatpak || write_error "${FUNCNAME[0]}: Failed to satisfy dependecy flatpak!"
-		flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || write_error "${FUNCNAME[0]}: Failed to add flatpak repo!"
-	return $?
+	if hash flatpak ; then
+		write_status "${FUNCNAME[0]}: FLATPAK command is available! Skipping check ... "
+	else
+		ensure_admin
+		write_information "${FUNCNAME[0]}: Ensuring Flatpack software distribution system is available..."
+			check_dependencies flatpak || write_error "${FUNCNAME[0]}: Failed to satisfy dependecy flatpak!"
+			flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || write_error "${FUNCNAME[0]}: Failed to add flatpak repo!"
+		return $?
+	fi
 }
 
 
@@ -5312,9 +5319,6 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 		--extra-args "AutoYaST=file:///$(basename $PRESEED_FILE)"   \
 		--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
 
-		# --location='http://download.opensuse.org/factory/repo/oss/'
-		# --location='http://download.opensuse.org/pub/opensuse/distribution/leap/15.2/repo/oss' \
-
 	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built. You may attach to this server and see the progress at IP: $(hostname -I))" 10 60
 
 }
@@ -5350,36 +5354,71 @@ make_kvm_virtual_machine_now_from_debian_org ()
 # Usage:
 # End of Documentation
 
+	write_status "${FUNCNAME[0]}:"
 	count=1
 	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install
 	do
-		write_status "${count}	- Verifying dependencies ( ${i} )..."
+		write_status "🧩 ${count}	- Verifying dependencies ( ${i} )..."
 		check_dependencies $i &>/dev/null
 		count=$((count + 1))
 	done
 
-	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
-	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
+	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet, and set variables.
+	: "${bin_virt_install:=$(type -p virt-install)}"
+	: "${PRESEED_FILE:="$(make_preseed_cfg $( mktemp -d ) gnome-desktop)"}"
+	if echo "${CONFIG:="ssh-server"}" |grep server &>/dev/null ; then : "${SRVorVDI="server"}" ; else : "${SRVorVDI="desktop"}" ; fi
 
-	# Discover if the appropriate VM net interface is (default or br'0 - n')
-	VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
+
+	case "${SRVorVDI}" in
+		server | Server )
+				: "${vm_kernel="${DEBIAN_FRONTEND_DEFAULT_KERNEL}"}"
+				: "${vm_initrd="${DEBIAN_FRONTEND_DEFAULT_INITRD}"}"
+				: "${ui_diplay_style="theme=light"}"
+				: "${vm_usecase="Server"}"
+				;;
+		desktop | Desktop )
+				: "${vm_kernel="${DEBIAN_FRONTEND_GTK_KERNEL}"}"
+				: "${vm_initrd="${DEBIAN_FRONTEND_GTK_INITRD}"}"
+				: "${ui_diplay_style="theme=dark"}"
+				: "${vm_usecase="VDI"}"
+				;;
+		*) break 		;;
+	esac
+
+	write_status "🔎 	- Discovering what the appropriate VM net interface is (default or br'0 - n')"
+	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
+
+	write_status "🔧	- Builing a Debian VM with the following requests:"
+	write_information "
+	Using the instructions in PRESEED: ${PRESEED_FILE}
+	Using the following kernel and initrd:
+	🌎 ${vm_kernel}
+	🌎 ${vm_initrd}
+	And Uing this source for the packages and files to download:
+	🌎 ${DEBIAN_SOURCE_URL}
+	Using the network: ${virt_net}
+	Memory: ${3:-2048}
+	CPU's: ${2:-2}
+	Disk Size: ${4:-40}"
 
 	# create image and run installer
-	"${BIN_VIRT_INSTALL}" --name VDI_Debian_"$CONFIG"_"$RANDOM" \
+	"${bin_virt_install}" --name Debian_${vm_usecase}_"${CONFIG}"_"${RANDOM}" \
 		--vcpus "${2:-2}" \
 		--memory "${3:-2048}" \
-		--network "$VIRT_NET" \
-		--location=http://ftp.us.debian.org/debian/dists/bullseye/main/installer-amd64/ \
+		--network "${virt_net}" \
+		--location="${DEBIAN_SOURCE_URL}" \
 		--disk size="${4:-40}" \
 		--os-variant="${1:-debian10}" \
 		--video "virtio" --channel "spicevmc" \
-		--initrd-inject="$PRESEED_FILE" \
-		--install kernel=http://ftp.us.debian.org/debian/dists/bullseye/main/installer-amd64/current/images/netboot/gtk/debian-installer/amd64/linux,initrd=http://ftp.us.debian.org/debian/dists/bullseye/main/installer-amd64/current/images/netboot/gtk/debian-installer/amd64/initrd.gz \
-		--extra-args "ks=file:/$(basename $PRESEED_FILE) theme=dark gfxmode=1152x864x24" \
+		--initrd-inject="${PRESEED_FILE}" \
+		--install kernel="${vm_kernel}",initrd="${vm_initrd}" \
+		--extra-args "ks=file:/$(basename $PRESEED_FILE) ${ui_diplay_style}" \
 		--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
-		#"$RTD_GUI" --backtitle "$BRANDING" --title "NOTICE!" --msgbox "ERROR: -- Building VM using $PRESEED_FILE and internal instruction: ks=file:/$(basename $PRESEED_FILE) Options given were: $1 $2 $3 $4" 10 60
 
-	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built. You may attach to this server and see the progress at IP: $(hostname -I))" 10 60
+	CONFIG=
+	PRESEED_FILE=
+
+	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine (Debian VDI) is currently being built. You may attach to this server using 'virt-manager' and see the progress at IP: $(hostname -I))" 12 60
 }
 
 
@@ -6985,7 +7024,7 @@ rtd_oem_preseed_cfg_Package_Selection ()
 		# relevant chice of debian role using "sed" or similar.
 		# End of documentation
 		tasksel tasksel/first multiselect $2
-		d-i pkgsel/include string openssh-server virt-what wget spice-vdagent git
+		d-i pkgsel/include string openssh-server virt-what curl wget spice-vdagent git
 
 		# Valid choices for pkgsel/upgrade are: safe-upgrade full-upgrade none
 		d-i pkgsel/upgrade select none
