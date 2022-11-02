@@ -2,14 +2,14 @@
 #::             RTD System System Managment Script
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#:: Author:     Stephan 
-#:: Version:	1.03
+#:: Author:     Vonschutter
+#:: Version:	1.04
 #::
 #::
 #:: Purpose: The purpose of the script is to perform managment tasks on Linux systems
-#::  
-#:: This is a script that will start Minecraft Server on an Ubuntu or Debian (Ubuntu) based server. It will start 
-#:: multiple panes using "byobu", and start the server etc there... 
+#::
+#:: This is a script that will start Minecraft Server on an Ubuntu or Debian (Ubuntu) based server. It will start
+#:: multiple panes using "byobu", and start the server etc there...
 #::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -21,11 +21,11 @@
 #::::::::::::::          Script Settings                 ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-# Variables that govern the behavior or the script and location of files are 
-# set here. There should be no reason to change any of this to setup and 
+# Variables that govern the behavior or the script and location of files are
+# set here. There should be no reason to change any of this to setup and
 # get a working Minecraft server on Ubuntu. However, if you have updated scripts
-# and need to download yours from someplace else you only need to change these 
-# setings. 
+# and need to download yours from someplace else you only need to change these
+# setings.
 
 # Your Minecraft version (this is a preference only), script will always
 # get the latest Minecraft if it does not find a local server.
@@ -47,7 +47,7 @@ MINECRAFT_JAR=server.jar
 #
 
 function check_dependencies (){
-	# Simple function to check if sofware is available and take action 
+	# Simple function to check if sofware is available and take action
 	# if it is not. Software name must match command to envoke it.
 	#---------------------------------------------------------------
 	echo "Checking for script dependencies and install if not there..."
@@ -69,7 +69,7 @@ function check_dependencies (){
 
 function install_software (){
 	# Simple function to help installing software on several linux distributions
-	# Should work on Fedora, SUSE, RedHat, Ubuntu, Debian etc. unless the naming 
+	# Should work on Fedora, SUSE, RedHat, Ubuntu, Debian etc. unless the naming
 	# convention of the software package is different between distributions.
 	if hash pkcon 2>/dev/null; then
 		sudo pkcon -y  install "$@"
@@ -88,10 +88,10 @@ function install_software (){
 }
 
 function setup_minecraft_root (){
-	# Setup and initiate the location of the mincraft server. 
+	# Setup and initiate the location of the mincraft server.
 	# For us i likes to live in /home/$USER/bin/minecraft.server/Minecraft.$VERSION
-	# This tests if the script files are available and downloades them if not. 
-	mkdir -p $MINECRAFT_HOME 
+	# This tests if the script files are available and downloades them if not.
+	mkdir -p $MINECRAFT_HOME
 
 	for i in start.sh announce.py server.properties eula.txt
 	do
@@ -108,7 +108,7 @@ function setup_minecraft_root (){
 
 function run_minecraft_server_manager (){
 
-	# Start byobu multi screen app... 
+	# Start byobu multi screen app...
 	byobu new-session -d -s $USER
 
 	# status screen
@@ -137,11 +137,14 @@ function run_minecraft_server_manager (){
 
 
 function check_java (){
-	java --version >/dev/null 
+	~/bin/java/bin/java --version >/dev/null
 	if [ $? -eq 0 ]; then
 		echo "java of some version is present. I respect your choice... and will try to run! --- OK!"
 	else
-		check_dependencies default-jre
+		echo Java is now present where expected... will now download:
+		wget https://download.oracle.com/java/19/latest/jdk-19_linux-x64_bin.tar.gz
+		mkdir ~/bin/java && tar xzvf jdk-19_linux-x64_bin.tar.gz --directory ~/bin/java/ --strip 1
+		#check_dependencies default-jre
 	fi
 }
 
@@ -156,27 +159,27 @@ function find_active_newtork_interface (){
 
  function minecraft_update() {
 	# Get minecraft version publication file and get the latest server URL
-	# This is an unneccessarily complicated way by Mojang! 
+	# This is an unneccessarily complicated way by Mojang!
 	cd $MINECRAFT_HOME || { echo "Failure change to Minecraft folder. Is it there?"; exit 1; }
 	wget -q -O $MINECRAFT_HOME/versions --no-check-certificate https://launchermeta.mojang.com/mc/game/version_manifest.json
-	JSONVERSION=$(cat versions | python -c "exec(\"import json,sys\nobj=json.load(sys.stdin)\nversion=obj['latest']['release']\nfor v in obj['versions']:\n   if v['id']==version:\n    print(v['url'])\")")
+	JSONVERSION=$(cat versions | python3 -c "exec(\"import json,sys\nobj=json.load(sys.stdin)\nversion=obj['latest']['release']\nfor v in obj['versions']:\n   if v['id']==version:\n    print(v['url'])\")")
 	wget -q -O $MINECRAFT_HOME/versions --no-check-certificate $JSONVERSION
-	MC_SERVER_URL=$(cat versions | python -c 'import json,sys;obj=json.load(sys.stdin);print(obj["downloads"]["server"]["url"])')
+	MC_SERVER_URL=$(cat versions | python3 -c 'import json,sys;obj=json.load(sys.stdin);print(obj["downloads"]["server"]["url"])')
 	rm $MINECRAFT_HOME/versions
 
 	# Download the latest minecraft vesrion and check if it is the same as the one installed
 	wget -q -O $MINECRAFT_HOME/minecraft_server.jar.update --no-check-certificate $MC_SERVER_URL
 	if [ -f $MINECRAFT_HOME/minecraft_server.jar.update ] ; then
 		if diff $MINECRAFT_HOME/$MINECRAFT_JAR $MINECRAFT_HOME/minecraft_server.jar.update >/dev/null ; then
-			dialog --title 'Minecraft Update' --msgbox "You are already running the latest version of $MINECRAFT_JAR." 0 0 
+			dialog --title 'Minecraft Update' --msgbox "You are already running the latest version of $MINECRAFT_JAR." 0 0
 	else
 		mv $MINECRAFT_JAR $MINECRAFT_JAR.previous
 		mv $MINECRAFT_HOME/minecraft_server.jar.update $MINECRAFT_HOME/$MINECRAFT_JAR
-		dialog --title 'Minecraft Update' --msgbox "Minecraft successfully updated." 0 0 
+		dialog --title 'Minecraft Update' --msgbox "Minecraft successfully updated." 0 0
 	fi
 	else
-		dialog --title 'Minecraft Update' --msgbox "Minecraft update could not be downloaded." 0 0 
-		echo 
+		dialog --title 'Minecraft Update' --msgbox "Minecraft update could not be downloaded." 0 0
+		echo
 	fi
 }
 
@@ -187,7 +190,7 @@ function find_active_newtork_interface (){
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # This section contains content to written out to several configuration
-# files and external scripts. 
+# files and external scripts.
 
 
 announce.py () {
@@ -196,15 +199,15 @@ announce.py () {
 #              RTD System System Managment Script
 # :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-# :: Author:     generated by minecraft.server 
+# :: Author:     generated by minecraft.server
 # :: Version 1.02
 # ::
 # ::
 # :: Purpose: The purpose of the script is to:
-# ::          1 - Broadcast service availability to the local network. 
-# ::              This script is used to broadcast the minecraft server on the  
-# ::              same machine (see "servers"). You may have as many minecraft 
-# ::              servers running and broadcast as you like. 
+# ::          1 - Broadcast service availability to the local network.
+# ::              This script is used to broadcast the minecraft server on the
+# ::              same machine (see "servers"). You may have as many minecraft
+# ::              servers running and broadcast as you like.
 # :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
@@ -248,29 +251,29 @@ start.sh () {
 #::             RTD System System Managment Script
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#:: Author:     generated by minecraft.server 
+#:: Author:     generated by minecraft.server
 #:: Version 1.00
 #::
 #::
 #:: Purpose: The purpose of the script is to:
-#::          1 - Launch Minecraft 
+#::          1 - Launch Minecraft
 #::          2 - Check that Minecraft runs for at least one minute
-#::          3 - If Minecraft crashes or quits after one minute, restart Minecraft 
-#::  
+#::          3 - If Minecraft crashes or quits after one minute, restart Minecraft
+#::
 #::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 pushd $(dirname "$0")
 
-MC_SERVER_NAME=`cat server.properties |grep "motd=.*" ` 
+MC_SERVER_NAME=`cat server.properties |grep "motd=.*" `
 export $MC_SERVER_NAME
 
 while true; do
 
     start_epoch=$(date +%s)
     echo Starting Minecraft server $MC_SERVER_NAME ....
-    java -Xmx2048M -Xms2048M -jar $(dirname "$0")/server.jar noggui broadcast
+    ~/bin/java/bin/java -Xmx2048M -Xms2048M -jar $(dirname "$0")/server.jar noggui broadcast
 
     # Abort if the application exited too quickly
     duration=$(( $(date +%s) - $start_epoch ))
@@ -361,7 +364,7 @@ filetowrite.txt () {
 
 
 # Check that the software components of this script are available.
-# iff they are not, attempt to install them. 
+# iff they are not, attempt to install them.
 for i in byobu speedometer htop python3 dialog
 do
 	check_dependencies $i
@@ -379,11 +382,11 @@ if echo "$@" | grep "update" ;then
 		esac
 fi
 
-# Basic check to see that the Minecraft folder is present and 
+# Basic check to see that the Minecraft folder is present and
 # if not crate it and download the scripts and the server jar file
-# to enable the server. 
+# to enable the server.
 setup_minecraft_root
-check_java 
+check_java
 
 # Start the server and monitor the server performance
 find_active_newtork_interface
