@@ -7065,13 +7065,15 @@ rtd_oem_preseed_cfg_Addon_MinecraftServer()
 		# --------------------------------------------------- #
 		# End of documentation
 		d-i preseed/late_command string \
-			in-target mkdir -p /etc/systemd/system/getty@tty1.service.d ; \
-			in-target echo "***********  Updating Autologin information... ************ "; \
-			in-target echo "[Service]" > '/etc/systemd/system/getty@tty1.service.d/override.confv' ; \
-			in-target echo "ExecStart=" >> '/etc/systemd/system/getty@tty1.service.d/override.conf' ; \
-			in-target echo "ExecStart=-/sbin/agetty --noissue --autologin tangarora "%I" "$TERM"" >> '/etc/systemd/system/getty@tty1.service.d/override.conf' ; \
-			in-target echo "Type=idle" >> '/etc/systemd/system/getty@tty1.service.d/override.conf' ; \
-			in-target echo "**********    Seting up minecraft.server to start automatically   ************* " ; \
+			in-target apt-get -y install git ; \
+			in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
+			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
+			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
+		 	cp /*.cfg /target/opt/rtd/ ; \
+			in-target mkdir -p "/etc/systemd/system/getty@tty1.service.d" ; \
+			in-target echo "[Service]" > "/etc/systemd/system/getty@tty1.service.d/override.conf" ; \
+			in-target echo "ExecStart=-/sbin/agetty --noissue --autologin tangarora "%I" "$TERM"" >> "/etc/systemd/system/getty@tty1.service.d/override.conf" ; \
+			in-target echo "Type=idle" >> "/etc/systemd/system/getty@tty1.service.d/override.conf" ; \
 			in-target echo "bash /home/tangarora/minecraft.server" >> /home/tangarora/.bashrc ; \
 			in-target wget https://github.com/vonschutter/RTD-Minecraft-Server-Manager/raw/master/minecraft-server -O /home/tangarora/minecraft.server ; \
 			in-target chmod 777 /home/tangarora/minecraft.server ; \
@@ -7090,7 +7092,6 @@ rtd_oem_preseed_cfg_Addon_MinecraftServer()
 		d-i finish-install/reboot_in_progress note
 
 		# --------------------------------------------------- #
-
 	EOF
 }
 
