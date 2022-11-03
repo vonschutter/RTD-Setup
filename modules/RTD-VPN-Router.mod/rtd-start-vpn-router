@@ -56,13 +56,13 @@ NORDVPN_RPM="https://repo.nordvpn.com/yum/nordvpn/centos/noarch/Packages/n/nordv
 find_active_newtork_interface (){
 	NETINT=$(ip addr | awk '/state UP/ {print $2}' |grep -v "br*" |grep -v "wlp*" | head --bytes -2 )
 	echo "Active network interface is: $NETINT"
-	: "${_LOCALINT:=$NETINT}"
+	: "${_LOCALINT:-$NETINT}"
 }
 
 find_active_bridge_interface () {
 	# Discover if the appropriate VM net interface is (default or br'0 - n')
 	VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep tun ; else echo default;fi)"
-	: "${_VPNINT:=$VIRT_NET}"
+	: "${_VPNINT:-$VIRT_NET}"
 }
 
 
