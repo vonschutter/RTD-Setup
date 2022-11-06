@@ -605,7 +605,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 			# -------------------------------------------------------------------------------------------------------#
 			case "$DESKTOP_SESSION" in
 				plasma )
-					write_information "$($FUNCNAME[0]): plasma on anything..".
+					write_information "${FUNCNAME[0]}: plasma on anything..".
 					check_dependencies plasma-discover
 					check_dependencies plasma-discover-backend-flatpak
 					check_dependencies plasma-discover-backend-snap
@@ -613,12 +613,12 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 				"/usr/share/xsessions/default" )
 					# Special case for suse again...
 					if cat /usr/share/xsessions/default.desktop |grep "Plasma"  ; then
-						write_information "$($FUNCNAME[0]): kde on suse"
+						write_information "${FUNCNAME[0]}: kde on suse"
 						check_dependencies plasma-discover
 						check_dependencies plasma-discover-backend-flatpak
 						check_dependencies plasma-discover-backend-snap
 					else
-						write_information "$($FUNCNAME[0]): gnome on suse"
+						write_information "${FUNCNAME[0]}: gnome on suse"
 						snap install snap-store
 						check_dependencies gnome-software
 						check_dependencies gnome-software-plugin-flatpak
@@ -626,7 +626,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 					fi
 				;;
 				* )
-					write_information "$($FUNCNAME[0]): case = *"
+					write_information "${FUNCNAME[0]}: case = *"
 					snap install snap-store
 					check_dependencies gnome-software
 					check_dependencies gnome-software-plugin-flatpak
@@ -658,16 +658,16 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 			check_dependencies virt-what
 			check_dependencies laptop-detect
 			if virt-what ; then
-				write_information "$($FUNCNAME[0]): This is likely not running in a virtual machine."
+				write_information "${FUNCNAME[0]}: This is likely not running in a virtual machine."
 				if laptop-detect ; then
-					write_information "$($FUNCNAME[0]): This is likely a laptop; applying pwersave profile..."
+					write_information "${FUNCNAME[0]}: This is likely a laptop; applying pwersave profile..."
 					tuned-adm profile powersave
 				else
-					write_information "$($FUNCNAME[0]): This is likely NOT a laptop; applying desktop profile..."
+					write_information "${FUNCNAME[0]}: This is likely NOT a laptop; applying desktop profile..."
 					tuned-adm profile desktop
 				fi
 			else
-				write_information "$($FUNCNAME[0]): This is likely a VM; applying virtual-guest profile..."
+				write_information "${FUNCNAME[0]}: This is likely a VM; applying virtual-guest profile..."
 				tuned-adm profile virtual-guest
 			fi
 			# -------------------------------------------------------------------------------------------------------#
@@ -751,7 +751,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 						check_dependencies  $i
 					done
 				else
-					write_error "$($FUNCNAME[0]): This option requires a supported package manager on your system (deb, zypper, dnf, pacman). Neiter was found!"
+					write_error "${FUNCNAME[0]}: This option requires a supported package manager on your system (deb, zypper, dnf, pacman). Neiter was found!"
 				fi
 
 				# Install theme for a smooth mocka experience in UI (snap, gnome, and icons)...
@@ -822,7 +822,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 
 			if  ps -e |grep "plasmashell" ; then
 
-				write_information "$($FUNCNAME[0]): Detected KDE UI!"
+				write_information "${FUNCNAME[0]}: Detected KDE UI!"
 				# Download and Set Wallpaper...
 				CacheDir="${_RTDCACHE:="/opt/rtd/cache"}"
 				sudo -H -u $SUDO_USER DISPLAY=$DISPLAY source /opt/rtd/core/_rtd_library ; rtd_oem_kde_set_wallpaper "${WallPaperDir}/Wayland.jpg"
@@ -864,7 +864,7 @@ Single_Remove_non_western_latin_fonts () {
 Single_Install_Brave_Browser () {
 		# This function will add the vendor maintained repository and install the software
 		# using the distribution speciffic installers.
-		write_information "$($FUNCNAME[0]): Installing Brave Browser directly from vendor repo..."
+		write_information "${FUNCNAME[0]}: Installing Brave Browser directly from vendor repo..."
 		if cat "/etc/os-release" | grep "debian" ; then
 			check_dependencies apt-transport-https
 			check_dependencies curl
@@ -908,7 +908,7 @@ Single_Install_Vivaldi_Browser (){
 		# # This function uses the RTD function "dl" to download a distribution speciffic package directly
 		# # from the vendors website. It will work until the vendor removes the exact file...
 
-		write_information "$($FUNCNAME[0]): Installing Brave Browser directly from vendor repo..."
+		write_information "${FUNCNAME[0]}: Installing Brave Browser directly from vendor repo..."
 		if cat "/etc/os-release" | grep "debian" ; then
 			apt -y install wget gnupg2 software-properties-common
 			wget -qO- https://repo.vivaldi.com/archive/linux_signing_key.pub | sudo apt-key add -
@@ -933,13 +933,13 @@ Single_Install_Vivaldi_Browser (){
 
 
 Single_Install_Windows_Subsystem_for_Linux (){
-			write_status "$($FUNCNAME[0]): Installing Wine..."
+			write_status "${FUNCNAME[0]}: Installing Wine..."
 			InstallSoftwareFromRepo wine
 }
 
 
 Single_Install_Simplenote (){
-			write_status "$($FUNCNAME[0]): Installing simplenote..."
+			write_status "${FUNCNAME[0]}: Installing simplenote..."
 			# some small simple apps you will like...
 			ensure_snap_package_managment
 			# A simple to use not taking app that auto syncs with the same app on any device.
@@ -950,7 +950,7 @@ Single_Install_Simplenote (){
 
 
 Single_Install_DOS_VM_for_Classic_Games (){
-			write_status "$($FUNCNAME[0]):  Installing DOS Environment..."
+			write_status "${FUNCNAME[0]}:  Installing DOS Environment..."
 			# some small simple apps you will like...
 			ensure_snap_package_managment
 			# A small app that allows you to use your old DOS software.
@@ -966,7 +966,7 @@ Single_Install_DOS_VM_for_Classic_Games (){
 
 Single_Install_Java_Runtime (){
 			# Special case for installing Oracle Java...
-			write_status "$($FUNCNAME[0]): Adding Java JRE..."
+			write_status "${FUNCNAME[0]}: Adding Java JRE..."
 			# Add the Oracle Java repository and install the software.
 			# add-apt-repository ppa:linuxuprising/java -y  1>>$_LOGFILE 2>>$_ERRLOGFILE
 			# apt-get update  1>>$_LOGFILE 2>>$_ERRLOGFILE
@@ -981,14 +981,14 @@ Single_Install_Java_Runtime (){
 
 Single_Install_Bleachbit_System_Cleaner (){
 			#Bleachbit
-			write_status "$($FUNCNAME[0]): Bleachbit System Cleaning Tool..."
+			write_status "${FUNCNAME[0]}: Bleachbit System Cleaning Tool..."
 			InstallSoftwareFromRepo bleachbit
 }
 
 
 
 Single_Install_Restricted_Codecs (){
-			write_status "$($FUNCNAME[0]): Install all the required multimedia codecs..."
+			write_status "${FUNCNAME[0]}: Install all the required multimedia codecs..."
 			for i in libdvdcss2 ffmpeg ; do
 			     InstallSoftwareFromRepo $i
 			done
@@ -998,7 +998,7 @@ Single_Install_Restricted_Codecs (){
 
 Single_Install_VLC_Universal_Videao_Player (){
 			#VLC Media Player
-			wtite_status "$($FUNCNAME[0]): Installing VLC Media Player..."
+			wtite_status "${FUNCNAME[0]}: Installing VLC Media Player..."
 			InstallSoftwareFromRepo vlc
 }
 
@@ -1006,7 +1006,7 @@ Single_Install_VLC_Universal_Videao_Player (){
 
 Single_Install_Google_Chrome_Browser (){
 			# Special case for installing Google Chrome
-			write_status "$($FUNCNAME[0]): Installing Google Chrome Browser from google directly..."
+			write_status "${FUNCNAME[0]}: Installing Google Chrome Browser from google directly..."
 
 			# Download either a deb or an rpm depending on what package format this system supports.
 			if hash deb ; then
@@ -1014,7 +1014,7 @@ Single_Install_Google_Chrome_Browser (){
 			elif hash rpm ; then
 				dl https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm
 			else
-				write_error "$($FUNCNAME[0]): No RPM or DEB package managment service was found! ..."
+				write_error "${FUNCNAME[0]}: No RPM or DEB package managment service was found! ..."
 			fi
 }
 
@@ -1022,7 +1022,7 @@ Single_Install_Google_Chrome_Browser (){
 
 Single_Install_Remote_Desktop_by_Team_Viewer (){
 			#Teamviewer
-			write_status  "$($FUNCNAME[0]): Installing Teamviewer..."
+			write_status  "${FUNCNAME[0]}: Installing Teamviewer..."
 
 			# Download either a deb or an rpm depending on what package format this system supports.
 			# Team Viewer has a special package for SUSE; thus we check if OS is suse or not as well.
@@ -1035,14 +1035,14 @@ Single_Install_Remote_Desktop_by_Team_Viewer (){
 					dl https://download.teamviewer.com/download/linux/teamviewer.x86_64.rpm
 				fi
 			else
-				write_error "$($FUNCNAME[0]): No RPM or DEB package managment service was found! ..."
+				write_error "${FUNCNAME[0]}: No RPM or DEB package managment service was found! ..."
 			fi
 }
 
 
 
 Single_Install_Remote_Desktop_by_Anydesk () {
-			write_status "$($FUNCNAME[0]): Installing Anydesk remote desktop... "
+			write_status "${FUNCNAME[0]}: Installing Anydesk remote desktop... "
 			ensure_flatpak_package_managment
 			flatpak install flathub com.anydesk.Anydesk --noninteractive -y
 }
@@ -1051,7 +1051,7 @@ Single_Install_Remote_Desktop_by_Anydesk () {
 
 Single_Install_Skype_Messenger (){
 			#Skype for Linux
-			write_status "$($FUNCNAME[0]): Installing Skype For Linux..."
+			write_status "${FUNCNAME[0]}: Installing Skype For Linux..."
 			ensure_snap_package_managment
 			snap install skype --classic
 }
@@ -1059,7 +1059,7 @@ Single_Install_Skype_Messenger (){
 
 
 Single_Install_Viber_Messenger (){
-			write_status "$($FUNCNAME[0]): Installing Viber instant messaging..."
+			write_status "${FUNCNAME[0]}: Installing Viber instant messaging..."
 			ensure_snap_package_managment
 			snap install --edge viber-mtd
 }
@@ -1068,7 +1068,7 @@ Single_Install_Viber_Messenger (){
 
 Single_Install_MEGA.nz_Encrypted_Cloud_Storage (){
 			# Special case for installing MEGA nz file sync utility (better than Drop Box)...
-			write_status "$($FUNCNAME[0]): Installing MEGA nz file crypto sync utility..."
+			write_status "${FUNCNAME[0]}: Installing MEGA nz file crypto sync utility..."
 
 			# Reset & clear variables in case of incomplete cleanup...
 			FILE2GET=
@@ -1079,25 +1079,25 @@ Single_Install_MEGA.nz_Encrypted_Cloud_Storage (){
 				if hostnamectl | grep -i "Debian" ; then
 					# Grab the debian name and version and format it like Mega does their download URL...
 					URL="https://mega.nz/linux/MEGAsync/Debian_$(hostnamectl |grep -i Debian |cut -f7 -d' ').0/amd64/${product}-Debian_$(hostnamectl |grep -i Debian |cut -f7 -d' ').0_amd64.deb"
-					write_information "$($FUNCNAME[0]): Downloading ${product} from: ${URL}"
+					write_information "${FUNCNAME[0]}: Downloading ${product} from: ${URL}"
 				elif hostnamectl | grep -i "Ubuntu" ; then
 					# Grab the Ubuntu name and version and format it like Mega does their download URL...
 					URL="https://mega.nz/linux/MEGAsync/xUbuntu_$(hostnamectl |grep -i Ubuntu |cut -f6 -d' ')/amd64/${product}-xUbuntu_$(hostnamectl |grep -i Ubuntu |cut -f6 -d' ')_amd64.deb"
-					write_information "$($FUNCNAME[0]): Downloading ${product} from: ${URL}"
+					write_information "${FUNCNAME[0]}: Downloading ${product} from: ${URL}"
 				elif hostnamectl | grep -i "openSUSE" ; then
 					# Grab the SUSE name and version and format it like Mega does their download URL...
 					TGT="$(hostnamectl |grep -i suse |head -n 1|cut -f5,6,7 -d' ')" ; TGT=${TGT// /_}
 					URL="https://mega.nz/linux/MEGAsync/${TGT}/x86_64/${product}-${TGT}.x86_64.rpm"
-					write_information "$($FUNCNAME[0]): Downloading ${product} from: ${URL}"
+					write_information "${FUNCNAME[0]}: Downloading ${product} from: ${URL}"
 				elif hostnamectl | grep -i "Fedora" ; then
 					# Grab the Fedora name and version and format it like Mega does their download URL...
 					TGT="$(hostnamectl |grep -i fedora |tail -n 2|cut -f5,6 -d' ')" ; TGT=${TGT// /_}
 					URL="https://mega.nz/linux/MEGAsync/${TGT::-2}/x86_64/${product}-${TGT::-2}.x86_64.rpm"
-					write_information "$($FUNCNAME[0]): Downloading ${product} from: ${URL}"
+					write_information "${FUNCNAME[0]}: Downloading ${product} from: ${URL}"
 				else
-					write_error "$($FUNCNAME[0]): I am not sure how to find the Mega sync download for $( hostnamectl |grep "Operating") "
-					write_error "$($FUNCNAME[0]): Please try to download it manually and instrtall it from the website:"
-					write_error "$($FUNCNAME[0]): https://mega.nz/sync"
+					write_error "${FUNCNAME[0]}: I am not sure how to find the Mega sync download for $( hostnamectl |grep "Operating") "
+					write_error "${FUNCNAME[0]}: Please try to download it manually and instrtall it from the website:"
+					write_error "${FUNCNAME[0]}: https://mega.nz/sync"
 
 				fi
 
@@ -1120,7 +1120,7 @@ Single_Install_MEGA.nz_Encrypted_Cloud_Storage (){
 
 Single_Install_Dropbox_Corporate_Cloud_Storage (){
 			# Install Dropbox
-			write_status "$($FUNCNAME[0]): Installing Dropbox Cloud Storage Sync..."
+			write_status "${FUNCNAME[0]}: Installing Dropbox Cloud Storage Sync..."
 			InstallSoftwareFromRepo nautilus-dropbox
 
 			if is_software_package_installed nautilus-dropbox ; then
@@ -1133,11 +1133,11 @@ Single_Install_Dropbox_Corporate_Cloud_Storage (){
 					mount /home/${SUDO_USER}/Dropbox/
 					chown -R ${SUDO_USER} /home/${SUDO_USER}/Dropbox
 				else
-					write_information "$($FUNCNAME[0]): Dropbox folder found! Dropbox is already configured, skipping..."
-					write_information "$($FUNCNAME[0]): Please use rtd-dropbox-on-ecryptfs to move dropox to a loop mounted volume if you need to use dropob in a Luks crypt home directory"
+					write_information "${FUNCNAME[0]}: Dropbox folder found! Dropbox is already configured, skipping..."
+					write_information "${FUNCNAME[0]}: Please use rtd-dropbox-on-ecryptfs to move dropox to a loop mounted volume if you need to use dropob in a Luks crypt home directory"
 				fi
 			else
-				write_error "$($FUNCNAME[0]): Dropox does not seem to have been installed..."
+				write_error "${FUNCNAME[0]}: Dropox does not seem to have been installed..."
 			fi
 }
 
@@ -1168,7 +1168,7 @@ Single_Install_VirtualBox (){
 
 			# Special case for installing VirtualBox since distributions name the package and install in different ways...
 			if virt-what ; then
-				write_warning "$($FUNCNAME[0]): This computer is likely a Virtual Macine ( $(virt-what) ) and using Virtualbox inside a VM is not reccommended."
+				write_warning "${FUNCNAME[0]}: This computer is likely a Virtual Macine ( $(virt-what) ) and using Virtualbox inside a VM is not reccommended."
 			else
 				if hash apt ; then
 					write_information "--- Installing VirtualBox in Debian based system if available..."
@@ -1185,15 +1185,15 @@ Single_Install_VirtualBox (){
 
 					# Ensure that the current user can use USB etc...
 					if id -nG "$SUDO_USER" | grep -qw "vboxusers"; then
-						write_information "$($FUNCNAME[0]): $SUDO_USER already belongs to vboxusers group"
+						write_information "${FUNCNAME[0]}: $SUDO_USER already belongs to vboxusers group"
 					else
 						usermod -G vboxusers -a $SUDO_USER
 					fi
 				elif hash dnf ; then
-					write_information "$($FUNCNAME[0]): Installing VirtualBox in a Red Hat based system if available..."
+					write_information "${FUNCNAME[0]}: Installing VirtualBox in a Red Hat based system if available..."
 					InstallSoftwareFromRepo VirtualBox
 				elif hash zypper  ; then
-					write_information "$($FUNCNAME[0]): Installing virtualbox in a SUSE based system..."
+					write_information "${FUNCNAME[0]}: Installing virtualbox in a SUSE based system..."
 					for i in virtualbox virtualbox-dkms virtualbox-ext-pack virtualbox-guest-additions-iso
 					do
 						InstallSoftwareFromRepo $i
@@ -1203,12 +1203,12 @@ Single_Install_VirtualBox (){
 
 					# Ensure that the current user can use USB etc...
 					if id -nG "$SUDO_USER" | grep -qw "vboxusers"; then
-						write_information "$($FUNCNAME[0]): $SUDO_USER already belongs to vboxusers group"
+						write_information "${FUNCNAME[0]}: $SUDO_USER already belongs to vboxusers group"
 					else
 						usermod -G vboxusers -a $SUDO_USER
 					fi
 				else
-					write_error "$($FUNCNAME[0]): No supported packaging system detected for special case of installing Virtual Box! "
+					write_error "${FUNCNAME[0]}: No supported packaging system detected for special case of installing Virtual Box! "
 				fi
 			fi
 }
