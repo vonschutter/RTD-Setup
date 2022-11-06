@@ -723,8 +723,9 @@ rtd_oem_reset_default_environment_config ()
 # End of documentation
 
 	# Disable the automatically trying to install OEM software
-	[[ -f /etc/xdg/autostart/org.runtimedata.oem.cofig.desktop ]] && mv /etc/xdg/autostart/org.runtimedata.oem.cofig.desktop ${_OEM_DIR}/cache
-	[[ -f /etc/sudoers.d/99_sudo_include_file ]] && mv /etc/sudoers.d/99_sudo_include_file ${_OEM_DIR}/cache
+	mkdir -p ${_OEM_DIR}/cache/
+	[[ -f /etc/xdg/autostart/org.runtimedata.oem.cofig.desktop ]] && mv /etc/xdg/autostart/org.runtimedata.oem.cofig.desktop ${_OEM_DIR}/cache/
+	[[ -f /etc/sudoers.d/99_sudo_include_file ]] && mv /etc/sudoers.d/99_sudo_include_file ${_OEM_DIR}/cache/
 	cp /home/${SUDO_USER}/.bashrc ${_OEM_DIR}/cache/bashrc
 	# Keep ability for root to open dialog boxes for a user.
 	sed -i '/xhost\ local:root/d' /home/${SUDO_USER}/.bashrc
@@ -1182,10 +1183,10 @@ set_enable_oem_elevated_privelege()
 # Returns:
 # Usage:
 # End of documentation
-	[[ -n "$1" ]] && : "${SUDO_USER=$1}"
-	write_information "Adding instruction to a sudoers include file: ${SUDO_USER:="tangarora"} ALL=(ALL) NOPASSWD:ALL"
+	: ${_OEM_USER:="${SUDO_USER}"}
+	write_information "Adding instruction to a sudoers include file: ${_OEM_USER} ALL=(ALL) NOPASSWD:ALL"
 	# This should be removed when OEM setup is complete as it would represent a back door...
-	echo "${SUDO_USER:="tangarora"} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/99_sudo_include_file
+	echo "${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/99_sudo_include_file
 
 	# Check that your sudoers include file passed the visudo syntax checks:
 	sudo visudo -cf /etc/sudoers.d/99_sudo_include_file
@@ -2704,11 +2705,11 @@ rtd_oem_ubuntu_auto_install_iso_builder()
 	all=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
 
 	# Ask for desired version to use:
-	UBUNTU_VER=$($RTD_GUI --title "Select Release Version of Ubuntu" --inputbox "Please pick an available ubuntu version by entering it below. Versions to choose from: ${all[*]} If you are not sure just let me choose for you... \n $picachu "  25 110 "${all[-1]}" 3>&1 1>&2 2>&3) ;clear
-	[ "$UBUNTU_VER" ] || UBUNTU_VER=${all[-1]}
+	ubuntu_ver=$($RTD_GUI --title "Select Release Version of Ubuntu" --inputbox "Please pick an available ubuntu version by entering it below. Versions to choose from: ${all[*]} If you are not sure just let me choose for you... \n $picachu "  25 110 "${all[-1]}" 3>&1 1>&2 2>&3) ;clear
+	[ "$ubuntu_ver" ] || ubuntu_ver=${all[-1]}
 
 	write_information Find the precice location of the requested ISO image:
-	ISO_URL=$(rtd_oem_find_live_release $UBUNTU_VER ubuntu $ISO_VER)
+	ISO_URL=$(rtd_oem_find_live_release $ubuntu_ver ubuntu $ISO_VER)
 		echo "requested iso for download : $ISO_URL"
 		ISO_FILENAME=$(basename $ISO_URL)
 		BASE=$(basename $ISO_URL .iso)
@@ -2907,11 +2908,11 @@ rtd_oem_ubuntu_auto_install_iso_builder()
 	all=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
 
 	# Ask for desired version to use:
-	UBUNTU_VER=$($RTD_GUI --title "Select Release Version of Ubuntu" --inputbox "Please pick an available ubuntu version by entering it below. Versions to choose from: ${all[*]} If you are not sure just let me choose for you... \n $picachu "  25 110 "${all[-1]}" 3>&1 1>&2 2>&3) ;clear
-	[ "$UBUNTU_VER" ] || UBUNTU_VER=${all[-1]}
+	ubuntu_ver=$($RTD_GUI --title "Select Release Version of Ubuntu" --inputbox "Please pick an available ubuntu version by entering it below. Versions to choose from: ${all[*]} If you are not sure just let me choose for you... \n $picachu "  25 110 "${all[-1]}" 3>&1 1>&2 2>&3) ;clear
+	[ "$ubuntu_ver" ] || ubuntu_ver=${all[-1]}
 
 	write_information Find the precice location of the requested ISO image:
-	ISO_URL=$(rtd_oem_find_live_release $UBUNTU_VER ubuntu $ISO_VER)
+	ISO_URL=$(rtd_oem_find_live_release $ubuntu_ver ubuntu $ISO_VER)
 		echo "requested iso for download : $ISO_URL"
 		ISO_FILENAME=$(basename $ISO_URL)
 		BASE=$(basename $ISO_URL .iso)
@@ -5373,14 +5374,14 @@ make_kvm_virtual_machine_now_from_debian_org ()
 
 	case "${SRVorVDI}" in
 		server | Server )
-				: "${vm_kernel="${DEBIAN_FRONTEND_DEFAULT_KERNEL}"}"
-				: "${vm_initrd="${DEBIAN_FRONTEND_DEFAULT_INITRD}"}"
+				: "${vm_kernel="${_DEBIAN_FRONTEND_DEFAULT_KERNEL}"}"
+				: "${vm_initrd="${_DEBIAN_FRONTEND_DEFAULT_INITRD}"}"
 				: "${ui_diplay_style="theme=light"}"
 				: "${vm_usecase="Server"}"
 				;;
 		desktop | Desktop )
-				: "${vm_kernel="${DEBIAN_FRONTEND_GTK_KERNEL}"}"
-				: "${vm_initrd="${DEBIAN_FRONTEND_GTK_INITRD}"}"
+				: "${vm_kernel="${_DEBIAN_FRONTEND_GTK_KERNEL}"}"
+				: "${vm_initrd="${_DEBIAN_FRONTEND_GTK_INITRD}"}"
 				: "${ui_diplay_style="theme=dark"}"
 				: "${vm_usecase="VDI"}"
 				;;
@@ -5404,11 +5405,11 @@ make_kvm_virtual_machine_now_from_debian_org ()
 	Disk Size: ${4:-40}"
 
 	# create image and run installer
-	"${bin_virt_install}" --name Debian_${vm_usecase}_"${CONFIG}"_"${RANDOM}" \
+	"${bin_virt_install}" --name Debian_${vm_usecase}_"${SRVFUNC}"_"${CONFIG}"_"${RANDOM}" \
 		--vcpus "${2:-2}" \
 		--memory "${3:-2048}" \
 		--network "${virt_net}" \
-		--location="${DEBIAN_SOURCE_URL}" \
+		--location="${_DEBIAN_SOURCE_URL}" \
 		--disk size="${4:-40}" \
 		--os-variant="${1:-debian10}" \
 		--video "virtio" --channel "spicevmc" \
@@ -5417,13 +5418,14 @@ make_kvm_virtual_machine_now_from_debian_org ()
 		--extra-args "ks=file:/$(basename $PRESEED_FILE) ${ui_diplay_style}" \
 		--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
 
+	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine (Debian_${vm_usecase}_"${SRVFUNC}"_"${CONFIG}"_"${RANDOM}") \
+	is currently being built. You may attach to this server using 'virt-manager' and see the progress at IP: $(hostname -I))" 12 60
+
 	unset vm_kernel
 	unset vm_initrd
 	unset vm_usecase
 	unset ui_diplay_style
 	cleanup_and_finish nomessage
-
-	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine (Debian VDI) is currently being built. You may attach to this server using 'virt-manager' and see the progress at IP: $(hostname -I))" 12 60
 }
 
 
@@ -5436,13 +5438,13 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 {
 # Description: Function to create a KVM virtual michine disk and define a VM. This function should be
 # used on a Qemu/KVM virtual host that the virtual guest is to be used on.
-# NOTE: QCOW2 is a storage format for virtual .
-# machine disk images QCOW stands for QEMU copy on write. The QCOW2 format decouples the physical storage
+# NOTE: QCOW2 is a storage format for virtual machine disk images.
+# QCOW stands for QEMU copy on write. The QCOW2 format decouples the physical storage
 # layer from the virtual layer by adding a mapping between logical and physical blocks.
 # NOTE2: Kernel-based Virtual Machine (KVM) is an open source virtualization technology built into Linux®.
 # Specifically, KVM lets you turn Linux into a hypervisor that allows a host machine to run multiple,
 # isolated virtual environments called guests or virtual machines (VMs). KVM is part of Linux.
-# For complete info: https://www.redhat.com/en/topics/virtualization/what-is-KVM || read -p "An error may have occurred (review above outout) then: Press [ENTER] to continue:"
+# For complete info: https://www.redhat.com/en/topics/virtualization/what-is-KVM
 #
 # Usage: Either simply call this function to use the defaults or:
 # Call this function with "function" "RAM_SIZE" "DISK_SIZE" "DISK_FORMAT" "DISK_FILE"
@@ -5461,72 +5463,60 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 # Alternatively; edit the function with new defaults that suit the needs.
 # End of Documentation
 	count=1
-	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install
+	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install wget
 	do
-		write_status "${FUNCNAME}: ${count}	- 🧩 Verifying dependencies ( ${i} )..."
-		check_dependencies $i &>/dev/null
+		write_status "🧩 ${count}	- Verifying dependencies ( ${i} )..."
+		check_dependencies ${i} &>/dev/null
 		count=$((count + 1))
 	done
 
-	write_information "Retreive list of available Ubuntu versions..."
-	all=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
+	write_information "🔎 Retreive list of available Ubuntu versions..."
+	all_ubuntu_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
 
-	UBUNTU_VER=$($RTD_GUI --title "Select Release Version of Ubuntu" --inputbox "Please pick an available ubuntu version by entering it below. Versions to choose from: ${all[*]} If you are not sure just let me choose for you... \n $picachu "  25 110 "${all[-1]}" 3>&1 1>&2 2>&3) ;clear
-	[ "$UBUNTU_VER" ] || UBUNTU_VER=${all[-1]}
-	ISO_VER="live"
-	if [[ -z $PRESEED_FILE ]] ; then
-		write_warning: "${FUNCNAME}: NO install instructions have been provided! Installation will be manual."
-		rtd_oem_pause 1 "Connect to VM and perform the instal lmanually."
+	tgt_ubuntu_ver=$($RTD_GUI --title "Select Release Version of Ubuntu" --inputbox "Please pick an available ubuntu version by entering it below. Versions to choose from 👍: ${all_ubuntu_lts_versions[*]} If you are not sure just let me choose for you... \n ${ubuntulogo} "  25 110 "${all_ubuntu_lts_versions[-1]}" 3>&1 1>&2 2>&3)
+	case $? in
+		"$DIALOG_CANCEL") return ;;
+		"$DIALOG_ESC") return ;;
+	esac
+	clear
+
+	[ "$tgt_ubuntu_ver" ] || tgt_ubuntu_ver=${all_ubuntu_lts_versions[-1]}
+
+	# Detect and set variables for key programs
+	: ${bin_virt_install:=$(type -p virt-install)}
+	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
+	: ${ubuntu_iso_url=$(rtd_oem_find_live_release $tgt_ubuntu_ver ubuntu live)}
+	: ${iso_filename:="$(basename $ubuntu_iso_url)"}
+	: ${permanent_download_dir:="/var/lib/libvirt/boot/"}
+
+	write_status "Checking if $iso_filename already downloaded..."
+	iso=$(find "$permanent_download_dir" -name "$iso_filename")
+	if [ ! -e "$iso" ]; then
+		write_warning "$iso_filename is not in cache, downloading..."
+		wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "Failure to download ISO file"
+		iso="$permanent_download_dir/$iso_filename"
 	fi
 
-	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
-	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
+	"${bin_virt_install}" --name VDI_${CONFIG}-${tgt_ubuntu_ver}-${RANDOM} \
+		--vcpus "${2:-2}" \
+		--memory "${3:-2048}" \
+		--network "${virt_net}" \
+		--disk size="${4:-30}" \
+		--os-variant="${1:-ubuntu21.10}" \
+		--video "virtio" --channel "spicevmc" \
+		--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
+		--extra-args="ks=file:$(basename $PRESEED_FILE) auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=us \
+		netcfg/get_hostname=${CONFIG}${tgt_ubuntu_ver} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
+		localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity quiet splash noprompt noshell" \
+		--initrd-inject="$PRESEED_FILE" \
+		--initrd-inject="$( dirname ${PRESEED_FILE})/ks.cfg" \
+		--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
 
-	# Discover if the appropriate VM net interface is (default or br'0 - n')
-	VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
-
-	if [[ ${UBUNTU_VER::2} -le 20 ]]; then
-		write_information "${FUNCNAME}: Creating legacy VM for Ubuntu"
-		"${BIN_VIRT_INSTALL}" --name VDI_Ubuntu_"$CONFIG"_"$RANDOM" \
-			--vcpus "${2:-2}" \
-			--memory "${3:-2048}" \
-			--network "${VIRT_NET}" \
-			--disk size="${4:-30}" \
-			--os-variant="${1:-debian10}" \
-			--location=http://us.archive.ubuntu.com/ubuntu/dists/focal/main/installer-amd64/ \
-			--initrd-inject="$PRESEED_FILE" \
-			--extra-args "ks=file:/$(basename $PRESEED_FILE)" \
-			--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
-	else
-		write_information "${FUNCNAME}: Find the precice location of the requested ISO image:"
-		ISO_URL=$(rtd_oem_find_live_release $UBUNTU_VER ubuntu $ISO_VER)
-			echo "${FUNCNAME}: requested iso for download : $ISO_URL"
-			${ISO_FILENAME:="$(basename $ISO_URL)"}
-			${PERMANENT_DOWNLOAD_DIR:="/var/lib/libvirt/boot/"}
-
-		write_status "${FUNCNAME}: Checking if $ISO_FILENAME already downloaded..."
-		iso=$(find "$PERMANENT_DOWNLOAD_DIR" -name "$ISO_FILENAME")
-		if [ ! -e "$iso" ]; then
-			echo "$ISO_FILENAME is not in cache, downloading..."
-			wget -nc $ISO_URL -P "$PERMANENT_DOWNLOAD_DIR" || read -p "Failure to download ISO file"
-			iso="$PERMANENT_DOWNLOAD_DIR/$ISO_FILENAME"
-		fi
-
-		"${BIN_VIRT_INSTALL}" --name VDI_Ubuntu_"$CONFIG"_"$RANDOM" \
-			--vcpus "${2:-2}" \
-			--memory "${3:-2048}" \
-			--network "${VIRT_NET}" \
-			--disk size="${4:-30}" \
-			--video "virtio" --channel "spicevmc" \
-			--os-variant="${1:-ubuntu21.10}" \
-			--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-			--extra-args="ks=file:$(basename $PRESEED_FILE) auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=us console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity initrd=/casper/initrd quiet splash noprompt noshell" \
-			--initrd-inject="$PRESEED_FILE" \
-			--initrd-inject="$( dirname ${PRESEED_FILE})/ks.cfg" \
-			--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
-	fi
-
-	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built. You may attach to this server and see the progress at IP: $(hostname -I))" 10 60
+	unset tgt_ubuntu_ver
+	unset iso_filename
+	unset ubuntu_iso_url
+	#
+	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built. \n You may attach to this server and see the progress at IP: $(hostname -I))" 10 60
 }
 
 
@@ -8121,6 +8111,25 @@ set_colors ()
 	⣿⣿⣿⣿⣿⣿⣿⣿⣧⠀⠀⠀⠀⠀⠀⠀⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢹⣿⣿ \n
 	⣿⣿⣿⣿⣿⣿⣿⣿⣿⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿ \n
 	"
+
+	ubuntulogo="
+	⣿⣿⣿⣿⣿⣿⣿⣿⠿⠛⠋⠉⠁⠀⠀⠀⠀⠈⠉⠙⠛⠿⣿⣿⣿⣿⣿⣿⣿⣿ \n
+	⣿⣿⣿⣿⣿⠿⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠿⣿⣿⣿⣿⣿ \n
+	⣿⣿⣿⡟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣾⣿⣦⠀⠀⠀⠈⢻⣿⣿⣿ \n
+	⣿⣿⠏⠀⠀⠀⠀⠀⠀⠀⠀⢠⣶⣶⣾⣷⣶⣆⠸⣿⣿⡟⠀⠀⠀⠀⠀⠹⣿⣿ \n
+	⣿⠃⠀⠀⠀⠀⠀⠀⣠⣾⣷⡈⠻⠿⠟⠻⠿⢿⣷⣤⣤⣄⠀⠀⠀⠀⠀⠀⠘⣿ \n
+	⡏⠀⠀⠀⠀⠀⠀⣴⣿⣿⠟⠁⠀⠀⠀⠀⠀⠀⠈⠻⣿⣿⣦⠀⠀⠀⠀⠀⠀⢹ \n
+	⠁⠀⠀⢀⣤⣤⡘⢿⣿⡏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢹⣿⣿⡇⠀⠀⠀⠀⠀⠈ \n
+	⠀⠀⠀⣿⣿⣿⡇⢸⣿⡁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢈⣉⣉⡁⠀⠀⠀⠀⠀⠀ \n
+	⡀⠀⠀⠈⠛⠛⢡⣾⣿⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣸⣿⣿⡇⠀⠀⠀⠀⠀⢀ \n
+	⣇⠀⠀⠀⠀⠀⠀⠻⣿⣿⣦⡀⠀⠀⠀⠀⠀⠀⢀⣴⣿⣿⠟⠀⠀⠀⠀⠀⠀⣸ \n
+	⣿⡄⠀⠀⠀⠀⠀⠀⠙⢿⡿⢁⣴⣶⣦⣴⣶⣾⡿⠛⠛⠋⠀⠀⠀⠀⠀⠀⢠⣿ \n
+	⣿⣿⣆⠀⠀⠀⠀⠀⠀⠀⠀⠘⠿⠿⢿⡿⠿⠏⢰⣿⣿⣧⠀⠀⠀⠀⠀⣰⣿⣿ \n
+	⣿⣿⣿⣧⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢿⣿⠟⠀⠀⠀⢀⣼⣿⣿⣿ \n
+	⣿⣿⣿⣿⣿⣶⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⣶⣿⣿⣿⣿⣿ \n
+	⣿⣿⣿⣿⣿⣿⣿⣿⣶⣤⣄⣀⡀⠀⠀⠀⠀⢀⣀⣠⣤⣶⣿⣿⣿⣿⣿⣿⣿⣿ \n
+	"
+
 	chess="♟️ ♔ ♕ ♖ ♗ ♘ ♙ ♚ ♛ ♜ ♝ ♞ ♟"
 	colorcircle="🔴 🟠 🟡 🟢 🔵 🟣 🟤"
 	colorsquares=" 🟥 🟧 🟨 🟩 🟦 🟪 🟫"

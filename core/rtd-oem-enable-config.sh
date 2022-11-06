@@ -46,14 +46,11 @@
 # capture the 3 first letters as org TLA (Three Letter Acronym)
 export _SCRIPTNAME=$(basename $0)
 export _TLA=${_SCRIPTNAME:0:3}
-export _LOG_DIR=/var/log/${_TLA}
+source /opt/${_TLA,,}/core/_rtd_library
 mkdir -p ${_LOG_DIR}
-source /opt/${_TLA}/core/_rtd_library
-
 
 # Determine log file directory
 _LOGFILE=${_LOG_DIR}/$( basename $0).log
-_OEM_USER=tangarora
 
 
 
@@ -65,7 +62,7 @@ _OEM_USER=tangarora
 
 
 toggle_oem_run_once "/opt/rtd/core/rtd-oem-linux-config.sh"	&>> $_LOGFILE
-set_enable_oem_elevated_privelege	${_OEM_USER}		&>> $_LOGFILE
+set_enable_oem_elevated_privelege	        		&>> $_LOGFILE
 toggle_oem_auto_login						&>> $_LOGFILE
 set_oem_elevated_privilege_gui					&>> $_LOGFILE
 rtd_oem_make_launchers						&>> $_LOGFILE
