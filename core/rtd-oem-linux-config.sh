@@ -137,7 +137,7 @@ else
 	if  [[ -f "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_rtd_library ]]; then
 		source "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_rtd_library
 	elif source $(find /opt -name _rtd_library ) ; then
-		write_host -cyan "Libraries loaded"
+		write_information "Libraries loaded"
 		write_status "Paths registered:
 		* # Root directory of tools: 		_OEM_DIR="${scriptdir%/*}"
 		* # Caching and download folder: 	_CACHE_DIR="${_OEM_DIR}/cache"
@@ -160,7 +160,7 @@ else
 	sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
 	rtd_wait_for_internet_availability
 	rtd_oem_reset_default_environment_config
-	write_host --cyan "Ensuring that all software is updated before continuing. "
+	write_information "Ensuring that all software is updated before continuing. "
 	rtd_update_system
 
 	if [[ -z "$(ps aux |grep X |grep  -v grep)" ]]; then
