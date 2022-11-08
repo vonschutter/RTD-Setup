@@ -562,7 +562,7 @@ recipe_Bundle:_CLOUD_Storage ()
 
 
 recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
-			echo "Applying OEM Configuration..."
+			write_status "Applying OEM Configuration..."
 			# This bundle includes all OEM speciffic setting and configurations for desktops.
 			# This may include some basic application seen as, well, basic, and shold always be there.
 			# This will also include som UI configuration and settings to improve usability,
@@ -575,7 +575,6 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 			check_dependencies zip
 			check_dependencies p7zip
 			check_dependencies p7zip-full
-			check_dependencies p7zip-plugins
 			# Ensure modern app distribution support
 			ensure_flatpak_package_managment
 			ensure_snap_package_managment
@@ -589,50 +588,15 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 			# -------------------------------------------------------------------------------------------------------#
 			# Add launchers for some OEM apps (Internal function).
 			# Assuming a given folder structure: as part of /location/of/powertools/ <hierarchy>...
-			: ${_OEM_DIR:-"$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/../"}
-			CacheDir=${_OEM_DIR}/cache
-			WallPaperDir=${_OEM_DIR}/wallpaper
-			CustomSoundDir=${_OEM_DIR}/sound
-			ThemeDir=${_OEM_DIR}/themes
-			mkdir -p ${CacheDir}
-			chmod -R 755 "${WallPaperDir}"
-			chmod -R 755 "${CustomSoundDir}"
-
+			mkdir -p ${_CACHE_DIR}
+			chmod -R 755 "${_WALLPAPER_DIR}"
+			chmod -R 755 "${_CUSTOM_SOUND_DIR}"
 			# -------------------------------------------------------------------------------------------------------#
 
 
 			# [Task 3] Configure Desktop software managers depending on desktop used
 			# -------------------------------------------------------------------------------------------------------#
-			case "$DESKTOP_SESSION" in
-				plasma )
-					write_information "${FUNCNAME[0]}: plasma on anything..".
-					check_dependencies plasma-discover
-					check_dependencies plasma-discover-backend-flatpak
-					check_dependencies plasma-discover-backend-snap
-				;;
-				"/usr/share/xsessions/default" )
-					# Special case for suse again...
-					if cat /usr/share/xsessions/default.desktop |grep "Plasma"  ; then
-						write_information "${FUNCNAME[0]}: kde on suse"
-						check_dependencies plasma-discover
-						check_dependencies plasma-discover-backend-flatpak
-						check_dependencies plasma-discover-backend-snap
-					else
-						write_information "${FUNCNAME[0]}: gnome on suse"
-						snap install snap-store
-						check_dependencies gnome-software
-						check_dependencies gnome-software-plugin-flatpak
-						check_dependencies gnome-software-plugin-snap
-					fi
-				;;
-				* )
-					write_information "${FUNCNAME[0]}: case = *"
-					snap install snap-store
-					check_dependencies gnome-software
-					check_dependencies gnome-software-plugin-flatpak
-					check_dependencies gnome-software-plugin-snap
-				;;
-			esac
+			software::ensure_software_store_available
 			# -------------------------------------------------------------------------------------------------------#
 
 
@@ -655,21 +619,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 			rtd_oem_check_splash /root/original-ks.cfg
 
 			#Tune to virtual machine guest or tune according to hardware type::
-			check_dependencies virt-what
-			check_dependencies laptop-detect
-			if virt-what ; then
-				write_information "${FUNCNAME[0]}: This is likely not running in a virtual machine."
-				if laptop-detect ; then
-					write_information "${FUNCNAME[0]}: This is likely a laptop; applying pwersave profile..."
-					tuned-adm profile powersave
-				else
-					write_information "${FUNCNAME[0]}: This is likely NOT a laptop; applying desktop profile..."
-					tuned-adm profile desktop
-				fi
-			else
-				write_information "${FUNCNAME[0]}: This is likely a VM; applying virtual-guest profile..."
-				tuned-adm profile virtual-guest
-			fi
+			system_config::tune_system_power_profile
 			# -------------------------------------------------------------------------------------------------------#
 
 
@@ -687,10 +637,10 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 				# current user. This will not be done if the system was not built by the oem process.
 
 				# Register Wallpapers in Gnome
-				rtd_oem_register_wallpapers_for_gnome ${WallPaperDir}
+				rtd_oem_register_wallpapers_for_gnome ${_WALLPAPER_DIR}
 
 				# Set the default wallpaper...
-				run_command_in_gnome_user_session gsettings set org.gnome.desktop.background picture-uri file://${WallPaperDir}/Wayland.jpg
+				run_command_in_gnome_user_session gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/Wayland.jpg
 				# -------------------------------------------------------------------------------------------------------
 
 
@@ -756,23 +706,23 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 
 				# Install theme for a smooth mocka experience in UI (snap, gnome, and icons)...
 				snap install vimix-themes
-					7z x ${ThemeDir}/vimix-gtk-themes.7z -o/usr/share/themes
-					7z x  ${ThemeDir}/vimix-icon-themes.7z -o${ThemeDir} && pushd ${ThemeDir}/vimix-icon-themes && ./install.sh && popd
+					7z x ${_THEME_DIR}/vimix-gtk-themes.7z -o/usr/share/themes
+					7z x  ${_THEME_DIR}/vimix-icon-themes.7z -o${_THEME_DIR} && pushd ${_THEME_DIR}/vimix-icon-themes && ./install.sh && popd
 					for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
 
 				# Install theme for previous Apple users...
 				snap install mojave-themes
-					7z x ${ThemeDir}/Mojave-gtk-theme.7z -o${ThemeDir} && pushd ${ThemeDir}/Mojave-gtk-theme && ./install.sh && popd
-					7z x ${ThemeDir}/McMojave-circle.7z -o${ThemeDir} && pushd ${ThemeDir}/McMojave-circle && ./install.sh && popd
+					7z x ${_THEME_DIR}/Mojave-gtk-theme.7z -o${_THEME_DIR} && pushd ${_THEME_DIR}/Mojave-gtk-theme && ./install.sh && popd
+					7z x ${_THEME_DIR}/McMojave-circle.7z -o${_THEME_DIR} && pushd ${_THEME_DIR}/McMojave-circle && ./install.sh && popd
 					for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i mojave-themes:gtk-3-themes ; done
 
 				# Install Windows 10 Themes (Light and Dark) + icons
-				7z x ${ThemeDir}/Windows-10-Light.7z -o/usr/share/themes
-				7z x ${ThemeDir}/Windows-10-Dark.7z -o/usr/share/themes
-				7z x ${ThemeDir}/Windows-10-Icons.7z -o/usr/share/icons
+				7z x ${_THEME_DIR}/Windows-10-Light.7z -o/usr/share/themes
+				7z x ${_THEME_DIR}/Windows-10-Dark.7z -o/usr/share/themes
+				7z x ${_THEME_DIR}/Windows-10-Icons.7z -o/usr/share/icons
 
 				# Install the Flattery icon theme...
-				7z x ${ThemeDir}/Flatery-icon-theme.7z -o/usr/share/icons
+				7z x ${_THEME_DIR}/Flatery-icon-theme.7z -o/usr/share/icons
 
 				# Install basic professional Arc and gnome default themes...
 				for i in numix-gtk-theme numix-icon-theme arc-theme
@@ -781,7 +731,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 				done
 
 				# Add a default Icon theme "Arc" fo a clean and crisp proffessional default look.
-				7z x ${ThemeDir}/Arc-icon-theme.7z -o${ThemeDir} && mv ${ThemeDir}/Arc-icon-theme /usr/share/icons/Arc
+				7z x ${_THEME_DIR}/Arc-icon-theme.7z -o${_THEME_DIR} && mv ${_THEME_DIR}/Arc-icon-theme /usr/share/icons/Arc
 				# -------------------------------------------------------------------------------------------------------
 
 
@@ -824,14 +774,14 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 
 				write_information "${FUNCNAME[0]}: Detected KDE UI!"
 				# Download and Set Wallpaper...
-				CacheDir="${_RTDCACHE:="/opt/rtd/cache"}"
-				sudo -H -u $SUDO_USER DISPLAY=$DISPLAY source /opt/rtd/core/_rtd_library ; rtd_oem_kde_set_wallpaper "${WallPaperDir}/Wayland.jpg"
+				_CACHE_DIR="${_RTDCACHE:="/opt/rtd/cache"}"
+				sudo -H -u $SUDO_USER DISPLAY=$DISPLAY source /opt/rtd/core/_rtd_library ; rtd_oem_kde_set_wallpaper "${_WALLPAPER_DIR}/Wayland.jpg"
 
-				mkdir -p ${CacheDir} && if [[ -e ${CacheDir}/master.zip ]] ; then rm ${CacheDir}/master.zip ; fi || write_error "Unable to create ${CacheDir}"
+				mkdir -p ${_CACHE_DIR} && if [[ -e ${_CACHE_DIR}/master.zip ]] ; then rm ${_CACHE_DIR}/master.zip ; fi || write_error "Unable to create ${_CACHE_DIR}"
 				wget https://github.com/vinceliuice/vimix-kde/archive/master.zip  -P /opt/rtd/cache || write_error "Unable to download https://github.com/vinceliuice/vimix-kde/archive/master.zip"
-				unzip -o /opt/rtd/cache/master.zip -d /opt/rtd/cache && pushd /opt/rtd/cache/vimix-kde-master && ./install.sh && popd ; rm ${CacheDir}/master.zip
+				unzip -o /opt/rtd/cache/master.zip -d /opt/rtd/cache && pushd /opt/rtd/cache/vimix-kde-master && ./install.sh && popd ; rm ${_CACHE_DIR}/master.zip
 
-				7z x  ${ThemeDir}/vimix-icon-themes.7z -o${ThemeDir} && pushd ${ThemeDir}/vimix-icon-themes && ./install.sh && popd
+				7z x  ${_THEME_DIR}/vimix-icon-themes.7z -o${_THEME_DIR} && pushd ${_THEME_DIR}/vimix-icon-themes && ./install.sh && popd
 				for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
 
 				sudo -H -u $SUDO_USER DISPLAY=$DISPLAY lookandfeeltool -a 'org.kde.breezedark.desktop'

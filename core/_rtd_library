@@ -3819,6 +3819,69 @@ scan_for_malware ()
 
 
 
+software::ensure_software_store_available ()
+{
+# Description: Function to ensure that flatpack is installed and flathup enabled.
+# Globals: none
+# Dependencies: [distro pakcage managment] [function: check_dependencies] [Internet access]
+# Arguments: None
+# Outputs:
+# Returns: Standard return codes 1/0
+# Usage: Call the function with no arguments
+# GNOME Software is a utility for installing applications and updates on Linux.
+# It is part of the GNOME Core Applications, and was introduced in GNOME 3.10.[3]
+#
+# It is the GNOME front-end to the PackageKit, in turn a front-end to several package management
+# systems, which include systems based on both RPM and DEB.
+#
+# The program is used to add and manage software repositories as well as Ubuntu
+# Personal Package Archives (PPA). Ubuntu replaced its previous Ubuntu Software Center
+# program with GNOME Software starting with Ubuntu 16.04 LTS,[5] and re-branded it as "Ubuntu Software".
+#
+# It also supports fwupd for servicing of system firmware.[6]
+#
+# GNOME Software removed Snap support in July 2019, due to code quality issues, lack of integration
+# (specifically, the user can't tell what snap is doing after they click "install" and that it
+# generally ignores GNOME's settings), and the fact that it competes with the GNOME-supported Flatpak standard.[7]
+#
+# End of documentation
+
+
+	case "$DESKTOP_SESSION" in
+		plasma )
+			write_information "${FUNCNAME[0]}: plasma on anything..".
+			check_dependencies plasma-discover
+			check_dependencies plasma-discover-backend-flatpak
+			check_dependencies plasma-discover-backend-snap
+		;;
+		"/usr/share/xsessions/default" )
+			# Special case for suse again...
+			if cat /usr/share/xsessions/default.desktop |grep "Plasma"  ; then
+				write_information "${FUNCNAME[0]}: kde on suse"
+				check_dependencies plasma-discover
+				check_dependencies plasma-discover-backend-flatpak
+				check_dependencies plasma-discover-backend-snap
+			else
+				write_information "${FUNCNAME[0]}: gnome on suse"
+				snap install snap-store
+				check_dependencies gnome-software
+				check_dependencies gnome-software-plugin-flatpak
+				check_dependencies gnome-software-plugin-snap
+			fi
+		;;
+		* )
+			write_information "${FUNCNAME[0]}: case = *"
+			snap install snap-store
+			check_dependencies gnome-software
+			check_dependencies gnome-software-plugin-flatpak
+			check_dependencies gnome-software-plugin-snap
+		;;
+	esac
+
+}
+
+
+
 
 
 
@@ -4031,6 +4094,43 @@ up_2_date ()
 
 
 
+
+system_config::tune_system_power_profile ()
+{
+# Description: Tuned is a Linux feature that monitors a system and optimizes its performance
+# under certain workloads. Tuned uses profiles to do this. A profile is a set of rules that
+# defines certain system parameters such as disk settings, kernel parameters, network
+# optimization settings, and many other aspects of the system.
+#
+# This function sets the performance according to laptop/desktop/vm based on what is detected.
+# Globals:
+# Arguments: None
+# Outputs:
+# Returns: 0/1/3 where 1/0 = sucess/fail and 3 = package manager NOT found
+# Usage: up_2_date
+# End of documentation
+
+	case "${1}" in
+		--quiet | -q ) : ${_print="#"} ;;
+		* ) _print= ;;
+	esac
+
+	check_dependencies virt-what
+	check_dependencies laptop-detect
+	if virt-what ; then
+		"${print}" write_information "${FUNCNAME[0]}: This is likely not running in a virtual machine."
+		if laptop-detect ; then
+			write_information "${FUNCNAME[0]}: This is likely a laptop; applying pwersave profile..."
+			tuned-adm profile powersave
+		else
+			write_information "${FUNCNAME[0]}: This is likely NOT a laptop; applying desktop profile..."
+			tuned-adm profile desktop
+		fi
+	else
+		write_information "${FUNCNAME[0]}: This is likely a VM; applying virtual-guest profile..."
+		tuned-adm profile virtual-guest
+	fi
+}
 
 
 
