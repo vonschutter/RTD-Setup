@@ -5414,7 +5414,7 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 		--disk size="${4:-40}" \
 		--os-variant=opensusetumbleweed \
 		--initrd-inject="${PRESEED_FILE}" \
-		--location='http://download.opensuse.org/factory/repo/oss/' \
+		--location='https://download.opensuse.org/distribution/openSUSE-current/repo/oss/' \
 		--extra-args "AutoYaST=file:///$(basename $PRESEED_FILE)"   \
 		--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
 
@@ -7836,13 +7836,16 @@ generate_autoyast_file ()
 # End of documentation
 	FILE="$1"
 	CONFIG="$2"
+	suse_product="Leap"
 	write_host --cyan "Creating AUTOYAST Instructions (XML): ${FILE}"
+
 
 	# Localized variables based on User preferences, but with suse speciffic defaults:
 	Preference_DiskEncryption_SUSE="$( [[ "$_EncryptDisk" == "YES" ]] && echo "<encryption_password>${PreferredDiskPassword:-"letmein1234"}</encryption_password>" )"
 	Preference_Password_SUSE=$( [[ -n "${PrefferredUserPassword}" ]] && echo "<user_password>${PrefferredUserPassword}</user_password>" || echo '<user_password>$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1</user_password>' )
 	Preference_Desktop_DE_SUSE=${_UserDesktopEnvironemtSelection:-"<pattern>kde</pattern>"}
 	Preference_InitialUser_SUSE="<username>${_OEM_USER:-"tangarora"}</username>"
+	Preference_Product_SUSE="<product>${suse_product:="openSUSE"}</product>"
 
 	cat >> ${FILE} <<-AUTOYAST_EOF
 <?xml version="1.0"?>
@@ -7856,7 +7859,7 @@ generate_autoyast_file ()
 			<final_reboot config:type="boolean">true</final_reboot>
 			<final_halt config:type="boolean">false</final_halt>
 			<halt config:type="boolean">false</halt>
-			<second_stage config:type="boolean">true</second_stage>
+			<second_stage config:type="boolean">false</second_stage>
 			<forceboot config:type="boolean">true</forceboot>
 		</mode>
 	</general>
@@ -7895,7 +7898,7 @@ generate_autoyast_file ()
 		</packages>
 
 		<products config:type="list">
-			<product>openSUSE</product>
+			${Preference_Product_SUSE}
 		</products>
 
 	</software>
