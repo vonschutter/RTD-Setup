@@ -1948,6 +1948,7 @@ set_gnome_ui_win10_tweaks_for_user ()
 		if [[ -d /usr/share/themes/Windows-10-Dark ]] ; then
 			gsettings set org.gnome.desktop.interface gtk-theme 'Windows-10-Dark'
 			gsettings set org.gnome.shell.extensions.user-theme name "Windows-10-Dark"
+			gsettings set org.gnome.desktop.interface icon-theme 'Windows-10-Icons-dark'
 		else
 			set_gnome_ui_tweak_no_media_error
 		fi
@@ -1956,17 +1957,12 @@ set_gnome_ui_win10_tweaks_for_user ()
 		if [[ -d /usr/share/themes/Windows-10-Light ]] ; then
 			gsettings set org.gnome.desktop.interface gtk-theme 'Windows-10-Light'
 			gsettings set org.gnome.shell.extensions.user-theme name "Windows-10-Light"
+			gsettings set org.gnome.desktop.interface icon-theme 'Windows-10-Icons'
 		else
 			set_gnome_ui_tweak_no_media_error
 		fi
 	;;
 	esac
-
-	if [[ -d /usr/share/icons/Windows-10-Icons ]] ; then
-		gsettings set org.gnome.desktop.interface icon-theme 'Windows-10-Icons'
-	else
-			set_gnome_ui_tweak_no_media_error
-	fi
 
 	# Set font
 	# gsettings set org.gnome.desktop.interface monospace-font-name 'Bitstream Vera Sans Mono'
@@ -4102,31 +4098,57 @@ system_config::tune_system_power_profile ()
 # Globals:
 # Arguments: None
 # Outputs:
-# Returns: 0/1/3 where 1/0 = sucess/fail and 3 = package manager NOT found
-# Usage: up_2_date
+# Returns:
+# Usage: simply call function in a script
 # End of documentation
+
+	check_dependencies tuned
+	systemctl enable --now tuned
+	tuned-adm profile balanced
 
 	case "${1}" in
 		--quiet | -q ) : ${_print="#"} ;;
-		* ) _print= ;;
+		* ) unset _print ;;
 	esac
 
 	check_dependencies virt-what
 	check_dependencies laptop-detect
 	if virt-what ; then
-		"${print}" write_information "${FUNCNAME[0]}: This is likely not running in a virtual machine."
+		"${_print}" write_information "${FUNCNAME[0]}: This is likely not running in a virtual machine."
 		if laptop-detect ; then
-			write_information "${FUNCNAME[0]}: This is likely a laptop; applying pwersave profile..."
+			"${_print}" write_information "${FUNCNAME[0]}: This is likely a laptop; applying pwersave profile..."
 			tuned-adm profile powersave
 		else
-			write_information "${FUNCNAME[0]}: This is likely NOT a laptop; applying desktop profile..."
+			"${_print}" write_information "${FUNCNAME[0]}: This is likely NOT a laptop; applying desktop profile..."
 			tuned-adm profile desktop
 		fi
 	else
-		write_information "${FUNCNAME[0]}: This is likely a VM; applying virtual-guest profile..."
+		"${_print}" write_information "${FUNCNAME[0]}: This is likely a VM; applying virtual-guest profile..."
 		tuned-adm profile virtual-guest
 	fi
 }
+
+
+
+
+rtd_oem::check_boot_splash_screen_enable () {
+# Description: OEM function to enable splash screen on boot if desktop is indicated in
+# a configuration file. This file could be an AutoYast.xml, or ks.cfg, or a preseed.cfg.
+#
+# Globals:
+# Arguments: [FILE]
+# Outputs:
+# Returns: error level
+# Usage: rtd_oem::check_boot_splash_screen_enable /root/original-ks.cfg
+# End of documentation
+	if -f $1 ; then
+		if cat $1 |grep "-desktop" ; then
+			InstallSoftwareFromRepo splash && echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"'>> /etc/default/grub
+			update-grub
+		fi
+	fi
+}
+
 
 
 
