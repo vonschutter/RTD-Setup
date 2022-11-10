@@ -3855,7 +3855,6 @@ software::ensure_software_store_available ()
 				check_dependencies plasma-discover-backend-snap
 			else
 				write_information "${FUNCNAME[0]}: gnome on suse"
-				snap install snap-store
 				check_dependencies gnome-software
 				check_dependencies gnome-software-plugin-flatpak
 				check_dependencies gnome-software-plugin-snap
@@ -3863,7 +3862,6 @@ software::ensure_software_store_available ()
 		;;
 		* )
 			write_information "${FUNCNAME[0]}: case = *"
-			snap install snap-store
 			check_dependencies gnome-software
 			check_dependencies gnome-software-plugin-flatpak
 			check_dependencies gnome-software-plugin-snap
@@ -5511,16 +5509,16 @@ make_kvm_virtual_machine_now_from_debian_org ()
 
 	write_status "🔧	- Builing a Debian VM with the following requests:"
 	write_information "
-	Using the instructions in PRESEED: ${PRESEED_FILE}
-	Using the following kernel and initrd:
+	✅ Using the instructions in PRESEED: ${PRESEED_FILE}
+	✅ Using the following kernel and initrd:
 	🌎 ${vm_kernel}
 	🌎 ${vm_initrd}
-	And Uing this source for the packages and files to download:
+	✅ And Uing this source for the packages and files to download:
 	🌎 ${DEBIAN_SOURCE_URL}
-	Using the network: ${virt_net}
-	Memory: ${3:-2048}
-	CPU's: ${2:-2}
-	Disk Size: ${4:-40}"
+	✅ Using the network: ${virt_net}
+	✅ Memory: ${3:-2048}
+	✅ CPU's: ${2:-2}
+	✅ Disk Size: ${4:-40}"
 
 	# create image and run installer
 	"${bin_virt_install}" --name Debian_${vm_usecase}_"${SRVFUNC}"_"${CONFIG}"_"${RANDOM}" \
@@ -5534,7 +5532,7 @@ make_kvm_virtual_machine_now_from_debian_org ()
 		--initrd-inject="${PRESEED_FILE}" \
 		--install kernel="${vm_kernel}",initrd="${vm_initrd}" \
 		--extra-args "ks=file:/$(basename $PRESEED_FILE) ${ui_diplay_style}" \
-		--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
+		--noautoconsole || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
 	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine (Debian_${vm_usecase}_"${SRVFUNC}"_"${CONFIG}"_"${RANDOM}") \
 	is currently being built. You may attach to this server using 'virt-manager' and see the progress at IP: $(hostname -I))" 12 60
@@ -5759,7 +5757,7 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		write_information "Generate Windows Instruction media..."
 		mkfs.msdos -C ${WindowsInstructions} 1440 || rtd_oem_pause 1
 
-		write_information "Generate installations iinstructions for Windows..."
+		write_information "Generate installations instructions for Windows..."
 		generate_autounattend_xml "${AutoUnattend}" || rtd_oem_pause 1
 
 		write_information "Generate post install bootstrap script..."

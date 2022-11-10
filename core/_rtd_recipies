@@ -598,21 +598,9 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 
 	# [Task 4] Configure relevant power management
 	# -------------------------------------------------------------------------------------------------------#
-	check_dependencies tuned
-	systemctl enable --now tuned
-	tuned-adm profile balanced
-
-	rtd_oem_check_splash () {
-		if -f $1 ; then
-			if cat $1 |grep "-desktop" ; then
-				InstallSoftwareFromRepo splash && echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"'>> /etc/default/grub
-				update-grub
-			fi
-		fi
-	}
 	# If this system was built using the RTD process and is debian based, use instructions in said file.
-	rtd_oem_check_splash /opt/rtd/preseed.cfg
-	rtd_oem_check_splash /root/original-ks.cfg
+	rtd_oem::check_boot_splash_screen_enable /opt/rtd/preseed.cfg
+	rtd_oem::check_boot_splash_screen_enable /root/original-ks.cfg
 
 	#Tune to virtual machine guest or tune according to hardware type::
 	system_config::tune_system_power_profile
@@ -653,7 +641,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 			InstallSoftwareFromRepo fedora-workstation-repositories
 			InstallSoftwareFromRepo gnome-tweaks
 		fi
-		InstallSoftwareFromRepo gnome-tweak
+		InstallSoftwareFromRepo gnome-tweaks
 
 		write_information "--- Optimizig look and feel of the desktop for productivity and aestetics..."
 		for i in gnome-shell-extensions \
@@ -716,6 +704,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		7z x ${_THEME_DIR}/Windows-10-Light.7z -o/usr/share/themes
 		7z x ${_THEME_DIR}/Windows-10-Dark.7z -o/usr/share/themes
 		7z x ${_THEME_DIR}/Windows-10-Icons.7z -o/usr/share/icons
+		7z x ${_THEME_DIR}/Windows-10-Icons-dark.7z -o/usr/share/icons
 
 		# Install the Flattery icon theme...
 		7z x ${_THEME_DIR}/Flatery-icon-theme.7z -o/usr/share/icons
