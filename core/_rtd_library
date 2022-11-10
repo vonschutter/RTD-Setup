@@ -2607,12 +2607,9 @@ prepare_environment_for_iso_creation ()
 # End of Documentation
 
 
-	#Include the path to where the isofile will be put...
 	: "${TARGET_ISO="$PUT_ISO_FILE_HERE_WHEN_DONE/$TARGET_ISO_FILE_NAME"}"
-	# Ensure that all needed software, outside of the most rudimantary,
-	# is available to us... If not, the script should exit.
 	: "${_DEPENDENCIES="dos2unix cpio gzip genisoimage whois pwgen wget fakeroot xorriso"}"
-	#set -e
+	set -e
 	for i in $_DEPENDENCIES
 	do
 		check_dependencies $i
@@ -2629,6 +2626,7 @@ prepare_environment_for_iso_creation ()
 	: "${VOLUME_TITLE:="RTD Auto Installer"}"
 	: "${SSH_PUBLIC_KEY_FILE:="/home/$SUDO_USER/.ssh/id_rsa.pub"}"
 	: "${PERMANENT_DOWNLOAD_DIR:="/home/$SUDO_USER/Virtual-DVDs/Downloaded"}"
+
 	if [[ -e /usr/lib/ISOLINUX/isohdpfx.bin ]]; then
 		: "${ISOHDPFX_BIN:="/usr/lib/ISOLINUX/isohdpfx.bin"}"
 	else
@@ -2638,8 +2636,7 @@ prepare_environment_for_iso_creation ()
 		locate isohdpfx.bin || ( write_error "The file isohdpfx.bin could not be found or fetched. Please correct manually!" ; rtd_oem_pause 1 )
 		: "${ISOHDPFX_BIN:=$(locate isohdpfx.bin  | head -n 1)}"
 	fi
-	# Find the location of the public key on this machine...
-	# This should be updated to create a key if not there...
+
 	if [ ! -f "$SSH_PUBLIC_KEY_FILE" ];
 	then
 		echo "Error: public SSH key $SSH_PUBLIC_KEY_FILE not found!"
@@ -2647,7 +2644,6 @@ prepare_environment_for_iso_creation ()
 		read -p "Press [Enter] to continue..."
 	fi
 
-	# Setup the required folder structure...
 	CURRENT_DIR="$(pwd)"
 	SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 	TMP_DOWNLOAD_DIR=$(mktemp -d )
@@ -6674,7 +6670,7 @@ rtd_oem_cloud-config_ubuntu_cfg_KS_CFG_Options ()
 # Arguments: Where to place file (directory)
 # Outputs: one preseed file section
 # Returns: instruction for Ubuntu's convoluted support for both preseed and kickstart files.
-# Usage: rtd_oem_preseed_ubuntu_cfg_KS_CFG_Options "directory"
+# Usage: rtd_oem_cloud-config_ubuntu_cfg_KS_CFG_Options "directory"
 # End of documentation
 	cat > $1/autoinstall.yaml <<-'EOF'
 #cloud-config
