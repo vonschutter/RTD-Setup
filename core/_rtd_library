@@ -5503,18 +5503,18 @@ make_kvm_virtual_machine_now_from_debian_org ()
 	write_status "🔎 	- Discovering what the appropriate VM net interface is (default or br'0 - n')"
 	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
 
-	write_status "🔧	- Builing a Debian VM with the following requests:"
-	write_information "
-	✅ Using the instructions in PRESEED: ${PRESEED_FILE}
-	✅ Using the following kernel and initrd:
-	🌎 ${vm_kernel}
-	🌎 ${vm_initrd}
-	✅ And Uing this source for the packages and files to download:
-	🌎 ${DEBIAN_SOURCE_URL}
-	✅ Using the network: ${virt_net}
-	✅ Memory: ${3:-2048}
-	✅ CPU's: ${2:-2}
-	✅ Disk Size: ${4:-40}"
+	_summary_message="The virtual machine (Debian_${vm_usecase}_${SRVFUNC}_${CONFIG}_${RANDOM}) \n
+	📋 -	Using the instructions in PRESEED: ${PRESEED_FILE} \n
+	🔧 -	And Using this source for the packages and files to download: \n
+	🌎 -	"${DEBIAN_SOURCE_URL}" \n
+	🔧 -	Using the following kernel and initrd: \n
+	🌎 -	${vm_kernel} \n
+	🌎 -	${vm_initrd} \n
+	✅ -	Using the network: ${virt_net} \n
+	✅ -	Memory: ${3:-2048} \n
+	✅ -	CPU's: ${2:-2} \n
+	✅ -	Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))"
+
 
 	# create image and run installer
 	"${bin_virt_install}" --name Debian_${vm_usecase}_"${SRVFUNC}"_"${CONFIG}"_"${RANDOM}" \
@@ -5530,14 +5530,13 @@ make_kvm_virtual_machine_now_from_debian_org ()
 		--extra-args "ks=file:/$(basename $PRESEED_FILE) ${ui_diplay_style}" \
 		--noautoconsole || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
-	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine (Debian_${vm_usecase}_"${SRVFUNC}"_"${CONFIG}"_"${RANDOM}") \
-	is currently being built. You may attach to this server using 'virt-manager' and see the progress at IP: $(hostname -I))" 12 60
-
 	unset vm_kernel
 	unset vm_initrd
 	unset vm_usecase
 	unset ui_diplay_style
 	cleanup_and_finish nomessage
+
+	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 20 80
 }
 
 
@@ -5630,7 +5629,14 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 	unset iso_filename
 	unset ubuntu_iso_url
 	#
-	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built. \n You may attach to this server and see the progress at IP: $(hostname -I))" 10 60
+	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built: \n
+	📋 -	Using the instructions in PRESEED: ${PRESEED_FILE} \n
+	🔧 -	And Using this source for the packages and files to download: \n
+	🌎 -	"${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \n
+	✅ -	Using the network: ${virt_net} \n
+	✅ -	Memory: ${3:-2048} \n
+	✅ -	CPU's: ${2:-2} \n
+	✅ -	Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))" 20 80
 }
 
 
