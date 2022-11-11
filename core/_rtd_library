@@ -952,6 +952,7 @@ toggle_oem_run_once () {
 			sudo rm ${_FILE}
 		fi
 	else
+		write_information "Adding execution on login of (${_FILE})"
 		cat > ${_FILE} <<-CREATE_START_LINK
 		# This will automatically start the RuntTime Data OEM config options on
 		# the first login. Once run this launcher will be moved to the /opt/rtd folder
@@ -5346,22 +5347,40 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 # Usage:
 # End of Documentation
 
+	write_status "${FUNCNAME[0]}:"
 	count=1
 	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install
 	do
-		write_status "${count}	- Verifying dependencies ( ${i} )..."
+		write_status "🧩 ${count}	- Verifying dependencies ( ${i} )..."
 		check_dependencies $i &>/dev/null
 		count=$((count + 1))
 	done
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
-	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
-	FedoraVersion=${FedoraVersion:-"35"}
-
-	# Discover if the appropriate VM net interface is (default or br'0 - n')
 	VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
+	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
+	FedoraVersion=$( $RTD_GUI --title "Select Release Version of Fedora" --inputbox "Please pick an available Fedoara version by entering it below. \
+	If you are not sure just let me choose for you... \n ${fedoralogo} "  25 110 "${_DEFAULT_FEDORA_VER}" 3>&1 1>&2 2>&3)
+	case $? in
+		"$DIALOG_CANCEL") return ;;
+		"$DIALOG_ESC") return ;;
+	esac
+	clear
 
-        # create image and run installer
+	: ${FedoraVersion:="${_DEFAULT_FEDORA_VER}"}
+	: ${source_url:="https://dl.fedoraproject.org/pub/fedora/linux/releases/${FedoraVersion}/Everything/x86_64/os/"}
+
+	_summary_message="The virtual machine (VDI_fedora_"${CONFIG}"_"${RANDOM}") \n
+	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
+	🔧 - And Using this source for the packages and files to download: \n
+	🌎 - ${source_url} \n
+	🌎 - ${vm_kernel:="DEFAULT"} \n
+	🌎 - ${vm_initrd:="DEFAULT"} \n
+	✅ - Using the network: ${virt_net} \n
+	✅ - Memory: ${3:-2048} \n
+	✅ - CPU's: ${2:-2} \n
+	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))"
+
         "${BIN_VIRT_INSTALL}" --connect qemu:///system --name VDI_fedora_"${CONFIG}"_"${RANDOM}" \
                 --vcpus "${2:-2}" \
                 --memory "${3:-2048}" \
@@ -5369,12 +5388,12 @@ make_kvm_virtual_machine_now_from_fedora_org ()
                 --disk size="${4:-40}" \
 		--os-variant="fedora30" \
                 --initrd-inject="${PRESEED_FILE}" \
-		--location="http://www.nic.funet.fi/pub/Linux/INSTALL/fedora/linux/releases/${FedoraVersion}/Everything/x86_64/os/" \
+		--location="https://dl.fedoraproject.org/pub/fedora/linux/releases/${FedoraVersion}/Everything/x86_64/os/" \
 		--extra-args "inst.ks=file:/$(basename $PRESEED_FILE)" \
 		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 22 85 \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
-
+	# http://www.nic.funet.fi/pub/Linux/INSTALL/fedora/linux/releases/${FedoraVersion}/Everything/x86_64/os/
 }
 
 
@@ -5407,14 +5426,14 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 # Usage:
 # End of Documentation
 
+	write_status "${FUNCNAME[0]}:"
 	count=1
 	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install
 	do
-		write_status "${count}	- Verifying dependencies (${i})..."
+		write_status "🧩 ${count}	- Verifying dependencies ( ${i} )..."
 		check_dependencies $i &>/dev/null
 		count=$((count + 1))
 	done
-	write_information "Using sintallation control file: ${PRESEED_FILE}"
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
@@ -5423,12 +5442,12 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 	VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
 	: ${source_url:="${_SUSE_LEAP_SOURCE}"}
 
-	_summary_message="The virtual machine (Debian_${vm_usecase}_${SRVFUNC}_${CONFIG}_${RANDOM}) \n
+	_summary_message="The virtual machine (VDI_SUSE_"$CONFIG"_"$RANDOM") \n
 	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
 	🔧 - And Using this source for the packages and files to download: \n
 	🌎 - ${source_url} \n
-	🌎 - ${vm_kernel} \n
-	🌎 - ${vm_initrd} \n
+	🌎 - ${vm_kernel:="DEFAULT"} \n
+	🌎 - ${vm_initrd:="DEFAULT"} \n
 	✅ - Using the network: ${virt_net} \n
 	✅ - Memory: ${3:-2048} \n
 	✅ - CPU's: ${2:-2} \n
@@ -5446,6 +5465,8 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 		--extra-args "AutoYaST=file:///$(basename $PRESEED_FILE)"   \
 		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 22 85 \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
+
+	cleanup_and_finish
 }
 
 
@@ -5618,7 +5639,7 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 		iso="$permanent_download_dir/$iso_filename"
 	fi
 
-	_summary_message="The virtual machine (Debian_${vm_usecase}_${SRVFUNC}_${CONFIG}_${RANDOM}) \n
+	_summary_message="The virtual machine (VDI_${CONFIG}-${tgt_ubuntu_ver}-${RANDOM}) \n
 	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
 	🔧 - And Using this source for the packages and files to download: \n
 	🌎 - ${source_url} \n
@@ -8276,6 +8297,23 @@ set_colors ()
 	⣿⣿⣿⣧⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢿⣿⠟⠀⠀⠀⢀⣼⣿⣿⣿ \n
 	⣿⣿⣿⣿⣿⣶⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⣶⣿⣿⣿⣿⣿ \n
 	⣿⣿⣿⣿⣿⣿⣿⣿⣶⣤⣄⣀⡀⠀⠀⠀⠀⢀⣀⣠⣤⣶⣿⣿⣿⣿⣿⣿⣿⣿ \n
+	"
+	fedoralogo="
+	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿ \n
+	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿ \n
+	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿ \n
+	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡟⠁⠀⠀⠈⠙⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿ \n
+	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡟⠀⠀⠀⠀⠀⠀⠀⠙⢿⣭⡉⠻⣿⣿⣿⣿⣿⣿⣿ \n
+	⣿⡏⠉⠈⠉⠉⠛⠻⣿⠟⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠁⠀⢹⣿⣿⣿⣿⣿⣿ \n
+	⣿⡀⠀⠀⠀⠀⢠⡾⠻⣦⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⣿⣿⣿⣿⣿⣿ \n
+	⣿⣧⠀⠀⠀⠀⠘⢷⣄⡈⠙⠻⢶⣤⣀⡀⠀⠀⠀⠀⠀⠀⠀⣿⣿⣿⣿⣿⣿⣿ \n
+	⣿⣿⣷⣄⠀⠀⠀⠀⠉⠻⢷⣦⣄⡈⠉⠛⠻⠷⢶⣤⣤⣤⣼⡟⠿⠿⢿⣿⣿⣿ \n
+	⣿⣿⣿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠉⠙⠛⠲⠶⣦⣤⣤⣤⣀⣼⡇⠀⠀⠀⠈⢿⣿ \n
+	⣿⣿⣿⣿⣿⣿⣿⣿⣷⣦⣄⣀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠉⠁⠀⠀⠀⠀⠀⠘⣿ \n
+	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣶⣦⣤⣄⣰⣿⣶⣄⡀⠀⠀⠀⠀⣀⣴⣿ \n
+	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿ \n
+	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿ \n
+	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿ \n
 	"
 
 	chess="♟️ ♔ ♕ ♖ ♗ ♘ ♙ ♚ ♛ ♜ ♝ ♞ ♟"
