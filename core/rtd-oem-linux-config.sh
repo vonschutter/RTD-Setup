@@ -160,7 +160,7 @@ else
 	sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
 	rtd_wait_for_internet_availability
 	rtd_oem_reset_default_environment_config
-	write_information "Ensuring that all software is updated before continuing. "
+	# write_information "Ensuring that all software is updated before continuing. "
 	# rtd_update_system
 
 	if [[ -z "$(ps aux |grep X |grep  -v grep)" ]]; then
