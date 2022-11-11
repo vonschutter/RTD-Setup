@@ -754,13 +754,12 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 	if  ps -e |grep "plasmashell" ; then
 
 		write_information "${FUNCNAME[0]}: Detected KDE UI!"
-		# Download and Set Wallpaper...
-		_CACHE_DIR="${_RTDCACHE:="/opt/rtd/cache"}"
-		sudo -H -u $SUDO_USER DISPLAY=$DISPLAY source /opt/rtd/core/_rtd_library ; rtd_oem_kde_set_wallpaper "${_WALLPAPER_DIR}/Wayland.jpg"
+		ln -s ${_WALLPAPER_DIR}/* ${_XDG_WALLPAPER_DIR}/
+		sudo -H -u $SUDO_USER DISPLAY=$DISPLAY source ${_CORE_DIR}/_rtd_library ; rtd_oem_kde_set_wallpaper "${_WALLPAPER_DIR}/Wayland.jpg"
 
 		mkdir -p ${_CACHE_DIR} && if [[ -e ${_CACHE_DIR}/master.zip ]] ; then rm ${_CACHE_DIR}/master.zip ; fi || write_error "Unable to create ${_CACHE_DIR}"
-		wget https://github.com/vinceliuice/vimix-kde/archive/master.zip  -P /opt/rtd/cache || write_error "Unable to download https://github.com/vinceliuice/vimix-kde/archive/master.zip"
-		unzip -o /opt/rtd/cache/master.zip -d /opt/rtd/cache && pushd /opt/rtd/cache/vimix-kde-master && ./install.sh && popd ; rm ${_CACHE_DIR}/master.zip
+		wget https://github.com/vinceliuice/vimix-kde/archive/master.zip  -P ${_CACHE_DIR}/ || write_error "Unable to download https://github.com/vinceliuice/vimix-kde/archive/master.zip"
+		unzip -o ${_CACHE_DIR}/master.zip -d ${_CACHE_DIR} && pushd ${_CACHE_DIR}/vimix-kde-master && ./install.sh && popd ; rm ${_CACHE_DIR}/master.zip
 
 		7z x  ${_THEME_DIR}/vimix-icon-themes.7z -o${_THEME_DIR} && pushd ${_THEME_DIR}/vimix-icon-themes && ./install.sh && popd
 		for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done

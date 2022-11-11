@@ -5371,8 +5371,8 @@ make_kvm_virtual_machine_now_from_fedora_org ()
                 --initrd-inject="${PRESEED_FILE}" \
 		--location="http://www.nic.funet.fi/pub/Linux/INSTALL/fedora/linux/releases/${FedoraVersion}/Everything/x86_64/os/" \
 		--extra-args "inst.ks=file:/$(basename $PRESEED_FILE)" \
-		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built. You may attach to this server and see the progress at IP: $(hostname -I))" 10 60 \
-	|| read -p "An ERROR has occurred. Please press [ENTER] to continue..." \
+		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 22 85 \
+	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
 
 }
@@ -5421,6 +5421,18 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 
 	# Discover if the appropriate VM net interface is (default or br'0 - n')
 	VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
+	: ${source_url:="${_SUSE_LEAP_SOURCE}"}
+
+	_summary_message="The virtual machine (Debian_${vm_usecase}_${SRVFUNC}_${CONFIG}_${RANDOM}) \n
+	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
+	🔧 - And Using this source for the packages and files to download: \n
+	🌎 - ${source_url} \n
+	🌎 - ${vm_kernel} \n
+	🌎 - ${vm_initrd} \n
+	✅ - Using the network: ${virt_net} \n
+	✅ - Memory: ${3:-2048} \n
+	✅ - CPU's: ${2:-2} \n
+	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))"
 
 	# create image and run installer
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name VDI_SUSE_"$CONFIG"_"$RANDOM" \
@@ -5432,10 +5444,8 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 		--initrd-inject="${PRESEED_FILE}" \
 		--location='https://download.opensuse.org/distribution/openSUSE-current/repo/oss/' \
 		--extra-args "AutoYaST=file:///$(basename $PRESEED_FILE)"   \
-		--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
-
-	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built. You may attach to this server and see the progress at IP: $(hostname -I))" 10 60
-
+		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 22 85 \
+	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 }
 
 
@@ -5504,16 +5514,15 @@ make_kvm_virtual_machine_now_from_debian_org ()
 	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
 
 	_summary_message="The virtual machine (Debian_${vm_usecase}_${SRVFUNC}_${CONFIG}_${RANDOM}) \n
-	📋 -	Using the instructions in PRESEED: ${PRESEED_FILE} \n
-	🔧 -	And Using this source for the packages and files to download: \n
-	🌎 -	"${DEBIAN_SOURCE_URL}" \n
-	🔧 -	Using the following kernel and initrd: \n
-	🌎 -	${vm_kernel} \n
-	🌎 -	${vm_initrd} \n
-	✅ -	Using the network: ${virt_net} \n
-	✅ -	Memory: ${3:-2048} \n
-	✅ -	CPU's: ${2:-2} \n
-	✅ -	Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))"
+	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
+	🔧 - And Using this source for the packages and files to download: \n
+	🌎 - ${source_url} \n
+	🌎 - ${vm_kernel} \n
+	🌎 - ${vm_initrd} \n
+	✅ - Using the network: ${virt_net} \n
+	✅ - Memory: ${3:-2048} \n
+	✅ - CPU's: ${2:-2} \n
+	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))"
 
 
 	# create image and run installer
@@ -5528,15 +5537,14 @@ make_kvm_virtual_machine_now_from_debian_org ()
 		--initrd-inject="${PRESEED_FILE}" \
 		--install kernel="${vm_kernel}",initrd="${vm_initrd}" \
 		--extra-args "ks=file:/$(basename $PRESEED_FILE) ${ui_diplay_style}" \
-		--noautoconsole || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
+		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 22 85 \
+	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
 	unset vm_kernel
 	unset vm_initrd
 	unset vm_usecase
 	unset ui_diplay_style
 	cleanup_and_finish nomessage
-
-	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 20 80
 }
 
 
@@ -5610,6 +5618,17 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 		iso="$permanent_download_dir/$iso_filename"
 	fi
 
+	_summary_message="The virtual machine (Debian_${vm_usecase}_${SRVFUNC}_${CONFIG}_${RANDOM}) \n
+	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
+	🔧 - And Using this source for the packages and files to download: \n
+	🌎 - ${source_url} \n
+	🌎 - ${vm_kernel} \n
+	🌎 - ${vm_initrd} \n
+	✅ - Using the network: ${virt_net} \n
+	✅ - Memory: ${3:-2048} \n
+	✅ - CPU's: ${2:-2} \n
+	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))"
+
 	"${bin_virt_install}" --name VDI_${CONFIG}-${tgt_ubuntu_ver}-${RANDOM} \
 		--vcpus "${2:-2}" \
 		--memory "${3:-2048}" \
@@ -5623,20 +5642,12 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 		localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity quiet splash noprompt noshell" \
 		--initrd-inject="$PRESEED_FILE" \
 		--initrd-inject="$( dirname ${PRESEED_FILE})/ks.cfg" \
-		--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
+		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 22 85 \
+	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
 	unset tgt_ubuntu_ver
 	unset iso_filename
 	unset ubuntu_iso_url
-	#
-	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built: \n
-	📋 -	Using the instructions in PRESEED: ${PRESEED_FILE} \n
-	🔧 -	And Using this source for the packages and files to download: \n
-	🌎 -	"${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \n
-	✅ -	Using the network: ${virt_net} \n
-	✅ -	Memory: ${3:-2048} \n
-	✅ -	CPU's: ${2:-2} \n
-	✅ -	Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))" 20 80
 }
 
 
@@ -5779,8 +5790,9 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		--os-variant=win10 \
 		--cdrom "${WindowsMedia}" \
 		--disk "${WindowsInstructions}",device=floppy \
-		--livecd --noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
-	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built. You may attach to this server and see the progress at IP: $(hostname -I))" 10 60
+		--livecd \
+		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 22 85 \
+	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 }
 
 
@@ -5833,16 +5845,16 @@ make_kvm_virtual_machine_now_from_iso ()
 		fi
 	# Discover if the appropriate VM net interface is (default or br'0 - n')
 	VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
-
-	echo	"--vcpus ${2:-"2"}"
-	echo	"--memory ${3:-"2048"}"
-	echo	"--network ${VIRT_NET}"
-	echo	"--disk size=${4:-"30"}"
-	echo	"--os-variant=${1:-"ubuntu20.04"}"
-	echo	"--location=${TARGET_ISO}"
-	echo	"--cdrom=${TARGET_ISO}"
-	echo	"--initrd-inject=$PRESEED_FILE"
-	echo	"--extra-args ks=file:/$(basename $PRESEED_FILE)"
+	_summary_message="
+	--vcpus ${2:-"2"}
+	--memory ${3:-"2048"}
+	--network ${VIRT_NET}
+	--disk size=${4:-"30"}
+	--os-variant=${1:-"ubuntu20.04"}
+	--location=${TARGET_ISO}
+	--cdrom=${TARGET_ISO}
+	--initrd-inject=$PRESEED_FILE
+	--extra-args ks=file:/$(basename $PRESEED_FILE)"
 
 
 
@@ -5855,9 +5867,8 @@ make_kvm_virtual_machine_now_from_iso ()
 		--os-variant="${1:-debian10}" \
 		--cdrom="${TARGET_ISO}" \
 		--cloud-init meta-data=
-		--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
-	# $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built. You may attach to this server and see the progress at IP: $(hostname -I)" 10 60
-	# clear
+		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 22 85 \
+	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 }
 
 
