@@ -2501,7 +2501,9 @@ rtd_oem_kde_set_wallpaper ()
 		d.writeConfig('$write', 'file://${full_image_path}')
 	}"
 
-	qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "${wallpaper_set_script}"
+
+	hash qdbus || ${_qdbus="$(find /usr/lib/* -name "qdbus" |grep qbus)"} && ${_qdbus="qdbus"}
+	${_qdbus} org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "${wallpaper_set_script}"
 	kwriteconfig5 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key Image "file://$full_image_path"
 }
 
