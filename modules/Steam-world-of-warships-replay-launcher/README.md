@@ -1,7 +1,7 @@
 # Steam World of Warships Replay Launcher
 < [Back](https://github.com/vonschutter/RTD-Setup/blob/main/README.md) |
 
-![Media Header](media_files/header.jpg "Executing the Script")
+![Media Header](media_files/header.png "Executing the Script")
 The minecraft server launcher script. Setting up your own Minecraft server on Ubuntu has never been easier! Just launch the script and it will do the rest!
 
 ## Purpose:
