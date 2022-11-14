@@ -1,10 +1,8 @@
 # Steam World of Warships Replay Launcher
 < [Back](https://github.com/vonschutter/RTD-Setup/blob/main/README.md) |
 
-![Media Header](Media_files/header-time.jpg "Executing the Script")
+![Media Header](media_files/header.jpg "Executing the Script")
 The minecraft server launcher script. Setting up your own Minecraft server on Ubuntu has never been easier! Just launch the script and it will do the rest!
-
-![Screenshot](Media_Files/Screenshot.png?raw=true "Executing the Script")
 
 ## Purpose:
 Purpose: The purpose of this script is to simplify watching your replays.
@@ -14,6 +12,10 @@ script helps facilitate watching your WoW's replays.
 
 Usage:	Simply execute this script to accomplish this task. No parameters required.
 Source: https://developer.valvesoftware.com/wiki/Command_Line_Options#Command-Line_Parameters_2
+
+![Screenshot](media_files/screenshot.png "Executing the Script")
+
+
 
 ## How to use this script.
 To use this script just download this script (rtd-steam-world-of-warships-replay-launcher)
