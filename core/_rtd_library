@@ -5359,7 +5359,7 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 	done
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
-	VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
+	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
 	FedoraVersion=$( $RTD_GUI --title "Select Release Version of Fedora" --inputbox "Please pick an available Fedoara version by entering it below. \
 	If you are not sure just let me choose for you... \n ${fedoralogo} "  25 110 "${_DEFAULT_FEDORA_VER}" 3>&1 1>&2 2>&3)
@@ -5376,9 +5376,9 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
 	🔧 - And Using this source for the packages and files to download: \n
 	🌎 - ${source_url} \n
-	🌎 - ${vm_kernel:="DEFAULT"} \n
-	🌎 - ${vm_initrd:="DEFAULT"} \n
-	✅ - Using the network: ${virt_net} \n
+	🌎 - ${vm_kernel:="Kernel DEFAULT"} \n
+	🌎 - ${vm_initrd:="Initrd DEFAULT"} \n
+	✅ - Using the network: ${virt_net:=default} \n
 	✅ - Memory: ${3:-2048} \n
 	✅ - CPU's: ${2:-2} \n
 	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))"
@@ -5386,15 +5386,16 @@ make_kvm_virtual_machine_now_from_fedora_org ()
         "${BIN_VIRT_INSTALL}" --connect qemu:///system --name VDI_fedora_"${CONFIG}"_"${RANDOM}" \
                 --vcpus "${2:-2}" \
                 --memory "${3:-2048}" \
-                --network "$VIRT_NET" \
+                --network "$virt_net" \
                 --disk size="${4:-40}" \
 		--os-variant="fedora30" \
                 --initrd-inject="${PRESEED_FILE}" \
-		--location="https://dl.fedoraproject.org/pub/fedora/linux/releases/${FedoraVersion}/Everything/x86_64/os/" \
+		--location="${source_url}" \
 		--extra-args "inst.ks=file:/$(basename $PRESEED_FILE)" \
-		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 22 85 \
+		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
+	for i in  PRESEED_FILE vm_kernel vm_initrd source_url CONFIG FedoraVersion ; do unset $i ; done
 	# http://www.nic.funet.fi/pub/Linux/INSTALL/fedora/linux/releases/${FedoraVersion}/Everything/x86_64/os/
 }
 
@@ -5441,7 +5442,7 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
 
 	# Discover if the appropriate VM net interface is (default or br'0 - n')
-	VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
+	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
 	: ${source_url:="${_SUSE_LEAP_SOURCE}"}
 
 	_summary_message="The virtual machine (VDI_SUSE_"$CONFIG"_"$RANDOM") \n
@@ -5459,16 +5460,16 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name VDI_SUSE_"$CONFIG"_"$RANDOM" \
 		--vcpus "${2:-2}" \
 		--memory "${3:-2048}" \
-		--network "$VIRT_NET" \
+		--network "${virt_net}" \
 		--disk size="${4:-40}" \
 		--os-variant=opensusetumbleweed \
 		--initrd-inject="${PRESEED_FILE}" \
-		--location='https://download.opensuse.org/distribution/openSUSE-current/repo/oss/' \
-		--extra-args "AutoYaST=file:///$(basename $PRESEED_FILE)"   \
-		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 22 85 \
+		--location="${source_url}" \
+		--extra-args "AutoYaST=file:///$(basename ${PRESEED_FILE})"   \
+		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
-	cleanup_and_finish
+	for i in  PRESEED_FILE vm_kernel vm_initrd source_url CONFIG ; do unset $i ; done
 }
 
 
@@ -5535,6 +5536,7 @@ make_kvm_virtual_machine_now_from_debian_org ()
 
 	write_status "🔎 	- Discovering what the appropriate VM net interface is (default or br'0 - n')"
 	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
+	: ${source_url:="${_DEBIAN_SOURCE_URL}"}
 
 	_summary_message="The virtual machine (Debian_${vm_usecase}_${SRVFUNC}_${CONFIG}_${RANDOM}) \n
 	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
@@ -5553,21 +5555,17 @@ make_kvm_virtual_machine_now_from_debian_org ()
 		--vcpus "${2:-2}" \
 		--memory "${3:-2048}" \
 		--network "${virt_net}" \
-		--location="${_DEBIAN_SOURCE_URL}" \
+		--location="${source_url}" \
 		--disk size="${4:-40}" \
 		--os-variant="${1:-debian10}" \
 		--video "virtio" --channel "spicevmc" \
 		--initrd-inject="${PRESEED_FILE}" \
 		--install kernel="${vm_kernel}",initrd="${vm_initrd}" \
 		--extra-args "ks=file:/$(basename $PRESEED_FILE) ${ui_diplay_style}" \
-		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 22 85 \
+		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
-	unset vm_kernel
-	unset vm_initrd
-	unset vm_usecase
-	unset ui_diplay_style
-	cleanup_and_finish nomessage
+	for i in  PRESEED_FILE vm_kernel vm_initrd source_url CONFIG ui_diplay_style ; do unset $i ; done
 }
 
 
@@ -5665,12 +5663,9 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 		localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity quiet splash noprompt noshell" \
 		--initrd-inject="$PRESEED_FILE" \
 		--initrd-inject="$( dirname ${PRESEED_FILE})/ks.cfg" \
-		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 22 85 \
+		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
-
-	unset tgt_ubuntu_ver
-	unset iso_filename
-	unset ubuntu_iso_url
+	for i in  PRESEED_FILE vm_kernel vm_initrd source_url CONFIG tgt_ubuntu_ver ubuntu_iso_url iso_filename ; do unset $i ; done
 }
 
 
@@ -5765,7 +5760,7 @@ make_kvm_virtual_machine_now_from_microsoft ()
 	: ${CONFIG:="Workstation"}
 	: ${WindowsMedia:="/var/lib/libvirt/boot/Win10_English_x64.iso"}
 	: ${WindowsInstructions:="/var/lib/libvirt/boot/win$(date +%Y-%m-%d-%H-%M-%S-%s).img"}
-	: ${VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
+	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
 	: ${AutoUnattend="/tmp/autounattend.xml"}
 	: ${PostTasks="/tmp/rtd-me-sh.cmd"}
 
@@ -5802,11 +5797,22 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		mcopy -i ${WindowsInstructions} ${AutoUnattend} ::/ || rtd_oem_pause 1
 	fi
 
+	_summary_message="The virtual machine (VDI_Windows10_"${CONFIG}"_"${RANDOM}") \n
+	📋 - Using the instructions in: ${AutoUnattend} \n
+	🔧 - And Using this source for the packages and files to download: \n
+	🌎 - ${WindowsMedia} \n
+	🌎 - ${WindowsInstructions} \n
+	🌎 - ${PostTasks} \n
+	✅ - Using the network: ${virt_net} \n
+	✅ - Memory: ${3:-2048} \n
+	✅ - CPU's: ${2:-2} \n
+	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))"
+
 	write_status "Creating and starting Virtual machine... "
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name VDI_Windows10_"${CONFIG}"_"${RANDOM}" \
 		--vcpus "${2:-2}" \
 		--memory "${3:-2048}" \
-		--network "${VIRT_NET}" \
+		--network "${virt_net}" \
 		--video qxl \
 		--disk size="${4:-40}" \
 		--os-type windows \
@@ -5814,7 +5820,7 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		--cdrom "${WindowsMedia}" \
 		--disk "${WindowsInstructions}",device=floppy \
 		--livecd \
-		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 22 85 \
+		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 }
 
@@ -5867,11 +5873,11 @@ make_kvm_virtual_machine_now_from_iso ()
 			clear
 		fi
 	# Discover if the appropriate VM net interface is (default or br'0 - n')
-	VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
+	virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
 	_summary_message="
 	--vcpus ${2:-"2"}
 	--memory ${3:-"2048"}
-	--network ${VIRT_NET}
+	--network ${virt_net}
 	--disk size=${4:-"30"}
 	--os-variant=${1:-"ubuntu20.04"}
 	--location=${TARGET_ISO}
@@ -5885,7 +5891,7 @@ make_kvm_virtual_machine_now_from_iso ()
 	"${BIN_VIRT_INSTALL}" --name VDI_Ubuntu_"$CONFIG"_"$RANDOM" \
 		--vcpus "${2:-2}" \
 		--memory "${3:-2048}" \
-		--network "${VIRT_NET}" \
+		--network "${virt_net}" \
 		--disk size="${4:-30}" \
 		--os-variant="${1:-debian10}" \
 		--cdrom="${TARGET_ISO}" \
@@ -7727,17 +7733,10 @@ generate_fedora_ks_cfg_file ()
 # Returns: 0/1
 # Usage: generate_fedora_ks_cfg_file $(mktemp) workstation
 # End of documentation
-	FILE=${FILE="$1"}
-	CONFIG=${CONFIG="$2"}
-	FedoraVersion=${FedoraVersion:-"35"}
+	: ${FILE="$1"}
+	: ${CONFIG="$2"}
+	: ${FedoraVersion:-"36"}
 	write_host --cyan "Creating KS.CFG Instructions (txt): ${FILE}"
-
-	# repo --name=fedora-updates --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f${FedoraVersion}&arch=x86_64" --cost=0
-	# repo --name=rpmfusion-free --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-${FedoraVersion}&arch=x86_64" --includepkgs=rpmfusion-free-release
-	# repo --name=rpmfusion-free-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-updates-released-${FedoraVersion}&arch=x86_64" --cost=0
-	# repo --name=rpmfusion-nonfree --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-${FedoraVersion}&arch=x86_64" --includepkgs=rpmfusion-nonfree-release
-	# repo --name=rpmfusion-nonfree-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-updates-released-${FedoraVersion}&arch=x86_64" --cost=0
-	# repo --name=google-chrome --install --baseurl="https://dl.google.com/linux/chrome/rpm/stable/x86_64" --cost=0
 
 	if [[ "${CONFIG}" == "ssh-server" ]]; then
 		write_information "Selected configuration is ssh-server..."
@@ -7780,6 +7779,9 @@ generate_fedora_ks_cfg_file ()
 		%packages --retries 5 --timeout 20
 		openssh-server
 		spice-vdagent
+		git
+		curl
+		dialog
 		%end
 		KS_EOF
 		return
@@ -7824,6 +7826,9 @@ generate_fedora_ks_cfg_file ()
 		%packages --retries 5 --timeout 20
 		openssh-server
 		spice-vdagent
+		git
+		curl
+		dialog
 		ansible
 		%end
 		KS_EOF
@@ -7858,6 +7863,8 @@ generate_fedora_ks_cfg_file ()
 		openssh-server
 		spice-vdagent
 		git
+		curl
+		dialog
 		%end
 
 		# Post-installation Script
@@ -7948,6 +7955,8 @@ generate_autoyast_file ()
 
 		<packages config:type="list">
 			<package>wget</package>
+			<package>curl</package>
+			<package>dialog</package>
 			<package>vim</package>
 			<package>spice-vdagent</package>
 			<package>git</package>
@@ -8007,6 +8016,9 @@ git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd
 chmod 755 /opt/rtd/core/rtd-oem-enable-config.sh
 /opt/rtd/core/rtd-oem-enable-config.sh
 cp *.xml /opt/rtd/
+sudo zypper ar -cfp 90 ${_SUSE_PACKMAN_LEAP} packman
+zypper --gpg-auto-import-keys refresh
+zypper dup --from packman -y --force-resolution
 ]]>
 		</source>
 	      </script>
@@ -8258,74 +8270,7 @@ set_colors ()
 	GREEN="$green"
 	BLUE="$blue"
 
-	music="
-	╔══╗ ♫ \n
-	║██║ ♪♪ \n
-	║██║♫♪ \n
-	║ ◎♫♪♫ \n
-	╚══╝ Turn Up The Music!!! \n
-	"
 
-	picachu="
-	⢀⣠⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀⠀⣠⣤⣶⣶ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀⢰⣿⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧⣀⣀⣾⣿⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⡏⠉⠛⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⣿ \n
-	⣿⣿⣿⣿⣿⣿⠀⠀⠀⠈⠛⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠛⠉⠁⠀⣿ \n
-	⣿⣿⣿⣿⣿⣿⣧⡀⠀⠀⠀⠀⠙⠿⠿⠿⠻⠿⠿⠟⠿⠛⠉⠀⠀⠀⠀⠀⣸⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣷⣄⠀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣴⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⣿⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠠⣴⣿⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⡟⠀⠀⢰⣹⡆⠀⠀⠀⠀⠀⠀⣭⣷⠀⠀⠀⠸⣿⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⠃⠀⠀⠈⠉⠀⠀⠤⠄⠀⠀⠀⠉⠁⠀⠀⠀⠀⢿⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⢾⣿⣷⠀⠀⠀⠀⡠⠤⢄⠀⠀⠀⠠⣿⣿⣷⠀⢸⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⡀⠉⠀⠀⠀⠀⠀⢄⠀⢀⠀⠀⠀⠀⠉⠉⠁⠀⠀⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⣧⠀⠀⠀⠀⠀⠀⠀⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢹⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⣿⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿ \n
-	"
-
-	ubuntulogo="
-	⣿⣿⣿⣿⣿⣿⣿⣿⠿⠛⠋⠉⠁⠀⠀⠀⠀⠈⠉⠙⠛⠿⣿⣿⣿⣿⣿⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⠿⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠿⣿⣿⣿⣿⣿ \n
-	⣿⣿⣿⡟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣾⣿⣦⠀⠀⠀⠈⢻⣿⣿⣿ \n
-	⣿⣿⠏⠀⠀⠀⠀⠀⠀⠀⠀⢠⣶⣶⣾⣷⣶⣆⠸⣿⣿⡟⠀⠀⠀⠀⠀⠹⣿⣿ \n
-	⣿⠃⠀⠀⠀⠀⠀⠀⣠⣾⣷⡈⠻⠿⠟⠻⠿⢿⣷⣤⣤⣄⠀⠀⠀⠀⠀⠀⠘⣿ \n
-	⡏⠀⠀⠀⠀⠀⠀⣴⣿⣿⠟⠁⠀⠀⠀⠀⠀⠀⠈⠻⣿⣿⣦⠀⠀⠀⠀⠀⠀⢹ \n
-	⠁⠀⠀⢀⣤⣤⡘⢿⣿⡏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢹⣿⣿⡇⠀⠀⠀⠀⠀⠈ \n
-	⠀⠀⠀⣿⣿⣿⡇⢸⣿⡁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢈⣉⣉⡁⠀⠀⠀⠀⠀⠀ \n
-	⡀⠀⠀⠈⠛⠛⢡⣾⣿⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣸⣿⣿⡇⠀⠀⠀⠀⠀⢀ \n
-	⣇⠀⠀⠀⠀⠀⠀⠻⣿⣿⣦⡀⠀⠀⠀⠀⠀⠀⢀⣴⣿⣿⠟⠀⠀⠀⠀⠀⠀⣸ \n
-	⣿⡄⠀⠀⠀⠀⠀⠀⠙⢿⡿⢁⣴⣶⣦⣴⣶⣾⡿⠛⠛⠋⠀⠀⠀⠀⠀⠀⢠⣿ \n
-	⣿⣿⣆⠀⠀⠀⠀⠀⠀⠀⠀⠘⠿⠿⢿⡿⠿⠏⢰⣿⣿⣧⠀⠀⠀⠀⠀⣰⣿⣿ \n
-	⣿⣿⣿⣧⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢿⣿⠟⠀⠀⠀⢀⣼⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⣶⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⣶⣿⣿⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⣶⣤⣄⣀⡀⠀⠀⠀⠀⢀⣀⣠⣤⣶⣿⣿⣿⣿⣿⣿⣿⣿ \n
-	"
-	fedoralogo="
-	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡟⠁⠀⠀⠈⠙⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡟⠀⠀⠀⠀⠀⠀⠀⠙⢿⣭⡉⠻⣿⣿⣿⣿⣿⣿⣿ \n
-	⣿⡏⠉⠈⠉⠉⠛⠻⣿⠟⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠁⠀⢹⣿⣿⣿⣿⣿⣿ \n
-	⣿⡀⠀⠀⠀⠀⢠⡾⠻⣦⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⣿⣿⣿⣿⣿⣿ \n
-	⣿⣧⠀⠀⠀⠀⠘⢷⣄⡈⠙⠻⢶⣤⣀⡀⠀⠀⠀⠀⠀⠀⠀⣿⣿⣿⣿⣿⣿⣿ \n
-	⣿⣿⣷⣄⠀⠀⠀⠀⠉⠻⢷⣦⣄⡈⠉⠛⠻⠷⢶⣤⣤⣤⣼⡟⠿⠿⢿⣿⣿⣿ \n
-	⣿⣿⣿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠉⠙⠛⠲⠶⣦⣤⣤⣤⣀⣼⡇⠀⠀⠀⠈⢿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⣷⣦⣄⣀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠉⠁⠀⠀⠀⠀⠀⠘⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣶⣦⣤⣄⣰⣿⣶⣄⡀⠀⠀⠀⠀⣀⣴⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿ \n
-	"
-
-	chess="♟️ ♔ ♕ ♖ ♗ ♘ ♙ ♚ ♛ ♜ ♝ ♞ ♟"
-	colorcircle="🔴 🟠 🟡 🟢 🔵 🟣 🟤"
-	colorsquares=" 🟥 🟧 🟨 🟩 🟦 🟪 🟫"
-	#⏰ 	⏱ 	⏲ 	⏳ 	⏴ 	⏵ 	⏶ 	⏷ 	⏸ 	⏹ 	⏺
-	#⏩ 	⏪ 	⏫ 	⏬ 	⏭ 	⏮ 	⏯
-	# ☔ 	☕ 	☖ 	☗ 	☘ 	☙ 	☚ 	☛ 	☜ 	☝ 	☞ 	☟
-	# ♰ 	♱ 	♲ 	♳ 	♴ 	♵ 	♶ 	♷ 	♸ 	♹ 	♺ 	♻ 	♼ 	♽ 	♾ 	♿
-	# ⚐ 	⚑ 	⚒ 	⚓ 	⚔ 	⚕ 	⚖ 	⚗ 	⚘ 	⚙ 	⚚ 	⚛ 	⚜ 	⚝ 	⚞ 	⚟
 }
 
 

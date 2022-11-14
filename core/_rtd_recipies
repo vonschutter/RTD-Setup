@@ -740,7 +740,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		# the OEM tweaks to the UI. If this task sequence is run on a system by a user on a system not
 		# built by the unattended OEM process, then these changes sould only be implemented for the user
 		# running this task.
-		if [[ -f /opt/rtd/log/task.sh.log ]] ; then
+		if [[ -f /opt/rtd/log/ ]] ; then
 			write_information "THis system was built by an OEM process: copying tweaks for all new users..."
 			mkdir -p /etc/skel/.config
 			cp -r /home/${SUDO_USER}/.config/dconf /etc/skel/.config/dconf
@@ -755,7 +755,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 
 		write_information "${FUNCNAME[0]}: Detected KDE UI!"
 		ln -s ${_WALLPAPER_DIR}/* ${_XDG_WALLPAPER_DIR}/
-		sudo -H -u $SUDO_USER DISPLAY=$DISPLAY source ${_CORE_DIR}/_rtd_library ; rtd_oem_kde_set_wallpaper "${_WALLPAPER_DIR}/Wayland.jpg"
+		sudo -H -u $SUDO_USER source ${_CORE_DIR}/_rtd_library ; rtd_oem_kde_set_wallpaper "${_WALLPAPER_DIR}/Wayland.jpg"
 
 		mkdir -p ${_CACHE_DIR} && if [[ -e ${_CACHE_DIR}/master.zip ]] ; then rm ${_CACHE_DIR}/master.zip ; fi || write_error "Unable to create ${_CACHE_DIR}"
 		wget https://github.com/vinceliuice/vimix-kde/archive/master.zip  -P ${_CACHE_DIR}/ || write_error "Unable to download https://github.com/vinceliuice/vimix-kde/archive/master.zip"

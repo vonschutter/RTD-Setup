@@ -149,7 +149,7 @@ check_rtd_library ()
 		# Critical failure: downloaded copy from github.com
 		source ./_rtd_library
 	else
-		# Abot condition: No mitigation steps worked.
+		# Abort condition: No mitigation steps worked.
 		echo -e "RTD functions NOT loaded!"
 		echo -e " "
 		echo -e "Cannot ensure that the correct functionality is available"
@@ -168,17 +168,13 @@ rtd_oem_check_inet_access ()
 {
 # Function to verrify internet availabiltiy.
 # The funciton will pause for 10 seconds by default, and will accept
-# an integer to indicate a non-decault time to pause.
+# an integer to indicate a non-deault time to pause.
 
 	_ARG=$1
-	if ! hash curl &>/dev/null; then
-		read -t 10 -p "N O T I C E ! --  Could not check for internet connectivity... Please install (curl) web crawler/downloader. Press [ENTER] to continue and [CTRL] + [C] to exit! Continuing in 10 seconds..."
+	if [[ -z "$_ARG" ]]; then
+		ping -c 1  8.8.8.8 &>/dev/null || ( read -p "N O T I C E ! -- NO INTERNET ACCESS: This script may require access to the internet to work properly! Press [ENTER] to continue and [CTRL] + [C] to exit!  " )
 	else
-		if [[ -z "$_ARG" ]]; then
-			ping -c 1  8.8.8.8 &>/dev/null || ( read -p "N O T I C E ! -- NO INTERNET ACCESS: This script may require access to the internet to work properly! Press [ENTER] to continue and [CTRL] + [C] to exit!  " )
-		else
-			ping -c 1  8.8.8.8 &>/dev/null || ( read -t ${1:-10} -p "N O T I C E ! -- NO INTERNET ACCESS: This script may require access to the internet to work properly! Press [ENTER] to continue and [CTRL] + [C] to exit!  Continuing in ${1:-10} seconds..." )
-		fi
+		ping -c 1  8.8.8.8 &>/dev/null || ( read -t ${1:-10} -p "N O T I C E ! -- NO INTERNET ACCESS: This script may require access to the internet to work properly! Press [ENTER] to continue and [CTRL] + [C] to exit!  Continuing in ${1:-10} seconds..." )
 	fi
 }
 
