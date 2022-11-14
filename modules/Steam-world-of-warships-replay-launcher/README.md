@@ -2,7 +2,7 @@
 < [Back](https://github.com/vonschutter/RTD-Setup/blob/main/README.md) |
 
 ![Media Header](media_files/header.png "Executing the Script")
-The minecraft server launcher script. Setting up your own Minecraft server on Ubuntu has never been easier! Just launch the script and it will do the rest!
+Watching your own World of Warships replays on Ubuntu or any other Linux distribution has never been easier! Just launch the script and it will do the rest!
 
 ## Purpose:
 Purpose: The purpose of this script is to simplify watching your replays.
