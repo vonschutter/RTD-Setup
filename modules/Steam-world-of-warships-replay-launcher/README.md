@@ -4,7 +4,7 @@
 ![Media Header](Media_files/header-time.jpg "Executing the Script")
 The minecraft server launcher script. Setting up your own Minecraft server on Ubuntu has never been easier! Just launch the script and it will do the rest!
 
-![Screenshot](Media_files/Screenshot.png?raw=true "Executing the Script")
+![Screenshot](Media_Files/Screenshot.png?raw=true "Executing the Script")
 
 ## Purpose:
 Purpose: The purpose of this script is to simplify watching your replays.
