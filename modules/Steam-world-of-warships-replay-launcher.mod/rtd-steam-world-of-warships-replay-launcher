@@ -15,7 +15,8 @@ GOTO :CMDSCRIPT
 #::	Purpose: The purpose of this script is to simplify watching your replays.
 #::		 As per the writing of this script World of Warships automatically stores the last 30
 #::		 replays on your system. There have been many posts asking hos to watch them so this
-#::		 script helps facilitate that.
+#::		 script helps facilitate that. Because a Windows user may be tempted to download this script
+#::		 this problem is handled in the header so no harm can come to the Windows user's PC.
 #::
 #::	Usage:	Simply execute this script to accomplish this task. No parameters required.
 #::		Source: https://developer.valvesoftware.com/wiki/Command_Line_Options#Command-Line_Parameters_2
@@ -68,8 +69,8 @@ if echo "$OSTYPE" |grep "linux" ; then
 		rtd::load_replays
 	else
 		echo "zenity is needed to select files... adding now..."
-		for i in apt dnf zypper ; do
-			if hash $i; then sudo $i install zenity ; fi
+		for i in zypper apt dnf ; do
+			if hash $i; then sudo $i install zenity || exit 1  ; fi
 		done
 		rtd::load_replays
 	fi
