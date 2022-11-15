@@ -302,6 +302,7 @@ Function InstallRTDProgs {
 	Write-Progress -Activity "-- Prerequisite Configuration" -CurrentOperation "Enabeling Software Management..." -Status "Core Setup..."
 	Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
 	choco install chocolatey-core.extension -y
+	choco install chocolateygui -y
 	Write-Progress -Activity "-- Prerequisite Configuration" -CurrentOperation "Enabeling Software Management..." -Status "Running O&O Shutup with Recommended Settings"
 	Import-Module BitsTransfer
 	Start-BitsTransfer -Source "https://raw.githubusercontent.com/ChrisTitusTech/win10script/master/ooshutup10.cfg" -Destination ooshutup10.cfg
