@@ -5820,7 +5820,7 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		--disk "${WindowsInstructions}",device=floppy \
 		--livecd \
                 --tpm default \
-                --boot uefi \
+                --boot uefi,loader_secure=no \
 		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 }
@@ -6476,7 +6476,6 @@ generate_autounattend_xml ()
                 <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
                 <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
                 <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
-                <ProtectYourPC>1</ProtectYourPC>
                 <UnattendEnableRetailDemo>false</UnattendEnableRetailDemo>
             </OOBE>
             <UserAccounts>
@@ -6510,27 +6509,27 @@ generate_autounattend_xml ()
 
 		<SynchronousCommand wcm:action="add">
 			<Description>Control Panel View</Description>
-			<Order>1</Order>
+			<Order>2</Order>
 			<CommandLine>reg add "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\ControlPanel" /v StartupPage /t REG_DWORD /d 1 /f</CommandLine>
 			<RequiresUserInput>true</RequiresUserInput>
 		</SynchronousCommand>
 
 		<SynchronousCommand wcm:action="add">
-			<Order>2</Order>
+			<Order>3</Order>
 			<Description>Control Panel Icon Size</Description>
 			<RequiresUserInput>false</RequiresUserInput>
 			<CommandLine>reg add "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\ControlPanel" /v AllItemsIconView /t REG_DWORD /d 1 /f</CommandLine>
 		</SynchronousCommand>
 
 		<SynchronousCommand wcm:action="add">
-			<Order>3</Order>
+			<Order>4</Order>
 			<RequiresUserInput>false</RequiresUserInput>
 			<CommandLine>cmd /C wmic useraccount where name="tangarora" set PasswordExpires=false</CommandLine>
 			<Description>Password Never Expires</Description>
 		</SynchronousCommand>
 
 		<SynchronousCommand wcm:action="add">
-			<Order>4</Order>
+			<Order>5</Order>
 			<RequiresUserInput>true</RequiresUserInput>
 			<CommandLine>"cmd a:\rtd-me.sh.cmd"</CommandLine>
 			<Description>Run Software install</Description>
@@ -6550,7 +6549,6 @@ generate_autounattend_xml ()
             <TimeZone>Central Standard Time</TimeZone>
         </component>
     </settings>
-    <cpi:offlineImage cpi:source="catalog://techsystem/x64/sources/install_windows 10 pro.clg" xmlns:cpi="urn:schemas-microsoft-com:cpi" />
 </unattend>
 EOF
 }
