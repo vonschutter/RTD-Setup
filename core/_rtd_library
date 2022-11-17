@@ -5612,6 +5612,7 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 
 	write_information "🔎 Retreive list of available Ubuntu versions..."
 	all_ubuntu_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
+	all_kubuntu_lts_versions=$(wget -O- cdimage.ubuntu.com/kubuntu/releases -q | perl -ne '/ (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu)
 
 	tgt_ubuntu_ver=$($RTD_GUI --title "Select Release Version of Ubuntu" --inputbox "Please pick an available ubuntu version by entering it below.
 	Long Term Support Versions to choose from are the following 👍: ${all_ubuntu_lts_versions[*]} You may also enter an inbetween release version
@@ -5755,24 +5756,36 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		check_dependencies $i &>/dev/null
 		count=$((count + 1))
 	done
-
+	
+	: ${target_winver="${1:-win10}"} || read -p "💥 - Failure to set variable target_winver" 
+	case $target_winver in
+		win11 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win11_English_x64.iso"} || read -p "💥 - Failure to set variable"
+			: ${uefi_option="--boot uefi,loader_secure=no"}  || read -p "💥 - Failure to set variable"
+			;;
+		win10 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win10_English_x64.iso"} || read -p "💥 - Failure to set variable" ;;
+		win10 )  : ${WindowsMedia="/var/lib/libvirt/boot/Win8_English_x64.iso"} || read -p "💥 - Failure to set variable" ;;
+		win7 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win7_English_x64v1.iso"} || read -p "💥 - Failure to set variable" ;;
+	esac
+	
 	: ${BIN_VIRT_INSTALL:="$(type -p virt-install)"}
 	: ${CONFIG:="Workstation"}
-	: ${WindowsMedia:="/var/lib/libvirt/boot/Win11_English_x64v1.iso"}
 	: ${WindowsInstructions:="/var/lib/libvirt/boot/win$(date +%Y-%m-%d-%H-%M-%S-%s).img"}
 	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
 	: ${AutoUnattend="/tmp/autounattend.xml"}
 	: ${PostTasks="/tmp/rtd-me-sh.cmd"}
-
-	write_information "Ensuring that install media is available to build a Windows VM..."
+	: ${cpu_count="${2:-2}"}
+	: ${mem_size="${3:-6000}"}
+	: ${disk_size="${4:-100}"}
+	: ${preferred_video="${5:-"virtio"}"}
+	
 	if [[ ! -e "${WindowsMedia}" ]]; then
 		if ( $RTD_GUI --backtitle "..$BRANDING" --title "Windows Install Media Needed" \
 			--no-button "NO: Just Cancel" \
 			--yes-button "OK: I am done upploading" \
-			--yesno "Windows install media was not found where expected ${WindowsMedia%/*} \n Please place a copy of it in /home/$SUDO_USER/Downloads/ and press [ OK ] \n Please name it Win**something**.iso" 20 90 );
+			--yesno "Windows install media was not found where expected ${WindowsMedia} \n Please place a copy of it in /home/$SUDO_USER/ and press [ OK ] \n Please name it Win**something**.iso" 20 90 );
 		then
-			if $(ls /home/$SUDO_USER/Downloads/Win*.iso >/dev/null ) ; then
-				mv -v /home/$SUDO_USER/Downloads/Win*.iso ${WindowsMedia}
+			if ls /home/$SUDO_USER/Win*.iso ; then
+				mv -v /home/$SUDO_USER/Win*.iso ${WindowsMedia} || rtd_oem_pause 1S
 			else
 				write_error "Could not find the file: /home/$SUDO_USER/Downloads/Win*.iso "
 				rtd_oem_pause 1
@@ -5783,7 +5796,6 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		fi
 	fi
 
-	write_information "Ensuring that instructions are available to build a Windows VM..."
 	if [[ ! -e "${WindowsInstructions}" ]]; then
 		write_information "Generate Windows Instruction media..."
 		mkfs.msdos -C ${WindowsInstructions} 1440 || rtd_oem_pause 1
@@ -5797,32 +5809,34 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		mcopy -i ${WindowsInstructions} ${AutoUnattend} ::/ || rtd_oem_pause 1
 	fi
 
-	_summary_message="The virtual machine (VDI_Windows10_"${CONFIG}"_"${RANDOM}") \n
+	_summary_message="The virtual machine (VDI_Windows${target_winver:(-2)}_${CONFIG}_${RANDOM}) \n
 	📋 - Using the instructions in: ${AutoUnattend} \n
 	🔧 - And Using this source for the packages and files to download: \n
 	🌎 - ${WindowsMedia} \n
 	🌎 - ${WindowsInstructions} \n
 	🌎 - ${PostTasks} \n
 	✅ - Using the network: ${virt_net} \n
-	✅ - Memory: ${3:-2048} \n
-	✅ - CPU's: ${2:-2} \n
-	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))"
+	✅ - Memory: ${mem_size} \n
+	✅ - CPU's: ${cpu_count} \n
+	✅ - Disk Size: ${disk_size} \n You may attach to this server and see the progress at IP: $(hostname -I))"
 
 	write_status "Creating and starting Virtual machine... "
-	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name VDI_Windows11_"${CONFIG}"_"${RANDOM}" \
-		--vcpus "${2:-2}" \
-		--memory "${3:-6000}" \
+	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "VDI_Windows${target_winver:(-2)}_${CONFIG}_${RANDOM}" \
+		--vcpus "${cpu_count}" \
+		--memory "${mem_size}" \
 		--network "${virt_net}" \
-		--video virtio \
-		--disk size="${4:-100}" \
-		--os-variant=win10 \
+		--video ${preferred_video} \
+		--disk size="${disk_size}" \
+		--os-variant="$( if osinfo-query -s -f os |grep ${target_winver} &>/dev/null ; then echo ${target_winver} ; else echo win10 ; fi )" \
 		--cdrom "${WindowsMedia}" \
 		--disk "${WindowsInstructions}",device=floppy \
 		--livecd \
                 --tpm default \
-                --boot uefi,loader_secure=no \
+                ${uefi_option} \
 		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
+	
+	for i in WindowsInstructions CONFIG WindowsMedia AutoUnattend PostTasks target_winver mem_size uefi_option cpu_count disk_size preferred_video ; do unset $i ; done
 }
 
 
@@ -6402,7 +6416,7 @@ generate_autounattend_xml ()
         <OSImage>
           <InstallTo>
             <DiskID>0</DiskID>
-            <PartitionID>3</PartitionID>
+            <PartitionID>2</PartitionID>
           </InstallTo>
         </OSImage>
       </ImageInstall>
@@ -6423,30 +6437,26 @@ generate_autounattend_xml ()
         </RunSynchronousCommand>
         <RunSynchronousCommand>
           <Order>3</Order>
-          <Path>cmd.exe /c echo CONVERT GPT &gt;&gt; X:\diskpart.txt</Path>
+          <Path>cmd.exe /c echo CREATE PARTITION PRIMARY SIZE=100 &gt;&gt; X:\diskpart.txt</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand>
           <Order>4</Order>
-          <Path>cmd.exe /c echo CREATE PARTITION EFI SIZE=100 &gt;&gt; X:\diskpart.txt</Path>
+          <Path>cmd.exe /c echo FORMAT QUICK FS=NTFS LABEL="System Reserved" &gt;&gt; X:\diskpart.txt</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand>
           <Order>5</Order>
-          <Path>cmd.exe /c echo FORMAT QUICK FS=FAT32 LABEL="System" &gt;&gt; X:\diskpart.txt</Path>
+          <Path>cmd.exe /c echo ACTIVE &gt;&gt; X:\diskpart.txt</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand>
           <Order>6</Order>
-          <Path>cmd.exe /c echo CREATE PARTITION MSR SIZE=16 &gt;&gt; X:\diskpart.txt</Path>
-        </RunSynchronousCommand>
-        <RunSynchronousCommand>
-          <Order>7</Order>
           <Path>cmd.exe /c echo CREATE PARTITION PRIMARY &gt;&gt; X:\diskpart.txt</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand>
-          <Order>8</Order>
+          <Order>7</Order>
           <Path>cmd.exe /c echo FORMAT QUICK FS=NTFS LABEL="Windows" &gt;&gt; X:\diskpart.txt</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand>
-          <Order>9</Order>
+          <Order>8</Order>
           <Path>cmd.exe /c diskpart /s X:\diskpart.txt &gt;&gt; X:\diskpart.log</Path>
         </RunSynchronousCommand>
       </RunSynchronous>
