@@ -5358,6 +5358,7 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 		count=$((count + 1))
 	done
 
+	
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
@@ -5371,7 +5372,9 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 
 	: ${FedoraVersion:="${_DEFAULT_FEDORA_VER}"}
 	: ${source_url:="https://dl.fedoraproject.org/pub/fedora/linux/releases/${FedoraVersion}/Everything/x86_64/os/"}
-
+	PRESEED_FILE="$( mktemp )"
+	generate_fedora_ks_cfg_file "${PRESEED_FILE}" workstation
+	
 	_summary_message="The virtual machine (VDI_fedora_"${CONFIG}"_"${RANDOM}") \n
 	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
 	🔧 - And Using this source for the packages and files to download: \n
@@ -7695,7 +7698,7 @@ generate_fedora_ks_cfg_file ()
 # End of documentation
 	: ${FILE="$1"}
 	: ${CONFIG="$2"}
-	: ${FedoraVersion:-"36"}
+	: ${FedoraVersion:="${3}"}
 	write_host --cyan "Creating KS.CFG Instructions (txt): ${FILE}"
 
 	if [[ "${CONFIG}" == "ssh-server" ]]; then
