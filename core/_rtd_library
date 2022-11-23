@@ -2366,7 +2366,7 @@ ensure_admin ()
 						0)
 							export HISTIGNORE='*sudo -S*'
 							echo ${token} | sudo -S -v || ensure_admin
-							sudo DISPLAY=$DISPLAY SUDO_USER=$USER /bin/bash ${0} $@ || rtd_oem_pause 1
+							sudo -E SUDO_USER=$USER /bin/bash ${0} $@ || rtd_oem_pause 1
 						;;
 						1) echo "Request cancelled" ;;
 						255) echo "[esc] Request aborted" ;;
@@ -2378,7 +2378,7 @@ ensure_admin ()
 					write_information "Dialog not found..."
 					write_warning "This script needs administrative access..."
 					xhost local:root
-					sudo DISPLAY=$DISPLAY SUDO_USER=$USER bash "${0}" "$@" || rtd_oem_pause 1
+					sudo -E SUDO_USER=$USER bash "${0}" "$@" || rtd_oem_pause 1
 					exit
 				fi
 			fi
@@ -2393,7 +2393,7 @@ ensure_admin ()
 					0)
 						export HISTIGNORE='*sudo -S*'
 						echo ${token} | sudo -S -v || ensure_admin
-						sudo DISPLAY=$DISPLAY SUDO_USER=$USER /bin/bash ${0} $@ || rtd_oem_pause 1
+						sudo -E SUDO_USER=$USER /bin/bash ${0} $@ || rtd_oem_pause 1
 					;;
 					1) echo "Request cancelled" ;;
 					255) echo "[esc] Request aborted" ;;
@@ -2402,7 +2402,7 @@ ensure_admin ()
 				exit
 			else
 				write_warning "This script needs administrative access..."
-				sudo DISPLAY=$DISPLAY SUDO_USER=$USER bash "${0}" "$@" || rtd_oem_pause 1
+				sudo -E SUDO_USER=$USER bash "${0}" "$@" || rtd_oem_pause 1
 				exit
 			fi
 		fi
@@ -5358,7 +5358,7 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 		count=$((count + 1))
 	done
 
-	
+
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
@@ -5374,7 +5374,7 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 	: ${source_url:="https://dl.fedoraproject.org/pub/fedora/linux/releases/${FedoraVersion}/Everything/x86_64/os/"}
 	PRESEED_FILE="$( mktemp ).cfg"
 	generate_fedora_ks_cfg_file "${PRESEED_FILE}" workstation
-	
+
 	_summary_message="The virtual machine (VDI_fedora_"${CONFIG}"_"${RANDOM}") \n
 	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
 	🔧 - And Using this source for the packages and files to download: \n
@@ -5759,8 +5759,8 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		check_dependencies $i &>/dev/null
 		count=$((count + 1))
 	done
-	
-	: ${target_winver="${1:-win10}"} || read -p "💥 - Failure to set variable target_winver" 
+
+	: ${target_winver="${1:-win10}"} || read -p "💥 - Failure to set variable target_winver"
 	case $target_winver in
 		win11 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win11_English_x64.iso"} || read -p "💥 - Failure to set variable"
 			: ${uefi_option="--boot uefi,loader_secure=no"}  || read -p "💥 - Failure to set variable"
@@ -5769,7 +5769,7 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		win10 )  : ${WindowsMedia="/var/lib/libvirt/boot/Win8_English_x64.iso"} || read -p "💥 - Failure to set variable" ;;
 		win7 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win7_English_x64v1.iso"} || read -p "💥 - Failure to set variable" ;;
 	esac
-	
+
 	: ${BIN_VIRT_INSTALL:="$(type -p virt-install)"}
 	: ${CONFIG:="Workstation"}
 	: ${WindowsInstructions:="/var/lib/libvirt/boot/win$(date +%Y-%m-%d-%H-%M-%S-%s).img"}
@@ -5780,7 +5780,7 @@ make_kvm_virtual_machine_now_from_microsoft ()
 	: ${mem_size="${3:-6000}"}
 	: ${disk_size="${4:-100}"}
 	: ${preferred_video="${5:-"qxl"}"}
-	
+
 	if [[ ! -e "${WindowsMedia}" ]]; then
 		if ( $RTD_GUI --backtitle "..$BRANDING" --title "Windows Install Media Needed" \
 			--no-button "NO: Just Cancel" \
@@ -5838,7 +5838,7 @@ make_kvm_virtual_machine_now_from_microsoft ()
                 ${uefi_option} \
 		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
-	
+
 	for i in WindowsInstructions CONFIG WindowsMedia AutoUnattend PostTasks target_winver mem_size uefi_option cpu_count disk_size preferred_video ; do unset $i ; done
 }
 
@@ -6401,7 +6401,7 @@ generate_autounattend_xml ()
 # End of documentation
 
 	case $target_winver in
-		win11 ) 
+		win11 )
 		cat > $1 <<-'EOF-GPT'
 		<?xml version="1.0" encoding="utf-8"?>
 	<unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
@@ -6482,7 +6482,7 @@ generate_autounattend_xml ()
 			<UILanguage>en-US</UILanguage>
 			<UserLocale>en-US</UserLocale>
 		</component>
-		
+
 		<component name="Microsoft-Windows-LUA-Settings" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 			<EnableLUA>false</EnableLUA>
 		</component>
@@ -6514,7 +6514,7 @@ generate_autounattend_xml ()
 			<HideEULAPage>true</HideEULAPage>
 			<HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
 		</OOBE>
-		
+
 		<AutoLogon>
 			<Enabled>true</Enabled>
 			<LogonCount>1</LogonCount>
@@ -6524,7 +6524,7 @@ generate_autounattend_xml ()
 			<PlainText>true</PlainText>
 			</Password>
 		</AutoLogon>
-		
+
 		<FirstLogonCommands>
 			<SynchronousCommand wcm:action="add">
 			<CommandLine>a:\rtd-me-sh.cmd</CommandLine>
@@ -6535,7 +6535,7 @@ generate_autounattend_xml ()
 
 		</component>
 		</settings>
-		</unattend>        
+		</unattend>
 		EOF-GPT
 		;;
 		* )
@@ -6666,7 +6666,7 @@ generate_autounattend_xml ()
 </unattend>
 		EOF-MBR
 		;;
-	esac	
+	esac
 }
 
 

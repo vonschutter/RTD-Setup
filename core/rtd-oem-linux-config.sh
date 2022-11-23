@@ -130,28 +130,16 @@ complete_setup () {
 if [[ ! $UID -eq 0 ]]; then
 	echo -e "This script needs administrative access..."
 	# Another workaround just for SUSE...
-	sudo sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
+	sudo -E sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
 	# Relaunch script in priviledged mode...
-	sudo bash $0 $*
+	sudo -E bash $0 $*
 else
 	if  [[ -f "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_rtd_library ]]; then
 		source "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_rtd_library
 	elif source $(find /opt -name _rtd_library ) ; then
 		write_information "Libraries loaded"
-		write_status "Paths registered:
-		* # Root directory of tools: 		_OEM_DIR="${scriptdir%/*}"
-		* # Caching and download folder: 	_CACHE_DIR="${_OEM_DIR}/cache"
-		* # Location of oem wallpapers: 	_WALLPAPER_DIR="${_OEM_DIR}/wallpaper"
-		* # Location of custom sounds:		_CUSTOMSOUND_DIR="${_OEM_DIR}/sound"
-		* # Location of installable themes: 	_THEME_DIR="${_OEM_DIR}/themes"
-		* # Location of 3rd party apps:		_APP_DIR="${_OEM_DIR}/apps"
-		* # Location of extension modules:	_MODS_DIR="${_OEM_DIR}/modules"
-		* # Root tools folder: 			_CORE_DIR="${_OEM_DIR}/core"
-		* # Location of log files:		_LOG_DIR=/var/log/${_TLA,,}
-		"
 	else
 		echo -e "RTD functions NOT loaded!"
-		echo -e " "
 		echo -e "Cannot ensure that the correct functionality is available"
 		echo -e "Quiting rather than cause potential damage..."
 		exit 1
@@ -160,8 +148,6 @@ else
 	sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
 	rtd_wait_for_internet_availability
 	rtd_oem_reset_default_environment_config
-	# write_information "Ensuring that all software is updated before continuing. "
-	# rtd_update_system
 
 	if [[ -z "$(ps aux |grep X |grep  -v grep)" ]]; then
 		echo "No X server at \$DISPLAY [$DISPLAY]"
