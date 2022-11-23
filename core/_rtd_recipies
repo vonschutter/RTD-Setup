@@ -757,6 +757,8 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		ln -s ${_WALLPAPER_DIR}/* ${_XDG_WALLPAPER_DIR}/
 		sudo -H -u $SUDO_USER source ${_CORE_DIR}/_rtd_library ; rtd_oem_kde_set_wallpaper "${_WALLPAPER_DIR}/Wayland.jpg"
 
+		7z x ${_THEME_DIR}/rtd-plasma-windows-11-look.7z -o${_THEME_DIR} && pushd ${_THEME_DIR}/rtd-plasma-windows-11-look && ./install.sh && popd
+
 		mkdir -p ${_CACHE_DIR} && if [[ -e ${_CACHE_DIR}/master.zip ]] ; then rm ${_CACHE_DIR}/master.zip ; fi || write_error "Unable to create ${_CACHE_DIR}"
 		wget https://github.com/vinceliuice/vimix-kde/archive/master.zip  -P ${_CACHE_DIR}/ || write_error "Unable to download https://github.com/vinceliuice/vimix-kde/archive/master.zip"
 		unzip -o ${_CACHE_DIR}/master.zip -d ${_CACHE_DIR} && pushd ${_CACHE_DIR}/vimix-kde-master && ./install.sh && popd ; rm ${_CACHE_DIR}/master.zip
@@ -764,7 +766,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		7z x  ${_THEME_DIR}/vimix-icon-themes.7z -o${_THEME_DIR} && pushd ${_THEME_DIR}/vimix-icon-themes && ./install.sh && popd
 		for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
 
-		sudo -H -u $SUDO_USER DISPLAY=$DISPLAY lookandfeeltool -a 'org.kde.breezedark.desktop'
+		sudo -H -u $SUDO_USER DISPLAY=$DISPLAY bash -c "lookandfeeltool -a 'RTD-Win11-Light' --resetLayout"
 	fi
 }
 
