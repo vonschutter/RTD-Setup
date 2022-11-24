@@ -574,6 +574,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 	check_dependencies zip
 	check_dependencies p7zip
 	check_dependencies p7zip-full
+	check_dependencies p7zip-plugins
 	ensure_snap_package_managment
 	enable_firewall
 	# -------------------------------------------------------------------------------------------------------#
@@ -657,8 +658,12 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		check_dependencies make
 		check_dependencies sassc
 		check_dependencies gettext
-		if git clone https://github.com/micheleg/dash-to-dock.git ; then make -C dash-to-dock install ; fi
-		if git clone git clone https://github.com/home-sweet-gnome/dash-to-panel.git ; then make install ; fi
+		if git clone https://github.com/micheleg/dash-to-dock.git ; then
+			pushd dash-to-dock
+				make -C dash-to-dock install
+			popd
+		fi
+		if git clone https://github.com/home-sweet-gnome/dash-to-panel.git ; then pushd dash-to-panel ; make install ; fi
 
 		# -------------------------------------------------------------------------------------------------------
 
