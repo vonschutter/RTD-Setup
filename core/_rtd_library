@@ -61,6 +61,8 @@ export RTD_VERSION=2.0
 	generate_minecraft_server_launcher		: Creates a minecraft server launcher, w. automatic dependeny resolutions
 	generate_report_disk_space_used_by_directory 	: Generate a disk usage report
 	generate_rtd_me_sh_cmd				: Creates a rtd bootstrap script for system/software install for Windows, Linux, MAC OS, BSD etc.
+	github::clone_repo_user				: Clone all repositories for a given user at github.com
+	github::list_all_user_repositories		: List all repositories for a given user
 	InstallSoftwareFromRepo				: Installs a package from a repository supports SUSE, Fedora, Cent OS, Ubuntu Deian etc.
 	is_software_package_available			: Checks to see if a software package is available in a repository
 	io_on_notify_wait				: Wait for a disk change and then execute a command
@@ -295,6 +297,64 @@ source "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_rtd_recipies
 #                           |___/
 # ----------------------------------------------------------------
 
+
+
+
+
+
+
+
+github::clone_repo_user ()
+{
+# Description:
+# Function to CLONE all github.com repositories for a specified user.
+# simply call the function and pass the username as parameter to clone
+# all github repositories in to the current folder.
+#
+# Globals: None
+# Arguments: User-name
+# Outputs:
+# Returns: a download of all repositories for the given user.
+# Usage: ${FUNCNAME[0]} user-name
+# End of documentation
+
+	if [ $# -eq 0 ]; then
+	    echo "Usage: ${FUNCNAME[0]} <user_name> "
+	    exit 1;
+	fi
+
+	for repo in $(curl -s https://api.github.com/users/${1}/repos?per_page=1000 |grep git_url |awk '{print $2}'| sed 's/"\(.*\)",/\1/');do
+	  git clone --depth=1 "https${repo:3}";
+	done
+
+}
+
+
+github::list_all_user_repositories ()
+{
+# Description:
+# Function to LIST all github.com repositories for a specified user.
+# simply call the function and pass the username as parameter to show
+# all github repositories the indicated user.
+#
+# Globals: None
+# Arguments: User-name
+# Outputs:
+# Returns: a LIST of all repositories for the given user.
+# Usage: ${FUNCNAME[0]} user-name
+# End of documentation
+
+	if [ $# -eq 0 ]
+	  then
+	    echo "Usage: ${FUNCNAME[0]} <user_name> "
+	    exit 1;
+	fi
+
+	for repo in $(curl -s https://api.github.com/users/${1}/repos?per_page=1000 |grep git_url |awk '{print $2}'| sed 's/"\(.*\)",/\1/'); do
+		echo "https${repo:3}"
+	done
+
+}
 
 
 
@@ -2477,6 +2537,7 @@ rtd_oem_kde_set_wallpaper ()
 	echo "Setting wallpaper $1"
 	full_image_path=$(realpath "$1")
 	ext=$(file -b --mime-type "$full_image_path")
+	XDG_RUNTIME_DIR="/run/user/${SUDO_UID}"
 
 	if [ -z "$2" ]; then
 	# Identify filetype and make changes

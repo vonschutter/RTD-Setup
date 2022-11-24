@@ -1,7 +1,7 @@
 #!/bin/bash
 #::                     S O F T W A R E    R E C I P I E S
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::// Linux //::::::::
 #:: Author(s):   	SLS, KLS, NB.  Buffalo Center, IA & Avarua, Cook Islands
 #:: Version 1.01
 #::
@@ -615,10 +615,6 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		# [Task 5.1] Configure Wallpapers for OEM look and feel.
 		# -------------------------------------------------------------------------------------------------------
 		write_information "${FUNCNAME[0]} : Fonud the gnome UI on this system! Adding OEM customizations..."
-		# Configure Gnome for OEM look and feel. This is completely as desired.
-		# These setings will then be copied to the "/etsc/skel" directory where user templates
-		# are stored. This will allow new users to get the same themes and settings as the
-		# current user. This will not be done if the system was not built by the oem process.
 
 		# Register Wallpapers in Gnome
 		rtd_oem_register_wallpapers_for_gnome ${_WALLPAPER_DIR}
@@ -657,6 +653,13 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		do
 			InstallSoftwareFromRepo $i
 		done
+
+		check_dependencies make
+		check_dependencies sassc
+		check_dependencies gettext
+		if git clone https://github.com/micheleg/dash-to-dock.git ; then make -C dash-to-dock install ; fi
+		if git clone git clone https://github.com/home-sweet-gnome/dash-to-panel.git ; then make install ; fi
+
 		# -------------------------------------------------------------------------------------------------------
 
 
@@ -668,6 +671,10 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		# distro package managemnt is installed. This is easier and likely accurate in most cases.
 		# Pop, Ubuntu, Kubuntu, and Debian all use deb packages and name the packages consistently for ex.
 		# This will ensure that the sofware is installed so the themes look good...
+
+		# Install Windows 10 Themes (Light and Dark) and more...
+		bash ${_THEME_DIR}/plus-themes.sh
+
 		if hash apt-get 2>/dev/null ; then
 			for i in sassc libcanberra-gtk-module libglib2.0-dev gtk2-engines-murrine gtk2-engines-pixbuf libxml2-utils ; do
 				check_dependencies  $i
@@ -690,29 +697,14 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 
 		# Install theme for a smooth mocka experience in UI (snap, gnome, and icons)...
 		snap install vimix-themes
-			7z x ${_THEME_DIR}/vimix-gtk-themes.7z -o/usr/share/themes
-			7z x  ${_THEME_DIR}/vimix-icon-themes.7z -o${_THEME_DIR} && pushd ${_THEME_DIR}/vimix-icon-themes && ./install.sh && popd
 			for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
 
 		# Install theme for previous Apple users...
 		snap install mojave-themes
-			7z x ${_THEME_DIR}/Mojave-gtk-theme.7z -o${_THEME_DIR} && pushd ${_THEME_DIR}/Mojave-gtk-theme && ./install.sh && popd
-			7z x ${_THEME_DIR}/McMojave-circle.7z -o${_THEME_DIR} && pushd ${_THEME_DIR}/McMojave-circle && ./install.sh && popd
 			for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i mojave-themes:gtk-3-themes ; done
 
-		# Install Windows 10 Themes (Light and Dark)
-		7z x ${_THEME_DIR}/Windows-10-Light.7z -o/usr/share/themes
-		7z x ${_THEME_DIR}/Windows-10-Dark.7z -o/usr/share/themes
-
-		# Install the icon theme(s)...
-		for i in $( ls ${_THEME_DIR}/*icon*.7z ) ; do 7z x $i -o/usr/share/icons -y ; done
-
 		# Install basic professional Arc and gnome default themes...
-		for i in numix-gtk-theme numix-icon-theme arc-theme
-		do
-			InstallSoftwareFromRepo $i
-		done
-
+		InstallSoftwareFromRepo arc-theme
 		# -------------------------------------------------------------------------------------------------------
 
 
@@ -740,7 +732,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		# the OEM tweaks to the UI. If this task sequence is run on a system by a user on a system not
 		# built by the unattended OEM process, then these changes sould only be implemented for the user
 		# running this task.
-		if [[ -f /opt/rtd/log/ ]] ; then
+		if [[ -e /opt/rtd ]] ; then
 			write_information "THis system was built by an OEM process: copying tweaks for all new users..."
 			mkdir -p /etc/skel/.config
 			cp -r /home/${SUDO_USER}/.config/dconf /etc/skel/.config/dconf
@@ -755,18 +747,12 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 
 		write_information "${FUNCNAME[0]}: Detected KDE UI!"
 		ln -s ${_WALLPAPER_DIR}/* ${_XDG_WALLPAPER_DIR}/
-		sudo -H -u $SUDO_USER source ${_CORE_DIR}/_rtd_library ; rtd_oem_kde_set_wallpaper "${_WALLPAPER_DIR}/Wayland.jpg"
+		bash ${_THEME_DIR}/plus-themes.sh
 
-		7z x ${_THEME_DIR}/rtd-plasma-windows-11-look.7z -o${_THEME_DIR} && pushd ${_THEME_DIR}/rtd-plasma-windows-11-look && ./install.sh && popd
-
-		mkdir -p ${_CACHE_DIR} && if [[ -e ${_CACHE_DIR}/master.zip ]] ; then rm ${_CACHE_DIR}/master.zip ; fi || write_error "Unable to create ${_CACHE_DIR}"
-		wget https://github.com/vinceliuice/vimix-kde/archive/master.zip  -P ${_CACHE_DIR}/ || write_error "Unable to download https://github.com/vinceliuice/vimix-kde/archive/master.zip"
-		unzip -o ${_CACHE_DIR}/master.zip -d ${_CACHE_DIR} && pushd ${_CACHE_DIR}/vimix-kde-master && ./install.sh && popd ; rm ${_CACHE_DIR}/master.zip
-
-		7z x  ${_THEME_DIR}/vimix-icon-themes.7z -o${_THEME_DIR} && pushd ${_THEME_DIR}/vimix-icon-themes && ./install.sh && popd
+		# sudo -H -u $SUDO_USER  bash -c source ${_CORE_DIR}/_rtd_library ; rtd_oem_kde_set_wallpaper "${_WALLPAPER_DIR}/Wayland.jpg"
 		for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
 
-		sudo -E -H -u $SUDO_USER "bash -c lookandfeeltool -a 'RTD-Win11-Light' --resetLayout"
+		sudo -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c '/usr/bin/lookandfeeltool -a RTD-Win11-Light --resetLayout'
 	fi
 }
 
