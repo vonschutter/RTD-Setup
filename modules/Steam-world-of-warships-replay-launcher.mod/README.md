@@ -7,8 +7,8 @@ Watching your own World of Warships replays on Ubuntu or any other Linux distrib
 ## Purpose:
 Purpose: The purpose of this script is to simplify watching your replays.
 As per the writing of this script World of Warships automatically stores the last 30
-replays on your system. There have been many posts asking how to watch them so this
-script helps facilitate watching your WoW's replays.
+replays on your system. There have been many posts asking how to watch them on Seam and Linux, so this
+script helps facilitate watching your WoW's (installed via Steam) replays on Linux.
 
 Usage:	Simply execute this script to accomplish this task. No parameters required.
 Source: https://developer.valvesoftware.com/wiki/Command_Line_Options#Command-Line_Parameters_2
