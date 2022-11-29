@@ -2,7 +2,7 @@
 PUBLICATION="RTD Simple Global Theme Install"
 VERSION="1.00"
 #
-#::             Linux icon Theme Installer Script
+#::             Linux Theme Installer Script
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::// Linux //::::
 #:: Author(s):   	SLS
@@ -29,7 +29,7 @@ VERSION="1.00"
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 : "${_my_scriptdir="$( cd "$( dirname ${BASH_SOURCE[0]} )" && pwd )"}"
 : "${_tmp="$( mktemp -d )"}" 
-_potential_dependencies="7z unzip p7zip-full p7zip sassc gettext make"
+_potential_dependencies="7z unzip p7zip-full p7zip p7zip-plugins sassc gettext make"
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
