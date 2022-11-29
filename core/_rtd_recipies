@@ -641,30 +641,43 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		InstallSoftwareFromRepo gnome-tweaks
 
 		write_information "--- Optimizig look and feel of the desktop for productivity and aestetics..."
+		check_dependencies make
+		check_dependencies sassc
+		check_dependencies gettext
+		
+		# Install the wanted shell extensions that can be found in the distributions repository 
+		if InstallSoftwareFromRepo gnome-shell-extension-dash-to-dock ; then
+			write_status "Installed dash-to-dock from the supported repository"
+		elif InstallSoftwareFromRepo gnome-shell-extension-dashtodock ; then
+			write_warning "As the default dash-to-dock was not available, I installed gnome-shell-extension-dashtodock, an alternative version..."
+		elif wget https://extensions.gnome.org/extension-data/dash-to-dockmicxgx.gmail.com.v71.shell-extension.zip ; then
+			 unzip dash-to-dock@micxgx.gmail.com.zip -d ~/.local/share/gnome-shell/extensions/dash-to-dock@micxgx.gmail.com/
+			 write_warning "No supported dash-to-dock package found, in desperation I downloaded a version from the distributor"
+		else
+			write_error "All attempts to get dash-to-dock have failed miserably... this feature will not be available! "
+		fi
+		
+		if InstallSoftwareFromRepo gnome-shell-extension-dash-to-panel ; then
+			write_information "Installed dash-to-panel from the supported repository..."
+			
+		elif git clone https://github.com/home-sweet-gnome/dash-to-panel.git ; then 
+			pushd dash-to-panel
+				make install
+			popd
+		else 
+			write_error "All attempts to get dash-to-dock have failed miserably... this feature will not be available! "
+		fi
+		
 		for i in gnome-shell-extensions \
 			gnome-shell-extension-appindicator \
 			gnome-shell-extension-suspend-button \
 			gnome-shell-extension-multi-monitors \
 			gnome-shell-extension-caffeine \
 			gnome-shell-extension-gsconnect  \
-			gnome-shell-extension-gsconnect-browsers \
-			gnome-shell-extension-dash-to-panel \
-			gnome-shell-extension-dash-to-dock \
-			gnome-shell-extension-dashtodock
+			gnome-shell-extension-gsconnect-browsers
 		do
 			InstallSoftwareFromRepo $i
 		done
-
-		check_dependencies make
-		check_dependencies sassc
-		check_dependencies gettext
-		if git clone https://github.com/micheleg/dash-to-dock.git ; then
-			pushd dash-to-dock
-				make -C dash-to-dock install
-			popd
-		fi
-		if git clone https://github.com/home-sweet-gnome/dash-to-panel.git ; then pushd dash-to-panel ; make install ; fi
-
 		# -------------------------------------------------------------------------------------------------------
 
 
@@ -741,6 +754,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 			write_information "THis system was built by an OEM process: copying tweaks for all new users..."
 			mkdir -p /etc/skel/.config
 			cp -r /home/${SUDO_USER}/.config/dconf /etc/skel/.config/dconf
+			write_information "THis system was built by an OEM process: done..."
 		else
 			write_information "Only implementing tweaks for the current user..."
 		fi

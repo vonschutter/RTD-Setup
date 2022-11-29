@@ -105,6 +105,7 @@ dependency::_rtd_library ()
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
+dependency::_rtd_library
 for i in "${_potential_dependencies}" ; do hash $i || check_dependencies $i ; done
 
 
