@@ -94,7 +94,7 @@ dependency::_rtd_library ()
 		echo -e " "
 		echo -e "Cannot ensure that the correct functionality is available"
 		echo -e "Quiting rather than cause potential damage..."
-		exit 1
+		return 1
 	fi
 }
 
@@ -105,8 +105,7 @@ dependency::_rtd_library ()
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-dependency::_rtd_library
-for i in "${_potential_dependencies}" ; do hash $i || check_dependencies $i ; done
+dependency::_rtd_library && for i in "${_potential_dependencies}" ; do hash $i || check_dependencies $i ; done
 
 
 case $1 in
