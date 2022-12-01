@@ -2,17 +2,20 @@
 # All included scripts should respect these locations.
 # These variable assignments attemt to detect the location of all dirs.
 
-scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+export scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 export _OEM_DIR="${scriptdir%/*}"               # Root directory of tools
 export _CACHE_DIR="${_OEM_DIR}/cache"           # Caching and download folder
 export _WALLPAPER_DIR="${_OEM_DIR}/wallpaper"   # Location of oem wallpapers
-export _CUSTOMSOUND_DIR="${_OEM_DIR}/sound"     # Location of custom sounds
+export _CUSTOM_SOUND_DIR="${_OEM_DIR}/sound"     # Location of custom sounds
 export _THEME_DIR="${_OEM_DIR}/themes"          # Location of installable themes
 export _APP_DIR="${_OEM_DIR}/apps"              # location of cusom apps (self contained)
 export _MODS_DIR="${_OEM_DIR}/modules"          # Location of all oem powertools extras
 export _CORE_DIR="${_OEM_DIR}/core"             # Location of oem libraries and core functions
 export _LOG_DIR=/var/log/${_TLA,,}              # Location of log files
+
+# Set where desktop wallpapers are stored if not already defined
+: ${_XDG_WALLPAPER_DIR:="/usr/share/wallpapers"} && export _XDG_WALLPAPER_DIR
 
 # Sometimes, depending on distribution of Linux, some paths are omitted fom the path statement
 # for the root user. This can break scripts. Therefore we add back some paths here if they are
@@ -22,9 +25,28 @@ if ! echo $PATH |grep /snap/bin ; then
     export PATH=$PATH:/snap/bin
 fi
 
-export DEBIAN_FRONTEND_GTK_KERNEL="http://ftp.us.debian.org/debian/dists/bullseye/main/installer-amd64/current/images/netboot/gtk/debian-installer/amd64/linux"
-export DEBIAN_FRONTEND_GTK_INITRD="http://ftp.us.debian.org/debian/dists/bullseye/main/installer-amd64/current/images/netboot/gtk/debian-installer/amd64/initrd.gz"
-export DEBIAN_FRONTEND_DEFAULT_KERNEL="http://ftp.us.debian.org/debian/dists/bullseye/main/installer-amd64/current/images/netboot/debian-installer/amd64/linux"
-export DEBIAN_FRONTEND_DEFAULT_INITRD="http://ftp.us.debian.org/debian/dists/bullseye/main/installer-amd64/current/images/netboot/debian-installer/amd64/initrd.gz"
-export DEBIAN_SOURCE_URL="http://ftp.us.debian.org/debian/dists/bullseye/main/installer-amd64/"
+# Debian provides several sources that may be used to install software from including the operating system.
+# These sources will be used to build virtual machines from.
+
+export _DEBIAN_FRONTEND_GTK_KERNEL="http://ftp.us.debian.org/debian/dists/bullseye/main/installer-amd64/current/images/netboot/gtk/debian-installer/amd64/linux"
+export _DEBIAN_FRONTEND_GTK_INITRD="http://ftp.us.debian.org/debian/dists/bullseye/main/installer-amd64/current/images/netboot/gtk/debian-installer/amd64/initrd.gz"
+export _DEBIAN_FRONTEND_DEFAULT_KERNEL="http://ftp.us.debian.org/debian/dists/bullseye/main/installer-amd64/current/images/netboot/debian-installer/amd64/linux"
+export _DEBIAN_FRONTEND_DEFAULT_INITRD="http://ftp.us.debian.org/debian/dists/bullseye/main/installer-amd64/current/images/netboot/debian-installer/amd64/initrd.gz"
+export _DEBIAN_SOURCE_URL="http://ftp.us.debian.org/debian/dists/bullseye/main/installer-amd64/"
+
+
+export _DEFAULT_SUSE_VER="15.4"
+export _SUSE_LEAP_SOURCE="https://download.opensuse.org/distribution/openSUSE-current/repo/oss/"
+export _SUSE_TUBMLEWEED_SOURCE="https://download.opensuse.org/tumbleweed/repo/oss/"
+export _SUSE_PACKMAN_LEAP="https://ftp.gwdg.de/pub/linux/misc/packman/suse/openSUSE_Leap_${_DEFAULT_SUSE_VER}/"
+export _SUSE_PACKMAN_TUMBLEWEED=
+
+export _DEFAULT_FEDORA_VER="36"
+# repo --name=fedora-updates --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f${FedoraVersion}&arch=x86_64" --cost=0
+# repo --name=rpmfusion-free --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-${FedoraVersion}&arch=x86_64" --includepkgs=rpmfusion-free-release
+# repo --name=rpmfusion-free-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-updates-released-${FedoraVersion}&arch=x86_64" --cost=0
+# repo --name=rpmfusion-nonfree --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-${FedoraVersion}&arch=x86_64" --includepkgs=rpmfusion-nonfree-release
+# repo --name=rpmfusion-nonfree-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-updates-released-${FedoraVersion}&arch=x86_64" --cost=0
+# repo --name=google-chrome --install --baseurl="https://dl.google.com/linux/chrome/rpm/stable/x86_64" --cost=0
+
 

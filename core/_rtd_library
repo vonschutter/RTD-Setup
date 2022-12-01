@@ -61,6 +61,8 @@ export RTD_VERSION=2.0
 	generate_minecraft_server_launcher		: Creates a minecraft server launcher, w. automatic dependeny resolutions
 	generate_report_disk_space_used_by_directory 	: Generate a disk usage report
 	generate_rtd_me_sh_cmd				: Creates a rtd bootstrap script for system/software install for Windows, Linux, MAC OS, BSD etc.
+	github::clone_repo_user				: Clone all repositories for a given user at github.com
+	github::list_all_user_repositories		: List all repositories for a given user
 	InstallSoftwareFromRepo				: Installs a package from a repository supports SUSE, Fedora, Cent OS, Ubuntu Deian etc.
 	is_software_package_available			: Checks to see if a software package is available in a repository
 	io_on_notify_wait				: Wait for a disk change and then execute a command
@@ -299,6 +301,64 @@ source "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_rtd_recipies
 
 
 
+
+
+
+github::clone_repo_user ()
+{
+# Description:
+# Function to CLONE all github.com repositories for a specified user.
+# simply call the function and pass the username as parameter to clone
+# all github repositories in to the current folder.
+#
+# Globals: None
+# Arguments: User-name
+# Outputs:
+# Returns: a download of all repositories for the given user.
+# Usage: ${FUNCNAME[0]} user-name
+# End of documentation
+
+	if [ $# -eq 0 ]; then
+	    echo "Usage: ${FUNCNAME[0]} <user_name> "
+	    exit 1;
+	fi
+
+	for repo in $(curl -s https://api.github.com/users/${1}/repos?per_page=1000 |grep git_url |awk '{print $2}'| sed 's/"\(.*\)",/\1/');do
+	  git clone --depth=1 "https${repo:3}";
+	done
+
+}
+
+
+github::list_all_user_repositories ()
+{
+# Description:
+# Function to LIST all github.com repositories for a specified user.
+# simply call the function and pass the username as parameter to show
+# all github repositories the indicated user.
+#
+# Globals: None
+# Arguments: User-name
+# Outputs:
+# Returns: a LIST of all repositories for the given user.
+# Usage: ${FUNCNAME[0]} user-name
+# End of documentation
+
+	if [ $# -eq 0 ]
+	  then
+	    echo "Usage: ${FUNCNAME[0]} <user_name> "
+	    exit 1;
+	fi
+
+	for repo in $(curl -s https://api.github.com/users/${1}/repos?per_page=1000 |grep git_url |awk '{print $2}'| sed 's/"\(.*\)",/\1/'); do
+		echo "https${repo:3}"
+	done
+
+}
+
+
+
+
 change_disk_pass ()
 {
 # Description: Function to change the passphrase fo an encrypted storage device.
@@ -439,10 +499,6 @@ oem_register_all_tools ()
 		return 1
 	fi
 }
-
-
-
-
 
 
 
@@ -723,8 +779,9 @@ rtd_oem_reset_default_environment_config ()
 # End of documentation
 
 	# Disable the automatically trying to install OEM software
-	[[ -f /etc/xdg/autostart/org.runtimedata.oem.cofig.desktop ]] && mv /etc/xdg/autostart/org.runtimedata.oem.cofig.desktop ${_OEM_DIR}/cache
-	[[ -f /etc/sudoers.d/99_sudo_include_file ]] && mv /etc/sudoers.d/99_sudo_include_file ${_OEM_DIR}/cache
+	mkdir -p ${_OEM_DIR}/cache/
+	[[ -f /etc/xdg/autostart/org.runtimedata.oem.cofig.desktop ]] && mv /etc/xdg/autostart/org.runtimedata.oem.cofig.desktop ${_OEM_DIR}/cache/
+	[[ -f /etc/sudoers.d/99_sudo_include_file ]] && mv /etc/sudoers.d/99_sudo_include_file ${_OEM_DIR}/cache/
 	cp /home/${SUDO_USER}/.bashrc ${_OEM_DIR}/cache/bashrc
 	# Keep ability for root to open dialog boxes for a user.
 	sed -i '/xhost\ local:root/d' /home/${SUDO_USER}/.bashrc
@@ -955,6 +1012,7 @@ toggle_oem_run_once () {
 			sudo rm ${_FILE}
 		fi
 	else
+		write_information "Adding execution on login of (${_FILE})"
 		cat > ${_FILE} <<-CREATE_START_LINK
 		# This will automatically start the RuntTime Data OEM config options on
 		# the first login. Once run this launcher will be moved to the /opt/rtd folder
@@ -962,7 +1020,7 @@ toggle_oem_run_once () {
 		#
 		[Desktop Entry]
 		Type=Application
-		Exec=sudo $1
+		Exec=sudo -E $1
 		Terminal=true
 		Hidden=false
 		X-GNOME-Autostart-enabled=true
@@ -1182,10 +1240,10 @@ set_enable_oem_elevated_privelege()
 # Returns:
 # Usage:
 # End of documentation
-	[[ -n "$1" ]] && : "${SUDO_USER=$1}"
-	write_information "Adding instruction to a sudoers include file: ${SUDO_USER:="tangarora"} ALL=(ALL) NOPASSWD:ALL"
+	: ${_OEM_USER:="${SUDO_USER}"}
+	write_information "Adding instruction to a sudoers include file: ${_OEM_USER} ALL=(ALL) NOPASSWD:ALL"
 	# This should be removed when OEM setup is complete as it would represent a back door...
-	echo "${SUDO_USER:="tangarora"} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/99_sudo_include_file
+	echo "${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/99_sudo_include_file
 
 	# Check that your sudoers include file passed the visudo syntax checks:
 	sudo visudo -cf /etc/sudoers.d/99_sudo_include_file
@@ -1863,10 +1921,10 @@ set_gnome_ui_mac_tweaks_for_user ()
 
 	case ${UiTone} in
 	Dark | dark )
-		if [[ -d /usr/share/themes/Mojave-dark ]] ; then
-			gsettings set org.gnome.desktop.interface gtk-theme 'Mojave-dark'
-			gsettings set org.gnome.desktop.interface icon-theme 'McMojave-circle-dark'
-			gsettings set org.gnome.shell.extensions.user-theme name "Mojave-dark"
+		if [[ -d /usr/share/themes/WhiteSur-Dark ]] ; then
+			gsettings set org.gnome.desktop.interface gtk-theme 'WhiteSur-Dark'
+			gsettings set org.gnome.desktop.interface icon-theme 'WhiteSur-dark'
+			gsettings set org.gnome.shell.extensions.user-theme name "WhiteSur-Dark"
 
 			gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/MojaveNight.jpg
 
@@ -1876,10 +1934,10 @@ set_gnome_ui_mac_tweaks_for_user ()
 		fi
 	;;
 	Light| light )
-		if [[ -d /usr/share/themes/Mojave-light ]] ; then
-			gsettings set org.gnome.desktop.interface gtk-theme 'Mojave-light'
-			gsettings set org.gnome.desktop.interface icon-theme 'McMojave-circle'
-			gsettings set org.gnome.shell.extensions.user-theme name "Mojave-light"
+		if [[ -d /usr/share/themes/WhiteSur-Light ]] ; then
+			gsettings set org.gnome.desktop.interface gtk-theme 'WhiteSur-Light'
+			gsettings set org.gnome.desktop.interface icon-theme 'WhiteSur-light'
+			gsettings set org.gnome.shell.extensions.user-theme name "WhiteSur-Light"
 
 			gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/MojaveDay.jpg
 
@@ -1951,6 +2009,7 @@ set_gnome_ui_win10_tweaks_for_user ()
 		if [[ -d /usr/share/themes/Windows-10-Dark ]] ; then
 			gsettings set org.gnome.desktop.interface gtk-theme 'Windows-10-Dark'
 			gsettings set org.gnome.shell.extensions.user-theme name "Windows-10-Dark"
+			gsettings set org.gnome.desktop.interface icon-theme 'Windows-10-Icons'
 		else
 			set_gnome_ui_tweak_no_media_error
 		fi
@@ -1959,17 +2018,12 @@ set_gnome_ui_win10_tweaks_for_user ()
 		if [[ -d /usr/share/themes/Windows-10-Light ]] ; then
 			gsettings set org.gnome.desktop.interface gtk-theme 'Windows-10-Light'
 			gsettings set org.gnome.shell.extensions.user-theme name "Windows-10-Light"
+			gsettings set org.gnome.desktop.interface icon-theme 'Windows-10-Icons'
 		else
 			set_gnome_ui_tweak_no_media_error
 		fi
 	;;
 	esac
-
-	if [[ -d /usr/share/icons/Windows-10-Icons ]] ; then
-		gsettings set org.gnome.desktop.interface icon-theme 'Windows-10-Icons'
-	else
-			set_gnome_ui_tweak_no_media_error
-	fi
 
 	# Set font
 	# gsettings set org.gnome.desktop.interface monospace-font-name 'Bitstream Vera Sans Mono'
@@ -1986,6 +2040,8 @@ set_gnome_ui_win10_tweaks_for_user ()
 
 	# Configure dash-to-panel
 	gsettings set org.gnome.shell.extensions.dash-to-panel trans-use-custom-opacity 'true'
+	gsettings set org.gnome.shell.extensions.dash-to-dock extend-height 'true'
+	gsettings set org.gnome.shell.extensions.dash-to-dock dock-fixed 'true'
 
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ font 'Monospace 10'
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-system-font false
@@ -2039,7 +2095,6 @@ set_gnome_ui_corprate_crisp_tweaks_for_user ()
 		if [[ -d /usr/share/themes/Arc-Dark ]] ; then
 			gsettings set org.gnome.desktop.interface gtk-theme 'Arc-Dark'
 			gsettings set org.gnome.shell.extensions.user-theme name "Arc-Dark"
-			# Set wallpaper
 			gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/RTD_Wallpapers_HQ_Public_Domain_019.jpg
 		else
 			set_gnome_ui_tweak_no_media_error
@@ -2049,7 +2104,6 @@ set_gnome_ui_corprate_crisp_tweaks_for_user ()
 		if [[ -d /usr/share/themes/Arc ]] ; then
 			gsettings set org.gnome.desktop.interface gtk-theme 'Arc'
 			gsettings set org.gnome.shell.extensions.user-theme name "Arc"
-			# Set wallpaper
 			gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/RTD_Wallpapers_HQ_Public_Domain_020.jpg
 		else
 			set_gnome_ui_tweak_no_media_error
@@ -2057,8 +2111,8 @@ set_gnome_ui_corprate_crisp_tweaks_for_user ()
 	;;
 	esac
 
-	if [[ -d /usr/share/icons/Arc ]] ; then
-		gsettings set org.gnome.desktop.interface icon-theme 'Arc'
+	if [[ -d /usr/share/icons/Arc-icon-theme ]] ; then
+		gsettings set org.gnome.desktop.interface icon-theme 'Arc-icon-theme'
 	else
 			set_gnome_ui_tweak_no_media_error
 	fi
@@ -2078,6 +2132,8 @@ set_gnome_ui_corprate_crisp_tweaks_for_user ()
 
 	# Configure dash-to-panel
 	gsettings set org.gnome.shell.extensions.dash-to-panel trans-use-custom-opacity 'true'
+	gsettings set org.gnome.shell.extensions.dash-to-dock extend-height 'true'
+	gsettings set org.gnome.shell.extensions.dash-to-dock dock-fixed 'true'
 
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ font 'Monospace 10'
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-system-font false
@@ -2087,8 +2143,6 @@ set_gnome_ui_corprate_crisp_tweaks_for_user ()
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ foreground-color '#AFAFAF'
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-transparent-background true
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ background-transparency-percent 20
-
-
 
 	# Restore Keyboard Layout (reset by gnome)
 	# gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
@@ -2125,11 +2179,10 @@ set_gnome_ui_moca_tweaks_for_user ()
 
 	GNOME_TERMINAL_PROFILE=`gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}'`
 
-	if [[ -d /usr/share/themes/vimix-dark-laptop ]] ; then
-		gsettings set org.gnome.desktop.interface gtk-theme 'vimix-dark-laptop'
-		gsettings set org.gnome.shell.extensions.user-theme name "vimix-dark-laptop"
-		# Set wallpaper
-		gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/Ubuntu-ThrowingStones.jpg
+	if [[ -d /usr/share/themes/vimix-dark-doder ]] ; then
+		gsettings set org.gnome.desktop.interface gtk-theme 'vimix-dark-doder'
+		gsettings set org.gnome.shell.extensions.user-theme name "vimix-dark-doder"
+		gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/Chocolate_brown_wallpaper.jpg
 	else
 		set_gnome_ui_tweak_no_media_error
 	fi
@@ -2155,7 +2208,8 @@ set_gnome_ui_moca_tweaks_for_user ()
 
 	# Configure dash-to-panel
 	gsettings set org.gnome.shell.extensions.dash-to-panel trans-use-custom-opacity 'true'
-
+	
+	# Configure terminal look...
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ font 'Monospace 10'
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-system-font false
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ audible-bell false
@@ -2372,7 +2426,7 @@ ensure_admin ()
 						0)
 							export HISTIGNORE='*sudo -S*'
 							echo ${token} | sudo -S -v || ensure_admin
-							sudo DISPLAY=$DISPLAY SUDO_USER=$USER /bin/bash ${0} $@ || rtd_oem_pause 1
+							sudo -E SUDO_USER=$USER /bin/bash ${0} $@ || rtd_oem_pause 1
 						;;
 						1) echo "Request cancelled" ;;
 						255) echo "[esc] Request aborted" ;;
@@ -2384,7 +2438,7 @@ ensure_admin ()
 					write_information "Dialog not found..."
 					write_warning "This script needs administrative access..."
 					xhost local:root
-					sudo DISPLAY=$DISPLAY SUDO_USER=$USER bash "${0}" "$@" || rtd_oem_pause 1
+					sudo -E SUDO_USER=$USER bash "${0}" "$@" || rtd_oem_pause 1
 					exit
 				fi
 			fi
@@ -2399,7 +2453,7 @@ ensure_admin ()
 					0)
 						export HISTIGNORE='*sudo -S*'
 						echo ${token} | sudo -S -v || ensure_admin
-						sudo DISPLAY=$DISPLAY SUDO_USER=$USER /bin/bash ${0} $@ || rtd_oem_pause 1
+						sudo -E SUDO_USER=$USER /bin/bash ${0} $@ || rtd_oem_pause 1
 					;;
 					1) echo "Request cancelled" ;;
 					255) echo "[esc] Request aborted" ;;
@@ -2408,7 +2462,7 @@ ensure_admin ()
 				exit
 			else
 				write_warning "This script needs administrative access..."
-				sudo DISPLAY=$DISPLAY SUDO_USER=$USER bash "${0}" "$@" || rtd_oem_pause 1
+				sudo -E SUDO_USER=$USER bash "${0}" "$@" || rtd_oem_pause 1
 				exit
 			fi
 		fi
@@ -2483,6 +2537,7 @@ rtd_oem_kde_set_wallpaper ()
 	echo "Setting wallpaper $1"
 	full_image_path=$(realpath "$1")
 	ext=$(file -b --mime-type "$full_image_path")
+	XDG_RUNTIME_DIR="/run/user/${SUDO_UID}"
 
 	if [ -z "$2" ]; then
 	# Identify filetype and make changes
@@ -2507,7 +2562,9 @@ rtd_oem_kde_set_wallpaper ()
 		d.writeConfig('$write', 'file://${full_image_path}')
 	}"
 
-	qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "${wallpaper_set_script}"
+	# have to put in these stupid fixes because distros can't agree where to but stuff!
+	hash qdbus || ${_qdbus="/usr/bin/qdbus-qt5"} && ${_qdbus="qdbus"}
+	${_qdbus} org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "${wallpaper_set_script}"
 	kwriteconfig5 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key Image "file://$full_image_path"
 }
 
@@ -2614,12 +2671,9 @@ prepare_environment_for_iso_creation ()
 # End of Documentation
 
 
-	#Include the path to where the isofile will be put...
 	: "${TARGET_ISO="$PUT_ISO_FILE_HERE_WHEN_DONE/$TARGET_ISO_FILE_NAME"}"
-	# Ensure that all needed software, outside of the most rudimantary,
-	# is available to us... If not, the script should exit.
 	: "${_DEPENDENCIES="dos2unix cpio gzip genisoimage whois pwgen wget fakeroot xorriso"}"
-	#set -e
+	set -e
 	for i in $_DEPENDENCIES
 	do
 		check_dependencies $i
@@ -2636,6 +2690,7 @@ prepare_environment_for_iso_creation ()
 	: "${VOLUME_TITLE:="RTD Auto Installer"}"
 	: "${SSH_PUBLIC_KEY_FILE:="/home/$SUDO_USER/.ssh/id_rsa.pub"}"
 	: "${PERMANENT_DOWNLOAD_DIR:="/home/$SUDO_USER/Virtual-DVDs/Downloaded"}"
+
 	if [[ -e /usr/lib/ISOLINUX/isohdpfx.bin ]]; then
 		: "${ISOHDPFX_BIN:="/usr/lib/ISOLINUX/isohdpfx.bin"}"
 	else
@@ -2645,8 +2700,7 @@ prepare_environment_for_iso_creation ()
 		locate isohdpfx.bin || ( write_error "The file isohdpfx.bin could not be found or fetched. Please correct manually!" ; rtd_oem_pause 1 )
 		: "${ISOHDPFX_BIN:=$(locate isohdpfx.bin  | head -n 1)}"
 	fi
-	# Find the location of the public key on this machine...
-	# This should be updated to create a key if not there...
+
 	if [ ! -f "$SSH_PUBLIC_KEY_FILE" ];
 	then
 		echo "Error: public SSH key $SSH_PUBLIC_KEY_FILE not found!"
@@ -2654,7 +2708,6 @@ prepare_environment_for_iso_creation ()
 		read -p "Press [Enter] to continue..."
 	fi
 
-	# Setup the required folder structure...
 	CURRENT_DIR="$(pwd)"
 	SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 	TMP_DOWNLOAD_DIR=$(mktemp -d )
@@ -2704,11 +2757,11 @@ rtd_oem_ubuntu_auto_install_iso_builder()
 	all=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
 
 	# Ask for desired version to use:
-	UBUNTU_VER=$($RTD_GUI --title "Select Release Version of Ubuntu" --inputbox "Please pick an available ubuntu version by entering it below. Versions to choose from: ${all[*]} If you are not sure just let me choose for you... \n $picachu "  25 110 "${all[-1]}" 3>&1 1>&2 2>&3) ;clear
-	[ "$UBUNTU_VER" ] || UBUNTU_VER=${all[-1]}
+	ubuntu_ver=$($RTD_GUI --title "Select Release Version of Ubuntu" --inputbox "Please pick an available ubuntu version by entering it below. Versions to choose from: ${all[*]} If you are not sure just let me choose for you... \n $picachu "  25 110 "${all[-1]}" 3>&1 1>&2 2>&3) ;clear
+	[ "$ubuntu_ver" ] || ubuntu_ver=${all[-1]}
 
 	write_information Find the precice location of the requested ISO image:
-	ISO_URL=$(rtd_oem_find_live_release $UBUNTU_VER ubuntu $ISO_VER)
+	ISO_URL=$(rtd_oem_find_live_release $ubuntu_ver ubuntu $ISO_VER)
 		echo "requested iso for download : $ISO_URL"
 		ISO_FILENAME=$(basename $ISO_URL)
 		BASE=$(basename $ISO_URL .iso)
@@ -2907,11 +2960,11 @@ rtd_oem_ubuntu_auto_install_iso_builder()
 	all=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
 
 	# Ask for desired version to use:
-	UBUNTU_VER=$($RTD_GUI --title "Select Release Version of Ubuntu" --inputbox "Please pick an available ubuntu version by entering it below. Versions to choose from: ${all[*]} If you are not sure just let me choose for you... \n $picachu "  25 110 "${all[-1]}" 3>&1 1>&2 2>&3) ;clear
-	[ "$UBUNTU_VER" ] || UBUNTU_VER=${all[-1]}
+	ubuntu_ver=$($RTD_GUI --title "Select Release Version of Ubuntu" --inputbox "Please pick an available ubuntu version by entering it below. Versions to choose from: ${all[*]} If you are not sure just let me choose for you... \n $picachu "  25 110 "${all[-1]}" 3>&1 1>&2 2>&3) ;clear
+	[ "$ubuntu_ver" ] || ubuntu_ver=${all[-1]}
 
 	write_information Find the precice location of the requested ISO image:
-	ISO_URL=$(rtd_oem_find_live_release $UBUNTU_VER ubuntu $ISO_VER)
+	ISO_URL=$(rtd_oem_find_live_release $ubuntu_ver ubuntu $ISO_VER)
 		echo "requested iso for download : $ISO_URL"
 		ISO_FILENAME=$(basename $ISO_URL)
 		BASE=$(basename $ISO_URL .iso)
@@ -3818,6 +3871,67 @@ scan_for_malware ()
 
 
 
+software::ensure_software_store_available ()
+{
+# Description: Function to ensure that flatpack is installed and flathup enabled.
+# Globals: none
+# Dependencies: [distro pakcage managment] [function: check_dependencies] [Internet access]
+# Arguments: None
+# Outputs:
+# Returns: Standard return codes 1/0
+# Usage: Call the function with no arguments
+# GNOME Software is a utility for installing applications and updates on Linux.
+# It is part of the GNOME Core Applications, and was introduced in GNOME 3.10.[3]
+#
+# It is the GNOME front-end to the PackageKit, in turn a front-end to several package management
+# systems, which include systems based on both RPM and DEB.
+#
+# The program is used to add and manage software repositories as well as Ubuntu
+# Personal Package Archives (PPA). Ubuntu replaced its previous Ubuntu Software Center
+# program with GNOME Software starting with Ubuntu 16.04 LTS,[5] and re-branded it as "Ubuntu Software".
+#
+# It also supports fwupd for servicing of system firmware.[6]
+#
+# GNOME Software removed Snap support in July 2019, due to code quality issues, lack of integration
+# (specifically, the user can't tell what snap is doing after they click "install" and that it
+# generally ignores GNOME's settings), and the fact that it competes with the GNOME-supported Flatpak standard.[7]
+#
+# End of documentation
+
+
+	case "$DESKTOP_SESSION" in
+		plasma )
+			write_information "${FUNCNAME[0]}: plasma on anything..".
+			check_dependencies plasma-discover
+			check_dependencies plasma-discover-backend-flatpak
+			check_dependencies plasma-discover-backend-snap
+		;;
+		"/usr/share/xsessions/default" )
+			# Special case for suse again...
+			if cat /usr/share/xsessions/default.desktop |grep "Plasma"  ; then
+				write_information "${FUNCNAME[0]}: kde on suse"
+				check_dependencies plasma-discover
+				check_dependencies plasma-discover-backend-flatpak
+				check_dependencies plasma-discover-backend-snap
+			else
+				write_information "${FUNCNAME[0]}: gnome on suse"
+				check_dependencies gnome-software
+				check_dependencies gnome-software-plugin-flatpak
+				check_dependencies gnome-software-plugin-snap
+			fi
+		;;
+		* )
+			write_information "${FUNCNAME[0]}: case = *"
+			check_dependencies gnome-software
+			check_dependencies gnome-software-plugin-flatpak
+			check_dependencies gnome-software-plugin-snap
+		;;
+	esac
+
+}
+
+
+
 
 
 
@@ -4029,6 +4143,69 @@ up_2_date ()
 
 
 
+
+
+system_config::tune_system_power_profile ()
+{
+# Description: Tuned is a Linux feature that monitors a system and optimizes its performance
+# under certain workloads. Tuned uses profiles to do this. A profile is a set of rules that
+# defines certain system parameters such as disk settings, kernel parameters, network
+# optimization settings, and many other aspects of the system.
+#
+# This function sets the performance according to laptop/desktop/vm based on what is detected.
+# Globals:
+# Arguments: None
+# Outputs:
+# Returns:
+# Usage: simply call function in a script
+# End of documentation
+
+	check_dependencies tuned
+	systemctl enable --now tuned
+	tuned-adm profile balanced
+
+	case "${1}" in
+		--quiet | -q ) : ${_print="#"} ;;
+		* ) unset _print ;;
+	esac
+
+	check_dependencies virt-what
+	check_dependencies laptop-detect
+	if virt-what ; then
+		"${_print}" write_information "${FUNCNAME[0]}: This is likely not running in a virtual machine."
+		if laptop-detect ; then
+			"${_print}" write_information "${FUNCNAME[0]}: This is likely a laptop; applying pwersave profile..."
+			tuned-adm profile powersave
+		else
+			"${_print}" write_information "${FUNCNAME[0]}: This is likely NOT a laptop; applying desktop profile..."
+			tuned-adm profile desktop
+		fi
+	else
+		"${_print}" write_information "${FUNCNAME[0]}: This is likely a VM; applying virtual-guest profile..."
+		tuned-adm profile virtual-guest
+	fi
+}
+
+
+
+
+rtd_oem::check_boot_splash_screen_enable () {
+# Description: OEM function to enable splash screen on boot if desktop is indicated in
+# a configuration file. This file could be an AutoYast.xml, or ks.cfg, or a preseed.cfg.
+#
+# Globals:
+# Arguments: [FILE]
+# Outputs:
+# Returns: error level
+# Usage: rtd_oem::check_boot_splash_screen_enable /root/original-ks.cfg
+# End of documentation
+	if -f $1 ; then
+		if cat $1 |grep "-desktop" ; then
+			InstallSoftwareFromRepo splash && echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"'>> /etc/default/grub
+			update-grub
+		fi
+	fi
+}
 
 
 
@@ -5233,35 +5410,57 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 # Usage:
 # End of Documentation
 
+	write_status "${FUNCNAME[0]}:"
 	count=1
 	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install
 	do
-		write_status "${count}	- Verifying dependencies ( ${i} )..."
+		write_status "🧩 ${count}	- Verifying dependencies ( ${i} )..."
 		check_dependencies $i &>/dev/null
 		count=$((count + 1))
 	done
 
+
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
+	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
-	FedoraVersion=${FedoraVersion:-"35"}
+	FedoraVersion=$( $RTD_GUI --title "Select Release Version of Fedora" --inputbox "Please pick an available Fedoara version by entering it below. \
+	If you are not sure just let me choose for you... \n ${fedoralogo} "  25 110 "${_DEFAULT_FEDORA_VER}" 3>&1 1>&2 2>&3)
+	case $? in
+		"$DIALOG_CANCEL") return ;;
+		"$DIALOG_ESC") return ;;
+	esac
+	clear
 
-	# Discover if the appropriate VM net interface is (default or br'0 - n')
-	VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
+	: ${FedoraVersion:="${_DEFAULT_FEDORA_VER}"}
+	: ${source_url:="https://dl.fedoraproject.org/pub/fedora/linux/releases/${FedoraVersion}/Everything/x86_64/os/"}
+	PRESEED_FILE="$( mktemp ).cfg"
+	generate_fedora_ks_cfg_file "${PRESEED_FILE}" workstation
 
-        # create image and run installer
+	_summary_message="The virtual machine (VDI_fedora_"${CONFIG}"_"${RANDOM}") \n
+	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
+	🔧 - And Using this source for the packages and files to download: \n
+	🌎 - ${source_url} \n
+	🌎 - ${vm_kernel:="Kernel DEFAULT"} \n
+	🌎 - ${vm_initrd:="Initrd DEFAULT"} \n
+	✅ - Using the network: ${virt_net:=default} \n
+	✅ - Memory: ${3:-2048} \n
+	✅ - CPU's: ${2:-2} \n
+	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))"
+
         "${BIN_VIRT_INSTALL}" --connect qemu:///system --name VDI_fedora_"${CONFIG}"_"${RANDOM}" \
                 --vcpus "${2:-2}" \
                 --memory "${3:-2048}" \
-                --network "$VIRT_NET" \
+                --network "$virt_net" \
                 --disk size="${4:-40}" \
 		--os-variant="fedora30" \
                 --initrd-inject="${PRESEED_FILE}" \
-		--location="http://www.nic.funet.fi/pub/Linux/INSTALL/fedora/linux/releases/${FedoraVersion}/Everything/x86_64/os/" \
+		--location="${source_url}" \
 		--extra-args "inst.ks=file:/$(basename $PRESEED_FILE)" \
-		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built. You may attach to this server and see the progress at IP: $(hostname -I))" 10 60 \
-	|| read -p "An ERROR has occurred. Please press [ENTER] to continue..." \
+		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
+	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
-
+	for i in  PRESEED_FILE vm_kernel vm_initrd source_url CONFIG FedoraVersion ; do unset $i ; done
+	# http://www.nic.funet.fi/pub/Linux/INSTALL/fedora/linux/releases/${FedoraVersion}/Everything/x86_64/os/
 }
 
 
@@ -5294,35 +5493,47 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 # Usage:
 # End of Documentation
 
+	write_status "${FUNCNAME[0]}:"
 	count=1
 	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install
 	do
-		write_status "${count}	- Verifying dependencies (${i})..."
+		write_status "🧩 ${count}	- Verifying dependencies ( ${i} )..."
 		check_dependencies $i &>/dev/null
 		count=$((count + 1))
 	done
-	write_information "Using sintallation control file: ${PRESEED_FILE}"
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
 
 	# Discover if the appropriate VM net interface is (default or br'0 - n')
-	VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
+	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
+	: ${source_url:="${_SUSE_LEAP_SOURCE}"}
+
+	_summary_message="The virtual machine (VDI_SUSE_"$CONFIG"_"$RANDOM") \n
+	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
+	🔧 - And Using this source for the packages and files to download: \n
+	🌎 - ${source_url} \n
+	🌎 - ${vm_kernel:="DEFAULT"} \n
+	🌎 - ${vm_initrd:="DEFAULT"} \n
+	✅ - Using the network: ${virt_net} \n
+	✅ - Memory: ${3:-2048} \n
+	✅ - CPU's: ${2:-2} \n
+	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))"
 
 	# create image and run installer
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name VDI_SUSE_"$CONFIG"_"$RANDOM" \
 		--vcpus "${2:-2}" \
 		--memory "${3:-2048}" \
-		--network "$VIRT_NET" \
+		--network "${virt_net}" \
 		--disk size="${4:-40}" \
 		--os-variant=opensusetumbleweed \
 		--initrd-inject="${PRESEED_FILE}" \
-		--location='http://download.opensuse.org/factory/repo/oss/' \
-		--extra-args "AutoYaST=file:///$(basename $PRESEED_FILE)"   \
-		--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
+		--location="${source_url}" \
+		--extra-args "AutoYaST=file:///$(basename ${PRESEED_FILE})"   \
+		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
+	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
-	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built. You may attach to this server and see the progress at IP: $(hostname -I))" 10 60
-
+	for i in  PRESEED_FILE vm_kernel vm_initrd source_url CONFIG ; do unset $i ; done
 }
 
 
@@ -5373,14 +5584,14 @@ make_kvm_virtual_machine_now_from_debian_org ()
 
 	case "${SRVorVDI}" in
 		server | Server )
-				: "${vm_kernel="${DEBIAN_FRONTEND_DEFAULT_KERNEL}"}"
-				: "${vm_initrd="${DEBIAN_FRONTEND_DEFAULT_INITRD}"}"
+				: "${vm_kernel="${_DEBIAN_FRONTEND_DEFAULT_KERNEL}"}"
+				: "${vm_initrd="${_DEBIAN_FRONTEND_DEFAULT_INITRD}"}"
 				: "${ui_diplay_style="theme=light"}"
 				: "${vm_usecase="Server"}"
 				;;
 		desktop | Desktop )
-				: "${vm_kernel="${DEBIAN_FRONTEND_GTK_KERNEL}"}"
-				: "${vm_initrd="${DEBIAN_FRONTEND_GTK_INITRD}"}"
+				: "${vm_kernel="${_DEBIAN_FRONTEND_GTK_KERNEL}"}"
+				: "${vm_initrd="${_DEBIAN_FRONTEND_GTK_INITRD}"}"
 				: "${ui_diplay_style="theme=dark"}"
 				: "${vm_usecase="VDI"}"
 				;;
@@ -5389,41 +5600,36 @@ make_kvm_virtual_machine_now_from_debian_org ()
 
 	write_status "🔎 	- Discovering what the appropriate VM net interface is (default or br'0 - n')"
 	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
+	: ${source_url:="${_DEBIAN_SOURCE_URL}"}
 
-	write_status "🔧	- Builing a Debian VM with the following requests:"
-	write_information "
-	Using the instructions in PRESEED: ${PRESEED_FILE}
-	Using the following kernel and initrd:
-	🌎 ${vm_kernel}
-	🌎 ${vm_initrd}
-	And Uing this source for the packages and files to download:
-	🌎 ${DEBIAN_SOURCE_URL}
-	Using the network: ${virt_net}
-	Memory: ${3:-2048}
-	CPU's: ${2:-2}
-	Disk Size: ${4:-40}"
+	_summary_message="The virtual machine (Debian_${vm_usecase}_${SRVFUNC}_${CONFIG}_${RANDOM}) \n
+	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
+	🔧 - And Using this source for the packages and files to download: \n
+	🌎 - ${source_url} \n
+	🌎 - ${vm_kernel} \n
+	🌎 - ${vm_initrd} \n
+	✅ - Using the network: ${virt_net} \n
+	✅ - Memory: ${3:-2048} \n
+	✅ - CPU's: ${2:-2} \n
+	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))"
+
 
 	# create image and run installer
-	"${bin_virt_install}" --name Debian_${vm_usecase}_"${CONFIG}"_"${RANDOM}" \
+	"${bin_virt_install}" --name Debian_${vm_usecase}_"${SRVFUNC}"_"${CONFIG}"_"${RANDOM}" \
 		--vcpus "${2:-2}" \
 		--memory "${3:-2048}" \
 		--network "${virt_net}" \
-		--location="${DEBIAN_SOURCE_URL}" \
+		--location="${source_url}" \
 		--disk size="${4:-40}" \
 		--os-variant="${1:-debian10}" \
 		--video "virtio" --channel "spicevmc" \
 		--initrd-inject="${PRESEED_FILE}" \
 		--install kernel="${vm_kernel}",initrd="${vm_initrd}" \
 		--extra-args "ks=file:/$(basename $PRESEED_FILE) ${ui_diplay_style}" \
-		--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
+		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
+	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
-	unset vm_kernel
-	unset vm_initrd
-	unset vm_usecase
-	unset ui_diplay_style
-	cleanup_and_finish nomessage
-
-	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine (Debian VDI) is currently being built. You may attach to this server using 'virt-manager' and see the progress at IP: $(hostname -I))" 12 60
+	for i in  PRESEED_FILE vm_kernel vm_initrd source_url CONFIG ui_diplay_style ; do unset $i ; done
 }
 
 
@@ -5436,13 +5642,13 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 {
 # Description: Function to create a KVM virtual michine disk and define a VM. This function should be
 # used on a Qemu/KVM virtual host that the virtual guest is to be used on.
-# NOTE: QCOW2 is a storage format for virtual .
-# machine disk images QCOW stands for QEMU copy on write. The QCOW2 format decouples the physical storage
+# NOTE: QCOW2 is a storage format for virtual machine disk images.
+# QCOW stands for QEMU copy on write. The QCOW2 format decouples the physical storage
 # layer from the virtual layer by adding a mapping between logical and physical blocks.
 # NOTE2: Kernel-based Virtual Machine (KVM) is an open source virtualization technology built into Linux®.
 # Specifically, KVM lets you turn Linux into a hypervisor that allows a host machine to run multiple,
 # isolated virtual environments called guests or virtual machines (VMs). KVM is part of Linux.
-# For complete info: https://www.redhat.com/en/topics/virtualization/what-is-KVM || read -p "An error may have occurred (review above outout) then: Press [ENTER] to continue:"
+# For complete info: https://www.redhat.com/en/topics/virtualization/what-is-KVM
 #
 # Usage: Either simply call this function to use the defaults or:
 # Call this function with "function" "RAM_SIZE" "DISK_SIZE" "DISK_FORMAT" "DISK_FILE"
@@ -5461,72 +5667,70 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 # Alternatively; edit the function with new defaults that suit the needs.
 # End of Documentation
 	count=1
-	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install
+	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install wget
 	do
-		write_status "${FUNCNAME}: ${count}	- 🧩 Verifying dependencies ( ${i} )..."
-		check_dependencies $i &>/dev/null
+		write_status "🧩 ${count}	- Verifying dependencies ( ${i} )..."
+		check_dependencies ${i} &>/dev/null
 		count=$((count + 1))
 	done
 
-	write_information "Retreive list of available Ubuntu versions..."
-	all=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
+	write_information "🔎 Retreive list of available Ubuntu versions..."
+	all_ubuntu_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
+	all_kubuntu_lts_versions=$(wget -O- cdimage.ubuntu.com/kubuntu/releases -q | perl -ne '/ (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu)
 
-	UBUNTU_VER=$($RTD_GUI --title "Select Release Version of Ubuntu" --inputbox "Please pick an available ubuntu version by entering it below. Versions to choose from: ${all[*]} If you are not sure just let me choose for you... \n $picachu "  25 110 "${all[-1]}" 3>&1 1>&2 2>&3) ;clear
-	[ "$UBUNTU_VER" ] || UBUNTU_VER=${all[-1]}
-	ISO_VER="live"
-	if [[ -z $PRESEED_FILE ]] ; then
-		write_warning: "${FUNCNAME}: NO install instructions have been provided! Installation will be manual."
-		rtd_oem_pause 1 "Connect to VM and perform the install lmanually."
+	tgt_ubuntu_ver=$($RTD_GUI --title "Select Release Version of Ubuntu" --inputbox "Please pick an available ubuntu version by entering it below.
+	Long Term Support Versions to choose from are the following 👍: ${all_ubuntu_lts_versions[*]} You may also enter an inbetween release version
+	by typing its release number below as well. If you are not sure just let me choose for you... \n ${ubuntulogo} "  25 110 "${all_ubuntu_lts_versions[-1]}" 3>&1 1>&2 2>&3)
+	case $? in
+		"$DIALOG_CANCEL") return ;;
+		"$DIALOG_ESC") return ;;
+	esac
+	clear
+
+	[ "$tgt_ubuntu_ver" ] || tgt_ubuntu_ver=${all_ubuntu_lts_versions[-1]}
+
+	# Detect and set variables for key programs
+	: ${bin_virt_install:=$(type -p virt-install)}
+	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
+	: ${ubuntu_iso_url=$(rtd_oem_find_live_release $tgt_ubuntu_ver ubuntu live)}
+	: ${iso_filename:="$(basename $ubuntu_iso_url)"}
+	: ${permanent_download_dir:="/var/lib/libvirt/boot/"}
+
+	write_status "Checking if $iso_filename already downloaded..."
+	iso=$(find "$permanent_download_dir" -name "$iso_filename")
+	if [ ! -e "$iso" ]; then
+		write_warning "$iso_filename is not in cache, downloading..."
+		wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "Failure to download ISO file"
+		iso="$permanent_download_dir/$iso_filename"
 	fi
 
-	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
-	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
+	_summary_message="The virtual machine (VDI_${CONFIG}-${tgt_ubuntu_ver}-${RANDOM}) \n
+	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
+	🔧 - And Using this source for the packages and files to download: \n
+	🌎 - ${source_url} \n
+	🌎 - ${vm_kernel} \n
+	🌎 - ${vm_initrd} \n
+	✅ - Using the network: ${virt_net} \n
+	✅ - Memory: ${3:-2048} \n
+	✅ - CPU's: ${2:-2} \n
+	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))"
 
-	# Discover if the appropriate VM net interface is (default or br'0 - n')
-	VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
-
-	if [[ ${UBUNTU_VER::2} -le 20 ]]; then
-		write_information "${FUNCNAME}: Creating legacy VM for Ubuntu"
-		"${BIN_VIRT_INSTALL}" --name VDI_Ubuntu_"$CONFIG"_"$RANDOM" \
-			--vcpus "${2:-2}" \
-			--memory "${3:-2048}" \
-			--network "${VIRT_NET}" \
-			--disk size="${4:-30}" \
-			--os-variant="${1:-debian10}" \
-			--location=http://us.archive.ubuntu.com/ubuntu/dists/focal/main/installer-amd64/ \
-			--initrd-inject="$PRESEED_FILE" \
-			--extra-args "ks=file:/$(basename $PRESEED_FILE)" \
-			--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
-	else
-		write_information "${FUNCNAME}: Find the precice location of the requested ISO image:"
-		ISO_URL=$(rtd_oem_find_live_release $UBUNTU_VER ubuntu $ISO_VER)
-			echo "${FUNCNAME}: requested iso for download : $ISO_URL"
-			${ISO_FILENAME:="$(basename $ISO_URL)"}
-			${PERMANENT_DOWNLOAD_DIR:="/var/lib/libvirt/boot/"}
-
-		write_status "${FUNCNAME}: Checking if $ISO_FILENAME already downloaded..."
-		iso=$(find "$PERMANENT_DOWNLOAD_DIR" -name "$ISO_FILENAME")
-		if [ ! -e "$iso" ]; then
-			echo "$ISO_FILENAME is not in cache, downloading..."
-			wget -nc $ISO_URL -P "$PERMANENT_DOWNLOAD_DIR" || read -p "Failure to download ISO file"
-			iso="$PERMANENT_DOWNLOAD_DIR/$ISO_FILENAME"
-		fi
-
-		"${BIN_VIRT_INSTALL}" --name VDI_Ubuntu_"$CONFIG"_"$RANDOM" \
-			--vcpus "${2:-2}" \
-			--memory "${3:-2048}" \
-			--network "${VIRT_NET}" \
-			--disk size="${4:-30}" \
-			--video "virtio" --channel "spicevmc" \
-			--os-variant="${1:-ubuntu21.10}" \
-			--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-			--extra-args="ks=file:$(basename $PRESEED_FILE) auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=us console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity initrd=/casper/initrd quiet splash noprompt noshell" \
-			--initrd-inject="$PRESEED_FILE" \
-			--initrd-inject="$( dirname ${PRESEED_FILE})/ks.cfg" \
-			--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
-	fi
-
-	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built. You may attach to this server and see the progress at IP: $(hostname -I))" 10 60
+	"${bin_virt_install}" --name VDI_${CONFIG}-${tgt_ubuntu_ver}-${RANDOM} \
+		--vcpus "${2:-2}" \
+		--memory "${3:-2048}" \
+		--network "${virt_net}" \
+		--disk size="${4:-30}" \
+		--os-variant="${1:-ubuntu21.10}" \
+		--video "virtio" --channel "spicevmc" \
+		--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
+		--extra-args="ks=file:$(basename $PRESEED_FILE) auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=us \
+		netcfg/get_hostname=${CONFIG}${tgt_ubuntu_ver} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
+		localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity quiet splash noprompt noshell" \
+		--initrd-inject="$PRESEED_FILE" \
+		--initrd-inject="$( dirname ${PRESEED_FILE})/ks.cfg" \
+		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
+	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
+	for i in  PRESEED_FILE vm_kernel vm_initrd source_url CONFIG tgt_ubuntu_ver ubuntu_iso_url iso_filename ; do unset $i ; done
 }
 
 
@@ -5617,23 +5821,35 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		count=$((count + 1))
 	done
 
+	: ${target_winver="${1:-win10}"} || read -p "💥 - Failure to set variable target_winver"
+	case $target_winver in
+		win11 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win11_English_x64.iso"} || read -p "💥 - Failure to set variable"
+			: ${uefi_option="--boot uefi,loader_secure=no"}  || read -p "💥 - Failure to set variable"
+			;;
+		win10 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win10_English_x64.iso"} || read -p "💥 - Failure to set variable" ;;
+		win10 )  : ${WindowsMedia="/var/lib/libvirt/boot/Win8_English_x64.iso"} || read -p "💥 - Failure to set variable" ;;
+		win7 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win7_English_x64v1.iso"} || read -p "💥 - Failure to set variable" ;;
+	esac
+
 	: ${BIN_VIRT_INSTALL:="$(type -p virt-install)"}
 	: ${CONFIG:="Workstation"}
-	: ${WindowsMedia:="/var/lib/libvirt/boot/Win10_English_x64.iso"}
 	: ${WindowsInstructions:="/var/lib/libvirt/boot/win$(date +%Y-%m-%d-%H-%M-%S-%s).img"}
-	: ${VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
+	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
 	: ${AutoUnattend="/tmp/autounattend.xml"}
 	: ${PostTasks="/tmp/rtd-me-sh.cmd"}
+	: ${cpu_count="${2:-2}"}
+	: ${mem_size="${3:-6000}"}
+	: ${disk_size="${4:-100}"}
+	: ${preferred_video="${5:-"qxl"}"}
 
-	write_information "Ensuring that install media is available to build a Windows VM..."
 	if [[ ! -e "${WindowsMedia}" ]]; then
 		if ( $RTD_GUI --backtitle "..$BRANDING" --title "Windows Install Media Needed" \
 			--no-button "NO: Just Cancel" \
 			--yes-button "OK: I am done upploading" \
-			--yesno "Windows install media was not found where expected ${WindowsMedia%/*} \n Please place a copy of it in /home/$SUDO_USER/Downloads/ and press [ OK ] \n Please name it Win**something**.iso" 20 90 );
+			--yesno "Windows install media was not found where expected ${WindowsMedia} \n Please place a copy of it in /home/$SUDO_USER/ and press [ OK ] \n Please name it Win**something**.iso" 20 90 );
 		then
-			if $(ls /home/$SUDO_USER/Downloads/Win*.iso >/dev/null ) ; then
-				mv -v /home/$SUDO_USER/Downloads/Win*.iso ${WindowsMedia}
+			if ls /home/$SUDO_USER/Win*.iso ; then
+				mv -v /home/$SUDO_USER/Win*.iso ${WindowsMedia} || rtd_oem_pause 1S
 			else
 				write_error "Could not find the file: /home/$SUDO_USER/Downloads/Win*.iso "
 				rtd_oem_pause 1
@@ -5644,12 +5860,11 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		fi
 	fi
 
-	write_information "Ensuring that instructions are available to build a Windows VM..."
 	if [[ ! -e "${WindowsInstructions}" ]]; then
 		write_information "Generate Windows Instruction media..."
 		mkfs.msdos -C ${WindowsInstructions} 1440 || rtd_oem_pause 1
 
-		write_information "Generate installations iinstructions for Windows..."
+		write_information "Generate installations instructions for Windows..."
 		generate_autounattend_xml "${AutoUnattend}" || rtd_oem_pause 1
 
 		write_information "Generate post install bootstrap script..."
@@ -5658,19 +5873,34 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		mcopy -i ${WindowsInstructions} ${AutoUnattend} ::/ || rtd_oem_pause 1
 	fi
 
+	_summary_message="The virtual machine (VDI_Windows${target_winver:(-2)}_${CONFIG}_${RANDOM}) \n
+	📋 - Using the instructions in: ${AutoUnattend} \n
+	🔧 - And Using this source for the packages and files to download: \n
+	🌎 - ${WindowsMedia} \n
+	🌎 - ${WindowsInstructions} \n
+	🌎 - ${PostTasks} \n
+	✅ - Using the network: ${virt_net} \n
+	✅ - Memory: ${mem_size} \n
+	✅ - CPU's: ${cpu_count} \n
+	✅ - Disk Size: ${disk_size} \n You may attach to this server and see the progress at IP: $(hostname -I))"
+
 	write_status "Creating and starting Virtual machine... "
-	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name VDI_Windows10_"${CONFIG}"_"${RANDOM}" \
-		--vcpus "${2:-2}" \
-		--memory "${3:-2048}" \
-		--network "${VIRT_NET}" \
-		--video qxl \
-		--disk size="${4:-40}" \
-		--os-type windows \
-		--os-variant=win10 \
+	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "VDI_Windows${target_winver:(-2)}_${CONFIG}_${RANDOM}" \
+		--vcpus "${cpu_count}" \
+		--memory "${mem_size}" \
+		--network "${virt_net}" \
+		--video ${preferred_video} \
+		--disk size="${disk_size}" \
+		--os-variant="$( if osinfo-query -s -f os |grep ${target_winver} &>/dev/null ; then echo ${target_winver} ; else echo win10 ; fi )" \
 		--cdrom "${WindowsMedia}" \
 		--disk "${WindowsInstructions}",device=floppy \
-		--livecd --noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
-	$RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built. You may attach to this server and see the progress at IP: $(hostname -I))" 10 60
+		--livecd \
+                --tpm default \
+                ${uefi_option} \
+		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
+	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
+
+	for i in WindowsInstructions CONFIG WindowsMedia AutoUnattend PostTasks target_winver mem_size uefi_option cpu_count disk_size preferred_video ; do unset $i ; done
 }
 
 
@@ -5722,17 +5952,17 @@ make_kvm_virtual_machine_now_from_iso ()
 			clear
 		fi
 	# Discover if the appropriate VM net interface is (default or br'0 - n')
-	VIRT_NET="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
-
-	echo	"--vcpus ${2:-"2"}"
-	echo	"--memory ${3:-"2048"}"
-	echo	"--network ${VIRT_NET}"
-	echo	"--disk size=${4:-"30"}"
-	echo	"--os-variant=${1:-"ubuntu20.04"}"
-	echo	"--location=${TARGET_ISO}"
-	echo	"--cdrom=${TARGET_ISO}"
-	echo	"--initrd-inject=$PRESEED_FILE"
-	echo	"--extra-args ks=file:/$(basename $PRESEED_FILE)"
+	virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
+	_summary_message="
+	--vcpus ${2:-"2"}
+	--memory ${3:-"2048"}
+	--network ${virt_net}
+	--disk size=${4:-"30"}
+	--os-variant=${1:-"ubuntu20.04"}
+	--location=${TARGET_ISO}
+	--cdrom=${TARGET_ISO}
+	--initrd-inject=$PRESEED_FILE
+	--extra-args ks=file:/$(basename $PRESEED_FILE)"
 
 
 
@@ -5740,14 +5970,13 @@ make_kvm_virtual_machine_now_from_iso ()
 	"${BIN_VIRT_INSTALL}" --name VDI_Ubuntu_"$CONFIG"_"$RANDOM" \
 		--vcpus "${2:-2}" \
 		--memory "${3:-2048}" \
-		--network "${VIRT_NET}" \
+		--network "${virt_net}" \
 		--disk size="${4:-30}" \
 		--os-variant="${1:-debian10}" \
 		--cdrom="${TARGET_ISO}" \
 		--cloud-init meta-data=
-		--noautoconsole || read -p "An ERROR has occurred. Please press [ENTER] to continue..."
-	# $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "The virtual machine is currently being built. You may attach to this server and see the progress at IP: $(hostname -I)" 10 60
-	# clear
+		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 22 85 \
+	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 }
 
 
@@ -6232,329 +6461,274 @@ generate_autounattend_xml ()
 #
 # End of documentation
 
-	cat > $1 <<-'EOF'
-	<?xml version="1.0" encoding="utf-8"?>
-	<unattend xmlns="urn:schemas-microsoft-com:unattend">
+	case $target_winver in
+		win11 )
+		cat > $1 <<-'EOF-GPT'
+		<?xml version="1.0" encoding="utf-8"?>
+	<unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+	<settings pass="offlineServicing" />
 	<settings pass="windowsPE">
-	<component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<SetupUILanguage>
-	<UILanguage>en-US</UILanguage>
-	</SetupUILanguage>
-	<InputLocale>0409:00000409</InputLocale>
-	<SystemLocale>en-US</SystemLocale>
-	<UILanguage>en-US</UILanguage>
-	<UILanguageFallback>en-US</UILanguageFallback>
-	<UserLocale>en-US</UserLocale>
+	<component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+		<SetupUILanguage>
+			<UILanguage>en-US</UILanguage>
+		</SetupUILanguage>
+		<InputLocale>0409:00000409</InputLocale>
+		<SystemLocale>en-US</SystemLocale>
+		<UILanguage>en-US</UILanguage>
+		<UserLocale>en-US</UserLocale>
 	</component>
-	<component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<SetupUILanguage>
-	<UILanguage>en-US</UILanguage>
-	</SetupUILanguage>
-	<InputLocale>0409:00000409</InputLocale>
-	<SystemLocale>en-US</SystemLocale>
-	<UILanguage>en-US</UILanguage>
-	<UILanguageFallback>en-US</UILanguageFallback>
-	<UserLocale>en-US</UserLocale>
-	</component>
-	<component name="Microsoft-Windows-Setup" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<DiskConfiguration>
-	<Disk wcm:action="add">
-	<CreatePartitions>
-	<CreatePartition wcm:action="add">
-	<Order>1</Order>
-	<Type>Primary</Type>
-	<Size>100</Size>
-	</CreatePartition>
-	<CreatePartition wcm:action="add">
-	<Extend>true</Extend>
-	<Order>2</Order>
-	<Type>Primary</Type>
-	</CreatePartition>
-	</CreatePartitions>
-	<ModifyPartitions>
-	<ModifyPartition wcm:action="add">
-	<Active>true</Active>
-	<Format>NTFS</Format>
-	<Label>System Reserved</Label>
-	<Order>1</Order>
-	<PartitionID>1</PartitionID>
-	<TypeID>0x27</TypeID>
-	</ModifyPartition>
-	<ModifyPartition wcm:action="add">
-	<Active>true</Active>
-	<Format>NTFS</Format>
-	<Label>OS</Label>
-	<Letter>C</Letter>
-	<Order>2</Order>
-	<PartitionID>2</PartitionID>
-	</ModifyPartition>
-	</ModifyPartitions>
-	<DiskID>0</DiskID>
-	<WillWipeDisk>true</WillWipeDisk>
-	</Disk>
-	</DiskConfiguration>
+	<component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 	<ImageInstall>
-	<OSImage>
-	<InstallTo>
-	<DiskID>0</DiskID>
-	<PartitionID>2</PartitionID>
-	</InstallTo>
-	<InstallToAvailablePartition>false</InstallToAvailablePartition>
-	</OSImage>
+		<OSImage>
+		<InstallTo>
+		<DiskID>0</DiskID>
+		<PartitionID>3</PartitionID>
+		</InstallTo>
+		</OSImage>
 	</ImageInstall>
 	<UserData>
-	<AcceptEula>true</AcceptEula>
-	<FullName>tangarora</FullName>
-	<Organization></Organization>
-	<ProductKey>
-	<Key>W269N-WFGWX-YVC9B-4J6C9-T83GX</Key>
-	</ProductKey>
+		<ProductKey>
+		<Key>VK7JG-NPHTM-C97JM-9MPGT-3V66T</Key>
+		</ProductKey>
+		<AcceptEula>true</AcceptEula>
 	</UserData>
-	</component>
-	<component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<DiskConfiguration>
-	<Disk wcm:action="add">
-	<CreatePartitions>
-	<CreatePartition wcm:action="add">
-	<Order>1</Order>
-	<Type>Primary</Type>
-	<Size>100</Size>
-	</CreatePartition>
-	<CreatePartition wcm:action="add">
-	<Extend>true</Extend>
-	<Order>2</Order>
-	<Type>Primary</Type>
-	</CreatePartition>
-	</CreatePartitions>
-	<ModifyPartitions>
-	<ModifyPartition wcm:action="add">
-	<Active>true</Active>
-	<Format>NTFS</Format>
-	<Label>System Reserved</Label>
-	<Order>1</Order>
-	<PartitionID>1</PartitionID>
-	<TypeID>0x27</TypeID>
-	</ModifyPartition>
-	<ModifyPartition wcm:action="add">
-	<Active>true</Active>
-	<Format>NTFS</Format>
-	<Label>OS</Label>
-	<Letter>C</Letter>
-	<Order>2</Order>
-	<PartitionID>2</PartitionID>
-	</ModifyPartition>
-	</ModifyPartitions>
-	<DiskID>0</DiskID>
-	<WillWipeDisk>true</WillWipeDisk>
-	</Disk>
-	</DiskConfiguration>
-	<ImageInstall>
-	<OSImage>
-	<InstallTo>
-	<DiskID>0</DiskID>
-	<PartitionID>2</PartitionID>
-	</InstallTo>
-	<InstallToAvailablePartition>false</InstallToAvailablePartition>
-	</OSImage>
-	</ImageInstall>
-	<UserData>
-	<AcceptEula>true</AcceptEula>
-	<FullName>tangarora</FullName>
-	<Organization></Organization>
-	<ProductKey>
-	<Key>W269N-WFGWX-YVC9B-4J6C9-T83GX</Key>
-	</ProductKey>
-	</UserData>
-	</component>
-	</settings>
-	<settings pass="offlineServicing">
-	<component name="Microsoft-Windows-LUA-Settings" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<EnableLUA>false</EnableLUA>
-	</component>
-	</settings>
-	<settings pass="offlineServicing">
-	<component name="Microsoft-Windows-LUA-Settings" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<EnableLUA>false</EnableLUA>
-	</component>
-	</settings>
-	<settings pass="generalize">
-	<component name="Microsoft-Windows-Security-SPP" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<SkipRearm>1</SkipRearm>
-	</component>
-	</settings>
-	<settings pass="generalize">
-	<component name="Microsoft-Windows-Security-SPP" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<SkipRearm>1</SkipRearm>
-	</component>
-	</settings>
-	<settings pass="specialize">
-	<component name="Microsoft-Windows-International-Core" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<InputLocale>0409:00000409</InputLocale>
-	<SystemLocale>en-US</SystemLocale>
-	<UILanguage>en-US</UILanguage>
-	<UILanguageFallback>en-US</UILanguageFallback>
-	<UserLocale>en-US</UserLocale>
-	</component>
-	<component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<InputLocale>0409:00000409</InputLocale>
-	<SystemLocale>en-US</SystemLocale>
-	<UILanguage>en-US</UILanguage>
-	<UILanguageFallback>en-US</UILanguageFallback>
-	<UserLocale>en-US</UserLocale>
-	</component>
-	<component name="Microsoft-Windows-Security-SPP-UX" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<SkipAutoActivation>true</SkipAutoActivation>
-	</component>
-	<component name="Microsoft-Windows-Security-SPP-UX" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<SkipAutoActivation>true</SkipAutoActivation>
-	</component>
-	<component name="Microsoft-Windows-SQMApi" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<CEIPEnabled>0</CEIPEnabled>
-	</component>
-	<component name="Microsoft-Windows-SQMApi" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<CEIPEnabled>0</CEIPEnabled>
-	</component>
-	<component name="Microsoft-Windows-Shell-Setup" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<ComputerName>-PC</ComputerName>
-	<ProductKey>W269N-WFGWX-YVC9B-4J6C9-T83GX</ProductKey>
-	</component>
-	<component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<ComputerName>-PC</ComputerName>
-	<ProductKey>W269N-WFGWX-YVC9B-4J6C9-T83GX</ProductKey>
-	</component>
-	</settings>
-	<settings pass="oobeSystem">
-	<component name="Microsoft-Windows-Shell-Setup" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<AutoLogon>
-	<Password>
-	<Value>letmein1234</Value>
-	<PlainText>true</PlainText>
-	</Password>
-	<Enabled>true</Enabled>
-	<Username>tangarora</Username>
-	</AutoLogon>
-	<OOBE>
-	<HideEULAPage>true</HideEULAPage>
-	<HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
-	<HideOnlineAccountScreens>true</HideOnlineAccountScreens>
-	<HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
-	<NetworkLocation>Work</NetworkLocation>
-	<SkipUserOOBE>true</SkipUserOOBE>
-	<SkipMachineOOBE>true</SkipMachineOOBE>
-	<ProtectYourPC>1</ProtectYourPC>
-	</OOBE>
-	<UserAccounts>
-	<LocalAccounts>
-	<LocalAccount wcm:action="add">
-	<Password>
-	<Value>letmein1234</Value>
-	<PlainText>true</PlainText>
-	</Password>
-	<Description>admin</Description>
-	<DisplayName>tangarora</DisplayName>
-	<Group>Administrators</Group>
-	<Name>tangarora</Name>
-	</LocalAccount>
-	</LocalAccounts>
-	</UserAccounts>
-	<RegisteredOrganization></RegisteredOrganization>
-	<RegisteredOwner>tangarora</RegisteredOwner>
-	<DisableAutoDaylightTimeSet>false</DisableAutoDaylightTimeSet>
-	<FirstLogonCommands>
-	<SynchronousCommand wcm:action="add">
-	<Description>Control Panel View</Description>
-	<Order>1</Order>
-	<CommandLine>reg add "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\ControlPanel" /v StartupPage /t REG_DWORD /d 1 /f</CommandLine>
-	<RequiresUserInput>true</RequiresUserInput>
-	</SynchronousCommand>
-	<SynchronousCommand wcm:action="add">
-	<Order>2</Order>
-	<Description>Control Panel Icon Size</Description>
-	<RequiresUserInput>false</RequiresUserInput>
-	<CommandLine>reg add "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\ControlPanel" /v AllItemsIconView /t REG_DWORD /d 1 /f</CommandLine>
-	</SynchronousCommand>
-	<SynchronousCommand wcm:action="add">
-	<Order>3</Order>
-	<RequiresUserInput>false</RequiresUserInput>
-	<CommandLine>cmd /C wmic useraccount where name="tangarora" set PasswordExpires=false</CommandLine>
-	<Description>Password Never Expires</Description>
-	</SynchronousCommand>
-	</FirstLogonCommands>
-	<TimeZone>W. Europe Standard Time</TimeZone>
-	</component>
-	<component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<AutoLogon>
-	<Password>
-	<Value>letmein1234</Value>
-	<PlainText>true</PlainText>
-	</Password>
-	<Enabled>true</Enabled>
-	<Username>tangarora</Username>
-	</AutoLogon>
-	<OOBE>
-	<HideEULAPage>true</HideEULAPage>
-	<HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
-	<HideOnlineAccountScreens>true</HideOnlineAccountScreens>
-	<HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
-	<NetworkLocation>Work</NetworkLocation>
-	<SkipUserOOBE>true</SkipUserOOBE>
-	<SkipMachineOOBE>true</SkipMachineOOBE>
-	<ProtectYourPC>1</ProtectYourPC>
-	</OOBE>
-	<UserAccounts>
-	<LocalAccounts>
-	<LocalAccount wcm:action="add">
-	<Password>
-	<Value>letmein1234</Value>
-	<PlainText>true</PlainText>
-	</Password>
-	<Description>admin</Description>
-	<DisplayName>tangarora</DisplayName>
-	<Group>Administrators</Group>
-	<Name>tangarora</Name>
-	</LocalAccount>
-	</LocalAccounts>
-	</UserAccounts>
-	<RegisteredOrganization></RegisteredOrganization>
-	<RegisteredOwner>tangarora</RegisteredOwner>
-	<DisableAutoDaylightTimeSet>false</DisableAutoDaylightTimeSet>
-	<FirstLogonCommands>
-		<SynchronousCommand wcm:action="add">
-		<Description>Control Panel View</Description>
+	<RunSynchronous>
+		<RunSynchronousCommand>
 		<Order>1</Order>
-		<CommandLine>reg add "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\ControlPanel" /v StartupPage /t REG_DWORD /d 1 /f</CommandLine>
-		<RequiresUserInput>true</RequiresUserInput>
-		</SynchronousCommand>
-
-		<SynchronousCommand wcm:action="add">
+		<Path>cmd.exe /c echo SELECT DISK=0 &gt;&gt; X:\diskpart.txt</Path>
+		</RunSynchronousCommand>
+		<RunSynchronousCommand>
 		<Order>2</Order>
-		<Description>Control Panel Icon Size</Description>
-		<RequiresUserInput>false</RequiresUserInput>
-		<CommandLine>reg add "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\ControlPanel" /v AllItemsIconView /t REG_DWORD /d 1 /f</CommandLine>
-		</SynchronousCommand>
-
-		<SynchronousCommand wcm:action="add">
+		<Path>cmd.exe /c echo CLEAN &gt;&gt; X:\diskpart.txt</Path>
+		</RunSynchronousCommand>
+		<RunSynchronousCommand>
 		<Order>3</Order>
-		<RequiresUserInput>false</RequiresUserInput>
-		<CommandLine>cmd /C wmic useraccount where name="tangarora" set PasswordExpires=false</CommandLine>
-		<Description>Password Never Expires</Description>
-		</SynchronousCommand>
-
-		<SynchronousCommand wcm:action="add">
+		<Path>cmd.exe /c echo CONVERT GPT &gt;&gt; X:\diskpart.txt</Path>
+		</RunSynchronousCommand>
+		<RunSynchronousCommand>
 		<Order>4</Order>
-		<RequiresUserInput>true</RequiresUserInput>
-		<CommandLine>"a:\rtd-me.sh.cmd"</CommandLine>
-		<Description>Run Software install</Description>
-		</SynchronousCommand>
-	</FirstLogonCommands>
-	<TimeZone>W. Europe Standard Time</TimeZone>
-	</component>
-	</settings>
-	</unattend>
-	EOF
+		<Path>cmd.exe /c echo CREATE PARTITION EFI SIZE=100 &gt;&gt; X:\diskpart.txt</Path>
+		</RunSynchronousCommand>
+		<RunSynchronousCommand>
+		<Order>5</Order>
+		<Path>cmd.exe /c echo FORMAT QUICK FS=FAT32 LABEL="System" &gt;&gt; X:\diskpart.txt</Path>
+		</RunSynchronousCommand>
+		<RunSynchronousCommand>
+		<Order>6</Order>
+		<Path>cmd.exe /c echo CREATE PARTITION MSR SIZE=16 &gt;&gt; X:\diskpart.txt</Path>
+		</RunSynchronousCommand>
+		<RunSynchronousCommand>
+		<Order>7</Order>
+		<Path>cmd.exe /c echo CREATE PARTITION PRIMARY &gt;&gt; X:\diskpart.txt</Path>
+		</RunSynchronousCommand>
+		<RunSynchronousCommand>
+		<Order>8</Order>
+		<Path>cmd.exe /c echo FORMAT QUICK FS=NTFS LABEL="Windows" &gt;&gt; X:\diskpart.txt</Path>
+		</RunSynchronousCommand>
+		<RunSynchronousCommand>
+		<Order>9</Order>
+		<Path>cmd.exe /c diskpart /s X:\diskpart.txt &gt;&gt; X:\diskpart.log</Path>
+		</RunSynchronousCommand>
+		</RunSynchronous>
+		</component>
+		</settings>
+		<settings pass="generalize" />
+		<settings pass="specialize" />
+		<settings pass="auditSystem" />
+		<settings pass="auditUser" />
+		<settings pass="oobeSystem">
+		<component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+			<InputLocale>en-US;fr-FR;sv-SE</InputLocale>
+			<SystemLocale>en-US</SystemLocale>
+			<UILanguage>en-US</UILanguage>
+			<UserLocale>en-US</UserLocale>
+		</component>
+
+		<component name="Microsoft-Windows-LUA-Settings" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+			<EnableLUA>false</EnableLUA>
+		</component>
+
+		<component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+		<UserAccounts>
+			<LocalAccounts>
+			<LocalAccount wcm:action="add">
+			<Name>tangarora</Name>
+			<Group>Administrators</Group>
+			<Password>
+			<Value>letmein1234</Value>
+			<PlainText>true</PlainText>
+			</Password>
+			</LocalAccount>
+			<LocalAccount wcm:action="add">
+			<Name>RTDUser</Name>
+			<Group>Users</Group>
+			<Password>
+			<Value>letmein1234</Value>
+			<PlainText>true</PlainText>
+			</Password>
+			</LocalAccount>
+			</LocalAccounts>
+		</UserAccounts>
+
+		<OOBE>
+			<ProtectYourPC>3</ProtectYourPC>
+			<HideEULAPage>true</HideEULAPage>
+			<HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+		</OOBE>
+
+		<AutoLogon>
+			<Enabled>true</Enabled>
+			<LogonCount>1</LogonCount>
+			<Username>tangarora</Username>
+			<Password>
+			<Value>letmein1234</Value>
+			<PlainText>true</PlainText>
+			</Password>
+		</AutoLogon>
+
+		<FirstLogonCommands>
+			<SynchronousCommand wcm:action="add">
+			<CommandLine>a:\rtd-me-sh.cmd</CommandLine>
+			<Description>Run Software install</Description>
+			<Order>1</Order>
+			</SynchronousCommand>
+		</FirstLogonCommands>
+
+		</component>
+		</settings>
+		</unattend>
+		EOF-GPT
+		;;
+		* )
+		cat > $1 <<-'EOF-MBR'
+<?xml version="1.0" encoding="utf-8"?>
+<unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+  <settings pass="offlineServicing" />
+  <settings pass="windowsPE">
+    <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <SetupUILanguage>
+        <UILanguage>en-US</UILanguage>
+      </SetupUILanguage>
+      <InputLocale>0409:00000409</InputLocale>
+      <SystemLocale>en-US</SystemLocale>
+      <UILanguage>en-US</UILanguage>
+      <UserLocale>en-US</UserLocale>
+    </component>
+    <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <ImageInstall>
+        <OSImage>
+          <InstallTo>
+            <DiskID>0</DiskID>
+            <PartitionID>2</PartitionID>
+          </InstallTo>
+        </OSImage>
+      </ImageInstall>
+      <UserData>
+        <ProductKey>
+          <Key>VK7JG-NPHTM-C97JM-9MPGT-3V66T</Key>
+        </ProductKey>
+        <AcceptEula>true</AcceptEula>
+      </UserData>
+      <RunSynchronous>
+        <RunSynchronousCommand>
+          <Order>1</Order>
+          <Path>cmd.exe /c echo SELECT DISK=0 &gt;&gt; X:\diskpart.txt</Path>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand>
+          <Order>2</Order>
+          <Path>cmd.exe /c echo CLEAN &gt;&gt; X:\diskpart.txt</Path>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand>
+          <Order>3</Order>
+          <Path>cmd.exe /c echo CREATE PARTITION PRIMARY SIZE=100 &gt;&gt; X:\diskpart.txt</Path>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand>
+          <Order>4</Order>
+          <Path>cmd.exe /c echo FORMAT QUICK FS=NTFS LABEL="System Reserved" &gt;&gt; X:\diskpart.txt</Path>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand>
+          <Order>5</Order>
+          <Path>cmd.exe /c echo ACTIVE &gt;&gt; X:\diskpart.txt</Path>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand>
+          <Order>6</Order>
+          <Path>cmd.exe /c echo CREATE PARTITION PRIMARY &gt;&gt; X:\diskpart.txt</Path>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand>
+          <Order>7</Order>
+          <Path>cmd.exe /c echo FORMAT QUICK FS=NTFS LABEL="Windows" &gt;&gt; X:\diskpart.txt</Path>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand>
+          <Order>8</Order>
+          <Path>cmd.exe /c diskpart /s X:\diskpart.txt &gt;&gt; X:\diskpart.log</Path>
+        </RunSynchronousCommand>
+      </RunSynchronous>
+    </component>
+  </settings>
+  <settings pass="generalize" />
+  <settings pass="specialize" />
+  <settings pass="auditSystem" />
+  <settings pass="auditUser" />
+  <settings pass="oobeSystem">
+    <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <InputLocale>0409:00000409</InputLocale>
+      <SystemLocale>en-US</SystemLocale>
+      <UILanguage>en-US</UILanguage>
+      <UserLocale>en-US</UserLocale>
+    </component>
+    <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <UserAccounts>
+        <AdministratorPassword>
+          <Value>letmein1234</Value>
+          <PlainText>true</PlainText>
+        </AdministratorPassword>
+        <LocalAccounts>
+          <LocalAccount wcm:action="add">
+            <Name>tangarora</Name>
+            <Group>Administrators</Group>
+            <Password>
+              <Value>letmein1234</Value>
+              <PlainText>true</PlainText>
+            </Password>
+          </LocalAccount>
+          <LocalAccount wcm:action="add">
+            <Name>RTDUser</Name>
+            <Group>Users</Group>
+            <Password>
+              <Value>letmein1234</Value>
+              <PlainText>true</PlainText>
+            </Password>
+          </LocalAccount>
+        </LocalAccounts>
+      </UserAccounts>
+      <AutoLogon>
+        <Username>Administrator</Username>
+        <Enabled>true</Enabled>
+        <LogonCount>1</LogonCount>
+        <Password>
+          <Value>letmein1234</Value>
+          <PlainText>true</PlainText>
+        </Password>
+      </AutoLogon>
+      <OOBE>
+        <ProtectYourPC>3</ProtectYourPC>
+        <HideEULAPage>true</HideEULAPage>
+        <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+      </OOBE>
+      <FirstLogonCommands>
+        <SynchronousCommand wcm:action="add">
+        <CommandLine>a:\rtd-me-sh.cmd</CommandLine>
+        <Description>Run Software install</Description>
+        <Order>1</Order>
+        </SynchronousCommand>
+      </FirstLogonCommands>
+    </component>
+  </settings>
+</unattend>
+		EOF-MBR
+		;;
+	esac
 }
-
-
 
 
 
@@ -6566,7 +6740,7 @@ rtd_oem_cloud-config_ubuntu_cfg_KS_CFG_Options ()
 # Arguments: Where to place file (directory)
 # Outputs: one preseed file section
 # Returns: instruction for Ubuntu's convoluted support for both preseed and kickstart files.
-# Usage: rtd_oem_preseed_ubuntu_cfg_KS_CFG_Options "directory"
+# Usage: rtd_oem_cloud-config_ubuntu_cfg_KS_CFG_Options "directory"
 # End of documentation
 	cat > $1/autoinstall.yaml <<-'EOF'
 #cloud-config
@@ -7029,7 +7203,7 @@ rtd_oem_preseed_cfg_Package_Selection ()
 		d-i pkgsel/include string openssh-server dialog virt-what curl wget spice-vdagent git
 
 		# Valid choices for pkgsel/upgrade are: safe-upgrade full-upgrade none
-		d-i pkgsel/upgrade select none
+		d-i pkgsel/upgrade select safe-upgrade
 		d-i pkgsel/update-policy select unattended-upgrades
 
 		# By default, the system’s locate database will be updated after the
@@ -7583,21 +7757,13 @@ generate_fedora_ks_cfg_file ()
 # Returns: 0/1
 # Usage: generate_fedora_ks_cfg_file $(mktemp) workstation
 # End of documentation
-	FILE=${FILE="$1"}
-	CONFIG=${CONFIG="$2"}
-	FedoraVersion=${FedoraVersion:-"35"}
-	write_host --cyan "Creating KS.CFG Instructions (txt): ${FILE}"
-
-	# repo --name=fedora-updates --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f${FedoraVersion}&arch=x86_64" --cost=0
-	# repo --name=rpmfusion-free --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-${FedoraVersion}&arch=x86_64" --includepkgs=rpmfusion-free-release
-	# repo --name=rpmfusion-free-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-updates-released-${FedoraVersion}&arch=x86_64" --cost=0
-	# repo --name=rpmfusion-nonfree --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-${FedoraVersion}&arch=x86_64" --includepkgs=rpmfusion-nonfree-release
-	# repo --name=rpmfusion-nonfree-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-updates-released-${FedoraVersion}&arch=x86_64" --cost=0
-	# repo --name=google-chrome --install --baseurl="https://dl.google.com/linux/chrome/rpm/stable/x86_64" --cost=0
+	: ${CONFIG="$2"}
+	: ${FedoraVersion:="${3}"}
+	write_host --cyan "Creating KS.CFG Instructions (txt): ${1}"
 
 	if [[ "${CONFIG}" == "ssh-server" ]]; then
 		write_information "Selected configuration is ssh-server..."
-		cat >> ${FILE} <<-KS_EOF
+		cat >> ${1} <<-KS_EOF
 		# Generated by: generate_fedora_ks_cfg_file
 		# Choosing mode (graphical|text|cmdline [--non-interactive])
 		text
@@ -7636,12 +7802,15 @@ generate_fedora_ks_cfg_file ()
 		%packages --retries 5 --timeout 20
 		openssh-server
 		spice-vdagent
+		git
+		curl
+		dialog
 		%end
 		KS_EOF
 		return
 	elif [[ "${CONFIG}" == "ansible-server" ]]; then
 		write_information "Selected configuration is ansible-server..."
-		cat >> ${FILE} <<-KS_EOF
+		cat >> ${1} <<-KS_EOF
 		# Generated by: generate_fedora_ks_cfg_file
 		# Choosing mode (graphical|text|cmdline [--non-interactive])
 		text
@@ -7680,13 +7849,16 @@ generate_fedora_ks_cfg_file ()
 		%packages --retries 5 --timeout 20
 		openssh-server
 		spice-vdagent
+		git
+		curl
+		dialog
 		ansible
 		%end
 		KS_EOF
 		return
 	elif [[ "${CONFIG}" == "workstation" ]]; then
 		write_information "Selected configuration is workstation..."
-		cat >> ${FILE} <<-KS_EOF
+		cat >> ${1} <<-KS_EOF
 		# Generated by: generate_fedora_ks_cfg_file
 		# Choosing mode (graphical|text|cmdline [--non-interactive])
 		graphical
@@ -7714,6 +7886,8 @@ generate_fedora_ks_cfg_file ()
 		openssh-server
 		spice-vdagent
 		git
+		curl
+		dialog
 		%end
 
 		# Post-installation Script
@@ -7748,13 +7922,16 @@ generate_autoyast_file ()
 # End of documentation
 	FILE="$1"
 	CONFIG="$2"
+	suse_product="Leap"
 	write_host --cyan "Creating AUTOYAST Instructions (XML): ${FILE}"
+
 
 	# Localized variables based on User preferences, but with suse speciffic defaults:
 	Preference_DiskEncryption_SUSE="$( [[ "$_EncryptDisk" == "YES" ]] && echo "<encryption_password>${PreferredDiskPassword:-"letmein1234"}</encryption_password>" )"
 	Preference_Password_SUSE=$( [[ -n "${PrefferredUserPassword}" ]] && echo "<user_password>${PrefferredUserPassword}</user_password>" || echo '<user_password>$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1</user_password>' )
 	Preference_Desktop_DE_SUSE=${_UserDesktopEnvironemtSelection:-"<pattern>kde</pattern>"}
 	Preference_InitialUser_SUSE="<username>${_OEM_USER:-"tangarora"}</username>"
+	Preference_Product_SUSE="<product>${suse_product:="openSUSE"}</product>"
 
 	cat >> ${FILE} <<-AUTOYAST_EOF
 <?xml version="1.0"?>
@@ -7768,7 +7945,7 @@ generate_autoyast_file ()
 			<final_reboot config:type="boolean">true</final_reboot>
 			<final_halt config:type="boolean">false</final_halt>
 			<halt config:type="boolean">false</halt>
-			<second_stage config:type="boolean">true</second_stage>
+			<second_stage config:type="boolean">false</second_stage>
 			<forceboot config:type="boolean">true</forceboot>
 		</mode>
 	</general>
@@ -7801,16 +7978,22 @@ generate_autoyast_file ()
 
 		<packages config:type="list">
 			<package>wget</package>
+			<package>curl</package>
+			<package>dialog</package>
 			<package>vim</package>
 			<package>spice-vdagent</package>
 			<package>git</package>
 		</packages>
 
 		<products config:type="list">
-			<product>openSUSE</product>
+			${Preference_Product_SUSE}
 		</products>
 
 	</software>
+
+	<firstboot>
+		<firstboot_enabled config:type="boolean">false</firstboot_enabled>
+	</firstboot>
 
 	<users config:type="list">
 		<user>
@@ -7856,6 +8039,9 @@ git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd
 chmod 755 /opt/rtd/core/rtd-oem-enable-config.sh
 /opt/rtd/core/rtd-oem-enable-config.sh
 cp *.xml /opt/rtd/
+sudo zypper ar -cfp 90 ${_SUSE_PACKMAN_LEAP} packman
+zypper --gpg-auto-import-keys refresh
+zypper dup --from packman -y --force-resolution
 ]]>
 		</source>
 	      </script>
@@ -7863,15 +8049,25 @@ cp *.xml /opt/rtd/
 	</scripts>
 
 	<security>
-	  <permission_security>secure</permission_security>
-	  <selinux_mode>permissive</selinux_mode>
+		<displaymanager_remote_access>no</displaymanager_remote_access>
+		<fail_delay>3</fail_delay>
+		<faillog_enab>yes</faillog_enab>
+		<gid_max>60000</gid_max>
+		<gid_min>101</gid_min>
+		<lastlog_enab>yes</lastlog_enab>
+		<obscure_checks_enab>no</obscure_checks_enab>
+		<permission_security>secure</permission_security>
+		<run_updatedb_as>nobody</run_updatedb_as>
+		<uid_max>60000</uid_max>
+		<uid_min>500</uid_min>
+		<selinux_mode>permissive</selinux_mode>
+		<lsm_select>selinux</lsm_select>
 	</security>
+
 
 </profile>
 
-
-
-	AUTOYAST_EOF
+AUTOYAST_EOF
 }
 
 
@@ -8097,38 +8293,7 @@ set_colors ()
 	GREEN="$green"
 	BLUE="$blue"
 
-	music="
-	╔══╗ ♫ \n
-	║██║ ♪♪ \n
-	║██║♫♪ \n
-	║ ◎♫♪♫ \n
-	╚══╝ Turn Up The Music!!! \n
-	"
 
-	picachu="
-	⢀⣠⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀⠀⣠⣤⣶⣶ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀⢰⣿⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧⣀⣀⣾⣿⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⡏⠉⠛⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⣿ \n
-	⣿⣿⣿⣿⣿⣿⠀⠀⠀⠈⠛⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠛⠉⠁⠀⣿ \n
-	⣿⣿⣿⣿⣿⣿⣧⡀⠀⠀⠀⠀⠙⠿⠿⠿⠻⠿⠿⠟⠿⠛⠉⠀⠀⠀⠀⠀⣸⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣷⣄⠀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣴⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⣿⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠠⣴⣿⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⡟⠀⠀⢰⣹⡆⠀⠀⠀⠀⠀⠀⣭⣷⠀⠀⠀⠸⣿⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⠃⠀⠀⠈⠉⠀⠀⠤⠄⠀⠀⠀⠉⠁⠀⠀⠀⠀⢿⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⢾⣿⣷⠀⠀⠀⠀⡠⠤⢄⠀⠀⠀⠠⣿⣿⣷⠀⢸⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⡀⠉⠀⠀⠀⠀⠀⢄⠀⢀⠀⠀⠀⠀⠉⠉⠁⠀⠀⣿⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⣧⠀⠀⠀⠀⠀⠀⠀⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢹⣿⣿ \n
-	⣿⣿⣿⣿⣿⣿⣿⣿⣿⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿ \n
-	"
-	chess="♟️ ♔ ♕ ♖ ♗ ♘ ♙ ♚ ♛ ♜ ♝ ♞ ♟"
-	colorcircle="🔴 🟠 🟡 🟢 🔵 🟣 🟤"
-	colorsquares=" 🟥 🟧 🟨 🟩 🟦 🟪 🟫"
-	#⏰ 	⏱ 	⏲ 	⏳ 	⏴ 	⏵ 	⏶ 	⏷ 	⏸ 	⏹ 	⏺
-	#⏩ 	⏪ 	⏫ 	⏬ 	⏭ 	⏮ 	⏯
-	# ☔ 	☕ 	☖ 	☗ 	☘ 	☙ 	☚ 	☛ 	☜ 	☝ 	☞ 	☟
-	# ♰ 	♱ 	♲ 	♳ 	♴ 	♵ 	♶ 	♷ 	♸ 	♹ 	♺ 	♻ 	♼ 	♽ 	♾ 	♿
-	# ⚐ 	⚑ 	⚒ 	⚓ 	⚔ 	⚕ 	⚖ 	⚗ 	⚘ 	⚙ 	⚚ 	⚛ 	⚜ 	⚝ 	⚞ 	⚟
 }
 
 

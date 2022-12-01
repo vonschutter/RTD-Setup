@@ -1,0 +1,92 @@
+#!/bin/bash
+:<<"::CMDLITERAL"
+@ECHO OFF
+GOTO :CMDSCRIPT
+::CMDLITERAL
+#
+#::                             STEAM LINUX REPLAY LAUNCHER
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::// OEM ENABLE CONFIG //::::::::::::::::::::::::::::::::::// Linux //::::::::
+#::
+#:: Author:   	Vonschutter
+#:: Version 	1.00
+#::
+#::
+#::	Purpose: The purpose of this script is to simplify watching your replays.
+#::		 As per the writing of this script World of Warships automatically stores the last 30
+#::		 replays on your system. There have been many posts asking hos to watch them so this
+#::		 script helps facilitate that. Because a Windows user may be tempted to download this script
+#::		 this problem is handled in the header so no harm can come to the Windows user's PC.
+#::
+#::	Usage:	Simply execute this script to accomplish this task. No parameters required.
+#::		Source: https://developer.valvesoftware.com/wiki/Command_Line_Options#Command-Line_Parameters_2
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+# This script is shared in the hopes that someone will find it useful.
+# This script is intended to live in the ~/bin/ or /bin/ folder, alternatively in the $PATH.
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+rtd::load_replays ()
+{
+	if [[ -d ~/.steam/debian-installation/steamapps/common/World\ of\ Warships/replays ]] ; then
+		pushd ~/.steam/debian-installation/steamapps/common/World\ of\ Warships/replays
+			_replay=$( zenity --file-selection )
+			if [[ -n ${_replay}  ]] ; then
+				steam -applaunch 552990 "./replays/$( basename "${_replay}")"
+			else
+				echo "No file selected"
+			fi
+		popd
+	else
+		echo "It appears that you do not have world of warships installed, or replays are not enabled..."
+		echo "Please install World of Warships in steam to use this tool."
+		exit 1
+	fi
+	unset _replay
+}
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Execute tasks                   ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+if echo "$OSTYPE" |grep "linux" ; then
+	if hash zenity ; then
+		rtd::load_replays
+	else
+		echo "zenity is needed to select files... adding now..."
+		for i in zypper apt dnf ; do
+			if hash $i; then sudo $i install zenity || exit 1  ; fi
+		done
+		rtd::load_replays
+	fi
+        exit $?
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "Mac OSX is currently not supported..."
+elif [[ "$OSTYPE" == "cygwin" ]]; then
+        echo "CYGWIN is currently unsupported..."
+elif [[ "$OSTYPE" == "msys" ]]; then
+        echo "Lightweight shell is currently unsupported... "
+elif [[ "$OSTYPE" == "freebsd"* ]]; then
+        echo "Free BSD is currently unsupported... "
+else
+       echo "I litterally have no IDEA what this OS could POSSIBLY be!"
+fi
+exit $?
+
+:CMDSCRIPT
+echo "NO! Just say no! Please install Linux instead of Windows and then Steam and then World of Warships"

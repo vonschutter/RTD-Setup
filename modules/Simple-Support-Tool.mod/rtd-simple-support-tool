@@ -1,7 +1,7 @@
 #!/bin/bash
 #::				S I M P L E     S Y S T E M   S U P P O R T    T O O L
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::// Linux //::::::::
 #:: Author(s):   	SLS, KLS, NB.  Buffalo Center, IA & Avarua, Cook Islands
 	RTD_Version=2.1
 :	${GIT_Profile:=vonschutter}
@@ -149,7 +149,7 @@ check_rtd_library ()
 		# Critical failure: downloaded copy from github.com
 		source ./_rtd_library
 	else
-		# Abot condition: No mitigation steps worked.
+		# Abort condition: No mitigation steps worked.
 		echo -e "RTD functions NOT loaded!"
 		echo -e " "
 		echo -e "Cannot ensure that the correct functionality is available"
@@ -168,17 +168,13 @@ rtd_oem_check_inet_access ()
 {
 # Function to verrify internet availabiltiy.
 # The funciton will pause for 10 seconds by default, and will accept
-# an integer to indicate a non-decault time to pause.
+# an integer to indicate a non-deault time to pause.
 
 	_ARG=$1
-	if ! hash curl &>/dev/null; then
-		read -t 10 -p "N O T I C E ! --  Could not check for internet connectivity... Please install (curl) web crawler/downloader. Press [ENTER] to continue and [CTRL] + [C] to exit! Continuing in 10 seconds..."
+	if [[ -z "$_ARG" ]]; then
+		ping -c 1  8.8.8.8 &>/dev/null || ( read -p "N O T I C E ! -- NO INTERNET ACCESS: This script may require access to the internet to work properly! Press [ENTER] to continue and [CTRL] + [C] to exit!  " )
 	else
-		if [[ -z "$_ARG" ]]; then
-			ping -c 1  8.8.8.8 &>/dev/null || ( read -p "N O T I C E ! -- NO INTERNET ACCESS: This script may require access to the internet to work properly! Press [ENTER] to continue and [CTRL] + [C] to exit!  " )
-		else
-			ping -c 1  8.8.8.8 &>/dev/null || ( read -t ${1:-10} -p "N O T I C E ! -- NO INTERNET ACCESS: This script may require access to the internet to work properly! Press [ENTER] to continue and [CTRL] + [C] to exit!  Continuing in ${1:-10} seconds..." )
-		fi
+		ping -c 1  8.8.8.8 &>/dev/null || ( read -t ${1:-10} -p "N O T I C E ! -- NO INTERNET ACCESS: This script may require access to the internet to work properly! Press [ENTER] to continue and [CTRL] + [C] to exit!  Continuing in ${1:-10} seconds..." )
 	fi
 }
 
@@ -611,7 +607,7 @@ show_deploy_VDI_VM_now_menu ()
 		"1" "Ubuntu Standard Desktop (more MAC like)" \
 		"2" "Kubuntu Desktop (more Windows like)" \
 		"3" "Lubuntu Desktop" \
-        "4" "Xubuntu (light weight) desktop" \
+		"4" "Xubuntu (light weight) desktop" \
 		"5" "Debian Default Desktop" \
 		"6" "Debian Cinnamon Desktop" \
 		"7" "Debian Plasma Desktop" \
@@ -619,6 +615,7 @@ show_deploy_VDI_VM_now_menu ()
 		"9" "Fedora Workstation VDI" \
 		"10" "SUSE Workstation VDI" \
 		"11" "Windows 10 VDI" \
+		"12" "Windows 11 VDI" \
 		2>&1 1>&3)
 		exit_status=$?
 		exec 3>&-
@@ -670,9 +667,6 @@ show_deploy_VDI_VM_now_menu ()
 			cleanup_and_finish nomessage
 		;;
 		9 )
-			PRESEED_FILE="$(mktemp)"
-			generate_fedora_ks_cfg_file "${PRESEED_FILE}" workstation
-			FedoraVersion="35"
 			make_kvm_virtual_machine_now_from_fedora_org
 			cleanup_and_finish nomessage
 		;;
@@ -683,7 +677,10 @@ show_deploy_VDI_VM_now_menu ()
 			cleanup_and_finish nomessage
 		;;
 		11 )
-			make_kvm_virtual_machine_now_from_microsoft
+			make_kvm_virtual_machine_now_from_microsoft win10
+		;;
+		12 )
+			make_kvm_virtual_machine_now_from_microsoft win11
 		;;
 		esac
 

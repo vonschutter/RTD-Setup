@@ -28,7 +28,7 @@ echo				-	RTD System System Managment Bootstrap Script      -
 #::		CMD (Windows NT, 2000, 2003, XP, Vista, 8, and 10).
 #::
 #:: NOTE:	To redirect this script to your own repository, simply rename the first 3 letters
-#::		to match the name of your repository ("TLA"-Setup), and set the _GIT_PROFILE variable 
+#::		to match the name of your repository ("TLA"-Setup), and set the _GIT_PROFILE variable
 #::		to the repo user or org to override the default (git username)...
 #::
 #:: Background: This system configuration and installation script was originally developed
@@ -115,7 +115,7 @@ echo				-	RTD System System Managment Bootstrap Script      -
 
 # Ensure administrative privileges.
 [ "$UID" -eq 0 ] || echo -e $YELLOW "This script needs administrative access..." $ENDCOLOR
-[ "$UID" -eq 0 ] || exec sudo DISPLAY=$DISPLAY bash "$0" "$@"
+[ "$UID" -eq 0 ] || exec sudo -E bash "$0" "$@"
 
 # Put a convenient link to the logs where logs are normally found...
 # capture the 3 first letters as org TLA (Three Letter Acronym)
@@ -330,7 +330,7 @@ echo			-	RTD System System Managment Bootstrap Script      -
 	:: fetch a script over the internet and execute it.
 	echo Detected %* ...
 	echo executing PRE Windows 7 instructions...
-	echo However, no instructions for Windows NT or 2000 are avaliable. 
+	echo However, no instructions for Windows NT or 2000 are avaliable.
 	goto end
 
 
