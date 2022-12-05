@@ -645,20 +645,18 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		check_dependencies sassc
 		check_dependencies gettext
 		
-		# Install the wanted shell extensions that can be found in the distributions repository 
+		# Install the wanted shell extension dash-so-dock that cannot be relied upon to be found in a ropository but is important. 
 		if InstallSoftwareFromRepo gnome-shell-extension-dash-to-dock ; then
 			write_status "Installed dash-to-dock from the supported repository"
 		elif InstallSoftwareFromRepo gnome-shell-extension-dashtodock ; then
 			write_warning "As the default dash-to-dock was not available, I installed gnome-shell-extension-dashtodock, an alternative version..."
 		elif bash $(find /opt -name rtd-gnome-shell-extension-installer |grep -v bakup )  307 ; then
 			write_warning "I installed dash-to-dock from the gnome look website... wich may or may not be supported by your distribution"
-		elif wget https://extensions.gnome.org/extension-data/dash-to-dockmicxgx.gmail.com.v71.shell-extension.zip ; then
-			 unzip dash-to-dock@micxgx.gmail.com.zip -d ~/.local/share/gnome-shell/extensions/dash-to-dock@micxgx.gmail.com/
-			 write_warning "No supported dash-to-dock package found, in desperation I downloaded a version from the distributor"
 		else
 			write_error "All attempts to get dash-to-dock have failed miserably... this feature will not be available! "
 		fi
 		
+		# Install the wanted shell extension dash-so-panel that cannot be relied upon to be found in a ropository but is important. 
 		if InstallSoftwareFromRepo gnome-shell-extension-dash-to-panel ; then
 			write_information "Installed dash-to-panel from the supported repository..."
 		elif git clone https://github.com/home-sweet-gnome/dash-to-panel.git ; then 
@@ -669,15 +667,21 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 			write_error "All attempts to get dash-to-dock have failed miserably... this feature will not be available! "
 		fi
 		
-		for i in gnome-shell-extensions \
-			gnome-shell-extension-appindicator \
-			gnome-shell-extension-suspend-button \
-			gnome-shell-extension-multi-monitors \
-			gnome-shell-extension-caffeine \
-			gnome-shell-extension-gsconnect  \
-			gnome-shell-extension-gsconnect-browsers
-		do
-			InstallSoftwareFromRepo $i
+		# Install the wanted shell extensions that can be found in the distributions repository
+		# 	615:	appindicator		307:  	dash-to-dock
+		# 	517: 	caffeine		1160: 	dash-to-pannel
+		# 	1319: 	gsconnect		
+		# 	6: 	application-menu	
+		# 	19: 	user-themes		
+		# 	7: 	removable-drive-menu	
+		# 	906: 	Sound Input/Output Chooser
+		# 	1852: 	GameMode
+		# 	97: 	Coverflow Alt-Tab
+		# 	3628: 	ArcMenu
+		# 	8: 	Places Status Indicator
+		
+		for i 6 7 8 19 97 307 517 615 906 1160 1319 1852 3628 ; do
+			bash $(find /opt -name rtd-gnome-shell-extension-installer )  $i
 		done
 		# -------------------------------------------------------------------------------------------------------
 
