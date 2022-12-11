@@ -100,12 +100,12 @@ $tweaks = @(
 
 	###	OEM Software Tasks
 	"RTDRegistryTweaks",
-	"InstallVMSDriverTools"
+	"InstallVMSDriverTools",         # Install VM Guest tools if a VM is detected 
 	"Install7Zip",
 	#"InstallGameBundle",
-	"InstallDeveloperToolsBundle",
+	#"InstallDeveloperToolsBundle",
 	"InstallVLC",
-	"InstallPDFToolsBundle",
+	# "InstallPDFToolsBundle",
 	"InstallBrave",
 	"InstallFirefox",
 	#"InstallLibreOffice",
@@ -233,7 +233,7 @@ $tweaks = @(
 	"InstallMediaPlayer", 		# "UninstallMediaPlayer",
 	"UninstallInternetExplorer",    # "InstallInternetExplorer",
 	"UninstallWorkFolders",         # "InstallWorkFolders",
-	"InstallLinuxSubsystem",        # "UninstallLinuxSubsystem",
+	# "InstallLinuxSubsystem",        # "UninstallLinuxSubsystem",
 	# "InstallHyperV",              # "UninstallHyperV",
 	"SetPhotoViewerAssociation",    # "UnsetPhotoViewerAssociation",
 	"AddPhotoViewerOpenWith",       # "RemovePhotoViewerOpenWith",
@@ -2796,12 +2796,12 @@ Function DebloatAll {
 		"*Dolby*"
 
 		#Optional: Typically not removed but you can if you need to for some reason
-		#"*Microsoft.Advertising.Xaml_10.1712.5.0_x64__8wekyb3d8bbwe*"
-		#"*Microsoft.Advertising.Xaml_10.1712.5.0_x86__8wekyb3d8bbwe*"
+		"*Microsoft.Advertising.Xaml_10.1712.5.0_x64__8wekyb3d8bbwe*"
+		"*Microsoft.Advertising.Xaml_10.1712.5.0_x86__8wekyb3d8bbwe*"
 		#"*Microsoft.BingWeather*"
 		#"*Microsoft.MSPaint*"
 		#"*Microsoft.MicrosoftStickyNotes*"
-		#"*Microsoft.Windows.Photos*"
+		"*Microsoft.Windows.Photos*"
 		#"*Microsoft.WindowsCalculator*"
 		#"*Microsoft.WindowsStore*"
 	)
