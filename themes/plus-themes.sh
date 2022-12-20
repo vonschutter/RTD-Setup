@@ -75,7 +75,7 @@ theme::add_global ()
 	;;
 esac
 }
-l
+
 theme::install_icons ()
 {
 	pushd ${_my_scriptdir}/ico
