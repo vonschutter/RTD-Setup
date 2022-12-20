@@ -69,6 +69,7 @@ theme::add_global ()
 		pushd ${_my_scriptdir}/fon
 		theme::install_payload
 		popd
+	;;
 	*)
 		echo "Neither GTK or KDE themes were requested"
 	;;
