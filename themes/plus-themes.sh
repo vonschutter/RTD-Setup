@@ -29,6 +29,8 @@ VERSION="1.00"
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 : "${_my_scriptdir="$( cd "$( dirname ${BASH_SOURCE[0]} )" && pwd )"}"
 : "${_tmp="$( mktemp -d )"}" 
+: "${_GIT_PROFILE:-"vonschutter"}"
+
 _potential_dependencies="7z unzip p7zip-full p7zip p7zip-plugins sassc gettext make"
 
 
@@ -159,5 +161,6 @@ esac
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 unset _my_scriptdir
+unset _potential_dependencies
 exit
 
