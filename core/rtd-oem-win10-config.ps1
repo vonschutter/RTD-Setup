@@ -64,7 +64,8 @@
 # call this script itself with elevated priviledges.
 
 If (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator")) {
-	Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" $PSCommandArgs" -WorkingDirectory $pwd -Verb RunAs
+	#Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" $PSCommandArgs" -WorkingDirectory $pwd -Verb RunAs
+	Start-Process PowerShell.exe -ArgumentList ("-NoProfile -ExecutionPolicy Bypass -File `"{0}`"" -f $PSCommandPath) -Verb RunAs
 }
 
 
@@ -2185,6 +2186,11 @@ Function InstallOneDrive {
 # Uninstall default Microsoft applications
 Function UninstallMsftBloat {
 	$Bloatware = @(
+		"Microsoft.Windows.NarratorQuickStart"
+		"Microsoft.XboxGameCallableUI"
+		"Microsoft.Windows.ParentalControls"
+		"Microsoft.Paint"
+		"Microsoft.GamingApp"
 		"Microsoft.3DBuilder"
 		"Microsoft.Appconnector"
 		"Microsoft.BingFinance"
@@ -2259,6 +2265,12 @@ Function UninstallMsftBloat {
 # Install default Microsoft applications
 Function InstallMsftBloat {
 	$Bloatware = @(
+		"Microsoft.Windows.NarratorQuickStart"
+		"Microsoft.XboxGameCallableUI"
+		"Microsoft.Windows.ParentalControls"
+		"Microsoft.Paint"
+		"Microsoft.GamingApp"
+		"SpotifyAB.SpotifyMusic"
 		"Microsoft.3DBuilder"
 		"Microsoft.Appconnector"
 		"Microsoft.BingFinance"
@@ -2335,6 +2347,7 @@ Function InstallMsftBloat {
 function UninstallThirdPartyBloat {
 	$Bloatware = @(
 		# non-Microsoft
+		"SpotifyAB.SpotifyMusic"
 		"2FE3CB00.PicsArt-PhotoStudio"
 		"46928bounde.EclipseManager"
 		"4DF9E0F8.Netflix"
@@ -2387,6 +2400,7 @@ function UninstallThirdPartyBloat {
 Function InstallThirdPartyBloat {
 	$Bloatware = @(
 		# non-Microsoft
+		"SpotifyAB.SpotifyMusic"
 		"2FE3CB00.PicsArt-PhotoStudio"
 		"46928bounde.EclipseManager"
 		"4DF9E0F8.Netflix"

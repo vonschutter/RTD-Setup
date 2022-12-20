@@ -54,6 +54,8 @@ theme::add_global ()
 	--gtk )
 		pushd ${_my_scriptdir}/gtk
 		theme::install_payload
+		ensure_snap_package_managment
+		snap install vimix-themes && for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
 		popd
 	;;
 	--kde )
@@ -61,12 +63,16 @@ theme::add_global ()
 		theme::install_payload
 		popd
 	;;
+	--fonts) 
+		pushd ${_my_scriptdir}/fon
+		theme::install_payload
+		popd
 	*)
 		echo "Neither GTK or KDE themes were requested"
 	;;
 esac
 }
-
+l
 theme::install_icons ()
 {
 	pushd ${_my_scriptdir}/ico
@@ -113,29 +119,35 @@ case $1 in
 		echo "Foced install of GTK themes..."
 		theme::add_global --gtk
 		theme::install_icons
+		theme::add_global --fonts
 	;;
 	--kde )
 		echo "Foced install of KDE themes..."
 		theme::add_global --kde
 		theme::install_icons
+		theme::add_global --fonts
 	;;
 	--all )
 		echo "Foced install of ALL themes..."
 		theme::add_global --kde
 		theme::add_global --gtk
 		theme::install_icons
+		theme::add_global --fonts
 	;;
 	* )
 		echo "No preference stated. Autodetecting themes for current environment..."
 		if  ps -e |grep "plasmashell" ; then
 			theme::add_global --kde
 			theme::install_icons
+			theme::add_global --fonts
 		elif  ps -e |grep "gnome-shell"; then
 			theme::add_global --gtk
 			theme::install_icons
+			theme::add_global --fonts
 		else
 			echo "Neither plasma or gnome was found! Only installing Icons."
 			theme::install_icons
+			theme::add_global --fonts
 		fi
 	;;
 esac
