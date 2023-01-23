@@ -64,7 +64,8 @@
 # call this script itself with elevated priviledges.
 
 If (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator")) {
-	Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" $PSCommandArgs" -WorkingDirectory $pwd -Verb RunAs
+	#Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" $PSCommandArgs" -WorkingDirectory $pwd -Verb RunAs
+	Start-Process PowerShell.exe -ArgumentList ("-NoProfile -ExecutionPolicy Bypass -File `"{0}`"" -f $PSCommandPath) -Verb RunAs
 }
 
 
@@ -100,12 +101,12 @@ $tweaks = @(
 
 	###	OEM Software Tasks
 	"RTDRegistryTweaks",
-	"InstallVMSDriverTools"
+	"InstallVMSDriverTools",         # Install VM Guest tools if a VM is detected 
 	"Install7Zip",
 	#"InstallGameBundle",
-	"InstallDeveloperToolsBundle",
+	#"InstallDeveloperToolsBundle",
 	"InstallVLC",
-	"InstallPDFToolsBundle",
+	# "InstallPDFToolsBundle",
 	"InstallBrave",
 	"InstallFirefox",
 	#"InstallLibreOffice",
@@ -233,7 +234,7 @@ $tweaks = @(
 	"InstallMediaPlayer", 		# "UninstallMediaPlayer",
 	"UninstallInternetExplorer",    # "InstallInternetExplorer",
 	"UninstallWorkFolders",         # "InstallWorkFolders",
-	"InstallLinuxSubsystem",        # "UninstallLinuxSubsystem",
+	# "InstallLinuxSubsystem",        # "UninstallLinuxSubsystem",
 	# "InstallHyperV",              # "UninstallHyperV",
 	"SetPhotoViewerAssociation",    # "UnsetPhotoViewerAssociation",
 	"AddPhotoViewerOpenWith",       # "RemovePhotoViewerOpenWith",
@@ -2185,40 +2186,74 @@ Function InstallOneDrive {
 # Uninstall default Microsoft applications
 Function UninstallMsftBloat {
 	$Bloatware = @(
+		"Microsoft.Windows.NarratorQuickStart"
+		"Microsoft.XboxGameCallableUI"
+		"Microsoft.Windows.ParentalControls"
+		"Microsoft.Paint"
+		"Microsoft.GamingApp"
 		"Microsoft.3DBuilder"
-		"Microsoft.AppConnector"
+		"Microsoft.Appconnector"
 		"Microsoft.BingFinance"
 		"Microsoft.BingNews"
 		"Microsoft.BingSports"
 		"Microsoft.BingTranslator"
 		"Microsoft.BingWeather"
+		"Microsoft.FreshPaint"
+		"Microsoft.GamingServices"
+		"Microsoft.Microsoft3DViewer"
+		"Microsoft.MicrosoftOfficeHub"
+		"Microsoft.MicrosoftPowerBIForWindows"
+		"Microsoft.MicrosoftSolitaireCollection"
+		"Microsoft.MicrosoftStickyNotes"
+		"Microsoft.MinecraftUWP"
+		"Microsoft.NetworkSpeedTest"
+		"Microsoft.Office.OneNote"
+		"Microsoft.OneConnect"
+		"Microsoft.People"
+		"Microsoft.Print3D"
+		"Microsoft.SkypeApp"
+		"Microsoft.Wallet"
+		"Microsoft.Windows.Photos"
+		"Microsoft.WindowsAlarms"
+		"Microsoft.WindowsCamera"
+		"microsoft.windowscommunicationsapps"
+		"Microsoft.WindowsMaps"
+		"Microsoft.WindowsPhone"
+		"Microsoft.WindowsSoundRecorder"
+		"Microsoft.Xbox.TCUI"
+		"Microsoft.XboxApp"
+		"Microsoft.XboxGameOverlay"
+		"Microsoft.XboxGamingOverlay"
+		"Microsoft.XboxSpeechToTextOverlay"
+		"Microsoft.YourPhone"
+		"Microsoft.ZuneMusic"
+		"Microsoft.ZuneVideo"
+
+		# Threshold 2 apps
 		"Microsoft.CommsPhone"
 		"Microsoft.ConnectivityStore"
 		"Microsoft.GetHelp"
 		"Microsoft.Getstarted"
 		"Microsoft.Messaging"
-		"Microsoft.Microsoft3DViewer"
-		"Microsoft.MicrosoftPowerBIForWindows"
-		"Microsoft.MicrosoftSolitaireCollection"
-		"Microsoft.MicrosoftStickyNotes"
-		"Microsoft.NetworkSpeedTest"
-		"Microsoft.Office.OneNote"
 		"Microsoft.Office.Sway"
 		"Microsoft.OneConnect"
-		"Microsoft.People"
-		"Microsoft.Print3D"
-		"Microsoft.RemoteDesktop"
-		"Microsoft.Wallet"
-		"Microsoft.WindowsAlarms"
-		"Microsoft.WindowsCamera"
-		"microsoft.windowscommunicationsapps"
 		"Microsoft.WindowsFeedbackHub"
-		"Microsoft.WindowsMaps"
-		"Microsoft.WindowsPhone"
-		"Microsoft.Windows.Photos"
-		"Microsoft.WindowsSoundRecorder"
-		"Microsoft.ZuneMusic"
-		"Microsoft.ZuneVideo"
+
+		# Creators Update apps
+		"Microsoft.Microsoft3DViewer"
+		"Microsoft.MSPaint"
+
+		#Redstone apps
+		"Microsoft.BingFoodAndDrink"
+		"Microsoft.BingHealthAndFitness"
+		"Microsoft.BingTravel"
+		"Microsoft.WindowsReadingList"
+
+		# Redstone 5 apps
+		"Microsoft.MixedReality.Portal"
+		"Microsoft.ScreenSketch"
+		"Microsoft.XboxGamingOverlay"
+		"Microsoft.YourPhone"
 	)
 	ForEach-Object $Bloat in $Bloatware {
 		Write-Progress --Activity "Uninstalling default third party applications" --Status "Removing: $Bloat"
@@ -2230,42 +2265,75 @@ Function UninstallMsftBloat {
 # Install default Microsoft applications
 Function InstallMsftBloat {
 	$Bloatware = @(
+		"Microsoft.Windows.NarratorQuickStart"
+		"Microsoft.XboxGameCallableUI"
+		"Microsoft.Windows.ParentalControls"
+		"Microsoft.Paint"
+		"Microsoft.GamingApp"
+		"SpotifyAB.SpotifyMusic"
 		"Microsoft.3DBuilder"
-		"Microsoft.AppConnector"
+		"Microsoft.Appconnector"
 		"Microsoft.BingFinance"
 		"Microsoft.BingNews"
 		"Microsoft.BingSports"
 		"Microsoft.BingTranslator"
 		"Microsoft.BingWeather"
+		"Microsoft.FreshPaint"
+		"Microsoft.GamingServices"
+		"Microsoft.Microsoft3DViewer"
+		"Microsoft.MicrosoftOfficeHub"
+		"Microsoft.MicrosoftPowerBIForWindows"
+		"Microsoft.MicrosoftSolitaireCollection"
+		"Microsoft.MicrosoftStickyNotes"
+		"Microsoft.MinecraftUWP"
+		"Microsoft.NetworkSpeedTest"
+		"Microsoft.Office.OneNote"
+		"Microsoft.OneConnect"
+		"Microsoft.People"
+		"Microsoft.Print3D"
+		"Microsoft.SkypeApp"
+		"Microsoft.Wallet"
+		"Microsoft.Windows.Photos"
+		"Microsoft.WindowsAlarms"
+		"Microsoft.WindowsCamera"
+		"microsoft.windowscommunicationsapps"
+		"Microsoft.WindowsMaps"
+		"Microsoft.WindowsPhone"
+		"Microsoft.WindowsSoundRecorder"
+		"Microsoft.Xbox.TCUI"
+		"Microsoft.XboxApp"
+		"Microsoft.XboxGameOverlay"
+		"Microsoft.XboxGamingOverlay"
+		"Microsoft.XboxSpeechToTextOverlay"
+		"Microsoft.YourPhone"
+		"Microsoft.ZuneMusic"
+		"Microsoft.ZuneVideo"
+
+		# Threshold 2 apps
 		"Microsoft.CommsPhone"
 		"Microsoft.ConnectivityStore"
 		"Microsoft.GetHelp"
 		"Microsoft.Getstarted"
 		"Microsoft.Messaging"
-		"Microsoft.Microsoft3DViewer"
-		"Microsoft.MicrosoftPowerBIForWindows"
-		"Microsoft.MicrosoftSolitaireCollection"
-		"Microsoft.MicrosoftStickyNotes"
-		"Microsoft.MinecraftUWP"
-		"Microsoft.MSPaint"
-		"Microsoft.NetworkSpeedTest"
 		"Microsoft.Office.Sway"
 		"Microsoft.OneConnect"
-		"Microsoft.People"
-		"Microsoft.Print3D"
-		"Microsoft.RemoteDesktop"
-		"Microsoft.SkypeApp"
-		"Microsoft.Wallet"
-		"Microsoft.WindowsAlarms"
-		"Microsoft.WindowsCamera"
-		"Microsoft.windowscommunicationsapps"
 		"Microsoft.WindowsFeedbackHub"
-		"Microsoft.WindowsMaps"
-		"Microsoft.WindowsPhone"
-		"Microsoft.Windows.Photos"
-		"Microsoft.WindowsSoundRecorder"
-		"Microsoft.ZuneMusic"
-		"Microsoft.ZuneVideo"
+
+		# Creators Update apps
+		"Microsoft.Microsoft3DViewer"
+		"Microsoft.MSPaint"
+
+		#Redstone apps
+		"Microsoft.BingFoodAndDrink"
+		"Microsoft.BingHealthAndFitness"
+		"Microsoft.BingTravel"
+		"Microsoft.WindowsReadingList"
+
+		# Redstone 5 apps
+		"Microsoft.MixedReality.Portal"
+		"Microsoft.ScreenSketch"
+		"Microsoft.XboxGamingOverlay"
+		"Microsoft.YourPhone"
 	)
 
 	ForEach-Object $Bloat in $Bloatware {
@@ -2278,35 +2346,48 @@ Function InstallMsftBloat {
 # Remove 3rd party and sponsor bloatware
 function UninstallThirdPartyBloat {
 	$Bloatware = @(
-		"2414FC7A.Viber"
-		"41038Axilesoft.ACGMediaPlayer"
+		# non-Microsoft
+		"SpotifyAB.SpotifyMusic"
+		"2FE3CB00.PicsArt-PhotoStudio"
 		"46928bounde.EclipseManager"
 		"4DF9E0F8.Netflix"
-		"64885BlueEdge.OneCalendar"
+		"613EBCEA.PolarrPhotoEditorAcademicEdition"
+		"6Wunderkinder.Wunderlist"
 		"7EE7776C.LinkedInforWindows"
-		"828B5831.HiddenCityMysteryofShadows"
 		"89006A2E.AutodeskSketchBook"
 		"9E2F88E3.Twitter"
 		"A278AB0D.DisneyMagicKingdoms"
 		"A278AB0D.MarchofEmpires"
 		"ActiproSoftwareLLC.562882FEEB491"
-		"AdobeSystemsIncorporated.AdobePhotoshopExpress"
-		"CAF9E577.Plex"
+		"CAF9E577.Plex"  
+		"ClearChannelRadioDigital.iHeartRadio"
 		"D52A8D61.FarmVille2CountryEscape"
 		"D5EA27B7.Duolingo-LearnLanguagesforFree"
 		"DB6EA5DB.CyberLinkMediaSuiteEssentials"
 		"DolbyLaboratories.DolbyAccess"
+		"DolbyLaboratories.DolbyAccess"
 		"Drawboard.DrawboardPDF"
 		"Facebook.Facebook"
-		"flaregamesGmbH.RoyalRevolt2"
+		"Fitbit.FitbitCoach"
+		"Flipboard.Flipboard"
 		"GAMELOFTSA.Asphalt8Airborne"
 		"KeeperSecurityInc.Keeper"
-		"king.com.BubbleWitch3Saga"
-		"king.com.CandyCrushSodaSaga"
+		"Microsoft.BingNews"
+		"NORDCURRENT.COOKINGFEVER"
 		"PandoraMediaInc.29680B314EFC2"
+		"Playtika.CaesarsSlotsFreeCasino"
+		"ShazamEntertainmentLtd.Shazam"
 		"SpotifyAB.SpotifyMusic"
+		"TheNewYorkTimes.NYTCrossword"
+		"ThumbmunkeysLtd.PhototasticCollage"
+		"TuneIn.TuneInRadio"
 		"WinZipComputing.WinZipUniversal"
 		"XINGAG.XING"
+		"flaregamesGmbH.RoyalRevolt2"
+		"king.com.*"
+		"king.com.BubbleWitch3Saga"
+		"king.com.CandyCrushSaga"
+		"king.com.CandyCrushSodaSaga"
 	)
 	ForEach-Object $Bloat in $Bloatware {
 		Write-Progress --Activity "Uninstalling default third party applications" --Status "Removing: $Bloat"
@@ -2318,35 +2399,48 @@ function UninstallThirdPartyBloat {
 # Install 3rd party and sponsor bloatware
 Function InstallThirdPartyBloat {
 	$Bloatware = @(
-		"2414FC7A.Viber"
-		"41038Axilesoft.ACGMediaPlayer"
+		# non-Microsoft
+		"SpotifyAB.SpotifyMusic"
+		"2FE3CB00.PicsArt-PhotoStudio"
 		"46928bounde.EclipseManager"
 		"4DF9E0F8.Netflix"
-		"64885BlueEdge.OneCalendar"
+		"613EBCEA.PolarrPhotoEditorAcademicEdition"
+		"6Wunderkinder.Wunderlist"
 		"7EE7776C.LinkedInforWindows"
-		"828B5831.HiddenCityMysteryofShadows"
 		"89006A2E.AutodeskSketchBook"
 		"9E2F88E3.Twitter"
 		"A278AB0D.DisneyMagicKingdoms"
 		"A278AB0D.MarchofEmpires"
 		"ActiproSoftwareLLC.562882FEEB491"
-		"AdobeSystemsIncorporated.AdobePhotoshopExpress"
-		"CAF9E577.Plex"
+		"CAF9E577.Plex"  
+		"ClearChannelRadioDigital.iHeartRadio"
 		"D52A8D61.FarmVille2CountryEscape"
 		"D5EA27B7.Duolingo-LearnLanguagesforFree"
 		"DB6EA5DB.CyberLinkMediaSuiteEssentials"
 		"DolbyLaboratories.DolbyAccess"
+		"DolbyLaboratories.DolbyAccess"
 		"Drawboard.DrawboardPDF"
 		"Facebook.Facebook"
-		"flaregamesGmbH.RoyalRevolt2"
+		"Fitbit.FitbitCoach"
+		"Flipboard.Flipboard"
 		"GAMELOFTSA.Asphalt8Airborne"
 		"KeeperSecurityInc.Keeper"
-		"king.com.BubbleWitch3Saga"
-		"king.com.CandyCrushSodaSaga"
+		"Microsoft.BingNews"
+		"NORDCURRENT.COOKINGFEVER"
 		"PandoraMediaInc.29680B314EFC2"
+		"Playtika.CaesarsSlotsFreeCasino"
+		"ShazamEntertainmentLtd.Shazam"
 		"SpotifyAB.SpotifyMusic"
+		"TheNewYorkTimes.NYTCrossword"
+		"ThumbmunkeysLtd.PhototasticCollage"
+		"TuneIn.TuneInRadio"
 		"WinZipComputing.WinZipUniversal"
 		"XINGAG.XING"
+		"flaregamesGmbH.RoyalRevolt2"
+		"king.com.*"
+		"king.com.BubbleWitch3Saga"
+		"king.com.CandyCrushSaga"
+		"king.com.CandyCrushSodaSaga"
 	)
 	ForEach-Object $Bloat in $Bloatware {
 		Write-Progress --Activity "Installing Default Microsoft Applications" --Status "Installing: $Bloat"
@@ -2796,12 +2890,12 @@ Function DebloatAll {
 		"*Dolby*"
 
 		#Optional: Typically not removed but you can if you need to for some reason
-		#"*Microsoft.Advertising.Xaml_10.1712.5.0_x64__8wekyb3d8bbwe*"
-		#"*Microsoft.Advertising.Xaml_10.1712.5.0_x86__8wekyb3d8bbwe*"
+		"*Microsoft.Advertising.Xaml_10.1712.5.0_x64__8wekyb3d8bbwe*"
+		"*Microsoft.Advertising.Xaml_10.1712.5.0_x86__8wekyb3d8bbwe*"
 		#"*Microsoft.BingWeather*"
 		#"*Microsoft.MSPaint*"
 		#"*Microsoft.MicrosoftStickyNotes*"
-		#"*Microsoft.Windows.Photos*"
+		"*Microsoft.Windows.Photos*"
 		#"*Microsoft.WindowsCalculator*"
 		#"*Microsoft.WindowsStore*"
 	)

@@ -3,13 +3,13 @@
 #::             	Linux Gnome shell extention installation script
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#:: Author(s):   	Ian Brunelli <ian@brunelli.me>
-#:: Version 1.6.2
+#:: Author(s):   	Ian Brunelli <ian@brunelli.me>  Modified: vonschutter
+#:: Version 1.6.3
 #::
 #::
 #::	Purpose: - The purpose of the script is to provide a scriptable way to find and install Gnome shell extensions
 #::
-#::	Dependencies:
+#::	Dependencies:  Base tools, perl, gnome-extensions, curl
 #::
 #::
 #::
@@ -20,7 +20,7 @@
 #
    #################################################################
    #                                                               #
-   #             GNOME Shell Extension Installer 1.6.2             #
+   #             GNOME Shell Extension Installer 1.6.3             #
    #                                                               #
    #       Copyright (C) 2017 Ian Brunelli <ian@brunelli.me>       #
    #       Licensed under the GNU General Public License 2.0       #
@@ -29,6 +29,40 @@
    #                                                               #
    #################################################################
 
+   
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+   
+   
+check_rtd_library ()
+{
+	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
+		# Library found in relative path...
+		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library
+	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
+		# Library not found in relative path: search the typical location...
+		write_information "${FUNCNAME[0]} 2 Using: $(find /opt -name _rtd_library |grep -v bakup )"
+	elif wget ${_src_url} ; then
+		# Critical failure: downloaded copy from github.com
+		source ./_rtd_library
+	else
+		# Abot condition: No mitigation steps worked.
+		echo -e "RTD functions NOT loaded!"
+		echo -e " "
+		echo -e "Cannot ensure that the correct functionality is available"
+		echo -e "Quiting rather than cause potential damage..."
+		exit 1
+	fi
+
+	write_host --cyan "Libraries loaded"
+}
+
+   
 usage_guide() {
   cat << EOF
 Usage: $SCRIPT_NAME EXTENSION_ID [EXTENSION_ID...] [GNOME_VERSION] [OPTIONS]
@@ -48,7 +82,7 @@ Usage examples:
   $SCRIPT_NAME -s "User Themes"	# Search "User Themes"
 
 Installation directory:
-  Extensions will be installed at '/usr/local/share/gnome-shell/extensions' if
+  Extensions will be installed at '/usr/share/gnome-shell/extensions' if
   the script is ran with super user privileges. If not, they will be installed
   at '$HOME/.local/share/gnome-shell/extensions'.
 EOF
@@ -57,8 +91,7 @@ EOF
 enable_extension() {
   if command -v gnome-extensions > /dev/null
   then
-    gnome-extensions enable "$2" &&
-    echo "[$1] Extension enabled"
+    gnome-extensions enable "$2" || echo "Failed to enable [$1] Extension" && echo "[$1] Extension enabled"
   else
     EXTL_OUTPUT=$( gnome-shell-extension-tool --enable-extension="$2" 2>&1 )
     sed -n "s/^'.*' is\( now\)\?\(.*\)\.$/[$1] Extension\2/p" <<< "$EXTL_OUTPUT"
@@ -71,6 +104,7 @@ extract_extension() {
   echo "[$1] Extracting extension"
   unzip -qq -o "$TMP_DIR/shell-$SELECTED_VERSION-extension-install.$3.zip" -d "$EXTENSIONS_PATH/$2"
   rm -f "$TMP_DIR/shell-$SELECTED_VERSION-extension-install.$3.zip"
+  chmod 755 -R "$EXTENSIONS_PATH/$2"
   return $CODE
 }
 
@@ -463,12 +497,26 @@ get_extension() {
     install_version
 }
 
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+check_rtd_library
+
+check_dependencies curl 
+check_dependencies perl
+
 for CMD in curl dbus-send
 do
     command -v "$CMD" > /dev/null ||
     { echo "Missing required command: ${CMD}" >&2
       exit 1; }
 done
+
+
 
 GNOME_VERSION=$( gnome-shell --version 2> /dev/null |
                  sed -n "s/^.* \([0-9]\+\.[0-9]\+\).*$/\1/p" )

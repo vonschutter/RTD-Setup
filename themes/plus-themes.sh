@@ -2,7 +2,7 @@
 PUBLICATION="RTD Simple Global Theme Install"
 VERSION="1.00"
 #
-#::             Linux icon Theme Installer Script
+#::             Linux Theme Installer Script
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::// Linux //::::
 #:: Author(s):   	SLS
@@ -29,7 +29,9 @@ VERSION="1.00"
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 : "${_my_scriptdir="$( cd "$( dirname ${BASH_SOURCE[0]} )" && pwd )"}"
 : "${_tmp="$( mktemp -d )"}" 
-_potential_dependencies="7z unzip p7zip-full p7zip sassc gettext make"
+: "${_GIT_PROFILE:-"vonschutter"}"
+
+_potential_dependencies="7z unzip p7zip-full p7zip p7zip-plugins sassc gettext make"
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -54,10 +56,17 @@ theme::add_global ()
 	--gtk )
 		pushd ${_my_scriptdir}/gtk
 		theme::install_payload
+		ensure_snap_package_managment
+		snap install vimix-themes && for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
 		popd
 	;;
 	--kde )
 		pushd ${_my_scriptdir}/kde
+		theme::install_payload
+		popd
+	;;
+	--fonts) 
+		pushd ${_my_scriptdir}/fon
 		theme::install_payload
 		popd
 	;;
@@ -94,7 +103,7 @@ dependency::_rtd_library ()
 		echo -e " "
 		echo -e "Cannot ensure that the correct functionality is available"
 		echo -e "Quiting rather than cause potential damage..."
-		exit 1
+		return 1
 	fi
 }
 
@@ -105,7 +114,7 @@ dependency::_rtd_library ()
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-for i in "${_potential_dependencies}" ; do hash $i || check_dependencies $i ; done
+dependency::_rtd_library && for i in "${_potential_dependencies}" ; do hash $i || check_dependencies $i ; done
 
 
 case $1 in
@@ -113,29 +122,35 @@ case $1 in
 		echo "Foced install of GTK themes..."
 		theme::add_global --gtk
 		theme::install_icons
+		theme::add_global --fonts
 	;;
 	--kde )
 		echo "Foced install of KDE themes..."
 		theme::add_global --kde
 		theme::install_icons
+		theme::add_global --fonts
 	;;
 	--all )
 		echo "Foced install of ALL themes..."
 		theme::add_global --kde
 		theme::add_global --gtk
 		theme::install_icons
+		theme::add_global --fonts
 	;;
 	* )
 		echo "No preference stated. Autodetecting themes for current environment..."
 		if  ps -e |grep "plasmashell" ; then
 			theme::add_global --kde
 			theme::install_icons
+			theme::add_global --fonts
 		elif  ps -e |grep "gnome-shell"; then
 			theme::add_global --gtk
 			theme::install_icons
+			theme::add_global --fonts
 		else
 			echo "Neither plasma or gnome was found! Only installing Icons."
 			theme::install_icons
+			theme::add_global --fonts
 		fi
 	;;
 esac
@@ -147,5 +162,6 @@ esac
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 unset _my_scriptdir
+unset _potential_dependencies
 exit
 

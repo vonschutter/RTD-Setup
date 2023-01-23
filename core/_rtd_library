@@ -347,7 +347,7 @@ github::list_all_user_repositories ()
 	if [ $# -eq 0 ]
 	  then
 	    echo "Usage: ${FUNCNAME[0]} <user_name> "
-	    exit 1;
+	    return 1;
 	fi
 
 	for repo in $(curl -s https://api.github.com/users/${1}/repos?per_page=1000 |grep git_url |awk '{print $2}'| sed 's/"\(.*\)",/\1/'); do
@@ -898,73 +898,73 @@ display_spinner ()
 #
 # End of documentation
 
-		function _spinner() {
-		# $1 start/stop
-		#
-		# on start: $2 display message
-		# on stop : $2 process exit status
-		#           $3 spinner function pid (supplied from stop_spinner)
+	function _spinner() {
+	# $1 start/stop
+	#
+	# on start: $2 display message
+	# on stop : $2 process exit status
+	#           $3 spinner function pid (supplied from stop_spinner)
 
-		local on_success="DONE"
-		local on_fail="FAIL"
-		local nc="\e[0m"
+	local on_success="DONE"
+	local on_fail="FAIL"
+	local nc="\e[0m"
 
-		case $1 in
-			start)
-			# calculate the column where spinner and status msg will be displayed
-			let column=$(tput cols)-${#2}-46
-			# display message and position the cursor in $column column
-			# echo -ne ${2}
-			printf "%${column}s"
+	case $1 in
+		start)
+		# calculate the column where spinner and status msg will be displayed
+		let column=$(tput cols)-${#2}-46
+		# display message and position the cursor in $column column
+		# echo -ne ${2}
+		printf "%${column}s"
 
-			# start spinner
-			i=1
-			sp='\|/-'
-			delay=${SPINNER_DELAY:-0.15}
+		# start spinner
+		i=1
+		sp='\|/-'
+		delay=${SPINNER_DELAY:-0.15}
 
-			while :
-			do
-				printf "${RED}\b[${sp:i++%${#sp}:1}]\b\b${ENDCOLOR}"
-				sleep $delay
-			done
-			;;
-			stop)
-			if [[ -z ${3} ]]; then
-				echo "spinner is not running.."
-				exit 1
-			fi
-
-			kill $3 > /dev/null 2>&1
-
-			# inform the user uppon success or failure
-			echo -en "\b["
-			if [[ $2 -eq 0 ]]; then
-				echo -en "${green}${on_success}${nc}"
-			else
-				echo -en "${red}${on_fail}${nc}"
-			fi
-			echo -e "]"
-			;;
-			*)
-			write_error "invalid argument, try {start/stop}"
+		while :
+		do
+			printf "${RED}\b[${sp:i++%${#sp}:1}]\b\b${ENDCOLOR}"
+			sleep $delay
+		done
+		;;
+		stop)
+		if [[ -z ${3} ]]; then
+			echo "spinner is not running.."
 			exit 1
-			;;
-		esac
-		}
+		fi
 
-		function start_spinner {
-		# $1 : msg to display
-		_spinner "start" "${1}" &
-		# set global spinner pid
-		export _sp_pid=$!
-		disown
-		}
+		kill $3 > /dev/null 2>&1
 
-		function stop_spinner {
-		# $1 : command exit status
-		_spinner "stop" $1 $_sp_pid
-		unset _sp_pid
-		}
+		# inform the user uppon success or failure
+		echo -en "\b["
+		if [[ $2 -eq 0 ]]; then
+			echo -en "${green}${on_success}${nc}"
+		else
+			echo -en "${red}${on_fail}${nc}"
+		fi
+		echo -e "]"
+		;;
+		*)
+		write_error "invalid argument, try {start/stop}"
+		exit 1
+		;;
+	esac
+	}
+
+	function start_spinner {
+	# $1 : msg to display
+	_spinner "start" "${1}" &
+	# set global spinner pid
+	export _sp_pid=$!
+	disown
+	}
+
+	function stop_spinner {
+	# $1 : command exit status
+	_spinner "stop" $1 $_sp_pid
+	unset _sp_pid
+	}
 
 	if [[ "$1" == "start" ]] ; then
 		start_spinner $2
@@ -1413,10 +1413,10 @@ rtd_oem_find_live_release()
 # rtd_oem_find_live_release 	      10              debian         net            ssh-server
 # rtd_oem_find_live_release 	      19.04.2         ubuntu         live
 # End of documentation
-	distro_version="${1:-10}"
-	distro_flavor="${2:-debian}"
-	live_or_not="${3:-live}"
-	desktop_env="${4:-standard}"
+	local distro_version="${1:-10}"
+	local distro_flavor="${2:-debian}"
+	local live_or_not="${3:-live}"
+	local desktop_env="${4:-standard}"
 
 	case "$distro_flavor" in
 	Ubuntu | ubuntu )
@@ -1879,7 +1879,7 @@ set_gnome_ui_tweak_no_media_error ()
 # Outputs:
 # Returns: Standard err for last task
 # End of documentation
-	: ${OEM_Hint:="There was a problem with finding themes, launch the Bundle Installer Tool?"}
+	: ${OEM_Hint:="I cannot find the actual theme files needed. Should I launch the Bundle Installer Tool to get these?"}
 
 	zenity --question --text "${OEM_Hint}" --width=600
 	case "$?" in
@@ -1921,10 +1921,10 @@ set_gnome_ui_mac_tweaks_for_user ()
 
 	case ${UiTone} in
 	Dark | dark )
-		if [[ -d /usr/share/themes/Mojave-dark ]] ; then
-			gsettings set org.gnome.desktop.interface gtk-theme 'Mojave-dark'
-			gsettings set org.gnome.desktop.interface icon-theme 'McMojave-circle-dark'
-			gsettings set org.gnome.shell.extensions.user-theme name "Mojave-dark"
+		if [[ -d /usr/share/themes/WhiteSur-Dark ]] ; then
+			gsettings set org.gnome.desktop.interface gtk-theme 'WhiteSur-Dark'
+			gsettings set org.gnome.desktop.interface icon-theme 'WhiteSur-dark'
+			gsettings set org.gnome.shell.extensions.user-theme name "WhiteSur-Dark"
 
 			gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/MojaveNight.jpg
 
@@ -1934,10 +1934,10 @@ set_gnome_ui_mac_tweaks_for_user ()
 		fi
 	;;
 	Light| light )
-		if [[ -d /usr/share/themes/Mojave-light ]] ; then
-			gsettings set org.gnome.desktop.interface gtk-theme 'Mojave-light'
-			gsettings set org.gnome.desktop.interface icon-theme 'McMojave-circle'
-			gsettings set org.gnome.shell.extensions.user-theme name "Mojave-light"
+		if [[ -d /usr/share/themes/WhiteSur-Light ]] ; then
+			gsettings set org.gnome.desktop.interface gtk-theme 'WhiteSur-Light'
+			gsettings set org.gnome.desktop.interface icon-theme 'WhiteSur'
+			gsettings set org.gnome.shell.extensions.user-theme name "WhiteSur-Light"
 
 			gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/MojaveDay.jpg
 
@@ -2025,7 +2025,7 @@ set_gnome_ui_win10_tweaks_for_user ()
 	;;
 	esac
 
-	# Set font
+	# Set font  
 	# gsettings set org.gnome.desktop.interface monospace-font-name 'Bitstream Vera Sans Mono'
 
 	#Set Extensions for gnome
@@ -2179,11 +2179,10 @@ set_gnome_ui_moca_tweaks_for_user ()
 
 	GNOME_TERMINAL_PROFILE=`gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}'`
 
-	if [[ -d /usr/share/themes/vimix-dark-laptop ]] ; then
-		gsettings set org.gnome.desktop.interface gtk-theme 'vimix-dark-laptop'
-		gsettings set org.gnome.shell.extensions.user-theme name "vimix-dark-laptop"
-		# Set wallpaper
-		gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/Ubuntu-ThrowingStones.jpg
+	if [[ -d /usr/share/themes/vimix-dark-doder ]] ; then
+		gsettings set org.gnome.desktop.interface gtk-theme 'vimix-dark-doder'
+		gsettings set org.gnome.shell.extensions.user-theme name "vimix-dark-doder"
+		gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/Chocolate_brown_wallpaper.jpg
 	else
 		set_gnome_ui_tweak_no_media_error
 	fi
@@ -2209,7 +2208,8 @@ set_gnome_ui_moca_tweaks_for_user ()
 
 	# Configure dash-to-panel
 	gsettings set org.gnome.shell.extensions.dash-to-panel trans-use-custom-opacity 'true'
-
+	
+	# Configure terminal look...
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ font 'Monospace 10'
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-system-font false
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ audible-bell false
@@ -3985,12 +3985,12 @@ ensure_flatpak_package_managment ()
 # +-----------------------------------------------------+----------------+-------------+-----------------+
 # End of documentation
 	if hash flatpak ; then
-		write_status "${FUNCNAME[0]}: FLATPAK command is available! Skipping check ... "
+		write_status "🧩 ${FUNCNAME[0]}: FLATPAK command is available! Skipping check ... "
 	else
 		ensure_admin
-		write_information "${FUNCNAME[0]}: Ensuring Flatpack software distribution system is available..."
-			check_dependencies flatpak || write_error "${FUNCNAME[0]}: Failed to satisfy dependecy flatpak!"
-			flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || write_error "${FUNCNAME[0]}: Failed to add flatpak repo!"
+		write_information "🧩 ${FUNCNAME[0]}: Ensuring Flatpack software distribution system is available..."
+			check_dependencies flatpak || write_error "💥 ${FUNCNAME[0]}: Failed to satisfy dependecy flatpak!"
+			flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || write_error "💥 ${FUNCNAME[0]}: Failed to add flatpak repo!"
 		return $?
 	fi
 }
@@ -4048,39 +4048,43 @@ ensure_snap_package_managment ()
 		ensure_admin
 		# these tests focus on the latest versions of the distros evaluated...
 		if hostnamectl |grep "SUSE" 2>/dev/null ; then
-			write_warning "${FUNCNAME[0]}: Special case for suse"
-			write_status "${FUNCNAME[0]}: Adding repository..."
+			write_warning "🧩 ${FUNCNAME[0]}: Special case for suse"
+			write_status "🧩 ${FUNCNAME[0]}: Adding repository..."
 				zypper addrepo --refresh https://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_$(cat /etc/os-release |grep VERSION_ID |cut -d= -f2|cut -d\" -f2) snappy
-			write_status "${FUNCNAME[0]}: Importing GPG keys..."
+			write_status "🧩 ${FUNCNAME[0]}: Importing GPG keys..."
 				zypper --gpg-auto-import-keys refresh
-			write_status "${FUNCNAME[0]}: Updating software repository indexes..."
+			write_status "🧩 ${FUNCNAME[0]}: Updating software repository indexes..."
 				zypper dup --from snappy
-			write_information "${FUNCNAME[0]}: Ensuring SNAP software distribution system is available..."
-				check_dependencies snapd || write_error "${FUNCNAME[0]}: Failed to satisfy dependecy SNAP!"
+			write_information "🧩 ${FUNCNAME[0]}: Ensuring SNAP software distribution system is available..."
+				check_dependencies snapd || write_error "💥 ${FUNCNAME[0]}: Failed to satisfy dependecy SNAP!"
 				systemctl enable snapd ; systemctl start snapd
-				systemctl is-active --quiet snapd || ( write "${FUNCNAME[0]}: Service snapd not started sucessfully!" ; return 1 )
+				systemctl is-active --quiet snapd || ( write_error "💥 ${FUNCNAME[0]}: Service snapd not started sucessfully!" ; return 1 )
 
 			if [[ -e /snap ]]; then
-				write_information "${FUNCNAME[0]}: SNAP classic support present... "
+				write_information "🧩 ${FUNCNAME[0]}: SNAP classic support present... "
 			else
 				ln -s /var/lib/snapd/snap /snap
 			fi
 			return $?
 		elif hostnamectl |grep "Solus" 2>/dev/null ; then
-			write_information "${FUNCNAME[0]}: Solus has snap support built in..." ;return 0
+			write_information "🧩 ${FUNCNAME[0]}: Solus has snap support built in..." ;return 0
 		elif hostnamectl |grep "Ubuntu" 2>/dev/null ; then
-			write_information "${FUNCNAME[0]}: Ubuntu has snap support built in..." ;return 0
+			write_information "🧩 ${FUNCNAME[0]}: Ubuntu has snap support built in..." ;return 0
 		elif hostnamectl |grep "Zorin" 2>/dev/null ; then
-			write_information "${FUNCNAME[0]}: Zoring has snap support built in..." ;return 0
+			write_information "🧩 ${FUNCNAME[0]}: Zoring has snap support built in..." ;return 0
 		elif hostnamectl |grep "Manjaro" 2>/dev/null ; then
-			write_information "${FUNCNAME[0]}: Manjaro has snap support built in..." ;return 0
+			write_information "🧩 ${FUNCNAME[0]}: Manjaro has snap support built in..." ;return 0
 		else
 			# For distributions that do not need to add a repository to install snap
 			# But would need to install it from their standard reopsitory....
 			write_information "${FUNCNAME[0]}: Ensuring SNAP software distribution system is available..."
-			check_dependencies snapd || write_error "${FUNCNAME[0]}: Failed to satisfy dependecy SNAP!"
-			systemctl enable snapd ; systemctl start snapd ; systemctl status snapd
-			systemctl is-active --quiet snapd || return 1
+			if check_dependencies snapd ; then
+				systemctl enable snapd ; systemctl start snapd 
+				echo snapd is $(systemctl is-active snapd) || return 1
+			else
+				write_error "💥 ${FUNCNAME[0]}: Failed to satisfy dependecy SNAP!"
+			fi
+
 
 			if [[ -e /snap ]]; then
 				write_information "SNAP classic support present... "
@@ -4427,7 +4431,7 @@ check_dependencies ()
 		if [ $? != 0 ];
 		then
 			ensure_snap_package_managment
-			snap install $1
+			snap install $1 
 			if [ $? != 0 ];
 			then
 				ensure_flatpak_package_managment
