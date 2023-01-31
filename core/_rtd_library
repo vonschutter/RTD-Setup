@@ -2025,7 +2025,7 @@ set_gnome_ui_win10_tweaks_for_user ()
 	;;
 	esac
 
-	# Set font  
+	# Set font
 	# gsettings set org.gnome.desktop.interface monospace-font-name 'Bitstream Vera Sans Mono'
 
 	#Set Extensions for gnome
@@ -2208,7 +2208,7 @@ set_gnome_ui_moca_tweaks_for_user ()
 
 	# Configure dash-to-panel
 	gsettings set org.gnome.shell.extensions.dash-to-panel trans-use-custom-opacity 'true'
-	
+
 	# Configure terminal look...
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ font 'Monospace 10'
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-system-font false
@@ -4049,6 +4049,7 @@ ensure_snap_package_managment ()
 		# these tests focus on the latest versions of the distros evaluated...
 		if hostnamectl |grep "SUSE" 2>/dev/null ; then
 			write_warning "🧩 ${FUNCNAME[0]}: Special case for suse"
+			[[ -d /snap  ]] && ( return 0 & write_status "🧩 ${FUNCNAME[0]}:Snap is already present" )
 			write_status "🧩 ${FUNCNAME[0]}: Adding repository..."
 				zypper addrepo --refresh https://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_$(cat /etc/os-release |grep VERSION_ID |cut -d= -f2|cut -d\" -f2) snappy
 			write_status "🧩 ${FUNCNAME[0]}: Importing GPG keys..."
@@ -4059,12 +4060,7 @@ ensure_snap_package_managment ()
 				check_dependencies snapd || write_error "💥 ${FUNCNAME[0]}: Failed to satisfy dependecy SNAP!"
 				systemctl enable snapd ; systemctl start snapd
 				systemctl is-active --quiet snapd || ( write_error "💥 ${FUNCNAME[0]}: Service snapd not started sucessfully!" ; return 1 )
-
-			if [[ -e /snap ]]; then
-				write_information "🧩 ${FUNCNAME[0]}: SNAP classic support present... "
-			else
 				ln -s /var/lib/snapd/snap /snap
-			fi
 			return $?
 		elif hostnamectl |grep "Solus" 2>/dev/null ; then
 			write_information "🧩 ${FUNCNAME[0]}: Solus has snap support built in..." ;return 0
@@ -4078,13 +4074,13 @@ ensure_snap_package_managment ()
 			# For distributions that do not need to add a repository to install snap
 			# But would need to install it from their standard reopsitory....
 			write_information "${FUNCNAME[0]}: Ensuring SNAP software distribution system is available..."
+			[[ -d /snap  ]] && ( return 0 & write_status "🧩 ${FUNCNAME[0]}:Snap is already present" )
 			if check_dependencies snapd ; then
-				systemctl enable snapd ; systemctl start snapd 
+				systemctl enable snapd ; systemctl start snapd
 				echo snapd is $(systemctl is-active snapd) || return 1
 			else
 				write_error "💥 ${FUNCNAME[0]}: Failed to satisfy dependecy SNAP!"
 			fi
-
 
 			if [[ -e /snap ]]; then
 				write_information "SNAP classic support present... "
@@ -4431,7 +4427,7 @@ check_dependencies ()
 		if [ $? != 0 ];
 		then
 			ensure_snap_package_managment
-			snap install $1 
+			snap install $1
 			if [ $? != 0 ];
 			then
 				ensure_flatpak_package_managment
@@ -4856,7 +4852,7 @@ dl ()
 # End of documentation
 
 	download_url="$1"
-	fetch_file () { wget -P {_OEM_DIR}/cache "${download_url}"  ; }
+	fetch_file () { wget -P ${_OEM_DIR}/cache "${download_url}"  ; }
 
 	echo  "${FUNCNAME[0]}: getting package ${download_url}..."
 	if hash wget ; then
@@ -5558,7 +5554,7 @@ make_kvm_virtual_machine_now_from_debian_org ()
 # Specifically, KVM lets you turn Linux into a hypervisor that allows a host machine to run multiple,
 # isolated virtual environments called guests or virtual machines (VMs). KVM is part of Linux.
 # For complete info: https://www.redhat.com/en/topics/virtualization/what-is-KVM
-# set -e
+#
 # Use the check_dependencies function to make sure the needed software is available.
 # Usage: Either simply call this function to use the defaults or:
 # Call this function with "function" "RAM_SIZE" "DISK_SIZE" "DISK_FORMAT" "DISK_FILE"
