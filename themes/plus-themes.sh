@@ -70,22 +70,17 @@ theme::add_global ()
 		theme::install_payload
 		popd
 	;;
+	--icons )
+		pushd ${_my_scriptdir}/ico
+		theme::install_payload
+		popd
+	;;	
 	*)
 		echo "Neither GTK or KDE themes were requested"
 	;;
 	esac
 }
 
-theme::install_icons ()
-{
-	pushd ${_my_scriptdir}/ico
-	for i in *.7z ; do
-		7z x $i -aoa -o${_tmp}
-		pushd "${_tmp}/${i::-3}"
-		bash ./install.sh
-		popd
-	done
-}
 
 
 dependency::_rtd_library ()
@@ -121,35 +116,35 @@ case $1 in
 	--gtk )
 		echo "Foced install of GTK themes..."
 		theme::add_global --gtk
-		theme::install_icons
+		theme::add_global --icons
 		theme::add_global --fonts
 	;;
 	--kde )
 		echo "Foced install of KDE themes..."
 		theme::add_global --kde
-		theme::install_icons
+		theme::add_global --icons
 		theme::add_global --fonts
 	;;
 	--all )
 		echo "Foced install of ALL themes..."
 		theme::add_global --kde
 		theme::add_global --gtk
-		theme::install_icons
+		theme::add_global --icons
 		theme::add_global --fonts
 	;;
 	* )
 		echo "No preference stated. Autodetecting themes for current environment..."
 		if  ps -e |grep "plasmashell" ; then
 			theme::add_global --kde
-			theme::install_icons
+			theme::add_global --icons
 			theme::add_global --fonts
 		elif  ps -e |grep "gnome-shell"; then
 			theme::add_global --gtk
-			theme::install_icons
+			theme::add_global --icons
 			theme::add_global --fonts
 		else
 			echo "Neither plasma or gnome was found! Only installing Icons."
-			theme::install_icons
+			theme::add_global --icons
 			theme::add_global --fonts
 		fi
 	;;
