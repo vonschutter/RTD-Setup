@@ -73,7 +73,7 @@ theme::add_global ()
 	*)
 		echo "Neither GTK or KDE themes were requested"
 	;;
-esac
+	esac
 }
 
 theme::install_icons ()
