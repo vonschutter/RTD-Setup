@@ -63,7 +63,7 @@ theme::help ()
 	--kde 	Install all KDE Plasma themes
 	--fonts	Install all additional fonts
 	--icons Install all additional icon themes
-	* 		Install everything
+	--all	Install everything
 	--help	Display this help message
 
 	If nothing is specified the script will try to detect the desktop session and 
@@ -149,20 +149,24 @@ case $1 in
 	--gtk )
 		echo "Foced install of GTK themes..."
 		theme::add_global --gtk
-		theme::add_global --icons
-		theme::add_global --fonts
 	;;
 	--kde )
 		echo "Foced install of KDE themes..."
 		theme::add_global --kde
-		theme::add_global --icons
-		theme::add_global --fonts
 	;;
 	--all )
 		echo "Foced install of ALL themes..."
 		theme::add_global --kde
 		theme::add_global --gtk
 		theme::add_global --icons
+		theme::add_global --fonts
+	;;
+	--icons )
+		echo "Installing icons only..."
+		theme::add_global --icons
+	;;
+	--fonts )
+		echo "Installing fonts only"
 		theme::add_global --fonts
 	;;
 	--help)
@@ -179,7 +183,7 @@ case $1 in
 			theme::add_global --icons
 			theme::add_global --fonts
 		else
-			echo "Neither plasma or gnome was found! Only installing Icons."
+			echo "Neither plasma or gnome was found! Only installing Icons and fonts."
 			theme::add_global --icons
 			theme::add_global --fonts
 		fi
