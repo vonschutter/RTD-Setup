@@ -31,7 +31,7 @@ VERSION="1.00"
 : "${_tmp="$( mktemp -d )"}" 
 : "${_GIT_PROFILE:-"vonschutter"}"
 
-_potential_dependencies="7z unzip p7zip-full p7zip p7zip-plugins sassc gettext make"
+_potential_dependencies="p7zip-full p7zip p7zip-plugins sassc gettext make"
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -39,6 +39,39 @@ _potential_dependencies="7z unzip p7zip-full p7zip p7zip-plugins sassc gettext m
 #::::::::::::::          Script Functions                ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+theme::help ()
+{
+	clear
+	echo "
+	------------------------------------------------------------
+	🔧           Linux Desktop Theme Install Script           🔧
+	------------------------------------------------------------
+	This script is used to install themes on a linux system. It assumes that themes
+	are placed in sub folders named gtk, kde, ico, and fon, directly in same folder as 
+	this script itself. In each of these folders idividual themes for icons, gnome, 
+	plasma, and fonts are compressed in the 7z format. This format often results in 
+	half the files sizes compared to the zip format. Further, in each of these compressed
+	archives a script called install.sh is expected. The install.sh file should do the job of
+	copying the contents to the appropriate location.
+	
+	Syntax: 
+	${0} [ --gtk, --kde, --fonts, --icons, *, --help ]
+	
+	Where: 
+	--gtk	Install all Gnome themes
+	--kde 	Install all KDE Plasma themes
+	--fonts	Install all additional fonts
+	--icons Install all additional icon themes
+	* 		Install everything
+	--help	Display this help message
+
+	If nothing is specified the script will try to detect the desktop session and 
+	install the appropriate themes.
+	
+	"
+}
+
 
 theme::install_payload ()
 {
@@ -109,7 +142,7 @@ dependency::_rtd_library ()
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-dependency::_rtd_library && for i in "${_potential_dependencies}" ; do hash $i || check_dependencies $i ; done
+dependency::_rtd_library && for i in "${_potential_dependencies}" ; do check_dependencies  $i ; done
 
 
 case $1 in
@@ -131,6 +164,9 @@ case $1 in
 		theme::add_global --gtk
 		theme::add_global --icons
 		theme::add_global --fonts
+	;;
+	--help)
+		theme::help
 	;;
 	* )
 		echo "No preference stated. Autodetecting themes for current environment..."

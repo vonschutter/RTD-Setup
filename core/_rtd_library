@@ -51,7 +51,7 @@ export RTD_VERSION=2.0
 	download_and_manipulate_iso_debian 		: Download and modify a debian iso to automatically install OEM addons
 	enable_firewall					: Will turn on UFW and add the Allow SSH rule
 	ensure_admin					: Elevates privileges to admin root for the whole script asks for password
-	ensure_flatpak_package_managment		: Ensure that the Flatpack software management is available
+	ensure_flatpak_package_managment		: Ensure that the flatpak software management is available
 	ensure_snap_package_managment			: Ensure that the snap software management system is installed
 	err_no_menu_system_found 			: Function to handle what to do if it is not possible to currently display menus in a terminal
 	get_Windows_Product_Key				: Retrieves a Microsoft Windows product key if it is stored in BIOS (common for OEM)
@@ -3873,7 +3873,7 @@ scan_for_malware ()
 
 software::ensure_software_store_available ()
 {
-# Description: Function to ensure that flatpack is installed and flathup enabled.
+# Description: Function to ensure that flatpak is installed and flathup enabled.
 # Globals: none
 # Dependencies: [distro pakcage managment] [function: check_dependencies] [Internet access]
 # Arguments: None
@@ -3938,7 +3938,7 @@ software::ensure_software_store_available ()
 
 ensure_flatpak_package_managment ()
 {
-# Description: Function to ensure that flatpack is installed and flathup enabled.
+# Description: Function to ensure that flatpak is installed and flathup enabled.
 # Globals: none
 # Dependencies: [distro pakcage managment] [function: check_dependencies] [Internet access]
 # Arguments: None
@@ -3988,7 +3988,7 @@ ensure_flatpak_package_managment ()
 		write_status "🧩 ${FUNCNAME[0]}: FLATPAK command is available! Skipping check ... "
 	else
 		ensure_admin
-		write_information "🧩 ${FUNCNAME[0]}: Ensuring Flatpack software distribution system is available..."
+		write_information "🧩 ${FUNCNAME[0]}: Ensuring Flatpak software distribution system is available..."
 			check_dependencies flatpak || write_error "💥 ${FUNCNAME[0]}: Failed to satisfy dependecy flatpak!"
 			flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || write_error "💥 ${FUNCNAME[0]}: Failed to add flatpak repo!"
 		return $?
@@ -4282,12 +4282,12 @@ is_software_package_available ()
 InstallSoftwareFromRepo ()
 {
 # Description: Function to simplify the installation of software by including all display and
-# installation logic for a given software provider. This should be expanded to include flatpack
+# installation logic for a given software provider. This should be expanded to include flatpak
 # snap for example. It should be the same consistent way no matter flavor of Linux.
 # This function uses the "$_INSTCMD" to install software. "$_INSTCMD" is defined separatley
 # in the "set_install_command" function (a dependency to this function) and could
-# be an RPM or deb string, or even snap or flatpack. A preference order between package system and
-# snap or flatpack use.
+# be an RPM or deb string, or even snap or flatpak. A preference order between package system and
+# snap or flatpak use.
 # End of documentation
 	ensure_admin
 	: ${_LOGFILE:="/var/log/rtd/$( basename "$0".log )"}
@@ -4401,7 +4401,7 @@ check_dependencies ()
 # Function to check that a piece of software is installed and if not install it.
 # Works for apt based systems currently. The function will take a parameter that is expected to
 # match the software command line name or rather the name of the package. This should get
-# updated to also check and install from snap and flatpack at some point.
+# updated to also check and install from snap and flatpak at some point.
 #
 # Globals:
 # Arguments: None
@@ -4431,7 +4431,7 @@ check_dependencies ()
 			if [ $? != 0 ];
 			then
 				ensure_flatpak_package_managment
-				flatpack install $1 -y
+				flatpak install $1 -y
 				if [ $? != 0 ];
 				then
 					write_error "That install didn't work out so well."
@@ -4788,7 +4788,7 @@ rtd_update_system ()
 		write_warning "--- snap software is not present on this system... skipping..."
 	fi
 
-	write_status "updating flatpacks if flatpack is present on system..."
+	write_status "updating flatpaks if flatpak is present on system..."
 	if hash flatpak 2>/dev/null; then
 		rtd_software_task flatpak update --user --noninteractive -y
 		rtd_software_task flatpak update --system --noninteractive -y
