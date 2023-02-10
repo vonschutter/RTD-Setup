@@ -1,5 +1,5 @@
 #!/bin/bash
-PUBLICATION="RTD Simple Global Theme Install"
+PUBLICATION="${_TLA} Simple Global Theme Install"
 VERSION="1.00"
 #
 #::             Linux Theme Installer Script
