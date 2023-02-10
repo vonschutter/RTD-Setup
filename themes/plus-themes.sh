@@ -14,8 +14,8 @@ VERSION="1.00"
 #::		 folder and run it.
 #::
 #::	Dependencies: - There may be dependencies like make and other development utilities.
-#::		      - It is also assumed that there is an "install.sh" script in the root of each compressed archive. 
-#::			This script may be supplied by the maintainer of the theme or us/you. It shall, by default, 
+#::		      - It is also assumed that there is an "install.sh" script in the root of each compressed archive.
+#::			This script may be supplied by the maintainer of the theme or us/you. It shall, by default,
 #::			install a sensible set of theme files (icons, themes, colors etc.).
 #::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -28,7 +28,7 @@ VERSION="1.00"
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 : "${_my_scriptdir="$( cd "$( dirname ${BASH_SOURCE[0]} )" && pwd )"}"
-: "${_tmp="$( mktemp -d )"}" 
+: "${_tmp="$( mktemp -d )"}"
 : "${_GIT_PROFILE:-"vonschutter"}"
 
 _potential_dependencies="p7zip-full p7zip p7zip-plugins sassc gettext make"
@@ -43,22 +43,22 @@ _potential_dependencies="p7zip-full p7zip p7zip-plugins sassc gettext make"
 theme::help ()
 {
 	clear
-	echo "
+	echo "	${PUBLICATION} ${VERSION}: ${FUNCNAME[0]}
 	------------------------------------------------------------
 	🔧           Linux Desktop Theme Install Script           🔧
 	------------------------------------------------------------
 	This script is used to install themes on a linux system. It assumes that themes
-	are placed in sub folders named gtk, kde, ico, and fon, directly in same folder as 
-	this script itself. In each of these folders idividual themes for icons, gnome, 
-	plasma, and fonts are compressed in the 7z format. This format often results in 
+	are placed in sub folders named gtk, kde, ico, and fon, directly in same folder as
+	this script itself. In each of these folders idividual themes for icons, gnome,
+	plasma, and fonts are compressed in the 7z format. This format often results in
 	half the files sizes compared to the zip format. Further, in each of these compressed
 	archives a script called install.sh is expected. The install.sh file should do the job of
 	copying the contents to the appropriate location.
-	
-	Syntax: 
-	${0} [ --gtk, --kde, --fonts, --icons, *, --help ]
-	
-	Where: 
+
+	Syntax:
+	${0} [ --gtk, --kde, --fonts, --icons, --all, --help ]
+
+	Where:
 	--gtk	Install all Gnome themes
 	--kde 	Install all KDE Plasma themes
 	--fonts	Install all additional fonts
@@ -66,9 +66,9 @@ theme::help ()
 	--all	Install everything
 	--help	Display this help message
 
-	If nothing is specified the script will try to detect the desktop session and 
+	If nothing is specified the script will try to detect the desktop session and
 	install the appropriate themes.
-	
+
 	"
 }
 
@@ -98,7 +98,7 @@ theme::add_global ()
 		theme::install_payload
 		popd
 	;;
-	--fonts) 
+	--fonts)
 		pushd ${_my_scriptdir}/fon
 		theme::install_payload
 		popd
@@ -107,7 +107,7 @@ theme::add_global ()
 		pushd ${_my_scriptdir}/ico
 		theme::install_payload
 		popd
-	;;	
+	;;
 	*)
 		echo "Neither GTK or KDE themes were requested"
 	;;
