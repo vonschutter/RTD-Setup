@@ -127,6 +127,7 @@ export RTD_VERSION=2.0
 	set_install_command				: Determines what install command should be used to install packages from repositories
 	set_oem_elevated_privilege_gui			: Set x-authority toallow root GUI
 	SofwareManagmentAvailabilityCHK			: Checks to see that the software managment system is not busy
+	system_config::deb::remove_old_kernel		: Removes all old linux kernels
 	toggle_oem_auto_login				: Toggle the auto login option for the user
 	test_iso_boot_media				: Test bootable media using QEMU
 	up2date						: Older universal software update function
@@ -4143,6 +4144,26 @@ up_2_date ()
 
 
 
+
+system_config::deb::remove_old_kernel ()
+{
+# Description: Function to remove all old linux kernels.
+#
+#
+# Globals:
+# Arguments: None
+# Outputs:
+# Returns: Standard error level.
+# Usage: simply call function in a script
+# End of documentation
+
+	if hash dpkg ; then
+		dpkg -l linux-* | awk '/^ii/{print $2}' | egrep [0-9] | sort -t- -k3,4 --version-sort -r | sed -e "1,/$(uname -r | cut -f1,2 -d"-")/d" | grep -v -e `uname -r | cut -f1,2 -d"-"` | xargs sudo apt-get -y purge
+	else
+		write_error "${FUNCNAME[0]}: No supported software managment found for removing kernels."
+		return 1
+	fi
+}
 
 
 system_config::tune_system_power_profile ()
