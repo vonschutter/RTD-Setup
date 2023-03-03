@@ -332,9 +332,7 @@ load_content() {
 restart_shell() {
   [[ $( pgrep gnome-shell ) ]] || return
   echo "Restarting GNOME Shell..."
-  dbus-send --session --type=method_call \
-            --dest=org.gnome.Shell /org/gnome/Shell \
-            org.gnome.Shell.Eval string:"global.reexec_self()";
+  echo "$(dbus-send --session --type=method_call --dest=org.gnome.Shell /org/gnome/Shell org.gnome.Shell.Eval string:"global.reexec_self();")"
 }
 
 interactive_search() {
@@ -495,8 +493,8 @@ get_extension() {
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 check_rtd_library
-check_dependencies curl
-check_dependencies perl
+hash curl || check_dependencies curl
+hash perl || check_dependencies perl
 
 
 

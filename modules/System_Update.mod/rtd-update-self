@@ -48,6 +48,7 @@ export _SCRIPTNAME=$(basename $0)
 export _TLA=${_SCRIPTNAME:0:3}
 export _LOG_DIR=/var/log/${_TLA,,}
 mkdir -p ${_LOG_DIR}
+autoconfirm=${1}
 
 # Set the GIT profile name to be used if not set elsewhere:
 export _GIT_PROFILE="${_GIT_PROFILE:-vonschutter}"
@@ -164,7 +165,13 @@ rtd_wait_for_internet_availability () {
 do_update ()
 {
 	rtd_wait_for_internet_availability
-	task_setup_rtd_basics && dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: DONE!" --msgbox "\nUpdating the ${BRAND} tools done!. \n\n Press OK to confirm." 20 80 ; clear|| dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: ERROR!" --msgbox "\nUpdating the ${BRAND} \Z1 FAILED!. \n\n Press OK to confirm." 20 80 ; clear
+	if task_setup_rtd_basics ; then
+		[[ --autoconfirm == ${autoconfirm} ]] || dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: DONE!" --msgbox "\nUpdating the ${BRAND} tools done!. \n\n Press OK to confirm." 20 80 ; clear
+		return 0
+	else
+		[[ --autoconfirm == ${autoconfirm} ]] || dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: ERROR!" --msgbox "\nUpdating the ${BRAND} \Z1 FAILED!. \n\n Press OK to confirm." 20 80 ; clear
+		return 1
+	fi
 	rtd_oem_make_launchers
 }
 
@@ -183,28 +190,35 @@ check_rtd_library
 if [[ ${UID} -eq 0 ]] ; then
 	# Execute only in the case of elevated privileges:
 	oem_launch_me () {
-		if hash dialog ; then
-			if ( dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: NOTICE!" --yesno "\nMay I update the ${BRAND} OEM tools on your system now? Updating the ${BRAND} tools will ensure that the latest functionality and bug fixes are applied. \n\n Press OK to continue or NO to skip doing this." 20 80 ) ; then
-				clear && do_update
+		case ${autoconfirm} in
+		--autoconfirm )
+			clear && do_update
+		;;
+		* )
+			if hash dialog ; then
+				if ( dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: NOTICE!" --yesno "\nMay I update the ${BRAND} OEM tools on your system now? Updating the ${BRAND} tools will ensure that the latest functionality and bug fixes are applied. \n\n Press OK to continue or NO to skip doing this." 20 80 ) ; then
+					clear && do_update
+				else
+					clear && exit
+				fi
 			else
-				clear && exit
+				echo -e $YELLOW
+				echo "RTD Tools Updater Version $RTD_UPDATE_SELF_VERSION"
+				echo "Hello $SUDO_USER ... I am going to update the rtd tools on this"
+				echo " "
+				echo "To cancel this, just close the terminal or press "CRTL C"."
+				echo " "
+				read -p "Press [ ENTER ] to continue with update"
+				echo -e $ENDCOLOR
+				do_update
 			fi
-		else
-			echo -e $YELLOW
-			echo "RTD Tools Updater Version $RTD_UPDATE_SELF_VERSION"
-			echo "Hello $SUDO_USER ... I am going to update the rtd tools on this"
-			echo " "
-			echo "To cancel this, just close the terminal or press "CRTL C"."
-			echo " "
-			read -p "Press [ ENTER ] to continue with update"
-			echo -e $ENDCOLOR
-			do_update
-		fi
+		;;
+		esac
 	}
 	oem_launch_me | tee ${_LOGFILE}
 else
 	# If privileges are not elevated; then request elevation using the appropriate method:
 	_exec_local="$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/"$( basename ${0} )"
-	if echo $(systemctl get-default ) |grep graphical &>/dev/null ; then pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY ${_exec_local} ; else ensure_admin ; fi
+	if echo $(systemctl get-default ) |grep graphical &>/dev/null ; then pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY ${_exec_local} ${autoconfirm} ; else ensure_admin ; fi
 	exit
 fi
