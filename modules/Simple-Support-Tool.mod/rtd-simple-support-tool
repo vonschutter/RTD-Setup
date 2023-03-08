@@ -605,17 +605,14 @@ show_deploy_VDI_VM_now_menu ()
 		exec 3>&1
 		selection=$($RTD_GUI --backtitle "$BRANDING" --title "Deploy Virtual Desktop (VDI)"  --menu "Please select which VDI to create on this server:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
 		"1" "Ubuntu Standard Desktop (more MAC like)" \
-		"2" "Kubuntu Desktop (more Windows like)" \
-		"3" "Lubuntu Desktop" \
-		"4" "Xubuntu (light weight) desktop" \
-		"5" "Debian Default Desktop" \
-		"6" "Debian Cinnamon Desktop" \
-		"7" "Debian Plasma Desktop" \
-		"8" "Debian Light Weight Desktop (LXDE)" \
-		"9" "Fedora Workstation VDI" \
-		"10" "SUSE Workstation VDI" \
-		"11" "Windows 10 VDI" \
-		"12" "Windows 11 VDI" \
+		"2" "Debian Default Desktop" \
+		"3" "Debian Cinnamon Desktop" \
+		"4" "Debian Plasma Desktop" \
+		"5" "Debian Light Weight Desktop (LXDE)" \
+		"6" "Fedora Workstation VDI" \
+		"7" "SUSE Workstation VDI" \
+		"8" "Windows 10 VDI" \
+		"9" "Windows 11 VDI" \
 		2>&1 1>&3)
 		exit_status=$?
 		exec 3>&-
@@ -632,54 +629,42 @@ show_deploy_VDI_VM_now_menu ()
 		;;
 		1 )
 			make_preseed_cfg "$( mktemp -d )" ubuntu-desktop
-			make_kvm_virtual_machine_now_from_ubuntu_com ubuntu20.04
+			make_kvm_virtual_machine_now_from_ubuntu_com ubuntu
 		;;
 		2 )
-			make_preseed_cfg "$( mktemp -d )" kubuntu-desktop
-			make_kvm_virtual_machine_now_from_ubuntu_com ubuntu20.04
-		;;
-		3 )
-			make_preseed_cfg "$( mktemp -d )" lubuntu-desktop
-			make_kvm_virtual_machine_now_from_ubuntu_com ubuntu20.04
-		;;
-		4 )
-			make_preseed_cfg "$( mktemp -d )" xubuntu-desktop
-			make_kvm_virtual_machine_now_from_ubuntu_com ubuntu20.04
-		;;
-		5 )
 			make_preseed_cfg "$( mktemp -d )" gnome-desktop
 			make_kvm_virtual_machine_now_from_debian_org debian10
 			cleanup_and_finish nomessage
 		;;
-		6 )
+		3 )
 			make_preseed_cfg "$( mktemp -d )" cinnamon-desktop
 			make_kvm_virtual_machine_now_from_debian_org debian10
 			cleanup_and_finish nomessage
 		;;
-		7 )
+		4 )
 			make_preseed_cfg "$( mktemp -d )" kde-desktop
 			make_kvm_virtual_machine_now_from_debian_org debian10
 			cleanup_and_finish nomessage
 		;;
-		8 )
+		5 )
 			make_preseed_cfg "$( mktemp -d )" lxde-desktop
 			make_kvm_virtual_machine_now_from_debian_org debian10
 			cleanup_and_finish nomessage
 		;;
-		9 )
+		6 )
 			make_kvm_virtual_machine_now_from_fedora_org
 			cleanup_and_finish nomessage
 		;;
-		10 )
+		7 )
 			PRESEED_FILE="$(mktemp).xml"
 			generate_autoyast_file "${PRESEED_FILE}"
 			make_kvm_virtual_machine_now_from_opensuse_com SUSE
 			cleanup_and_finish nomessage
 		;;
-		11 )
+		8 )
 			make_kvm_virtual_machine_now_from_microsoft win10
 		;;
-		12 )
+		9 )
 			make_kvm_virtual_machine_now_from_microsoft win11
 		;;
 		esac

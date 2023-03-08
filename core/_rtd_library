@@ -1400,15 +1400,15 @@ check_if_password_p0wned () {
 rtd_oem_find_live_release()
 {
 # Description: This function will return the URL for the version of Debian, Ubuntu server or Destktop requested.
-# 3 parameters are required for this function to know what to do: distro_version/
-# It will also try to read the available iso images and grab the latest or requested iso.
+# 3 parameters are required for this function to know what to do: distro_version/distro_flavor/live_or_not
+# 
 # Globals:
 # Arguments: None
 # Outputs:
 # Returns: Return a URL to the desired release ISO of Ubuntu or Debian.
 # Usage:
 # Example:
-# Function name 		: distro_version : distro_flavor : live_or_not : desktop_env
+# Function name 		: distro_version : distro_flavor : live_or_not : desktop_env (only Debian)
 # rtd_oem_find_live_release 	      10              debian         live           kde
 # rtd_oem_find_live_release 	      10              debian         live           cinnamon
 # rtd_oem_find_live_release 	      10              debian         net            ssh-server
@@ -1423,7 +1423,7 @@ rtd_oem_find_live_release()
 	Ubuntu | ubuntu )
 		case "$live_or_not" in
 		Live | live | current-live | desktop)
-			echo "http://releases.ubuntu.com/$distro_version/$(curl --silent http://releases.ubuntu.com/$distro_version/SHA256SUMS | \grep -o 'ubuntu-.*-desktop-amd64.iso')"
+			echo "http://releases.ubuntu.com/$distro_version/$(curl --silent http://releases.ubuntu.com/$distro_version/SHA256SUMS | grep -o 'ubuntu-.*-desktop-amd64.iso')"
 		;;
 		server | netinst | net | mini )
 			# 18.04 and later need to use the alternative installer
@@ -1434,6 +1434,20 @@ rtd_oem_find_live_release()
 				rel=http://releases.ubuntu.com/$1
 				echo "$rel/$(curl --silent $rel/MD5SUMS | \grep -o 'ubuntu-.*-server-amd64.iso')"
 			fi
+		;;
+		* )
+			$RTD_GUI --backtitle "$BRANDING" --title "ERROR!" --msgbox "You passed the function ${FUNCNAME[0]} the parameters $*. The 4th parameter should be either of: Live | live | current-live | server | netinst | net | mini! Not $live_or_not" 10 60
+		;;
+		esac
+	;;
+	Kubuntu | kubuntu )
+		case "$live_or_not" in
+		Live | live | current-live | desktop)
+			base_url="https://cdimage.ubuntu.com/kubuntu/releases/$distro_version/release"
+			echo "${base_url}/$(curl --silent ${base_url}/SHA256SUMS | grep -o 'kubuntu-.*-desktop-amd64.iso')"
+		;;
+		server | netinst | net | mini )
+			rtd_oem_pause 1 "${FUNCNAME[0]}: you have requested a server version of Kubuntu. Kubuntu Does not have a server version."
 		;;
 		* )
 			$RTD_GUI --backtitle "$BRANDING" --title "ERROR!" --msgbox "You passed the function ${FUNCNAME[0]} the parameters $*. The 4th parameter should be either of: Live | live | current-live | server | netinst | net | mini! Not $live_or_not" 10 60
@@ -5675,14 +5689,16 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 # Arguments: None
 # Outputs:
 # Returns:
-# Usage:
-# Example:
+# Usage: make_kvm_virtual_machine_now_from_ubuntu_com (optional arguments)
+#
+# Example:									   (may be set otherwise defaults are used)
 #                                              vmtype    CPU  RAM   DISK
-# make_kvm_virtual_machine_now_from_ubuntu_com debian10  4    2048  40
+# make_kvm_virtual_machine_now_from_ubuntu_com ubuntu     
 #
 # If complete flexibility is needed simply use the virt-install binary and directly write the arguments.
 # Alternatively; edit the function with new defaults that suit the needs.
 # End of Documentation
+	ubuntu_flavor="${1}"
 	count=1
 	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install wget
 	do
@@ -5691,25 +5707,37 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 		count=$((count + 1))
 	done
 
-	write_information "🔎 Retreive list of available Ubuntu versions..."
-	all_ubuntu_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
-	all_kubuntu_lts_versions=$(wget -O- cdimage.ubuntu.com/kubuntu/releases -q | perl -ne '/ (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu)
+	write_information "🔎 Retreive list of available $ubuntu_flavor versions..."
+	case "$ubuntu_flavor" in 
+		ubuntu)
+			declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
+			dist_logo="$ubuntulogo"
+		;;
+		kubuntu)
+			declare -a all_lts_versions=($(wget -O- cdimage.ubuntu.com/kubuntu/releases -q | perl -ne '/ (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
+			dist_logo="$kubuntulogo"
+		;;
+		*)
+			declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
+			dist_logo="$ubuntulogo"
+		;;
+	esac
 
-	tgt_ubuntu_ver=$($RTD_GUI --title "Select Release Version of Ubuntu" --inputbox "Please pick an available ubuntu version by entering it below.
-	Long Term Support Versions to choose from are the following 👍: ${all_ubuntu_lts_versions[*]} You may also enter an inbetween release version
-	by typing its release number below as well. If you are not sure just let me choose for you... \n ${ubuntulogo} "  25 110 "${all_ubuntu_lts_versions[-1]}" 3>&1 1>&2 2>&3)
+	tgt_ubuntu_ver=$($RTD_GUI --colors --title "Select Release Version of $ubuntu_flavor " --inputbox "\n 👍 Please pick an available \Z1 $ubuntu_flavor \Zn version by entering it below.
+	Long Term Support Versions to choose from are the following:\Z4 ${all_lts_versions[*]} \Zn You may also enter an inbetween release version
+	by typing its release number below as well. If you are not sure just let me choose intelligently for you... \n \Z1 ${dist_logo} \Zn"  30 90 "${all_lts_versions[-1]}" 3>&1 1>&2 2>&3)
 	case $? in
 		"$DIALOG_CANCEL") return ;;
 		"$DIALOG_ESC") return ;;
 	esac
 	clear
 
-	[ "$tgt_ubuntu_ver" ] || tgt_ubuntu_ver=${all_ubuntu_lts_versions[-1]}
+	[ "$tgt_ubuntu_ver" ] || tgt_ubuntu_ver=${all_lts_versions[-1]}
 
 	# Detect and set variables for key programs
 	: ${bin_virt_install:=$(type -p virt-install)}
 	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
-	: ${ubuntu_iso_url=$(rtd_oem_find_live_release $tgt_ubuntu_ver ubuntu live)}
+	: ${ubuntu_iso_url=$(rtd_oem_find_live_release $tgt_ubuntu_ver $ubuntu_flavor live)}
 	: ${iso_filename:="$(basename $ubuntu_iso_url)"}
 	: ${permanent_download_dir:="/var/lib/libvirt/boot/"}
 
@@ -5724,9 +5752,8 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 	_summary_message="The virtual machine (VDI_${CONFIG}-${tgt_ubuntu_ver}-${RANDOM}) \n
 	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
 	🔧 - And Using this source for the packages and files to download: \n
-	🌎 - ${source_url} \n
-	🌎 - ${vm_kernel} \n
-	🌎 - ${vm_initrd} \n
+	🌎 - ${ubuntu_iso_url} \n
+	🌎 - ${iso} \n
 	✅ - Using the network: ${virt_net} \n
 	✅ - Memory: ${3:-2048} \n
 	✅ - CPU's: ${2:-2} \n
@@ -5737,17 +5764,18 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 		--memory "${3:-2048}" \
 		--network "${virt_net}" \
 		--disk size="${4:-30}" \
-		--os-variant="${1:-ubuntu21.10}" \
+		--os-variant="ubuntu21.10" \
 		--video "virtio" --channel "spicevmc" \
 		--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 		--extra-args="ks=file:$(basename $PRESEED_FILE) auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=us \
 		netcfg/get_hostname=${CONFIG}${tgt_ubuntu_ver} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
-		localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity quiet splash noprompt noshell" \
+		localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 		--initrd-inject="$PRESEED_FILE" \
 		--initrd-inject="$( dirname ${PRESEED_FILE})/ks.cfg" \
 		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 	for i in  PRESEED_FILE vm_kernel vm_initrd source_url CONFIG tgt_ubuntu_ver ubuntu_iso_url iso_filename ; do unset $i ; done
+	# extra args: quiet noshell
 }
 
 
@@ -5809,10 +5837,10 @@ make_kvm_virtual_machine_now_from_microsoft ()
 # At this time this functio takes no arguments but will prompt for what it needs if it is not available.
 #
 # Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
+# Arguments: [ win11 | win10 | win8 | win7 ]
+# Outputs: One VM running windows
+# Returns:  
+# Usage: make_kvm_virtual_machine_now_from_microsoft target_winver
 #
 #
 # NOTE: QCOW2 is a storage format for virtual .
@@ -5831,20 +5859,20 @@ make_kvm_virtual_machine_now_from_microsoft ()
 # End of Documentation
 	write_status "Lookup specific binaries: use full path since they may just have been added and not in PATH yet."
 	count=1
-	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install mtools
+	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install mtools libosinfo-bin
 	do
 		write_status "${count}	- Verifying dependencies ( ${i} )..."
 		check_dependencies $i &>/dev/null
 		count=$((count + 1))
 	done
-
+	
 	: ${target_winver="${1:-win10}"} || read -p "💥 - Failure to set variable target_winver"
 	case $target_winver in
 		win11 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win11_English_x64.iso"} || read -p "💥 - Failure to set variable"
-			: ${uefi_option="--boot uefi,loader_secure=no"}  || read -p "💥 - Failure to set variable"
+			: ${uefi_option="--boot uefi"}  || read -p "💥 - Failure to set variable"
 			;;
 		win10 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win10_English_x64.iso"} || read -p "💥 - Failure to set variable" ;;
-		win10 )  : ${WindowsMedia="/var/lib/libvirt/boot/Win8_English_x64.iso"} || read -p "💥 - Failure to set variable" ;;
+		win8 )  : ${WindowsMedia="/var/lib/libvirt/boot/Win8_English_x64.iso"} || read -p "💥 - Failure to set variable" ;;
 		win7 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win7_English_x64v1.iso"} || read -p "💥 - Failure to set variable" ;;
 	esac
 
@@ -5912,8 +5940,8 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		--cdrom "${WindowsMedia}" \
 		--disk "${WindowsInstructions}",device=floppy \
 		--livecd \
-                --tpm default \
-                ${uefi_option} \
+        --tpm default \
+        ${uefi_option} \
 		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
