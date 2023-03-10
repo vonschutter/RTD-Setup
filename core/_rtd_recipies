@@ -29,7 +29,7 @@
 #		and facilitates several users working on the same scripts over time.
 #
 #
-#	RTD admin scrips are placed in /opt/rtd/scripts. Optionally scripts may use the common
+#	RTD admin scrips are placed in /opt/{_TLA}/scripts. Optionally scripts may use the common
 #	functions in _rtd_library and _rtd_recipies.
 #	  _rtd_library   -- contain usefull admin functions for scripts, such as "how to install software" on different systems.
 #	  _rtd_recipies  -- contain software installation and configuration "recipies".
@@ -48,7 +48,7 @@
 #	to make the script more readable. Each function shall also be documented to the point of the obvious.
 #	Suggested function structure per google guidelines:
 #
-#	function_name () {
+#	category::function_name () {
 #		# Documentation and comments...
 #		...code...
 #	}
@@ -58,7 +58,7 @@
 #
 #				OUTPUT REDIRECTION TABLE
 #
-#		  || visible in terminal ||   visible in file   || existing
+#	          || visible in terminal ||   visible in file   || existing
 #	  Syntax  ||  StdOut  |  StdErr  ||  StdOut  |  StdErr  ||   file
 #	==========++==========+==========++==========+==========++===========
 #	    >     ||    no    |   yes    ||   yes    |    no    || overwrite
@@ -133,37 +133,37 @@
 #	*	---       PREFFERRED Software install (Security + Control)           ----		*
 #
 #  CAPABILITY TABLE:
-# +-----------------------------------------------------+-----------------------------------+-----------------------------------+----------------------+
-# | Features                                            | Snap                              | Flatpak                           | AppImage             |
-# +-----------------------------------------------------+-----------------------------------+-----------------------------------+----------------------+
-# | Permission Controls Toggles                         | Yes                               | Yes                               | No                   |
-# | Sandboxing Support                                  | Yes                               | Yes                               | Yes                  |
-# | Sandboxing Mandatory                                | Yes                               | Yes                               | No                   |
-# | App Portability                                     | Yes                               | Yes                               | No                   |
-# | Native Theme Support                                | Yes (with caveats)                | Yes (with caveats)                | Yes (with caveats)   |
-# | Support for Bundled Libraries                       | Yes                               | Yes                               | Yes                  |
-# | Fully Contained Single Executable Support           | No                                | No                                | Yes                  |
-# | Online App Store                                    | Yes                               | Yes                               | Yes                  |
-# | Multi-version Parallel Apps Support                 | Yes                               | Yes                               | Yes                  |
-# | Automatic Updates                                   | Yes                               | Yes                               | Yes(with caveats)    |
-# | Support for Chrome OS (through Crostini containers) | Yes                               | Yes                               | Yes                  |
-# | App Size                                            | Can vary but higher than AppImage | Can vary but higher than AppImage | Lowest               |
-# | Number of Applications Available in the App Store   | Highest                           | Lowest                            | Somewhere in between |
-# | Plugins for Desktop App Store Software              | Yes                               | Yes                               | No                   |
-# +-----------------------------------------------------+-----------------------------------+-----------------------------------+----------------------+
+# +-----------------------------------------------------+--------------------------------+----------------------------+----------------------+
+# | Features                                            | Snap                           | Flatpak                    | AppImage             |
+# +-----------------------------------------------------+--------------------------------+----------------------------+----------------------+
+# | Permission Controls Toggles                         | Yes                            | Yes                        | No                   |
+# | Sandboxing Support                                  | Yes                            | Yes                        | Yes                  |
+# | Sandboxing Mandatory                                | Yes                            | Yes                        | No                   |
+# | App Portability                                     | Yes                            | Yes                        | No                   |
+# | Native Theme Support                                | Yes (with caveats)             | Yes (with caveats)         | Yes (with caveats)   |
+# | Support for Bundled Libraries                       | Yes                            | Yes                        | Yes                  |
+# | Fully Contained Single Executable Support           | No                             | No                         | Yes                  |
+# | Online App Store                                    | Yes                            | Yes                        | Yes                  |
+# | Multi-version Parallel Apps Support                 | Yes                            | Yes                        | Yes                  |
+# | Automatic Updates                                   | Yes                            | Yes                        | Yes(with caveats)    |
+# | Support for Chrome OS (through Crostini containers) | Yes                            | Yes                        | Yes                  |
+# | App Size                                            | Higher than AppImage           | Higher than AppImage       | Lowest               |
+# | Number of Applications Available in the App Store   | Highest                        | Lowest                     | Somewhere in between |
+# | Plugins for Desktop App Store Software              | Yes                            | Yes                        | No                   |
+# +-----------------------------------------------------+--------------------------------+----------------------------+----------------------+
 #
 #
 #
 # A new way to manage native packages on Linux PackageKit. PackageKit is a free and open-source suite of software
 # applications designed to provide a consistent and high-level front end for a number of different package management systems.
 # PackageKit simplifies how to manage software on several different linux distribution and may even be available on BSD flavors.
-# The "dl" function uses package kit because it can istall both rpms and debs.
+# The "dl" function uses package kit because it can istall both rpms and debs, locally and from the repositories.
 #
 # TEMPLATE: For adding a new menu entry for a single package or bundle of software:
 #
 # recipe_Bundle:_descriptive_name () {
 # 			# function documentaton...
-# 			# Echo to terminal:
+# 			# Echo to terminal using built in functions with color:
 # 			write_error		: Prints an error message to terminal in RED
 # 			write_host 		: Prints a message to the terminal w. a choice of color
 # 			write_information 	: Prints a message to the terminal in BLUE
@@ -185,6 +185,10 @@
 #
 # 			# Check a dependency (install only if not present):
 # 			check_dependencies package-name
+#
+#			# NOTE: installing native packages may have caveats since distributions may name
+#			# 	packages differently. For example Fedora and Ubuntu name the 7z packages 
+#			#	differently.
 # }
 
 
@@ -204,6 +208,8 @@
 # Setting govern how this list will behave.
 
 # Set account on GIT Hub to fetch items from.
+# NOTE: you may copy the rtd repository and update its contents. You redirect everything
+#       by specifying the github user. 
 GIT_Profile=${GIT_Profile:-vonschutter}
 
 
@@ -400,9 +406,8 @@ recipe_Bundle:_Developer_Software (){
 	done
 
 	ensure_snap_package_managment
-	snap install atom --classic
 	snap install gitkraken --classic
-	sudo snap install code --classic
+	snap install code --classic
 	snap install slack --classic
 }
 
@@ -452,12 +457,11 @@ recipe_Bundle:_Top_Curated_Games (){
 		if hash rpm &>/dev/null; then
 			dl https://steamcdn-a.akamaihd.net/client/installer/steam.rpm
 		elif hash apt &>/dev/null; then
-
 			dl https://steamcdn-a.akamaihd.net/client/installer/steam.deb
 		else
 			echo -e $RED
 			echo "I am not sure how to find the Steam download for $(lsb_release -sd) "
-			echo "Please try to download it manually and instrtall it from the website:"
+			echo "Please try to download it manually and insttall it from the website:"
 			echo "https://store.steampowered.com/about/"
 			echo -e $ENDCOLOR
 		fi
@@ -644,20 +648,20 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		check_dependencies make
 		check_dependencies sassc
 		check_dependencies gettext
-		
+
 		# Install the wanted shell extensions that can be found in the distributions repository
 		# 	615:	appindicator		307:  	dash-to-dock
 		# 	517: 	caffeine		1160: 	dash-to-pannel
-		# 	1319: 	gsconnect		
-		# 	6: 	application-menu	
-		# 	19: 	user-themes		
-		# 	7: 	removable-drive-menu	
+		# 	1319: 	gsconnect
+		# 	6: 	application-menu
+		# 	19: 	user-themes
+		# 	7: 	removable-drive-menu
 		# 	906: 	Sound Input/Output Chooser
 		# 	1852: 	GameMode
 		# 	97: 	Coverflow Alt-Tab
 		# 	3628: 	ArcMenu
 		# 	8: 	Places Status Indicator
-		
+
 		for i in 6 7 8 19 97 307 517 615 906 1160 1319 1852 3628 ; do
 			bash $(find /opt -name rtd-gnome-shell-extension-installer )  $i
 		done

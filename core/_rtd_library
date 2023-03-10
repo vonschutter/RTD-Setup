@@ -390,7 +390,7 @@ change_disk_pass ()
 
 
 
-oem_autounlock_disk ()
+system::oem_autounlock_disk ()
 {
 # Setup automatic unlocking of the encrypted system disk (encryption is default on RTD systems).
 # NOTE: This will render the encryption useless since the key to unlock the encrypted
@@ -886,7 +886,7 @@ io_on_notify_wait ()
 
 
 
-display_spinner ()
+system::display_spinner ()
 {
 # Description: Simple function to display a spinner in the terminal.
 # Globals:
@@ -1401,7 +1401,7 @@ rtd_oem_find_live_release()
 {
 # Description: This function will return the URL for the version of Debian, Ubuntu server or Destktop requested.
 # 3 parameters are required for this function to know what to do: distro_version/distro_flavor/live_or_not
-# 
+#
 # Globals:
 # Arguments: None
 # Outputs:
@@ -5478,13 +5478,13 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 	✅ - CPU's: ${2:-2} \n
 	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))"
 
-        "${BIN_VIRT_INSTALL}" --connect qemu:///system --name VDI_fedora_"${CONFIG}"_"${RANDOM}" \
-                --vcpus "${2:-2}" \
-                --memory "${3:-2048}" \
-                --network "$virt_net" \
-                --disk size="${4:-40}" \
+	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name VDI_fedora_"${CONFIG}"_"${RANDOM}" \
+		--vcpus "${2:-2}" \
+		--memory "${3:-2048}" \
+		--network "$virt_net" \
+		--disk size="${4:-40}" \
 		--os-variant="fedora30" \
-                --initrd-inject="${PRESEED_FILE}" \
+		--initrd-inject="${PRESEED_FILE}" \
 		--location="${source_url}" \
 		--extra-args "inst.ks=file:/$(basename $PRESEED_FILE)" \
 		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
@@ -5693,7 +5693,7 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 #
 # Example:									   (may be set otherwise defaults are used)
 #                                              vmtype    CPU  RAM   DISK
-# make_kvm_virtual_machine_now_from_ubuntu_com ubuntu     
+# make_kvm_virtual_machine_now_from_ubuntu_com ubuntu
 #
 # If complete flexibility is needed simply use the virt-install binary and directly write the arguments.
 # Alternatively; edit the function with new defaults that suit the needs.
@@ -5708,7 +5708,7 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 	done
 
 	write_information "🔎 Retreive list of available $ubuntu_flavor versions..."
-	case "$ubuntu_flavor" in 
+	case "$ubuntu_flavor" in
 		ubuntu)
 			declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
 			dist_logo="$ubuntulogo"
@@ -5839,7 +5839,7 @@ make_kvm_virtual_machine_now_from_microsoft ()
 # Globals:
 # Arguments: [ win11 | win10 | win8 | win7 ]
 # Outputs: One VM running windows
-# Returns:  
+# Returns:
 # Usage: make_kvm_virtual_machine_now_from_microsoft target_winver
 #
 #
@@ -5865,7 +5865,7 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		check_dependencies $i &>/dev/null
 		count=$((count + 1))
 	done
-	
+
 	: ${target_winver="${1:-win10}"} || read -p "💥 - Failure to set variable target_winver"
 	case $target_winver in
 		win11 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win11_English_x64.iso"} || read -p "💥 - Failure to set variable"

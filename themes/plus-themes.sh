@@ -77,7 +77,7 @@ theme::install_payload ()
 {
 	for i in *.7z ; do
 		7z x $i -aoa -o${_tmp}
-		pushd "${_tmp}/${i::-3}"
+		pushd "${_tmp}/${i::-3}"  || return
 		bash ./install.sh
 		popd
 	done
@@ -87,24 +87,24 @@ theme::add_global ()
 {
 	case $1 in
 	--gtk )
-		pushd ${_my_scriptdir}/gtk
+		pushd "${_my_scriptdir}/gtk" || return
 		theme::install_payload
 		ensure_snap_package_managment
 		snap install vimix-themes && for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
 		popd
 	;;
 	--kde )
-		pushd ${_my_scriptdir}/kde
+		pushd "${_my_scriptdir}/kde" || return
 		theme::install_payload
 		popd
 	;;
 	--fonts)
-		pushd ${_my_scriptdir}/fon
+		pushd "${_my_scriptdir}/fon" || return
 		theme::install_payload
 		popd
 	;;
 	--icons )
-		pushd ${_my_scriptdir}/ico
+		pushd "${_my_scriptdir}/ico" || return
 		theme::install_payload
 		popd
 	;;
@@ -142,7 +142,7 @@ dependency::_rtd_library ()
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-dependency::_rtd_library && for i in "${_potential_dependencies}" ; do check_dependencies  $i ; done
+dependency::_rtd_library && for i in ${_potential_dependencies} ; do check_dependencies  "${i}" ; done
 
 
 case $1 in
