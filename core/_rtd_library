@@ -4613,12 +4613,16 @@ rtd_oem_release_upgrade ()
 			fi
 		elif hostnamectl |grep "fedora" 2>/dev/null ; then
 			releasever=$($RTD_GUI --title "Fedora Distribution Upgrade Confirmation" --inputbox "Please enter the Fedora version you want to upgrade to. Please make sure that it has been published. You are currently using: $(hosnamectl)  only numbers are valid" 8 78  3>&1 1>&2 2>&3)
-			sudo dnf upgrade --refresh
-			sudo dnf install dnf-plugin-system-upgrade
-			sudo dnf system-upgrade download --refresh --releasever="${releasever}"
-			sudo dnf system-upgrade
-			read -p "$ERRMSG: Press  [ ENTER ] to REBOOT:"
-			reboot
+			dnf upgrade --refresh
+			dnf install dnf-plugin-system-upgrade
+			dnf system-upgrade download --refresh --releasever="${releasever}"
+			read -p "$ERRMSG: Press  [ ENTER ] to REBOOT and install the upgrade:"
+				case $? in
+					0 ) dnf system-upgrade reboot || return 1;;
+					1 ) return 1 ;;
+					255) return 1 ;;
+				esac
+
 		else
 			[[ "$interactive" == "interactive" ]] && read -p "This option requires the program (do-release-upgrade) (Ubuntu) or OpenSUSE (zypper) on your system. Press [Enter] key to return to menu."
 		fi
