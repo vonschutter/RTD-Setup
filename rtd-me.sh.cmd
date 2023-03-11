@@ -167,7 +167,7 @@ if echo "$OSTYPE" |grep "linux" ; then
 			fi
 			mv /opt/${_TLA,,}.tmp /opt/${_TLA,,} ; rm -rf /opt/${_TLA,,}/.git
 			source /opt/${_TLA,,}/core/_rtd_library
-			oem_register_all_tools
+			oem::register_all_tools
 			ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
 			bash ${_OEM_DIR}/core/rtd-oem-linux-config.sh ${@}
 		else

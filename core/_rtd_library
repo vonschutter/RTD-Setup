@@ -84,7 +84,9 @@ export RTD_VERSION=2.0
 	rtd_oem_check_inet_access 			: Verifies that the internet is accessible
 	rtd_oem_find_live_release 			: locate and download live media for debian and ubuntu
 	rtd_oem_kde_set_wallpaper 			: Sets wallpaper in the plasma workspace
-	rtd_oem_make_launchers				: Creates a default set of pre-defined launchers
+	oem::rtd_tools_make_launchers			: Creates a default set of pre-defined launchers
+	oem::check_boot_splash_screen_enable            : Check if the boot splash screen should be anabled
+	oem::register_wallpapers_for_gnome		: Register wallpapers for Gnome (so they show up in the appearance tool)
 	rtd_oem_pause 					: Pause function; will only pause if a non zero integet is passed
 	rtd_oem_preseed_cfg_Addon_MinecraftServer 	: MODULE  sets minecraft server setup tasks for a preseed file
 	rtd_oem_preseed_cfg_Addon_Tasks 		: MODULE  sets default post OS install tasks for a preseed file
@@ -97,7 +99,6 @@ export RTD_VERSION=2.0
 	rtd_oem_preseed_cfg_Prevent_Install_On_USB 	: MODULE  settings for a preseed file to prevent auto installation on a USB stick
 	rtd_oem_preseed_cfg_Unattended_Install 		: MODULE  sets fully unattended install for a preseed file
 	rtd_oem_preseed_ubuntu_cfg_KS_CFG_Options 	: MODULE  sets optional elements for a kickstart file normally not needed
-	rtd_oem_register_wallpapers_for_gnome		: Register wallpapers for Gnome (so they show up in the appearance tool)
 	rtd_oem_release_upgrade 			: Attempt to perform a release upgrade for supported systems
 	rtd_oem_remove_non_western_latin_fonts 		: Remove all non-latin fonts from a distribution. for the western world these are not needed and slow the system
 	rtd_oem_remove_software 			: Removes the software title requested on all supported distributions
@@ -115,7 +116,7 @@ export RTD_VERSION=2.0
 	rtd_setup_choices_term_fallback			: For server setup, displays a menu where you may chose CLI productivity software
 	rtd_update_system 				: Performs a software update/refresh on supported distributions
 	rtd_wait_for_internet_availability 		: Checks that the internet is reachable and waits until it is...
-	run_command_in_gnome_user_session 		: Running with elevated privileges; will allow to switch back to user who started process to execute script in that environment
+	system::run_command_in_gnome_user_session 	: Running with elevated privileges; will allow to switch back to user who started process to execute script in that environment
 	scan_for_malware				: Scan location for malware
 	set_colors					: Set colors for prompting on screen in human usable variables: $RED, $GEEN etc.
 	set_enable_oem_elevated_privelege		: Set automatic privilege escalation for scripts
@@ -465,7 +466,7 @@ system::oem_autounlock_disk ()
 
 
 
-oem_register_all_tools ()
+oem::register_all_tools ()
 {
 # Description: Function to register all executables on the current device.
 # It will find all the $TLA powertools locations and make and executable lin to
@@ -476,7 +477,7 @@ oem_register_all_tools ()
 # Arguments: None accepted
 # Outputs:
 # Returns: default exit status of the last command run.
-# Usage: oem_register_all_tools
+# Usage: oem::register_all_tools
 # Dependencies: _locations
 #
 # End of Documentation
@@ -554,7 +555,7 @@ check_menu_availability ()
 
 
 
-rtd_oem_make_launchers ()
+oem::rtd_tools_make_launchers ()
 {
 # Description: Function that creates a default set of launchers for the Linux GUI menu system.
 #
@@ -565,7 +566,7 @@ rtd_oem_make_launchers ()
 # Arguments: None accepted
 # Outputs: Launcherc created in /usr/share/applications/
 # Returns: Default exit status of the last command run.
-# Usage: rtd_oem_make_launchers
+# Usage: oem::rtd_tool_make_launchers
 #
 # End of documentation
 
@@ -1647,7 +1648,7 @@ set_gnome_ui_common_tweaks_for_user ()
 # To run this function as the user who started a script with sudo script content
 # could be echoed out ot a temporary file and executed as follows
 # sudo -H -u $SUDO_USER DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u "$SUDO_USER")/bus temporary_script.sh > /dev/null 2>&1
-# or alternatively by calling the function "run_command_in_gnome_user_session /path/to/temorary_script.sh".
+# or alternatively by calling the function "system::run_command_in_gnome_user_session /path/to/temorary_script.sh".
 # Globals:
 # Arguments: None
 # Outputs:
@@ -2248,7 +2249,7 @@ set_gnome_ui_moca_tweaks_for_user ()
 
 
 
-rtd_oem_register_wallpapers_for_gnome ()
+oem::register_wallpapers_for_gnome ()
 {
 # Description: Function to simplify registering wallpapers for Gnome.
 #
@@ -2257,7 +2258,7 @@ rtd_oem_register_wallpapers_for_gnome ()
 # Outputs:
 # Returns:
 # Usage:
-# rtd_oem_install_wallpapers_for_gnome /path/to/folder/with/wallpapers
+# oem::register_wallpapers_for_gnome  /path/to/folder/with/wallpapers
 #
 # End of documentation
 
@@ -2371,17 +2372,17 @@ add_gnome3_favorite_app ()
 
 
 
-run_command_in_gnome_user_session () {
+system::run_command_in_gnome_user_session () {
 # Description: Function to do a reverse sudo back to teh original Gnome user who called upon sudo.
 # This functon expects any number of parameters that would make up the command or commands
 # to be run in the users session. For example:
-# 	run_command_in_gnome_user_session script_name.sh parameter one two etc
+# 	system::run_command_in_gnome_user_session script_name.sh parameter one two etc
 #
 # Globals:
 # Arguments: [path/script.sh] [bash command]
 # Outputs:
 # Returns:
-# Usage: run_command_in_gnome_user_session script_name.sh
+# Usage: system::run_command_in_gnome_user_session script_name.sh
 #
 # End of documentation
 	echo -------------------------- Begin as user: $SUDO_USER ---------------------
@@ -4220,7 +4221,7 @@ system_config::tune_system_power_profile ()
 
 
 
-rtd_oem::check_boot_splash_screen_enable () {
+oem::check_boot_splash_screen_enable () {
 # Description: OEM function to enable splash screen on boot if desktop is indicated in
 # a configuration file. This file could be an AutoYast.xml, or ks.cfg, or a preseed.cfg.
 #
@@ -4228,7 +4229,7 @@ rtd_oem::check_boot_splash_screen_enable () {
 # Arguments: [FILE]
 # Outputs:
 # Returns: error level
-# Usage: rtd_oem::check_boot_splash_screen_enable /root/original-ks.cfg
+# Usage: oem::check_boot_splash_screen_enable /root/original-ks.cfg
 # End of documentation
 	if -f $1 ; then
 		if cat $1 |grep "-desktop" ; then
@@ -6312,7 +6313,7 @@ generate_rtd_me_sh_cmd ()
 			then
 				echo "Instructions successfully retrieved..."
 				source ${_TLA}/core/_${_TLA}_library
-				oem_register_all_tools
+				oem::register_all_tools
 				ln -s ${_LOG_DIR} ${_OEM_DIR}/log
 				bash ${_CORE_DIR}/rtd-oem-linux-config.sh "$@" | tee ${_LOGFILE}
 			else

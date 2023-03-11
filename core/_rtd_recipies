@@ -575,10 +575,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 	# [Task 1] Set basic locations files belonging to RTD Power Tools
 	# -------------------------------------------------------------------------------------------------------#
 	# Add dependencies to used in this bundle.
-	check_dependencies zip
-	check_dependencies p7zip
-	check_dependencies p7zip-full
-	check_dependencies p7zip-plugins
+	recipe_Bundle:_Compression_Tools
 	ensure_snap_package_managment
 	enable_firewall
 	# -------------------------------------------------------------------------------------------------------#
@@ -587,11 +584,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 	# [Task 2] Set basic locations files belonging to RTD Power Tools
 	# -------------------------------------------------------------------------------------------------------#
 	# Add launchers for some OEM apps (Internal function).
-	# Assuming a given folder structure: as part of /location/of/powertools/ <hierarchy>...
-	mkdir -p ${_CACHE_DIR}
-	rtd_oem_make_launchers
-	chmod -R 755 "${_WALLPAPER_DIR}"
-	chmod -R 755 "${_CUSTOM_SOUND_DIR}"
+	oem::rtd_tools_make_launchers
 	# -------------------------------------------------------------------------------------------------------#
 
 
@@ -604,8 +597,8 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 	# [Task 4] Configure relevant power management
 	# -------------------------------------------------------------------------------------------------------#
 	# If this system was built using the RTD process and is debian based, use instructions in said file.
-	rtd_oem::check_boot_splash_screen_enable /opt/rtd/preseed.cfg
-	rtd_oem::check_boot_splash_screen_enable /root/original-ks.cfg
+	oem::check_boot_splash_screen_enable /opt/rtd/preseed.cfg
+	oem::check_boot_splash_screen_enable /root/original-ks.cfg
 
 	#Tune to virtual machine guest or tune according to hardware type::
 	system_config::tune_system_power_profile
@@ -622,10 +615,10 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		write_information "${FUNCNAME[0]} : Fonud the gnome UI on this system! Adding OEM customizations..."
 
 		# Register Wallpapers in Gnome
-		rtd_oem_register_wallpapers_for_gnome ${_WALLPAPER_DIR}
+		oem::register_wallpapers_for_gnome ${_WALLPAPER_DIR}
 
 		# Set the default wallpaper...
-		run_command_in_gnome_user_session gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/Wayland.jpg
+		system::run_command_in_gnome_user_session gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/Wayland.jpg
 		# -------------------------------------------------------------------------------------------------------
 
 
@@ -726,7 +719,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		set_gnome_ui_win10_tweaks_for_user
 		EOF
 
-		run_command_in_gnome_user_session /bin/bash ${tempfile}
+		system::run_command_in_gnome_user_session /bin/bash ${tempfile}
 		# -------------------------------------------------------------------------------------------------------
 
 
