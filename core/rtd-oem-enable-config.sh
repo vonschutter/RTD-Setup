@@ -65,6 +65,6 @@ toggle_oem_run_once "/opt/rtd/core/rtd-oem-linux-config.sh"	&>> $_LOGFILE
 set_enable_oem_elevated_privelege	        		&>> $_LOGFILE
 toggle_oem_auto_login						&>> $_LOGFILE
 set_oem_elevated_privilege_gui					&>> $_LOGFILE
-rtd_oem_make_launchers						&>> $_LOGFILE
-oem_register_all_tools						&>> $_LOGFILE
+oem::rtd_tools_make_launchers					&>> $_LOGFILE
+oem::register_all_tools						&>> $_LOGFILE
 ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log				&>> $_LOGFILE
