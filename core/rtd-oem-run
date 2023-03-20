@@ -1,0 +1,123 @@
+#!/bin/bash
+PUBLICATION="${_TLA} Simple Global OEM Application Launcher"
+VERSION="1.00"
+#
+#::             Linux Theme Installer Script
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::// Linux //::::
+#:: Author(s):   	SLS
+#:: Version 1.00
+#::
+#::
+#::	Purpose: The purpose of this script is to securely run OEM applications. OEM applicatioins are some selected 
+#::		 applications used for OEM related system management. 
+#::
+#::	Dependencies: - There may be dependencies like make and other development utilities.
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+dependency::_rtd_library ()
+{
+	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library ; then
+		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
+	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
+		write_information "${FUNCNAME[0]} 2 Using: $(find /opt -name _rtd_library |grep -v bakup )"
+	elif wget ${_src_url} ; then
+		source ./_rtd_library
+	else
+		echo -e "RTD functions NOT loaded!"
+		return 1
+	fi
+}
+
+
+
+oem::run_payload ()
+{
+	if [[ -r "${_APPS_DIR}/${1}.7z" ]] ; then 
+		if [[ "$(md5sum "${_APPS_DIR}/${1}.7z" |awk '{print $1;}')" = "$(cat "${_CORE_DIR}/sigs/${1}.sig" |awk '{print $1;}')" ]] ; then
+			7z x "${_APPS_DIR}/${1}.7z" -aoa -o${2} &>/dev/null 
+			pushd "${2}" &>/dev/null || ( return 1 ; echo "Failure to enter execution directory!" )
+			chmod +x ./${1}
+			if file ./${1} | grep "Windows" ; then
+				 wine ./${1} &>/dev/null
+			else
+				./${1} &>/dev/null
+			fi
+			exit
+		else
+			echo "Failed to verify security of application!"
+			return 1 
+		fi
+	else 
+		echo "No such application present!"
+	fi
+}
+
+internal::chk_param_payload ()
+{
+
+	if [[ -r "${_APPS_DIR}/${1}.7z" ]] ; then 
+		write_information "Runnig OEM application ${1}"
+		return
+	else 
+		case ${1} in 
+			--help ) display::help ;;
+			*) display::help ;;
+		esac
+		exit
+	fi
+}
+
+
+display::help ()
+{
+	write_warning "	
+	To use this application to start OEM apps please
+	try the following:
+	" 
+	write_host --cyan "	${BASH_SOURCE[0]} application
+	"
+
+	write_information "	Installed OEM applications are: 
+	------------------------------
+$( for i in $(for file in ${_APPS_DIR}/*.7z ; do echo "${file##*/}" ; done ); do write_host --red "	${i::-3}" ; done )
+
+	"
+exit
+}
+
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Logic and Flow Control          ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+dependency::_rtd_library &>/dev/null
+internal::chk_param_payload ${1}
+hash 7z &>/dev/null || recipe_Bundle:_Compression_Tools
+hash md5sum &>/dev/null || (echo "I cannot start OEM apps without security validation software!" ; exit 1)
+oem::run_payload ${1} $( mktemp -d )
+
+
+
+

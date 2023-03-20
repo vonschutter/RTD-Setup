@@ -1,0 +1,122 @@
+#!/bin/bash
+PUBLICATION="${_TLA} Simple Global OEM Kernel Remover"
+VERSION="0.01"
+#
+#::             Linux Kernel Remover Script
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::// Linux //::::
+#:: Author(s):   	SLS
+#:: Version 1.00
+#::
+#::
+#::	Purpose:       The purpose of this script is to remove all old kernels on a system. This is usefull when you get the 
+#::                    error message that /boot is out of space... 
+#::		  
+#::
+#::	Dependencies: - There may be dependencies like make and other development utilities.
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+dialog::display_notice ()
+{
+
+	${RTD_GUI:-dialog} --backtitle "$PUBLICATION" --colors --no-collapse --title "Notice" --msgbox "\n ${@} \n" 15 78 
+	clear
+}
+
+
+
+dependency::_rtd_library ()
+{
+	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library ; then
+		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
+	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
+		write_information "${FUNCNAME[0]} 2 Using: $(find /opt -name _rtd_library |grep -v bakup )"
+	elif wget ${_src_url} ; then
+		source ./_rtd_library
+	else
+		echo -e "RTD functions NOT loaded!"
+		return 1
+	fi
+}
+
+ 
+system::remove_old_kernel ()
+{
+        if [[ $(echo "$OSTYPE" |grep "linux") ]]; then
+                # these tests focus on the latest versions of the distros evaluated...
+                if hash apt-get &>/dev/null ; then
+                        dialog::display_notice "🧩 ${FUNCNAME[0]}: An apt based system has been found... proceeding... "
+                        if [[ $? -ne 0 ]] ; then
+                                ensure_admin
+                                dpkg -l linux-* | awk '/^ii/{print $2}' | egrep [0-9] | sort -t- -k3,4 --version-sort -r | sed -e "1,/$(uname -r | cut -f1,2 -d"-")/d" | grep -v -e `uname -r | cut -f1,2 -d"-"` | xargs sudo apt-get -y purge
+                                return $?
+                        else
+                                return 1 
+                        fi
+                else
+                        # For distributions that do not need to add a repository to install snap
+                        # But would need to install it from their standard reopsitory....
+                        dialog::display_notice "${FUNCNAME[0]}: only deb based package managers are supported for this action..."
+                        return 1
+                fi
+
+        elif [[ "$OSTYPE" == "darwin"* ]]; then
+                write_error "${FUNCNAME[0]}: Mac OSX is currently not supported with snap..."  ; return 1
+        elif [[ "$OSTYPE" == "cygwin" ]]; then
+                write_error "${FUNCNAME[0]}: CYGWIN is currently unsupported with snap..."  ; return 1
+        elif [[ "$OSTYPE" == "msys" ]]; then
+                write_error "${FUNCNAME[0]}: Lightweight shell is currently unsupported with snap... "  ; return 1
+        elif [[ "$OSTYPE" == "freebsd"* ]]; then
+                write_error "${FUNCNAME[0]}: Free BSD is currently unsupported with snap... " ; return 1
+        else
+                echo "I have no Idea what this system is" ; return 1
+        fi
+
+}
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Logic and Flow Control          ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+dependency::_rtd_library
+
+system::exec () {
+confirmation=$($RTD_GUI --backtitle "$PUBLICATION" --colors --title "\Z1 Warning!" --inputbox " \n 
+Removing old kernels by script could be risky. An error could 
+result in all kernels being removed making your system un-usable. \n
+\n
+Please type 'YES' in to the field below to confirm that you understand that this 
+process may render your computer unbootaple. \n" 15 78  3>&1 1>&2 2>&3)
+        case $? in
+                0 ) 
+                case ${confirmation} in
+                        YES | yes | Yes ) system::remove_old_kernel ;;
+                        * ) clear ; write_status "You did not confirm, exiting." ; exit 1 ;;
+                esac
+                ;;
+                1 ) clear ; write_status "You selected to not remove kernels..." ; return 1 ;;
+                255) clear ; write_status "you pressed escape... " ; return 1 ;;
+        esac
+
+}
+system::exec
+
+
