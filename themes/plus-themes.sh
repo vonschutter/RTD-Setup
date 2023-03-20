@@ -99,12 +99,12 @@ theme::add_global ()
 		popd
 	;;
 	--fonts)
-		pushd "${_my_scriptdir}/fon" || return
+		pushd "${_my_scriptdir}/fon*" || return
 		theme::install_payload
 		popd
 	;;
 	--icons )
-		pushd "${_my_scriptdir}/ico" || return
+		pushd "${_my_scriptdir}/ico*" || return
 		theme::install_payload
 		popd
 	;;

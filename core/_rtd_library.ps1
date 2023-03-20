@@ -1,5 +1,20 @@
-
-
+#::				R T D   F u n c t i o n   L i b r a r y
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::// Windows //::::::
+#::	Author(s):   	SLS
+#:: 	Version:	0.1
+#::
+#::
+#::	Purpose:	To collect and enable the use of code snippets in other scripts.
+#::			To document these thoroughly so that they may be useful for learning BASH.
+#::	Usage: 		call this file as part of your script execution.
+#::
+#::	This script is shared in the hopes that
+#::	someone will find it useful.
+#::
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 
 
@@ -60,24 +75,24 @@ function Set-DefaultBrowser
             Set-ItemProperty $regKeyHttps -name ProgId Opera.Protocol
             break
         }
-    } 
+    }
 }
 
 
 Function Restart {
 	Write-Output "Restarting..."
 	Restart-Computer
- 
+
 }
 
 
 Function ChangeTheDefaultBrowser {
 	param($defaultBrowser)
-    
+
 	$regKey = "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\{0}\UserChoice"
 	$regKeyHttp = $regKey -f 'http'
 	$regKeyHttps = $regKey -f 'https'
-    
+
 	switch -Regex ($defaultBrowser.ToLower()) {
 	    # Brave Browser
 	    # https://brave.com
@@ -169,7 +184,7 @@ Function ChangeTheDefaultBrowser {
 		Set-ItemProperty -Force -PassThru -Verbose $regKeyHttps -name Hash wxeuCoUyJR0=
 		break
 	    }
-	}    
+	}
 }
 
 
@@ -185,11 +200,11 @@ Function RestoreTheDefaultBrowser {
 	#ChangeTheDefaultBrowser ob
 	#ChangeTheDefaultBrowser wf
 	param($defaultBrowser)
-    
+
 	$regKey = "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\{0}\UserChoice"
 	$regKeyHttp = $regKey -f 'http'
 	$regKeyHttps = $regKey -f 'https'
-    
+
 	switch -Regex ($defaultBrowser.ToLower()) {
 		# Microsoft Edge
 		# https://www.microsoft.com/pt-br/windows/microsoft-edge
