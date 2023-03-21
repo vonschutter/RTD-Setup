@@ -128,7 +128,7 @@ export RTD_VERSION=2.0
 	set_install_command				: Determines what install command should be used to install packages from repositories
 	set_oem_elevated_privilege_gui			: Set x-authority toallow root GUI
 	SofwareManagmentAvailabilityCHK			: Checks to see that the software managment system is not busy
-	system_config::deb::remove_old_kernel		: Removes all old linux kernels
+	system_config::remove_old_kernel		: Removes all old linux kernels
 	toggle_oem_auto_login				: Toggle the auto login option for the user
 	test_iso_boot_media				: Test bootable media using QEMU
 	up2date						: Older universal software update function
@@ -237,6 +237,7 @@ source "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_rtd_recipies
 ###########################################################################
 
 # All library functions are listed below in a few sections:
+# - Standard Interactions
 # - System Managment
 # - Software Management
 # - Virtual Machine Management
@@ -248,6 +249,80 @@ source "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_rtd_recipies
 
 
 
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::           Function Section               ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+#---------------------------------------------------------------------------------------
+#
+# 	. -------------------------------------------------------------------.
+# 	| [Esc] [F1][F2][F3][F4][F5][F6][F7][F8][F9][F0][F10][F11][F12] o o o|
+# 	|                                                                    |
+# 	| [`][1][2][3][4][5][6][7][8][9][0][-][=][_<_] [I][H][U] [N][/][*][-]|
+# 	| [|-][Q][W][E][R][T][Y][U][I][O][P][{][}] | | [D][E][D] [7][8][9]|+||
+# 	| [CAP][A][S][D][F][G][H][J][K][L][;]['][#]|_|           [4][5][6]|_||
+# 	| [^][\][Z][X][C][V][B][N][M][,][.][/] [__^__]    [^]    [1][2][3]| ||
+# 	| [c]   [a][________________________][a]   [c] [<][V][>] [ 0  ][.]|_||
+# 	`--------------------------------------------------------------------'
+#	  ___  _                   _                _
+#	 / __|| |_  __ _  _ _   __| | __ _  _ _  __| |
+#	 \__ \|  _|/ _` || ' \ / _` |/ _` || '_|/ _` |
+#	 |___/ \__|\__/_||_||_|\__/_|\__/_||_|  \__/_|
+#
+#	  ___        _                        _    _
+#	 |_ _| _ _  | |_  ___  _ _  __ _  __ | |_ (_) ___  _ _   ___
+#	  | | | ' \ |  _|/ -_)| '_|/ _` |/ _||  _|| |/ _ \| ' \ (_-/
+#	 |___||_||_| \__|\___||_|  \__/_|\__| \__||_|\___/|_||_|/__/
+#
+#--------------------------------------------------------------------------------------
+
+dialog::display_notice ()
+{
+# Description: Function to display an information notice. The purpose of this function
+# is simply to make it easy and convenient to display a mesage to an end user in a terminal
+# in a nice way. To use this function simply call it passing whaterver string you want displayed
+# using dialog.
+# Globals: ${result}, ${BRANDING}
+# Arguments: ["Title to display"]
+# Outputs: Message in dialog box
+# Returns: 0 or ESC
+# Usage:
+#
+# result=$( command with output)
+# display_result "title of the mesage"
+#
+# End of Documentation
+
+	hash ${RTD_GUI:-dialog} &>/dev/null || check_dependencies ${RTD_GUI:-dialog} &>/dev/null || return 1
+
+	${RTD_GUI:-dialog} --backtitle "$PUBLICATION" --colors --no-collapse --title "Notice" --msgbox "\n ${@} \n" 15 78
+	clear
+}
+
+
+display_result ()
+{
+# Description: Function to read a variable "result" and display its contents. The purpose of this function
+# is simply to make it easy and convenient to display a mesage to an end user in a terminal
+# in a nice way. To use this function simply call it after populating the variable result.
+# Globals: ${result}, ${BRANDING}
+# Arguments: ["Title to display"]
+# Outputs: Message in dialog box
+# Returns: 0 or ESC
+# Usage:
+#
+# result=$( command with output)
+# display_result "title of the mesage"
+#
+# End of Documentation
+
+	${RTD_GUI:-dialog} --backtitle "$BRANDING" --colors --no-collapse --title "$1" --msgbox "$result" ${HEIGHT:-"20"} ${WIDTH:-"80"}
+	clear
+}
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -298,6 +373,78 @@ source "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_rtd_recipies
 # |_|  |_|\__,_|_| |_|\__,_|\__, |_| |_| |_|\___|_| |_|\__|
 #                           |___/
 # ----------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+system_config::remove_old_kernel ()
+{
+	# Description: Function to remove all old linux kernels.
+#
+#
+# Globals:
+# Arguments: None
+# Outputs:
+# Returns: Standard error level.
+# Usage: simply call function in a script
+# End of documentation
+
+        if [[ $(echo "$OSTYPE" |grep "linux") ]]; then
+                # these tests focus on the latest versions of the distros evaluated...
+                if hash apt-get &>/dev/null ; then
+                        dialog::display_notice "🧩 ${FUNCNAME[0]}: An apt based system has been found... proceeding... "
+                        if [[ $? -eq 0 ]] ; then
+                                ensure_admin
+                                dpkg -l linux-* | awk '/^ii/{print $2}' | egrep [0-9] | sort -t- -k3,4 --version-sort -r | sed -e "1,/$(uname -r | cut -f1,2 -d"-")/d" | grep -v -e `uname -r | cut -f1,2 -d"-"` | xargs sudo apt-get -y purge
+                                return $?
+                        else
+                                return 1
+                        fi
+                elif hash zypper &>/dev/null ; then
+                        dialog::display_notice "🧩 ${FUNCNAME[0]}: An Zypper based package management system has been found... proceeding... "
+                        if [[ $? -eq 0 ]] ; then
+                                ensure_admin
+                                zypper purge-kernels
+                                return $?
+                        else
+                                return 1
+                        fi
+                elif hash dnf &>/dev/null ; then
+                        dialog::display_notice "🧩 ${FUNCNAME[0]}: An DNF based package management system has been found... proceeding... "
+                        if [[ $? -eq 0 ]] ; then
+                                ensure_admin
+                                dnf remove $(dnf repoquery --installonly --latest-limit 2 -q)
+                                return $?
+                        else
+                                return 1
+                        fi
+                else
+                        # For distributions that do not need to add a repository to install snap
+                        # But would need to install it from their standard reopsitory....
+                        dialog::display_notice "${FUNCNAME[0]}: a supported package manager was not found for this action..."
+                        return 1
+                fi
+        elif [[ "$OSTYPE" == "darwin"* ]]; then
+                write_error "${FUNCNAME[0]}: Mac OSX is currently not supported with snap..."  ; return 1
+        elif [[ "$OSTYPE" == "cygwin" ]]; then
+                write_error "${FUNCNAME[0]}: CYGWIN is currently unsupported with snap..."  ; return 1
+        elif [[ "$OSTYPE" == "msys" ]]; then
+                write_error "${FUNCNAME[0]}: Lightweight shell is currently unsupported with snap... "  ; return 1
+        elif [[ "$OSTYPE" == "freebsd"* ]]; then
+                write_error "${FUNCNAME[0]}: Free BSD is currently unsupported with snap... " ; return 1
+        else
+                echo "I have no Idea what this system is" ; return 1
+        fi
+
+}
 
 
 
@@ -4156,25 +4303,6 @@ up_2_date ()
 
 
 
-system_config::deb::remove_old_kernel ()
-{
-# Description: Function to remove all old linux kernels.
-#
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns: Standard error level.
-# Usage: simply call function in a script
-# End of documentation
-
-	if hash dpkg ; then
-		dpkg -l linux-* | awk '/^ii/{print $2}' | egrep [0-9] | sort -t- -k3,4 --version-sort -r | sed -e "1,/$(uname -r | cut -f1,2 -d"-")/d" | grep -v -e `uname -r | cut -f1,2 -d"-"` | xargs sudo apt-get -y purge
-	else
-		write_error "${FUNCNAME[0]}: No supported software managment found for removing kernels."
-		return 1
-	fi
-}
 
 
 system_config::tune_system_power_profile ()
@@ -8353,25 +8481,7 @@ set_colors ()
 
 
 
-display_result ()
-{
-# Description: Function to read a variable "result" and display its contents. The purpose of this function
-# is simply to make it easy and convenient to display a mesage to an end user in a terminal
-# in a nice way. To use this function simply call it after populating the variable result.
-# Globals: ${result}, ${BRANDING}
-# Arguments: ["Title to display"]
-# Outputs: Message in dialog box
-# Returns: 0 or ESC
-# Usage:
-#
-# result=$( command with output)
-# display_result "title of the mesage"
-#
-# End of Documentation
 
-	${RTD_GUI:-dialog} --backtitle "$BRANDING" --colors --no-collapse --title "$1" --msgbox "$result" ${HEIGHT:-"20"} ${WIDTH:-"80"}
-	clear
-}
 
 
 
