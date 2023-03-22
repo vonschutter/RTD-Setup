@@ -5115,13 +5115,12 @@ software::display_bundle_install_choices_gtk ()
 #
 # End of documentation
 
-	local
 	while true; do
 		exec 3>&1
-		DisplayList=$(software::list_bundles --zformat-installable)
-		IFS_SAV=$IFS
-		IFS=$(echo -en "\n\b")
-		for i in ${DisplayList} ; do echo $i ; done
+		local DisplayList=$(software::list_bundles --zformat-installable)
+		local IFS_SAV=$IFS
+		local IFS=$(echo -en "\n\b")
+
 		_text=" Select a Software Bundle below that you want to add to this computer: \n NOTE: only items that are not yet installed are shown. \n"
 		selection=$(zenity --list --checklist --text="${_text}" --height=600 --width=980 --print-column=2 --column="Selected" --column="Bundle" --column="Description" --separator=" " ${DisplayList} )
 		exit_status=$?
@@ -5138,8 +5137,8 @@ software::display_bundle_install_choices_gtk ()
 				c=0
 				previously_completed_bundles="$(cat ${completed_bundles_list})"
 				for i in ${selection} ; do
-					software::add_software_task recipe_Bundle:_${i}
-					echo $i >> ${completed_bundles_list}
+					current_bundle="${i}"
+					software::add_software_task recipe_Bundle:_${current_bundle} && echo "${current_bundle}" >> ${completed_bundles_list}
 					((c=c+1))
 				done
 
@@ -5198,9 +5197,10 @@ software::display_bundle_removal_choices_gtk ()
 				c=0
 				removed_bundle_list="$(mktemp)"
 				for i in ${selection} ; do
+					current_bundle="${i}"
 					#software::remove_software_task recipe_Bundle:_${i}
-					sed -i "/${i}/d" "${completed_bundles_list}"
-					echo ${i} >> "${removed_bundle_list}"
+					sed -i "/${current_bundle}/d" "${completed_bundles_list}"
+					echo ${current_bundle} >> "${removed_bundle_list}"
 					((c=c+1))
 				done
 
@@ -8848,7 +8848,7 @@ list_loaded_software_functions ()
 	if [[ "$1" == "--nonum" ]]; then
 		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" |grep "recipe_")
 		do
-			echo false ${index/recipe_/} "$()"
+			echo false ${index/recipe_/}
 		done
 	else
 		i=1
