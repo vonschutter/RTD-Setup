@@ -118,6 +118,25 @@ complete_setup () {
 	esac
 }
 
+dependency::_rtd_library ()
+{
+	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library ; then
+		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
+	elif source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
+		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
+	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
+		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name _rtd_library |grep -v bakup )"
+	elif wget ${_src_url} ; then
+                write_information "${FUNCNAME[0]} 4 Using: ${_src_url}"
+		source ./_rtd_library
+	else
+		echo -e "RTD functions NOT found!"
+		return 1
+	fi
+}
+
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -129,23 +148,13 @@ complete_setup () {
 # ensure_admin
 if [[ ! $UID -eq 0 ]]; then
 	echo -e "This script needs administrative access..."
-	# Another workaround just for SUSE...
-	sudo -E sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
 	# Relaunch script in priviledged mode...
 	sudo -E bash $0 $*
 else
-	if  [[ -f "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_rtd_library ]]; then
-		source "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_rtd_library
-	elif source $(find /opt -name _rtd_library ) ; then
-		write_information "Libraries loaded"
-	else
-		echo -e "RTD functions NOT loaded!"
-		echo -e "Cannot ensure that the correct functionality is available"
-		echo -e "Quiting rather than cause potential damage..."
-		exit 1
-	fi
-
+	dependency::_rtd_library
+	# Allow super user to display gui menu on users screen.
 	sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
+
 	rtd_wait_for_internet_availability
 	rtd_oem_reset_default_environment_config
 
@@ -155,7 +164,8 @@ else
 		rtd_setup_choices_server
 	else
 		check_dependencies zenity || exit 1
-		display_software_installation_choices_gtk
+		#software::display_bundle_removal_choices_gtk
+		software::display_bundle_install_choices_gtk
 		complete_setup
 	fi
 fi

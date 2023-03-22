@@ -29,7 +29,11 @@ export RTD_VERSION=2.0
 	Function Name: 					Description:
 	----------------------------------------------------------------------------------------------------------------
 	add_gnome3_favorite_app				: Adds a new favorite app to the gnome favorites bar
-	add_software_task 				: Wrapper function to execute a command and display pretty terminal OK or FAIL
+	software::add_software_task 			: Wrapper function to execute a command and display pretty terminal OK or FAIL
+	software::list_bundles				: Lists software bundles defined in _rtd_recipes
+	software::ensure_software_store_available	: Ensure that the appropriate software store is available with Flatpak & Snap support
+	software::display_bundle_install_choices_gtk	: Show a menu of all installable software bundles defined in _rtd_recipes
+	software::display_bundle_removal_choices_gtk	: Show a menu of installed softwrae bundles that may be removed
 	backup_running_vm 				: Backs up all running virtual machines on the local computer
 	change_disk_pass 				: Allows user to change password of the system partition encrypted disk
 	check_dependencies 				: Checks that software requirements are met so scripts do not fail
@@ -43,6 +47,7 @@ export RTD_VERSION=2.0
 	create_physical_media_from_iso			: Create physical media thumb drive from an ISO file
 	debug_list_loaded_functions			: Lists all loaded RTD functions in the environment
 	create_swapfile					: Create a new swapfile
+	dialog::display_notice 				: Display a supplied string as an OK box for a terminal user
 	display_result 					: Displays command results in a pretty terminal box
 	display_spinner					: Display a spinner in the terminal
 	display_software_installation_choices_gtk	: Show software installation options defined in recipe file (external)
@@ -61,8 +66,8 @@ export RTD_VERSION=2.0
 	generate_minecraft_server_launcher		: Creates a minecraft server launcher, w. automatic dependeny resolutions
 	generate_report_disk_space_used_by_directory 	: Generate a disk usage report
 	generate_rtd_me_sh_cmd				: Creates a rtd bootstrap script for system/software install for Windows, Linux, MAC OS, BSD etc.
-	github::clone_repo_user				: Clone all repositories for a given user at github.com
-	github::list_all_user_repositories		: List all repositories for a given user
+	github::clone_repo_user                         : Clone all repositories for a given user at github.com
+	github::list_all_user_repositories              : List all repositories for a given user
 	InstallSoftwareFromRepo				: Installs a package from a repository supports SUSE, Fedora, Cent OS, Ubuntu Deian etc.
 	is_software_package_available			: Checks to see if a software package is available in a repository
 	io_on_notify_wait				: Wait for a disk change and then execute a command
@@ -326,6 +331,13 @@ display_result ()
 }
 
 
+
+
+
+
+
+
+
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::           Function Section               ::::::::::::::::::::::
@@ -386,7 +398,7 @@ display_result ()
 
 
 
-system_config::remove_old_kernel ()
+system::remove_old_kernel ()
 {
 	# Description: Function to remove all old linux kernels.
 #
@@ -451,65 +463,7 @@ system_config::remove_old_kernel ()
 
 
 
-
-
-
-github::clone_repo_user ()
-{
-# Description:
-# Function to CLONE all github.com repositories for a specified user.
-# simply call the function and pass the username as parameter to clone
-# all github repositories in to the current folder.
-#
-# Globals: None
-# Arguments: User-name
-# Outputs:
-# Returns: a download of all repositories for the given user.
-# Usage: ${FUNCNAME[0]} user-name
-# End of documentation
-
-	if [ $# -eq 0 ]; then
-	    echo "Usage: ${FUNCNAME[0]} <user_name> "
-	    exit 1;
-	fi
-
-	for repo in $(curl -s https://api.github.com/users/${1}/repos?per_page=1000 |grep git_url |awk '{print $2}'| sed 's/"\(.*\)",/\1/');do
-	  git clone --depth=1 "https${repo:3}";
-	done
-
-}
-
-
-github::list_all_user_repositories ()
-{
-# Description:
-# Function to LIST all github.com repositories for a specified user.
-# simply call the function and pass the username as parameter to show
-# all github repositories the indicated user.
-#
-# Globals: None
-# Arguments: User-name
-# Outputs:
-# Returns: a LIST of all repositories for the given user.
-# Usage: ${FUNCNAME[0]} user-name
-# End of documentation
-
-	if [ $# -eq 0 ]
-	  then
-	    echo "Usage: ${FUNCNAME[0]} <user_name> "
-	    return 1;
-	fi
-
-	for repo in $(curl -s https://api.github.com/users/${1}/repos?per_page=1000 |grep git_url |awk '{print $2}'| sed 's/"\(.*\)",/\1/'); do
-		echo "https${repo:3}"
-	done
-
-}
-
-
-
-
-change_disk_pass ()
+system::change_disk_pass ()
 {
 # Description: Function to change the passphrase fo an encrypted storage device.
 # It will offer to change the first encrypted volume found by blockid.
@@ -530,11 +484,6 @@ change_disk_pass ()
 	cryptsetup luksChangeKey "$(blkid | grep crypto_LUKS|  cut -d : -f 1)"
 	read -p "Press  [ ENTER ] to continue:"
 }
-
-
-
-
-
 
 
 
@@ -608,6 +557,58 @@ system::oem_autounlock_disk ()
 
 
 
+
+github::clone_repo_user ()
+{
+# Description:
+# Function to CLONE all github.com repositories for a specified user.
+# simply call the function and pass the username as parameter to clone
+# all github repositories in to the current folder.
+#
+# Globals: None
+# Arguments: User-name
+# Outputs:
+# Returns: a download of all repositories for the given user.
+# Usage: ${FUNCNAME[0]} user-name
+# End of documentation
+
+	if [ $# -eq 0 ]; then
+	    echo "Usage: ${FUNCNAME[0]} <user_name> "
+	    exit 1;
+	fi
+
+	for repo in $(curl -s https://api.github.com/users/${1}/repos?per_page=1000 |grep git_url |awk '{print $2}'| sed 's/"\(.*\)",/\1/');do
+	  git clone --depth=1 "https${repo:3}";
+	done
+
+}
+
+
+github::list_all_user_repositories ()
+{
+# Description:
+# Function to LIST all github.com repositories for a specified user.
+# simply call the function and pass the username as parameter to show
+# all github repositories the indicated user.
+#
+# Globals: None
+# Arguments: User-name
+# Outputs:
+# Returns: a LIST of all repositories for the given user.
+# Usage: ${FUNCNAME[0]} user-name
+# End of documentation
+
+	if [ $# -eq 0 ]
+	  then
+	    echo "Usage: ${FUNCNAME[0]} <user_name> "
+	    return 1;
+	fi
+
+	for repo in $(curl -s https://api.github.com/users/${1}/repos?per_page=1000 |grep git_url |awk '{print $2}'| sed 's/"\(.*\)",/\1/'); do
+		echo "https${repo:3}"
+	done
+
+}
 
 
 
@@ -796,12 +797,7 @@ oem::rtd_tools_make_launchers ()
 
 
 
-
-
-
-
-
-get_Windows_Product_Key ()
+system::get_Windows_Product_Key ()
 {
 # Description: Function to retrieve a Windows product key from the BIOS. This assumes that the OEM
 # has indeed stored the windows key in the BIOS... Doing so is a common practice. It is useful to
@@ -818,10 +814,6 @@ get_Windows_Product_Key ()
 	WinKey=$(sudo strings /sys/firmware/acpi/tables/MSDM | tail -1)
 	echo "${WinKey}"
 }
-
-
-
-
 
 
 
@@ -875,11 +867,6 @@ err_no_menu_system_found ()
 
 
 
-
-
-
-
-
 enable_firewall ()
 {
 # Description:
@@ -902,10 +889,6 @@ enable_firewall ()
 			echo -e $faded_orange "UFW not present on this system: please turn on the firewall and configure it manually!" $ENDCOLOR
 	fi
 }
-
-
-
-
 
 
 
@@ -943,13 +926,6 @@ rtd_oem_reset_default_environment_config ()
 
 
 
-
-
-
-
-
-
-
 rtd_wait_for_internet_availability ()
 {
 # Description: Function that, when called, will wait for an active internet connection
@@ -973,9 +949,6 @@ rtd_wait_for_internet_availability ()
 		sleep 10
 	done
 }
-
-
-
 
 
 
@@ -4129,24 +4102,24 @@ ensure_flatpak_package_managment ()
 #	*	---       PREFFERRED Software install (Security + Control)           ----		*
 #
 #  CAPABILITY TABLE:
-# +-----------------------------------------------------+----------------+-------------+-----------------+
-# | Features                                            | Snap           | Flatpak     | AppImage        |
-# +-----------------------------------------------------+----------------+-------------+-----------------+
-# | Permission Controls Toggles                         | Yes            | Yes         | No              |
-# | Sandboxing Support                                  | Yes            | Yes         | Yes             |
-# | Sandboxing Mandatory                                | Yes            | Yes         | No              |
-# | App Portability                                     | Yes            | Yes         | No              |
-# | Native Theme Support                                | Yes (with      | Yes (with c | Yes (with cav   |
-# | Support for Bundled Libraries                       | Yes            | Yes         | Yes             |
-# | Fully Contained Single Executable Support           | No             | No          | Yes             |
-# | Online App Store                                    | Yes            | Yes         | Yes             |
-# | Multi-version Parallel Apps Support                 | Yes            | Yes         | Yes             |
-# | Automatic Updates                                   | Yes            | Yes         | Yes(with cave   |
-# | Support for Chrome OS (through Crostini containers) | Yes            | Yes         | Yes             |
-# | App Size                                            | higher than    | higher than | Lowest          |
-# | Number of Applications Available in the App Store   | Highest        | Lowest      | Somewhere in  n |
-# | Plugins for Desktop App Store Software              | Yes            | Yes         | No              |
-# +-----------------------------------------------------+----------------+-------------+-----------------+
+# +----------------------------------------------------+-------------+-------------+--------------+
+# | Features                                           | Snap        | Flatpak     | AppImage     |
+# +----------------------------------------------------+-------------+-------------+--------------+
+# | Permission Controls Toggles                        | Yes         | Yes         | No           |
+# | Sandboxing Support                                 | Yes         | Yes         | Yes          |
+# | Sandboxing Mandatory                               | Yes         | Yes         | No           |
+# | App Portability                                    | Yes         | Yes         | No           |
+# | Native Theme Support                               | Yes (caveat)| Yes (caveat)| Yes (caveat) |
+# | Support for Bundled Libraries                      | Yes         | Yes         | Yes          |
+# | Fully Contained Single Executable Support          | No          | No          | Yes          |
+# | Online App Store                                   | Yes         | Yes         | Yes          |
+# | Multi-version Parallel Apps Support                | Yes         | Yes         | Yes          |
+# | Automatic Updates                                  | Yes         | Yes         | Yes (caveat) |
+# | Support for Chrome OS (through Crostini containers)| Yes         | Yes         | Yes          |
+# | App Size                                           | higher than | higher than | Lowest       |
+# | Number of Applications Available in the App Store  | Highest     | Lowest      | Somewhere in |
+# | Plugins for Desktop App Store Software             | Yes         | Yes         | No           |
+# +----------------------------------------------------+-------------+-------------+--------------+
 # End of documentation
 	if hash flatpak ; then
 		write_status "🧩 ${FUNCNAME[0]}: FLATPAK command is available! Skipping check ... "
@@ -4172,39 +4145,42 @@ ensure_snap_package_managment ()
 # Outputs: stdout
 # Returns: Standard return codes 1/0
 # Usage: Call the function with no arguments
-# NOTE: https://www.fosslinux.com/42410/snap-vs-flatpak-vs-appimage-know-the-differences-which-is-better.htm
+# NOTE:
+# https://www.fosslinux.com/42410/snap-vs-flatpak-vs-appimage-know-the-differences-which-is-better.htm
 # Snap is a distribution independent package format developed by Canonical and first released
 # in 2014. It was initially developed for Ubuntu but has been adopted by other Linux distributions
-# like Arch, Linux Mint, CentOS, Gentoo, and Fedora, and also included support for the Snap framework.
-# The main aim behind this package format development was to come up with a single unified format for
-# software packages to run in a wide range of devices. That includes IoT (IoT), embedded devices
-# running Ubuntu Core (a minimalistic version of Ubuntu), and computer systems that ran some Ubuntu version.
-# Snap also offers an online app store – Snapcraft, where users can find and install the software packages.
-# It creates a large pool where users can find all available a snap package. Snapcraft is itself
-# controlled and maintained by the Canonical team.
-# package is the lack of support for Servers.
+# like Arch, Linux Mint, CentOS, Gentoo, and Fedora, and also included support for the Snap
+# framework. The main aim behind this package format development was to come up with a
+# single unified format for software packages to run in a wide range of devices.
+# That includes IoT (IoT), embedded devices running Ubuntu Core (a minimalistic
+# version of Ubuntu), and computer systems that ran some Ubuntu version.
+# Snap also offers an online app store – Snapcraft, where users can find and
+# install the software packages. It creates a large pool where users can find all
+# available a snap package. Snapcraft is itself controlled and maintained by the
+# Canonical team.
 #
-#	*	---       PREFFERRED Software install (Security + Control)           ----		*
+#
+#	*	---   PREFFERRED Software install (Security + Control)        ----	*
 #
 #  CAPABILITY TABLE:
-# +-----------------------------------------------------+----------------+-------------+-----------------+
-# | Features                                            | Snap           | Flatpak     | AppImage        |
-# +-----------------------------------------------------+----------------+-------------+-----------------+
-# | Permission Controls Toggles                         | Yes            | Yes         | No              |
-# | Sandboxing Support                                  | Yes            | Yes         | Yes             |
-# | Sandboxing Mandatory                                | Yes            | Yes         | No              |
-# | App Portability                                     | Yes            | Yes         | No              |
-# | Native Theme Support                                | Yes (with      | Yes (with c | Yes (with cav   |
-# | Support for Bundled Libraries                       | Yes            | Yes         | Yes             |
-# | Fully Contained Single Executable Support           | No             | No          | Yes             |
-# | Online App Store                                    | Yes            | Yes         | Yes             |
-# | Multi-version Parallel Apps Support                 | Yes            | Yes         | Yes             |
-# | Automatic Updates                                   | Yes            | Yes         | Yes(with cave   |
-# | Support for Chrome OS (through Crostini containers) | Yes            | Yes         | Yes             |
-# | App Size                                            | higher than    | higher than | Lowest          |
-# | Number of Applications Available in the App Store   | Highest        | Lowest      | Somewhere in  n |
-# | Plugins for Desktop App Store Software              | Yes            | Yes         | No              |
-# +-----------------------------------------------------+----------------+-------------+-----------------+
+# +----------------------------------------------------+-------------+-------------+--------------+
+# | Features                                           | Snap        | Flatpak     | AppImage     |
+# +----------------------------------------------------+-------------+-------------+--------------+
+# | Permission Controls Toggles                        | Yes         | Yes         | No           |
+# | Sandboxing Support                                 | Yes         | Yes         | Yes          |
+# | Sandboxing Mandatory                               | Yes         | Yes         | No           |
+# | App Portability                                    | Yes         | Yes         | No           |
+# | Native Theme Support                               | Yes (caveat)| Yes (caveat)| Yes (caveat) |
+# | Support for Bundled Libraries                      | Yes         | Yes         | Yes          |
+# | Fully Contained Single Executable Support          | No          | No          | Yes          |
+# | Online App Store                                   | Yes         | Yes         | Yes          |
+# | Multi-version Parallel Apps Support                | Yes         | Yes         | Yes          |
+# | Automatic Updates                                  | Yes         | Yes         | Yes (caveat) |
+# | Support for Chrome OS (through Crostini containers)| Yes         | Yes         | Yes          |
+# | App Size                                           | higher than | higher than | Lowest       |
+# | Number of Applications Available in the App Store  | Highest     | Lowest      | Somewhere in |
+# | Plugins for Desktop App Store Software             | Yes         | Yes         | No           |
+# +----------------------------------------------------+-------------+-------------+--------------+
 # End of documentation
 
 
@@ -4970,7 +4946,7 @@ rtd_update_system ()
 
 
 
-add_software_task ()
+software::add_software_task ()
 {
 # Description: Display executed task and echo ON/NOK based on sucess
 # This function is created to reduce the terminal output and create a more poliched output of
@@ -4981,7 +4957,7 @@ add_software_task ()
 # Arguments: function or command to execute
 # Outputs:
 # Returns:
-# Usage: add_software_task function_name
+# Usage: software::add_software_task function_name
 # End of documentation
 
 	PAD="---------------------------------------------------------"
@@ -5114,11 +5090,132 @@ display_software_installation_choices_gtk ()
 	for choice in ${choices}
 		do
 		# call each chosen software install (by function) & add recepie (removed for display purposes)
-		add_software_task recipe_${choice}
+		software::add_software_task recipe_${choice}
 	done
 }
 
 
+
+
+software::display_bundle_install_choices_gtk ()
+{
+# Function to display the software install otions. All software option are listed in
+# the _rtd_recipes recipe book. Leveraging all the useful function in _rtd_library.
+# NOTE: adding a function in _rtd_recipes named "recipes_* ()" will automaticall populete
+# the menu displayed to the user.
+#
+# Globals: ${_BACK_TITLE} ${zstatus}
+# Dependencies: _rtd_recipes
+# Arguments: None
+# Outputs: interactive screen
+# Returns: 0/1 last command executed.
+# Usage:  simply call the function by its name.
+# Arguments: none
+#
+#
+# End of documentation
+
+	local
+	while true; do
+		exec 3>&1
+		DisplayList=$(software::list_bundles --zformat-installable)
+		IFS_SAV=$IFS
+		IFS=$(echo -en "\n\b")
+		for i in ${DisplayList} ; do echo $i ; done
+		_text=" Select a Software Bundle below that you want to add to this computer: \n NOTE: only items that are not yet installed are shown. \n"
+		selection=$(zenity --list --checklist --text="${_text}" --height=600 --width=980 --print-column=2 --column="Selected" --column="Bundle" --column="Description" --separator=" " ${DisplayList} )
+		exit_status=$?
+		IFS=$IFS_SAV
+		exec 3>&-
+		case $exit_status in
+			1) clear && echo [Cancel] && return ;;
+			255) clear && echo [ESC] && return ;;
+		esac
+
+		case "${selection}" in
+			"${selection}" )
+				d=0 ; for i in $(cat ${completed_bundles_list}) ; do ((d=d+1)) ; done
+				c=0
+				previously_completed_bundles="$(cat ${completed_bundles_list})"
+				for i in ${selection} ; do
+					software::add_software_task recipe_Bundle:_${i}
+					echo $i >> ${completed_bundles_list}
+					((c=c+1))
+				done
+
+				completed_bundles="$(cat ${completed_bundles_list} |tail -$c)"
+				zenity --info --timeout 120 --title "Bundles Installed: $c Bundles Previously Installed: $d" --text="The following Software bundles have been installed: \n \n $completed_bundles \n \n Previouly installed bundles: \n \n $previously_completed_bundles" --height=600 --width=800
+			;;
+			* )
+				# Trap unknown conditions so as to not do harm
+				exit
+			;;
+		esac
+	done
+	return
+}
+
+
+
+
+software::display_bundle_removal_choices_gtk ()
+{
+# Function to display the software install otions. All software option are listed in
+# the _rtd_recipes recipe book. Leveraging all the useful function in _rtd_library.
+# NOTE: adding a function in _rtd_recipes named "recipes_* ()" will automaticall populete
+# the menu displayed to the user.
+#
+# Globals: ${_BACK_TITLE} ${zstatus}
+# Dependencies: _rtd_recipes
+# Arguments: None
+# Outputs: interactive screen
+# Returns: 0/1 last command executed.
+# Usage:  simply call the function by its name.
+# Arguments: none
+#
+#
+# End of documentation
+
+	local
+	while true; do
+		exec 3>&1
+			DisplayList=$(software::list_bundles --zformat-removable)
+			IFS_SAV=$IFS
+			IFS=$(echo -en "\n\b")
+			_text=" Select a Software Bundle below that you want to REMOVE from this computer: \n \n"
+			selection=$(zenity --list --checklist --text="${_text}" --height=600 --width=980 --print-column=2 --column="Selected" --column="Bundle" --column="Description" --separator=" " ${DisplayList} )
+			exit_status=$?
+			IFS=$IFS_SAV
+		exec 3>&-
+		case $exit_status in
+			1) clear && echo [Cancel] && exit ;;
+			255) clear && echo [ESC] && exit ;;
+			2) clear && echo [QUIT] && exit ;;
+		esac
+
+		case "${selection}" in
+			"${selection}" )
+				c=0
+				removed_bundle_list="$(mktemp)"
+				for i in ${selection} ; do
+					#software::remove_software_task recipe_Bundle:_${i}
+					sed -i "/${i}/d" "${completed_bundles_list}"
+					echo ${i} >> "${removed_bundle_list}"
+					((c=c+1))
+				done
+
+				zenity --info --timeout 120 --title "Bundles Removed: $c " --text="The following Software bundles have been REMOVED: \n \n $(cat ${removed_bundle_list}) " --height=600 --width=800
+			;;
+			* )
+				# Trap unknown conditions so as to not do harm
+				exit
+			;;
+		esac
+		unset DisplayList
+		unset removed_bundle_list
+	done
+	return
+}
 
 
 
@@ -5152,7 +5249,7 @@ echo Under construction...
 	# for choice in ${choices}
 	# 	do
 	# 	# call each chosen software install (by function) & add recepie (removed for display purposes)
-	# 	add_software_task recipe_${choice}
+	# 	software::add_software_task recipe_${choice}
 	# done
 }
 
@@ -8690,6 +8787,54 @@ list_loaded_internal_functions ()
 }
 
 
+software::list_bundles ()
+{
+# Description: Function to list all software bundles defined in _rtd_recipes that are either installable or removable.
+# Globals:
+# Arguments: none or [--zformat]
+# Outputs: Standard out, list of functions either formatted for zenity or not. Output may be used to populate a zenity menu or dialog.
+# Returns:
+# Usage: software::list_bundles [] [--zformat-installable | --zformat-removable]
+# End of documentation
+
+	case "$1" in
+		--zformat-installable )
+		# List software bundles for use with zenity
+		for _bundle in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" |grep "recipe_" |grep -v "Single_Install" )
+		do
+			# Build each line to be displayed in the bundle installer...
+			Description=$(grep -A 1 "$_bundle ()" _rtd_recipies |tail -1)
+			Description="${Description/"# "/": "}"
+			Description="${Description/"	"/""}"
+			[[ -f ${completed_bundles_list} ]] || (touch ${completed_bundles_list} ; mkdir -p ${completed_bundles_list%/*} )
+			cat ${completed_bundles_list} |grep "${_bundle/recipe_Bundle:_/}" &>/dev/null || echo -en "true \n ${_bundle/recipe_Bundle:_/} \n ${Description} \n"
+		done
+		;;
+		--zformat-removable )
+		# List software bundles for use with zenity
+		[[ -f ${completed_bundles_list} ]] || (touch ${completed_bundles_list} ; mkdir -p ${completed_bundles_list%/*} ) &>>/dev/null
+		completed_bundles_list="$(cat ${completed_bundles_list} )"
+		for _installed_bundle in $completed_bundles_list ; do
+			# Build each line to be displayed in the bundle installer...
+			Description=$(grep -A 1 "recipe_Bundle:_$_installed_bundle ()" _rtd_recipies |tail -1)
+			Description="${Description/"# "/": "}"
+			Description="${Description/"	"/""}"
+			echo -e "true \n ${_installed_bundle} \n ${Description} \n"
+		done
+		;;
+		* )
+			# Default list format
+			i=1
+			for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" |grep "recipe_" |grep -v "Single_Install" )
+			do
+				echo "$index #$i"
+				((i=i+1))
+			done
+		;;
+	esac
+}
+
+
 list_loaded_software_functions ()
 {
 # Description: Function to list all software (_rtd_recipes) functions loaded... for debugging/support purposes.
@@ -8703,7 +8848,7 @@ list_loaded_software_functions ()
 	if [[ "$1" == "--nonum" ]]; then
 		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" |grep "recipe_")
 		do
-			echo ${index/recipe_/}
+			echo false ${index/recipe_/} "$()"
 		done
 	else
 		i=1
