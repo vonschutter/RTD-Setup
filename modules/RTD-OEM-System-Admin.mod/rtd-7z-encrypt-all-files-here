@@ -1,0 +1,72 @@
+#!/bin/bash
+#
+#::                                      A D M I N   C O M M A N D
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::// Simple Compression Tool //::::::::::::::::::::::::::::::::::// Linux //::::::::
+#::
+#::     Author:   	SLS
+#::     Version 	1.02
+:	${GIT_Profile:=vonschutter}
+#::
+#::
+#::	Purpose: To compress all files and folders individually found in the current folder.
+#::		 The current folder refers to the present working directory "PWD".
+#::
+#::	Usage:	Simply execute this script to accomplish this task. No parameters required.
+#::
+#::
+#::
+#::
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+# This script is shared in the hopes that someone will find it useful.
+# For convenience and supportability most actions (work) is stored in a common library used bu multiple scripts.
+# To use these functions in the library, simply load the library using the "source" bash built in command. All
+# functions will then be available for use. This script demonstrates the simplicity of using these functions.
+#
+# This script is intended to live in the ~/bin/ or /bin/ folder, alternatively in the $PATH.
+# By default this script is placed in /opt/rtd/scrips/
+#
+# 1 - To see options to use the rtd library type: "bash _rtd_library --help"
+# 2 - To see usefull documentation on each function in this library: "bash _rtd_library --devhelp"
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+dependency::_rtd_library ()
+{
+	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library ; then
+		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
+	elif source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
+		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
+	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
+		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name _rtd_library |grep -v bakup )"
+	elif wget ${_src_url} ; then
+                write_information "${FUNCNAME[0]} 4 Using: ${_src_url}"
+		source ./_rtd_library
+	else
+		echo -e "RTD functions NOT found!"
+		return 1
+	fi
+}
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# Ensure access to the rtd library functions:
+dependency::_rtd_library
+
+# Call compression function with encryption option; function will prompt for pasphrase...
+compress_all_items_here --encrypt

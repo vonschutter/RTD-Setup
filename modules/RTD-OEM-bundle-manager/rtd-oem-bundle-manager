@@ -1,0 +1,222 @@
+#!/bin/bash
+#
+#::                                       A D M I N   T O O L
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:::::::::::::::::::::::::::::::::::::::// RTD OEM bundle manager //::::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Author(s):   	Vonschutter
+#:: Version 1.00
+#::
+#::
+#::	Purpose: - The purpose of the script is to setup extra apps/config that is useful for a complete and productive environment.
+#::		 - Feature: this script "detects" how to install and update software and and tweak the system.
+#::		 - Flexible: This script works on several distributions of Linux since it uses "RTD Functions". Of course, you could
+#::		   simply list all the "apt", "yum", or "zypper" commands along with the "snap" and "flatpak" to install
+#::		   the software needed. However, you would likely need separate scripts for each distribution AND you
+#::		   could not select or de-select software bundles or speciffic titles. This uses a GUI with a timeout for that.
+#::		 - Smart: The "recipies" also downloads setup files from vendors with no repositories, and that do not have "snaps".
+#::		 - Resiliant: This RTD installation system is therefore resiliant, stable, and flexible.
+#::
+#::	Dependencies:
+#::	  _rtd_functions -- contain usefull admin functions for scripts, such as "how to install software" on different systems.
+#::	  _rtd_recipies  -- contain software installation and configuration "recipies".
+#::
+#::
+#::
+#::
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# Variables that govern the behavior or the script and location of files are
+# set here. There should be no reason to change any of this.
+
+# Decide where to put log files.
+# Default: log in to the $_LOG_DIR location dated accordingly. If this is already set
+# we use the requested location. These settings are calculated below but you may
+# chose to over ride them by uncommenting the variables below:
+#
+# export _LOG_DIR=
+# export _ERRLOGFILE=
+# export _LOGFILE=
+# export _TLA=
+
+
+: ${_SCRIPTNAME=$(basename $0)}
+: ${_TLA=${_SCRIPTNAME:0:3}}
+: ${_LOG_DIR:="/var/log/${_TLA}"} ; mkdir -p ${_LOG_DIR}
+: ${_ERRLOGFILE:="${_LOG_DIR}/$( basename $0)-$(date +%Y-%m-%d-%H-%M-%S-%s)-error.log}"}
+: ${_LOGFILE:="${_LOG_DIR}/$( basename $0)-$(date +%Y-%m-%d-%H-%M-%S-%s).log}"}
+
+
+
+_ABOUT='
+<span font="16" foreground="blue">OEM Bundle Manager</span>
+
+The OEM Bundle Manager is part of the RTD Power Tools, and makes is easy to add
+and remove groups of packages. A group of packages are ususally grouped
+around a capabillity or set of tasks, and could be considered roles.
+
+For example, you may have a bundle called '3D_Printing' that will
+install all applications needed to work with 3D Pringing objects.
+These applications can be added or removed by simply checking a box.
+A bundle can also be a collection of themes, or fonts, or a
+set of configurations; not just a list of software and plugins.
+
+<big>Overview</big>
+
+The purpose of this tool is to facilitate the easy adding and removal of
+extra apps/config and other items useful for a complete and productive desktop environment.
+This is an ideal tool to use on a nely built system when you need to install a ton of stuff
+to get a truly useful system
+
+- Feature: this tool detects how to install and update software and and tweak the system.
+- Flexible: This tool works on several distributions of Linux since it uses RTD Functions.
+  Of course, you could simply list all the apt, yum, or zypper commands along with the snap
+  and flatpak commands to install the software needed. However, you would likely need separate scripts
+  for each distribution AND you could not select or de-select software bundles or speciffic titles.
+  The OEM Bundle Manager uses a simple GUI to select and make sure app, configurations,
+  and other items are added.
+- Smart: The "recipies" also downloads setup files from vendors with no repositories, and that do not have "snaps".
+- Resiliant: This RTD bundle manager is therefore resiliant, stable, and flexible since it is built to partially
+  succeed tather than fail and installing dependencies when you need them.
+'
+
+
+
+# Normally all choices are checked. Pass the variable "false" to this script to default
+# to unchecked. If none is passed, a default will be used.
+export zstatus="$1"
+
+# Set the background tilte:
+: "${_BACK_TITLE:-"RTD OEM Simple System Setup"}"
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+
+dependency::file ()
+{
+	# Use the RTD function library. This contains most of the intelligence used to perform this systems
+	# maintenance. As this library is required for basically everything, we should exit if it is not available.
+	_depfile="${1}"
+	_src_url="https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/${_depfile}"
+
+
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/${_depfile} 2> /dev/null; then
+		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/${_depfile}
+	elif source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/${_depfile} 2> /dev/null; then
+		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/${_depfile}
+	elif source $(find /opt -name ${_depfile} |grep -v bakup ) 2> /dev/null; then
+		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name ${_depfile} |grep -v bakup )"
+	elif wget ${_src_url} 2> /dev/null ; then
+                write_information "${FUNCNAME[0]} 4 Using: ${_src_url}"
+		source ./${_depfile}
+	else
+		echo -e "${_depfile} NOT found!"
+		return 1
+	fi
+}
+
+
+system::ExecStart () {
+
+	# Ensure that this script is run with administrative priveledges such that it may
+	ensure_admin
+	rtd_wait_for_internet_availability
+	# Allow super user to display gui menu on users screen.
+	sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
+
+	if hash zenity &>/dev/nul ; then
+		while true; do
+
+			exec 3>&1
+			selection=$(zenity --list \
+				"Add Bundles to this computer" \
+				"Remove Bundles from this computer" \
+				"Information abount this tool" \
+				--column="Select What you Want To Do:" --text='
+				<span font="16" foreground="blue">Add or remove bundles on this system</span> \n
+				NOTE: The OEM Bundle Manager may download vendor packages, or snap apps, or flatpak apps, or even download
+				software from a vendors web site, as well as install fonts and wallpapeers etc. \n ' \
+				--title="OEM Bundle Manager" --height=300 --width=800)
+			exit_status=$?
+			exec 3>&-
+
+			case $exit_status in
+				1) clear && echo [Cancel] && exit ;;
+				255) clear && echo [ESC] && exit ;;
+			esac
+
+			case "$selection" in
+				"Add Bundles to this computer" ) software::display_bundle_install_choices_gtk ;;
+				"Remove Bundles from this computer" ) software::display_bundle_removal_choices_gtk ;;
+				"Information abount this tool" ) zenity::display_info "$_ABOUT" ;;
+				* )
+				# Trap unknown exit code...
+				exit
+				;;
+			esac
+		done
+	else
+		check_dependencies zenity || (
+			write_error "zenity is not available to display menus"
+			exit 1
+			)
+	fi
+
+
+}
+
+
+
+system::ExecStart::help ()
+{
+	clear
+	_HELP_MSG='
+	<span font="16" foreground="blue">🔧    OEM Bundle Manager HELP     🔧</span>
+
+	This is not yet written.
+
+	Syntax (to be added):
+
+	rtd-oem-bundle-manager [ --remove-menu | --install-menu | --help | --timeout="SECONDS" ]
+
+	Where:
+	<tt>
+	--remove-menu .......... Display the "Remove Bundle" menu
+	--install-menu ......... Display the "Install Bundle" menu
+	--timeout="SECONDS" .... Set a timeout for the menu
+	--help ................. Display this help message
+	</tt>
+
+	If nothing is specified the main dialog will be shown.
+
+	'
+	zenity::display_info "$_HELP_MSG"
+}
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Execute tasks                   ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+dependency::file _rtd_library
+dependency::file _rtd_recipies
+
+case ${1} in
+	--help ) system::ExecStart::help ;;
+	--about ) zenity::display_info "$_ABOUT";;
+	* ) system::ExecStart $@ ;;
+esac

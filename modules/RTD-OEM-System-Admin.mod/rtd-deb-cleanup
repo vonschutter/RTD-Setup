@@ -1,0 +1,168 @@
+#!/bin/bash
+#
+#::                                            A D M I N   C O M M A N D
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::// Simple Debian/Ubuntu system cleanup Tool //::::::::::::::::// Debian //::::::::
+#::
+#::     Author:   	SLS
+#::     Version 	1.02
+:	${GIT_Profile:=vonschutter}
+#::
+#::
+#::	Purpose: The purpose of this script is to do som cleaning of system files.
+#::
+#::
+#::     Usage:	Simply execute this commandlet to accomplish this task. No parameters required.
+#::
+#::
+#::
+#::
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+#
+# This  script was originally developed for RuntimeData, a small OEM in Buffalo Center, IA.
+# This OEM and store nolonger exists as its owner has passed away.
+# This script is shared in the hopes that someone will find it useful.
+#
+# This script is intended to live in the ~/bin/ or /bin/ folder, alternatively in the $PATH.
+#
+
+###########################################################################
+##                                                                       ##
+##                       Script     settings                             ##
+##                                                                       ##
+###########################################################################
+
+OLDCONF=$(dpkg -l|grep "^rc"|awk '{print $2}')
+CURKERNEL=$(uname -r|sed 's/-*[a-z]//g'|sed 's/-386//g')
+LINUXPKG="linux-(image|headers|ubuntu-modules|restricted-modules)"
+METALINUXPKG="linux-(image|headers|restricted-modules)-(generic|i386|server|common|rt|xen)"
+OLDKERNELS=$(dpkg -l|awk '{print $2}'|grep -E $LINUXPKG |grep -vE $METALINUXPKG|grep -v $CURKERNEL)
+YELLOW="\033[1;33m"
+RED="\033[0;31m"
+ENDCOLOR="\033[0m"
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+dependency::_rtd_library ()
+{
+	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library ; then
+		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
+	elif source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
+		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
+	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
+		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name _rtd_library |grep -v bakup )"
+	elif wget ${_src_url} ; then
+                write_information "${FUNCNAME[0]} 4 Using: ${_src_url}"
+		source ./_rtd_library
+	else
+		echo -e "RTD functions NOT found!"
+		return 1
+	fi
+}
+
+
+
+
+
+
+rtd_oem_clean_deb ()
+{
+	#---------------------------------------------------------------
+	echo "Checking for aptitude and install if not there..."
+	#---------------------------------------------------------------
+	check_dependencies aptitude
+
+	echo -e $YELLOW"Cleaning apt cache..."$ENDCOLOR
+	aptitude clean
+
+	echo -e $YELLOW"Removing old config files..."$ENDCOLOR
+	sudo aptitude purge $OLDCONF
+
+	echo -e $YELLOW"Removing old kernels..."$ENDCOLOR
+	sudo aptitude purge $OLDKERNELS
+
+	echo -e $YELLOW"Emptying every trash..."$ENDCOLOR
+	rm -rf /home/*/.local/share/Trash/*/** &> /dev/null
+	rm -rf /root/.local/share/Trash/*/** &> /dev/null
+
+	echo -e $YELLOW"Cleanup  Finished!"$ENDCOLOR
+}
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# Ensure access to the rtd library functions:
+dependency::_rtd_library
+
+
+
+conditional_run ()
+{
+	if [[ $(echo "$OSTYPE" |grep "linux") ]]; then
+
+		# Only run these cleanup function on a debian based system.
+		if cat /etc/os-release |grep "debian" 2>/dev/null ; then
+			# Ensure elevated privs:
+			ensure_admin
+
+			# Display information about script:
+			result="This utility will clean up old kernels, orphaned configurations, and cached packages from completed installs. Please note that you may run this utility more than once if a cleanup changes the profile of the system; for example if an updated kernel is added ass part of the process."
+			display_result $( basename $0 : Notice!)
+
+			# Complete cleanup:
+			rtd_oem_clean_deb
+			return $?
+		else
+			# Notify if this system is not debian.
+			result="This system does not appear to be Debian based. This cleanup is only intended for the debian based systems that use the 'apt' software managment system."
+			display_result $( basename $0 : Notice!)
+		fi
+
+	elif [[ "$OSTYPE" == "darwin"* ]]; then
+		write_error "${FUNCNAME[0]}: Mac OSX is currently not supported ..."  ; return 1
+	elif [[ "$OSTYPE" == "cygwin" ]]; then
+		write_error "${FUNCNAME[0]}: CYGWIN is currently unsupported ..."  ; return 1
+	elif [[ "$OSTYPE" == "msys" ]]; then
+		write_error "${FUNCNAME[0]}: Lightweight shell is currently unsupported ... "  ; return 1
+	elif [[ "$OSTYPE" == "freebsd"* ]]; then
+		write_error "${FUNCNAME[0]}: Free BSD is currently unsupported ... " ; return 1
+	else
+		echo "I have no Idea what this system is: aborting!" ; return 1
+	fi
+}
+conditional_run
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

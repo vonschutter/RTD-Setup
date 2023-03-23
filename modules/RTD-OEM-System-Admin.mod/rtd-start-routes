@@ -1,0 +1,131 @@
+#!/bin/bash
+#
+#::                                    VPN Server Firewall configuration script
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::// Simple Admin Tool //::::::::::::::::::::::::::::::::::::::::// Debian //:::::::
+#::     Author:   	SLS
+#::     Version 	1.02
+:	${GIT_Profile:=vonschutter}
+#::
+#::	Monday 27 November, 2017  - SLS.
+#::		* File originally created.
+#::
+#::
+#::	Purpose: The purpose of the script is to setup iptables (Fire Wall) so that it will forward all traffic through
+#:: a vpn (tun0) and block all traffic if the VPN is down for any reason. This will ensure that
+#:: traffic is not accidentally exposed to evil authorities.
+#::           - Local interface is "ens3"
+#::           - VPN tunnel interface is "tun0"
+#:: If either of these are different on your system you must change these in the script.
+#::
+#:: You may for exaple deploy a Debian based VM, and install your preferred VPN, run this script,
+#:: and then configure your client devices to (via DHCP) route all traffic through the VM's IP address.
+#:: This will ensure that all traffic from your LAN to the internet is anonymized, and that traffic is blocked if not.
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+_LOCALINT="$(ip route get 1.1.1.1 | grep -Po '(?<=dev\s)\w+' | cut -f1 -d ' ')"
+_active_vpn="$(nmcli c show --active | grep vpn )"
+_VPNINT=${_active_vpn:-"tun0"}
+_LOCALNET="$(ip -o addr show up primary scope global | while read -r num dev fam addr rest; do echo ${addr%/*}; done | head -1)"
+_LOCALSUB="$(ip -o -f inet addr show | awk '/scope global/ {print $4}' | head -1 | cut -f2 -d/)"
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+dependency::_rtd_library ()
+{
+	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library ; then
+		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
+	elif source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
+		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
+	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
+		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name _rtd_library |grep -v bakup )"
+	elif wget ${_src_url} ; then
+                write_information "${FUNCNAME[0]} 4 Using: ${_src_url}"
+		source ./_rtd_library
+	else
+		echo -e "RTD functions NOT found!"
+		return 1
+	fi
+}
+
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Setup iptables for VPN          ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+# Elevate the privileges to root equivalent (if not already) to manage system...
+dependency::_rtd_library
+
+ensure_admin
+
+#---------------------------------------------------------------
+echo "Checking for iptables and install if not there..."
+#---------------------------------------------------------------
+    if hash iptables 2>/dev/null; then
+        echo "I found that iptables is present on this system... thankyou for that! "
+    else
+        echo "You seem to have no iptables.. I will try to get it... "
+        apt install iptables -y
+            if [ $? != 0 ];
+            then
+                echo "That install didn't work out so well."
+                echo "Please manually try to add the software since I couldn't do it."
+                exit
+            fi
+        echo "OK Done! Continuing..."
+    fi
+
+#---------------------------------------------------------------
+echo "Removing old rules and tables..."
+#---------------------------------------------------------------
+iptables -F
+iptables -X
+iptables -t nat -F
+iptables -t nat -X
+iptables -t mangle -F
+iptables -t mangle -X
+
+#---------------------------------------------------------------
+echo "Default Policy - Drop everything!"
+#---------------------------------------------------------------
+iptables -P INPUT DROP
+iptables -P FORWARD DROP
+iptables -P OUTPUT DROP
+
+#---------------------------------------------------------------
+echo "Allow all local connections."
+#---------------------------------------------------------------
+iptables -A INPUT  -i lo  -j ACCEPT
+iptables -A OUTPUT -o lo  -j ACCEPT
+iptables -A INPUT  -i $_LOCALINT  -j ACCEPT
+iptables -A OUTPUT -o $_LOCALINT  -j ACCEPT
+
+#---------------------------------------------------------------
+echo "Forward all traffic to this host through the vpn."
+#---------------------------------------------------------------
+sh -c "echo 1 > /proc/sys/net/ipv4/ip_forward"
+iptables -A FORWARD -o $_VPNINT -i $_LOCALINT -s $_LOCALNET/$_LOCALSUB -m conntrack --ctstate NEW -j ACCEPT
+iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+iptables -A POSTROUTING -t nat -j MASQUERADE
+iptables-save | sudo tee /etc/iptables.sav

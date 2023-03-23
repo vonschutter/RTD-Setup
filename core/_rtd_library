@@ -332,7 +332,26 @@ display_result ()
 
 
 
+zenity::display_info ()
+{
+# Description: Function to display an information notice. The purpose of this function
+# is simply to make it easy and convenient to display a mesage to an end user in a GUI
+# in a nice way. To use this function simply call it passing whaterver string you want displayed
+# using dialog.
+# Globals: $_TITLE (optional) $selection (optional)
+# Arguments: ["String to display"]
+# Outputs: Message in zenity info box
+# Returns:
+# Usage:
+#
+#
+# zenity::display_info  "The message that you want to display"
+#
+# End of Documentation
 
+	_text="${@}"
+	zenity --info --text --title="${_TITLE:="Notice"}: $selection" --text="$_text" --ellipsize --height=600 --width=800
+}
 
 
 
@@ -2549,7 +2568,7 @@ ensure_admin ()
 				write_information "Allowing root to display menus..."
 				xhost local:root
 				write_information "Authenticating..."
-				pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY SUDO_USER=$USER ${0}
+				pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY SUDO_USER=$USER "$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )/${0}"
 				exit
 			else
 				# If we are some other kind of archane GUI then...
@@ -2563,7 +2582,7 @@ ensure_admin ()
 						0)
 							export HISTIGNORE='*sudo -S*'
 							echo ${token} | sudo -S -v || ensure_admin
-							sudo -E SUDO_USER=$USER /bin/bash ${0} $@ || rtd_oem_pause 1
+							sudo -E SUDO_USER=$USER /bin/bash "$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )/${0}" $@ || rtd_oem_pause 1
 						;;
 						1) echo "Request cancelled" ;;
 						255) echo "[esc] Request aborted" ;;
@@ -2575,7 +2594,7 @@ ensure_admin ()
 					write_information "Dialog not found..."
 					write_warning "This script needs administrative access..."
 					xhost local:root
-					sudo -E SUDO_USER=$USER bash "${0}" "$@" || rtd_oem_pause 1
+					sudo -E SUDO_USER=$USER bash "$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )/${0}" "$@" || rtd_oem_pause 1
 					exit
 				fi
 			fi
@@ -2590,7 +2609,7 @@ ensure_admin ()
 					0)
 						export HISTIGNORE='*sudo -S*'
 						echo ${token} | sudo -S -v || ensure_admin
-						sudo -E SUDO_USER=$USER /bin/bash ${0} $@ || rtd_oem_pause 1
+						sudo -E SUDO_USER=$USER /bin/bash "$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )/${0}" $@ || rtd_oem_pause 1
 					;;
 					1) echo "Request cancelled" ;;
 					255) echo "[esc] Request aborted" ;;
@@ -2599,7 +2618,7 @@ ensure_admin ()
 				exit
 			else
 				write_warning "This script needs administrative access..."
-				sudo -E SUDO_USER=$USER bash "${0}" "$@" || rtd_oem_pause 1
+				sudo -E SUDO_USER=$USER bash "$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )/${0}" "$@" || rtd_oem_pause 1
 				exit
 			fi
 		fi
@@ -4429,22 +4448,22 @@ InstallSoftwareFromRepo ()
 	ensure_admin
 	: ${_LOGFILE:="/var/log/rtd/$( basename "$0".log )"}
 	# Ask function how to install software...
-	set_install_command >>/dev/null 2>&1
+	set_install_command &>>"${_LOGFILE}"
 
 	# make some decent display terminal Graphics...
 	PAD="------------------------------------------------"
 	LINE=$(printf "%s %s" "$@" "$PAD" | cut -c 1-${#PAD})
 	PRE=" - Installing $LINE :"
 	# Test if package name is installed, if not then...
-	if ! is_software_package_installed "$1"; then
-		if is_software_package_available "$1"; then
-			echo -ne "${PRE}"& $_INSTCMD "$1" &>>${_LOGFILE}  && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR \n" ||printf "%b%-6s%b [ ! ] $RED FAILED $ENDCOLOR \n"
+	if ! is_software_package_installed "${1}"; then
+		if is_software_package_available "${1}"; then
+			echo -ne "${PRE}"& $_INSTCMD "${1}" &>>${_LOGFILE} && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR \n" ||printf "%b%-6s%b [ ! ] $RED FAILED $ENDCOLOR \n"
 			if [ $? != 0 ];
 			then
 				return 1
 			fi
 		else
-			echo -ne "$PRE"\ && ( printf "%b%-6s%b [ \xE2\x9C\x94 ] $YELLOW NOT AVAILABLE... $ENDCOLOR \n" && return 1 )
+			echo -ne "$PRE"\ && ( printf "%b%-6s%b [ \xE2\x9C\x94 ] $YELLOW Not Available... $ENDCOLOR \n" && return 1 )
 		fi
 	else
 		echo -ne "$PRE"\ && printf "%b%-6s%b [ \xE2\x9C\x94 ] $YELLOW Allready Installed... $ENDCOLOR \n"
@@ -4556,19 +4575,19 @@ check_dependencies ()
 	#---------------------------------------------------------------
 	write_status "Checking for script dependencies and install if not there..."
 	#---------------------------------------------------------------
-	if is_software_package_installed $1 ; then
-		write_information "I found that $1 is present on this system... thankyou for that! "
+	if is_software_package_installed "${1}" ; then
+		write_information "I found that ${1} is present on this system... thankyou for that! "
 	else
-		write_warning "You seem to have no $1... I will try to get it... "
-		InstallSoftwareFromRepo $1
+		write_warning "You seem to have no ${1}... I will try to get it... "
+		InstallSoftwareFromRepo "${1}"
 		if [ $? != 0 ];
 		then
-			ensure_snap_package_managment
-			snap install $1
+			ensure_flatpak_package_managment
+			flatpak install "${1}" -y
 			if [ $? != 0 ];
 			then
-				ensure_flatpak_package_managment
-				flatpak install $1 -y
+				ensure_snap_package_managment
+				snap install "${1}"
 				if [ $? != 0 ];
 				then
 					write_error "That install didn't work out so well."
@@ -4580,7 +4599,6 @@ check_dependencies ()
 		echo "OK Done! Continuing..."
 	fi
 }
-
 
 
 
@@ -5187,9 +5205,8 @@ software::display_bundle_removal_choices_gtk ()
 			IFS=$IFS_SAV
 		exec 3>&-
 		case $exit_status in
-			1) clear && echo [Cancel] && exit ;;
-			255) clear && echo [ESC] && exit ;;
-			2) clear && echo [QUIT] && exit ;;
+			1) clear && echo [Cancel] && return ;;
+			255) clear && echo [ESC] && return ;;
 		esac
 
 		case "${selection}" in

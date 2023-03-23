@@ -1,0 +1,185 @@
+#!/bin/bash
+#::                                 RTD System System Managment Script
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::// Simple Admin Tool //::::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#::     Author:   	SLS
+#::     Version 	1.02
+:	${GIT_Profile:=vonschutter}
+#::
+#::
+#:: Purpose: The purpose of the script is to perform managment tasks on Linux systems
+#::
+#:: This is a script that will start Minecraft Server on an Ubuntu or Debian (Ubuntu) based server. It will start
+#:: multiple panes using "byobu", and start the server etc there...
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# Variables that govern the behavior or the script and location of files are
+# set here. There should be no reason to change any of this unless you know What
+# you are doing.
+export NEWT_COLORS='root=,gray '
+BRANDING="RTD Simple Support Tool: File type mover/collector "
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+dependency::_rtd_library ()
+{
+	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library ; then
+		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
+	elif source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
+		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
+	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
+		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name _rtd_library |grep -v bakup )"
+	elif wget ${_src_url} ; then
+                write_information "${FUNCNAME[0]} 4 Using: ${_src_url}"
+		source ./_rtd_library
+	else
+		echo -e "RTD functions NOT found!"
+		return 1
+	fi
+}
+
+
+me="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
+filetype=$1
+root=$2
+target=$3
+usage=$(
+echo "This RTD tool is used to recursively scan a location and move all files"
+echo "of a given extention to a collection location"
+echo " "
+echo "$me --help     - Show this usage text "
+echo "$me <file_type> <source> <destination>"
+echo "<file_type>   = file name extension"
+echo "<source>      = directory to search for files of indicated type"
+echo "<destination> = directory to recurively move all files of said type to"
+echo ""
+echo "This tool will NOT overwrite anny files in the destination but will, instead,"
+echo "rename the files appending a number if a file of the same name exists: "
+echo "./source/coolvideo.mp4 => ./destination/coolvideo1.mp4"
+echo "Example: $me *.mp4 /media/camera ~/Videos"
+)
+
+# First discover what menu system is installed. Some systems use "dialog" and
+# other systems use whiptail for the terminal to show menus and dialogs.
+if hash whiptail >/dev/null ; then
+	export rtd_menu=whiptail
+elif hash dialog >/dev/null ; then
+	export rtd_menu=dialog
+else
+	echo "There is no menu dialog installed on this system..."
+	read -p Press [ENTER] to exit...
+	exit 1
+fi
+
+SAVEIFS=$IFS
+IFS=$(echo -en "\n\b")
+
+todo=$( echo ---------------------------------------------
+echo "Moving:"
+echo "files of type          :  $filetype"
+echo "from the source        :  $root"
+echo "to the destination     :  $target"
+echo --------------------------------------------- )
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          INTERNAL FUNCTIONS              ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+file_mover () {
+	source=$1
+	dest=$2
+
+	file=$(basename $source)
+	basename=${file%.*}
+	ext=${file##*.}
+
+	if [[ ! -e "$dest/$basename.$ext" ]]; then
+	mv -v "$source" "$dest"
+	else
+	num=1
+	while [[ -e "$dest/$basename$num.$ext" ]]; do
+		(( num++ ))
+	done
+	mv -v "$source" "$dest/$basename$num.$ext"
+	fi
+
+}
+
+
+build_file_list () {
+	echo "Looking for files..."
+	count=0
+	for line in  $(find -L $root -name "$filetype")  ; do
+		filelist[$count]="$line"
+		(( count++ ))
+	done
+	number_of_files_to_move=${#filelist[@]}
+	echo "Number of files to move: $number_of_files_to_move"
+}
+
+
+move_file_list () {
+	{
+	count=0
+	for file_entry in ${filelist[@]} ; do
+		file_mover $file_entry $target
+		prog=$((100*$count/$number_of_files_to_move))
+		echo "XXX"
+		echo "$prog"
+		echo "Moving file:$count of $number_of_files_to_move $basename ..."
+		echo "XXX"
+		(( count++ ))
+	done
+
+} | $rtd_menu --fb --title "$BRANDING" --gauge "RTD File By Type Mover" 15 95 0
+}
+
+
+display_help () {
+	$rtd_menu --fb --title "$BRANDING" --msgbox "$usage" 0 95
+	exit
+}
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::                  RUN                     ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+if [ "$1" = "--help" ]; then display_help ; fi
+if [ "$1" = "" ]; then display_help ; fi
+
+exec_task () {
+	dependency::_rtd_library
+	build_file_list
+
+	if ($rtd_menu --fb  --title "$BRANDING" --yesno "I found $number_of_files_to_move files for $filetype type to move. Do you want to proceed?  $todo" 15 95); then
+		move_file_list && echo "$prog %: $number of files moved to $target" || echo "someting may have gone wrong: $prog % ($number) of files were moved. Please check."
+	else
+		echo Skipping move of $number_of_files_to_move files
+	fi
+
+	#Cleanup
+	IFS=$SAVEIFS
+	return
+}
+
