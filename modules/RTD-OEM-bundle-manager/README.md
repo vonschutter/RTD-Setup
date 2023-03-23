@@ -1,14 +1,10 @@
 # OEM Bundle Manager
 
-
 The OEM Bundle Manager is part of the Power Tools, and makes it easy to add and remove groups of packages. A group of packages are usually grouped around a capability or set of tasks, and could be considered roles.
 
 For example, you may have a bundle called "3D_Printing" that will install all applications needed to work with 3D Printing. These applications can be added or removed by simply checking a box. A bundle can also be a collection of themes, or fonts, or a set of configurations; not just a list of software and plugins.
 
 ## Overview
-
-
-
 
 The purpose of this tool is to facilitate the easy adding and removal of extra apps/config and other items useful for a complete and productive desktop environment.
 
@@ -37,7 +33,6 @@ Once a bundle is added to your computer, it may be removed by choosing the "Remo
 
 ![1679592243988](image/README/1679592243988.png)
 
-
 ### Installation Guide
 
 To install this tool it is recommended to install the RTD Power Tools for which it is a part.
@@ -46,7 +41,17 @@ To install this tool it is recommended to install the RTD Power Tools for which 
 wget https://github.com/vonschutter/RTD-Setup/raw/main/rtd-me.sh.cmd && bash ./rtd-me.sh.cmd
 ```
 
+It may also be possible to simply download the script and run it as a stand alone script because it will try to satisfy ist own dependencies by downloading them as needed:
+
+```bash
+wget https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/modules/RTD-OEM-bundle-manager/rtd-oem-bundle-manager
+./rtd-oem-bundle-manager
+```
+
+Alternatively, try using the direct download link:
+
+[Direct Download Link](https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/modules/RTD-OEM-bundle-manager/rtd-oem-bundle-manager "Use the save asd button in your browser")
 
 ## Questions and comments
 
-If you have any trouble running this sample, please log an issue.
+If you have any trouble running this tool, please log an issue.
