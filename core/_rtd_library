@@ -196,9 +196,7 @@ source "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_locations
 # Software recipes and bundles to be installed on request:
 source "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_rtd_recipies
 
-# Determine log file directory
-: ${_ERRLOGFILE:-"$_LOG_DIR/$( basename $0)-error.log"}
-: ${_LOG_FILE:-"${_LOG_DIR}/$( basename $0).log"}
+
 
 
 
@@ -337,7 +335,7 @@ zenity::display_info ()
 # Description: Function to display an information notice. The purpose of this function
 # is simply to make it easy and convenient to display a mesage to an end user in a GUI
 # in a nice way. To use this function simply call it passing whaterver string you want displayed
-# using dialog.
+#
 # Globals: $_TITLE (optional) $selection (optional)
 # Arguments: ["String to display"]
 # Outputs: Message in zenity info box
@@ -350,11 +348,33 @@ zenity::display_info ()
 # End of Documentation
 
 	_text="${@}"
-	zenity --info --text --title="${_TITLE:="Notice"}: $selection" --text="$_text" --ellipsize --height=600 --width=800
+	zenity --info --text --title="${_TITLE:="Notice"}: $selection" --text="$_text" --ellipsize --height=600 --width=800 2>/dev/null
 }
 
 
 
+
+zenity::display_url ()
+{
+# Description: Function to display the content of a URL. The purpose of this function
+# is simply to make it easy and convenient to display web content to an end user in a GUI
+# in a nice way. To use this function simply call it passing whaterver URL you need.
+#
+# Globals: $_TITLE (optional)
+# Arguments: ["URL"]
+# Outputs: Formatted html message in zenity window
+# Returns:
+# Usage:
+#
+#
+# zenity::display_info  "https://www.someplace.com/index.html"
+#
+# End of Documentation
+
+	_url="${@}"
+	zenity --text-info --html --url="$_url" --width=800 --height=600 2>/dev/null
+
+}
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -2568,7 +2588,7 @@ ensure_admin ()
 				write_information "Allowing root to display menus..."
 				xhost local:root
 				write_information "Authenticating..."
-				pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY SUDO_USER=$USER "$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )/${0}"
+				pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY SUDO_USER=$USER "$(pwd)/${0}"
 				exit
 			else
 				# If we are some other kind of archane GUI then...
@@ -2582,7 +2602,7 @@ ensure_admin ()
 						0)
 							export HISTIGNORE='*sudo -S*'
 							echo ${token} | sudo -S -v || ensure_admin
-							sudo -E SUDO_USER=$USER /bin/bash "$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )/${0}" $@ || rtd_oem_pause 1
+							sudo -E SUDO_USER=$USER /bin/bash "${0}" $@ || rtd_oem_pause 1
 						;;
 						1) echo "Request cancelled" ;;
 						255) echo "[esc] Request aborted" ;;
@@ -2594,7 +2614,7 @@ ensure_admin ()
 					write_information "Dialog not found..."
 					write_warning "This script needs administrative access..."
 					xhost local:root
-					sudo -E SUDO_USER=$USER bash "$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )/${0}" "$@" || rtd_oem_pause 1
+					sudo -E SUDO_USER=$USER bash "${0}" "$@" || rtd_oem_pause 1
 					exit
 				fi
 			fi
@@ -2609,7 +2629,7 @@ ensure_admin ()
 					0)
 						export HISTIGNORE='*sudo -S*'
 						echo ${token} | sudo -S -v || ensure_admin
-						sudo -E SUDO_USER=$USER /bin/bash "$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )/${0}" $@ || rtd_oem_pause 1
+						sudo -E SUDO_USER=$USER /bin/bash "${0}" $@ || rtd_oem_pause 1
 					;;
 					1) echo "Request cancelled" ;;
 					255) echo "[esc] Request aborted" ;;
@@ -2618,7 +2638,7 @@ ensure_admin ()
 				exit
 			else
 				write_warning "This script needs administrative access..."
-				sudo -E SUDO_USER=$USER bash "$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )/${0}" "$@" || rtd_oem_pause 1
+				sudo -E SUDO_USER=$USER bash "${0}" "$@" || rtd_oem_pause 1
 				exit
 			fi
 		fi
@@ -8814,30 +8834,30 @@ software::list_bundles ()
 # Usage: software::list_bundles [] [--zformat-installable | --zformat-removable]
 # End of documentation
 
+	[[ -f ${completed_bundles_list} ]] || (touch ${completed_bundles_list} ; mkdir -p ${completed_bundles_list%/*} ) &>>/dev/null
+
 	case "$1" in
 		--zformat-installable )
-		# List software bundles for use with zenity
-		for _bundle in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" |grep "recipe_" |grep -v "Single_Install" )
-		do
-			# Build each line to be displayed in the bundle installer...
-			Description=$(grep -A 1 "$_bundle ()" "${_OEM_DIR}/core/_rtd_recipies" |tail -1)
-			Description="${Description/"# "/": "}"
-			Description="${Description/"	"/""}"
-			[[ -f ${completed_bundles_list} ]] || (touch ${completed_bundles_list} ; mkdir -p ${completed_bundles_list%/*} )
-			cat ${completed_bundles_list} |grep "${_bundle/recipe_Bundle:_/}" &>/dev/null || echo -en "true \n ${_bundle/recipe_Bundle:_/} \n ${Description} \n"
-		done
+			# List software bundles for use with zenity
+			for _bundle in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" |grep "recipe_" |grep -v "Single_Install" )
+			do
+				# Build each line to be displayed in the bundle installer...
+				Description=$(grep -A 1 "$_bundle ()" "${_OEM_DIR}/core/_rtd_recipies" |tail -1)
+				Description="${Description/"# "/": "}"
+				Description="${Description/"	"/""}"
+				cat ${completed_bundles_list} |grep "${_bundle/recipe_Bundle:_/}" &>/dev/null || echo -en "true \n ${_bundle/recipe_Bundle:_/} \n ${Description} \n"
+			done
 		;;
 		--zformat-removable )
-		# List software bundles for use with zenity
-		[[ -f ${completed_bundles_list} ]] || (touch ${completed_bundles_list} ; mkdir -p ${completed_bundles_list%/*} ) &>>/dev/null
-		completed_bundles_list="$(cat ${completed_bundles_list} )"
-		for _installed_bundle in $completed_bundles_list ; do
-			# Build each line to be displayed in the bundle installer...
-			Description=$(grep -A 1 "recipe_Bundle:_$_installed_bundle ()" _rtd_recipies |tail -1)
-			Description="${Description/"# "/": "}"
-			Description="${Description/"	"/""}"
-			echo -e "true \n ${_installed_bundle} \n ${Description} \n"
-		done
+			# List software bundles for use with zenity
+			completed_bundles_list="$(cat ${completed_bundles_list} )"
+			for _installed_bundle in $completed_bundles_list ; do
+				# Build each line to be displayed in the bundle installer...
+				Description=$(grep -A 1 "recipe_Bundle:_$_installed_bundle ()" _rtd_recipies |tail -1)
+				Description="${Description/"# "/": "}"
+				Description="${Description/"	"/""}"
+				echo -e "true \n ${_installed_bundle} \n ${Description} \n"
+			done
 		;;
 		* )
 			# Default list format

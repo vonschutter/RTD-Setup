@@ -53,6 +53,7 @@
 : ${_LOG_DIR:="/var/log/${_TLA}"} ; mkdir -p ${_LOG_DIR}
 : ${_ERRLOGFILE:="${_LOG_DIR}/$( basename $0)-$(date +%Y-%m-%d-%H-%M-%S-%s)-error.log}"}
 : ${_LOGFILE:="${_LOG_DIR}/$( basename $0)-$(date +%Y-%m-%d-%H-%M-%S-%s).log}"}
+: ${_GIT_PROFILE:=vonschutter}
 
 
 
@@ -90,12 +91,6 @@ to get a truly useful system
 
 
 
-# Normally all choices are checked. Pass the variable "false" to this script to default
-# to unchecked. If none is passed, a default will be used.
-export zstatus="$1"
-
-# Set the background tilte:
-: "${_BACK_TITLE:-"RTD OEM Simple System Setup"}"
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -110,18 +105,18 @@ dependency::file ()
 	# Use the RTD function library. This contains most of the intelligence used to perform this systems
 	# maintenance. As this library is required for basically everything, we should exit if it is not available.
 	_depfile="${1}"
-	_src_url="https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/${_depfile}"
+	_src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${_depfile}"
 
 
-	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/${_depfile} 2> /dev/null; then
-		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/${_depfile}
-	elif source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/${_depfile} 2> /dev/null; then
-		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/${_depfile}
-	elif source $(find /opt -name ${_depfile} |grep -v bakup ) 2> /dev/null; then
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/${_depfile} ; then
+		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"../core/${_depfile}
+	elif source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/${_depfile} ; then
+		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"../../core/${_depfile}
+	elif source $(find /opt -name ${_depfile} |grep -v bakup ) ; then
 		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name ${_depfile} |grep -v bakup )"
-	elif wget ${_src_url} 2> /dev/null ; then
-                write_information "${FUNCNAME[0]} 4 Using: ${_src_url}"
+	elif wget ${_src_url} ; then
 		source ./${_depfile}
+		write_information "${FUNCNAME[0]} 4 Using: ${_src_url}"
 	else
 		echo -e "${_depfile} NOT found!"
 		return 1
@@ -146,7 +141,7 @@ system::ExecStart () {
 				"Remove Bundles from this computer" \
 				"Information abount this tool" \
 				--column="Select What you Want To Do:" --text='
-				<span font="16" foreground="blue">Add or remove bundles on this system</span> \n
+				<span font="16" foreground="red">Add or remove bundles on this system</span> \n
 				NOTE: The OEM Bundle Manager may download vendor packages, or snap apps, or flatpak apps, or even download
 				software from a vendors web site, as well as install fonts and wallpapeers etc. \n ' \
 				--title="OEM Bundle Manager" --height=300 --width=800)
@@ -184,7 +179,7 @@ system::ExecStart::help ()
 {
 	clear
 	_HELP_MSG='
-	<span font="16" foreground="blue">🔧    OEM Bundle Manager HELP     🔧</span>
+	<span font="16" foreground="red">🔧    OEM Bundle Manager HELP     🔧</span>
 
 	This is not yet written.
 
@@ -213,12 +208,13 @@ system::ExecStart::help ()
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-dependency::file _rtd_library
-dependency::file _rtd_recipies
+
+
+for i in _rtd_library _rtd_recipies ; do dependency::file $i  ; done
 
 case ${1} in
 	--help ) system::ExecStart::help ;;
 	--about ) zenity::display_info "$_ABOUT";;
-	--more-help ) zenity --text-info --html --url="https://github.com/vonschutter/RTD-Setup/blob/main/modules/RTD-OEM-bundle-manager/README.md" --width=800 --height=600 2>/dev/null ;;
+	--more-help ) zenity::display_url "https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/blob/main/modules/RTD-OEM-bundle-manager/README.md" ;;
 	* ) system::ExecStart $@ ;;
 esac
