@@ -52,14 +52,33 @@ oem::run_payload ()
 	if [[ -r "${_APPS_DIR}/${1}.7z" ]] ; then 
 		if [[ "$(md5sum "${_APPS_DIR}/${1}.7z" |awk '{print $1;}')" = "$(cat "${_CORE_DIR}/sigs/${1}.sig" |awk '{print $1;}')" ]] ; then
 			7z x "${_APPS_DIR}/${1}.7z" -aoa -o${2} &>/dev/null 
-			pushd "${2}" &>/dev/null || ( return 1 ; echo "Failure to enter execution directory!" )
-			chmod +x ./${1}
-			if file ./${1} | grep "Windows" ; then
-				 wine ./${1} &>/dev/null
+			chmod +x ${2}/${1}
+			if file ${2}/${1} | grep "Windows" ; then
+				if hash wine ; then 
+					wine ${2}/${1} &>/dev/null
+					return
+				else
+					dialog --backtitle "RTD Power Tools" \
+					--title "Something Went Wrong" \
+					--yes-label "Install Wine" \
+					--no-label "Cancel" \
+					--yesno "\nWINE is needed to run windows programs on Linux. However, WINE is not installed. \
+					Please install WINE and try again. \n\n \
+					I could try to install Wine for you if you wish? \
+					$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )\
+					Should I do that? " 20 80
+					response=$?
+					
+					case $response in
+						0) ensure_admin ; check_dependencies wine ;;
+						1) return ;;
+						255) echo "[ESC] key pressed.";;
+					esac
+				fi
 			else
-				./${1} &>/dev/null
+				${2}/${1} &>/dev/null
 			fi
-			exit
+			return
 		else
 			echo "Failed to verify security of application!"
 			return 1 
@@ -72,15 +91,20 @@ oem::run_payload ()
 internal::chk_param_payload ()
 {
 
-	if [[ -r "${_APPS_DIR}/${1}.7z" ]] ; then 
-		write_information "Runnig OEM application ${1}"
-		return
-	else 
-		case ${1} in 
-			--help ) display::help ;;
-			*) display::help ;;
-		esac
-		exit
+	if [[ -z "${1}" ]] ; then 
+		display::oem_program_list
+	else
+		if [[ -r "${_APPS_DIR}/${1}.7z" ]] ; then 
+			write_information "Runnig OEM application ${1}"
+			oem::run_payload ${1} $( mktemp -d )
+			return
+		else 
+			case ${1} in 
+				--help ) display::help ;;
+				*) display::help ;;
+			esac
+			exit
+		fi
 	fi
 }
 
@@ -97,13 +121,45 @@ display::help ()
 	write_information "	Installed OEM applications are: 
 	------------------------------
 $( for i in $(for file in ${_APPS_DIR}/*.7z ; do echo "${file##*/}" ; done ); do write_host --red "	${i::-3}" ; done )
-
 	"
+	write_host --cyan "	To use the menu of apps to start, please run ${BASH_SOURCE[0]} with no parameters at all.\n"
 exit
 }
 
 
+display::oem_program_list ()
+{
+	while true; do
+		exec 3>&1
+			local n=1
+			local _proglist="$(
+				for i in $(for file in ${_APPS_DIR}/*.7z ; do echo "${file##*/}" ; done );
+				do 
+					echo  "${i::-3}" 
+					((n=n+1)) 
+				done
+				)"
+			_run=$(dialog --backtitle "RTD Power Tools" --no-items --ok-label "Start" --cancel-label "EXIT" --menu "Please Choose an OEM Application to Start"  25 80 20 $_proglist 2>&1 1>&3 )
+			exit_status=$?
+			clear
+		exec 3>&-
 
+		case $exit_status in
+			1) clear && echo [Cancel] && exit ;;
+			255) clear && echo [ESC] && exit ;;
+		esac
+
+		case $_run in
+			$_run )
+				oem::run_payload ${_run} $( mktemp -d )
+				display::oem_program_list
+			;;
+			* ) exit ;;
+		esac
+	done
+	
+	
+}
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -113,10 +169,11 @@ exit
 
 
 dependency::_rtd_library &>/dev/null
-internal::chk_param_payload ${1}
 hash 7z &>/dev/null || recipe_Bundle:_Compression_Tools
 hash md5sum &>/dev/null || (echo "I cannot start OEM apps without security validation software!" ; exit 1)
-oem::run_payload ${1} $( mktemp -d )
+internal::chk_param_payload ${1}
+
+
 
 
 
