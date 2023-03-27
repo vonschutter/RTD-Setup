@@ -36,7 +36,7 @@ export RTD_VERSION=2.0
 	software::display_bundle_removal_choices_gtk	; Show a menu of installed softwrae bundles that may be removed
 	backup_running_vm 				; Backs up all running virtual machines on the local computer
 	check_dependencies 				; Checks that software requirements are met so scripts do not fail
-	check_if_password_p0wned 			; Allows user to check if an intended password is already in well known dictionaries
+	check_if_password_pOwned 			; Allows user to check if an intended password is already in well known dictionaries
 	check_menu_availability 			; Checks if it is possible to display graphical menus in a terminal
 	cleanup_and_finish 				; Cleans and clears variables and temp files used by the media creations functions
 	compress_all_items_here				; Compress all folders and files in pwd using 7z (optionally encrypt)
@@ -1537,8 +1537,9 @@ make_system_recovery_partition ()
 
 
 
-rtd_oem_reseal () {
-# Description:
+rtd_oem_reseal () 
+{
+# Description: 
 # Function to reseal a newly installed system for delivery to end user.
 # Globals: The distribution must have an OEM reseal function or software available.
 # Arguments: None
@@ -1569,14 +1570,18 @@ rtd_oem_reseal () {
 
 
 
-check_if_password_p0wned () {
-# Description: Function to query a user for a password suggestion and check it against P0wned data base online.
+check_if_password_pOwned ()
+{
+# Description: 
+# Function to query a user for a password suggestion and check it against P0wned data base online.
 # Globals: $RTD_GUI
 # Arguments: None
-# Outputs:
+# Outputs: dialog box
 # Returns:
-# Usage:
+# Usage: check_if_password_pOwned
+
 # End of documentation
+
 	pass_str=$($RTD_GUI --passwordbox "Please enter your intended password to validate your new password against P0wned DB" 8 78 --title "" 3>&1 1>&2 2>&3)
 	result=$(
 		sha1=$(echo -n $pass_str | tr -d '\n' | sha1sum); echo "Hash prefix: ${sha1:0:5}"; echo "Hash suffix: ${sha1:5:35}";
@@ -1594,7 +1599,7 @@ check_if_password_p0wned () {
 
 
 
-rtd_oem_find_live_release()
+rtd_oem_find_live_release ()
 {
 # Description: This function will return the URL for the version of Debian, Ubuntu server or Destktop requested.
 # 3 parameters are required for this function to know what to do: distro_version/distro_flavor/live_or_not
@@ -4611,21 +4616,29 @@ check_dependencies ()
 {
 # Description:
 # Function to check that a piece of software is installed and if not install it.
-# Works for apt based systems currently. The function will take a parameter that is expected to
-# match the software command line name or rather the name of the package. This should get
-# updated to also check and install from snap and flatpak at some point.
-#
+# Works for apt, zypper, dnf or yum based systems currently. The function will take a parameter 
+# that is expected to match the software name or rather the name of the package. 
+# 
+# This function will also attempt to find a snap or a flatpack with the same name if it is not
+# found as a package name in the repositories.
+# 
+# This is done to comply wiht the philosophy to do what it takes to reach the objective, and 
+# just work. Rather than just fail, we want to try and solve the problem and make the software
+# available. 
+# 
 # Globals:
 # Arguments: None
-# Dependencies: [flatpak; snap; or package manager]
-# Function Dependencies: ensure_admin, write_status, write_information, write_warning, write_error, is_software_package_installed,
-#                        InstallSoftwareFromRepo, ensure_snap_package_managment, ensure_flatpak_package_managment
+# Dependencies: [flatpak | snap | package manager]
+# Function Dependencies: (other functions)
+# ensure_admin, write_status, write_information, write_warning, write_error, is_software_package_installed,
+# InstallSoftwareFromRepo, ensure_snap_package_managment, ensure_flatpak_package_managment
+# 
 # Outputs:
 # Returns: 1/0
 # Usage: check_dependencies [packagename]
-#
+# 
 # EXAMPLE: check_dependencies snapd
-#
+# 
 # End of documentation
 	ensure_admin
 	#---------------------------------------------------------------
