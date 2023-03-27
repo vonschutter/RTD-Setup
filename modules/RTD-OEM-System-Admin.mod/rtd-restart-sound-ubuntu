@@ -42,11 +42,11 @@ dependency::_rtd_library ()
 {
 	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
 
-	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library ; then
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library 2>/dev/null ; then
 		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
-	elif source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
-		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
-	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
+	elif source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library 2>/dev/null ; then
+		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library
+	elif source $(find /opt -name _rtd_library |grep -v bakup ) 2>/dev/null ; then
 		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name _rtd_library |grep -v bakup )"
 	elif wget ${_src_url} ; then
                 write_information "${FUNCNAME[0]} 4 Using: ${_src_url}"
@@ -59,5 +59,8 @@ dependency::_rtd_library ()
 
 
 
-dependency::_rtd_library
-pulseaudio -k && sudo alsa force-reload
+dependency::_rtd_library || (exit 1 ; echo "Library not found!" )
+write_warning "Do you want to try and restart sound on this syystem?"
+read -p "Press [ENTER] to restart sound or [CTRL]+[C] to exit"
+system::restart_sound
+
