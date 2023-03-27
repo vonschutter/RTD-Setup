@@ -1,4 +1,6 @@
-# RTD Power Tools <img src="media_files/WindowsLogo.png"> <img src="media_files/UbuntuLogo.png"> <img src="media_files/RedHatLogo.png"> <img src="media_files/SuseLogo.png">
+# RTD Power Tools 
+
+<img src="media_files/WindowsLogo.png"> <img src="media_files/UbuntuLogo.png"> <img src="media_files/RedHatLogo.png"> <img src="media_files/SuseLogo.png">
 
 [MinecraftServer](https://github.com/vonschutter/RTD-Setup/blob/main/modules/Minecraft-Server-Manager.mod/README.md) \| [NordVPN\_GUI](https://github.com/vonschutter/RTD-Setup/blob/main/modules/Nordvpn-Manager.mod/README.md) \| [DesktopLookSwitcher](modules/RTD-Desktop-Look-Switcher.mod/README.md) \| [Instant VPN Router](/modules/RTD-VPN-Router.mod/README.md) \| [Simple Support Tool](/modules/Simple-Support-Tool.mod/README.md) \| [WoW Replay Launcher](https://github.com/vonschutter/RTD-Setup/blob/main/modules/Steam-world-of-warships-replay-launcher.mod/README.md)
 
@@ -44,7 +46,7 @@ If a graphical environment is not detected, the RTD System Configurator will int
 As promised, the rtd-me.sh.cmd script will run under windows as well. Simply download it and double click on it (you will be prompted to elevate privileges if needed). Please NOTE: that at this time the Windows functionality is roughly equivalent to the Linux **Software Bundle Installer**, but will not prompt for anything, whereas for Linux the setup will pause for 60 seconds to allow for some selections. However, the script will optimize Windows by removing bloatware (Sponsored Software) and turning off services that most do not use to enhance both performance and security. Several useful and fun software titles are automatically added (will not fill up your disk). The Windows changes are made with PowerShell.
 
 Running "rtd-oem-win10-config.ps1" (**Software Bundle Installer**) in Windows (also run when installing RTD Power Tools):
-<img src="media_files/Scr11.png">
+`<img src="media_files/Scr11.png">`
 
 # How to Install RTD Power Tools:
 
@@ -54,7 +56,7 @@ Getting the RTD power Tools has been made as easy as possible. The installation 
 
 To get these tools for yourself on Linux just copy and paste the line below in to a terminal:
 
-``` bash
+```bash
 wget https://github.com/vonschutter/RTD-Setup/raw/main/rtd-me.sh.cmd && bash ./rtd-me.sh.cmd
 ```
 
