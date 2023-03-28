@@ -1,0 +1,186 @@
+#!/bin/bash
+#
+#::                                    SSH automatic find and connect script
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::// Simple Admin Tool //::::::::::::::::::::::::::::::::::::::::// Linux  //:::::::
+#::     Author:   	SLS
+#::     Version 	1.00
+:	${GIT_Profile:=vonschutter}
+#::
+#::	Monday 27 November, 2017  - SLS.
+#::		* File originally created.
+#::
+#::
+#::	Purpose: The purpose of the script is to scan the local subnet for computers with ssh running on it
+#::              and give you a menu where you can select on of the computers to connect to. 
+#:: 
+#::              This is usefull for a home network or a small business to manage local linux PCs.
+#::           
+#:: 
+#::
+#:: 
+#:: 
+#:: 
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+_LOCALNET="$(ip -o addr show up primary scope global | while read -r num dev fam addr rest; do echo ${addr%/*}; done | head -1)"
+_LOCALSUB="$(ip -o -f inet addr show | awk '/scope global/ {print $4}' | head -1 | cut -f2 -d/)"
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+dependency::_rtd_library ()
+{
+	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library ; then
+		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
+	elif source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
+		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
+	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
+		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name _rtd_library |grep -v bakup )"
+	elif wget ${_src_url} ; then
+                write_information "${FUNCNAME[0]} 4 Using: ${_src_url}"
+		source ./_rtd_library
+	else
+		echo -e "RTD functions NOT found!"
+		return 1
+	fi
+}
+
+
+system::scan_local_net_ssh ()
+{
+        echo "scaning for hosts on the local subnet with SSH (port 22) open"
+        local n=1
+        hosts=$(nmap -p 22 --open -sV $(hostname -I | cut -d' ' -f1 | cut -d. -f1-3).0/24 | grep -Eo "([0-9]{1,3}\.){3}[0-9]{1,3}")
+        hosts_arr=($hosts)
+}
+
+
+system::show_local_ssh_list ()
+{
+
+	while true; do
+		exec 3>&1
+                        tags=()
+                        for i in "${!hosts_arr[@]}"; do  
+                        tags+=("${hosts_arr[$i]}" "$i")
+                        done
+
+                        selected=$(dialog --backtitle "${_BACK_TITLE}: My IP: ${_LOCALNET} : Subnet: ${_LOCALSUB}" --title "Select a host to connect to" --menu "Available hosts:" 15 60 6 "${tags[@]}" 3>&1 1>&2 2>&3)
+                        exit_status=$?
+			clear
+		exec 3>&-
+
+		case $exit_status in
+			1) clear && echo [Cancel] && exit ;;
+			255) clear && echo [ESC] && exit ;;
+		esac
+
+		case $selected in
+			$selected )
+				ssh ${_remote_user:-"$USER"}@${selected} 
+			;;
+			* ) exit ;;
+		esac
+	done
+}
+
+
+system::get_remote_user ()
+{
+        if [[ -e $HOME/.config/$_TLA/remote.pref ]] ; then
+                _remote_user="$(cat $HOME/.config/$_TLA/remote.pref)" 
+                if [[ "${_remote_user}" == "default" ]] ; then
+                        unset _remote_user
+                fi
+        else
+                system::configure_remote_user
+        fi
+}
+
+
+system::configure_remote_user ()
+{
+        local _param=$1
+
+        mkdir -p $HOME/.config/$_TLA/
+        _remote_user=$(dialog --title "ssh default username" --backtitle "${_BACK_TITLE}" --insecure --stdout --passwordbox "\n No default remote user has been chosen. Type the name of the remote user you want to use by default here. If you do not want to store a remore user just shose 'Cancel', if you want to always use your own username then type 'default'." 10 90)
+        exit_status=$?
+        clear
+
+        case $exit_status in
+                1) clear && echo [Cancel] && exit ;;
+                255) clear && echo [ESC] && exit ;;
+        esac
+
+        echo "${_remote_user}" > "$HOME/.config/$_TLA/remote.pref"
+
+        case $_param in 
+                --quit ) exit ;;
+                * ) return ::
+        esac
+}
+
+
+display::help ()
+{
+        clear
+        write_host --cyan "
+        $_BACK_TITLE - $0
+        "
+        write_information "
+
+        Usage: 
+        $0                : Displays menu of ssh enabled hosts on your subnet
+        $0 --help         : Displays this help
+        $0 --config-user  : Set a default username to use for remote connections
+        "
+        exit
+}
+
+
+system::parameter_check ()
+{
+        _param=${1}
+        case ${_param} in 
+                --config-user ) system::configure_remote_user --quit ;;
+                --help ) display::help ;;
+                * ) return ;;
+        esac
+}
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Setup iptables for VPN          ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+# Elevate the privileges to root equivalent (if not already) to manage system...
+dependency::_rtd_library
+system::parameter_check ${1}
+system::get_remote_user
+system::scan_local_net_ssh
+system::show_local_ssh_list
+
+
+
+
+#---------------------------------------------------------------

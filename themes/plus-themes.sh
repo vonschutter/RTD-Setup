@@ -86,25 +86,25 @@ theme::install_payload ()
 theme::add_global ()
 {
 	case $1 in
-	--gtk )
+	--gtk | --GTK | --gnome | --Gnome )
 		pushd "${_my_scriptdir}/gtk" || return
 		theme::install_payload
 		ensure_snap_package_managment
 		snap install vimix-themes && for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
 		popd
 	;;
-	--kde )
+	--kde | --KDE | --plasma )
 		pushd "${_my_scriptdir}/kde" || return
 		theme::install_payload
 		popd
 	;;
-	--fonts)
-		pushd "${_my_scriptdir}/fon*" || return
+	--fonts | --font | --fon )
+		pushd "${_my_scriptdir}/font" || return
 		theme::install_payload
 		popd
 	;;
-	--icons )
-		pushd "${_my_scriptdir}/ico*" || return
+	--icons | --icon | --ico )
+		pushd "${_my_scriptdir}/icon" || return
 		theme::install_payload
 		popd
 	;;
