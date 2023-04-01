@@ -113,9 +113,14 @@ echo				-	RTD System System Managment Bootstrap Script      -
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # Variables that govern the behavior or the script and location of files are
 # set here. There should be no reason to change any of this abcent strong preferences.
+set -eu
+printf '\n'
+
+YELLOW="$(tput setaf 3 2>/dev/null || printf '')"
+NO_COLOR="$(tput sgr0 2>/dev/null || printf '')"
 
 # Ensure administrative privileges.
-[ "$UID" -eq 0 ] || echo -e $YELLOW "This script needs administrative access..." $ENDCOLOR
+[ "$UID" -eq 0 ] || echo -e $YELLOW "This script needs administrative access..." $NO_COLOR
 [ "$UID" -eq 0 ] || exec sudo -E bash "$0" "$@"
 
 # Put a convenient link to the logs where logs are normally found...
