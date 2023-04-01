@@ -7,9 +7,9 @@ Simple System Hardware Information tool is a utility for viewing informatoin abo
 
 
 
-![1680304786891](https://file+.vscode-resource.vscode-cdn.net/home/stephans/GIT/RTD-Setup/modules/simple-system-profile/image/README/1680304786891.png "Viewing CPU information")
+![1680304786891](image/README/1680304786891.png "Viewing CPU information")
 
-![1680304828450](https://file+.vscode-resource.vscode-cdn.net/home/stephans/GIT/RTD-Setup/modules/simple-system-profile/image/README/1680304828450.png)
+![1680304828450](image/README/1680304828450.png)
 
 ## Installation
 
