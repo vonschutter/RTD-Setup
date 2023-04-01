@@ -108,6 +108,11 @@ theme::add_global ()
 		theme::install_payload
 		popd
 	;;
+	--bash | --shell | --starship )
+		pushd "${_my_scriptdir}/bash" || return
+		theme::install_payload
+		popd
+	;;
 	*)
 		echo "Neither GTK or KDE themes were requested"
 	;;
@@ -160,6 +165,7 @@ case $1 in
 		theme::add_global --gtk
 		theme::add_global --icons
 		theme::add_global --fonts
+		theme::add_global --bash
 	;;
 	--icons )
 		echo "Installing icons only..."
@@ -168,6 +174,10 @@ case $1 in
 	--fonts )
 		echo "Installing fonts only"
 		theme::add_global --fonts
+	;;
+	--bash )
+		echo "Installing bash theme only"
+		theme::add_global --bash
 	;;
 	--help)
 		theme::help
@@ -178,10 +188,12 @@ case $1 in
 			theme::add_global --kde
 			theme::add_global --icons
 			theme::add_global --fonts
+			theme::add_global --bash
 		elif  ps -e |grep "gnome-shell"; then
 			theme::add_global --gtk
 			theme::add_global --icons
 			theme::add_global --fonts
+			theme::add_global --bash
 		else
 			echo "Neither plasma or gnome was found! Only installing Icons and fonts."
 			theme::add_global --icons

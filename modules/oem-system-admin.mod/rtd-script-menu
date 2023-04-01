@@ -1,0 +1,34 @@
+#!/bin/bash
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# Variables that govern the behavior or the script and location of files are
+# set here. There should be no reason to change any of this abcent strong preferences.
+
+
+# Put a convenient link to the logs where logs are normally found...
+# capture the 3 first letters as org TLA (Three Letter Acronym)
+export _scriptname=$(basename $0)
+export _tla=${_scriptname:0:3}
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Execute tasks                   ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+_run=$(find /opt/$_tla/modules -name "${_tla}*" | zenity --list --title "Search Results" --text "OEM Tools and Scripts List" --column "Files" --width=800 --height=600 2>/dev/null )
+exit_status=$?
+
+case $exit_status in
+        1) clear && echo [Cancel] && exit ;;
+        255) clear && echo [ESC] && exit ;;
+esac
+
+if [[ -n ${_run} ]] ; then bash ${_run} ; else echo "$0 Nothing requested..." ; fi

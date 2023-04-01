@@ -22,25 +22,26 @@
 
 
 
-
-#::      Location of files and directories.
-#::      All included scripts should respect these locations.
-#::      These variable assignments attemt to detect the location of all dirs.
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# Location of files and directories.
+# All included scripts should respect these locations.
+# These variable assignments attemt to detect the location of all relevant directories.
 
 export scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+export _OEM_DIR="${scriptdir%/*}"			# Root directory of tools
+export _CACHE_DIR="${_OEM_DIR}/cache"			# Caching and download folder
+export _WALLPAPER_DIR="${_OEM_DIR}/wallpaper"		# Location of oem wallpapers
+export _CUSTOM_SOUND_DIR="${_OEM_DIR}/sound"		# Location of custom sounds
+export _THEME_DIR="${_OEM_DIR}/themes"			# Location of installable themes
+export _APP_DIR="${_OEM_DIR}/apps"              	# location of cusom apps (self contained)
+export _MODS_DIR="${_OEM_DIR}/modules"         		# Location of all oem powertools extras
+export _CORE_DIR="${_OEM_DIR}/core"            		# Location of oem libraries and core functions
+export _APPS_DIR="${_OEM_DIR}/apps"             	# Location of 3rd party free apps that may be useful
+export _LOG_DIR=/var/log/${_TLA,,}              	# Location of log files
+export _CONFIG_DIR=/etc/${_TLA,,}               	# Location of status files and config files
 
-export _OEM_DIR="${scriptdir%/*}"               # Root directory of tools
-export _CACHE_DIR="${_OEM_DIR}/cache"           # Caching and download folder
-export _WALLPAPER_DIR="${_OEM_DIR}/wallpaper"   # Location of oem wallpapers
-export _CUSTOM_SOUND_DIR="${_OEM_DIR}/sound"    # Location of custom sounds
-export _THEME_DIR="${_OEM_DIR}/themes"          # Location of installable themes
-export _APP_DIR="${_OEM_DIR}/apps"              # location of cusom apps (self contained)
-export _MODS_DIR="${_OEM_DIR}/modules"          # Location of all oem powertools extras
-export _CORE_DIR="${_OEM_DIR}/core"             # Location of oem libraries and core functions
-export _APPS_DIR="${_OEM_DIR}/apps"             # Location of 3rd party free apps that may be useful
-export _LOG_DIR=/var/log/${_TLA,,}              # Location of log files
-export _CONFIG_DIR=/etc/${_TLA,,}               # Location of status files and config files
 
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # Set location to backup virtual machines to. This location must have addequate space
 # to store several copies of the virtual machine disks. This may be a network share or
 # an external storage or san mount point. If you do non need to backup VMs you can set
@@ -48,9 +49,11 @@ export _CONFIG_DIR=/etc/${_TLA,,}               # Location of status files and c
 # option to back up Virtual Machines in the menu will do nothing.
 export VM_BACKUP_TARGET="${VM_BACKUP_TARGET:="/mnt/vmdsk/VM_BACKUP"}"
 
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # Set where desktop wallpapers are stored if not already defined
 : ${_XDG_WALLPAPER_DIR:="/usr/share/wallpapers"} && export _XDG_WALLPAPER_DIR
 
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # Sometimes, depending on distribution of Linux, some paths are omitted fom the path statement
 # for the root user. This can break scripts. Therefore we add back some paths here if they are
 # not already present.
@@ -59,6 +62,7 @@ if ! echo $PATH |grep /snap/bin &>/dev/null ; then
     export PATH=$PATH:/snap/bin
 fi
 
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # Debian provides several sources that may be used to install software from including the operating system.
 # These sources will be used to build virtual machines from.
 export _DEBIAN_SOURCE_URL="http://ftp.us.debian.org/debian/dists/bullseye/main/installer-amd64/"
@@ -67,6 +71,7 @@ export _DEBIAN_FRONTEND_GTK_INITRD="${_DEBIAN_SOURCE_URL}/current/images/netboot
 export _DEBIAN_FRONTEND_DEFAULT_KERNEL="${_DEBIAN_SOURCE_URL}/current/images/netboot/debian-installer/amd64/linux"
 export _DEBIAN_FRONTEND_DEFAULT_INITRD="${_DEBIAN_SOURCE_URL}/current/images/netboot/debian-installer/amd64/initrd.gz"
 
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # Suse VM build default sources.
 export _DEFAULT_SUSE_VER="15.4"
 export _SUSE_LEAP_SOURCE="https://download.opensuse.org/distribution/openSUSE-current/repo/oss/"
@@ -74,7 +79,8 @@ export _SUSE_TUBMLEWEED_SOURCE="https://download.opensuse.org/tumbleweed/repo/os
 export _SUSE_PACKMAN_LEAP="https://ftp.gwdg.de/pub/linux/misc/packman/suse/openSUSE_Leap_${_DEFAULT_SUSE_VER}/"
 export _SUSE_PACKMAN_TUMBLEWEED=
 
-export _DEFAULT_FEDORA_VER="36"
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+export _DEFAULT_FEDORA_VER="38"
 # repo --name=fedora-updates --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f${FedoraVersion}&arch=x86_64" --cost=0
 # repo --name=rpmfusion-free --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-${FedoraVersion}&arch=x86_64" --includepkgs=rpmfusion-free-release
 # repo --name=rpmfusion-free-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-updates-released-${FedoraVersion}&arch=x86_64" --cost=0

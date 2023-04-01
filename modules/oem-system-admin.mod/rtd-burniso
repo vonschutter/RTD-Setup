@@ -1,0 +1,100 @@
+#!/bin/bash
+#
+#::                                           A D M I N   C O M M A N D
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::// Simple bootable CD/DVD creation Tool //:::::::::::::::::::::// Linux //::::::::
+#::
+#::     Author:   	SLS
+#::     Version 	1.02
+:	${GIT_Profile:=vonschutter}
+#::
+#::
+#::	Purpose: The purpose of the script is to write an ISO file to an optical device verbatim.
+#::
+#::
+#::     Usage:	Simply execute this commandlet passing the parameter indicating where the ISO is located
+#:: 		to accomplish this task.
+#::
+#::     	Example:
+#::		rtd-burniso path/to/file.iso
+#::
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+# Additional information:
+#
+# An ISO image is a disk image of an optical disc. In other words, it is an archive file that contains everything that would
+# be written to an optical disc, sector by sector, including the optical disc file system.[1] ISO image files bear the .iso
+# filename extension. The name ISO is taken from the ISO 9660 file system used with CD-ROM media, but what is known as an
+# ISO image might also contain a UDF (ISO/IEC 13346) file system (commonly used by DVDs and Blu-ray Discs).
+#
+# ISO images can be created from optical discs by disk imaging software, or from a collection of files by optical disc authoring
+# software, or from a different disk image file by means of conversion. Software distributed on bootable discs is often available
+# for download in ISO image format. And like any other ISO image, it may be written to an optical disc such as CD or DVD.
+#
+# This  script was originally developed for RuntimeData, a small OEM in Buffalo Center, IA.
+# This OEM and store nolonger exists as its owner has passed away.
+# This script is shared in the hopes that someone will find it useful.
+#
+# This script is intended to live in the ~/bin/ or /bin/ folder, alternatively in the $PATH.
+#
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+dependency::_rtd_library ()
+{
+	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library ; then
+		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
+	elif source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
+		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
+	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
+		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name _rtd_library |grep -v bakup )"
+	elif wget ${_src_url} ; then
+                write_information "${FUNCNAME[0]} 4 Using: ${_src_url}"
+		source ./_rtd_library
+	else
+		echo -e "RTD functions NOT found!"
+		return 1
+	fi
+}
+
+
+
+
+###########################################################################
+##                                                                       ##
+##                       Script Executive                                ##
+##                                                                       ##
+###########################################################################
+
+# Ensure access to the rtd library functions:
+dependency::_rtd_library
+
+# Check syntax this script is called with:
+if [[ -z "$1" ]]; then
+        write_error "You must provide atleast one argument!
+        Example: $0 ~/my_videos.iso"
+        exit 1
+fi
+
+# Check that the indicated iso file exists:
+if [[ ! -f "$1" ]]; then
+        write_error "The file $1 dies not exist or is not readable!"
+        exit 1
+fi
+
+# Ensure that "cdrecord" is available on the system:
+check_dependencies cdrecord
+
+# Write iso to device:
+$IN = $ARGV[0];
+print "Writing the ISO file $IN to the cd... \n";
+print 'dd if=$IN | cdrecord -speed=16 dev=0,0,0 -eject -data -'

@@ -1,0 +1,72 @@
+#!/bin/bash
+#
+#::                                     A D M I N   C O M M A N D L E T
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::// Simple Admin Tool //::::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#::
+#::     Author:   	SLS
+#::     Version 	1.02
+:	${GIT_Profile:=vonschutter}
+#::
+#::
+#::	Purpose: The purpose of this script is to "unrar" all archives in a folder herarchy.
+#::
+#::
+#::     Usage:	Simply execute this commandlet to accomplith this task.
+#::
+#::
+#::
+#::
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+# This script was originally developed for RuntimeData, a small OEM in Buffalo Center, IA.
+# This OEM and store nolonger exists as its owner has passed away.
+# This script is shared in the hopes that someone will find it usefull.
+#
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+dependency::_rtd_library ()
+{
+	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library ; then
+		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
+	elif source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
+		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
+	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
+		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name _rtd_library |grep -v bakup )"
+	elif wget ${_src_url} ; then
+                write_information "${FUNCNAME[0]} 4 Using: ${_src_url}"
+		source ./_rtd_library
+	else
+		echo -e "RTD functions NOT found!"
+		return 1
+	fi
+}
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+dependency::_rtd_library
+hash unrar || check_dependencies unrar
+
+SAVEIFS=$IFS
+IFS=$(echo -en "\n\b")
+
+list="$(find ./ -type f -name "*.rar")"
+for line in $list; do
+        DEST=${line%/*}
+        unrar x "$line" "$DEST"
+done
+
+IFS=$SAVEIFS
+

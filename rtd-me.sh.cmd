@@ -1,6 +1,7 @@
 #!/bin/bash
-cls
+
 :<<"::CMDLITERAL"
+cls
 @ECHO OFF
 GOTO :CMDSCRIPT
 ::CMDLITERAL
