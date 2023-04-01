@@ -33,7 +33,7 @@ As of version 1.02 you can also launch the "minecraft.server" with the "--update
 ```
 
 ## Features:
-When the RTD-Minecraft-Server-Manager is started, it will do the collowing.
+When the RTD-Minecraft-Server-Manager is started, it will do the following.
 
 - Check and see if Minecraft is installed in the expected localion on the server. 
 - If no server is found in the expected location, one will be downloaded.
