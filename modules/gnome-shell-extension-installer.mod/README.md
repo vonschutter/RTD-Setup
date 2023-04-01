@@ -9,7 +9,7 @@ ORIGIN: [https://github.com/brunelli/gnome-shell-extension-installer]()
 ## How to use the script:
 
 ```
-Usage: gnome-shell-extension-installer EXTENSION_ID [EXTENSION_ID...] [GNOME_VERSION] [OPTIONS]
+Usage: rtd-gnome-shell-extension-installer EXTENSION_ID [EXTENSION_ID...] [GNOME_VERSION] [OPTIONS]
 
 Options:
   -s or --search [STRING] Interactive search.
