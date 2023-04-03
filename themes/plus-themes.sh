@@ -73,44 +73,17 @@ theme::help ()
 }
 
 
-theme::install_payload ()
-{
-	for i in *.7z ; do
-		7z x $i -aoa -o${_tmp}
-		pushd "${_tmp}/${i::-3}"  || return
-		bash ./install.sh
-		popd
-	done
-}
-
 theme::add_global ()
 {
-	case $1 in
-	--gtk | --GTK | --gnome | --Gnome )
-		pushd "${_my_scriptdir}/gtk" || return
-		theme::install_payload
-		ensure_snap_package_managment
-		snap install vimix-themes && for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
-		popd
-	;;
-	--kde | --KDE | --plasma )
-		pushd "${_my_scriptdir}/kde" || return
-		theme::install_payload
-		popd
-	;;
-	--fonts | --font | --fon )
-		pushd "${_my_scriptdir}/font" || return
-		theme::install_payload
-		popd
-	;;
-	--icons | --icon | --ico )
-		pushd "${_my_scriptdir}/icon" || return
-		theme::install_payload
-		popd
-	;;
-	--bash | --shell | --starship )
-		pushd "${_my_scriptdir}/bash" || return
-		theme::install_payload
+	case "${1}" in
+	--bash | --font | --gtk | --icon | --kde )
+		pushd "${_my_scriptdir}/${1}" || return 1
+		for i in *.7z ; do
+			7z x $i -aoa -o${_tmp}
+			pushd "${_tmp}/${i::-3}"  || return 1
+			bash ./install.sh || ( echo "Could not find or run the expected install.sh" ; return 1 )
+			popd
+		done
 		popd
 	;;
 	*)
@@ -121,24 +94,41 @@ theme::add_global ()
 
 
 
-dependency::_rtd_library ()
+dependency::file ()
 {
-	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+	_src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
 
-	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
-		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library
-	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
-		write_information "${FUNCNAME[0]} 2 Using: $(find /opt -name _rtd_library |grep -v bakup )"
-	elif wget ${_src_url} ; then
-		source ./_rtd_library
+	dependency::search_local ()
+	{
+		echo "${FUNCNAME[0]}: Searching for ${1} ..." 
+
+		for i in "./${1}" "${0%/*}/../core/${1}" "${0%/*}/../../core/${1}" "../core/${1}" "../../core/${1}" "$(find /opt -name ${1} |grep -v bakup )" ; do 
+			echo "${FUNCNAME[0]}: Searching for ${i} ..." 
+			if [[ -e "${i}" ]] ; then 
+				echo "${FUNCNAME[0]}: Found ${i}" 
+				source "${i}" ""
+				return 0
+			fi
+		done	
+	}
+
+	if dependency::search_local "${1}" ; then
+		return 0
 	else
-		echo -e "RTD functions NOT loaded!"
-		echo -e " "
-		echo -e "Cannot ensure that the correct functionality is available"
-		echo -e "Quiting rather than cause potential damage..."
-		return 1
-	fi
+		echo "$(date) failure to find $1 on the local comuter, now searching online..."
+		if curl -sL $_src_url | source /dev/stdin ; then 
+			echo "${FUNCNAME[0]} Using: ${_src_url} directly..."
+		elif wget ${_src_url} &>/dev/null ; then
+			source ./"${1}"
+			echo "${FUNCNAME[0]} Using: ${_src_url} downloaded..."
+		else 
+			echo "${FUNCNAME[0]} Failed to find  ${1} "
+			exit 1
+		fi
+	fi 
+
 }
+
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -163,17 +153,17 @@ case $1 in
 		echo "Foced install of ALL themes..."
 		theme::add_global --kde
 		theme::add_global --gtk
-		theme::add_global --icons
-		theme::add_global --fonts
+		theme::add_global --icon
+		theme::add_global --font
 		theme::add_global --bash
 	;;
 	--icons )
 		echo "Installing icons only..."
-		theme::add_global --icons
+		theme::add_global --icon
 	;;
 	--fonts )
 		echo "Installing fonts only"
-		theme::add_global --fonts
+		theme::add_global --font
 	;;
 	--bash )
 		echo "Installing bash theme only"
@@ -186,18 +176,18 @@ case $1 in
 		echo "No preference stated. Autodetecting themes for current environment..."
 		if  ps -e |grep "plasmashell" ; then
 			theme::add_global --kde
-			theme::add_global --icons
-			theme::add_global --fonts
+			theme::add_global --icon
+			theme::add_global --font
 			theme::add_global --bash
 		elif  ps -e |grep "gnome-shell"; then
 			theme::add_global --gtk
-			theme::add_global --icons
-			theme::add_global --fonts
+			theme::add_global --icon
+			theme::add_global --font
 			theme::add_global --bash
 		else
 			echo "Neither plasma or gnome was found! Only installing Icons and fonts."
-			theme::add_global --icons
-			theme::add_global --fonts
+			theme::add_global --icon
+			theme::add_global --font
 		fi
 	;;
 esac
