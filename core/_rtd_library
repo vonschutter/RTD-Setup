@@ -46,6 +46,7 @@ export RTD_VERSION=2.0
 	create_physical_media_from_iso			; Create physical media thumb drive from an ISO file
 	debug_list_loaded_functions			; Lists all loaded RTD functions in the environment
 	create_swapfile					; Create a new swapfile
+	dependency::file				; Find and source an external script of a any name provided
 	dialog::display_notice 				; Display a supplied string as an OK box for a terminal user
 	display_result 					; Displays command results in a pretty terminal box
 	display_software_installation_choices_gtk	; Show software installation options defined in recipe file (external)
@@ -196,16 +197,11 @@ Library_Documentation
 ##                                                                       ##
 ###########################################################################
 
-
+# Online source for scripts and configuraions
+_src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
 
 # load branding informaton:
-source "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_branding
-
-# Load base folder structure for optional administrative scripts:
-source "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_locations
-
-# Software recipes and bundles to be installed on request:
-source "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/_rtd_recipies
+_OEM_DEPENDENCIES="_branding _locations _rtd_recipies"
 
 
 
@@ -436,6 +432,58 @@ zenity::display_url ()
 # |_|  |_|\__,_|_| |_|\__,_|\__, |_| |_| |_|\___|_| |_|\__|
 #                           |___/
 # ----------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+dependency::file ()
+{
+# Description: Function to check for a bash library or script file and source it.
+#
+#
+# Globals:
+# Arguments: Filename
+# Outputs:
+# Returns: Standard error
+# Usage: dependency::file _filename.sh
+# End of documentation	
+
+	dependency::search_local ()
+	{
+	# Description: Internal dunction!
+	# End of Documentation
+		echo "${FUNCNAME[0]}: Searching for ${1} ..." 
+		for i in "./${1}" "${0%/*}/../core/${1}" "${0%/*}/../../core/${1}" "../core/${1}" "../../core/${1}" "$(find /opt -name ${1} |grep -v bakup )" ; do 
+			echo "${FUNCNAME[0]}: Searching for ${i} ..." 
+			if [[ -e "${i}" ]] ; then 
+				echo "${FUNCNAME[0]}: Found ${i}" 
+				source "${i}" ""
+				return 0
+			fi
+		done	
+	}
+
+	if dependency::search_local "${1}" ; then
+		return 0
+	else
+		echo "$(date) failure to find $1 on the local comuter, now searching online..."
+		if curl -sL $_src_url | source /dev/stdin ; then 
+			echo "${FUNCNAME[0]} Using: ${_src_url} directly..."
+		elif wget ${_src_url} &>/dev/null ; then
+			source ./"${1}"
+			echo "${FUNCNAME[0]} Using: ${_src_url} downloaded..."
+		else 
+			echo "${FUNCNAME[0]} Failed to find  ${1} "
+			exit 1
+		fi
+	fi 
+}
+
 
 
 
@@ -8993,6 +9041,8 @@ list_loaded_software_functions ()
 
 
 set_colors
+# Find and load all dependant files... 
+for i in ${_OEM_DEPENDENCIES} ; do dependency::file ${i} ; done
 export RTDFUNCTIONS=1
 
 if [ -z $1 ]; then

@@ -56,13 +56,14 @@ theme::help ()
 	copying the contents to the appropriate location.
 
 	Syntax:
-	${0} [ --gtk, --kde, --fonts, --icons, --all, --help ]
+	${0} [ --gtk | --kde | --font | --icon | --bash | --all | --help ]
 
 	Where:
 	--gtk	Install all Gnome themes
 	--kde 	Install all KDE Plasma themes
 	--fonts	Install all additional fonts
 	--icons Install all additional icon themes
+	--bash  Install bash terminal theme with starship
 	--all	Install everything
 	--help	Display this help message
 
@@ -77,7 +78,7 @@ theme::add_global ()
 {
 	case "${1}" in
 	--bash | --font | --gtk | --icon | --kde )
-		pushd "${_my_scriptdir}/${1}" || return 1
+		pushd "${_my_scriptdir}/${1/--/}" || return 1
 		for i in *.7z ; do
 			7z x $i -aoa -o${_tmp}
 			pushd "${_tmp}/${i::-3}"  || return 1
