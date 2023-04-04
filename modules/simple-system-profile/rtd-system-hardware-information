@@ -9,7 +9,7 @@
 #:: Version 1.00
 #::
 #::
-#::	Purpose: - The purpose of the script is to displey system environment elements. 
+#::	Purpose: - The purpose of the script is to displey system hardware information. 
 #::		   
 #::		 
 #::		 
@@ -100,9 +100,9 @@ dependency::file ()
 
 show_mod_info () 
 {
-    TXT="\\n<span face='Monospace'>$(modinfo $1 | sed 's/&/\&amp;/g;s/</\&lt;/g;s/>/\&gt;/g')</span>"
-    yad --title=$"Module information" --button="yad-close" --width=500 \
-        --image="application-x-addon" --text="$TXT"
+	TXT="\\n<span face='Monospace'>$(modinfo $1 | sed 's/&/\&amp;/g;s/</\&lt;/g;s/>/\&gt;/g')</span>"
+	yad --title=$"Module information" --button="yad-close" --width=500 \
+		--image="application-x-addon" --text="$TXT"
 }
 export -f show_mod_info
 
@@ -115,7 +115,7 @@ exec::show_UI ()
 		--list --no-selection --column=$"Parameter" --column=$"Value" &
 
 	# Memory tab
-	sed -r "s/:[ ]*/\n/" /proc/meminfo |\
+	sed -r "s/:[ ]*/\n/" /proc/meminfo |
 	yad --plug=$KEY --tabnum=2 --image=memory --text=$"Memory usage information" \
 		--list --no-selection --column=$"Parameter" --column=$"Value" &
 
@@ -161,7 +161,7 @@ exec::show_UI ()
 	--list --tree --tree-expanded --no-selection --column=$"Sensor" --column=$"Value" &
 
 	# main dialog
-	TXT=$"<b>	OEM Hardware system information</b>\\n\\n"
+	TXT=$"<b>	$_TLA System Hardware Information</b>\\n\\n"
 	TXT+=$"\\tOS: $(lsb_release -ds) on $(hostname)\\n"
 	TXT+=$"\\tKernel: $(uname -sr)\\n\\n"
 	TXT+="\\t<i>$(uptime)</i>"
