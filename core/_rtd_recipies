@@ -303,7 +303,7 @@ recipe_Bundle:_3D_Printing_Tools () {
 recipe_Bundle:_Office_Tools () {
 	# Office apps like: LibreOffice, Joplin notes, Mailspring, Keepass, and more
 	ensure_snap_package_managment
-	snap install libreoffice						# The latest most advanced office suit for linux
+	#snap install libreoffice						# The latest most advanced office suit for linux
 	snap install mailspring							# A modern email client
 	snap install zenkit							# Zenkit is a platform for collaboration and project management for task management, ERP, CRM
 	snap install joplin-desktop						# Excellent note-taking and note organization app
@@ -483,7 +483,7 @@ recipe_Bundle:_Admin_Tools_and_Utilities () {
 	# using the relevant packaging system.
 	AdminToolsAppList="terminix nmap synaptic ssh gparted sshfs htop iftop nethogs vnstat ifstat dstat nload glances bmon \
 		vim vim-scripts gufw variety remmina remmina-plugin-exec remmina-plugin-secret remmina-plugin-vnc remmina-plugin-nx \
-		remmina-plugin-spice remmina-plugin-xdmcp remmina-plugin-rdp remmina-plugin-telepathy diodon polari filezilla tilix dialog p7zip byobu"
+		remmina-plugin-spice remmina-plugin-xdmcp remmina-plugin-rdp remmina-plugin-telepathy diodon polari filezilla tilix dialog byobu"
 
 	write_status "--- Adding some minor congiguration items for productivity..."
 	for i in ${AdminToolsAppList}
@@ -657,6 +657,9 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		# 	97: 	Coverflow Alt-Tab
 		# 	3628: 	ArcMenu
 		# 	8: 	Places Status Indicator
+
+		# For critical extensions try to install from package manager first
+		for i in dash-to-dock dash-to-panel gnome-shell-extension-manager ; do check_dependencies gnome-shell-extension-${i} ; done
 
 		for i in 6 7 8 19 97 307 517 615 906 1160 1319 1852 3628 ; do
 			bash $(find /opt -name rtd-gnome-shell-extension-installer )  $i
