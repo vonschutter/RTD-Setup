@@ -107,8 +107,8 @@ show_mod_info ()
 
 run::show_UI ()
 {
-	# Main Tab
-	echo $(hostnamctl) |\
+	# Overview Tab
+	echo -e "$(hostnamectl)"| sed -r "s/:[ ]*/\n/"  |\
 	yad --plug=$KEY --tabnum=1 --image=cpu --text=$"Overview" \
 		--list --no-selection --column=$"Parameter" --column=$"Value" &
 
@@ -123,7 +123,7 @@ run::show_UI ()
 		--list --no-selection --column=$"Parameter" --column=$"Value" &
 
 	# Harddrive tab
-	df -T | tail -n +2 | awk '{printf "%s\n%s\n%s\n%s\n%s\n%s\n", $1,$7, $2, $3, $4, $6}' |\
+	df -h -x squashfs -x tmpfs -x devtmpfs| tail -n +2 | awk '{printf "%s\n%s\n%s\n%s\n%s\n%s\n", $1,$7, $2, $3, $4, $6}' |\
 	yad --plug=$KEY --tabnum=4 --image=drive-harddisk --text=$"Disk space usage" \
 		--list --no-selection --column=$"Device" --column=$"Mountpoint" --column=$"Type" \
 		--column=$"Total:sz" --column=$"Free:sz" --column=$"Usage:bar" &
@@ -170,7 +170,7 @@ run::show_UI ()
 	TXT+="\\t<i>$(uptime)</i>"
 
 	yad --notebook --width=800 --height=600 --title=$"System information" --text="$TXT" --button="Close" \
-	--key=$KEY --tab=$"CPU" --tab=$"Memory" --tab=$"Disks" --tab=$"PCI" --tab=$"Modules" \
+	--key=$KEY --tab=$"Overview" --tab=$"CPU" --tab=$"Memory" --tab=$"Disks" --tab=$"PCI" --tab=$"Modules" \
 	--tab=$"Battery" --tab=$"Sensors" --active-tab=${1:-1}
 
 }
@@ -182,13 +182,15 @@ run::show_UI ()
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-dependency::file _rtd_library
+dependency::file _rtd_library &>/dev/null
 
-# for i in $_dependencies ; do 
-# 	if hash $i &>/dev/null ; then 
-# 		check_dependencies $i
-# 	fi
-# done  
+for i in $_dependencies ; do 
+ 	if [ ! hash $i ] &>/dev/null ; then
+		write_error "The software ($i) is missing from the system. Would you like me to try to get the software for you?"
+		read -p "Press [ENTER] to continue, or [CTRL] + C to exit"
+ 		check_dependencies $i
+ 	fi
+done  
 
 if hash yad &>/dev/null ; then 
 	run::show_UI
