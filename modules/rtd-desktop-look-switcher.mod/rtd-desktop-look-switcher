@@ -31,6 +31,20 @@
 # 1 - To see options to use the rtd library type: "bash _rtd_library --help"
 # 2 - To see usefull documentation on each function in this library: "bash _rtd_library --devhelp"
 
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+_LOG_DIR="${HOME}/.config/rtd/logs"
+_LOGFILE="${_LOG_DIR}/$0.log"
+
+mkdir -p "${_LOG_DIR}"
+
+
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::          Script Functions                ::::::::::::::::::::::
@@ -41,39 +55,40 @@
 # This script requires the bash library "rtd library", so if it is not present;
 # a copy must be downloaded.
 
-check_rtd_library ()
+dependency::file ()
 {
-	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+	_src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
 
-	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
-		# Library found in relative path...
-		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library
-	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
-		# Library not found in relative path: search the typical location...
-		write_information "${FUNCNAME[0]} 2 Using: $(find /opt -name _rtd_library |grep -v bakup )"
-	elif wget ${_src_url} ; then
-		# Critical failure: downloaded copy from github.com
-		source ./_rtd_library
+	dependency::search_local ()
+	{
+		echo "${FUNCNAME[0]}: Searching for ${1} in:"
+
+		for i in "./${1}" "./../../core/${1}" "${0%/*}/../core/${1}" "${0%/*}/../../core/${1}" "../core/${1}" "../../core/${1}" "$(find /opt -name ${1} |grep -v bakup )" ; do 
+			echo "${FUNCNAME[0]}: In: ${i} ..."
+			if [[ -e "${i}" ]] ; then 
+				echo "${FUNCNAME[0]}: Found ${i}"
+				source "${i}" "" && return 0
+			fi
+		done
+		if [[ ${RTDFUNCTIONS} -eq 1 ]] ; then 
+			return 0
+		else
+			return 1
+		fi 
+	}
+
+	if dependency::search_local "${1}" ; then
+		return 0
 	else
-		# Abot condition: No mitigation steps worked.
-		echo -e "RTD functions NOT loaded!"
-		echo -e " "
-		echo -e "Cannot ensure that the correct functionality is available"
-		echo -e "Quiting rather than cause potential damage..."
-		exit 1
-	fi
-	write_host --cyan "Libraries loaded"
-	write_status "Paths registered:
-	- Root directory of tools:              _OEM_DIR="${scriptdir%/*}"
-	- Caching and download folder:          _CACHE_DIR="${_OEM_DIR}/cache"
-	- Location of oem wallpapers:           _WALLPAPER_DIR="${_OEM_DIR}/wallpaper"
-	- Location of custom sounds:            _CUSTOMSOUND_DIR="${_OEM_DIR}/sound"
-	- Location of installable themes:       _THEME_DIR="${_OEM_DIR}/themes"
-	- Location of 3rd party apps:           _APP_DIR="${_OEM_DIR}/apps"
-	- Location of extension modules:        _MODS_DIR="${_OEM_DIR}/modules"
-	- Root tools folder:                    _CORE_DIR="${_OEM_DIR}/core"
-	- Location of log files:                _LOG_DIR=/var/log/${_TLA,,}
-	"
+		if wget ${_src_url} &>/dev/null ; then
+			source ./"${1}"
+			echo "${FUNCNAME[0]} Using: ${_src_url}"
+		else 
+			echo "${FUNCNAME[0]} Failed to find  ${1} "
+			exit 1
+		fi
+	fi 
+
 }
 
 
@@ -86,59 +101,78 @@ check_rtd_library ()
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 # Ensure access to the rtd library functions:
-check_rtd_library
+date &>>"${_LOGFILE}"
+dependency::file _rtd_library &>>"${_LOGFILE}"
+dependency::os_linux || ( 
+	echo "This script is intended for Linux only!"
+	exit 1 
+	)
 
 
-while true; do
-        exec 3>&1
-        DefaultDistro=$(hostnamectl |grep "Operating System" |cut -d: -f2)
-        DefaultTitle=$( basename $0 ) ; DefaultTitle=${DefaultTitle//-/ }
-        ProgressTXT="Working..."
 
-        selection=$(zenity --title="${DefaultTitle^^}" --list \
-        --text "        Select your prefferred style of desktop look below. Please NOTE: that the resulting look is just an
-        adjustment to look more like what you may be used to, and not a perfect replica of the original look.
-        Though some may say that the look and function this Gnome variant is an improvement over the originals.
-        " \
-        --height="${HEIGHT:-400}" --width="${WIDTH:-830}" \
-        --print-column=1 --column "Look" --column "Description" \
-        "Windows 10 Dark Mode" "Change the look of this desktop be more like Windows 10 Dark" \
-        "Windows 10 Light Mode" "Change the look of this desktop be more like Windows 10 Light" \
-        "Mac OS Bright" "Change the look of this desktop for be more like Apple's MAC OS" \
-        "Mac OS Dusk" "Change the look of this desktop for be more like Apple's MAC OS" \
-        "Crisp Day" "Crisp and clean proffessional business look (Tuned for day time)" \
-        "Crisp Evening" "Crisp and clean proffessional business look (Tuned for evening time)" \
-        "Moca Smooth" "A dark and chocolate smooth comfortable look" \
-        "${DefaultDistro/ /}" "The default look and feel of ${DefaultDistro/ /} (this distribution of Linux)" )
-        exit_status=$?
 
-        exec 3>&-
-        case $exit_status in
-                1) clear && echo [Cancel] && exit ;;
-                255) clear && echo [ESC] && exit ;;
-        esac
+if dependency::desktop gnome ; then 
+	zenity --info --text "Please be advised: the developers of Gnome have limited the ability to use Themes. So not all elements may be set correctly... " 
+	while true; do
+		exec 3>&1
+		DefaultDistro=$(hostnamectl |grep "Operating System" |cut -d: -f2)
+		DefaultTitle=$( basename $0 ) ; DefaultTitle=${DefaultTitle//-/ }
+		ProgressTXT="Working..."
 
-        write_status "OK setting OEM theme: ${selection}"
+		selection=$(zenity --title="${DefaultTitle^^}" --list \
+		--text "        Select your prefferred style of desktop look below. Please NOTE: that the resulting look is just an
+		adjustment to look more like what you may be used to, and not a perfect replica of the original look.
+		Though some may say that the look and function this Gnome variant is an improvement over the originals.
+		" \
+		--height="400" --width="830" \
+		--print-column=1 --column "Look" --column "Description" \
+		"Windows 10 Dark Mode" "Change the look of this desktop be more like Windows 10 Dark" \
+		"Windows 10 Light Mode" "Change the look of this desktop be more like Windows 10 Light" \
+		"Mac OS Bright" "Change the look of this desktop for be more like Apple's MAC OS" \
+		"Mac OS Dusk" "Change the look of this desktop for be more like Apple's MAC OS" \
+		"Crisp Day" "Crisp and clean proffessional business look (Tuned for day time)" \
+		"Crisp Evening" "Crisp and clean proffessional business look (Tuned for evening time)" \
+		"Moca Smooth" "A dark and chocolate smooth comfortable look" \
+		"${DefaultDistro/ /}" "The default look and feel of ${DefaultDistro/ /} (this distribution of Linux)" ) &>>"${_LOGFILE}"
+		exit_status=$?
 
-        case "${selection}" in
-                "Windows 10 Dark Mode" ) set_gnome_ui_win10_tweaks_for_user Dark & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
-                "Windows 10 Light Mode" ) set_gnome_ui_win10_tweaks_for_user Light & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
-                "Mac OS Bright" ) set_gnome_ui_mac_tweaks_for_user Light & sleep 5 ; notify-send --urgency=low "${selection} set"  ;;
-                "Mac OS Dusk" ) set_gnome_ui_mac_tweaks_for_user Dark & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
-                "Crisp Day" ) set_gnome_ui_corprate_crisp_tweaks_for_user Light & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
-                "Crisp Evening" ) set_gnome_ui_corprate_crisp_tweaks_for_user Dark & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
-                "Moca Smooth" ) set_gnome_ui_moca_tweaks_for_user & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
-                "${DefaultDistro/ /}" )
-			# Resetting deskop environment to distribution defaults!
-			KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
-			dconf reset -f /org/gnome/
-			busctl --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'Meta.restart("Reloadig Gnome with the new settings...")'
-			notify-send --urgency=low "UI reset to: ${selection}"
-			gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
+		exec 3>&-
+		case $exit_status in
+			1) clear && echo [Cancel] && exit ;;
+			255) clear && echo [ESC] && exit ;;
+		esac
+
+		write_status "OK setting OEM theme: ${selection}"  &>>"${_LOGFILE}"
+
+		case "${selection}" in
+			"Windows 10 Dark Mode" ) set_gnome_ui_win10_tweaks_for_user Dark & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
+			"Windows 10 Light Mode" ) set_gnome_ui_win10_tweaks_for_user Light & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
+			"Mac OS Bright" ) set_gnome_ui_mac_tweaks_for_user Light & sleep 5 ; notify-send --urgency=low "${selection} set"  ;;
+			"Mac OS Dusk" ) set_gnome_ui_mac_tweaks_for_user Dark & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
+			"Crisp Day" ) set_gnome_ui_corprate_crisp_tweaks_for_user Light & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
+			"Crisp Evening" ) set_gnome_ui_corprate_crisp_tweaks_for_user Dark & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
+			"Moca Smooth" ) set_gnome_ui_moca_tweaks_for_user & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
+			"${DefaultDistro/ /}" )
+				# Resetting deskop environment to distribution defaults!
+				KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
+				dconf reset -f /org/gnome/
+				busctl --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'Meta.restart("Reloadig Gnome with the new settings...")'
+				notify-send --urgency=low "UI reset to: ${selection}"
+				gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
+				;;
+			* )
+			# Trap unknown exit code...
+			exit
 			;;
-                * )
-                # Trap unknown exit code...
-                exit
-                ;;
-        esac
-done
+		esac
+	done
+else 
+	if dependency::desktop kde ; then
+		echo "Found KDE -- Using kcm_lookandfeel instead..."&>>"${_LOGFILE}"
+		kcmshell5 kcm_lookandfeel  &>>"${_LOGFILE}"
+	else
+		echo "Neither Gnome or KDE found -- Notifying and quitting... "&>>"${_LOGFILE}"
+		zenity --info --text "You are not using the gnome desktop so it does not make sense to use this tool... " 
+		exit 1
+	fi 
+fi

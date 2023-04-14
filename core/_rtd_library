@@ -47,6 +47,8 @@ export RTD_VERSION=2.0
 	debug_list_loaded_functions			; Lists all loaded RTD functions in the environment
 	create_swapfile					; Create a new swapfile
 	dependency::file				; Find and source an external script of a any name provided
+	dependency::desktop                             ; Check if you are running a given desktop (kde, gnome, xfce)
+	dependency::os_linnux                           ; Verify if we are running bash in a linux session
 	dialog::display_notice 				; Display a supplied string as an OK box for a terminal user
 	display_result 					; Displays command results in a pretty terminal box
 	display_software_installation_choices_gtk	; Show software installation options defined in recipe file (external)
@@ -435,6 +437,79 @@ zenity::display_url ()
 
 
 
+dependency::desktop ()
+{
+# Description: This function simplifies identifying the currently running desktop. 
+# 
+# The main problem with checking the DESKTOP_SESSION is that it is set by the display 
+# manager rather than the desktop session and is subject to inconsistencies. 
+# For lightdm on Debian, the values come from the names of files under /usr/share/xsessions/. 
+# DESKTOP_SESSION reflects the desktop environment if a specific selection is made at log in, 
+# however the lightdm-xsession is always used the default session.
+#
+# GDMSESSION is another option, but seems to have a similar predicament 
+# (it is often the same value as DESKTOP_SESSION ).
+#
+# XDG_CURRENT_DESKTOP looks like a good choice, however it is currently not in the XDG 
+# standard and thus not always implemented. See here for a discussion of this. This 
+# answer shows its values for different distros/desktops.
+#
+# The reasonable fallback for XDG_CURRENT_DESKTOP not existing would be to try 
+# XDG_DATA_DIRS. Provided the data files for the desktop environment are installed 
+# in a directory bearing its name, this approach should work. This will hopefully 
+# be the case for all distros/desktops!
+#
+# Globals:	None
+# Arguments:	None
+# Outputs:	Standard error 1/0
+# Returns:	0 = desktop is what you are searching for. 1 = is not what you are searching for.
+# Usage: 	dependency::desktop gnome|kde|xfce|mate
+# End of documentation
+	local _sought="${1}"
+
+	if [ "$XDG_CURRENT_DESKTOP" = "" ] ; then
+		local _desktop=$(echo "$XDG_DATA_DIRS" | sed 's/.*\(xfce\|kde\|gnome\|mate\).*/\1/')
+	else
+		local _desktop="$XDG_CURRENT_DESKTOP"
+	fi
+
+	local _desktop="${_desktop,,}"
+	if [[ "$_desktop" == "$_sought" ]]; then 
+		return 0
+	else 
+		return 1
+	fi
+
+}
+
+
+
+
+dependency::os_linux ()
+{
+# Description: This function simplifies checking if the currently OS is Linux or not. 
+# 
+#
+# Globals:	None
+# Arguments:	None
+# Outputs:	Standard error 1/0
+# Returns:	0 = Running in Linux. 1 = is not running in Linux.
+# Usage: 	dependency::os_linux
+# End of documentation
+       	if [[ $(echo "$OSTYPE" |grep "linux") ]]; then
+		return 0
+	elif [[ "$OSTYPE" == "darwin"* ]]; then
+		write_error "${FUNCNAME[0]}: Mac OSX is currently not supported ..."  ; return 1
+	elif [[ "$OSTYPE" == "cygwin" ]]; then
+		write_error "${FUNCNAME[0]}: CYGWIN is currently unsupported..."  ; return 1
+	elif [[ "$OSTYPE" == "msys" ]]; then
+		write_error "${FUNCNAME[0]}: Lightweight shell is currently unsupported ... "  ; return 1
+	elif [[ "$OSTYPE" == "freebsd"* ]]; then
+		write_error "${FUNCNAME[0]}: Free BSD is currently unsupported... " ; return 1
+	else
+		echo "I have no Idea what this OS is" ; return 1
+	fi
+}
 
 
 
@@ -455,7 +530,10 @@ dependency::file ()
 
 	dependency::search_local ()
 	{
-	# Description: Internal dunction!
+	# Description: Internal function!
+	# It may not be useful to call this directly. This function searches 
+	# a predetermined set of paths for a given file, and source it if found.
+	# it is part of the function dependency::file -- use this instead.
 	# End of Documentation
 		echo "${FUNCNAME[0]}: Searching for ${1} ..." 
 		for i in "./${1}" "${0%/*}/../core/${1}" "${0%/*}/../../core/${1}" "../core/${1}" "../../core/${1}" "$(find /opt -name ${1} |grep -v bakup )" ; do 
@@ -4326,14 +4404,10 @@ ensure_snap_package_managment ()
 				systemctl is-active --quiet snapd || ( write_error "💥 ${FUNCNAME[0]}: Service snapd not started sucessfully!" ; return 1 )
 				ln -s /var/lib/snapd/snap /snap
 			return $?
-		elif hostnamectl |grep "Solus" 2>/dev/null ; then
-			write_information "🧩 ${FUNCNAME[0]}: Solus has snap support built in..." ;return 0
 		elif hostnamectl |grep "Ubuntu" 2>/dev/null ; then
 			write_information "🧩 ${FUNCNAME[0]}: Ubuntu has snap support built in..." ;return 0
 		elif hostnamectl |grep "Zorin" 2>/dev/null ; then
 			write_information "🧩 ${FUNCNAME[0]}: Zoring has snap support built in..." ;return 0
-		elif hostnamectl |grep "Manjaro" 2>/dev/null ; then
-			write_information "🧩 ${FUNCNAME[0]}: Manjaro has snap support built in..." ;return 0
 		else
 			# For distributions that do not need to add a repository to install snap
 			# But would need to install it from their standard reopsitory....
@@ -5815,7 +5889,7 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
-	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
+	: ${virt_net="$(if ls /sys/class/net |grep br >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
 	FedoraVersion=$( $RTD_GUI --title "Select Release Version of Fedora" --inputbox "Please pick an available Fedoara version by entering it below. \
 	If you are not sure just let me choose for you... \n ${fedoralogo} "  25 110 "${_DEFAULT_FEDORA_VER}" 3>&1 1>&2 2>&3)
@@ -8940,6 +9014,7 @@ list_loaded_internal_functions ()
 			((i=i+1))
 		done
 	else
+		i=1
 		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" |grep -v "recipe_" |grep -v "Single_Install" )
 		do
 			echo "$index #$i"
@@ -9043,10 +9118,11 @@ list_loaded_software_functions ()
 set_colors
 # Find and load all dependant files... 
 for i in ${_OEM_DEPENDENCIES} ; do dependency::file ${i} ; done
-export RTDFUNCTIONS=1
+
 
 if [ -z $1 ]; then
 	echo OK
+	export RTDFUNCTIONS=1
 else
 	case $1 in
 		--help | -? )
@@ -9087,6 +9163,8 @@ else
 					$selection )
 						result=$(while IFS= read -r 'line'; do
 							[[ "$line" == "$selection ()" ]]		&& printline="yes"
+							[[ "$line" == "	$selection ()" ]]		&& printline="yes"
+							[[ "$line" == "		$selection ()" ]]	&& printline="yes"
 							[[ "$line" == "# End of documentation"* ]]	&& printline="no"
 							[[ "$line" == *"# End of documentation"* ]]	&& printline="no"
 							[[ "$line" == *End*of*Documentation* ]]		&& printline="no"
@@ -9118,6 +9196,9 @@ else
 					"$selection" )
 						result=$(while IFS= read -r 'line'; do
 							[[ "$line" == "${selection/ /}()" ]]		&& printline="yes"
+							[[ "$line" == "$selection ()" ]]		&& printline="yes"
+							[[ "$line" == "	$selection ()" ]]		&& printline="yes"
+							[[ "$line" == "		$selection ()" ]]	&& printline="yes"
 							[[ "$line" == "# End of documentation"* ]]	&& printline="no"
 							[[ "$line" == *"# End of documentation"* ]]	&& printline="no"
 							[[ "$line" == *End*of*Documentation* ]]		&& printline="no"
