@@ -48,7 +48,8 @@ export RTD_VERSION=2.0
 	create_swapfile					; Create a new swapfile
 	dependency::file				; Find and source an external script of a any name provided
 	dependency::desktop                             ; Check if you are running a given desktop (kde, gnome, xfce)
-	dependency::os_linnux                           ; Verify if we are running bash in a linux session
+	dependency::os_linux                            ; Verify if we are running bash in a linux session
+	dependency::search_local			; Internal function to search defined paths for a given files name...
 	dialog::display_notice 				; Display a supplied string as an OK box for a terminal user
 	display_result 					; Displays command results in a pretty terminal box
 	display_software_installation_choices_gtk	; Show software installation options defined in recipe file (external)
@@ -465,7 +466,7 @@ dependency::desktop ()
 # Returns:	0 = desktop is what you are searching for. 1 = is not what you are searching for.
 # Usage: 	dependency::desktop gnome|kde|xfce|mate
 # End of documentation
-	local _sought="${1}"
+	local _sought="${1,,}"
 
 	if [ "$XDG_CURRENT_DESKTOP" = "" ] ; then
 		local _desktop=$(echo "$XDG_DATA_DIRS" | sed 's/.*\(xfce\|kde\|gnome\|mate\).*/\1/')
@@ -474,7 +475,7 @@ dependency::desktop ()
 	fi
 
 	local _desktop="${_desktop,,}"
-	if [[ "$_desktop" == "$_sought" ]]; then 
+	if [[ "$_desktop" == *"$_sought"* ]]; then 
 		return 0
 	else 
 		return 1
@@ -488,8 +489,7 @@ dependency::desktop ()
 dependency::os_linux ()
 {
 # Description: This function simplifies checking if the currently OS is Linux or not. 
-# 
-#
+#  
 # Globals:	None
 # Arguments:	None
 # Outputs:	Standard error 1/0
@@ -9195,10 +9195,10 @@ else
 				case "$selection" in
 					"$selection" )
 						result=$(while IFS= read -r 'line'; do
+							# if echo "$line" |grep "$selection ()" ; then printline="yes" ; fi
 							[[ "$line" == "${selection/ /}()" ]]		&& printline="yes"
-							[[ "$line" == "$selection ()" ]]		&& printline="yes"
-							[[ "$line" == "	$selection ()" ]]		&& printline="yes"
-							[[ "$line" == "		$selection ()" ]]	&& printline="yes"
+							[[ "$line" =~ ?"$selection ()" ]]		&& printline="yes"
+							[[ "$line" == *"$selection ()"* ]]		&& printline="yes"
 							[[ "$line" == "# End of documentation"* ]]	&& printline="no"
 							[[ "$line" == *"# End of documentation"* ]]	&& printline="no"
 							[[ "$line" == *End*of*Documentation* ]]		&& printline="no"
