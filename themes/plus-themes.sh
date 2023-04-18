@@ -101,14 +101,16 @@ dependency::file ()
 
 	dependency::search_local ()
 	{
-		echo "${FUNCNAME[0]}: Searching for ${1} ..." 
+		echo "${FUNCNAME[0]}: Searching for ${1} ..."
 
 		for i in "./${1}" "${0%/*}/../core/${1}" "${0%/*}/../../core/${1}" "../core/${1}" "../../core/${1}" "$(find /opt -name ${1} |grep -v bakup )" ; do 
-			echo "${FUNCNAME[0]}: Searching for ${i} ..." 
+			echo "${FUNCNAME[0]}: Searching for ${i} ..."
 			if [[ -e "${i}" ]] ; then 
-				echo "${FUNCNAME[0]}: Found ${i}" 
+				echo "${FUNCNAME[0]}: Found ${i}"
 				source "${i}" ""
-				return 0
+				return $? 
+			else 
+				return 1
 			fi
 		done	
 	}
@@ -116,12 +118,9 @@ dependency::file ()
 	if dependency::search_local "${1}" ; then
 		return 0
 	else
-		echo "$(date) failure to find $1 on the local comuter, now searching online..."
-		if curl -sL $_src_url | source /dev/stdin ; then 
-			echo "${FUNCNAME[0]} Using: ${_src_url} directly..."
-		elif wget ${_src_url} &>/dev/null ; then
+		if wget ${_src_url} &>/dev/null ; then
 			source ./"${1}"
-			echo "${FUNCNAME[0]} Using: ${_src_url} downloaded..."
+			echo "${FUNCNAME[0]} Using: ${_src_url}"
 		else 
 			echo "${FUNCNAME[0]} Failed to find  ${1} "
 			exit 1
@@ -142,11 +141,11 @@ dependency::_rtd_library && for i in ${_potential_dependencies} ; do check_depen
 
 
 case $1 in
-	--gtk )
+	--gtk | --gnome )
 		echo "Foced install of GTK themes..."
 		theme::add_global --gtk
 	;;
-	--kde )
+	--kde --plasma )
 		echo "Foced install of KDE themes..."
 		theme::add_global --kde
 	;;
@@ -158,19 +157,19 @@ case $1 in
 		theme::add_global --font
 		theme::add_global --bash
 	;;
-	--icons )
+	--icons | --icon)
 		echo "Installing icons only..."
 		theme::add_global --icon
 	;;
-	--fonts )
+	--fonts | --font )
 		echo "Installing fonts only"
 		theme::add_global --font
 	;;
-	--bash )
+	--bash | --term | --terminal )
 		echo "Installing bash theme only"
 		theme::add_global --bash
 	;;
-	--help)
+	--help )
 		theme::help
 	;;
 	* )
