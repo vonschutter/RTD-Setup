@@ -159,9 +159,11 @@ export _STATUSLOG=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-status.log
 if echo "$OSTYPE" |grep "linux" ; then
 	echo "Linux OS Found: Attempting to get instructions for Linux..."
 	echo executing $0 >> ${_LOGFILE}
-	if ! hash git &>> ${_LOGFILE} ; then
-		for i in apt yum dnf zypper ; do $i -y install git | tee ${_LOGFILE} ; done
-	fi
+	for dependency in git zip ; do 
+		if ! hash ${dependecy} &>> ${_LOGFILE} ; then
+			for pkgmgr in apt yum dnf zypper ; do hash ${pkgmgr} && ${pkgmgr} -y install ${dependecy} | tee ${_LOGFILE} ; done
+		fi
+	done
 	git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp | tee ${_LOGFILE}
 		if [ $? -eq 0 ]
 		then
