@@ -113,7 +113,6 @@ echo				-	RTD System System Managment Bootstrap Script      -
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # Variables that govern the behavior or the script and location of files are
 # set here. There should be no reason to change any of this abcent strong preferences.
-set -eu
 printf '\n'
 
 YELLOW="$(tput setaf 3 2>/dev/null || printf '')"
