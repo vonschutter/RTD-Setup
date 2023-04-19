@@ -137,7 +137,7 @@ dependency::file ()
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-dependency::_rtd_library && for i in ${_potential_dependencies} ; do check_dependencies  "${i}" ; done
+dependency::file _rtd_library && for i in ${_potential_dependencies} ; do check_dependencies  "${i}" ; done
 
 
 case $1 in
