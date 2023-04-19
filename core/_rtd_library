@@ -2993,7 +2993,7 @@ rtd_oem_setup_brand_splash_screen ()
 	if [ -f $image_file_to_brand ]; then
 		convert $image_file_to_brand -gravity north -stroke '#000C' -strokewidth 3 -annotate 0 "$text_to_brand_with" -stroke none -strokewidth 3 -fill white -annotate 0 " $text_to_brand_with "  edit-out.png
 		rm $image_file_to_brand
-		mv edit-out.png $image_file_to_brand || echo -e $RED "Image [ $image_file_to_brand ] NOT branded!  " $ENDCOLOR
+		mv edit-out.png $image_file_to_brand || write_error "Image [ $image_file_to_brand ] NOT branded!  "
 	fi
 }
 
@@ -3291,7 +3291,7 @@ rtd_oem_setup_brand_splash_screen()
 	if [ -f $image_file_to_brand ]; then
 		convert $image_file_to_brand -gravity north -stroke '#000C' -strokewidth 3 -annotate 0 "$text_to_brand_with" -stroke none -strokewidth 3 -fill white -annotate 0 " $text_to_brand_with "  edit-out.png
 		rm $image_file_to_brand
-		mv edit-out.png $image_file_to_brand || echo -e $RED "Image [ $image_file_to_brand ] NOT branded!  " $ENDCOLOR
+		mv edit-out.png $image_file_to_brand || write_error "Image [ $image_file_to_brand ] NOT branded!  " 
 	fi
 }
 
@@ -3487,7 +3487,7 @@ download_and_manipulate_iso_debian ()
 		echo -e $YELLOW Geting install image...
 		echo -e $GREEN Download: $SOURCE_ISO_URL $ENDCOLOR
 
-	wget -4  -q --show-progress "$SOURCE_ISO_URL" -O "$TMP_DOWNLOAD_DIR/netboot.iso" && "$BIN_7Z" x "$TMP_DOWNLOAD_DIR/netboot.iso" "-o$TMP_DISC_DIR" || echo -e $RED "FAILED to download and extract $SOURCE_ISO_URL" $ENDCOLOR
+	wget -4  -q --show-progress "$SOURCE_ISO_URL" -O "$TMP_DOWNLOAD_DIR/netboot.iso" && "$BIN_7Z" x "$TMP_DOWNLOAD_DIR/netboot.iso" "-o$TMP_DISC_DIR" || write_error  "FAILED to download and extract $SOURCE_ISO_URL" 
 		echo -e $BLUE; ls $TMP_DISC_DIR ; echo -e $ENDCOLOR
 		echo -e $YELLOW Geting non-free firmware...
 		echo -e $GREEN Download: $SOURCE_FIRMWARE $ENDCOLOR
@@ -3527,7 +3527,7 @@ PATCH_II
 
 	# Edit the installation instructions file...
 	sed -i s/oem-replace-me-desktop-selection/$PREFERENCE/g "$TMP_INITRD_DIR/preseed.cfg"
-	mkdir "$TMP_INITRD_DIR/custom" && cp "$SSH_PUBLIC_KEY_FILE" "$TMP_INITRD_DIR/custom/userkey.pub" || echo -e $RED "Failed to create $TMP_INITRD_DIR/custom" $ENDCOLOR
+	mkdir "$TMP_INITRD_DIR/custom" && cp "$SSH_PUBLIC_KEY_FILE" "$TMP_INITRD_DIR/custom/userkey.pub" || write_error "Failed to create $TMP_INITRD_DIR/custom" 
 
 # ---------------------Create ssh key service ------------------ #
 
@@ -3549,7 +3549,7 @@ SSH_KEY_KEYGEN
 
 	# Inject created content into the new ISO...
 	echo -e $GREEN "# Modify the CLI Installer" $ENDCOLOR
-	pushd "$TMP_INITRD_DIR" || echo -e $RED "failed to enter init directory: $TMP_INITRD_DIR" $ENDCOLOR
+	pushd "$TMP_INITRD_DIR" || write_error "failed to enter init directory: $TMP_INITRD_DIR" 
 		gzip -d -c "$TMP_DISC_DIR/install.amd/initrd.gz" > "./initrd"
 		echo "./preseed.cfg" | fakeroot "$BIN_CPIO" -o -H newc -A -F "./initrd"
 		echo "./task.sh" | fakeroot "$BIN_CPIO" -o -H newc -A -F "./initrd"
@@ -3563,7 +3563,7 @@ SSH_KEY_KEYGEN
 		echo "./task.sh" | fakeroot "$BIN_CPIO" -o -H newc -A -F "./initrd"
 		find "./custom" | fakeroot "$BIN_CPIO" -o -H newc -A -F "./initrd"
 		cat "./initrd" | gzip -9c > "$TMP_DISC_DIR/install.amd/gtk/initrd.gz"
-	popd || (echo -e $RED "Failed to popd" $ENDCOLOR & rtd_oem_pause 1)
+	popd || (write_error  "Failed to popd"  & rtd_oem_pause 1)
 	rtd_oem_setup_brand_splash_screen
 }
 
@@ -4085,12 +4085,12 @@ create_swapfile ()
 
 	if [[ -z "${SWAP_SIZE}" ]]; then
 		# If we are not given any size to make the swaptfile... well...
-		echo -e $RED "Please tell me what size swap file to make!" $ENDCOLOR
+		write_error "Please tell me what size swap file to make!" 
 		usage_mesage
 		exit 1
 	elif [[ ! "${SWAP_SIZE:0:1}" -ge "1" ]]; then
 		# Fail if the argument is not a numer
-		echo -e $RED "The size for swap file must be a number!" $ENDCOLOR
+		write_error "The size for swap file must be a number!" 
 		usage_mesage
 		exit 1
 	else
@@ -4670,7 +4670,7 @@ InstallSoftwareFromRepo ()
 	# Test if package name is installed, if not then...
 	if ! is_software_package_installed "${1}"; then
 		if is_software_package_available "${1}"; then
-			echo -ne "${PRE}"& $_INSTCMD "${1}" &>>${_LOGFILE} && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR \n" ||printf "%b%-6s%b [ ! ] $RED FAILED $ENDCOLOR \n"
+			echo -ne "${PRE}"& $_INSTCMD "${1}" &>>${_LOGFILE} && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR \n" ||printf "%b%-6s%b [ ! ] ${RED} FAILED ${ENDCOLOR} \n"
 			if [ $? != 0 ];
 			then
 				return 1
@@ -5132,7 +5132,7 @@ rtd_update_system ()
 		# make some decent display terminal graphics...
 		PAD="----------------------------------------------"
 		LINE=$(printf "%s %s" "$@" "$PAD" | cut -c 1-${#PAD})
-		echo -ne "Executing $LINE:"\ & "$@" >>"$LOGFILE" 2>&1 && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR   \n" ||printf "%b%-6s%b [ ! ] $RED FAILED $ENDCOLOR  \n"
+		echo -ne "Executing $LINE:"\ & "$@" >>"$LOGFILE" 2>&1 && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR   \n" ||printf "%b%-6s%b [ ! ] ${RED} FAILED $ENDCOLOR  \n"
 	}
 
 	if hash dnf 2>/dev/null; then
@@ -5202,7 +5202,7 @@ software::add_software_task ()
 	PAD="---------------------------------------------------------"
 	LINE=$(printf "%s %s" "$@" "$PAD" | cut -c 1-${#PAD})
 	#display_spinner start
-	echo -ne "Task: ${LINE/recipe_/}:" & $@ &>${_LOGFILE:-"/var/log/rtd/$($FUNCNAME[0])$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log"} && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR   \n" ||printf "%b%-6s%b [ ! ] $RED FAILED $ENDCOLOR  \n"
+	echo -ne "Task: ${LINE/recipe_/}:" & $@ &>${_LOGFILE:-"/var/log/rtd/$($FUNCNAME[0])$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log"} && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR   \n" ||printf "%b%-6s%b [ ! ] ${RED} FAILED $ENDCOLOR  \n"
 	#display_spinner stop
 }
 
@@ -8833,11 +8833,11 @@ set_colors ()
 	darkpurple="${ecode}0;35"
 
 	# Back compatability w. old scripts
-	YELLOW="$yellow"
-	RED="$red"
-	ENDCOLOR="$endcolor"
-	GREEN="$green"
-	BLUE="$blue"
+	export YELLOW="$yellow"
+	export RED="$red"
+	export ENDCOLOR="$endcolor"
+	export GREEN="$green"
+	export BLUE="$blue"
 
 
 }
