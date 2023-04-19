@@ -7,7 +7,11 @@ The OEM Support Tool Runner is part of the RTD Power Tools.
 
 ## Overview
 
-This is a simple tool to run OEM tools. These may be to create boot media and other tasks from a verified tool. The tools are stored in compressed files to use as little space as possible and are checked for consistency prior to being run. 
+This is a simple tool to run OEM tools. These may be to create boot media and other tasks from a verified tool. The tools are stored in compressed files to use as little space as possible and are checked for consistency prior to being run. The runner will: 
+
+* Validate the executable with a hash
+* Run the tool in an evergreen way
+* On exit, not store any configuration items
 
 If the tool is run with no options at all: 
 

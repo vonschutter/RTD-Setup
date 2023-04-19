@@ -569,6 +569,36 @@ dependency::file ()
 
 
 
+oem::deploy_themes ()
+{
+# Description: Function to dowload and deploy themes from Github.
+#              The github location is defined in the _locations file for consistency.
+#
+# Globals:
+# Arguments: None
+# Outputs:
+# Returns: Standard error level.
+# Usage: simply call function in a script
+# End of documentation
+
+	local GIT_Theme_URL="${1:-"$GIT_Theme_URL"}"
+	local _THEME_DIR="${_THEME_DIR:-"/opt/${_TLA:-"rtd"}/themes"}"
+	mkdir -p ${_THEME_DIR}
+	[[ -z ${GIT_Theme_URL} ]] && (
+		write_error "No theme URL found! It need to be set in the _locations file or passed as an argument."
+		return 1
+	)
+	
+	if git clone --depth=1 "${GIT_Theme_URL}" /opt/${_TLA:-"rtd"}/themes ; then
+		write_status "Cloned ${GIT_Theme_URL} sucessfully. " 
+	else
+		write_error "An error occurred while cloinging ${GIT_Theme_URL} "
+	fi
+}
+
+
+
+
 
 
 
@@ -2222,11 +2252,11 @@ set_gnome_ui_tweak_no_media_error ()
 # Outputs:
 # Returns: Standard err for last task
 # End of documentation
-	: ${OEM_Hint:="I cannot find the actual theme files needed. Should I launch the Bundle Installer Tool to get these?"}
+	: ${OEM_Hint:="I cannot find the actual theme files needed. Should I attempt to get these?"}
 
 	zenity --question --text "${OEM_Hint}" --width=600
 	case "$?" in
-		0 ) pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY ${_CORE_DIR}/rtd-oem-linux-config.sh ;;
+		0 ) oem::deploy_themes ; bash ${_THEME_DIR}/plus-themes.se ;;
 		1 ) return ;;
 		* ) write_error "unknown response received!" ; return 1 ;;
 	esac
