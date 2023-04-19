@@ -582,14 +582,14 @@ oem::deploy_themes ()
 # End of documentation
 
 	local GIT_Theme_URL="${1:-"$GIT_Theme_URL"}"
-	local _THEME_DIR="${_THEME_DIR:-"/opt/${_TLA:-"rtd"}/themes"}"
+	local _THEME_DIR="${_THEME_DIR:-"/opt/${_TLA:-"rtd",,}/themes"}"
 	mkdir -p ${_THEME_DIR}
 	[[ -z ${GIT_Theme_URL} ]] && (
 		write_error "No theme URL found! It need to be set in the _locations file or passed as an argument."
 		return 1
 	)
 	
-	if git clone --depth=1 "${GIT_Theme_URL}" /opt/${_TLA:-"rtd"}/themes ; then
+	if git clone --depth=1 "${GIT_Theme_URL}" "${_THEME_DIR}" ; then
 		write_status "Cloned ${GIT_Theme_URL} sucessfully. " 
 	else
 		write_error "An error occurred while cloinging ${GIT_Theme_URL} "
