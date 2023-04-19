@@ -145,7 +145,7 @@ case $1 in
 		echo "Foced install of GTK themes..."
 		theme::add_global --gtk
 	;;
-	--kde --plasma )
+	--kde | --plasma )
 		echo "Foced install of KDE themes..."
 		theme::add_global --kde
 	;;
