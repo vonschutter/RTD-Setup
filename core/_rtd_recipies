@@ -751,12 +751,15 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 	if  ps -e |grep "plasmashell" ; then
 
 		write_information "${FUNCNAME[0]}: Detected KDE UI!"
-		ln -s ${_WALLPAPER_DIR}/* ${_XDG_WALLPAPER_DIR}/
-		bash ${_THEME_DIR}/plus-themes.sh
+		if [[ -e ${_THEME_DIR}/plus-themes.sh ]] ; then 
+			bash ${_THEME_DIR}/plus-themes.sh
+		else 
+			oem::deploy_themes
+			bash ${_THEME_DIR}/plus-themes.sh || return 1
+		fi
 
 		# sudo -H -u $SUDO_USER  bash -c source ${_CORE_DIR}/_rtd_library ; rtd_oem_kde_set_wallpaper "${_WALLPAPER_DIR}/Wayland.jpg"
-		for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
-
+		# for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
 		sudo -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c '/usr/bin/lookandfeeltool -a RTD-Win11-Light --resetLayout'
 	fi
 }
