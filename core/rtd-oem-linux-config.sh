@@ -164,6 +164,14 @@ else
 		rtd_setup_choices_server
 	else
 		check_dependencies zenity || exit 1
+		if echo "$XDG_SESSION_TYPE" |grep "x11" ; then 
+			oem::deploy_themes
+		elif echo "$XDG_SESSION_TYPE" |grep "wayland" ; then
+			oem::deploy_themes
+		else 
+			write_information "No GUI was found, it does not make sense to install themes..."
+			exit 1
+		fi
 		#software::display_bundle_removal_choices_gtk
 		software::display_bundle_install_choices_gtk
 		complete_setup

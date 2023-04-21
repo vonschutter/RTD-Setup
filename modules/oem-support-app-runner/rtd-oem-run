@@ -18,8 +18,13 @@ VERSION="1.00"
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-
+_APPS_DIR="${_APPS_DIR:-"$(find /opt -name apps)"}"
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -29,21 +34,63 @@ VERSION="1.00"
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 
-dependency::_rtd_library ()
-{
-	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
 
-	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library ; then
-		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
-	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
-		write_information "${FUNCNAME[0]} 2 Using: $(find /opt -name _rtd_library |grep -v bakup )"
-	elif wget ${_src_url} ; then
-		source ./_rtd_library
-	else
-		echo -e "RTD functions NOT loaded!"
+dependency::file ()
+{
+	local _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
+	local _tgt="${1}"
+
+	dependency::search_local ()
+	{
+		echo "${FUNCNAME[0]}: Requested dependency file: ${1} ..."
+
+		for i in "./${1}" "../core/${1}" "../../core/${1}" "${0%/*}/../core/${1}" "${0%/*}/../../core/${1}" "$(find /opt -name ${1} |grep -v bakup )" ; do 
+			echo "${FUNCNAME[0]}: Searching for ${i} ..."
+			if [[ -e "${i}" ]] ; then 
+				echo "${FUNCNAME[0]}: Found ${i}"
+				source "${i}" ""
+				return 0
+			fi
+		done
 		return 1
-	fi
+	}
+
+	if dependency::search_local "${1}" ; then
+		return 0
+	else
+		echo "$(date) failure to find $1 on the local comuter, now searching online..."
+		if curl -sL $_src_url | source /dev/stdin ; then 
+			echo "${FUNCNAME[0]} Using: ${_src_url} directly from URL..."
+		elif wget ${_src_url} &>/dev/null ; then
+			source ./"${1}"
+			echo "${FUNCNAME[0]} Using: ${_src_url} downloaded..."
+		else 
+			echo "${FUNCNAME[0]} Failed to find  ${1} "
+			exit 1
+		fi
+	fi 
 }
+
+
+
+oem::refresh_apps ()
+{
+	[ "$UID" -eq 0 ] || { 
+		write_warning "This script needs administrative access..." 
+		exec sudo -E bash "$0" --refresh
+		}
+	
+	for z in ${_APPS_DIR}/*.7z ; do
+		if [[ -e "${_APPS_DIR}/${z}.1" ]] ; then 
+			rm "${_APPS_DIR}/${z}.1"
+		fi
+		wget --backups=1ref "https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/apps/${z##*/}" --directory-prefix="${_APPS_DIR}" || local _err=1
+	done
+
+	[[ $_err -eq 1 ]] && write_error "At least one problem occurred while transferring files..."
+}
+
+
 
 
 
@@ -101,6 +148,7 @@ internal::chk_param_payload ()
 		else 
 			case ${1} in 
 				--help ) display::help ;;
+				--refresh ) oem::refresh_apps ;;
 				*) display::help ;;
 			esac
 			exit
@@ -122,7 +170,16 @@ display::help ()
 	------------------------------
 $( for i in $(for file in ${_APPS_DIR}/*.7z ; do echo "${file##*/}" ; done ); do write_host --red "	${i::-3}" ; done )
 	"
-	write_host --cyan "	To use the menu of apps to start, please run ${BASH_SOURCE[0]} with no parameters at all.\n"
+	write_host --cyan "
+	To use the menu of apps to start, please run ${BASH_SOURCE[0]} with no parameters at all.
+	In case of problems, please use the --refresh option.
+
+	Valid options are:
+	<application name>	: To start an application cleanly
+	--help			: To see this help
+	--refresh		: To refresh cached OEM apps
+	"
+
 exit
 }
 
@@ -168,7 +225,7 @@ display::oem_program_list ()
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 
-dependency::_rtd_library &>/dev/null
+dependency::file _rtd_library &>/dev/null
 hash 7z &>/dev/null || check_dependencies p7zip
 hash wine &>/dev/null || check_dependencies wine
 hash md5sum &>/dev/null || (echo "I cannot start OEM apps without security validation software!" ; exit 1)

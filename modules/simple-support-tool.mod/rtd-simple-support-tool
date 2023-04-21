@@ -159,36 +159,40 @@ check_rtd_library ()
 
 dependency::file ()
 {
-	# Search for important libraries in multiple locations (6) and finally download if possible.
-	_src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
+	local _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
+	local _tgt="${1}"
 
 	dependency::search_local ()
 	{
-		echo "${FUNCNAME[0]}: Searching for ${1} in multiple locations..."
+		echo "${FUNCNAME[0]}: Requested dependency file: ${1} ..."
 
-		for i in "./${1}" "${0%/*}/../core/${1}" "${0%/*}/../../core/${1}" "../core/${1}" "../../core/${1}" "$(find /opt -name ${1} |grep -v bakup )" ; do 
+		for i in "./${1}" "../core/${1}" "../../core/${1}" "${0%/*}/../core/${1}" "${0%/*}/../../core/${1}" "$(find /opt -name ${1} |grep -v bakup )" ; do 
 			echo "${FUNCNAME[0]}: Searching for ${i} ..."
 			if [[ -e "${i}" ]] ; then 
 				echo "${FUNCNAME[0]}: Found ${i}"
 				source "${i}" ""
 				return 0
 			fi
-		done	
+		done
+		return 1
 	}
 
 	if dependency::search_local "${1}" ; then
 		return 0
 	else
-		if wget ${_src_url} &>/dev/null ; then
+		echo "$(date) failure to find $1 on the local comuter, now searching online..."
+		if curl -sL $_src_url | source /dev/stdin ; then 
+			echo "${FUNCNAME[0]} Using: ${_src_url} directly from URL..."
+		elif wget ${_src_url} &>/dev/null ; then
 			source ./"${1}"
-			echo "${FUNCNAME[0]} Using: ${_src_url}"
+			echo "${FUNCNAME[0]} Using: ${_src_url} downloaded..."
 		else 
 			echo "${FUNCNAME[0]} Failed to find  ${1} "
 			exit 1
 		fi
 	fi 
-
 }
+
 
 
 

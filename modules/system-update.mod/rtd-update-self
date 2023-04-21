@@ -44,22 +44,21 @@ GIT_Profile=${GIT_Profile:-vonschutter}
 
 # Put a convenient link to the logs where logs are normally found...
 # capture the 3 first letters as org TLA (Three Letter Acronym)
-export _SCRIPTNAME=$(basename $0)
-export _TLA=${_SCRIPTNAME:0:3}
-export _LOG_DIR=/var/log/${_TLA,,}
+_SCRIPTNAME=$(basename $0)
+_TLA=${_SCRIPTNAME:0:3}
+_LOG_DIR=/var/log/${_TLA,,}
 mkdir -p ${_LOG_DIR}
 autoconfirm=${1}
 
 # Set the GIT profile name to be used if not set elsewhere:
-export _GIT_PROFILE="${_GIT_PROFILE:-vonschutter}"
+_GIT_PROFILE="${_GIT_PROFILE:-vonschutter}"
 
 # Location of base administrative scripts and command-lets to get.
 _git_src_url=https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git
 
 # Determine log file names for this session
-export _ERRLOGFILE=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-error.log
-export _LOGFILE=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log
-export _STATUSLOG=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-status.log
+_LOGFILE=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log
+
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -67,69 +66,78 @@ export _STATUSLOG=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-status.log
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-
-check_rtd_library ()
+dependency::file ()
 {
-	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+	local _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
+	local _tgt="${1}"
 
-	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
-		# Library found in relative path...
-		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library
-	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
-		# Library not found in relative path: search the typical location...
-		write_information "${FUNCNAME[0]} 2 Using: $(find /opt -name _rtd_library |grep -v bakup )"
-	elif wget ${_src_url} ; then
-		# Critical failure: downloaded copy from github.com
-		source ./_rtd_library
+	dependency::search_local ()
+	{
+		echo "${FUNCNAME[0]}: Requested dependency file: ${1} ..."
+
+		for i in "./${1}" "../core/${1}" "../../core/${1}" "${0%/*}/../core/${1}" "${0%/*}/../../core/${1}" "$(find /opt -name ${1} |grep -v bakup )" ; do 
+			echo "${FUNCNAME[0]}: Searching for ${i} ..."
+			if [[ -e "${i}" ]] ; then 
+				echo "${FUNCNAME[0]}: Found ${i}"
+				source "${i}" ""
+				return 0
+			fi
+		done
+		return 1
+	}
+
+	if dependency::search_local "${1}" ; then
+		return 0
 	else
-		# Abot condition: No mitigation steps worked.
-		echo -e "RTD functions NOT loaded!"
-		echo -e " "
-		echo -e "Cannot ensure that the correct functionality is available"
-		echo -e "Quiting rather than cause potential damage..."
-		exit 1
-	fi
-
-	write_host --cyan "Libraries loaded"
-	write_status "Paths registered:
-	- Root directory of tools: 		_OEM_DIR="${scriptdir%/*}"
-	- Caching and download folder: 		_CACHE_DIR="${_OEM_DIR}/cache"
-	- Location of oem wallpapers: 		_WALLPAPER_DIR="${_OEM_DIR}/wallpaper"
-	- Location of custom sounds:		_CUSTOMSOUND_DIR="${_OEM_DIR}/sound"
-	- Location of installable themes: 	_THEME_DIR="${_OEM_DIR}/themes"
-	- Location of 3rd party apps:		_APP_DIR="${_OEM_DIR}/apps"
-	- Location of extension modules:	_MODS_DIR="${_OEM_DIR}/modules"
-	- Root tools folder: 			_CORE_DIR="${_OEM_DIR}/core"
-	- Location of log files:		_LOG_DIR=/var/log/${_TLA,,}
-	"
+		echo "$(date) failure to find $1 on the local comuter, now searching online..."
+		if curl -sL $_src_url | source /dev/stdin ; then 
+			echo "${FUNCNAME[0]} Using: ${_src_url} directly from URL..."
+		elif wget ${_src_url} &>/dev/null ; then
+			source ./"${1}"
+			echo "${FUNCNAME[0]} Using: ${_src_url} downloaded..."
+		else 
+			echo "${FUNCNAME[0]} Failed to find  ${1} "
+			exit 1
+		fi
+	fi 
 }
 
+
+
 task_setup_rtd_basics() {
-	echo "Task: Attempting to get the latest RTD tools..."
+	write_information "Task: Attempting to get the latest RTD tools..."
 	if [[ "${OSTYPE:0:5}" == "linux" ]]; then
-		echo "Linux OS Found: Attempting to get instructions for Linux..."
+		write_information "Linux OS Found: Attempting to get instructions for Linux..."
 		echo executing $0 >> ${_LOGFILE}
 		if ! hash git &>> ${_LOGFILE} ; then
-			for i in apt yum dnf zypper ; do
-				if hash $i ; then $i -y install git | tee ${_LOGFILE} ; fi
-			done
+			check_dependencies git | tee ${_LOGFILE} 
 		fi
 		git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp | tee ${_LOGFILE}
-			if [ $? -eq 0 ]
-			then
-				echo "Instructions successfully retrieved..."
+			if [ $? -eq 0 ] ; then
+				write_information "Powertools successfully retrieved..."
 				if [[ -d /opt/${_TLA,,}  ]] ; then
 					mv /opt/${_TLA,,} ${_BackupFolderName:="/opt/${_TLA,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"}
 					write_warning "Backing up old (${_TLA,,} ) to ${_BackupFolderName}.zip..."
 					zip -m -r -5 -q ${_BackupFolderName}.zip  ${_BackupFolderName}
 					rm -r ${_BackupFolderName}
 				fi
+
 				mv /opt/${_TLA,,}.tmp /opt/${_TLA,,} ; rm -rf /opt/${_TLA,,}/.git
 				source /opt/${_TLA,,}/core/_rtd_library
 				oem::register_all_tools
 				ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
+
+				if echo "$XDG_SESSION_TYPE" |grep "x11" ; then
+					[[ -d ${_THEME_DIR:-"/opt/${_TLA,,}/themes"} ]] && oem::deploy_themes
+					oem::rtd_tools_make_launchers
+				elif echo "$XDG_SESSION_TYPE" |grep "wayland" ; then
+					[[ -d ${_THEME_DIR:-"/opt/${_TLA,,}/themes"} ]] && oem::deploy_themes
+					oem::rtd_tools_make_launchers
+				else 
+					write_information "No GUI was found, it does not make sense to install themes..."
+				fi
 			else
-				echo "Failed to retrieve instructions correctly! "
+				echo "Failed to retrieve powertools correctly! "
 				echo "Suggestion: check write permission in "/opt" or internet connectivity."
 				exit 1
 			fi
@@ -166,13 +174,14 @@ do_update ()
 {
 	rtd_wait_for_internet_availability
 	if task_setup_rtd_basics ; then
+
 		[[ --autoconfirm == ${autoconfirm} ]] || dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: DONE!" --msgbox "\nUpdating the ${BRAND} tools done!. \n\n Press OK to confirm." 20 80 ; clear
 		return 0
 	else
 		[[ --autoconfirm == ${autoconfirm} ]] || dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: ERROR!" --msgbox "\nUpdating the ${BRAND} \Z1 FAILED!. \n\n Press OK to confirm." 20 80 ; clear
 		return 1
 	fi
-	oem::rtd_tools_make_launchers
+
 }
 
 
@@ -184,7 +193,7 @@ do_update ()
 
 # Using the common function library to elevate priviledges... This is only useful
 # is the script is not run via sudo to begin with...
-check_rtd_library
+dependency::file _rtd_library
 
 
 if [[ ${UID} -eq 0 ]] ; then
