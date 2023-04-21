@@ -175,7 +175,7 @@ if echo "$OSTYPE" |grep "linux" ; then
 			mv /opt/${_TLA,,}.tmp /opt/${_TLA,,} ; rm -rf /opt/${_TLA,,}/.git
 			source /opt/${_TLA,,}/core/_rtd_library
 			oem::register_all_tools
-			if echo "$XDG_SESSION_TYPE" |grep "x11" ; then 
+			if echo "$XDG_SESSION_TYPE" |grep "x11" ; then
 				oem::deploy_themes
 			elif echo "$XDG_SESSION_TYPE" |grep "wayland" ; then
 				oem::deploy_themes

@@ -59,6 +59,9 @@ _git_src_url=https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git
 # Determine log file names for this session
 _LOGFILE=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log
 
+# List spciffic commands of software that are needed
+_software_dependencies="zip dialog"
+
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -107,31 +110,33 @@ dependency::file ()
 task_setup_rtd_basics() {
 	write_information "Task: Attempting to get the latest RTD tools..."
 	if [[ "${OSTYPE:0:5}" == "linux" ]]; then
-		write_information "Linux OS Found: Attempting to get instructions for Linux..."
-		echo executing $0 >> ${_LOGFILE}
+		write_information "Linux OS Found: Attempting to get the latest RTD tools..."
+
 		if ! hash git &>> ${_LOGFILE} ; then
-			check_dependencies git | tee ${_LOGFILE} 
+			check_dependencies git
 		fi
+
 		[[ -d ${_THEME_DIR:-"/opt/${_TLA,,}/themes"} ]] && local _update_themes=yes
-		if git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp | tee ${_LOGFILE} ; then
+
+		if git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp ; then
 			write_information "Powertools successfully retrieved..."
 			if [[ -d /opt/${_TLA,,}  ]] ; then
-				mv /opt/${_TLA,,} ${_BackupFolderName:="/opt/${_TLA,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"} || rtd_oem_pause 1
-				write_warning "Backing up old (${_TLA,,} ) to ${_BackupFolderName}.zip..." || rtd_oem_pause 1
-				zip -m -r -5 -q ${_BackupFolderName}.zip  ${_BackupFolderName} || rtd_oem_pause 1
-				rm -r ${_BackupFolderName} || rtd_oem_pause 1
+				mv /opt/${_TLA,,} ${_BackupFolderName:="/opt/${_TLA,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"} 
+				write_warning "Backing up old (${_TLA,,} ) to ${_BackupFolderName}.zip..." 
+				zip -m -r -5 -q ${_BackupFolderName}.zip  ${_BackupFolderName} 
+				rm -r ${_BackupFolderName} 
 			fi
 
-			mv /opt/${_TLA,,}.tmp /opt/${_TLA,,} ; rm -rf /opt/${_TLA,,}/.git || rtd_oem_pause 1
-			source /opt/${_TLA,,}/core/_rtd_library || rtd_oem_pause 1
+			mv /opt/${_TLA,,}.tmp /opt/${_TLA,,} ; rm -rf /opt/${_TLA,,}/.git 
+			source /opt/${_TLA,,}/core/_rtd_library 
 			oem::register_all_tools
 			ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
 			[[ -n $_update_themes ]] && oem::deploy_themes
 			oem::rtd_tools_make_launchers
 		else
-				echo "Failed to retrieve powertools correctly! "
-				echo "Suggestion: check write permission in "/opt" or internet connectivity."
-				exit 1
+			echo "Failed to retrieve powertools correctly! "
+			echo "Suggestion: check write permission in "/opt" or internet connectivity."
+			exit 1
 		fi
 		return $?
 	elif [[ "$OSTYPE" == "darwin"* ]]; then
@@ -190,6 +195,8 @@ dependency::file _rtd_library
 if [[ ${UID} -eq 0 ]] ; then
 	# Execute only in the case of elevated privileges:
 	oem_launch_me () {
+		echo "$(date) executing $0"
+		for i in $_software_dependencies ; do hash ${i} || check_dependencies ${i} ; done
 		case ${autoconfirm} in
 		--autoconfirm )
 			clear && do_update
