@@ -112,6 +112,7 @@ task_setup_rtd_basics() {
 		if ! hash git &>> ${_LOGFILE} ; then
 			check_dependencies git | tee ${_LOGFILE} 
 		fi
+		[[ -d ${_THEME_DIR:-"/opt/${_TLA,,}/themes"} ]] && local _update_themes=1
 		git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp | tee ${_LOGFILE}
 			if [ $? -eq 0 ] ; then
 				write_information "Powertools successfully retrieved..."
@@ -128,10 +129,10 @@ task_setup_rtd_basics() {
 				ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
 
 				if echo "$XDG_SESSION_TYPE" |grep "x11" ; then
-					[[ -d ${_THEME_DIR:-"/opt/${_TLA,,}/themes"} ]] && oem::deploy_themes
+					oem::deploy_themes
 					oem::rtd_tools_make_launchers
 				elif echo "$XDG_SESSION_TYPE" |grep "wayland" ; then
-					[[ -d ${_THEME_DIR:-"/opt/${_TLA,,}/themes"} ]] && oem::deploy_themes
+					oem::deploy_themes
 					oem::rtd_tools_make_launchers
 				else 
 					write_information "No GUI was found, it does not make sense to install themes..."
