@@ -44,23 +44,26 @@ GIT_Profile=${GIT_Profile:-vonschutter}
 
 # Put a convenient link to the logs where logs are normally found...
 # capture the 3 first letters as org TLA (Three Letter Acronym)
-_SCRIPTNAME=$(basename $0)
-_TLA=${_SCRIPTNAME:0:3}
-_LOG_DIR=/var/log/${_TLA,,}
-mkdir -p ${_LOG_DIR}
+export _scriptname=$(basename $0)
+export _tla=${_scriptname:0:3}
+export _log_dir=/var/log/${_tla,,}
+mkdir -p ${_log_dir}
 autoconfirm=${1}
+export _theme_dir=/opt/${_tla,,}/themes
+
 
 # Set the GIT profile name to be used if not set elsewhere:
-_GIT_PROFILE="${_GIT_PROFILE:-vonschutter}"
+export _git_profile="${_GIT_PROFILE:-vonschutter}"
 
 # Location of base administrative scripts and command-lets to get.
-_git_src_url=https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git
+export _git_src_url=https://github.com/${_git_profile}/${_tla^^}-Setup.git
+export _git_theme_url="https://github.com/${_git_profile}/RTD-Themes.git"
 
 # Determine log file names for this session
-_LOGFILE=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log
+export _logfile=${_log_dir}/$(date +%Y-%m-%d-%H-%M-%S-%s)-${_scriptname}.log
 
 # List spciffic commands of software that are needed
-_software_dependencies="zip dialog"
+export _software_dependencies="zip dialog"
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -71,7 +74,7 @@ _software_dependencies="zip dialog"
 
 dependency::file ()
 {
-	local _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
+	local _src_url="https://github.com/${_git_profile}/RTD-Setup/raw/main/core/${1}"
 	local _tgt="${1}"
 
 	dependency::search_local ()
@@ -107,38 +110,77 @@ dependency::file ()
 
 
 
+system::perform_powertools_update_linux ()
+{
+	cmd=(dialog --backtitle "$( basename $0 )" --title "$_tla^^ PowerTools Updater" --separate-output --checklist "Please select what to include in the update below:" 22 85 16 )
+	options=(1 "Update Base RTD Powertools" on
+		2 "Update menu shortcuts" on
+		3 "Update Themes (wallpapers, icons, themes, fonts etc.)" $( if [[ -e "${_theme_dir}" ]]; then echo on ; else echo off ; fi )
+		)
+
+		choices=$("${cmd[@]}" "${options[@]}" 2>&1 >/dev/tty)
+		exit_status=$?
+
+		case $exit_status in
+			1) clear && _pressed=Cancel && return ;;
+			255) clear && _pressed=ESC && return ;;
+		esac
+
+		clear
+		for choice in $choices
+			do
+			case $choice in
+				1)
+					write_information "Attempting to get the latest RTD tools..."
+					hash git &>> ${_logfile} || check_dependencies git
+				
+					if git clone --depth=1 ${_git_src_url} /opt/${_tla,,}.tmp ; then
+						write_information "Powertools successfully retrieved..."
+						if [[ -d /opt/${_tla,,}  ]] ; then
+							mv /opt/${_tla,,} ${_BackupFolderName:="/opt/${_tla,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"} 
+							write_warning "Backing up old (${_tla,,} ) to ${_BackupFolderName}.zip..." 
+							zip -m -r -5 -q ${_BackupFolderName}.zip  ${_BackupFolderName} 
+							rm -r ${_BackupFolderName} 
+						fi
+
+						mv /opt/${_tla,,}.tmp /opt/${_tla,,} ; rm -rf /opt/${_tla,,}/.git 
+						source /opt/${_tla,,}/core/_rtd_library 
+						oem::register_all_tools
+						ln -s -f ${_log_dir} -T ${_OEM_DIR}/log
+						oem::rtd_tools_make_launchers
+					else
+						echo "Failed to retrieve powertools correctly! "
+						echo "Suggestion: check write permission in "/opt" or internet connectivity."
+						exit 1
+					fi
+				;;
+				2)  
+					write_information "Creating menu launchers..."
+					oem::rtd_tools_make_launchers				
+				;;
+				3)
+					write_information "Updating themes..."
+					[[ -e "${_theme_dir}" ]] && zip -m -r -5 -q ${_bakup_dir}/themes-$(date +%Y-%m-%d-%H-%M-%S-%s).bakup.zip "${_theme_dir}" && rm -r "${_theme_dir}"
+					mkdir -p "${_theme_dir}"
+					
+					if git clone --depth=1 "${_git_theme_url}" "${_theme_dir}" ; then
+						echo done! 
+					else
+						_err_cmd=" git clone --depth=1 ${_git_theme_url} ${_theme_dir}"
+						dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: ERROR!" --msgbox "\ncommand: \n $_err_cmd ." 20 80 ; clear
+					fi
+
+				;;
+			esac
+		done
+}
+
+
 task_setup_rtd_basics() {
 	write_information "Task: Attempting to get the latest RTD tools..."
 	if [[ "${OSTYPE:0:5}" == "linux" ]]; then
-		write_information "Linux OS Found: Attempting to get the latest RTD tools..."
-
-		if ! hash git &>> ${_LOGFILE} ; then
-			check_dependencies git
-		fi
-
-		[[ -d ${_THEME_DIR:-"/opt/${_TLA,,}/themes"} ]] && local _update_themes=yes
-
-		if git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp ; then
-			write_information "Powertools successfully retrieved..."
-			if [[ -d /opt/${_TLA,,}  ]] ; then
-				mv /opt/${_TLA,,} ${_BackupFolderName:="/opt/${_TLA,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"} 
-				write_warning "Backing up old (${_TLA,,} ) to ${_BackupFolderName}.zip..." 
-				zip -m -r -5 -q ${_BackupFolderName}.zip  ${_BackupFolderName} 
-				rm -r ${_BackupFolderName} 
-			fi
-
-			mv /opt/${_TLA,,}.tmp /opt/${_TLA,,} ; rm -rf /opt/${_TLA,,}/.git 
-			source /opt/${_TLA,,}/core/_rtd_library 
-			oem::register_all_tools
-			ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
-			[[ -n $_update_themes ]] && oem::deploy_themes
-			oem::rtd_tools_make_launchers
-		else
-			echo "Failed to retrieve powertools correctly! "
-			echo "Suggestion: check write permission in "/opt" or internet connectivity."
-			exit 1
-		fi
-		return $?
+		write_information "Detected Linux OS..."
+		system::perform_powertools_update_linux
 	elif [[ "$OSTYPE" == "darwin"* ]]; then
 		echo "Mac OSX is currently not supported..."
 	elif [[ "$OSTYPE" == "cygwin" ]]; then
@@ -170,14 +212,20 @@ do_update ()
 {
 	rtd_wait_for_internet_availability
 	if task_setup_rtd_basics ; then
-
-		[[ --autoconfirm == ${autoconfirm} ]] || dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: DONE!" --msgbox "\nUpdating the ${BRAND} tools done!. \n\n Press OK to confirm." 20 80 ; clear
+		if [[ ! --autoconfirm == ${autoconfirm} ]] ; then		
+			if [[ "${_pressed}" == "Cancel" ]] ; then
+				dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: CANCELED!" --msgbox "\nQuiting without updateign powertools. \n\n Press OK to confirm." 20 80 ; clear
+			elif [[ "${_pressed}" == "ESC" ]] ; then
+				echo "[ESC]"
+			else
+				dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: DONE!" --msgbox "\nUpdating the ${BRAND} tools done!. \n\n Press OK to confirm." 20 80 ; clear
+			fi
+		fi
 		return 0
 	else
-		[[ --autoconfirm == ${autoconfirm} ]] || dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: ERROR!" --msgbox "\nUpdating the ${BRAND} \Z1 FAILED!. \n\n Press OK to confirm." 20 80 ; clear
+		[[ --autoconfirm == ${autoconfirm} ]] || dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: ERROR!" --msgbox "\nUpdating the ${BRAND} FAILED!. \n\n Press OK to confirm." 20 80 ; clear
 		return 1
 	fi
-
 }
 
 
@@ -222,7 +270,7 @@ if [[ ${UID} -eq 0 ]] ; then
 		;;
 		esac
 	}
-	oem_launch_me | tee ${_LOGFILE}
+	oem_launch_me | tee ${_logfile}
 else
 	# If privileges are not elevated; then request elevation using the appropriate method:
 	_exec_local="$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/"$( basename ${0} )"
