@@ -70,10 +70,8 @@ export VM_BACKUP_TARGET="${VM_BACKUP_TARGET:="/mnt/vmdsk/VM_BACKUP"}"
 # Sometimes, depending on distribution of Linux, some paths are omitted fom the path statement
 # for the root user. This can break scripts. Therefore we add back some paths here if they are
 # not already present.
+hash snap && if ! echo $PATH |grep /snap/bin ; then export PATH=$PATH:/snap/bin ; fi &>/dev/null
 
-if ! echo $PATH |grep /snap/bin &>/dev/null ; then
-    export PATH=$PATH:/snap/bin
-fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # Debian provides several sources that may be used to install software from including the operating system.
@@ -93,12 +91,19 @@ export _SUSE_PACKMAN_LEAP="https://ftp.gwdg.de/pub/linux/misc/packman/suse/openS
 export _SUSE_PACKMAN_TUMBLEWEED=
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# Fedora VM default build sources
 export _DEFAULT_FEDORA_VER="38"
-# repo --name=fedora-updates --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f${FedoraVersion}&arch=x86_64" --cost=0
-# repo --name=rpmfusion-free --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-${FedoraVersion}&arch=x86_64" --includepkgs=rpmfusion-free-release
-# repo --name=rpmfusion-free-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-updates-released-${FedoraVersion}&arch=x86_64" --cost=0
-# repo --name=rpmfusion-nonfree --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-${FedoraVersion}&arch=x86_64" --includepkgs=rpmfusion-nonfree-release
-# repo --name=rpmfusion-nonfree-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-updates-released-${FedoraVersion}&arch=x86_64" --cost=0
-# repo --name=google-chrome --install --baseurl="https://dl.google.com/linux/chrome/rpm/stable/x86_64" --cost=0
 
+# repo --name=fedora-updates --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f${_DEFAULT_FEDORA_VER}&arch=x86_64" --cost=0
+# repo --name=rpmfusion-free --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-${_DEFAULT_FEDORA_VER}&arch=x86_64" --includepkgs=rpmfusion-free-release
+# repo --name=rpmfusion-free-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=free-fedora-updates-released-${_DEFAULT_FEDORA_VER}&arch=x86_64" --cost=0
+# repo --name=rpmfusion-nonfree --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-${_DEFAULT_FEDORA_VER}&arch=x86_64" --includepkgs=rpmfusion-nonfree-release
+# repo --name=rpmfusion-nonfree-updates --mirrorlist="https://mirrors.rpmfusion.org/mirrorlist?repo=nonfree-fedora-updates-released-${_DEFAULT_FEDORA_VER}&arch=x86_64" --cost=0
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# RedHat VM default build sources
+export _DEFAULT_REDHAT_VER="9.1"
+# repo --name="alamalinux${_DEFAULT_REDHAT_VER}-baseos" --baseurl="https://repo.almalinux.org/almalinux/${_DEFAULT_REDHAT_VER}/BaseOS/x86_64/os/" --mirrorlist=""
+# repo --name="alamalinux${_DEFAULT_REDHAT_VER}-appstream" --baseurl="https://repo.almalinux.org/almalinux/${_DEFAULT_REDHAT_VER}/AppStream/x86_64/os/" --mirrorlist=""
+# repo --name="epel${_DEFAULT_REDHAT_VER}-everything" --baseurl="" --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=epel-${_DEFAULT_REDHAT_VER}&arch=x86_64"
 

@@ -49,11 +49,13 @@ export RTD_VERSION=2.01
 	dependency::file				; Find and source an external script of a any name provided
 	dependency::desktop                             ; Check if you are running a given desktop (kde, gnome, xfce)
 	dependency::os_linux                            ; Verify if we are running bash in a linux session
+	dependency::virtualization                      ; Check that Virtualization is supported and handle deviations
 	dependency::search_local			; Internal function to search defined paths for a given files name...
 	dialog::display_notice 				; Display a supplied string as an OK box for a terminal user
 	display_result 					; Displays command results in a pretty terminal box
 	display_software_installation_choices_gtk	; Show software installation options defined in recipe file (external)
 	display_software_installation_choices_term	; Show software installation options defined in recipe file (external)
+	dialog::display_summary_message                 ; Display all text in _summary_message with automatic/manual width
 	software::vendor_download_and_install		; Downloads and installs a package from the internet
 	download_and_manipulate_iso_debian 		; Download and modify a debian iso to automatically install OEM addons
 	enable_firewall					; Will turn on UFW and add the Allow SSH rule
@@ -61,10 +63,10 @@ export RTD_VERSION=2.01
 	ensure_flatpak_package_managment		; Ensure that the flatpak software management is available
 	ensure_snap_package_managment			; Ensure that the snap software management system is installed
 	err_no_menu_system_found 			; Function to handle what to do if it is not possible to currently display menus in a terminal
-	gen_cloudconfig                                 ; Function to generate a cloud config file for use in deploying servers
+	system::generate_cloudconfig                    ; Function to generate a cloud config file for use in deploying servers
 	generate_autounattend_xml			; Creates an autounattend.xml for Windows setup
 	generate_autoyast_file				; Generates an installation configuration file for SUSE builds.
-	generate_fedora_ks_cfg_file			; Creates a kickstart file for fedora
+	system::generate_ks_cfg_file			; Creates a kickstart file for fedora
 	generate_minecraft_server_launcher		; Creates a minecraft server launcher, w. automatic dependeny resolutions
 	generate_report_disk_space_used_by_directory 	; Generate a disk usage report
 	generate_rtd_me_sh_cmd				; Creates a rtd bootstrap script for system/software install for Windows, Linux, MAC OS, BSD etc.
@@ -95,6 +97,8 @@ export RTD_VERSION=2.01
 	oem::check_boot_splash_screen_enable            ; Check if the boot splash screen should be anabled
 	oem::register_wallpapers_for_gnome		; Register wallpapers for Gnome (so they show up in the appearance tool)
 	oem::register_all_tools                         ; Register all OEM scripts so that they are accessible by terminal
+	oem::start_animation                            ; Start simple animation to let user know a silent action is currently executing
+	oem::stop_animation                             ; Stop simple animation to let user know a silent action is done executing
 	rtd_oem_pause 					; Pause function; will only pause if a non zero integet is passed
 	rtd_oem_cloud-config_ubuntu_cfg_KS_CFG_Options  ; TO DO (incomplete)
 	rtd_oem_preseed_cfg_Addon_MinecraftServer 	; MODULE  sets minecraft server setup tasks for a preseed file
@@ -132,6 +136,7 @@ export RTD_VERSION=2.01
 	system_config::tune_system_power_profile        ; Tune the system power profile based on detected Laptop or PC or VM
 	system::display_spinner				; Display a spinner in the terminal
 	system::get_Windows_Product_Key			; Retrieves a Microsoft Windows product key if it is stored in BIOS (common for OEM)
+	system::find_vm_bridge                          ; Echo back the name of the bridge device and if one is not found then echo default (nat)
 	scan_for_malware				; Scan location for malware
 	set_colors					; Set colors for prompting on screen in human usable variables; $RED, $GEEN etc.
 	set_enable_oem_elevated_privelege		; Set automatic privilege escalation for scripts
@@ -314,6 +319,36 @@ dialog::display_notice ()
 	${RTD_GUI:-dialog} --backtitle "${PUBLICATION:-"Notice"}" --colors --no-collapse --title "Notice" --msgbox "\n ${@} \n" 15 78
 	clear
 }
+
+
+
+dialog::display_summary_message ()
+{
+# Description: Function to read a variable "result" and display its contents. The purpose of this function
+# is simply to make it easy and convenient to display a mesage to an end user in a terminal
+# in a nice way. To use this function simply call it after populating the variable result.
+# Globals: ${result}, ${BRANDING}
+# Arguments: ["Title to display"]
+# Outputs: Message in dialog box
+# Returns: 0 or ESC
+# Usage:
+#
+# result=$( command with output)
+# display_result "title of the mesage"
+#
+# End of Documentation
+
+	hash ${RTD_GUI:-dialog} &>/dev/null || check_dependencies ${RTD_GUI:-dialog} &>/dev/null || return 1
+
+	if echo ${FUNCNAME[1]} | grep "make_kvm_virtual_machine" ; then 
+		${RTD_GUI} --backtitle "$BRANDING" --colors --no-collapse --title "$1" --msgbox "\n ${_summary_message} \n" 0 0
+	else 
+		${RTD_GUI} --backtitle "$BRANDING" --colors --no-collapse --title "$1" --msgbox "${_summary_message}" ${HEIGHT:-"20"} ${WIDTH:-"80"}
+	fi
+	clear
+}
+
+
 
 
 display_result ()
@@ -588,8 +623,8 @@ oem::deploy_themes ()
 # Arguments: None
 # Outputs:
 # Returns: Standard error level.
-# Usage: simply call function in a script, or override the defeult location in _locations:
-#        oem::deploy_themes https://www.guthub.com/myuser/myrepo.git
+# Usage: simply call function in a script, or override the default location in _locations:
+#        oem::deploy_themes https://www.github.com/myuser/myrepo.git
 # End of documentation
 
 	local GIT_Theme_URL="${1:-"$GIT_Theme_URL"}"
@@ -609,6 +644,47 @@ oem::deploy_themes ()
 
 
 
+
+
+dependency::virtualization ()
+{
+# Description: Common function to check on the required components for making virtual machines. 
+#
+# Globals:
+# Arguments: None
+# Outputs:
+# Returns: nothing
+# Usage: simply call function in a script
+# End of documentation
+
+
+	write_status "${FUNCNAME[1]}:"
+	count=1
+	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install
+	do
+		write_status "🧩 ${count}	- Verifying dependencies if relevant( ${i} )..."
+		check_dependencies $i &>/dev/null
+		count=$((count + 1))
+	done
+}
+
+
+
+
+
+system::find_vm_bridge ()
+{
+# Description: Common function to find the default bridge network device. 
+#              If there is no br/bridge we likely have a nat device "default"
+# Globals:
+# Arguments: None
+# Outputs:
+# Returns: br0 | bridge0 | default
+# Usage: simply call function in a script
+# End of documentation
+
+	if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi
+}
 
 
 
@@ -4448,7 +4524,7 @@ ensure_snap_package_managment ()
 		elif hostnamectl |grep "Ubuntu" 2>/dev/null ; then
 			write_information "🧩 ${FUNCNAME[0]}: Ubuntu has snap support built in..." ;return 0
 		elif hostnamectl |grep "Zorin" 2>/dev/null ; then
-			write_information "🧩 ${FUNCNAME[0]}: Zoring has snap support built in..." ;return 0
+			write_information "🧩 ${FUNCNAME[0]}: Zorin has snap support built in..." ;return 0
 		else
 			# For distributions that do not need to add a repository to install snap
 			# But would need to install it from their standard reopsitory....
@@ -4681,16 +4757,16 @@ InstallSoftwareFromRepo ()
 	# Test if package name is installed, if not then...
 	if ! is_software_package_installed "${1}"; then
 		if is_software_package_available "${1}"; then
-			echo -ne "${PRE}"& $_INSTCMD "${1}" &>>${_LOGFILE} && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR \n" ||printf "%b%-6s%b [ ! ] ${RED} FAILED ${ENDCOLOR} \n"
+			oem::start_animation ; printf "${PRE}" & $_INSTCMD "${1}" &>>${_LOGFILE} && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR " ;oem::stop_animation  ||   printf "%b%-6s%b [ ! ] ${RED} FAILED ${ENDCOLOR}" ; oem::stop_animation
 			if [ $? != 0 ];
 			then
 				return 1
 			fi
 		else
-			echo -ne "$PRE"\ && ( printf "%b%-6s%b [ \xE2\x9C\x94 ] $YELLOW Not Available... $ENDCOLOR \n" && return 1 )
+			echo -ne "$PRE"\ && printf "%b%-6s%b [ \xE2\x9C\x94 ] $YELLOW Not available... $ENDCOLOR \n" && oem::stop_animation && return 1
 		fi
 	else
-		echo -ne "$PRE"\ && printf "%b%-6s%b [ \xE2\x9C\x94 ] $YELLOW Allready Installed... $ENDCOLOR \n"
+		echo -ne "$PRE"\ && oem::stop_animation && printf "%b%-6s%b [ \xE2\x9C\x94 ] $YELLOW Allready installed... $ENDCOLOR \n"
 	fi
 }
 
@@ -4745,7 +4821,7 @@ set_install_command ()
 			write_status  "Setting install options for DEB"
 			export _INSTCMD="sudo apt-get -y install"
 		elif hash pkcon 2>/dev/null; then
-			# If thre is no apt, zypper, dnf
+			# If there is no apt, zypper, dnf
 			write_status  "Setting install options for Package Kit"
 			export _INSTCMD="sudo pkcon -y  install"
 		else
@@ -4782,8 +4858,6 @@ check_dependencies ()
 # Works for apt, zypper, dnf or yum based systems currently. The function will take a parameter 
 # that is expected to match the software name or rather the name of the package. 
 # 
-# This function will also attempt to find a snap or a flatpack with the same name if it is not
-# found as a package name in the repositories.
 # 
 # This is done to comply wiht the philosophy to do what it takes to reach the objective, and 
 # just work. Rather than just fail, we want to try and solve the problem and make the software
@@ -4791,10 +4865,10 @@ check_dependencies ()
 # 
 # Globals:
 # Arguments: None
-# Dependencies: [flatpak | snap | package manager]
+# Dependencies: [package manager]
 # Function Dependencies: (other functions)
 # ensure_admin, write_status, write_information, write_warning, write_error, is_software_package_installed,
-# InstallSoftwareFromRepo, ensure_snap_package_managment, ensure_flatpak_package_managment
+# InstallSoftwareFromRepo
 # 
 # Outputs:
 # Returns: 1/0
@@ -4811,24 +4885,13 @@ check_dependencies ()
 		write_information "I found that ${1} is present on this system... thankyou for that! "
 	else
 		write_warning "You seem to have no ${1}... I will try to get it... "
-		InstallSoftwareFromRepo "${1}"
-		if [ $? != 0 ];
-		then
-			ensure_flatpak_package_managment
-			flatpak install "${1}" -y
-			if [ $? != 0 ];
-			then
-				ensure_snap_package_managment
-				snap install "${1}"
-				if [ $? != 0 ];
-				then
-					write_error "That install didn't work out so well."
-					write_error "Please manually try to add the software since I couldn't do it."
-					return 1
-				fi
-			fi
+		if InstallSoftwareFromRepo "${1}" ; then
+			write_status "OK Done! Continuing..."
+		else
+			write_error "That install didn't work out so well."
+			write_error "Please manually try to add the software since I couldn't do it."
+			return 1
 		fi
-		echo "OK Done! Continuing..."
 	fi
 }
 
@@ -5919,59 +5982,125 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 # Usage:
 # End of Documentation
 
-	write_status "${FUNCNAME[0]}:"
-	count=1
-	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install
-	do
-		write_status "🧩 ${count}	- Verifying dependencies ( ${i} )..."
-		check_dependencies $i &>/dev/null
-		count=$((count + 1))
-	done
-
+	dependency::virtualization
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
-	: ${virt_net="$(if ls /sys/class/net |grep br >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
+	: ${virt_net="$(system::find_vm_bridge)"}
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
-	FedoraVersion=$( $RTD_GUI --title "Select Release Version of Fedora" --inputbox "Please pick an available Fedoara version by entering it below. \
-	If you are not sure just let me choose for you... \n ${fedoralogo} "  25 110 "${_DEFAULT_FEDORA_VER}" 3>&1 1>&2 2>&3)
+	: ${_os_version=$( $RTD_GUI --title "Select Release Version of Fedora" --inputbox "Please pick an available OS version by entering it below. \
+	If you are not sure just let me choose for you... \n ${fedoralogo} "  25 110 "${_DEFAULT_FEDORA_VER}" 3>&1 1>&2 2>&3)}
 	case $? in
 		"$DIALOG_CANCEL") return ;;
 		"$DIALOG_ESC") return ;;
 	esac
 	clear
 
-	: ${FedoraVersion:="${_DEFAULT_FEDORA_VER}"}
-	: ${source_url:="https://dl.fedoraproject.org/pub/fedora/linux/releases/${FedoraVersion}/Everything/x86_64/os/"}
-	PRESEED_FILE="$( mktemp ).cfg"
-	generate_fedora_ks_cfg_file "${PRESEED_FILE}" workstation
+	: ${_os_version:="${_DEFAULT_FEDORA_VER}"}
+	: ${_mirrorlist_url="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-${_os_version}&arch=x86_64"}
+	: ${_source_url:="https://dl.fedoraproject.org/pub/fedora/linux/releases/${_os_version}/Everything/x86_64/os/"}
+	: ${_preseed_file="$( mktemp ).cfg"}
+	: ${_config="${1:-"workstation"}"}
+	system::generate_ks_cfg_file -u "${_source_url}" -c "${_config}" -p "${_preseed_file}" -e "@workstation-product-environment"
 
-	_summary_message="The virtual machine (VDI_fedora_"${CONFIG}"_"${RANDOM}") \n
-	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
+	_summary_message="The virtual machine (VDI_Fedora_"${_config}"_"${RANDOM}") \n
+	📋 - Using the instructions in PRESEED: ${_preseed_file} \n
 	🔧 - And Using this source for the packages and files to download: \n
-	🌎 - ${source_url} \n
-	🌎 - ${vm_kernel:="Kernel DEFAULT"} \n
-	🌎 - ${vm_initrd:="Initrd DEFAULT"} \n
+	🌎 - ${_source_url} \n
+	🌎 - ${_mirrorlist_url} \n
 	✅ - Using the network: ${virt_net:=default} \n
 	✅ - Memory: ${3:-2048} \n
 	✅ - CPU's: ${2:-2} \n
-	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))"
+	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I)"
 
-	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name VDI_fedora_"${CONFIG}"_"${RANDOM}" \
+	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name VDI_Fedora_"${_config}"_"${RANDOM}" \
 		--vcpus "${2:-2}" \
 		--memory "${3:-2048}" \
 		--network "$virt_net" \
 		--disk size="${4:-40}" \
 		--os-variant="fedora30" \
-		--initrd-inject="${PRESEED_FILE}" \
-		--location="${source_url}" \
-		--extra-args "inst.ks=file:/$(basename $PRESEED_FILE)" \
-		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
+		--initrd-inject="${_preseed_file}" \
+		--location="${_source_url}" \
+		--extra-args "inst.ks=file:/$(basename $_preseed_file)" \
+		--noautoconsole && dialog::display_summary_message "NOTICE!" \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
-	for i in  PRESEED_FILE vm_kernel vm_initrd source_url CONFIG FedoraVersion ; do unset $i ; done
-	# http://www.nic.funet.fi/pub/Linux/INSTALL/fedora/linux/releases/${FedoraVersion}/Everything/x86_64/os/
+	for i in  _preseed_file vm_kernel vm_initrd _source_url _config _mirrorlist_url _os_version _summary_message ; do unset $i ; done
 }
 
+
+
+
+
+
+
+make_kvm_virtual_machine_now_from_redhat_com ()
+{
+# Description: Function to create a Alma Linux KVM virtual michine disk and define a VM. This function should be
+# used on a Qemu/KVM virtual host that the virtual guest is to be used on.
+# NOTE: QCOW2 is a storage format for virtual .
+# machine disk images QCOW stands for QEMU copy on write. The QCOW2 format decouples the physical storage
+# layer from the virtual layer by adding a mapping between logical and physical blocks.
+# NOTE2: Kernel-based Virtual Machine (KVM) is an open source virtualization technology built into Linux®.
+# Specifically, KVM lets you turn Linux into a hypervisor that allows a host machine to run multiple,
+# isolated virtual environments called guests or virtual machines (VMs). KVM is part of Linux.
+# For complete info: https://www.redhat.com/en/topics/virtualization/what-is-KVM
+# set -e
+# Use the check_dependencies function to make sure the needed software is available.
+# Usage: Either simply call this function to use the defaults or:
+# Call this function with "function" "RAM_SIZE" "DISK_SIZE" "DISK_FORMAT" "DISK_FILE"
+# Omitting any of the arguments will us the default instead.
+#
+# Globals: ${FedoraVersion} ${PRESEED_FILE}
+# Arguments: None
+# Outputs:
+# Returns:
+# Usage:
+# End of Documentation
+
+	dependency::virtualization
+
+	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
+	: ${virt_net="$(system::find_vm_bridge)"}
+	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
+	: ${_os_version=$( $RTD_GUI --title "Select Release Version of RedHat" --inputbox "Please pick an available OS version by entering it below. \
+	If you are not sure just let me choose for you... \n ${fedoralogo} "  25 110 "${_DEFAULT_REDHAT_VER}" 3>&1 1>&2 2>&3)}
+	case $? in
+		"$DIALOG_CANCEL") return ;;
+		"$DIALOG_ESC") return ;;
+	esac
+	clear
+
+	: ${_os_version:="${_DEFAULT_REDHAT_VER}"}
+	: ${_mirrorlist_url="https://mirrors.almalinux.org/mirrorlist/${_os_version}/baseos"}
+	: ${_source_url="https://repo.almalinux.org/almalinux/${_os_version}/BaseOS/x86_64/kickstart/"}
+	: ${_preseed_file="$( mktemp ).cfg"}
+	: ${_config="${1:-"workstation"}"}
+	system::generate_ks_cfg_file -u "${_source_url}" -c "${_config}" -p "${_preseed_file}" -e "@workstation-product-environment"
+
+	_summary_message="The virtual machine (VDI_RedHat_"${_config}"_"${RANDOM}") \n
+	📋 - Using the instructions in PRESEED: ${_preseed_file} \n
+	🔧 - And Using this source for the packages and files to download: \n
+	🌎 - ${_source_url} \n
+	🌎 - ${_mirrorlist_url} \n
+	✅ - Using the network: ${virt_net:=default} \n
+	✅ - Memory: ${3:-2048} \n
+	✅ - CPU's: ${2:-2} \n
+	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I)"
+
+	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name VDI_RedHat_"${_config}"_"${RANDOM}" \
+		--vcpus "${2:-2}" \
+		--memory "${3:-2048}" \
+		--network "$virt_net" \
+		--disk size="${4:-40}" \
+		--os-variant="fedora30" \
+		--initrd-inject="${_preseed_file}" \
+		--location="${_source_url}" \
+		--extra-args "inst.ks=file:/$(basename $_preseed_file)" \
+		--noautoconsole && dialog::display_summary_message "NOTICE!"  \
+	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
+
+	for i in  _preseed_file vm_kernel vm_initrd _source_url _config _mirrorlist_url _os_version ; do unset $i ; done
+}
 
 
 
@@ -6002,20 +6131,13 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 # Usage:
 # End of Documentation
 
-	write_status "${FUNCNAME[0]}:"
-	count=1
-	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install
-	do
-		write_status "🧩 ${count}	- Verifying dependencies ( ${i} )..."
-		check_dependencies $i &>/dev/null
-		count=$((count + 1))
-	done
+	dependency::virtualization
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
 
 	# Discover if the appropriate VM net interface is (default or br'0 - n')
-	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
+	: ${virt_net="$(system::find_vm_bridge)"}
 	: ${source_url:="${_SUSE_LEAP_SOURCE}"}
 
 	_summary_message="The virtual machine (VDI_SUSE_"$CONFIG"_"$RANDOM") \n
@@ -6039,7 +6161,7 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 		--initrd-inject="${PRESEED_FILE}" \
 		--location="${source_url}" \
 		--extra-args "AutoYaST=file:///$(basename ${PRESEED_FILE})"   \
-		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
+		--noautoconsole && dialog::display_summary_message "NOTICE!"  \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
 	for i in  PRESEED_FILE vm_kernel vm_initrd source_url CONFIG ; do unset $i ; done
@@ -6076,14 +6198,7 @@ make_kvm_virtual_machine_now_from_debian_org ()
 # Usage:
 # End of Documentation
 
-	write_status "${FUNCNAME[0]}:"
-	count=1
-	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install
-	do
-		write_status "🧩 ${count}	- Verifying dependencies ( ${i} )..."
-		check_dependencies $i &>/dev/null
-		count=$((count + 1))
-	done
+	dependency::virtualization
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet, and set variables.
 	: "${bin_virt_install:=$(type -p virt-install)}"
@@ -6108,7 +6223,7 @@ make_kvm_virtual_machine_now_from_debian_org ()
 	esac
 
 	write_status "🔎 	- Discovering what the appropriate VM net interface is (default or br'0 - n')"
-	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
+	: ${virt_net="$(system::find_vm_bridge)"}
 	: ${source_url:="${_DEBIAN_SOURCE_URL}"}
 
 	_summary_message="The virtual machine (Debian_${vm_usecase}_${SRVFUNC}_${CONFIG}_${RANDOM}) \n
@@ -6135,7 +6250,7 @@ make_kvm_virtual_machine_now_from_debian_org ()
 		--initrd-inject="${PRESEED_FILE}" \
 		--install kernel="${vm_kernel}",initrd="${vm_initrd}" \
 		--extra-args "ks=file:/$(basename $PRESEED_FILE) ${ui_diplay_style}" \
-		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
+		--noautoconsole && dialog::display_summary_message "NOTICE!"  \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
 	for i in  PRESEED_FILE vm_kernel vm_initrd source_url CONFIG ui_diplay_style ; do unset $i ; done
@@ -6177,13 +6292,7 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 # Alternatively; edit the function with new defaults that suit the needs.
 # End of Documentation
 	ubuntu_flavor="${1}"
-	count=1
-	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install wget
-	do
-		write_status "🧩 ${count}	- Verifying dependencies ( ${i} )..."
-		check_dependencies ${i} &>/dev/null
-		count=$((count + 1))
-	done
+	dependency::virtualization
 
 	write_information "🔎 Retreive list of available $ubuntu_flavor versions..."
 	case "$ubuntu_flavor" in
@@ -6214,7 +6323,7 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 
 	# Detect and set variables for key programs
 	: ${bin_virt_install:=$(type -p virt-install)}
-	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
+	: ${virt_net="$(system::find_vm_bridge)"}
 	: ${ubuntu_iso_url=$(rtd_oem_find_live_release $tgt_ubuntu_ver $ubuntu_flavor live)}
 	: ${iso_filename:="$(basename $ubuntu_iso_url)"}
 	: ${permanent_download_dir:="/var/lib/libvirt/boot/"}
@@ -6250,85 +6359,11 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 		localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 		--initrd-inject="$PRESEED_FILE" \
 		--initrd-inject="$( dirname ${PRESEED_FILE})/ks.cfg" \
-		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
+		--noautoconsole && dialog::display_summary_message "NOTICE!"  \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 	for i in  PRESEED_FILE vm_kernel vm_initrd source_url CONFIG tgt_ubuntu_ver ubuntu_iso_url iso_filename ; do unset $i ; done
 	# extra args: quiet noshell
 }
-
-
-
-
-
-
-
-gen_cloudconfig (){
-# Description:
-# Function to generate a cloud config file for use in deploying servers
-#
-# Globals:
-# Arguments: 
-# Outputs: 
-# Returns:
-# Usage: gen_cloudconfig 
-#
-#
-# With the introduction of the DigitalOcean metadata service, it is possible to start configuring your 
-# servers before you even log in. In short, the metadata service is an HTTP location that your server 
-# can access during the boot process.
-#
-# The metadata location will contain basic data about the server’s configuration and environment, 
-# such as network addresses, hostname, etc. During the initial setup, these values can be pulled 
-# down by a program called cloud-init to help configure essential services.
-#
-# The most powerful feature is that you can pass a script to the metadata service when you create a 
-# server using a field called user-data. This will be run during the initial boot process and is very 
-# flexible, allowing you to accomplish whatever you can script.
-#
-# The most common type of script to pass in is called a cloud-config script. This is a 
-# YAML formatted file that provides simple, readable methods of setting up common configuration 
-# items by declaration. It also has the ability to run arbitrary commands for other tasks.
-#
-# In this guide, we will get familiar with the DigitalOcean metadata service and cloud-config 
-# files by trying out a simple example. We will be recreating some of the steps outlined 
-# in the initial server setup for Ubuntu 14.04 guide in order to demonstrate.
-#
-# End of Documentation
-CloudConfig=$( mktemp )
-PRESEED_FILE=${CloudConfig}
-
-cat >> ${CloudConfig} <<-'EOF'
-#cloud-config
-autoinstall:
-  debconf-selections: |
-    debconf-set partman-auto/disk $BOOTDEV;\
-    debconf-set grub-installer/bootdev $BOOTDEV;
-    tasksel tasksel/first multiselect ubuntu-desktop
-    in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd  ; \
-    in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
-    in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
-    cp /*.cfg /target/opt/rtd/ ;\
-    umount -l /media || echo "Empty" ; \
-    eject || true; \
-    echo "------  initial Setup Complete!  ------"
-    ubiquity ubiquity/success_command string \
-  identity:
-    hostname: RTD-Client
-    password: $6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1
-    realname: RTD User
-    username: tangarora
-  keyboard:
-    layout: se
-  locale: en_US.UTF-8
-  network:
-    ethernets:
-      manual: {}
-    version: 2
-  version: 1
-EOF
-
-}
-
 
 
 
@@ -6366,14 +6401,7 @@ make_kvm_virtual_machine_now_from_microsoft ()
 # Omitting any of the arguments will us the default instead.
 #
 # End of Documentation
-	write_status "Lookup specific binaries: use full path since they may just have been added and not in PATH yet."
-	count=1
-	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install mtools libosinfo-bin
-	do
-		write_status "${count}	- Verifying dependencies ( ${i} )..."
-		check_dependencies $i &>/dev/null
-		count=$((count + 1))
-	done
+	dependency::virtualization
 
 	: ${target_winver="${1:-win10}"} || read -p "💥 - Failure to set variable target_winver"
 	case $target_winver in
@@ -6388,7 +6416,7 @@ make_kvm_virtual_machine_now_from_microsoft ()
 	: ${BIN_VIRT_INSTALL:="$(type -p virt-install)"}
 	: ${CONFIG:="Workstation"}
 	: ${WindowsInstructions:="/var/lib/libvirt/boot/win$(date +%Y-%m-%d-%H-%M-%S-%s).img"}
-	: ${virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"}
+	: ${virt_net="$(system::find_vm_bridge)"}
 	: ${AutoUnattend="/tmp/autounattend.xml"}
 	: ${PostTasks="/tmp/rtd-me-sh.cmd"}
 	: ${cpu_count="${2:-2}"}
@@ -6454,7 +6482,7 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		--livecd \
         --tpm default \
         ${uefi_option} \
-		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 0 0 \
+		--noautoconsole && dialog::display_summary_message "NOTICE!"  \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
 	for i in WindowsInstructions CONFIG WindowsMedia AutoUnattend PostTasks target_winver mem_size uefi_option cpu_count disk_size preferred_video ; do unset $i ; done
@@ -6490,14 +6518,7 @@ make_kvm_virtual_machine_now_from_iso ()
 # Usage:
 # End of Documentation
 
-	RTD_GUI=dialog
-	count=1
-	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install
-	do
-		write_status "${count}	- Verifying dependencies ( ${i} )..."
-		check_dependencies $i &>/dev/null
-		count=$((count + 1))
-	done
+	dependency::virtualization
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
@@ -6509,7 +6530,7 @@ make_kvm_virtual_machine_now_from_iso ()
 			clear
 		fi
 	# Discover if the appropriate VM net interface is (default or br'0 - n')
-	virt_net="$(if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi)"
+	: ${virt_net="$(system::find_vm_bridge)"}
 	_summary_message="
 	--vcpus ${2:-"2"}
 	--memory ${3:-"2048"}
@@ -6532,7 +6553,7 @@ make_kvm_virtual_machine_now_from_iso ()
 		--os-variant="${1:-debian10}" \
 		--cdrom="${TARGET_ISO}" \
 		--cloud-init meta-data=
-		--noautoconsole && $RTD_GUI --backtitle "$BRANDING" --title "NOTICE!" --msgbox "${_summary_message}" 22 85 \
+		--noautoconsole &&  dialog::display_summary_message "NOTICE!"  \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 }
 
@@ -6812,21 +6833,35 @@ generate_rtd_me_sh_cmd ()
 	#:: Table of evaluating family of OS and executing the appropriate action fiven the OS found.
 	#:: In this case it is easier to manage a straight table than a for loop or array:
 
-
-	if [[ "$OSTYPE" == "linux-gnu" ]]; then
+	if echo "$OSTYPE" |grep "linux" ; then
 		echo "Linux OS Found: Attempting to get instructions for Linux..."
 		echo executing $0 >> ${_LOGFILE}
-		if ! hash git &>> ${_LOGFILE} ; then
-			for i in apt yum dnf zypper ; do $i -y install git | tee ${_LOGFILE} ; done
-		fi
-		git clone ${_src_url} /opt/${_TLA} | tee ${_LOGFILE}
+		for d in git zip ; do 
+			if ! hash ${d} &>> ${_LOGFILE} ; then
+				for pkgmgr in apt yum dnf zypper ; do hash ${pkgmgr} && ${pkgmgr} -y install ${d} | tee ${_LOGFILE} ; done
+			fi
+		done
+		git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp | tee ${_LOGFILE}
 			if [ $? -eq 0 ]
 			then
 				echo "Instructions successfully retrieved..."
-				source ${_TLA}/core/_${_TLA}_library
+				if [[ -d /opt/${_TLA,,}  ]] ; then
+					mv /opt/${_TLA,,} ${_BackupFolderName:="/opt/${_TLA,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"}
+					zip -m -r -5 ${_BackupFolderName}.zip  ${_BackupFolderName}
+					rm -r ${_BackupFolderName}
+				fi
+				mv /opt/${_TLA,,}.tmp /opt/${_TLA,,} ; rm -rf /opt/${_TLA,,}/.git
+				source /opt/${_TLA,,}/core/_rtd_library
 				oem::register_all_tools
-				ln -s ${_LOG_DIR} ${_OEM_DIR}/log
-				bash ${_CORE_DIR}/rtd-oem-linux-config.sh "$@" | tee ${_LOGFILE}
+				if echo "$XDG_SESSION_TYPE" |grep "x11" ; then
+					oem::deploy_themes
+				elif echo "$XDG_SESSION_TYPE" |grep "wayland" ; then
+					oem::deploy_themes
+				else 
+					write_information "No GUI was found, it does not make sense to install themes..."
+				fi
+				ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
+				bash ${_OEM_DIR}/core/rtd-oem-linux-config.sh ${@}
 			else
 				echo "Failed to retrieve instructions correctly! "
 				echo "Suggestion: check write permission in "/opt" or internet connectivity."
@@ -8305,55 +8340,66 @@ MINECRAFT_EOF
 
 
 
-generate_fedora_ks_cfg_file ()
+system::generate_ks_cfg_file ()
 {
 # Description: Function to generate an installation configuration file for Fedora/Red Hat.
-# Globals:
-# Arguments: [file path] [workstation, ssh-server, ansible-server]
-# Outputs: One configuration file.
+# Globals: 
+# Arguments: [-p <filename> ] [-u URL ] [-c workstation|ssh-server|ansible-server ]
+# Outputs: One kick start configuration file.
 # Returns: 0/1
-# Usage: generate_fedora_ks_cfg_file $(mktemp) workstation
+# Usage: system::generate_ks_cfg_file [-p <filename> ] [-u URL ] [-c workstation|ssh-server|ansible-server ]
 # End of documentation
-	: ${CONFIG="$2"}
-	: ${FedoraVersion:="${3}"}
-	write_host --cyan "Creating KS.CFG Instructions (txt): ${1}"
 
-	if [[ "${CONFIG}" == "ssh-server" ]]; then
-		write_information "Selected configuration is ssh-server..."
-		cat >> ${1} <<-KS_EOF
-		# Generated by: generate_fedora_ks_cfg_file
+	echo "Function : ${FUNCNAME[0]}"
+	echo "Called by: ${FUNCNAME[-1]}"
+
+	local OPTIND o a
+	while getopts ':u:c:p:e:' OPTION; do
+		case "$OPTION" in
+		u )
+			local _repo_url="${OPTARG}"
+			write_host --cyan "${FUNCNAME[0]}: Using URL: ${OPTARG}"
+		;;
+		c )
+			local _config="${OPTARG}"
+			write_host --cyan  "${FUNCNAME[0]}: Using Config for: ${OPTARG}"
+		;;
+		p )
+			local _ks_file="${OPTARG}"
+			write_host --cyan  "${FUNCNAME[0]}: Creating KS.CFG Instructions: ${_ks_file}"
+		;;
+		e )
+			local _wks_env="${OPTARG}"
+			write_host --cyan  "${FUNCNAME[0]}: Received optioinal option: ${_wks_env}"
+		;;
+		? )
+			write_host --cyan  "${FUNCNAME[0]}: Usage: $(FUNCNAME[0]) [-p <filename> ] [-u URL ] [-c workstation|ssh-server|ansible-server ]"
+			return 1
+		;;
+		esac
+	done
+	unset OPTIND
+
+	[[ -v _repo_url && -v _config && -v _ks_file   ]] || ( echo missing mandatory parameters! ; return 1 )
+
+	case ${_config} in
+	ssh-server )
+		write_information "${FUNCNAME[0]}: Selected configuration is ssh-server..."
+		cat >> "${_ks_file}" <<-KS_EOF
+		# Generated by: system::generate_ks_cfg_file by RTD Power Tools
 		# Choosing mode (graphical|text|cmdline [--non-interactive])
 		text
-
-		# Configure installation method
-		url --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-${FedoraVersion}&arch=x86_64"
-
-		# Run the Setup Agent on first boot
+		url --mirrorlist="${_repo_url}"
 		firstboot --enable
-
-		# Keyboard layouts
 		keyboard --vckeymap=us --xlayouts='us'
-
-		# System language
 		lang en_US.UTF-8
-
-		# System timezone
 		timezone Europe/London --isUtc --ntpservers=0.pool.ntp.org
-
-		# Network information
 		network --onboot=yes --bootproto=dhcp
-
 		rootpw \$6\$Rn5/UTzjIs68MX\$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted
 		user --groups=wheel --name=tangarora --password=\$6\$Rn5/UTzjIs68MX\$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted
-
-		# Partition clearing information
 		zerombr
 		clearpart --all
-
-		# Disk partitioning information
 		autopart --nohome
-
-		#Reboot the system after installation.
 		reboot
 
 		%packages --retries 5 --timeout 20
@@ -8365,42 +8411,24 @@ generate_fedora_ks_cfg_file ()
 		%end
 		KS_EOF
 		return
-	elif [[ "${CONFIG}" == "ansible-server" ]]; then
-		write_information "Selected configuration is ansible-server..."
-		cat >> ${1} <<-KS_EOF
-		# Generated by: generate_fedora_ks_cfg_file
+	;;
+	ansible-server )
+		write_information "${FUNCNAME[0]}: Selected configuration is ansible-server..."
+		cat >> "${_ks_file}" <<-KS_EOF
+		# Generated by: system::generate_ks_cfg_file by RTD Power Tools
 		# Choosing mode (graphical|text|cmdline [--non-interactive])
 		text
-
-		# Configure installation method
-		url --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-${FedoraVersion}&arch=x86_64"
-
-		# Run the Setup Agent on first boot
+		url --mirrorlist="${_repo_url}"
 		firstboot --enable
-
-		# Keyboard layouts
 		keyboard --vckeymap=us --xlayouts='us'
-
-		# System language
 		lang en_US.UTF-8
-
-		# System timezone
 		timezone Europe/London --isUtc --ntpservers=0.pool.ntp.org
-
-		# Network information
 		network --onboot=yes --bootproto=dhcp --hostname=ansible.localdomain
-
 		rootpw \$6\$Rn5/UTzjIs68MX\$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted
 		user --groups=wheel --name=tangarora --password=\$6\$Rn5/UTzjIs68MX\$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted
-
-		# Partition clearing information
 		zerombr
 		clearpart --all
-
-		# Disk partitioning information
 		autopart --nohome
-
-		#Reboot the system after installation.
 		reboot
 
 		%packages --retries 5 --timeout 20
@@ -8413,17 +8441,15 @@ generate_fedora_ks_cfg_file ()
 		%end
 		KS_EOF
 		return
-	elif [[ "${CONFIG}" == "workstation" ]]; then
-		write_information "Selected configuration is workstation..."
-		cat >> ${1} <<-KS_EOF
-		# Generated by: generate_fedora_ks_cfg_file
+	;;
+	workstation )
+		write_information "${FUNCNAME[0]}: Selected configuration is workstation..."
+		cat >> "${_ks_file}" <<-KS_EOF
+		# Generated by: system::generate_ks_cfg_file by RTD Power Tools
 		# Choosing mode (graphical|text|cmdline [--non-interactive])
 		graphical
-
-		# Configure installation method
-		url --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-${FedoraVersion}&arch=x86_64"
-
-		# Setup Agent on first boot
+		# url --mirrorlist="${_repo_url}"
+		url --url "${_repo_url}"
 		firstboot --disable
 		keyboard --xlayouts='se'
 		lang en_US.UTF-8
@@ -8431,15 +8457,13 @@ generate_fedora_ks_cfg_file ()
 		network --onboot=yes --bootproto=dhcp
 		rootpw \$6\$Rn5/UTzjIs68MX\$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted
 		user --groups=wheel --name=tangarora --password=\$6\$Rn5/UTzjIs68MX\$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted
-
-		# Partition clearing information
 		zerombr
 		clearpart --all
 		autopart --nohome --encrypted --passphrase letmein1234
 		reboot
 
 		%packages --retries 5 --timeout 20
-		@^workstation-product-environment
+		${_wks_env}
 		openssh-server
 		spice-vdagent
 		git
@@ -8455,10 +8479,14 @@ generate_fedora_ks_cfg_file ()
 		%end
 		KS_EOF
 		return
-	else
-		write_information "No configuration request: skipping..."
+	;;
+	* )
+		write_information "${FUNCNAME[0]}: No valid OS configuration requested: 
+		Valid requests are: workstation, ssh-server, ansible-server
+		skipping..."
 		return 1
-	fi
+	;;
+	esac
 }
 
 
@@ -8632,7 +8660,72 @@ AUTOYAST_EOF
 
 
 
+system::generate_cloudconfig (){
+# Description:
+# Function to generate a cloud config file for use in deploying servers
+#
+# Globals:
+# Arguments: 
+# Outputs: 
+# Returns:
+# Usage: gen_cloudconfig 
+#
+#
+# With the introduction of the DigitalOcean metadata service, it is possible to start configuring your 
+# servers before you even log in. In short, the metadata service is an HTTP location that your server 
+# can access during the boot process.
+#
+# The metadata location will contain basic data about the server’s configuration and environment, 
+# such as network addresses, hostname, etc. During the initial setup, these values can be pulled 
+# down by a program called cloud-init to help configure essential services.
+#
+# The most powerful feature is that you can pass a script to the metadata service when you create a 
+# server using a field called user-data. This will be run during the initial boot process and is very 
+# flexible, allowing you to accomplish whatever you can script.
+#
+# The most common type of script to pass in is called a cloud-config script. This is a 
+# YAML formatted file that provides simple, readable methods of setting up common configuration 
+# items by declaration. It also has the ability to run arbitrary commands for other tasks.
+#
+# In this guide, we will get familiar with the DigitalOcean metadata service and cloud-config 
+# files by trying out a simple example. We will be recreating some of the steps outlined 
+# in the initial server setup for Ubuntu 14.04 guide in order to demonstrate.
+#
+# End of Documentation
+CloudConfig=$( mktemp )
+PRESEED_FILE=${CloudConfig}
 
+cat >> ${CloudConfig} <<-'EOF'
+#cloud-config
+autoinstall:
+  debconf-selections: |
+    debconf-set partman-auto/disk $BOOTDEV;\
+    debconf-set grub-installer/bootdev $BOOTDEV;
+    tasksel tasksel/first multiselect ubuntu-desktop
+    in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd  ; \
+    in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
+    in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
+    cp /*.cfg /target/opt/rtd/ ;\
+    umount -l /media || echo "Empty" ; \
+    eject || true; \
+    echo "------  initial Setup Complete!  ------"
+    ubiquity ubiquity/success_command string \
+  identity:
+    hostname: RTD-Client
+    password: $6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1
+    realname: RTD User
+    username: tangarora
+  keyboard:
+    layout: se
+  locale: en_US.UTF-8
+  network:
+    ethernets:
+      manual: {}
+    version: 2
+  version: 1
+EOF
+
+}
 
 
 
@@ -8850,12 +8943,77 @@ set_colors ()
 	export GREEN="$green"
 	export BLUE="$blue"
 
-
+	anim=(
+	"${blue}•${green}•${red}•${magenta}•    "
+	" ${green}•${red}•${magenta}•${blue}•   "
+	"  ${red}•${magenta}•${blue}•${green}•  "
+	"   ${magenta}•${blue}•${green}•${red}• "
+	"    ${blue}•${green}•${red}•${magenta}•"
+	)
 }
 
 
 
 
+
+anim::start_animation () {
+# Description:
+# A simple function to display and animation during a silent acton
+#
+# Globals:
+# Arguments: 
+# Outputs: Standard out
+# Returns:
+# Usage: 
+# oem::start_animation ; EXPRESSION of COMMAND or FUNCTION 
+# oem::stop_animation
+#
+# End of documentation
+
+	setterm -cursor off
+	export ANIM_PID="0"
+	(
+	while true; do
+		for i in {0..4}; do
+			printf "\r\033[2K                                                 ${anim[i]}"
+			sleep 0.1
+		done
+
+		for i in {4..0}; do
+			printf "\r\033[2K                                                 ${anim[i]}"
+			sleep 0.1
+		done
+	done
+	) & 
+	
+	export ANIM_PID="${!}" 
+}
+
+
+
+test_me () {
+  write_warning "WARNING: blablablabla"
+  anim::start_animation; sleep 5; anim::stop_animation 
+}
+
+
+anim::stop_animation () {
+# Description:
+# A simple function to STOP display and animation during a silent acton
+#
+# Globals:
+# Arguments: 
+# Outputs: Standard out
+# Returns:
+# Usage: 
+# oem::start_animation ; EXPRESSION of COMMAND or FUNCTION 
+# oem::stop_animation
+#
+# End of documentation
+
+	[[ -e "/proc/${ANIM_PID}" ]]  && kill SIGPIPE "${ANIM_PID}"  &>/dev/null
+	setterm -cursor on
+}
 
 
 
