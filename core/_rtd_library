@@ -6062,7 +6062,7 @@ make_kvm_virtual_machine_now_from_redhat_com ()
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: ${virt_net="$(system::find_vm_bridge)"}
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
-	: ${_os_version=$( $RTD_GUI --title "Select Release Version of RedHat" --inputbox "Please pick an available OS version by entering it below. \
+	: ${_os_version:-$( $RTD_GUI --title "Select Release Version of RedHat" --inputbox "Please pick an available OS version by entering it below. \
 	If you are not sure just let me choose for you... \n ${fedoralogo} "  25 110 "${_DEFAULT_REDHAT_VER}" 3>&1 1>&2 2>&3)}
 	case $? in
 		"$DIALOG_CANCEL") return ;;
@@ -6405,12 +6405,13 @@ make_kvm_virtual_machine_now_from_microsoft ()
 
 	: ${target_winver="${1:-win10}"} || read -p "💥 - Failure to set variable target_winver"
 	case $target_winver in
-		win11 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win11_English_x64.iso"} || read -p "💥 - Failure to set variable"
-			: ${uefi_option="--boot uefi"}  || read -p "💥 - Failure to set variable"
+		win12 ) ;;
+		win11 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win11_English_x64.iso"} 
+			: ${uefi_option="--boot uefi"} 
 			;;
-		win10 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win10_English_x64.iso"} || read -p "💥 - Failure to set variable" ;;
-		win8 )  : ${WindowsMedia="/var/lib/libvirt/boot/Win8_English_x64.iso"} || read -p "💥 - Failure to set variable" ;;
-		win7 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win7_English_x64v1.iso"} || read -p "💥 - Failure to set variable" ;;
+		win10 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win10_English_x64.iso"} ;;
+		win8 )  : ${WindowsMedia="/var/lib/libvirt/boot/Win8_English_x64.iso"}  ;;
+		win7 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win7_English_x64v1.iso"} ;;
 	esac
 
 	: ${BIN_VIRT_INSTALL:="$(type -p virt-install)"}
@@ -6428,7 +6429,7 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		if ( $RTD_GUI --backtitle "..$BRANDING" --title "Windows Install Media Needed" \
 			--no-button "NO: Just Cancel" \
 			--yes-button "OK: I am done upploading" \
-			--yesno "Windows install media was not found where expected ${WindowsMedia} \n Please place a copy of it in /home/$SUDO_USER/ and press [ OK ] \n Please name it Win**something**.iso" 20 90 );
+			--yesno "Windows install media was not found where expected ${WindowsMedia} \n Please place a copy of it in /home/$SUDO_USER/ and press [ OK ] \n Please name it Win**something**.iso NOTE: you can download Windows from Microsoft for free" 20 90 );
 		then
 			if ls /home/$SUDO_USER/Win*.iso ; then
 				mv -v /home/$SUDO_USER/Win*.iso ${WindowsMedia} || rtd_oem_pause 1S
@@ -9011,7 +9012,7 @@ anim::stop_animation () {
 #
 # End of documentation
 
-	[[ -e "/proc/${ANIM_PID}" ]]  && kill SIGPIPE "${ANIM_PID}"  &>/dev/null
+	[[ -e "/proc/${ANIM_PID}" ]]  && kill -SIGPIPE "${ANIM_PID}"  &>/dev/null
 	setterm -cursor on
 }
 
