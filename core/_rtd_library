@@ -29,6 +29,9 @@ export RTD_VERSION=2.01
 	Function Name: 					Description:
 	----------------------------------------------------------------------------------------------------------------
 	add_gnome3_favorite_app				; Adds a new favorite app to the gnome favorites bar
+	term::animate_while_command               ; Display terminal output during a silent task execution
+	term::start_animation                           ; Start simple animation to let user know a silent action is currently executing
+	term::stop_animation                            ; Stop simple animation to let user know a silent action is done executing
 	software::add_software_task 			; Wrapper function to execute a command and display pretty terminal OK or FAIL
 	software::list_bundles				; Lists software bundles defined in _rtd_recipes
 	software::ensure_software_store_available	; Ensure that the appropriate software store is available with Flatpak & Snap support
@@ -97,8 +100,6 @@ export RTD_VERSION=2.01
 	oem::check_boot_splash_screen_enable            ; Check if the boot splash screen should be anabled
 	oem::register_wallpapers_for_gnome		; Register wallpapers for Gnome (so they show up in the appearance tool)
 	oem::register_all_tools                         ; Register all OEM scripts so that they are accessible by terminal
-	oem::start_animation                            ; Start simple animation to let user know a silent action is currently executing
-	oem::stop_animation                             ; Stop simple animation to let user know a silent action is done executing
 	rtd_oem_pause 					; Pause function; will only pause if a non zero integet is passed
 	rtd_oem_cloud-config_ubuntu_cfg_KS_CFG_Options  ; TO DO (incomplete)
 	rtd_oem_preseed_cfg_Addon_MinecraftServer 	; MODULE  sets minecraft server setup tasks for a preseed file
@@ -154,6 +155,7 @@ export RTD_VERSION=2.01
 	toggle_oem_run_once				; Toggle the oem run once of a script at login
 	test_iso_boot_media				; Test bootable media using QEMU
 	up_2_date					; Older universal software update function
+	pause_a_given_time                              ; Pause while showing a count down in seconds
 	write_error					; Prints an error message to terminal in RED
 	write_host 					; Prints a message to the terminal w. a choice of color
 	write_information 				; Prints a message to the terminal in BLUE
@@ -419,6 +421,40 @@ zenity::display_url ()
 	zenity --text-info --html --url="$_url" --width=800 --height=600 2>/dev/null
 
 }
+
+
+
+
+
+term::animate_while_command ()
+{
+# Description:
+# A simple function to display and animation during a silent acton.
+# This is useful for uning anoter functiona that may take some time. 
+# Note that this works best if the function doe not print to terminal.
+#
+# Globals:
+# Arguments: 
+# Outputs: Standard out
+# Returns:
+# Usage: 
+# term::animate_while_command ; EXPRESSION of COMMAND or FUNCTION 
+# 
+#
+# End of documentation
+
+	
+        if [[ -z ${1} ]] ; then
+		write_error "Specifying a command to wait for is required! "
+		return 1
+	else
+		term::start_animation "${@}" ; ${@} &>/dev/null; term::stop_animation 
+	fi
+
+}
+
+
+
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -4757,16 +4793,17 @@ InstallSoftwareFromRepo ()
 	# Test if package name is installed, if not then...
 	if ! is_software_package_installed "${1}"; then
 		if is_software_package_available "${1}"; then
-			anim::start_animation ; printf "${PRE}" & $_INSTCMD "${1}" &>>${_LOGFILE} && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR " ;anim::stop_animation  ||   printf "%b%-6s%b [ ! ] ${RED} FAILED ${ENDCOLOR}" ; anim::stop_animation
+			#printf "${PRE}" & $_INSTCMD "${1}" &>>${_LOGFILE} && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR " ||   printf "%b%-6s%b [ ! ] ${RED} FAILED ${ENDCOLOR}"
+			term::animate_while_command "$_INSTCMD ${1}" 
 			if [ $? != 0 ];
 			then
 				return 1
 			fi
 		else
-			echo -ne "$PRE"\ && printf "%b%-6s%b [ \xE2\x9C\x94 ] $YELLOW Not available... $ENDCOLOR \n" && anim::stop_animation && return 1
+			echo -ne "$PRE"\ && printf "%b%-6s%b [ \xE2\x9C\x94 ] $YELLOW Not available... $ENDCOLOR \n" && return 1
 		fi
 	else
-		echo -ne "$PRE"\ && anim::stop_animation && printf "%b%-6s%b [ \xE2\x9C\x94 ] $YELLOW Allready installed... $ENDCOLOR \n"
+		echo -ne "$PRE"\ && printf "%b%-6s%b [ \xE2\x9C\x94 ] $YELLOW Allready installed... $ENDCOLOR \n"
 	fi
 }
 
@@ -8780,9 +8817,18 @@ set_colors ()
 # "🔴  🔵 "
 # The function will not return any sucess or failure codes. It will do its best and exit.
 #
+# Num  Colour    #define         R G B
+# 0    black     COLOR_BLACK     0,0,0
+# 1    red       COLOR_RED       1,0,0
+# 2    green     COLOR_GREEN     0,1,0
+# 3    yellow    COLOR_YELLOW    1,1,0
+# 4    blue      COLOR_BLUE      0,0,1
+# 5    magenta   COLOR_MAGENTA   1,0,1
+# 6    cyan      COLOR_CYAN      0,1,1
+# 7    white     COLOR_WHITE     1,1,1
 # End of documentation
 
-# Foreground & background colour commands
+# Foreground & background colour commands: (uncomment to use)
 #
 # tput setab [1-7] # Set the background colour using ANSI escape
 # tput setaf [1-7] # Set the foreground colour using ANSI escape
@@ -8797,15 +8843,6 @@ set_colors ()
 # Cyan         0;36     Light Cyan    1;36
 # Light Gray   0;37     White         1;37
 #
-#      Num  Colour    #define         R G B
-# 0    black     COLOR_BLACK     0,0,0
-# 1    red       COLOR_RED       1,0,0
-# 2    green     COLOR_GREEN     0,1,0
-# 3    yellow    COLOR_YELLOW    1,1,0
-# 4    blue      COLOR_BLUE      0,0,1
-# 5    magenta   COLOR_MAGENTA   1,0,1
-# 6    cyan      COLOR_CYAN      0,1,1
-# 7    white     COLOR_WHITE     1,1,1
 #
 # Text mode commands
 #
@@ -8957,7 +8994,8 @@ set_colors ()
 
 
 
-anim::start_animation () {
+term::start_animation ()
+{
 # Description:
 # A simple function to display and animation during a silent acton
 #
@@ -8966,8 +9004,8 @@ anim::start_animation () {
 # Outputs: Standard out
 # Returns:
 # Usage: 
-# oem::start_animation ; EXPRESSION of COMMAND or FUNCTION 
-# oem::stop_animation
+# term::start_animation "Display text"
+# term::stop_animation
 #
 # End of documentation
 
@@ -8976,29 +9014,31 @@ anim::start_animation () {
 	(
 	while true; do
 		for i in {0..4}; do
-			printf "\r\033[2K                                                 ${anim[i]}"
+			PAD="---------------------------------------------------------"
+			LINE=$(printf "%s %s" "${@}" "$PAD" | cut -c 1-${#PAD})
+
+			printf "\r\033[2K $LINE  ${anim[i]}"
 			sleep 0.1
 		done
 
 		for i in {4..0}; do
-			printf "\r\033[2K                                                 ${anim[i]}"
+			printf "\r\033[2K $LINE  ${anim[i]}"
 			sleep 0.1
 		done
 	done
 	) & 
-	
+
 	export ANIM_PID="${!}" 
 }
 
 
 
-test_me () {
-  write_warning "WARNING: blablablabla"
-  anim::start_animation; sleep 5; anim::stop_animation 
-}
 
 
-anim::stop_animation () {
+
+
+term::stop_animation ()
+{
 # Description:
 # A simple function to STOP display and animation during a silent acton
 #
@@ -9007,12 +9047,12 @@ anim::stop_animation () {
 # Outputs: Standard out
 # Returns:
 # Usage: 
-# oem::start_animation ; EXPRESSION of COMMAND or FUNCTION 
-# oem::stop_animation
+# term::stop_animation
 #
 # End of documentation
-
 	[[ -e "/proc/${ANIM_PID}" ]]  && kill -SIGPIPE "${ANIM_PID}"
+	printf "$LINE [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR \n"
+	unset LINE
 	setterm -cursor on
 }
 
@@ -9048,6 +9088,61 @@ rtd_oem_pause ()
 	fi
 }
 
+
+
+
+pause_a_given_time ()
+{
+# Description:
+# Simple function to pause for a given number of seconds whle showing a count down
+# in seconds. If only a pause and no output is needed then it would be simpler to
+# use the 'pause' built in command.
+#
+# Globals: OPTIND
+# Arguments: -t -m -e where -t 'seconds' is mandatory.
+# Outputs: STDOUT
+# Returns: STDERR
+# Usage: [-t <seconds> ] [-e <word> *completion message* ] [-m <word> *start message* ]
+#
+# EXAMPLE:
+#
+# pause_a_given_time -t 10 -m Waiting... -e Done!
+#
+# End of documentation
+        local OPTIND o a
+        while getopts ':t:m:e:' OPTION; do
+                case "$OPTION" in
+                t )
+                        local _time="${OPTARG}"
+                ;;
+                e )
+                        local _end_message="${OPTARG}"
+                ;;
+                m )
+                        local _message="${OPTARG}"
+                ;;
+                ? )
+                        write_host --cyan  "Usage: ${FUNCNAME[0]} [-t <seconds> ] [-e <word> *completion message* ] [-m <word> *start message* ]"
+                        return 1
+                ;;
+                esac
+        done
+        unset OPTIND
+
+        if [[ -z $_time ]] ; then
+		write_error "Specifying time is required! [-t <seconds> ] Optional arguments are: [-e <word> *completion message* ] [-m <word> *start message* ]"
+		return 1
+	else
+		write_status "$_message"
+		while [ $_time -ge 1 ]; do
+			echo -ne "One Moment please $_time ... \r"
+			sleep 1
+			_time=$[$_time-1]
+		done
+		echo
+		write_status "$_end_message"
+	fi
+}
 
 
 
@@ -9364,6 +9459,8 @@ else
 						result=$(while IFS= read -r 'line'; do
 							[[ "$line" == "$selection ()" ]]		&& printline="yes"
 							[[ "$line" == "	$selection ()" ]]		&& printline="yes"
+							[[ "$line" == "$selection () " ]]		&& printline="yes"
+							[[ "$line" == "	$selection () " ]]		&& printline="yes"
 							[[ "$line" == "		$selection ()" ]]	&& printline="yes"
 							[[ "$line" == "# End of documentation"* ]]	&& printline="no"
 							[[ "$line" == *"# End of documentation"* ]]	&& printline="no"
