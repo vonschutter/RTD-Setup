@@ -1,5 +1,5 @@
 # RTD Desktop Look Switcher
-< [Back](https://github.com/vonschutter/RTD-Setup/blob/main/modules/RTD-Desktop-Look-Switcher.mod/README.md) | 
+< [Back](https://github.com/vonschutter/RTD-Setup/blob/main/modules/rtd-desktop-look-switcher.mod/README.md) | 
 ## Screenshots
 
 ![RTD Desktop Look Changer ScreenShot](ScrWinLi.jpg "Windows Light")
