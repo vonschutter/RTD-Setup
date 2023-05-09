@@ -7,7 +7,7 @@ The core of the RTD Power Tools are the core libraries and the configuration scr
 * _branding: Contains configurations for how things look
 * _locations: Contains URL's, file locations, etc.
 * _rtd_library: Contains all functions that do all the heavy lifting and repeated work.
-* _rtd_library.ps1: Windows main configuration script (debloats, turns of tracking, and installs useful software)
+* _rtd_library.ps1: Windows main configuration script (debloats, turns off tracking, and installs useful software)
 * _rtd_recipies: Collections of software to make available for install.
 * sigs (folder): contains the hashes used to validate the oem apps compressed in the /apps folder
 * rtd-oem-enable-config.sh: script to enable the tools when auto installed via PRESEED, or AUTOUNATTEND.
@@ -24,10 +24,9 @@ The RTD Power Tools may be installed manually and/or added by either of PRESEED,
 | --------------------------------------------------- |
 | ![1683625615788](image/README/1683625615788.png)      |
 
-
 ## RTD Power Tools Library Usage:
 
-The RTD Toolset is a collection of scripts intended to facilitate adding, optional and highly usefull, software to a vanilla install of Debian, SUSE, or RedHat based distributions automatically. This tool could be useful for a smaller OEM to load systems in a consistent and easy way. Alternatively; an individual may simply want to have an easy way to reload or install another version of Linux without the hasstle of adding all the software or answering all the setup questions.
+The RTD Toolset is a collection of scripts intended to facilitate adding, optional and highly useful, software to a vanilla install of Debian, SUSE, or RedHat based distributions automatically. This tool could be useful for a smaller OEM to load systems in a consistent and easy way. Alternatively; an individual may simply want to have an easy way to reload or install another version of Linux without the hassle of adding all the software or answering all the setup questions.
 
  Consider this usecase: You want to move from one distribution to another. To move to a different distribution from the one that you are currently using all you would need to do is run the **rtd-me.sh.cmd** by opening a terminal and typing:
 
@@ -61,7 +60,7 @@ _rtd_library :: RunTime Data Library HELP ::
 
 For example if you are using the tool remotely via SSH, you may display a help screen as illustrated below. This would facilitate working with scripts remotely.
 
-To see usefull documentation on each function in this library in a Terminal or remote ssh:
+To see useful documentation on each function in this library in a Terminal or remote ssh:
 ``bash bash _rtd_library --devhelp``
 
 ![1683618476060](image/README/1683618476060.png)
@@ -76,7 +75,7 @@ Once a function is selected the instructions are shown for how to use the functi
 
 Handily if you are on a Linux desktop you may display library function documentation on your desktop using the --devhelp-gtk option.
 
-To see usefull documentation on each function in this library in GTK (local desktop):
+To see useful documentation on each function in this library in GTK (local desktop):
 ``bash bash _rtd_library --devhelp-gtk``
 
 ![1683622846033](image/README/1683622846033.png)
