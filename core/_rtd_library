@@ -4182,9 +4182,8 @@ create_swapfile ()
 # Using swap is a very useful way to extend the RAM because it provides the necessary additional
 # memory when the RAM space has been exhausted and a process has to be continued. It is especially
 # recommended when you have less than 1Gb of RAM. Although in the end, everything depends on you.
-#
-#
-# End of documentaton
+# 
+# End of documentation
 
 
 	SWAP_SIZE=$1
@@ -4252,12 +4251,13 @@ create_swapfile ()
 
 scan_for_malware ()
 {
-# Description:
-# Globals:
+# Description: This function uses clam AV to scan for malware in a given location.
+# Globals: None.
 # Arguments: None
-# Outputs:
-# Returns:
-# Usage:
+# Outputs: STDOUT
+# Returns: STDERR & STDOUT
+# Usage: scan_for_malware /directory/to/scan
+#
 # End of documentation
 
 	# Set the location of the quarantined files
@@ -9412,7 +9412,7 @@ list_loaded_software_functions ()
 
 set_colors
 # Find and load all dependant files... 
-for i in ${_OEM_DEPENDENCIES} ; do dependency::file ${i} ; done
+for i in ${_OEM_DEPENDENCIES} ; do dependency::file ${i} &>/dev/null ; done
 
 
 if [ -z $1 ]; then
@@ -9499,6 +9499,7 @@ else
 							[[ "$line" == "# End of documentation"* ]]	&& printline="no"
 							[[ "$line" == *"# End of documentation"* ]]	&& printline="no"
 							[[ "$line" == *End*of*Documentation* ]]		&& printline="no"
+							[[ "$line" == "# End of Documentation" ]]	&& printline="no"
 							[[ "$printline" == "yes" ]]			&& echo "$line" |grep "# " |cut -c 2-
 						done < $0 )
 						zenity --info --modal --ok-label=BACK --title "RTD Functon: $selection" --text="$result" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1000}"
