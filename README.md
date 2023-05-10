@@ -2,13 +2,13 @@
 
 <img src="media_files/WindowsLogo.png" width="15"/>  <img src="media_files/UbuntuLogo.png" width="20"/>  <img src="media_files/RedHatLogo.png" width="20"/>  <img src="media_files/SuseLogo.png" width="28"/>
 
-[MinecraftServer](https://github.com/vonschutter/RTD-Setup/blob/main/modules/minecraft-server-manager.mod/README.md)|[NordVPN_GUI](https://github.com/vonschutter/RTD-Setup/blob/main/modules/nordvpn-manager.mod/README.md)|[DesktopLookSwitcher](modules/rtd-desktop-look-switcher.mod/README.md)|[Instant VPN Router](/modules/rtd-vpn-router.mod/README.md)|[Simple Support Tool](/modules/simple-support-tool.mod/README.md)|[WoW Replay Launcher](https://github.com/vonschutter/RTD-Setup/blob/main/modules/steam-world-of-warships-replay-launcher.mod/README.md)
+[MinecraftServer](https://github.com/vonschutter/RTD-Setup/blob/main/modules/minecraft-server-manager.mod/README.md)|[NordVPN_GUI](https://github.com/vonschutter/RTD-Setup/blob/main/modules/nordvpn-manager.mod/README.md)|[DesktopLookSwitcher](modules/rtd-desktop-look-switcher.mod/README.md)|[Instant VPN Router](/modules/rtd-vpn-router.mod/README.md)|[Simple Support Tool](/modules/simple-support-tool.mod/README.md)|[WoW Replay Launcher](https://github.com/vonschutter/RTD-Setup/blob/main/modules/steam-world-of-warships-replay-launcher.mod/README.md)|[System Hardware Informaton](/modules/system-hardware-information/README.md)
 
 ![RTD Builder Screenshot](media_files/header-time.jpg)
 
 # Overview:
 
-These Power Tools are originally created to facilitate supporting Linux machines remotely. However, are broadly applicable as they simplify the life of an enthusiast, a system administrator or developer. If you are the person who lives and breathes in the terminal and know every single system command in the back of your head like a reflex, and you don't mind typing several hundred characters each time you want to, for example, build a VM to test your stuff; this may not be as valuable to you. The purpose of these tools are to expose common tasks and automate them so all you need to do is a few up/down arrows and selections. Some tools included are (usable over an ssh connection).
+These Power Tools are originally created to facilitate supporting Linux machines remotely. However, are broadly applicable as they simplify the life of an enthusiast, a system administrator or developer. These tools are written in simple bash script to be as open and easily understandable as possible, so that anyone can download and modify them for their own unique purposes. If you are the person who lives and breathes in the terminal and know every single system command in the back of your head like a reflex, and you don't mind typing several hundred characters each time you want to, for example, build a VM to test your stuff; this may not be as valuable to you. The purpose of these tools are to expose common tasks and automate them so all you need to do is a few up/down arrows and selections. Some tools included are (usable over an ssh connection).
 
 Installing the RTD Power Tools will give you:
 
