@@ -2,7 +2,7 @@
 
 <img src="media_files/WindowsLogo.png" width="15"/>  <img src="media_files/UbuntuLogo.png" width="20"/>  <img src="media_files/RedHatLogo.png" width="20"/>  <img src="media_files/SuseLogo.png" width="28"/>
 
-[MinecraftServer](https://github.com/vonschutter/RTD-Setup/blob/main/modules/minecraft-server-manager.mod/README.md)|[NordVPN_GUI](https://github.com/vonschutter/RTD-Setup/blob/main/modules/nordvpn-manager.mod/README.md)|[DesktopLookSwitcher](modules/rtd-desktop-look-switcher.mod/README.md)|[Instant VPN Router](/modules/rtd-vpn-router.mod/README.md)|[Simple Support Tool](/modules/simple-support-tool.mod/README.md)|[WoW Replay Launcher](https://github.com/vonschutter/RTD-Setup/blob/main/modules/steam-world-of-warships-replay-launcher.mod/README.md)|[System Hardware Informaton](/modules/system-hardware-information/README.md)
+[MinecraftServer](https://github.com/vonschutter/RTD-Setup/blob/main/modules/minecraft-server-manager.mod/README.md) | [NordVPN_GUI](https://github.com/vonschutter/RTD-Setup/blob/main/modules/nordvpn-manager.mod/README.md) | [DesktopLookSwitcher](modules/rtd-desktop-look-switcher.mod/README.md) | [Instant VPN Router](/modules/rtd-vpn-router.mod/README.md) | [Simple Support Tool](/modules/simple-support-tool.mod/README.md) | [WoW Replay Launcher](https://github.com/vonschutter/RTD-Setup/blob/main/modules/steam-world-of-warships-replay-launcher.mod/README.md) | [System Hardware Informaton](/modules/system-hardware-information/README.md) | [OEM System Admin Tools](/modules/oem-system-admin.mod/README.md) | [OEM Support App Runner](/modules/oem-support-app-runner/README.md)
 
 ![RTD Builder Screenshot](media_files/header-time.jpg)
 
