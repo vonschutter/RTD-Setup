@@ -1,4 +1,5 @@
 # OEM Bundle Manager
+< [Back](https://github.com/vonschutter/RTD-Setup/blob/main/README.md) |
 
 The OEM Bundle Manager is part of the Power Tools, and makes it easy to add and remove groups of packages. A group of packages are usually grouped around a capability or set of tasks, and could be considered roles.
 

@@ -1,5 +1,6 @@
 GNOME Shell Extension Installer
 ===============================
+< [Back](https://github.com/vonschutter/RTD-Setup/blob/main/README.md) |
 
 This is a script used to install and search for extensions from [extensions.gnome.org](https://extensions.gnome.org/).
 
