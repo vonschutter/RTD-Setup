@@ -18,11 +18,11 @@ This is a tool to help users who come to Linux from a different OS. Currently th
 ## The Look:
 These tweaks are not intended to be so similar that they confuse the user as to what OS they are using, but to tweak Gnome so that is looks and feels more familiar to the user depending on prior experience; while still showing some of the Gnome workflow. 
 ***
-![RTD Desktop Look Changer ScreenShot](Media_files/ScrWinLi.jpg "Windows Light") | ![RTD Desktop Look Changer ScreenShot](Media_files/ScrWinDk.jpg "Windows Dark")
+![RTD Desktop Look Changer ScreenShot](/Media_files/ScrWinLi.jpg "Windows Light") | ![RTD Desktop Look Changer ScreenShot](/Media_files/ScrWinDk.jpg "Windows Dark")
 ------------ | -------------
-![RTD Desktop Look Changer ScreenShot](Media_files/ScrMacLi.jpg "Mac Light") | ![RTD Desktop Look Changer ScreenShot](Media_files/ScrMacDk.jpg "Mac Dark")
-![RTD Desktop Look Changer ScreenShot](Media_files/ScrProLi.jpg "Pro Light") | ![RTD Desktop Look Changer ScreenShot](Media_files/ScrProDk.jpg "Pro Dark")
-![RTD Desktop Look Changer ScreenShot](Media_files/ScrMocca.jpg "Mocca Smooth") | ![RTD Desktop Look Changer ScreenShot](Media_files/ScrReset.jpg "Distributio Reset")
+![RTD Desktop Look Changer ScreenShot](/Media_files/ScrMacLi.jpg "Mac Light") | ![RTD Desktop Look Changer ScreenShot](Media_files/ScrMacDk.jpg "Mac Dark")
+![RTD Desktop Look Changer ScreenShot](/Media_files/ScrProLi.jpg "Pro Light") | ![RTD Desktop Look Changer ScreenShot](/Media_files/ScrProDk.jpg "Pro Dark")
+![RTD Desktop Look Changer ScreenShot](/Media_files/ScrMocca.jpg "Mocca Smooth") | ![RTD Desktop Look Changer ScreenShot](/Media_files/ScrReset.jpg "Distributio Reset")
 
 ***
 
