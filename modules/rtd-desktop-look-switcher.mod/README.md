@@ -20,7 +20,7 @@ These tweaks are not intended to be so similar that they confuse the user as to 
 ***
 ![RTD Desktop Look Changer ScreenShot](/Media_files/ScrWinLi.jpg "Windows Light") | ![RTD Desktop Look Changer ScreenShot](/Media_files/ScrWinDk.jpg "Windows Dark")
 ------------ | -------------
-![RTD Desktop Look Changer ScreenShot](/Media_files/ScrMacLi.jpg "Mac Light") | ![RTD Desktop Look Changer ScreenShot](Media_files/ScrMacDk.jpg "Mac Dark")
+![RTD Desktop Look Changer ScreenShot](/Media_files/ScrMacLi.jpg "Mac Light") | ![RTD Desktop Look Changer ScreenShot](/Media_files/ScrMacDk.jpg "Mac Dark")
 ![RTD Desktop Look Changer ScreenShot](/Media_files/ScrProLi.jpg "Pro Light") | ![RTD Desktop Look Changer ScreenShot](/Media_files/ScrProDk.jpg "Pro Dark")
 ![RTD Desktop Look Changer ScreenShot](/Media_files/ScrMocca.jpg "Mocca Smooth") | ![RTD Desktop Look Changer ScreenShot](/Media_files/ScrReset.jpg "Distributio Reset")
 
