@@ -413,12 +413,38 @@ zenity::display_url ()
 # Usage:
 #
 #
-# zenity::display_info  "https://www.someplace.com/index.html"
+# zenity::display_url  "https://www.someplace.com/index.html"
 #
 # End of Documentation
 
 	_url="${@}"
-	zenity --text-info --html --url="$_url" --width=800 --height=600 2>/dev/null
+	zenity --text-info --html --title="${_TITLE:="$_url"}:" --url="$_url" --width=800 --height=600 &>/dev/null
+
+}
+
+
+
+
+
+zenity::display_file ()
+{
+# Description: Function to display the content of a text file. The purpose of this function
+# is simply to make it easy and convenient to display text content to an end user in a GUI
+# in a nice way. To use this function simply call it passing whaterver file path you need.
+#
+# Globals: $_TITLE (optional)
+# Arguments: ["/path/to/file.txt"]
+# Outputs: Message in zenity window
+# Returns:
+# Usage:
+#
+#
+# zenity::display_file  "/path/to/file.txt"
+#
+# End of Documentation
+
+	_filename="${@}"
+	zenity --text-info --title="${_TITLE:="$_filename"}:" --filename="$_filename" --width=800 --height=600 &>/dev/null
 
 }
 
