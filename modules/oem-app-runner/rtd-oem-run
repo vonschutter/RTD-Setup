@@ -98,7 +98,7 @@ oem::run_payload ()
 {
 	if [[ -r "${_APPS_DIR}/${1}.7z" ]] ; then 
 		if [[ "$(md5sum "${_APPS_DIR}/${1}.7z" |awk '{print $1;}')" = "$(cat "${_CORE_DIR}/sigs/${1}.sig" |awk '{print $1;}')" ]] ; then
-			7z x "${_APPS_DIR}/${1}.7z" -aoa -o${2} &>/dev/null 
+			7z x "${_APPS_DIR}/${1}.7z" -aoa -o${2} &>/dev/null
 			chmod +x ${2}/${1}
 			if file ${2}/${1} | grep "Windows" ; then
 				if hash wine ; then 
@@ -123,11 +123,13 @@ oem::run_payload ()
 					esac
 				fi
 			else
-				${2}/${1} &>/dev/null
+				${2}/${1} || rtd_oem_pause 1
 			fi
 			return
 		else
-			echo "Failed to verify security of application!"
+			dialog --backtitle "RTD Power Tools" \
+			--title "Failed to verify security of application!" \
+			--msgbox "\nThe file does not seem to be the original that the OEM has provided. Please verify that the application is the original one. \n\n" 20 80
 			return 1 
 		fi
 	else 
@@ -192,7 +194,7 @@ display::oem_program_list ()
 			local _proglist="$(
 				for i in $(for file in ${_APPS_DIR}/*.7z ; do echo "${file##*/}" ; done );
 				do 
-					echo  "${i::-3}" 
+					echo  "${i::-3}"
 					((n=n+1)) 
 				done
 				)"

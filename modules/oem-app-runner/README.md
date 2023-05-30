@@ -1,4 +1,4 @@
-# RTD OEM Support Tool Runner
+# RTD OEM Tool Runner
 
 < [Back](https://github.com/vonschutter/RTD-Setup/blob/main/README.md) |
 
