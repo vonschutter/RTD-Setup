@@ -4507,12 +4507,26 @@ ensure_flatpak_package_managment ()
 # +----------------------------------------------------+-------------+-------------+--------------+
 # End of documentation
 	if hash flatpak ; then
-		write_status "🧩 ${FUNCNAME[0]}: FLATPAK command is available! Skipping check ... "
+		write_status "🧩 ${FUNCNAME[0]}: flatpak command is available... "
+		if flatpak list|grep com.github.tchx84.Flatseal ; then 
+			write_status "🧩 ${FUNCNAME[0]}: flatseal security management is also present..."
+		else
+			ensure_admin
+			write_status "🧩 ${FUNCNAME[0]}: flatseal security manager not found, adding now..."
+			flatpak install flathub com.github.tchx84.Flatseal --noninteractive -y
+		fi
 	else
 		ensure_admin
 		write_information "🧩 ${FUNCNAME[0]}: Ensuring Flatpak software distribution system is available..."
 			check_dependencies flatpak || write_error "💥 ${FUNCNAME[0]}: Failed to satisfy dependecy flatpak!"
 			flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || write_error "💥 ${FUNCNAME[0]}: Failed to add flatpak repo!"
+		if flatpak list|grep com.github.tchx84.Flatseal ; then 
+			write_status "🧩 ${FUNCNAME[0]}: flatseal security management is also present..."
+		else
+			ensure_admin
+			write_status "🧩 ${FUNCNAME[0]}: flatseal security manager not found, adding now..."
+			flatpak install flathub com.github.tchx84.Flatseal --noninteractive -y
+		fi
 		return $?
 	fi
 }
@@ -4574,7 +4588,7 @@ ensure_snap_package_managment ()
 		# these tests focus on the latest versions of the distros evaluated...
 		if hostnamectl |grep "SUSE" 2>/dev/null ; then
 			write_warning "🧩 ${FUNCNAME[0]}: Special case for suse"
-			[[ -d /snap  ]] && ( return 0 & write_status "🧩 ${FUNCNAME[0]}:Snap is already present" )
+			hash snap && ( return 0 & write_status "🧩 ${FUNCNAME[0]}:Snap is already present" )
 				zypper addrepo --refresh https://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_$(cat /etc/os-release |grep VERSION_ID |cut -d= -f2|cut -d\" -f2) snappy || ( write_error "💥 ${FUNCNAME[0]}: Failed to add snap repo!" ; return 1 )
 				zypper --gpg-auto-import-keys refresh || ( write_error "💥 ${FUNCNAME[0]}: Failed to gpg keys!" ; return 1 )
 				zypper dup --from snappy || ( write_error "💥 ${FUNCNAME[0]}: Failed to update snap repository!" ; return 1 )
@@ -4591,7 +4605,7 @@ ensure_snap_package_managment ()
 			# For distributions that do not need to add a repository to install snap
 			# But would need to install it from their standard reopsitory....
 			write_information "${FUNCNAME[0]}: Ensuring SNAP software distribution system is available..."
-			[[ -d /snap  ]] && ( return 0 & write_status "🧩 ${FUNCNAME[0]}:Snap is already present" )
+			hash snap && ( return 0 & write_status "🧩 ${FUNCNAME[0]}:Snap is already present" )
 			if check_dependencies snapd ; then
 				systemctl enable snapd ; systemctl start snapd
 				echo snapd is $(systemctl is-active snapd) || return 1

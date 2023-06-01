@@ -303,15 +303,14 @@ recipe_Bundle:_3D_Printing_Tools () {
 recipe_Bundle:_Office_Tools () {
 	# Office apps like: LibreOffice, Joplin notes, Mailspring, Keepass, and more
 	ensure_snap_package_managment
-	#snap install libreoffice						# The latest most advanced office suit for linux
 	snap install mailspring							# A modern email client
-	snap install zenkit							# Zenkit is a platform for collaboration and project management for task management, ERP, CRM
 	snap install joplin-desktop						# Excellent note-taking and note organization app
 	snap install simplenote							# Best simple note app for sharing and collaboration on notes
 
 	ensure_flatpak_package_managment
 	flatpak install flathub org.keepassxc.KeePassXC -y --noninteractive		# App for secure encrypted password management
 	flatpak install flathub org.onlyoffice.desktopeditors -y --noninteractive	# Excellent simple to use and streamlines office bundle
+	flatpak install flathub com.github.IsmaelMartinez.teams_for_linux -y --noninteractive		# Microsofts collaboration and conferencing tool
 }
 
 
@@ -322,7 +321,7 @@ recipe_Bundle:_Media_Streaming () {
 	# Install Steaming apps from the Snap store:
 	ensure_snap_package_managment
 	snap install spotify							# The worlds most popular music streamer
-	snap install winds								# Great News Reader
+	snap install winds							# Great News Reader
 	snap install red-app							# Red is a neat, simple yet feature rich, privacy focused YouTube Player and Downloader
 
 	# Install Streaming apps from Flat Hub:
@@ -343,43 +342,23 @@ recipe_Bundle:_Audio_Editing () {
 		snap connect musescore:network-manager
 		snap connect musescore:alsa
 		snap connect musescore:removable-media
-	snap install transitionsdj						# App for mixing music, great for live DJing and mixtape production
-
 }
 
 
 recipe_Bundle:_Video_Editing_and_Streaming () {
 	# Vidcutter, Handbrake, Matroska-tools, Kdenlive, Shotcut, OBS, OpenShot
-	ensure_snap_package_managment
-	snap install vidcutter 							# Install a simple video cutter
-	snap install handbrake-jz						# Install handbrake DVD/BlueRay ripper video converter
-	snap install matroska-tools						# Video analysis tools
-	snap install kdenlive							# Popular video editor
-	snap install shotcut --classic						# Simle video crop/cut
-	snap install obs-studio							# Desktop Recording and Streaming
-		snap connect obs-studio:alsa
-		snap connect obs-studio:audio-record
-		snap connect obs-studio:avahi-control
-		snap connect obs-studio:camera
-		snap connect obs-studio:jack1
-		snap connect obs-studio:kernel-module-observe
-		snap connect obs-studio:avahi-control
-		snap connect obs-studio:kernel-module-observe
-			if check_dependencies v4l2loopback-dkms ; then
-				if check_dependencies v4l2loopback-utils ; then
-					echo "options v4l2loopback devices=1 video_nr=13 card_label='OBS Virtual Camera'    exclusive_caps=1" | sudo tee /etc/modprobe.d/v4l2loopback.conf
-					echo "v4l2loopback" | sudo tee /etc/modules-load.d/v4l2loopback.conf
-					sudo modprobe -r v4l2loopback
-					sudo modprobe v4l2loopback devices=1 video_nr=13 card_label='OBS Virtual Camera' exclusive_caps=1
-				fi
-			fi
-		snap connect obs-studio:removable-media
-		snap connect obs-studio:raw-usb
-		snap connect obs-studio:joystick
-		sudo snap install blender --classic
-
-	# Add other popular video tools not in the snap repo.
+	# Install handbrake DVD/BlueRay ripper video converter
+	# Video analysis tools
+	# Popular video editor
+	# Simle video crop/cut
 	ensure_flatpak_package_managment
+	flatpak install flathub org.blender.Blender --noninteractive -y
+	flatpak install flathub org.shotcut.Shotcut --noninteractive -y
+	flatpak install flathub org.kde.kdenlive --noninteractive -y
+	flatpak install flathub org.bunkus.mkvtoolnix-gui  --noninteractive -y
+	flatpak install flathub fr.handbrake.ghb  --noninteractive -y
+	flatpak install flathub com.ozmartians.VidCutter  --noninteractive -y
+	flatpak install flathub com.obsproject.Studio --noninteractive -y
 	flatpak install flathub org.openshot.OpenShot --noninteractive -y
 	flatpak install flathub io.github.jliljebl.Flowblade --noninteractive -y
 
@@ -409,7 +388,6 @@ recipe_Bundle:_Developer_Software () {
 	ensure_snap_package_managment
 	snap install gitkraken --classic
 	snap install code --classic
-	snap install slack --classic
 }
 
 
@@ -428,30 +406,32 @@ recipe_Bundle:_Top_Curated_Games () {
 	# Top rated Games: Minecraft, OpenaArena, 0AD, SuperTuxCart, warzone2100, and Steam
 	write_status "--- Adding Selection of Quality Games..."
 
-	# --- Install games available in SNAP repository ---
 	ensure_snap_package_managment
-	for i in 0ad warzone2100 supertuxkart marsshooter mc-installer dm-tools
+	install_games="0ad \
+		supertuxkart \
+		marsshooter \
+		mc-installer \
+		dm-tools"
+
+	for i in $install_games
 	do
 		snap install $i
 	done
 
-	# --- Install games available in Flathub repository and not at Snapcrafters ---
 	ensure_flatpak_package_managment
+	install_games="com.moddb.TotalChaos \
+		com.viewizard.AstroMenace \
+		io.github.EndlessSky.endless-sky \
+		com.albiononline.AlbionOnline \
+		com.endlessnetwork.aqueducts \
+		de.billardgl.Billardgl \
+		ws.openarena.OpenArena"
 
-	# Add requested games:
-	flatpak install flathub com.moddb.TotalChaos -y	--noninteractive
-	flatpak install flathub com.viewizard.AstroMenace -y --noninteractive
-	flatpak install flathub io.github.EndlessSky.endless-sky -y --noninteractive
-	flatpak install flathub com.albiononline.AlbionOnline -y --noninteractive
-	flatpak install flathub com.endlessnetwork.aqueducts -y --noninteractive
-	flatpak install flathub de.billardgl.Billardgl -y --noninteractive
-	flatpak install flathub org.naev.Naev -y --noninteractive
+	for i in $install_games 
+	do 
+		flatpak install flathub $i -y --noninteractive
+	done 
 
-	# --- Install games available in repository only ---
-	for i in dreamchess armagetronad mesa-utils assaultcube openarena
-	do
-		InstallSoftwareFromRepo $i
-	done
 	# Install Valves Steam Client for gaming.
 	InstallSoftwareFromRepo steam
 	if [ $? != 0 ]; then
@@ -481,11 +461,9 @@ recipe_Bundle:_Admin_Tools_and_Utilities () {
 
 	# Loop through each item in this list of software and perform an install
 	# using the relevant packaging system.
-	AdminToolsAppList="terminix nmap synaptic ssh gparted sshfs htop iftop nethogs vnstat ifstat dstat nload glances bmon \
-		vim vim-scripts gufw variety remmina remmina-plugin-exec remmina-plugin-secret remmina-plugin-vnc remmina-plugin-nx \
-		remmina-plugin-spice remmina-plugin-xdmcp remmina-plugin-rdp remmina-plugin-telepathy diodon polari filezilla tilix dialog byobu"
+	AdminToolsAppList="nmap synaptic ssh gparted sshfs htop iftop nethogs glances bmon \
+		vim vim-scripts gufw variety diodon polari filezilla tilix dialog byobu"
 
-	write_status "--- Adding some minor congiguration items for productivity..."
 	for i in ${AdminToolsAppList}
 	do
 		InstallSoftwareFromRepo $i
@@ -501,9 +479,6 @@ recipe_Bundle:_Admin_Tools_and_Utilities () {
 recipe_Bundle:_Digital_Art_and_Imaging () {
 	# Createive art software; Krita, GIMP, Inkscape, Flameshot
 	ensure_snap_package_managment
-	# Feature rich screenshot tool and screenshot annotation tool. Great for support.
-	snap install screencloud					# Save your screenshot locally or upload it to the cloud! A link is automatically copied to your clipboard.
-	snap install flameshot						# A powerful open source screenshot and annotation tool for Linux, Flameshot has a varied set of markup tools available
 	snap install krita						# It is perfect for sketching and painting, and presents an end–to–end solution for creating digital painting files from scratch by masters.
 	snap install gimp						# Whether you are a graphic designer, photographer, illustrator, or scientist, GIMP provides you with sophisticated tools to get your job done.
 	snap install inkscape						# Inkscape is a Free and open source vector graphics editor.
@@ -579,7 +554,6 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 	# -------------------------------------------------------------------------------------------------------#
 	# Add dependencies to used in this bundle.
 	recipe_Bundle:_Compression_Tools
-	ensure_snap_package_managment
 	enable_firewall
 	# -------------------------------------------------------------------------------------------------------#
 
@@ -664,6 +638,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		for i in 6 7 8 19 97 307 517 615 906 1160 1319 1852 3628 ; do
 			bash $(find /opt -name rtd-gnome-shell-extension-installer ) --yes ${i}
 		done
+		bash $(find /opt -name rtd-gnome-shell-extension-installer ) --restart-shell
 		# -------------------------------------------------------------------------------------------------------
 
 
@@ -676,7 +651,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		# Pop, Ubuntu, Kubuntu, and Debian all use deb packages and name the packages consistently for ex.
 		# This will ensure that the sofware is installed so the themes look good...
 
-		# Install Windows 10 Themes (Light and Dark) and more...
+		# Install hemes (Light and Dark) and more...
 		bash ${_THEME_DIR}/plus-themes.sh
 
 		if hash apt-get 2>/dev/null ; then
@@ -717,15 +692,15 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		# These common OEM tweaks are defind in the function "set_gnome_ui_common_tweaks_for_user" in the
 		# _rtd_library. The easiest is to simply use that. Naturally, any additional tweaks my be added in the
 		# gtweak.sh below.
-		tempfile=$( mktemp )
-		chmod 777 ${tempfile}
-		cat > ${tempfile} <<-EOF
-		#!/bin/bash
-		source ${_OEM_DIR}/core/_rtd_library
-		set_gnome_ui_win10_tweaks_for_user
-		EOF
+		# tempfile=$( mktemp )
+		# chmod 777 ${tempfile}
+		# cat > ${tempfile} <<-EOF
+		# #!/bin/bash
+		# source ${_OEM_DIR}/core/_rtd_library
+		# set_gnome_ui_win10_tweaks_for_user
+		# EOF
 
-		system::run_command_in_gnome_user_session /bin/bash ${tempfile}
+		# system::run_command_in_gnome_user_session /bin/bash ${tempfile}
 		# -------------------------------------------------------------------------------------------------------
 
 
@@ -736,14 +711,14 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		# the OEM tweaks to the UI. If this task sequence is run on a system by a user on a system not
 		# built by the unattended OEM process, then these changes sould only be implemented for the user
 		# running this task.
-		if [[ -e /opt/rtd ]] ; then
-			write_information "THis system was built by an OEM process: copying tweaks for all new users..."
-			mkdir -p /etc/skel/.config
-			cp -r /home/${SUDO_USER}/.config/dconf /etc/skel/.config/dconf
-			write_information "THis system was built by an OEM process: done..."
-		else
-			write_information "Only implementing tweaks for the current user..."
-		fi
+		# if [[ -e /opt/rtd ]] ; then
+		# 	write_information "THis system was built by an OEM process: copying tweaks for all new users..."
+		# 	mkdir -p /etc/skel/.config
+		# 	cp -r /home/${SUDO_USER}/.config/dconf /etc/skel/.config/dconf
+		# 	write_information "THis system was built by an OEM process: done..."
+		# else
+		# 	write_information "Only implementing tweaks for the current user..."
+		# fi
 		# -------------------------------------------------------------------------------------------------------
 	fi
 
