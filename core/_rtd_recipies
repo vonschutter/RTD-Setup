@@ -40,7 +40,7 @@
 #
 #	Only make special cases for packages that are not distributed in the distributions own repositories os as snaps or
 #	flatpaks; for example if you must download from a vendors web site (like for example Google Chrome). In such a case
-#	you may use the dl function. It will automatically install the package at the url provided.
+#	you may use the software::vendor_download_and_install function. It will automatically install the package at the url provided.
 #
 #	Scripts may also be stand-alone if there is a reason for this.
 #
@@ -364,11 +364,11 @@ recipe_Bundle:_Video_Editing_and_Streaming () {
 
 	# Download and install Light Works Proffessional Video Editor.
 	if hash zypper  ; then
-		dl https://cdn.lwks.com/releases/2021.1/lightworks_2021.1_r126716.rpm
+		software::vendor_download_and_install https://cdn.lwks.com/releases/2021.1/lightworks_2021.1_r126716.rpm
 	elif hash apt-get ; then
-		dl https://cdn.lwks.com/releases/2021.1/lightworks_2021.1_r126716.deb
+		software::vendor_download_and_install https://cdn.lwks.com/releases/2021.1/lightworks_2021.1_r126716.deb
 	elif hash dnf ; then
-		dl https://cdn.lwks.com/releases/2021.1/lightworks_2021.1_r126716.rpm
+		software::vendor_download_and_install https://cdn.lwks.com/releases/2021.1/lightworks_2021.1_r126716.rpm
 	else
 		write_error "Neither rpm or deb package managers found!"
 	fi
@@ -436,9 +436,9 @@ recipe_Bundle:_Top_Curated_Games () {
 	InstallSoftwareFromRepo steam
 	if [ $? != 0 ]; then
 		if hash rpm &>/dev/null; then
-			dl https://steamcdn-a.akamaihd.net/client/installer/steam.rpm
+			software::vendor_download_and_install https://steamcdn-a.akamaihd.net/client/installer/steam.rpm
 		elif hash apt &>/dev/null; then
-			dl https://steamcdn-a.akamaihd.net/client/installer/steam.deb
+			software::vendor_download_and_install https://steamcdn-a.akamaihd.net/client/installer/steam.deb
 		else
 			echo -e $RED
 			echo "I am not sure how to find the Steam download for $(lsb_release -sd) "
@@ -521,6 +521,7 @@ recipe_Bundle:_Social_Non_Secured_Communication () {
 	# or used for gaming.
 	ensure_snap_package_managment
 	snap install discord 						# All-in-one voice and text chat for gamers that's free, secure, and works on both your desktop and phone.
+	snap connect discord:system-observe
 }
 
 
@@ -534,7 +535,7 @@ recipe_Bundle:_CLOUD_Storage () {
 	# includes the 5 eyes english speaking intelligence agencies cooperation and information
 	# sharing.
 	Single_Install_MEGA.nz_Encrypted_Cloud_Storage	megasync	# Secure cloud storage
-	Single_Install_Dropbox_Corporate_Cloud_Storage			# Common cloud storage (vandor has access to crypto keys)
+	Single_Install_Dropbox_Corporate_Cloud_Storage			# Common cloud storage (vendor has access to crypto keys)
 	InstallSoftwareFromRepo gnome-documents				# Access to cloud storage via online accounts in the distribution.
 }
 
@@ -590,6 +591,7 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		# [Task 5.1] Configure Wallpapers for OEM look and feel.
 		# -------------------------------------------------------------------------------------------------------
 		write_information "${FUNCNAME[0]} : Fonud the gnome UI on this system! Adding OEM customizations..."
+		set_gnome_ui_common_tweaks_for_user
 
 		# Register Wallpapers in Gnome
 		oem::register_wallpapers_for_gnome ${_WALLPAPER_DIR}
@@ -911,9 +913,9 @@ Single_Install_Google_Chrome_Browser (){
 
 	# Download either a deb or an rpm depending on what package format this system supports.
 	if hash deb ; then
-		dl https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+		software::vendor_download_and_install https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
 	elif hash rpm ; then
-		dl https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm
+		software::vendor_download_and_install https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm
 	else
 		write_error "${FUNCNAME[0]}: No RPM or DEB package managment service was found! ..."
 	fi
@@ -928,12 +930,12 @@ Single_Install_Remote_Desktop_by_Team_Viewer (){
 	# Download either a deb or an rpm depending on what package format this system supports.
 	# Team Viewer has a special package for SUSE; thus we check if OS is suse or not as well.
 	if hash deb ; then
-		dl https://download.teamviewer.com/download/linux/teamviewer_amd64.deb
+		software::vendor_download_and_install https://download.teamviewer.com/download/linux/teamviewer_amd64.deb
 	elif hash rpm ; then
 		if hostnamectl | grep -i suse ; then
-			dl https://download.teamviewer.com/download/linux/teamviewer-suse.x86_64.rpm
+			software::vendor_download_and_install https://download.teamviewer.com/download/linux/teamviewer-suse.x86_64.rpm
 		else
-			dl https://download.teamviewer.com/download/linux/teamviewer.x86_64.rpm
+			software::vendor_download_and_install https://download.teamviewer.com/download/linux/teamviewer.x86_64.rpm
 		fi
 	else
 		write_error "${FUNCNAME[0]}: No RPM or DEB package managment service was found! ..."
@@ -1002,8 +1004,8 @@ Single_Install_MEGA.nz_Encrypted_Cloud_Storage (){
 
 		fi
 
-		# If a known distributio was found and URL set, use "dl" function to install app...
-		[[ -n "${URL}" ]] && dl ${URL}
+		# If a known distributio was found and URL set, use "software::vendor_download_and_install" function to install app...
+		[[ -n "${URL}" ]] && software::vendor_download_and_install ${URL}
 	}
 	fetch_mega_file megasync
 	fetch_mega_file megacmd
