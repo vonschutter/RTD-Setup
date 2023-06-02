@@ -591,7 +591,15 @@ recipe_Bundle:_RTD_OEM_Configuration_and_Optimizations (){
 		# [Task 5.1] Configure Wallpapers for OEM look and feel.
 		# -------------------------------------------------------------------------------------------------------
 		write_information "${FUNCNAME[0]} : Fonud the gnome UI on this system! Adding OEM customizations..."
+
+		tempfile=$( mktemp )
+		chmod 777 ${tempfile}
+		cat > ${tempfile} <<-EOF
+		#!/bin/bash
+		source ${_OEM_DIR}/core/_rtd_library
 		set_gnome_ui_common_tweaks_for_user
+		EOF
+		system::run_command_in_gnome_user_session /bin/bash ${tempfile}
 
 		# Register Wallpapers in Gnome
 		oem::register_wallpapers_for_gnome ${_WALLPAPER_DIR}

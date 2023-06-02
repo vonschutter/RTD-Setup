@@ -4508,6 +4508,14 @@ ensure_flatpak_package_managment ()
 # End of documentation
 	if hash flatpak ; then
 		write_status "🧩 ${FUNCNAME[0]}: flatpak command is available... "
+		if flatpak remotes | grep flathub ; then 
+			write_status "🧩 ${FUNCNAME[0]}: Flathub remote is present..."
+		else
+			write_warning "🧩 ${FUNCNAME[0]}: Flathub remote is not present... adding now... "
+			ensure_admin
+			flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || write_error "💥 ${FUNCNAME[0]}: Failed to add flatpak repo!"
+		fi
+
 		if flatpak list|grep com.github.tchx84.Flatseal ; then 
 			write_status "🧩 ${FUNCNAME[0]}: flatseal security management is also present..."
 		else
