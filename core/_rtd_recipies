@@ -34,7 +34,7 @@
 #	  _rtd_library   -- contain usefull admin functions for scripts, such as "how to install software" on different systems.
 #	  _rtd_recipies  -- contain software installation and configuration "recipies".
 #
-#	Use InstallSoftwareFromRepo, check_dependencies, ensure_snap_package_managment, ensure_flatpak_package_managment
+#	Use InstallSoftwareFromRepo, check_dependencies,   ,   
 #	to install software as a general rule. These functions will make it simple to add software no matter what the underlying
 #	distribution package managment is.
 #
@@ -176,11 +176,11 @@
 # 			done
 #
 # 			# Install flatpaks:
-# 			ensure_flatpak_package_managment
+# 			  
 # 			flatpak install package-name
 #
 # 			# Install snap packages:
-# 			ensure_snap_package_managment
+# 			  
 # 			software::from_snapcraft.io package-name
 #
 # 			# Check a dependency (install only if not present):
@@ -233,20 +233,18 @@ bundle_prefix="recipe_Bundle:_"
 
 
 recipe_Bundle:_Safe_Internet_Browsing () {
-	# Browsers and other internet tools with a focus on security and privacy
-	Single_Install_Brave_Browser
+	# Brave and Vivaldi Browsers and other internet tools with a focus on security and privacy
+	software::from_snapcraft.io brave
 	Single_Install_Vivaldi_Browser
-
-	ensure_flatpak_package_managment
-	 software::from_flathub.org org.keepassxc.KeePassXC   	# App for secure encrypted password management
+	software::from_flathub.org org.keepassxc.KeePassXC   	# App for secure encrypted password management
 
 }
 
 
 
-recipe_Bundle:_Virtualization_Tools () {
-	# Virtualizaton tools, and technologies
-	Single_Install_DOS_VM_for_Classic_Games
+recipe_Bundle:_Virtualization () {
+	# Virtualizaton tools (virt-manager, qemu-kvm, Virtualbox), and others
+	software::from_snapcraft.io dosbox-x
 	Single_Install_VirtualBox
 	InstallSoftwareFromRepo virt-manager
 	InstallSoftwareFromRepo qemu-kvm
@@ -254,10 +252,9 @@ recipe_Bundle:_Virtualization_Tools () {
 
 
 
-recipe_Bundle:_CLOUD_Management_Tools () {
+recipe_Bundle:_CLOUD_Management () {
 	# Tools to manage cloud environments like GCP, Azure, AWS
-
-	ensure_snap_package_managment
+  
 	# Azure Cloud
 	software::from_snapcraft.io powershell  		# PowerShell is an automation and configuration management platform. It consists of a cross-platform (Windows, Linux, and macOS) command-line shell and associated scripting language.
 	software::from_snapcraft.io azure-cli 			# A great cloud needs great tools; we're excited to introduce Azure CLI 2.0, our next generation multi-platform command line experience for Azure.
@@ -281,9 +278,8 @@ recipe_Bundle:_CLOUD_Management_Tools () {
 
 
 
-recipe_Bundle:_3D_Printing_Tools () {
-	# Tools for supporting and working with 3D-Printin
-	ensure_snap_package_managment
+recipe_Bundle:_3D_Printing () {
+	# 3D Printing tools (Prusa, Cura slicers, and CAD, and 3D editing) for supporting and working with 3D-Printing
 
 	software::from_snapcraft.io cura-slicer			# Ultimaker Cura is the world’s most popular 3D printing software
 		snap connect cura-slicer:mount-observe
@@ -295,8 +291,8 @@ recipe_Bundle:_3D_Printing_Tools () {
 		snap connect prusa-slicer:udisks2
 		snap connect prusa-slicer:raw-usb
 	software::from_snapcraft.io blender  			# Blender is the free and open source 3D creation suite
-	software::from_snapcraft.io freecad							# https://www.freecadweb.org/
-	software::from_snapcraft.io openscad 							# OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD aspects rather than artistic ones
+	software::from_snapcraft.io freecad			# https://www.freecadweb.org/
+	software::from_snapcraft.io openscad 			# OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD aspects rather than artistic ones
 }
 
 
@@ -304,16 +300,15 @@ recipe_Bundle:_3D_Printing_Tools () {
 
 recipe_Bundle:_Office_Tools () {
 	# Office apps like: Onlyoffice, Joplin notes, Mailspring, Keepass, and more
-	ensure_snap_package_managment
+	  
 	software::from_snapcraft.io mailspring			# A modern email client
 	software::from_snapcraft.io joplin-desktop		# Excellent note-taking and note organization app
 	software::from_snapcraft.io simplenote			# Best simple note app for sharing and collaboration on notes
-
-	ensure_flatpak_package_managment
-	 software::from_flathub.org org.keepassxc.KeePassXC   		# App for secure encrypted password management
-	 software::from_flathub.org org.onlyoffice.desktopeditors   	# Excellent simple to use and streamlines office bundle
-	 software::from_flathub.org com.github.IsmaelMartinez.teams_for_linux   		# Microsofts collaboration and conferencing tool
-	 software::from_flathub.org com.jgraph.drawio.desktop   
+	  
+	software::from_flathub.org org.keepassxc.KeePassXC   			# App for secure encrypted password management
+	software::from_flathub.org org.onlyoffice.desktopeditors   		# Excellent simple to use and streamlines office bundle
+	software::from_flathub.org com.github.IsmaelMartinez.teams_for_linux   	# Microsofts collaboration and conferencing tool
+	software::from_flathub.org com.jgraph.drawio.desktop   
 }
 
 
@@ -321,14 +316,12 @@ recipe_Bundle:_Office_Tools () {
 recipe_Bundle:_Media_Streaming () {
 	# Streaming apps; Spotify, Stremio, Vocal, and Cozy audiobook reader...
 	
-	# Install Steaming apps from the Snap store:
-	ensure_snap_package_managment
-	software::from_snapcraft.io spotify		# The worlds most popular music streamer
-	software::from_snapcraft.io red-app		# Red is a neat, simple yet feature rich, privacy focused YouTube Player and Downloader
+	# Install Steaming apps from the Snap store:  
+	software::from_snapcraft.io spotify				# The worlds most popular music streamer
+	software::from_snapcraft.io red-app				# Red is a neat, simple yet feature rich, privacy focused YouTube Player and Downloader
 
-	# Install Streaming apps from Flat Hub:
-	ensure_flatpak_package_managment
-	 software::from_flathub.org com.stremio.Stremio   			# Watch videos, movies, TV series and TV channels instantly.
+	# Install Streaming apps from Flat Hub: 
+	 software::from_flathub.org com.stremio.Stremio   		# Watch videos, movies, TV series and TV channels instantly.
 	 software::from_flathub.org com.github.needleandthread.vocal   	# Simle and easy to use pod cast player
 	 software::from_flathub.org com.github.geigi.cozy    
 }
@@ -337,10 +330,10 @@ recipe_Bundle:_Media_Streaming () {
 
 recipe_Bundle:_Audio_Editing () {
 	# Audio Tools Bundle including Picard, Audacity, Musescore...
-	ensure_snap_package_managment
-	software::from_snapcraft.io picard							# Music tag editor
-	software::from_snapcraft.io audacity							# Audio editor
-	software::from_snapcraft.io musescore							# Create, play and print beautiful sheet music
+	  
+	software::from_snapcraft.io picard				# Music tag editor
+	software::from_snapcraft.io audacity				# Audio editor
+	software::from_snapcraft.io musescore				# Create, play and print beautiful sheet music
 		snap connect musescore:cups-control
 		snap connect musescore:network-manager
 		snap connect musescore:alsa
@@ -349,21 +342,21 @@ recipe_Bundle:_Audio_Editing () {
 
 
 recipe_Bundle:_Video_Editing_and_Streaming () {
-	# Vidcutter, Handbrake, Matroska-tools, Kdenlive, Shotcut, OBS, OpenShot
+	# Video editing apps; Vidcutter, Handbrake, Matroska-tools, Kdenlive, Shotcut, OBS, OpenShot
 	# Install handbrake DVD/BlueRay ripper video converter
 	# Video analysis tools
 	# Popular video editor
 	# Simle video crop/cut
-	ensure_flatpak_package_managment
-	 software::from_flathub.org org.blender.Blender   
-	 software::from_flathub.org org.shotcut.Shotcut   
-	 software::from_flathub.org org.kde.kdenlive   
-	 software::from_flathub.org org.bunkus.mkvtoolnix-gui    
-	 software::from_flathub.org fr.handbrake.ghb    
-	 software::from_flathub.org com.ozmartians.VidCutter    
-	 software::from_flathub.org com.obsproject.Studio   
-	 software::from_flathub.org org.openshot.OpenShot   
-	 software::from_flathub.org io.github.jliljebl.Flowblade   
+	  
+	software::from_flathub.org org.blender.Blender   
+	software::from_flathub.org org.shotcut.Shotcut   
+	software::from_flathub.org org.kde.kdenlive   
+	software::from_flathub.org org.bunkus.mkvtoolnix-gui    
+	software::from_flathub.org fr.handbrake.ghb    
+	software::from_flathub.org com.ozmartians.VidCutter    
+	software::from_flathub.org com.obsproject.Studio   
+	software::from_flathub.org org.openshot.OpenShot   
+	software::from_flathub.org io.github.jliljebl.Flowblade   
 
 	# Download and install Light Works Proffessional Video Editor.
 	# if hash zypper  ; then
@@ -382,13 +375,13 @@ recipe_Bundle:_Video_Editing_and_Streaming () {
 
 
 recipe_Bundle:_Developer_Software () {
-	# VSCode, GitKraken, Slack and more..
+	# For creating code: VSCode, GitKraken, and more..
 	write_status "--- Adding Developer Software Apps: IDE Tools and Compilers..."
+
 	for i in build-essential git ; do
 		InstallSoftwareFromRepo $i
 	done
-
-	ensure_snap_package_managment
+  
 	software::from_snapcraft.io gitkraken  
 	software::from_snapcraft.io code  
 }
@@ -406,10 +399,9 @@ recipe_Bundle:_Compression_Tools () {
 
 
 recipe_Bundle:_Top_Curated_Games () {
-	# Top rated Games: Minecraft, OpenaArena, 0AD, SuperTuxCart, warzone2100, and Steam
-	write_status "--- Adding Selection of Quality Games..."
+	# Top rated Games: Steam platform, and Minecraft, OpenaArena, 0AD, SuperTuxCart etc.
+	write_status "Adding Selection of Quality Games..."
 
-	ensure_snap_package_managment
 	install_games="0ad \
 		supertuxkart \
 		marsshooter \
@@ -421,7 +413,6 @@ recipe_Bundle:_Top_Curated_Games () {
 		software::from_snapcraft.io $i
 	done
 
-	ensure_flatpak_package_managment
 	install_games="com.moddb.TotalChaos \
 		com.viewizard.AstroMenace \
 		io.github.EndlessSky.endless-sky \
@@ -451,7 +442,6 @@ recipe_Bundle:_Top_Curated_Games () {
 		fi
 	fi
 
-	Single_Install_DOS_VM_for_Classic_Games
 }
 
 
@@ -459,8 +449,7 @@ recipe_Bundle:_Top_Curated_Games () {
 
 
 recipe_Bundle:_Admin_Tools_and_Utilities () {
-	# OEM System Administrative Tools...
-
+	# System Admin Tools (nmap synaptic ssh gparted sshfs htop iftop nethogs glances)...
 
 	# Loop through each item in this list of software and perform an install
 	# using the relevant packaging system.
@@ -481,10 +470,10 @@ recipe_Bundle:_Admin_Tools_and_Utilities () {
 
 recipe_Bundle:_Digital_Art_and_Imaging () {
 	# Createive art software; Krita, GIMP, Inkscape, Flameshot
-	ensure_snap_package_managment
-	software::from_snapcraft.io krita						# It is perfect for sketching and painting, and presents an end–to–end solution for creating digital painting files from scratch by masters.
-	software::from_snapcraft.io gimp						# Whether you are a graphic designer, photographer, illustrator, or scientist, GIMP provides you with sophisticated tools to get your job done.
-	software::from_snapcraft.io inkscape						# Inkscape is a Free and open source vector graphics editor.
+	  
+	software::from_snapcraft.io krita				# It is perfect for sketching and painting, and presents an end–to–end solution for creating digital painting files from scratch by masters.
+	software::from_snapcraft.io gimp				# Whether you are a graphic designer, photographer, illustrator, or scientist, GIMP provides you with sophisticated tools to get your job done.
+	software::from_snapcraft.io inkscape				# Inkscape is a Free and open source vector graphics editor.
 
 }
 
@@ -509,10 +498,10 @@ recipe_Bundle:_Secure_Communication () {
 	# This software is end to end encrypted
 	# and generally does not share keys with the vendor. Also, these apps are confined on the desktop
 	# meaning that they cannot access the wich is not granted explicitly.
-	ensure_snap_package_managment
-	software::from_snapcraft.io signal-desktop					# Encrypted person to person chat/call/conferencing
-	software::from_snapcraft.io telegram-desktop					# Encrypted chat, group commmunications
-	software::from_snapcraft.io electron-mail					# Uses protonmail.com (encrypted mail)
+	  
+	software::from_snapcraft.io signal-desktop			# Encrypted person to person chat/call/conferencing
+	software::from_snapcraft.io telegram-desktop			# Encrypted chat, group commmunications
+	software::from_snapcraft.io electron-mail			# Uses protonmail.com (encrypted mail)
 }
 
 
@@ -522,9 +511,11 @@ recipe_Bundle:_Social_Non_Secured_Communication () {
 	# This bundle includes social media communications software: Discord, Skype
 	# for privacy, but may be encrypted. This software is often useful for legacy reasons
 	# or used for gaming.
-	ensure_snap_package_managment
-	software::from_snapcraft.io discord 						# All-in-one voice and text chat for gamers that's free, secure, and works on both your desktop and phone.
-	snap connect discord:system-observe
+	  
+	software::from_snapcraft.io discord 				# All-in-one voice and text chat for gamers that's free, and works on both your desktop and phone.
+		snap connect discord:system-observe
+	software::from_snapcraft.io skype
+	software::from_flathub.com com.viber.Viber
 }
 
 
@@ -539,7 +530,6 @@ recipe_Bundle:_CLOUD_Storage () {
 	# sharing.
 	Single_Install_MEGA.nz_Encrypted_Cloud_Storage	megasync	# Secure cloud storage
 	Single_Install_Dropbox_Corporate_Cloud_Storage			# Common cloud storage (vendor has access to crypto keys)
-	InstallSoftwareFromRepo gnome-documents				# Access to cloud storage via online accounts in the distribution.
 }
 
 
@@ -770,79 +760,75 @@ recipe_Bundle:_1_RTD_CONFIG (){
 
 
 
-Single_Install_Remove_non_western_latin_fonts () {
-rtd_oem_remove_non_western_latin_fonts
-}
-
 
 Single_Install_Brave_Browser () {
-# This function will add the vendor maintained repository and install the software
-# using the distribution speciffic installers.
-write_information "${FUNCNAME[0]}: Installing Brave Browser directly from vendor repo..."
-if cat "/etc/os-release" | grep "debian" ; then
-	check_dependencies apt-transport-https
-	check_dependencies curl
-	check_dependencies gnupg
-	curl -s https://brave-browser-apt-release.s3.brave.com/brave-core.asc | apt-key --keyring /etc/apt/trusted.gpg.d/brave-browser-release.gpg add -
-	echo "deb [arch=amd64] https://brave-browser-apt-release.s3.brave.com/ stable main" | tee /etc/apt/sources.list.d/brave-browser-release.list
-	apt update
-	InstallSoftwareFromRepo brave-browser
-	return $?
-elif cat "/etc/os-release" | grep "fedora" ; then
-	check_dependencies dnf-plugins-core
-	dnf config-manager --add-repo https://brave-browser-rpm-release.s3.brave.com/x86_64/
-	rpm --import https://brave-browser-rpm-release.s3.brave.com/brave-core.asc
-	InstallSoftwareFromRepo brave-browser
-	return $?
-elif  cat "/etc/os-release" | grep "suse" ; then
-	check_dependencies curl
-	rpm --import https://brave-browser-rpm-release.s3.brave.com/brave-core.asc
-	zypper addrepo https://brave-browser-rpm-release.s3.brave.com/x86_64/ brave-browser
-	InstallSoftwareFromRepo brave-browser
-	return $?
-else
-	# Try for any distro using apt... SUSE has a shortcut for a simple apt, wich will mess this up if checked first...
-	if hash apt-get ; then
-		apt install -y apt-transport-https curl gnupg
+	# This function will add the vendor maintained repository and install the software
+	# using the distribution speciffic installers.
+	write_information "${FUNCNAME[0]}: Installing Brave Browser directly from vendor repo..."
+	if cat "/etc/os-release" | grep "debian" ; then
+		check_dependencies apt-transport-https
+		check_dependencies curl
+		check_dependencies gnupg
 		curl -s https://brave-browser-apt-release.s3.brave.com/brave-core.asc | apt-key --keyring /etc/apt/trusted.gpg.d/brave-browser-release.gpg add -
 		echo "deb [arch=amd64] https://brave-browser-apt-release.s3.brave.com/ stable main" | tee /etc/apt/sources.list.d/brave-browser-release.list
 		apt update
-		apt install brave-browser -y
+		InstallSoftwareFromRepo brave-browser
+		return $?
+	elif cat "/etc/os-release" | grep "fedora" ; then
+		check_dependencies dnf-plugins-core
+		dnf config-manager --add-repo https://brave-browser-rpm-release.s3.brave.com/x86_64/
+		rpm --import https://brave-browser-rpm-release.s3.brave.com/brave-core.asc
+		InstallSoftwareFromRepo brave-browser
+		return $?
+	elif  cat "/etc/os-release" | grep "suse" ; then
+		check_dependencies curl
+		rpm --import https://brave-browser-rpm-release.s3.brave.com/brave-core.asc
+		zypper addrepo https://brave-browser-rpm-release.s3.brave.com/x86_64/ brave-browser
+		InstallSoftwareFromRepo brave-browser
 		return $?
 	else
-		echo "${FUNCNAME[0]}: Neither debian, fedora, or suse base distros could be found; NOT installing brave."
-		return 1
+		# Try for any distro using apt... SUSE has a shortcut for a simple apt, wich will mess this up if checked first...
+		if hash apt-get ; then
+			apt install -y apt-transport-https curl gnupg
+			curl -s https://brave-browser-apt-release.s3.brave.com/brave-core.asc | apt-key --keyring /etc/apt/trusted.gpg.d/brave-browser-release.gpg add -
+			echo "deb [arch=amd64] https://brave-browser-apt-release.s3.brave.com/ stable main" | tee /etc/apt/sources.list.d/brave-browser-release.list
+			apt update
+			apt install brave-browser -y
+			return $?
+		else
+			echo "${FUNCNAME[0]}: Neither debian, fedora, or suse base distros could be found; NOT installing brave."
+			return 1
+		fi
 	fi
-fi
 }
 
 
 
 Single_Install_Vivaldi_Browser (){
-# # This function uses the RTD function "dl" to download a distribution speciffic package directly
-# # from the vendors website. It will work until the vendor removes the exact file...
+	# # This function uses the RTD function "dl" to download a distribution speciffic package directly
+	# # from the vendors website. It will work until the vendor removes the exact file...
 
-write_information "${FUNCNAME[0]}: Installing Brave Browser directly from vendor repo..."
-if cat "/etc/os-release" | grep "debian" ; then
-	apt -y install wget gnupg2 software-properties-common
-	wget -qO- https://repo.vivaldi.com/archive/linux_signing_key.pub | sudo apt-key add -
-	echo 'deb https://repo.vivaldi.com/archive/deb/ stable main' | sudo tee /etc/apt/sources.list.d/vivaldi.list
-	apt update
-	InstallSoftwareFromRepo vivaldi-stable
-	return $?
-elif cat "/etc/os-release" | grep "fedora" ; then
-	InstallSoftwareFromRepo dnf-utils
-	dnf config-manager --add-repo https://repo.vivaldi.com/archive/vivaldi-fedora.repo
-	InstallSoftwareFromRepo vivaldi-stable
-	return $?
-elif  cat "/etc/os-release" | grep "suse" ; then
-	zypper --gpg-auto-import-keys addrepo --refresh https://repo.vivaldi.com/archive/vivaldi-suse.repo
-	InstallSoftwareFromRepo vivaldi-stable
-	return $?
-else
-	echo "${FUNCNAME[0]}: Neither debian, fedora, or suse base distros could be found; NOT installing vivaldi."
-	return 1
-fi
+	write_information "${FUNCNAME[0]}: Installing Brave Browser directly from vendor repo..."
+	if cat "/etc/os-release" | grep "debian" ; then
+		apt -y install wget gnupg2 software-properties-common
+		wget -qO- https://repo.vivaldi.com/archive/linux_signing_key.pub | sudo apt-key add -
+		echo 'deb https://repo.vivaldi.com/archive/deb/ stable main' | sudo tee /etc/apt/sources.list.d/vivaldi.list
+		apt update
+		InstallSoftwareFromRepo vivaldi-stable
+		return $?
+	elif cat "/etc/os-release" | grep "fedora" ; then
+		InstallSoftwareFromRepo dnf-utils
+		dnf config-manager --add-repo https://repo.vivaldi.com/archive/vivaldi-fedora.repo
+		InstallSoftwareFromRepo vivaldi-stable
+		return $?
+	elif  cat "/etc/os-release" | grep "suse" ; then
+		zypper --gpg-auto-import-keys addrepo --refresh https://repo.vivaldi.com/archive/vivaldi-suse.repo
+		InstallSoftwareFromRepo vivaldi-stable
+		return $?
+	else
+		echo "${FUNCNAME[0]}: Neither debian, fedora, or suse base distros could be found; NOT installing vivaldi."
+		return 1
+	fi
 }
 
 
@@ -850,30 +836,6 @@ Single_Install_Windows_Subsystem_for_Linux (){
 	write_status "${FUNCNAME[0]}: Installing Wine..."
 	InstallSoftwareFromRepo wine
 }
-
-
-Single_Install_Simplenote (){
-	write_status "${FUNCNAME[0]}: Installing simplenote..."
-	# some small simple apps you will like...
-	ensure_snap_package_managment
-	# A simple to use not taking app that auto syncs with the same app on any device.
-	software::from_snapcraft.io simplenote
-
-}
-
-
-
-Single_Install_DOS_VM_for_Classic_Games (){
-	write_status "${FUNCNAME[0]}:  Installing DOS Environment..."
-	# some small simple apps you will like...
-	ensure_snap_package_managment
-	# A small app that allows you to use your old DOS software.
-	software::from_snapcraft.io dosbox-x
-
-}
-
-
-
 
 
 
@@ -921,15 +883,7 @@ Single_Install_VLC_Universal_Videao_Player (){
 Single_Install_Google_Chrome_Browser (){
 	# Special case for installing Google Chrome
 	write_status "${FUNCNAME[0]}: Installing Google Chrome Browser from google directly..."
-
-	# Download either a deb or an rpm depending on what package format this system supports.
-	if hash deb ; then
-		software::vendor_download_and_install https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-	elif hash rpm ; then
-		software::vendor_download_and_install https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm
-	else
-		write_error "${FUNCNAME[0]}: No RPM or DEB package managment service was found! ..."
-	fi
+	software::from_flathub.com com.google.Chrome
 }
 
 
@@ -957,26 +911,11 @@ Single_Install_Remote_Desktop_by_Team_Viewer (){
 
 Single_Install_Remote_Desktop_by_Anydesk () {
 	write_status "${FUNCNAME[0]}: Installing Anydesk remote desktop... "
-	ensure_flatpak_package_managment
-	 software::from_flathub.org com.anydesk.Anydesk   
+	
+	software::from_flathub.org com.anydesk.Anydesk   
 }
 
 
-
-Single_Install_Skype_Messenger (){
-	#Skype for Linux
-	write_status "${FUNCNAME[0]}: Installing Skype For Linux..."
-	ensure_snap_package_managment
-	software::from_snapcraft.io skype  
-}
-
-
-
-Single_Install_Viber_Messenger (){
-	write_status "${FUNCNAME[0]}: Installing Viber instant messaging..."
-	ensure_snap_package_managment
-	software::from_snapcraft.io --edge viber-mtd
-}
 
 
 
