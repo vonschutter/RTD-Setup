@@ -6335,7 +6335,9 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 	: ${_config="${1:-"workstation"}"}
 	system::generate_ks_cfg_file -u "${_source_url}" -c "${_config}" -p "${_preseed_file}" -e "@workstation-product-environment"
 
-	_summary_message="The virtual machine (VDI_Fedora_"${_config}"_"${RANDOM}") \n
+	local vm_name="VDI_Fedora_"${_config}"_"${RANDOM}""
+
+	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in PRESEED: ${_preseed_file} \n
 	🔧 - And Using this source for the packages and files to download: \n
 	🌎 - ${_source_url} \n
@@ -6345,7 +6347,7 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 	✅ - CPU's: ${2:-2} \n
 	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I)"
 
-	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name VDI_Fedora_"${_config}"_"${RANDOM}" \
+	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
 		--vcpus "${2:-2}" \
 		--memory "${3:-2048}" \
 		--network "$virt_net" \
@@ -6410,7 +6412,9 @@ make_kvm_virtual_machine_now_from_redhat_com ()
 	: ${_config="${1:-"workstation"}"}
 	system::generate_ks_cfg_file -u "${_source_url}" -c "${_config}" -p "${_preseed_file}" -e "@workstation-product-environment"
 
-	_summary_message="The virtual machine (VDI_RedHat_"${_config}"_"${RANDOM}") \n
+	local vm_name="RedHat_${_config}_${RANDOM}"
+
+	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in PRESEED: ${_preseed_file} \n
 	🔧 - And Using this source for the packages and files to download: \n
 	🌎 - ${_source_url} \n
@@ -6420,7 +6424,7 @@ make_kvm_virtual_machine_now_from_redhat_com ()
 	✅ - CPU's: ${2:-2} \n
 	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I)"
 
-	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name VDI_RedHat_"${_config}"_"${RANDOM}" \
+	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
 		--vcpus "${2:-2}" \
 		--memory "${3:-2048}" \
 		--network "$virt_net" \
@@ -6473,7 +6477,9 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 	: ${virt_net="$(system::find_vm_bridge)"}
 	: ${source_url:="${_SUSE_LEAP_SOURCE}"}
 
-	_summary_message="The virtual machine (VDI_SUSE_"$CONFIG"_"$RANDOM") \n
+	local vm_name="SUSE_${CONFIG}_${RANDOM}"
+
+	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
 	🔧 - And Using this source for the packages and files to download: \n
 	🌎 - ${source_url} \n
@@ -6485,7 +6491,7 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))"
 
 	# create image and run installer
-	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name VDI_SUSE_"$CONFIG"_"$RANDOM" \
+	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
 		--vcpus "${2:-2}" \
 		--memory "${3:-2048}" \
 		--network "${virt_net}" \
@@ -6559,7 +6565,9 @@ make_kvm_virtual_machine_now_from_debian_org ()
 	: ${virt_net="$(system::find_vm_bridge)"}
 	: ${source_url:="${_DEBIAN_SOURCE_URL}"}
 
-	_summary_message="The virtual machine (Debian_${vm_usecase}_${SRVFUNC}_${CONFIG}_${RANDOM}) \n
+	local vm_name="Debian_${vm_usecase}_${SRVFUNC}_${CONFIG}_${RANDOM}"
+
+	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
 	🔧 - And Using this source for the packages and files to download: \n
 	🌎 - ${source_url} \n
@@ -6572,7 +6580,7 @@ make_kvm_virtual_machine_now_from_debian_org ()
 
 
 	# create image and run installer
-	"${bin_virt_install}" --name Debian_${vm_usecase}_"${SRVFUNC}"_"${CONFIG}"_"${RANDOM}" \
+	"${bin_virt_install}" --name "${vm_name}" \
 		--vcpus "${2:-2}" \
 		--memory "${3:-2048}" \
 		--network "${virt_net}" \
@@ -6669,7 +6677,9 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 		iso="$permanent_download_dir/$iso_filename"
 	fi
 
-	_summary_message="The virtual machine (VDI_${CONFIG}-${tgt_ubuntu_ver}-${RANDOM}) \n
+	local vm_name="${CONFIG}-${tgt_ubuntu_ver}-${RANDOM}"
+
+	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
 	🔧 - And Using this source for the packages and files to download: \n
 	🌎 - ${ubuntu_iso_url} \n
@@ -6679,7 +6689,7 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 	✅ - CPU's: ${2:-2} \n
 	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))"
 
-	"${bin_virt_install}" --name VDI_${CONFIG}-${tgt_ubuntu_ver}-${RANDOM} \
+	"${bin_virt_install}" --name ${vm_name} \
 		--vcpus "${2:-2}" \
 		--memory "${3:-2048}" \
 		--network "${virt_net}" \
@@ -6792,7 +6802,9 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		done
 	fi
 
-	_summary_message="The virtual machine (VDI_Windows${target_winver:(-2)}_${CONFIG}_${RANDOM}) \n
+	local vm_name="Windows${target_winver:(-2)}_${CONFIG}_${RANDOM}"
+
+	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in: ${AutoUnattend} \n
 	🔧 - And Using this source for the packages and files to download: \n
 	🌎 - ${WindowsMedia} \n
@@ -6804,7 +6816,7 @@ make_kvm_virtual_machine_now_from_microsoft ()
 	✅ - Disk Size: ${disk_size} \n You may attach to this server and see the progress at IP: $(hostname -I))"
 
 	write_status "Creating and starting Virtual machine... "
-	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "VDI_Windows${target_winver:(-2)}_${CONFIG}_${RANDOM}" \
+	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
 		--vcpus "${cpu_count}" \
 		--memory "${mem_size}" \
 		--network "${virt_net}" \
