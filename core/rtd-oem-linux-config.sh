@@ -158,7 +158,7 @@ else
 	rtd_wait_for_internet_availability
 	rtd_oem_reset_default_environment_config
 
-	if [[ -z "$(ps aux |grep X |grep  -v grep)" ]]; then
+	if [[ -z "$(ps aux |grep X |grep -v grep)" ]]; then
 		echo "No X server at \$DISPLAY [$DISPLAY]"
 		check_dependencies dialog
 		rtd_setup_choices_server
