@@ -701,6 +701,7 @@ oem::deploy_themes ()
 		write_status "Cloned ${GIT_Theme_URL} sucessfully. " 
 	else
 		write_error "An error occurred while cloinging ${GIT_Theme_URL} "
+		return 1
 	fi
 }
 
@@ -4423,6 +4424,7 @@ software::ensure_software_store_available ()
 
 	case "$DESKTOP_SESSION" in
 		plasma )
+			# If we find any plasma session then install the plasma store addons...
 			write_information "${FUNCNAME[0]}: plasma on anything..".
 			check_dependencies plasma-discover
 			check_dependencies plasma-discover-backend-flatpak
@@ -4443,6 +4445,7 @@ software::ensure_software_store_available ()
 			fi
 		;;
 		* )
+			# in any other case, install the gnome versions of store and plugins... 
 			write_information "${FUNCNAME[0]}: case = *"
 			check_dependencies gnome-software
 			check_dependencies gnome-software-plugin-flatpak
@@ -7199,13 +7202,6 @@ generate_rtd_me_sh_cmd ()
 				mv /opt/${_TLA,,}.tmp /opt/${_TLA,,} ; rm -rf /opt/${_TLA,,}/.git
 				source /opt/${_TLA,,}/core/_rtd_library
 				oem::register_all_tools
-				if echo "$XDG_SESSION_TYPE" |grep "x11" ; then
-					oem::deploy_themes
-				elif echo "$XDG_SESSION_TYPE" |grep "wayland" ; then
-					oem::deploy_themes
-				else 
-					write_information "No GUI was found, it does not make sense to install themes..."
-				fi
 				ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
 				bash ${_OEM_DIR}/core/rtd-oem-linux-config.sh ${@}
 			else

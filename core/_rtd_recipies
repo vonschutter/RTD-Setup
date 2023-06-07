@@ -53,43 +53,35 @@
 #		...code...
 #	}
 #
-#	We also like to log all activity, and to echo status output to the screen in a frienly way. To accomplish this,
-#	the table below may be used as appropriate:
 #
-#				OUTPUT REDIRECTION TABLE
+# ---------------------------------------------- SOFTWARE SOURCES --------------------------------------------------------------
 #
-#	          || visible in terminal ||   visible in file   || existing
-#	  Syntax  ||  StdOut  |  StdErr  ||  StdOut  |  StdErr  ||   file
-#	==========++==========+==========++==========+==========++===========
-#	    >     ||    no    |   yes    ||   yes    |    no    || overwrite
-#	    >>    ||    no    |   yes    ||   yes    |    no    ||  append
-#	          ||          |          ||          |          ||
-#	   2>     ||   yes    |    no    ||    no    |   yes    || overwrite
-#	   2>>    ||   yes    |    no    ||    no    |   yes    ||  append
-#	          ||          |          ||          |          ||
-#	   &>     ||    no    |    no    ||   yes    |   yes    || overwrite
-#	   &>>    ||    no    |    no    ||   yes    |   yes    ||  append
-#	          ||          |          ||          |          ||
-#	 | tee    ||   yes    |   yes    ||   yes    |    no    || overwrite
-#	 | tee -a ||   yes    |   yes    ||   yes    |    no    ||  append
-#	          ||          |          ||          |          ||
-#	 n.e. (*) ||   yes    |   yes    ||    no    |   yes    || overwrite
-#	 n.e. (*) ||   yes    |   yes    ||    no    |   yes    ||  append
-#	          ||          |          ||          |          ||
-#	|& tee    ||   yes    |   yes    ||   yes    |   yes    || overwrite
-#	|& tee -a ||   yes    |   yes    ||   yes    |   yes    ||  append
+#  Chosing an install source:
+# +-----------------------------------------------------+------------------------------------+---------------------------------+
+# | Source                                              | Pro                                | Con                             |
+# +-----------------------------------------------------+------------------------------------+---------------------------------+
+# | Native distro repository                            | supported, size, launch speed      | Version lagg, no containment    |
+# | Snapcraft.io                                        | Containment, snapcrafters, support | slower launch, integration      |
+# | Flathub.com                                         | Containment, open, performance     | Less good for Terminal apps     |
+# | AppImage                                            | More self contained, just copy file| No control, no security         |
+# | Developer PPA (Ubuntu + derivatives only)           | Known source, performance          | Only Ubuntu, no containement    |
+# | Company web page download                           | Known source, performance          | Managment, no containment       |
+# +-----------------------------------------------------+------------------------------------+---------------------------------+
 #
-#	The best solution is to redirect at the "wrapper" layer; a.k.a. the script that loads these functions
-#	and executes them. Simply use the "source" statement to pull in the "_rtd_library" and it will do the rest:
-#	you can now simply name each function herein that you wish to have installed on a wide range of distributions.
-#
-#	Our scripts are also structured in to three major sections: "settings", "functions", and "execute".
-#	Settings, contain configurable options for the script. Functions, contain all functions. Execute,
-#	contains all the actual logic and flow control of the script.
+# When chosing where to get the application from consider you selection strategy: what is important to you, 
+# your users and others. What is the priority? Suggestion: 
+# 	- Use contained applications where possible to have better overall security. 
+#	- Use contained applications where possible to always have the updated version ove an app
+# 	- Use flathub.com first for GUI applications for performance and control (flatseal)
+#	- Use Snapcraft.io for non GUI apps, as these apps are better implemented and no GUI performance issues
+#	- Use Stapcraft or falthub depending on if the original developer provides the app in that format
+#	- Use the distro version if you need deep desktop integration, and latest version is not important
+#	- Avoid the distro version if different distributions name their packages differently between eachother
+#	- Prefer any contained version of an app fire easier managment and support (no library issues)
+# 	- Follow the path of availability: Contained > Native > vendor site > AppImage in that order
 #
 #
-#
-# 	*		--- Installing software from the snap repository is prefferred --- 		*
+# ------------------ Installing software from the snap repository is prefferred for terminal apps -------------------------
 #
 # Snap is a software deployment and package management system developed by Canonical for the Linux operating system.
 # The packages, called snaps, and the tool for using them, snapd, work across a range of Linux distributions
@@ -105,7 +97,7 @@
 # Snaps are also contained from a security point of view and only have the access really needed on a system. The user may
 # add additional access descressionally.
 #
-# 	*	--- Installing software from the flathub repository is a secondary preferrence ---      *
+# ------------------- Installing software from the flathub repository is prefferred for GUI apps --------------------------
 #
 # Flatpak (formerly xdg-app) is a software utility for software deployment and package management for Linux. It is advertised
 # as offering a sandbox environment in which users can run application software in isolation from the rest of the system.
@@ -119,7 +111,7 @@
 # Although Flathub is the de facto source for applications packaged with Flatpak, Flatpak can work independently of Flathub;
 # it is possible to host a remote and access to remotes that are totally independent of Flathub.
 #
-#	*	---       Installing software from native distribution repositories  ----		*
+# -------------------- Installing software from native distribution repositories  ------------------------------------------
 #
 # A Linux repository is a storage location from which your system retrieves and installs OS updates and applications.
 # Each repository is a collection of software hosted on a remote server and intended to be used for installing and updating
@@ -130,7 +122,8 @@
 #
 # For more information on package managers see: https://en.wikipedia.org/wiki/Package_manager
 #
-#	*	---       PREFFERRED Software install (Security + Control)           ----		*
+#
+# ---------------------- PREFFERRED Contained Software install (Security + Control) ----------------------------------------
 #
 #  CAPABILITY TABLE:
 # +-----------------------------------------------------+--------------------------------+----------------------------+----------------------+
@@ -157,12 +150,16 @@
 # A new way to manage native packages on Linux PackageKit. PackageKit is a free and open-source suite of software
 # applications designed to provide a consistent and high-level front end for a number of different package management systems.
 # PackageKit simplifies how to manage software on several different linux distribution and may even be available on BSD flavors.
-# The "dl" function uses package kit because it can istall both rpms and debs, locally and from the repositories.
+# The "software::vendor_download_and_install" function uses package kit because it can istall both rpms and debs, 
+# locally and from the repositories.
 #
 # TEMPLATE: For adding a new menu entry for a single package or bundle of software:
 #
-# recipe_Bundle:_descriptive_name () {
-# 			# function documentaton...
+#
+#    system tag          name
+#         |                |
+# "recipe_Bundle:_""descriptive_name" () {
+# 			# function documentaton (shows on the menu)...
 # 			# Echo to terminal using built in functions with color:
 # 			write_error		: Prints an error message to terminal in RED
 # 			write_host 		: Prints a message to the terminal w. a choice of color
@@ -177,18 +174,21 @@
 #
 # 			# Install flatpaks:
 # 			  
-# 			flatpak install package-name
+# 			software::from_flathub.org package-name $1
 #
 # 			# Install snap packages:
 # 			  
-# 			software::from_snapcraft.io package-name
+# 			software::from_snapcraft.io package-name $1
 #
 # 			# Check a dependency (install only if not present):
 # 			check_dependencies package-name
 #
-#			# NOTE: installing native packages may have caveats since distributions may name
-#			# 	packages differently. For example Fedora and Ubuntu name the 7z packages
-#			#	differently.
+#			NOTE: installing native packages may have caveats since distributions may name
+#				packages differently. For example Fedora and Ubuntu name the 7z packages
+#				differently.
+#
+#			NOTE2: the "$1" after the package-name is if you want to trap the --remove option for 
+#				Bundle removals. This is optional.
 # }
 
 
@@ -234,9 +234,9 @@ bundle_prefix="recipe_Bundle:_"
 
 recipe_Bundle:_Safe_Internet_Browsing () {
 	# Brave and Vivaldi Browsers and other internet tools with a focus on security and privacy
-	software::from_snapcraft.io brave
-	Single_Install_Vivaldi_Browser
-	software::from_flathub.org org.keepassxc.KeePassXC   	# App for secure encrypted password management
+	software::from_snapcraft.io brave $1 			# Brave secure browser, vendor provided Snap.
+	Single_Install_Vivaldi_Browser				# The Vivaldi browser, not available in snap, or flatpak, nor in repo.
+	software::from_flathub.org org.keepassxc.KeePassXC $1  	# App for secure encrypted password management
 
 }
 
@@ -244,10 +244,21 @@ recipe_Bundle:_Safe_Internet_Browsing () {
 
 recipe_Bundle:_Virtualization () {
 	# Virtualizaton tools (virt-manager, qemu-kvm, Virtualbox), and others
-	software::from_snapcraft.io dosbox-x
-	Single_Install_VirtualBox
-	InstallSoftwareFromRepo virt-manager
-	InstallSoftwareFromRepo qemu-kvm
+		# VirtualBox is a powerful x86 and AMD64/Intel64 virtualization product for enterprise as well as
+	# home use. Not only is VirtualBox an extremely feature rich, high performance product for enterprise
+	# customers, it is also the only professional solution that is freely available as Open Source Software
+	# under the terms of the GNU General Public License (GPL) version 2. See "About VirtualBox" for an introduction.
+	# Presently, VirtualBox runs on Windows, Linux, Macintosh, and Solaris hosts and supports a large number
+	# of guest operating systems including but not limited to Windows (NT 4.0, 2000, XP, Server 2003, Vista, Windows 7,
+	# Windows 8, Windows 10), DOS/Windows 3.x, Linux (2.4, 2.6, 3.x and 4.x), Solaris and OpenSolaris, OS/2, and OpenBSD.
+	# VirtualBox is being actively developed with frequent releases and has an ever growing list of features,
+	# supported guest operating systems and platforms it runs on. VirtualBox is a community effort backed by a
+	# dedicated company: everyone is encouraged to contribute while Oracle ensures the product always meets professional
+	# quality criteria. VirtualBox is not provided as a Snap or Flatpak, and must silently be installed with some logic
+	# using the distribution speciffic package manager.
+	Single_Install_VirtualBox				 
+	InstallSoftwareFromRepo virt-manager			# Qemu-KVM GUI for managing virtual machines locally and remote
+	InstallSoftwareFromRepo qemu-kvm			# Very efficient hypervisor fo rrunning virtual machines
 }
 
 
@@ -256,22 +267,22 @@ recipe_Bundle:_CLOUD_Management () {
 	# Tools to manage cloud environments like GCP, Azure, AWS
   
 	# Azure Cloud
-	software::from_snapcraft.io powershell  		# PowerShell is an automation and configuration management platform. It consists of a cross-platform (Windows, Linux, and macOS) command-line shell and associated scripting language.
-	software::from_snapcraft.io azure-cli 			# A great cloud needs great tools; we're excited to introduce Azure CLI 2.0, our next generation multi-platform command line experience for Azure.
-	software::from_snapcraft.io storage-explorer					# Upload, download, and manage Azure blobs, files, queues, and tables, as well as Azure Cosmos DB and Azure Data Lake Storage entities.
+	software::from_snapcraft.io powershell $1  		# PowerShell is an automation and configuration management platform. 
+	software::from_snapcraft.io azure-cli $1 		# Azure CLI 2.0, our next generation multi-platform command line experience for Azure.
+	software::from_snapcraft.io storage-explorer $1		# Upload, download, and manage Azure blobs, files, queues, and tables.
 
 	# Ubuntu Cloud Tool
-	software::from_snapcraft.io ubuntu-cloud-image		# Find the latest Ubuntu Images for clouds
-	software::from_snapcraft.io juju  			# Juju extends the idea of operators beyond Kubernetes to traditional machine environments, for multi cloud and hybrid cloud application management.
-	software::from_snapcraft.io ubuntu-image  		# ubuntu-image is a tool used for creation of various Ubuntu preinstalled images, both classic and snap-based.
+	software::from_snapcraft.io ubuntu-cloud-image $1	# Find the latest Ubuntu Images for clouds
+	software::from_snapcraft.io juju $1  			# Juju extends the idea of operators beyond Kubernetes to traditional machine environments, for multi cloud and hybrid cloud application management.
+	software::from_snapcraft.io ubuntu-image $1  		# ubuntu-image is a tool used for creation of various Ubuntu preinstalled images, both classic and snap-based.
 
 	# GCP Platform
-	software::from_snapcraft.io google-cloud-sdk  		# Command-line interface for Google Cloud Platform products and services
+	software::from_snapcraft.io google-cloud-sdk $1  	# Command-line interface for Google Cloud Platform products and services
 
 	# AWS Platform
-	software::from_snapcraft.io aws-cli  			# Universal Command Line Interface for Amazon Web Services
-	software::from_snapcraft.io aws-iot-greengrass		# AWS supported software that extends cloud capabilities to local devices
-	software::from_snapcraft.io amazon-ssm-agent  		# Agent to enable remote management of your Amazon EC2 instance configuration
+	software::from_snapcraft.io aws-cli $1  		# Universal Command Line Interface for Amazon Web Services
+	software::from_snapcraft.io aws-iot-greengrass $1	# AWS supported software that extends cloud capabilities to local devices
+	software::from_snapcraft.io amazon-ssm-agent $1  	# Agent to enable remote management of your Amazon EC2 instance configuration
 }
 
 
@@ -281,18 +292,18 @@ recipe_Bundle:_CLOUD_Management () {
 recipe_Bundle:_3D_Printing () {
 	# 3D Printing tools (Prusa, Cura slicers, and CAD, and 3D editing) for supporting and working with 3D-Printing
 
-	software::from_snapcraft.io cura-slicer			# Ultimaker Cura is the world’s most popular 3D printing software
+	software::from_snapcraft.io cura-slicer $1		# Ultimaker Cura is the world’s most popular 3D printing software
 		snap connect cura-slicer:mount-observe
 		snap connect cura-slicer:removable-media
-	software::from_snapcraft.io meshlab			# The open source system for processing and editing 3D triangular meshes
-	software::from_snapcraft.io prusa-slicer		# PrusaSlicer takes 3D models (STL, OBJ, AMF) and converts them into G-code instructions for FFF printers or PNG layers for mSLA 3D printers.
+	software::from_snapcraft.io meshlab $1			# The open source system for processing and editing 3D triangular meshes
+	software::from_snapcraft.io prusa-slicer $1		# PrusaSlicer takes 3D models (STL, OBJ, AMF) and converts them into G-code instructions for FFF printers or PNG layers for mSLA 3D printers.
 		snap connect prusa-slicer:removable-media
 		snap connect prusa-slicer:mount-observe
 		snap connect prusa-slicer:udisks2
 		snap connect prusa-slicer:raw-usb
-	software::from_snapcraft.io blender  			# Blender is the free and open source 3D creation suite
-	software::from_snapcraft.io freecad			# https://www.freecadweb.org/
-	software::from_snapcraft.io openscad 			# OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD aspects rather than artistic ones
+	software::from_snapcraft.io blender $1 			# Blender is the free and open source 3D creation suite
+	software::from_snapcraft.io freecad $1			# https://www.freecadweb.org/
+	software::from_snapcraft.io openscad $1			# OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD aspects rather than artistic ones
 }
 
 
@@ -301,14 +312,14 @@ recipe_Bundle:_3D_Printing () {
 recipe_Bundle:_Office_Tools () {
 	# Office apps like: Onlyoffice, Joplin notes, Mailspring, Keepass, and more
 	  
-	software::from_snapcraft.io mailspring			# A modern email client
-	software::from_snapcraft.io joplin-desktop		# Excellent note-taking and note organization app
-	software::from_snapcraft.io simplenote			# Best simple note app for sharing and collaboration on notes
+	software::from_snapcraft.io mailspring $1		# A modern email client
+	software::from_snapcraft.io joplin-desktop $1		# Excellent note-taking and note organization app
+	software::from_snapcraft.io simplenote $1		# Best simple note app for sharing and collaboration on notes
 	  
-	software::from_flathub.org org.keepassxc.KeePassXC   			# App for secure encrypted password management
-	software::from_flathub.org org.onlyoffice.desktopeditors   		# Excellent simple to use and streamlines office bundle
-	software::from_flathub.org com.github.IsmaelMartinez.teams_for_linux   	# Microsofts collaboration and conferencing tool
-	software::from_flathub.org com.jgraph.drawio.desktop   
+	software::from_flathub.org org.keepassxc.KeePassXC  $1  		# App for secure encrypted password management
+	software::from_flathub.org org.onlyoffice.desktopeditors  $1   		# Excellent simple to use and streamlines office bundle
+	software::from_flathub.org com.github.IsmaelMartinez.teams_for_linux $1 # Microsofts collaboration and conferencing tool
+	software::from_flathub.org com.jgraph.drawio.desktop $1   		# draw.io is the most flexible and privacy-focused of any production grade diagramming tool
 }
 
 
@@ -317,13 +328,13 @@ recipe_Bundle:_Media_Streaming () {
 	# Streaming apps; Spotify, Stremio, Vocal, and Cozy audiobook reader...
 	
 	# Install Steaming apps from the Snap store:  
-	software::from_snapcraft.io spotify				# The worlds most popular music streamer
-	software::from_snapcraft.io red-app				# Red is a neat, simple yet feature rich, privacy focused YouTube Player and Downloader
+	software::from_snapcraft.io spotify $1				# The worlds most popular music streamer
+	software::from_snapcraft.io red-app $1				# Red is a neat, simple yet feature rich, privacy focused YouTube Player and Downloader
 
 	# Install Streaming apps from Flat Hub: 
-	 software::from_flathub.org com.stremio.Stremio   		# Watch videos, movies, TV series and TV channels instantly.
-	 software::from_flathub.org com.github.needleandthread.vocal   	# Simle and easy to use pod cast player
-	 software::from_flathub.org com.github.geigi.cozy    
+	 software::from_flathub.org com.stremio.Stremio $1  		# Watch videos, movies, TV series and TV channels instantly.
+	 software::from_flathub.org com.github.needleandthread.vocal $1 # Simle and easy to use pod cast player
+	 software::from_flathub.org com.github.geigi.cozy $1    	# Cozy is a audio book player. Import all your audio books into Cozy to browse them comfortably
 }
 
 
@@ -331,9 +342,9 @@ recipe_Bundle:_Media_Streaming () {
 recipe_Bundle:_Audio_Editing () {
 	# Audio Tools Bundle including Picard, Audacity, Musescore...
 	  
-	software::from_snapcraft.io picard				# Music tag editor
-	software::from_snapcraft.io audacity				# Audio editor
-	software::from_snapcraft.io musescore				# Create, play and print beautiful sheet music
+	software::from_snapcraft.io picard $1				# Music tag editor
+	software::from_snapcraft.io audacity $1				# Audio editor
+	software::from_snapcraft.io musescore $1			# Create, play and print beautiful sheet music
 		snap connect musescore:cups-control
 		snap connect musescore:network-manager
 		snap connect musescore:alsa
@@ -348,26 +359,16 @@ recipe_Bundle:_Video_Editing_and_Streaming () {
 	# Popular video editor
 	# Simle video crop/cut
 	  
-	software::from_flathub.org org.blender.Blender   
-	software::from_flathub.org org.shotcut.Shotcut   
-	software::from_flathub.org org.kde.kdenlive   
-	software::from_flathub.org org.bunkus.mkvtoolnix-gui    
-	software::from_flathub.org fr.handbrake.ghb    
-	software::from_flathub.org com.ozmartians.VidCutter    
-	software::from_flathub.org com.obsproject.Studio   
-	software::from_flathub.org org.openshot.OpenShot   
-	software::from_flathub.org io.github.jliljebl.Flowblade   
+	software::from_flathub.org org.blender.Blender $1   		# Free and open source 3D creation suite
+	software::from_flathub.org org.shotcut.Shotcut $1   		# Shotcut is a free and open-source cross-platform video editing application
+	software::from_flathub.org org.kde.kdenlive $1   		# Kdenlive is a non linear video editor. 
+	software::from_flathub.org org.bunkus.mkvtoolnix-gui $1    	# MKVToolNix is a set of tools to create, alter and inspect Matroska files
+	software::from_flathub.org fr.handbrake.ghb $1    		# HandBrake is a tool for converting video from nearly any format to a selection of modern, widely supported codecs
+	software::from_flathub.org com.ozmartians.VidCutter $1    	# A modern, simple to use, constantly evolving and hella fast MEDIA CUTTER + JOINER
+	software::from_flathub.org com.obsproject.Studio $1   		# Live streaming and video recording software
+	software::from_flathub.org org.openshot.	 $1   		# OpenShot can create stunning videos, films, and animations with an easy-to-use interface and rich set of features
+	software::from_flathub.org io.github.jliljebl.Flowblade $1	# Flowblade is a multitrack non-linear video editor, helps make your vision a reality of image and sound
 
-	# Download and install Light Works Proffessional Video Editor.
-	# if hash zypper  ; then
-	# 	software::vendor_download_and_install https://cdn.lwks.com/releases/2021.1/lightworks_2021.1_r126716.rpm
-	# elif hash apt-get ; then
-	# 	software::vendor_download_and_install https://cdn.lwks.com/releases/2021.1/lightworks_2021.1_r126716.deb
-	# elif hash dnf ; then
-	# 	software::vendor_download_and_install https://cdn.lwks.com/releases/2021.1/lightworks_2021.1_r126716.rpm
-	# else
-	# 	write_error "Neither rpm or deb package managers found!"
-	# fi
 }
 
 
@@ -376,24 +377,41 @@ recipe_Bundle:_Video_Editing_and_Streaming () {
 
 recipe_Bundle:_Developer_Software () {
 	# For creating code: VSCode, GitKraken, and more..
-	write_status "--- Adding Developer Software Apps: IDE Tools and Compilers..."
-
-	for i in build-essential git ; do
-		InstallSoftwareFromRepo $i
-	done
+	InstallSoftwareFromRepo build-essential
+	InstallSoftwareFromRepo git
   
-	software::from_snapcraft.io gitkraken  
-	software::from_snapcraft.io code  
+	software::from_snapcraft.io gitkraken $1			# For repo management, in-app code editing & issue tracking
+	software::from_snapcraft.io code $1  				# Visual Studio Code is a new choice of tool that combines the simplicity of a code editor with what developers need
 }
 
 
 
 recipe_Bundle:_Compression_Tools () {
 	# Compression Toolset (zip, 7zip rar etc.)...
-	for i in p7zip-full p7zip-rar rar zip p7zip
-	do
-		check_dependencies $i
-	done
+
+	# - 7-Zip is a free and open-source file archiver, a utility used to place groups 
+	# of files within compressed containers known as "archives". It is developed by 
+	# Igor Pavlov and was first released in 1999. 7-Zip has its own archive format 
+	# called 7z, but can read and write several others.
+	# - RAR is a proprietary archive file format that supports data compression, error 
+	# correction and file spanning. It was developed in 1993 by Russian software 
+	# engineer Eugene Roshal and the software is licensed by win.rar GmbH. 
+	# The name RAR stands for Roshal Archive.
+	# - ZIP is an archive file format that supports lossless data compression. 
+	# A ZIP file may contain one or more files or directories that may have 
+	# been compressed. The ZIP file format permits a number of compression 
+	# algorithms, though DEFLATE is the most common.
+	
+	if hash dnf ; then 
+		write_information "Fedora based software management found, assuming fedora based distribution..."
+		for i in p7zip-gui p7zip p7zip-plugins zip; do
+			check_dependencies $i
+		done
+	else
+		for i in p7zip-full p7zip-rar rar zip ; do
+			check_dependencies $i
+		done
+	fi
 }
 
 
@@ -402,31 +420,21 @@ recipe_Bundle:_Top_Curated_Games () {
 	# Top rated Games: Steam platform, and Minecraft, OpenaArena, 0AD, SuperTuxCart etc.
 	write_status "Adding Selection of Quality Games..."
 
-	install_games="0ad \
-		supertuxkart \
-		marsshooter \
-		mc-installer \
-		dm-tools"
+	software::from_snapcraft.io 0ad $1				# 0 A.D. is a real-time strategy (RTS) game of ancient warfare. 
+	software::from_snapcraft.io supertuxkart $1			# A 3D arcade racer with a variety of characters, tracks, and modes to play
+	software::from_snapcraft.io marsshooter $1			# A 2D space shooter with awesome visual effects and attractive physics.
+	software::from_snapcraft.io dm-tools $1				# dm-tools is a collection of tools for Dungeons and Dragons 5e
 
-	for i in $install_games
-	do
-		software::from_snapcraft.io $i
-	done
+	software::from_flathub.org com.mojang.Minecraft $1		# Join people all over the world playing Minecraft, one of the most popular videogames around!
+	software::from_flathub.org com.moddb.TotalChaos $1		# Survival horror set on a remote island known as Fort Oasis
+	software::from_flathub.org com.viewizard.AstroMenace $1		# Hardcore 3D space scroll-shooter with spaceship upgrade possibilities
+	software::from_flathub.org io.github.EndlessSky.endless-sky $1	# Space exploration and combat game
+	software::from_flathub.org com.albiononline.AlbionOnline $1	# Albion Online is a sandbox MMORPG set in an open medieval fantasy world
+	software::from_flathub.org com.endlessnetwork.aqueducts $1	# An immersive puzzle adventure game where you hack your way to saving the day!
+	software::from_flathub.org de.billardgl.Billardgl $1		# Do you love playing billiards, or have you ever wanted to learn how to play
+	software::from_flathub.org ws.openarena.OpenArena $1		# OpenArena is a free and open source first-person shooter game based heavily on the Quake III Arena-style deathmatch
 
-	install_games="com.moddb.TotalChaos \
-		com.viewizard.AstroMenace \
-		io.github.EndlessSky.endless-sky \
-		com.albiononline.AlbionOnline \
-		com.endlessnetwork.aqueducts \
-		de.billardgl.Billardgl \
-		ws.openarena.OpenArena"
-
-	for i in $install_games 
-	do 
-		 software::from_flathub.org $i   
-	done 
-
-	# Install Valves Steam Client for gaming.
+	# Install Valves Steam Client for gaming: gives access to thousands of commercial games.
 	InstallSoftwareFromRepo steam
 	if [ $? != 0 ]; then
 		if hash rpm &>/dev/null; then
@@ -441,16 +449,16 @@ recipe_Bundle:_Top_Curated_Games () {
 			echo -e $ENDCOLOR
 		fi
 	fi
-
 }
 
 
 
 
 
-recipe_Bundle:_Admin_Tools_and_Utilities () {
+recipe_Bundle:_Admin_Tools () {
 	# System Admin Tools (nmap synaptic ssh gparted sshfs htop iftop nethogs glances)...
 
+	# NOT REMOVABLE. Bundle contains downloaded software from sites. 
 	# Loop through each item in this list of software and perform an install
 	# using the relevant packaging system.
 	AdminToolsAppList="nmap synaptic ssh gparted sshfs htop iftop nethogs glances bmon \
@@ -468,27 +476,37 @@ recipe_Bundle:_Admin_Tools_and_Utilities () {
 }
 
 
+recipe_Bundle:_Windows_Subsystem_for_Linux (){
+	# Run windows programs! includes wine, DOS, and Acrobat reader, Notepad++, and more...
+	InstallSoftwareFromRepo wine					# Wine runtime environment for windows apps.
+	software::from_snapcraft.io dosbox-x $1				# A DOS virtual environment!
+	software::from_snapcraft.io acrordrdc $1			# Adobe Acrobat Reader is a pdf reader & Web services developed by Adobe Inc.
+	software::from_snapcraft.io notepad-plus-plus $1		# notepad-plus-plus is a free source code editor for Windows
+	software::from_snapcraft.io resourcehacker $1 			# Resourcehacker is a resource extraction utility and resource compiler
+	software::from_snapcraft.io multicommander $1			# File Manager For Professionals.
+}
+
+
+
+
 recipe_Bundle:_Digital_Art_and_Imaging () {
 	# Createive art software; Krita, GIMP, Inkscape, Flameshot
 	  
-	software::from_snapcraft.io krita				# It is perfect for sketching and painting, and presents an end–to–end solution for creating digital painting files from scratch by masters.
-	software::from_snapcraft.io gimp				# Whether you are a graphic designer, photographer, illustrator, or scientist, GIMP provides you with sophisticated tools to get your job done.
-	software::from_snapcraft.io inkscape				# Inkscape is a Free and open source vector graphics editor.
-
+	software::from_snapcraft.io krita $1				# It is perfect for sketching and painting, and presents an end–to–end solution for creating digital painting files from scratch by masters.
+	software::from_snapcraft.io gimp $1				# Whether you are a graphic designer, photographer, illustrator, or scientist, GIMP provides you with sophisticated tools to get your job done.
+	software::from_snapcraft.io inkscape $1				# Inkscape is a Free and open source vector graphics editor.
+	software::from_snapcraft.io photoscape $1			# PhotoScape is a fun and easy photo editing software that enables you to fix and enhance photos
 }
 
 
 
 recipe_Bundle:_OEM_restricted_fonts () {
-	# Download and install Trutype font pack...
+	# Download and install Trutype standard font pack...
 	wget "https://www.dropbox.com/s/y16d8wpb45yebv8/True_Type_Font_Pack.7z" -P /opt/rtd/cache/
 	mkdir -p /usr/share/fonts/truetype/oem
-	for i in p7zip-full p7zip-gui p7zip p7zip-plugins ; do
-		check_dependencies $i
-	done
-
+	# This bundle depends on teh compressions tools bundle...
+	recipe_Bundle:_Compression_Tools
 	7z e -y /opt/rtd/cache/True_Type_Font_Pack.7z -o/usr/share/fonts/truetype/oem/
-	rtd_oem_remove_non_western_latin_fonts				# By default Ubuntu includes wierd fonts not used in the west.
 }
 
 
@@ -499,9 +517,9 @@ recipe_Bundle:_Secure_Communication () {
 	# and generally does not share keys with the vendor. Also, these apps are confined on the desktop
 	# meaning that they cannot access the wich is not granted explicitly.
 	  
-	software::from_snapcraft.io signal-desktop			# Encrypted person to person chat/call/conferencing
-	software::from_snapcraft.io telegram-desktop			# Encrypted chat, group commmunications
-	software::from_snapcraft.io electron-mail			# Uses protonmail.com (encrypted mail)
+	software::from_snapcraft.io signal-desktop $1			# Encrypted person to person chat/call/conferencing
+	software::from_snapcraft.io telegram-desktop $1			# Encrypted chat, group commmunications
+	software::from_snapcraft.io electron-mail $1			# Uses protonmail.com (encrypted mail)
 }
 
 
@@ -512,10 +530,10 @@ recipe_Bundle:_Social_Non_Secured_Communication () {
 	# for privacy, but may be encrypted. This software is often useful for legacy reasons
 	# or used for gaming.
 	  
-	software::from_snapcraft.io discord 				# All-in-one voice and text chat for gamers that's free, and works on both your desktop and phone.
+	software::from_snapcraft.io discord $1				# Official Snap: All-in-one voice and text chat for gamers that's free, and works on both your desktop and phone.
 		snap connect discord:system-observe
-	software::from_snapcraft.io skype
-	software::from_flathub.com com.viber.Viber
+	software::from_snapcraft.io skype $1				# Official Snap:  Connect, Create, Talk & Discover, now with Bing GPT-4
+	software::from_flathub.com com.viber.Viber $1			# Send free messages and make free calls to other Viber users on any device and network, in any country!
 }
 
 
@@ -528,6 +546,7 @@ recipe_Bundle:_CLOUD_Storage () {
 	# to your content and Dropox must comply with US governemnt access requests. This
 	# includes the 5 eyes english speaking intelligence agencies cooperation and information
 	# sharing.
+	# 
 	Single_Install_MEGA.nz_Encrypted_Cloud_Storage	megasync	# Secure cloud storage
 	Single_Install_Dropbox_Corporate_Cloud_Storage			# Common cloud storage (vendor has access to crypto keys)
 }
@@ -562,6 +581,10 @@ recipe_Bundle:_1_RTD_CONFIG (){
 	# [Task 3] Configure Desktop software managers depending on desktop used
 	# -------------------------------------------------------------------------------------------------------#
 	software::ensure_software_store_available
+
+	# By default distros includes wierd fonts not used in the west.
+	rtd_oem_remove_non_western_latin_fonts	
+
 	# -------------------------------------------------------------------------------------------------------#
 
 
@@ -573,6 +596,7 @@ recipe_Bundle:_1_RTD_CONFIG (){
 
 	#Tune to virtual machine guest or tune according to hardware type::
 	system_config::tune_system_power_profile
+			
 	# -------------------------------------------------------------------------------------------------------#
 
 
@@ -639,9 +663,18 @@ recipe_Bundle:_1_RTD_CONFIG (){
 		for i in dash-to-dock dash-to-panel gnome-shell-extension-manager ; do check_dependencies gnome-shell-extension-${i} ; done
 
 		for i in 6 7 8 19 97 307 517 615 906 1160 1319 1852 3628 ; do
-			bash $(find /opt -name rtd-gnome-shell-extension-installer ) --yes ${i}
+			local extension_installer="$(find /opt -name rtd-gnome-shell-extension-installer )"
+			local gnome_shell_ver=
+			if [[ -n "${extension_installer}" ]] ; then
+				bash ${extension_installer} --yes ${i} || \
+					bash ${extension_installer} --yes ${i} --yes ${i} "$(gnome-shell --version |cut -d' '  -f3)" ||\
+						bash ${extension_installer} --yes ${i} --yes ${i} $(sudo -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c  "gnome-shell --version |cut -d' '  -f3")
+				bash bash ${extension_installer} --yes ${i} --restart-shell
+			else
+				write_error "I could not find the gnome extension installer anywhere! "
+			fi
 		done
-		bash $(find /opt -name rtd-gnome-shell-extension-installer ) --restart-shell
+		
 		# -------------------------------------------------------------------------------------------------------
 
 
@@ -730,7 +763,7 @@ recipe_Bundle:_1_RTD_CONFIG (){
 
 		write_information "${FUNCNAME[0]}: Detected KDE UI!"
 		if [[ -e ${_THEME_DIR}/plus-themes.sh ]] ; then 
-			bash ${_THEME_DIR}/plus-themes.sh
+			bash ${_THEME_DIR}/plus-themes.sh || return 1
 		else 
 			oem::deploy_themes
 			bash ${_THEME_DIR}/plus-themes.sh || return 1
@@ -738,7 +771,7 @@ recipe_Bundle:_1_RTD_CONFIG (){
 
 		# sudo -H -u $SUDO_USER  bash -c source ${_CORE_DIR}/_rtd_library ; rtd_oem_kde_set_wallpaper "${_WALLPAPER_DIR}/Wayland.jpg"
 		# for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
-		sudo -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c '/usr/bin/lookandfeeltool -a RTD-Win11-Light --resetLayout'
+		sudo -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c '/usr/bin/lookandfeeltool -a RTD-Win11-Dark --resetLayout'
 	fi
 }
 
@@ -755,7 +788,8 @@ recipe_Bundle:_1_RTD_CONFIG (){
 #::::::::::::::	               |___/                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-
+# This is the hall of shame for vendors that have not made software avaiable in the distribution 
+# repositories, or as a Snap or a flatpak. We need to do some advanced contortions to get the software! 
 
 
 
@@ -832,10 +866,7 @@ Single_Install_Vivaldi_Browser (){
 }
 
 
-Single_Install_Windows_Subsystem_for_Linux (){
-	write_status "${FUNCNAME[0]}: Installing Wine..."
-	InstallSoftwareFromRepo wine
-}
+
 
 
 
@@ -995,17 +1026,7 @@ Single_Install_Dropbox_Corporate_Cloud_Storage (){
 Single_Install_VirtualBox (){
 	# Install Virtual Box from Oracle. However avoid installing it in a VM, as tis usecase may be counterproductive.
 	# NOTE:
-	# VirtualBox is a powerful x86 and AMD64/Intel64 virtualization product for enterprise as well as
-	# home use. Not only is VirtualBox an extremely feature rich, high performance product for enterprise
-	# customers, it is also the only professional solution that is freely available as Open Source Software
-	# under the terms of the GNU General Public License (GPL) version 2. See "About VirtualBox" for an introduction.
-	# Presently, VirtualBox runs on Windows, Linux, Macintosh, and Solaris hosts and supports a large number
-	# of guest operating systems including but not limited to Windows (NT 4.0, 2000, XP, Server 2003, Vista, Windows 7,
-	# Windows 8, Windows 10), DOS/Windows 3.x, Linux (2.4, 2.6, 3.x and 4.x), Solaris and OpenSolaris, OS/2, and OpenBSD.
-	# VirtualBox is being actively developed with frequent releases and has an ever growing list of features,
-	# supported guest operating systems and platforms it runs on. VirtualBox is a community effort backed by a
-	# dedicated company: everyone is encouraged to contribute while Oracle ensures the product always meets professional
-	# quality criteria.
+
 	#
 	check_dependencies virt-what
 
