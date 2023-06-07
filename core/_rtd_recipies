@@ -71,13 +71,13 @@
 # When chosing where to get the application from consider you selection strategy: what is important to you, 
 # your users and others. What is the priority? Suggestion: 
 # 	- Use contained applications where possible to have better overall security. 
-#	- Use contained applications where possible to always have the updated version ove an app
+#	- Use contained applications where possible to always have the updated version of an app
 # 	- Use flathub.com first for GUI applications for performance and control (flatseal)
 #	- Use Snapcraft.io for non GUI apps, as these apps are better implemented and no GUI performance issues
 #	- Use Stapcraft or falthub depending on if the original developer provides the app in that format
 #	- Use the distro version if you need deep desktop integration, and latest version is not important
 #	- Avoid the distro version if different distributions name their packages differently between eachother
-#	- Prefer any contained version of an app fire easier managment and support (no library issues)
+#	- Prefer any contained version of an app for easier managment and support (no library issues)
 # 	- Follow the path of availability: Contained > Native > vendor site > AppImage in that order
 #
 #
@@ -95,7 +95,7 @@
 #
 # Security:
 # Snaps are also contained from a security point of view and only have the access really needed on a system. The user may
-# add additional access descressionally.
+# add additional access descressionally through the "connect" command.
 #
 # ------------------- Installing software from the flathub repository is prefferred for GUI apps --------------------------
 #
@@ -118,7 +118,7 @@
 # software packages on Linux systems. When you run commands such as “sudo apt update” or “sudo apt upgrade”, you may be pulling
 # package information and package updates from a number of repositories.
 #
-#    ***Issues with native repositories are that distribusions may name packages differently making install difficult***
+#    ***Issues with native repositories are that distribusions may name packages differently making management difficult***
 #
 # For more information on package managers see: https://en.wikipedia.org/wiki/Package_manager
 #
@@ -442,11 +442,11 @@ recipe_Bundle:_Top_Curated_Games () {
 		elif hash apt &>/dev/null; then
 			software::vendor_download_and_install https://steamcdn-a.akamaihd.net/client/installer/steam.deb
 		else
-			echo -e $RED
-			echo "I am not sure how to find the Steam download for $(lsb_release -sd) "
-			echo "Please try to download it manually and insttall it from the website:"
-			echo "https://store.steampowered.com/about/"
-			echo -e $ENDCOLOR
+			write_error "
+			 "I am not sure how to find the Steam download for $(lsb_release -sd) "
+			 "Please try to download it manually and insttall it from the website:"
+			 "https://store.steampowered.com/about/"
+			"
 		fi
 	fi
 }
@@ -707,7 +707,7 @@ recipe_Bundle:_1_RTD_CONFIG (){
 				check_dependencies  $i
 			done
 		else
-			write_error "${FUNCNAME[0]}: This option requires a supported package manager on your system (deb, zypper, dnf, pacman). Neiter was found!"
+			write_error "This option requires a supported package manager on your system (deb, zypper, dnf, pacman). Neiter was found!"
 		fi
 
 		# # Install theme for a smooth mocka experience in UI (snap, gnome, and icons)...
@@ -761,7 +761,7 @@ recipe_Bundle:_1_RTD_CONFIG (){
 
 	if  ps -e |grep "plasmashell" ; then
 
-		write_information "${FUNCNAME[0]}: Detected KDE UI!"
+		write_information "Detected KDE UI!"
 		if [[ -e ${_THEME_DIR}/plus-themes.sh ]] ; then 
 			bash ${_THEME_DIR}/plus-themes.sh || return 1
 		else 
@@ -798,7 +798,7 @@ recipe_Bundle:_1_RTD_CONFIG (){
 Single_Install_Brave_Browser () {
 	# This function will add the vendor maintained repository and install the software
 	# using the distribution speciffic installers.
-	write_information "${FUNCNAME[0]}: Installing Brave Browser directly from vendor repo..."
+	write_information "Installing Brave Browser directly from vendor repo..."
 	if cat "/etc/os-release" | grep "debian" ; then
 		check_dependencies apt-transport-https
 		check_dependencies curl
@@ -830,7 +830,7 @@ Single_Install_Brave_Browser () {
 			apt install brave-browser -y
 			return $?
 		else
-			echo "${FUNCNAME[0]}: Neither debian, fedora, or suse base distros could be found; NOT installing brave."
+			write_error "Neither debian, fedora, or suse base distros could be found; NOT installing brave."
 			return 1
 		fi
 	fi
@@ -842,7 +842,7 @@ Single_Install_Vivaldi_Browser (){
 	# # This function uses the RTD function "dl" to download a distribution speciffic package directly
 	# # from the vendors website. It will work until the vendor removes the exact file...
 
-	write_information "${FUNCNAME[0]}: Installing Brave Browser directly from vendor repo..."
+	write_information "Installing Brave Browser directly from vendor repo..."
 	if cat "/etc/os-release" | grep "debian" ; then
 		apt -y install wget gnupg2 software-properties-common
 		wget -qO- https://repo.vivaldi.com/archive/linux_signing_key.pub | sudo apt-key add -
@@ -860,7 +860,7 @@ Single_Install_Vivaldi_Browser (){
 		InstallSoftwareFromRepo vivaldi-stable
 		return $?
 	else
-		echo "${FUNCNAME[0]}: Neither debian, fedora, or suse base distros could be found; NOT installing vivaldi."
+		write_error "Neither debian, fedora, or suse base distros could be found; NOT installing vivaldi."
 		return 1
 	fi
 }
@@ -873,7 +873,7 @@ Single_Install_Vivaldi_Browser (){
 
 Single_Install_Java_Runtime (){
 	# Special case for installing Oracle Java...
-	write_status "${FUNCNAME[0]}: Adding Java JRE..."
+	write_status "Adding Java JRE..."
 	# Add the Oracle Java repository and install the software.
 	# add-apt-repository ppa:linuxuprising/java -y  1>>$_LOGFILE 2>>$_ERRLOGFILE
 	# apt-get update  1>>$_LOGFILE 2>>$_ERRLOGFILE
@@ -888,14 +888,14 @@ Single_Install_Java_Runtime (){
 
 Single_Install_Bleachbit_System_Cleaner (){
 	#Bleachbit
-	write_status "${FUNCNAME[0]}: Bleachbit System Cleaning Tool..."
+	write_status "Bleachbit System Cleaning Tool..."
 	InstallSoftwareFromRepo bleachbit
 }
 
 
 
 Single_Install_Restricted_Codecs (){
-	write_status "${FUNCNAME[0]}: Install all the required multimedia codecs..."
+	write_status "Install all the required multimedia codecs..."
 	for i in libdvdcss2 ffmpeg ; do
 		InstallSoftwareFromRepo $i
 	done
@@ -905,7 +905,7 @@ Single_Install_Restricted_Codecs (){
 
 Single_Install_VLC_Universal_Videao_Player (){
 	#VLC Media Player
-	wtite_status "${FUNCNAME[0]}: Installing VLC Media Player..."
+	wtite_status "Installing VLC Media Player..."
 	InstallSoftwareFromRepo vlc
 }
 
@@ -913,7 +913,7 @@ Single_Install_VLC_Universal_Videao_Player (){
 
 Single_Install_Google_Chrome_Browser (){
 	# Special case for installing Google Chrome
-	write_status "${FUNCNAME[0]}: Installing Google Chrome Browser from google directly..."
+	write_status "Installing Google Chrome Browser from google directly..."
 	software::from_flathub.com com.google.Chrome
 }
 
@@ -921,27 +921,25 @@ Single_Install_Google_Chrome_Browser (){
 
 Single_Install_Remote_Desktop_by_Team_Viewer (){
 	#Teamviewer
-	write_status  "${FUNCNAME[0]}: Installing Teamviewer..."
+	write_status  "Installing Teamviewer..."
 
 	# Download either a deb or an rpm depending on what package format this system supports.
 	# Team Viewer has a special package for SUSE; thus we check if OS is suse or not as well.
-	if hash deb ; then
+	if hash apt ; then
 		software::vendor_download_and_install https://download.teamviewer.com/download/linux/teamviewer_amd64.deb
-	elif hash rpm ; then
-		if hostnamectl | grep -i suse ; then
-			software::vendor_download_and_install https://download.teamviewer.com/download/linux/teamviewer-suse.x86_64.rpm
-		else
-			software::vendor_download_and_install https://download.teamviewer.com/download/linux/teamviewer.x86_64.rpm
-		fi
+	elif hash zypper ; then
+		software::vendor_download_and_install https://download.teamviewer.com/download/linux/teamviewer-suse.x86_64.rpm
+	elif hash dnf ; then
+		software::vendor_download_and_install https://download.teamviewer.com/download/linux/teamviewer.x86_64.rpm
 	else
-		write_error "${FUNCNAME[0]}: No RPM or DEB package managment service was found! ..."
+		write_error "No RPM or DEB package managment service was found! ..."
 	fi
 }
 
 
 
 Single_Install_Remote_Desktop_by_Anydesk () {
-	write_status "${FUNCNAME[0]}: Installing Anydesk remote desktop... "
+	write_status "Installing Anydesk remote desktop... "
 	
 	software::from_flathub.org com.anydesk.Anydesk   
 }
@@ -952,7 +950,7 @@ Single_Install_Remote_Desktop_by_Anydesk () {
 
 Single_Install_MEGA.nz_Encrypted_Cloud_Storage (){
 	# Special case for installing MEGA nz file sync utility (better than Drop Box)...
-	write_status "${FUNCNAME[0]}: Installing MEGA nz file crypto sync utility..."
+	write_status "Installing MEGA nz file crypto sync utility..."
 
 	# Reset & clear variables in case of incomplete cleanup...
 	FILE2GET=
@@ -963,25 +961,25 @@ Single_Install_MEGA.nz_Encrypted_Cloud_Storage (){
 		if hostnamectl | grep -i "Debian" ; then
 			# Grab the debian name and version and format it like Mega does their download URL...
 			URL="https://mega.nz/linux/MEGAsync/Debian_$(hostnamectl |grep -i Debian |cut -f7 -d' ').0/amd64/${product}-Debian_$(hostnamectl |grep -i Debian |cut -f7 -d' ').0_amd64.deb"
-			write_information "${FUNCNAME[0]}: Downloading ${product} from: ${URL}"
+			write_information "Downloading ${product} from: ${URL}"
 		elif hostnamectl | grep -i "Ubuntu" ; then
 			# Grab the Ubuntu name and version and format it like Mega does their download URL...
 			URL="https://mega.nz/linux/MEGAsync/xUbuntu_$(hostnamectl |grep -i Ubuntu |cut -f6 -d' ')/amd64/${product}-xUbuntu_$(hostnamectl |grep -i Ubuntu |cut -f6 -d' ')_amd64.deb"
-			write_information "${FUNCNAME[0]}: Downloading ${product} from: ${URL}"
+			write_information "Downloading ${product} from: ${URL}"
 		elif hostnamectl | grep -i "openSUSE" ; then
 			# Grab the SUSE name and version and format it like Mega does their download URL...
 			TGT="$(hostnamectl |grep -i suse |head -n 1|cut -f5,6,7 -d' ')" ; TGT=${TGT// /_}
 			URL="https://mega.nz/linux/MEGAsync/${TGT}/x86_64/${product}-${TGT}.x86_64.rpm"
-			write_information "${FUNCNAME[0]}: Downloading ${product} from: ${URL}"
+			write_information "Downloading ${product} from: ${URL}"
 		elif hostnamectl | grep -i "Fedora" ; then
 			# Grab the Fedora name and version and format it like Mega does their download URL...
 			TGT="$(hostnamectl |grep -i fedora |tail -n 2|cut -f5,6 -d' ')" ; TGT=${TGT// /_}
 			URL="https://mega.nz/linux/MEGAsync/${TGT::-2}/x86_64/${product}-${TGT::-2}.x86_64.rpm"
-			write_information "${FUNCNAME[0]}: Downloading ${product} from: ${URL}"
+			write_information "Downloading ${product} from: ${URL}"
 		else
-			write_error "${FUNCNAME[0]}: I am not sure how to find the Mega sync download for $( hostnamectl |grep "Operating") "
-			write_error "${FUNCNAME[0]}: Please try to download it manually and instrtall it from the website:"
-			write_error "${FUNCNAME[0]}: https://mega.nz/sync"
+			write_error "I am not sure how to find the Mega sync download for $( hostnamectl |grep "Operating") "
+			write_error "Please try to download it manually and instrtall it from the website:"
+			write_error "https://mega.nz/sync"
 
 		fi
 
@@ -1004,15 +1002,20 @@ Single_Install_MEGA.nz_Encrypted_Cloud_Storage (){
 
 Single_Install_Dropbox_Corporate_Cloud_Storage (){
 	# Install Dropbox
-	write_status "${FUNCNAME[0]}: Installing Dropbox Cloud Storage Sync..."
-	if hash apt ; then 
+	write_status "Installing Dropbox Cloud Storage Sync..."
+	if hash apt ; then
+		write_warning "Please NOTE that Doropox only supports Ubuntu"
 		software::vendor_download_and_install https://www.dropbox.com/download?dl=packages/ubuntu/dropbox_2022.12.05_amd64.deb
-	elif hash rpm ; then 
+		InstallSoftwareFromRepo nautilus-dropbox
+	elif hash dnf ; then 
 		software::vendor_download_and_install https://www.dropbox.com/download?dl=packages/fedora/nautilus-dropbox-2022.12.05-1.fedora.x86_64.rpm
+		InstallSoftwareFromRepo nautilus-dropbox
+	elif hash zypper ; then 
+		write_error "SUSE is not supported by Dropbox. You may try to download and compile it yourself
+		at: https://help.dropbox.com/installs/linux-commands"
 	else 
-		write_error "${FUNCNAME[0]}: Dropox does not seem to have been installed..."
+		write_error "Dropox does not seem to have been installed..."
 	fi
-	InstallSoftwareFromRepo nautilus-dropbox
 }
 
 
@@ -1032,7 +1035,7 @@ Single_Install_VirtualBox (){
 
 	# Special case for installing VirtualBox since distributions name the package and install in different ways...
 	if virt-what ; then
-		write_warning "${FUNCNAME[0]}: This computer is likely a Virtual Machine ( $(virt-what) ) and using Virtualbox inside a VM is not reccommended."
+		write_warning "This computer is likely a Virtual Machine ( $(virt-what) ) and using Virtualbox inside a VM is not reccommended."
 	else
 		if hash apt ; then
 			write_information "--- Installing VirtualBox in Debian based system if available..."
@@ -1049,15 +1052,15 @@ Single_Install_VirtualBox (){
 
 			# Ensure that the current user can use USB etc...
 			if id -nG "$SUDO_USER" | grep -qw "vboxusers"; then
-				write_information "${FUNCNAME[0]}: $SUDO_USER already belongs to vboxusers group"
+				write_information "$SUDO_USER already belongs to vboxusers group"
 			else
 				usermod -G vboxusers -a $SUDO_USER
 			fi
 		elif hash dnf ; then
-			write_information "${FUNCNAME[0]}: Installing VirtualBox in a Red Hat based system if available..."
+			write_information "Installing VirtualBox in a Red Hat based system if available..."
 			InstallSoftwareFromRepo VirtualBox
 		elif hash zypper  ; then
-			write_information "${FUNCNAME[0]}: Installing virtualbox in a SUSE based system..."
+			write_information "Installing virtualbox in a SUSE based system..."
 			for i in virtualbox virtualbox-dkms virtualbox-ext-pack virtualbox-guest-additions-iso
 			do
 				InstallSoftwareFromRepo $i
@@ -1067,12 +1070,12 @@ Single_Install_VirtualBox (){
 
 			# Ensure that the current user can use USB etc...
 			if id -nG "$SUDO_USER" | grep -qw "vboxusers"; then
-				write_information "${FUNCNAME[0]}: $SUDO_USER already belongs to vboxusers group"
+				write_information "$SUDO_USER already belongs to vboxusers group"
 			else
 				usermod -G vboxusers -a $SUDO_USER
 			fi
 		else
-			write_error "${FUNCNAME[0]}: No supported packaging system detected for special case of installing Virtual Box! "
+			write_error "No supported packaging system detected for special case of installing Virtual Box! "
 		fi
 	fi
 }
