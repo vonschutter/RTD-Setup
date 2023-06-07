@@ -153,7 +153,7 @@ if [[ ! $UID -eq 0 ]]; then
 else
 	dependency::_rtd_library
 	# Allow super user to display gui menu on users screen.
-	sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
+	# sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
 
 	rtd_wait_for_internet_availability
 	rtd_oem_reset_default_environment_config
@@ -164,14 +164,7 @@ else
 		rtd_setup_choices_server
 	else
 		check_dependencies zenity || exit 1
-		if echo "$XDG_SESSION_TYPE" |grep "x11" ; then 
-			oem::deploy_themes
-		elif echo "$XDG_SESSION_TYPE" |grep "wayland" ; then
-			oem::deploy_themes
-		else 
-			write_information "No GUI was found, it does not make sense to install themes..."
-			exit 1
-		fi
+		oem::deploy_themes
 		#software::display_bundle_removal_choices_gtk
 		software::display_bundle_install_choices_gtk
 		complete_setup
