@@ -232,19 +232,48 @@ bundle_prefix="recipe_Bundle:_"
 # multiple single installs (functions that install a single piece of software).
 
 
-recipe_Bundle:_Safe_Internet_Browsing () {
-	# Brave and Vivaldi Browsers and other internet tools with a focus on security and privacy
-	software::from_snapcraft.io brave $1 			# Brave secure browser, vendor provided Snap.
-	Single_Install_Vivaldi_Browser				# The Vivaldi browser, not available in snap, or flatpak, nor in repo.
-	software::from_flathub.org org.keepassxc.KeePassXC $1  	# App for secure encrypted password management
+recipe_Bundle:_Internet_Browsing_Private () {
+	# Brave, Vivaldi, and Chromium browsers and other internet tools with a focus on security and privacy
 
+	# Brave secure browser, vendor provided Snap.
+	# If you prefer the downloaded version directly from Brave, uncomment the below line.
+	# Single_Install_Brave_Browser
+	software::from_snapcraft.io brave $1
+
+	# The Vivaldi browser, not available in snap, or flatpak, nor in repo. 			
+	Single_Install_Vivaldi_Browser
+
+	# Chromium is an open-source browser project that aims to build a safer, 
+	# faster, and more stable way to experience the web. 
+	software::from_flathub.org com.github.Eloston.UngoogledChromium $1
+
+	# App for secure encrypted password management
+	software::from_flathub.org org.keepassxc.KeePassXC $1  	
 }
 
 
 
+recipe_Bundle:_Internet_Browsing_Corporate () {
+	# Browsers and tools (Google Chrome, Microsoft Edge)
+
+	# Google Chrome is a browser that combines a minimal design with sophisticated 
+	# technology to make the web faster, safer, and easier.
+	# WARNING: will attempt to ttrack everything about you!
+	software::from_flathub.org com.google.Chrome $1  
+
+	# Introducing the new Microsoft Edge web browser. It’s time to expect more.
+	# More privacy. More control. More productivity. More value.
+	# WARNING: may attempt to ttrack everything about you!
+	software::from_flathub.org com.microsoft.Edge $1  
+}
+
+
 recipe_Bundle:_Virtualization () {
 	# Virtualizaton tools (virt-manager, qemu-kvm, Virtualbox), and others
-		# VirtualBox is a powerful x86 and AMD64/Intel64 virtualization product for enterprise as well as
+	# NOTE: hypervisors are installed using ropositories own versions, or downloaded
+	# Directly from the vendors web page.
+
+	# VirtualBox is a powerful x86 and AMD64/Intel64 virtualization product for enterprise as well as
 	# home use. Not only is VirtualBox an extremely feature rich, high performance product for enterprise
 	# customers, it is also the only professional solution that is freely available as Open Source Software
 	# under the terms of the GNU General Public License (GPL) version 2. See "About VirtualBox" for an introduction.
@@ -256,16 +285,22 @@ recipe_Bundle:_Virtualization () {
 	# dedicated company: everyone is encouraged to contribute while Oracle ensures the product always meets professional
 	# quality criteria. VirtualBox is not provided as a Snap or Flatpak, and must silently be installed with some logic
 	# using the distribution speciffic package manager.
-	Single_Install_VirtualBox				 
-	InstallSoftwareFromRepo virt-manager			# Qemu-KVM GUI for managing virtual machines locally and remote
-	InstallSoftwareFromRepo qemu-kvm			# Very efficient hypervisor fo rrunning virtual machines
+	Single_Install_VirtualBox
+
+	# Qemu-KVM GUI for managing virtual machines locally and remote		 
+	InstallSoftwareFromRepo virt-manager
+
+	# Very efficient hypervisor for running virtual machines
+	InstallSoftwareFromRepo qemu-kvm
 }
 
 
 
 recipe_Bundle:_CLOUD_Management () {
 	# Tools to manage cloud environments like GCP, Azure, AWS
-  
+	# NOTE: the "$1" after the package-name is if you want to trap the --remove option for 
+	# Bundle removals. This is optional.
+
 	# Azure Cloud
 	software::from_snapcraft.io powershell $1  		# PowerShell is an automation and configuration management platform. 
 	software::from_snapcraft.io azure-cli $1 		# Azure CLI 2.0, our next generation multi-platform command line experience for Azure.
@@ -291,85 +326,223 @@ recipe_Bundle:_CLOUD_Management () {
 
 recipe_Bundle:_3D_Printing () {
 	# 3D Printing tools (Prusa, Cura slicers, and CAD, and 3D editing) for supporting and working with 3D-Printing
+	# NOTE: the "$1" after the package-name is if you want to trap the --remove option for 
+	# Bundle removals. This is optional.
 
-	software::from_snapcraft.io cura-slicer $1		# Ultimaker Cura is the world’s most popular 3D printing software
-		snap connect cura-slicer:mount-observe
-		snap connect cura-slicer:removable-media
-	software::from_snapcraft.io meshlab $1			# The open source system for processing and editing 3D triangular meshes
-	software::from_snapcraft.io prusa-slicer $1		# PrusaSlicer takes 3D models (STL, OBJ, AMF) and converts them into G-code instructions for FFF printers or PNG layers for mSLA 3D printers.
-		snap connect prusa-slicer:removable-media
-		snap connect prusa-slicer:mount-observe
-		snap connect prusa-slicer:udisks2
-		snap connect prusa-slicer:raw-usb
-	software::from_snapcraft.io blender $1 			# Blender is the free and open source 3D creation suite
-	software::from_snapcraft.io freecad $1			# https://www.freecadweb.org/
-	software::from_snapcraft.io openscad $1			# OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD aspects rather than artistic ones
+	software::from_flathub.org com.ultimaker.cura $1
+	# ! if you would prefer to use the snap package then please uncomment the lines below.
+	# software::from_snapcraft.io cura-slicer $1		# Ultimaker Cura is the world’s most popular 3D printing software
+	# 	snap connect cura-slicer:mount-observe
+	# 	snap connect cura-slicer:removable-media
+
+	software::from_flathub.org net.meshlab.MeshLab $1
+	# ! if you would prefer to use the snap package then please uncomment the lines below.
+	# software::from_snapcraft.io meshlab $1			# The open source system for processing and editing 3D triangular meshes
+
+	software::from_flathub.org flathub com.prusa3d.PrusaSlicer $1
+	# ! if you would prefer to use the snap package then please uncomment the lines below.
+	# software::from_snapcraft.io prusa-slicer $1		# PrusaSlicer takes 3D models (STL, OBJ, AMF) and converts them into G-code instructions for FFF printers or PNG layers for mSLA 3D printers.
+	# 	snap connect prusa-slicer:removable-media
+	# 	snap connect prusa-slicer:mount-observe
+	# 	snap connect prusa-slicer:udisks2
+	# 	snap connect prusa-slicer:raw-usb
+
 }
+
+
+recipe_Bundle:_CAD_Software () {
+	# CAD Sofware (Blender, FreeCAD, OpenSCAD, LeoCAD, Sweet Home 3D)
+	# NOTE: the "$1" after the package-name is if you want to trap the --remove option for 
+	# Bundle removals. This is optional.
+
+	# Blender is the free and open source 3D creation suite
+	software::from_flathub.org org.blender.Blender $1 
+
+	# FreeCAD is an open-source parametric 3D modeler made primarily to design real-life 
+	# objects of any size. Parametric modeling allows you to easily modify your 
+	# design by going back into your model history and changing its parameters. 
+	# It is designed to fit a wide range of uses including product design, mechanical 
+	# engineering, architecture and 3D printing. 
+	software::from_flathub.org org.freecadweb.FreeCAD $1
+
+	# OpenSCAD is a software for creating solid 3D CAD objects. 
+	# It focuses on CAD aspects rather than artistic ones
+	software::from_flathub.org org.openscad.OpenSCAD $1
+
+	# LeoCAD is a CAD program for creating virtual LEGO models.
+	software::from_flathub.org flathub org.leocad.LeoCAD $1
+
+	# This program is aimed at people who want to design their interior 
+	# quickly, whether they are moving or they just want to redesign 
+	# their existing home. Numerous visual guides help you draw the 
+	# plan of your home and layout furniture.
+	software::from_flathub.org com.sweethome3d.Sweethome3d $1
+}
+
+
 
 
 
 
 recipe_Bundle:_Office_Tools () {
-	# Office apps like: Onlyoffice, Joplin notes, Mailspring, Keepass, and more
-	  
-	software::from_snapcraft.io mailspring $1		# A modern email client
-	software::from_snapcraft.io joplin-desktop $1		# Excellent note-taking and note organization app
-	software::from_snapcraft.io simplenote $1		# Best simple note app for sharing and collaboration on notes
-	  
-	software::from_flathub.org org.keepassxc.KeePassXC  $1  		# App for secure encrypted password management
-	software::from_flathub.org org.onlyoffice.desktopeditors  $1   		# Excellent simple to use and streamlines office bundle
-	software::from_flathub.org com.github.IsmaelMartinez.teams_for_linux $1 # Microsofts collaboration and conferencing tool
-	software::from_flathub.org com.jgraph.drawio.desktop $1   		# draw.io is the most flexible and privacy-focused of any production grade diagramming tool
+	# Office apps like: Onlyoffice, Teams, Draw.io, Joplin notes, Mailspring, Keepass, and more
+	# NOTE: the "$1" after the package-name is if you want to trap the --remove option for 
+	# Bundle removals. This is optional.
+
+	# A modern email client supporting a central management of many accounts.
+	software::from_snapcraft.io mailspring $1
+
+	# Excellent note-taking and note organization app
+	software::from_snapcraft.io joplin-desktop $1
+
+	# Best simple note app for sharing and collaboration on notes	
+	software::from_snapcraft.io simplenote $1		
+
+	# App for secure encrypted password management
+	software::from_flathub.org org.keepassxc.KeePassXC  $1
+
+	# Excellent simple to use and streamlines office bundle
+	software::from_flathub.org org.onlyoffice.desktopeditors  $1
+
+	# Microsofts collaboration and conferencing tool
+	software::from_flathub.org com.github.IsmaelMartinez.teams_for_linux $1
+
+	# draw.io is the most flexible and privacy-focused of any production grade diagramming tool
+	software::from_flathub.org com.jgraph.drawio.desktop $1   		
 }
 
 
 
 recipe_Bundle:_Media_Streaming () {
-	# Streaming apps; Spotify, Stremio, Vocal, and Cozy audiobook reader...
+	# Streaming apps (Spotify, Stremio, Vocal, and Cozy audiobook reader)...
 	
 	# Install Steaming apps from the Snap store:  
-	software::from_snapcraft.io spotify $1				# The worlds most popular music streamer
-	software::from_snapcraft.io red-app $1				# Red is a neat, simple yet feature rich, privacy focused YouTube Player and Downloader
+	# Red is a neat, simple yet feature rich, privacy focused YouTube Player and Downloader
+	# Red is not available as a Flatpak as of yet.
+	software::from_snapcraft.io red-app $1				
 
 	# Install Streaming apps from Flat Hub: 
-	 software::from_flathub.org com.stremio.Stremio $1  		# Watch videos, movies, TV series and TV channels instantly.
-	 software::from_flathub.org com.github.needleandthread.vocal $1 # Simle and easy to use pod cast player
-	 software::from_flathub.org com.github.geigi.cozy $1    	# Cozy is a audio book player. Import all your audio books into Cozy to browse them comfortably
+
+	# Access all of your favorite music, discover new songs, and share music online with 
+	# your friends - all in one place. Create shared playlists or share individual songs 
+	# with your Facebook friends with just a click of a button. Follow your favorite artists 
+	# or friends to know what they are listening to, and then save the songs to your own 
+	# playlists. Spotify is the best way to have access to millions of songs, and all the latest hits.
+	software::from_flathub.org com.spotify.Client $1
+
+	# Watch videos, movies, TV series and TV channels instantly.
+	software::from_flathub.org com.stremio.Stremio $1  		
+	
+	# Simle and easy to use pod cast player
+	software::from_flathub.org com.github.needleandthread.vocal $1 
+	
+	# Plexamp - A beautiful Plex music player for audiophiles, curators, and hipsters.
+	# ★★ You'll need a Plex Media Server and an active Plex Pass to use this app ★★
+	# please see: https://www.plex.tv
+	software::from_flathub.org com.plexamp.Plexamp $1
+
+	# Plex client for desktop computers:
+	# ★★ You'll need access to a Plex Media Server to use this app ★★
+	# Plex for Linux is your client for playback on the Linux desktop. It features the 
+	# point and click interface you see in your browser but uses a more powerful 
+	# playback engine as well as some other advanced features.
+	# To install the server part on another computer please follow the instructions on the 
+	# PLEX website: https://www.plex.tv/media-server-downloads/#plex-media-server
+	software::from_flathub.org tv.plex.PlexDesktop $1
 }
+
+
+
+
+recipe_Bundle:_Media_Players () {
+	# Media Player Apps (VLC, Cozy Audio Book PLayer, Tauon Music Player)
+
+	# Tauon Music Box is a modern, comfortable and streamlined music player for the playback of 
+	# your music collection. Packed with features while maintaining simplicity. Use drag and 
+	# drop for easy file importing and playlist management. Groups albums by folder and allows 
+	# you to manage your music with built-in functions such as file and folder renaming,
+	# cover art downloading and file deleting.
+	software::from_flathub.org com.github.taiko2k.tauonmb $1
+
+	# Cozy is a audio book player. Import all your audio books into Cozy to browse them comfortably
+	software::from_flathub.org com.github.geigi.cozy $1
+
+	# VLC is a free and open source cross-platform multimedia player and framework that plays
+	# most multimedia files as well as DVDs, Audio CDs, VCDs, and various streaming protocols.
+	# If you prefer to have VLC install from you repository you may comment out the line below. 
+	# However, some distributions remove all the usefull codecs so VLC may not work fully. 
+	# InstallSoftwareFromRepo vlc
+	software::from_flathub.org org.videolan.VLC $1
+}
+
+
 
 
 
 recipe_Bundle:_Audio_Editing () {
-	# Audio Tools Bundle including Picard, Audacity, Musescore...
-	  
-	software::from_snapcraft.io picard $1				# Music tag editor
-	software::from_snapcraft.io audacity $1				# Audio editor
-	software::from_snapcraft.io musescore $1			# Create, play and print beautiful sheet music
-		snap connect musescore:cups-control
-		snap connect musescore:network-manager
-		snap connect musescore:alsa
-		snap connect musescore:removable-media
+	# Audio Tools Bundle including Music Brainz Picard, Audacity, Musescore...
+
+
+	# Do you need to clean up your music library? Picard is an open-source 
+	# cross-platform music tagger by MusicBrainz. It has the ability 
+	# to identify audio files even without any existing metadata.
+	software::from_flathub.org org.musicbrainz.Picard $1
+
+	# Audacity® is a free, easy-to-use, multi-track audio editor and 
+	# recorder for Windows, macOS, GNU/Linux and other operating systems.
+	# The interface is translated into many languages.
+	software::from_flathub.org org.audacityteam.Audacity $1
+
+	# MuseScore is cross-platform, multi-lingual, open source music notation software. 
+	# It features an easy to use WYSIWYG editor with audio score playback for results 
+	# that look and sound beautiful
+	# If you would like to use the snap version instead, you may un-comment the next few lines.
+	software::from_flathub.org org.musescore.MuseScore $1
+	# software::from_snapcraft.io musescore $1
+	# 	snap connect musescore:cups-control
+	# 	snap connect musescore:network-manager
+	# 	snap connect musescore:alsa
+	# 	snap connect musescore:removable-media
 }
 
 
-recipe_Bundle:_Video_Editing_and_Streaming () {
+recipe_Bundle:_Video_Editing () {
 	# Video editing apps; Vidcutter, Handbrake, Matroska-tools, Kdenlive, Shotcut, OBS, OpenShot
 	# Install handbrake DVD/BlueRay ripper video converter
 	# Video analysis tools
 	# Popular video editor
 	# Simle video crop/cut
-	  
-	software::from_flathub.org org.blender.Blender $1   		# Free and open source 3D creation suite
-	software::from_flathub.org org.shotcut.Shotcut $1   		# Shotcut is a free and open-source cross-platform video editing application
-	software::from_flathub.org org.kde.kdenlive $1   		# Kdenlive is a non linear video editor. 
-	software::from_flathub.org org.bunkus.mkvtoolnix-gui $1    	# MKVToolNix is a set of tools to create, alter and inspect Matroska files
-	software::from_flathub.org fr.handbrake.ghb $1    		# HandBrake is a tool for converting video from nearly any format to a selection of modern, widely supported codecs
-	software::from_flathub.org com.ozmartians.VidCutter $1    	# A modern, simple to use, constantly evolving and hella fast MEDIA CUTTER + JOINER
-	software::from_flathub.org com.obsproject.Studio $1   		# Live streaming and video recording software
-	software::from_flathub.org org.openshot.	 $1   		# OpenShot can create stunning videos, films, and animations with an easy-to-use interface and rich set of features
-	software::from_flathub.org io.github.jliljebl.Flowblade $1	# Flowblade is a multitrack non-linear video editor, helps make your vision a reality of image and sound
+
+	# Free and open source 3D creation suite
+	software::from_flathub.org org.blender.Blender $1
+
+	# Shotcut is a free and open-source cross-platform video editing application
+	software::from_flathub.org org.shotcut.Shotcut $1
+
+	# Kdenlive is a non linear video editor. 
+	software::from_flathub.org org.kde.kdenlive $1
+
+	# MKVToolNix is a set of tools to create, alter and inspect Matroska files
+	software::from_flathub.org org.bunkus.mkvtoolnix-gui $1
+
+	# HandBrake is a tool for converting video from nearly any format to a selection of modern, widely supported codecs
+	software::from_flathub.org fr.handbrake.ghb $1
+
+	# A modern, simple to use, constantly evolving and hella fast MEDIA CUTTER + JOINER
+	software::from_flathub.org com.ozmartians.VidCutter $1
+
+	# Live streaming and video recording software
+	software::from_flathub.org com.obsproject.Studio $1
+
+	# OpenShot can create stunning videos, films, and animations with an easy-to-use interface and rich set of features
+	software::from_flathub.org org.openshot.OpenShot $1
+
+	# Flowblade is a multitrack non-linear video editor, helps make your vision a reality of image and sound
+	software::from_flathub.org io.github.jliljebl.Flowblade $1
 
 }
+
+
 
 
 
@@ -377,13 +550,36 @@ recipe_Bundle:_Video_Editing_and_Streaming () {
 
 recipe_Bundle:_Developer_Software () {
 	# For creating code: VSCode, GitKraken, and more..
+
+	# Git and build essentials (compiler) is available in the distribution
+	# repository
 	InstallSoftwareFromRepo build-essential
 	InstallSoftwareFromRepo git
-  
-	software::from_snapcraft.io gitkraken $1			# For repo management, in-app code editing & issue tracking
-	software::from_snapcraft.io code $1  				# Visual Studio Code is a new choice of tool that combines the simplicity of a code editor with what developers need
-}
 
+  	# For repo management, in-app code editing & issue tracking
+	software::from_snapcraft.io gitkraken $1
+
+	# Visual Studio Code is a new choice of tool that combines the simplicity 
+	# of a code editor with what developers need
+	software::from_flathub.org com.visualstudio.code $1
+
+	# Helix is a terminal-based text editor inspired by Kakoune / Neovim and written in Rust.
+	# - Vim-like modal editing
+	# - Multiple selections
+	# - Built-in language server support
+	# - Smart, incremental syntax highlighting and code editing via tree-sitter
+	software::from_flathub.org com.helix_editor.Helix $1
+
+	# Neovim is a refactor of the Vim text editor designed to encourage new 
+	# features, advanced UIs, and powerful extensions.
+	software::from_flathub.org io.neovim.nvim $1
+	# NvChad is built upon its personal plugins and many general neovim plugins, 
+	# below are the features that are provided by nvchad plugins ( our ui plugin, 
+	# base46, extensions, nvterm, nvim-colorizer )... 
+	# Please comment out the folowing line if you do not want NeoVim customizations.
+	hash git && git clone https://github.com/NvChad/NvChad "${SUDO_USER}/.config/nvim" --depth 1 
+
+}
 
 
 recipe_Bundle:_Compression_Tools () {
@@ -901,13 +1097,6 @@ Single_Install_Restricted_Codecs (){
 	done
 }
 
-
-
-Single_Install_VLC_Universal_Videao_Player (){
-	#VLC Media Player
-	wtite_status "Installing VLC Media Player..."
-	InstallSoftwareFromRepo vlc
-}
 
 
 
