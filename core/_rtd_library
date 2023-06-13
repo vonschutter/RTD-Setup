@@ -5805,7 +5805,8 @@ software::display_bundle_install_choices_gtk ()
 				previously_completed_bundles="$(cat ${completed_bundles_list})"
 				for i in ${selection} ; do
 					current_bundle="${i}"
-					software::add_software_task recipe_Bundle:_${current_bundle} && echo "${current_bundle}" >> ${completed_bundles_list}
+					#software::add_software_task 
+					recipe_Bundle:_${current_bundle} && echo "${current_bundle}" >> ${completed_bundles_list}
 					((c=c+1))
 				done
 
@@ -5864,7 +5865,8 @@ software::display_bundle_removal_choices_gtk ()
 				removed_bundle_list="$(mktemp)"
 				for i in ${selection} ; do
 					current_bundle="${i}"
-					#software::remove_software_task recipe_Bundle:_${i}
+					#software::add_software_task 
+					recipe_Bundle:_${i} --remove
 					sed -i "/${current_bundle}/d" "${completed_bundles_list}"
 					echo ${current_bundle} >> "${removed_bundle_list}"
 					((c=c+1))
