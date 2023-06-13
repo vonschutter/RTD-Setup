@@ -513,6 +513,20 @@ recipe_Bundle:_Video_Editing () {
 	# Popular video editor
 	# Simle video crop/cut
 
+	# Make sure that libdvdcss is available and ffmpeg... 
+	software::ensure_restricted_codecs
+
+	# MakeMKV is your one-click solution to convert video that you own into 
+	# free and patents-unencumbered format that can be played everywhere. MakeMKV 
+	# is a format converter, otherwise called "transcoder". 
+	software::from_flathub.org com.makemkv.MakeMKV $1
+
+	# Video subtitle editor that supports basic and advanced editing operations
+	software::from_flathub.org org.kde.subtitlecomposer $1
+
+	# K3b was created to be a feature-rich and easy to handle CD burning application.
+	software::from_snapcraft.io k3b $1
+
 	# Free and open source 3D creation suite
 	software::from_flathub.org org.blender.Blender $1
 
@@ -549,7 +563,7 @@ recipe_Bundle:_Video_Editing () {
 
 
 recipe_Bundle:_Developer_Software () {
-	# For creating code: VSCode, GitKraken, and more..
+	# For creating code: (VSCode, GitKraken, Neo VIM, Helix) and more..
 
 	# Git and build essentials (compiler) is available in the distribution
 	# repository
@@ -614,21 +628,43 @@ recipe_Bundle:_Compression_Tools () {
 
 recipe_Bundle:_Top_Curated_Games () {
 	# Top rated Games: Steam platform, and Minecraft, OpenaArena, 0AD, SuperTuxCart etc.
-	write_status "Adding Selection of Quality Games..."
 
-	software::from_snapcraft.io 0ad $1				# 0 A.D. is a real-time strategy (RTS) game of ancient warfare. 
-	software::from_snapcraft.io supertuxkart $1			# A 3D arcade racer with a variety of characters, tracks, and modes to play
-	software::from_snapcraft.io marsshooter $1			# A 2D space shooter with awesome visual effects and attractive physics.
-	software::from_snapcraft.io dm-tools $1				# dm-tools is a collection of tools for Dungeons and Dragons 5e
+	# 0 A.D. is a real-time strategy (RTS) game of ancient warfare.
+	software::from_snapcraft.io 0ad $1
 
-	software::from_flathub.org com.mojang.Minecraft $1		# Join people all over the world playing Minecraft, one of the most popular videogames around!
-	software::from_flathub.org com.moddb.TotalChaos $1		# Survival horror set on a remote island known as Fort Oasis
-	software::from_flathub.org com.viewizard.AstroMenace $1		# Hardcore 3D space scroll-shooter with spaceship upgrade possibilities
-	software::from_flathub.org io.github.EndlessSky.endless-sky $1	# Space exploration and combat game
-	software::from_flathub.org com.albiononline.AlbionOnline $1	# Albion Online is a sandbox MMORPG set in an open medieval fantasy world
-	software::from_flathub.org com.endlessnetwork.aqueducts $1	# An immersive puzzle adventure game where you hack your way to saving the day!
-	software::from_flathub.org de.billardgl.Billardgl $1		# Do you love playing billiards, or have you ever wanted to learn how to play
-	software::from_flathub.org ws.openarena.OpenArena $1		# OpenArena is a free and open source first-person shooter game based heavily on the Quake III Arena-style deathmatch
+	# A 3D arcade racer with a variety of characters, tracks, and modes to play
+	software::from_snapcraft.io supertuxkart $1
+
+	# A 2D space shooter with awesome visual effects and attractive physics.
+	software::from_snapcraft.io marsshooter $1
+
+	# dm-tools is a collection of tools for Dungeons and Dragons 5e	
+	software::from_snapcraft.io dm-tools $1
+	
+	# Join people all over the world playing Minecraft, one of the most popular videogames around!
+	software::from_flathub.org com.mojang.Minecraft $1
+
+	# Survival horror set on a remote island known as Fort Oasis
+	software::from_flathub.org com.moddb.TotalChaos $1
+
+	# Hardcore 3D space scroll-shooter with spaceship upgrade possibilities	
+	software::from_flathub.org com.viewizard.AstroMenace $1
+
+	# Space exploration and combat game		
+	software::from_flathub.org io.github.EndlessSky.endless-sky $1
+
+	# Albion Online is a sandbox MMORPG set in an open medieval fantasy world	
+	software::from_flathub.org com.albiononline.AlbionOnline $1
+
+	# An immersive puzzle adventure game where you hack your way to saving the day!	
+	software::from_flathub.org com.endlessnetwork.aqueducts $1
+
+	# Do you love playing billiards, or have you ever wanted to learn how to play	
+	software::from_flathub.org de.billardgl.Billardgl $1
+
+	# OpenArena is a free and open source first-person shooter game based heavily on the Quake III Arena-style deathmatch		
+	software::from_flathub.org ws.openarena.OpenArena $1
+
 
 	# Install Valves Steam Client for gaming: gives access to thousands of commercial games.
 	InstallSoftwareFromRepo steam
@@ -657,29 +693,44 @@ recipe_Bundle:_Admin_Tools () {
 	# NOT REMOVABLE. Bundle contains downloaded software from sites. 
 	# Loop through each item in this list of software and perform an install
 	# using the relevant packaging system.
-	AdminToolsAppList="nmap synaptic ssh gparted sshfs htop iftop nethogs glances bmon \
-		vim vim-scripts gufw variety diodon polari filezilla tilix dialog byobu"
+	AdminToolsAppList="nmap synaptic ssh sshfs htop iftop nethogs glances bmon \
+		vim vim-scripts variety diodon polari filezilla tilix dialog byobu bleachbit"
 
 	for i in ${AdminToolsAppList}
 	do
 		InstallSoftwareFromRepo $i
 	done
 
-	Single_Install_Windows_Subsystem_for_Linux			# Installs the ability to run Windows wrograms on Linux
-	Single_Install_Java_Runtime					# Installs Java, needed for cross platform software like Minecraft and others
-	Single_Install_Bleachbit_System_Cleaner				# Install a system cleaner (disk space saver)
-	Single_Install_Remote_Desktop_by_Team_Viewer			# Teamviewer remote admin
+	# Installs Java, needed for cross platform software like Minecraft and others
+	InstallSoftwareFromRepo default-jre
+
+	# Teamviewer remote admin		
+	Single_Install_Remote_Desktop_by_Team_Viewer			
 }
+
+
 
 
 recipe_Bundle:_Windows_Subsystem_for_Linux (){
 	# Run windows programs! includes wine, DOS, and Acrobat reader, Notepad++, and more...
-	InstallSoftwareFromRepo wine					# Wine runtime environment for windows apps.
-	software::from_snapcraft.io dosbox-x $1				# A DOS virtual environment!
-	software::from_snapcraft.io acrordrdc $1			# Adobe Acrobat Reader is a pdf reader & Web services developed by Adobe Inc.
-	software::from_snapcraft.io notepad-plus-plus $1		# notepad-plus-plus is a free source code editor for Windows
-	software::from_snapcraft.io resourcehacker $1 			# Resourcehacker is a resource extraction utility and resource compiler
-	software::from_snapcraft.io multicommander $1			# File Manager For Professionals.
+
+	# Wine runtime environment for windows apps.	
+	InstallSoftwareFromRepo wine
+	
+	# A DOS virtual environment!				
+	software::from_snapcraft.io dosbox-x $1
+	
+	# Adobe Acrobat Reader is a pdf reader & Web services developed by Adobe Inc.				
+	software::from_snapcraft.io acrordrdc $1
+	
+	# notepad-plus-plus is a free source code editor for Windows			
+	software::from_snapcraft.io notepad-plus-plus $1
+	
+	# Resourcehacker is a resource extraction utility and resource compiler		
+	software::from_snapcraft.io resourcehacker $1
+	
+	# File Manager For Professionals.	 		
+	software::from_snapcraft.io multicommander $1
 }
 
 
@@ -687,22 +738,32 @@ recipe_Bundle:_Windows_Subsystem_for_Linux (){
 
 recipe_Bundle:_Digital_Art_and_Imaging () {
 	# Createive art software; Krita, GIMP, Inkscape, Flameshot
-	  
-	software::from_snapcraft.io krita $1				# It is perfect for sketching and painting, and presents an end–to–end solution for creating digital painting files from scratch by masters.
-	software::from_snapcraft.io gimp $1				# Whether you are a graphic designer, photographer, illustrator, or scientist, GIMP provides you with sophisticated tools to get your job done.
-	software::from_snapcraft.io inkscape $1				# Inkscape is a Free and open source vector graphics editor.
-	software::from_snapcraft.io photoscape $1			# PhotoScape is a fun and easy photo editing software that enables you to fix and enhance photos
+
+	# It is perfect for sketching and painting, and presents an end–to–end solution for creating 
+	# digital painting files from scratch by masters.
+	software::from_snapcraft.io flathub org.kde.krita $1
+
+	# Whether you are a graphic designer, photographer, illustrator, or scientist, GIMP provides 
+	# you with sophisticated tools to get your job done.
+	software::from_snapcraft.io org.gimp.GIMP $1
+
+	# Inkscape is a Free and open source vector graphics editor.				
+	software::from_snapcraft.io org.inkscape.Inkscape $1
+
+	# PhotoScape is a fun and easy photo editing software that enables you to fix and enhance photos		
+	software::from_snapcraft.io photoscape $1
 }
 
 
 
+
 recipe_Bundle:_OEM_restricted_fonts () {
-	# Download and install Trutype standard font pack...
-	wget "https://www.dropbox.com/s/y16d8wpb45yebv8/True_Type_Font_Pack.7z" -P /opt/rtd/cache/
-	mkdir -p /usr/share/fonts/truetype/oem
+	# Install Legacy TruType standard font pack an more...
+	# wget "https://www.dropbox.com/s/y16d8wpb45yebv8/True_Type_Font_Pack.7z" -P /opt/rtd/cache/
+	# mkdir -p /usr/share/fonts/truetype/oem
 	# This bundle depends on teh compressions tools bundle...
 	recipe_Bundle:_Compression_Tools
-	7z e -y /opt/rtd/cache/True_Type_Font_Pack.7z -o/usr/share/fonts/truetype/oem/
+	bash $(find /opt -name plus-themes.sh) --fonts
 }
 
 
@@ -712,10 +773,15 @@ recipe_Bundle:_Secure_Communication () {
 	# This software is end to end encrypted
 	# and generally does not share keys with the vendor. Also, these apps are confined on the desktop
 	# meaning that they cannot access the wich is not granted explicitly.
-	  
-	software::from_snapcraft.io signal-desktop $1			# Encrypted person to person chat/call/conferencing
-	software::from_snapcraft.io telegram-desktop $1			# Encrypted chat, group commmunications
-	software::from_snapcraft.io electron-mail $1			# Uses protonmail.com (encrypted mail)
+	
+	# Encrypted person to person chat/call/conferencing  
+	software::from_snapcraft.io signal-desktop $1
+
+	# Encrypted chat, group commmunications
+	software::from_snapcraft.io telegram-desktop $1
+
+	# Uses protonmail.com (encrypted mail)
+	software::from_snapcraft.io electron-mail $1
 }
 
 
@@ -1067,44 +1133,6 @@ Single_Install_Vivaldi_Browser (){
 
 
 
-Single_Install_Java_Runtime (){
-	# Special case for installing Oracle Java...
-	write_status "Adding Java JRE..."
-	# Add the Oracle Java repository and install the software.
-	# add-apt-repository ppa:linuxuprising/java -y  1>>$_LOGFILE 2>>$_ERRLOGFILE
-	# apt-get update  1>>$_LOGFILE 2>>$_ERRLOGFILE
-	# echo oracle-java11-installer shared/accepted-oracle-license-v1-2 select true | sudo /usr/bin/debconf-set-selections && \
-	# apt install -y oracle-java12-installer    1>>$_LOGFILE 2>>$_ERRLOGFILE
-	# apt install -y oracle-java12-set-default  1>>$_LOGFILE 2>>$_ERRLOGFILE
-	InstallSoftwareFromRepo default-jre
-
-}
-
-
-
-Single_Install_Bleachbit_System_Cleaner (){
-	#Bleachbit
-	write_status "Bleachbit System Cleaning Tool..."
-	InstallSoftwareFromRepo bleachbit
-}
-
-
-
-Single_Install_Restricted_Codecs (){
-	write_status "Install all the required multimedia codecs..."
-	for i in libdvdcss2 ffmpeg ; do
-		InstallSoftwareFromRepo $i
-	done
-}
-
-
-
-
-Single_Install_Google_Chrome_Browser (){
-	# Special case for installing Google Chrome
-	write_status "Installing Google Chrome Browser from google directly..."
-	software::from_flathub.com com.google.Chrome
-}
 
 
 
@@ -1127,11 +1155,15 @@ Single_Install_Remote_Desktop_by_Team_Viewer (){
 
 
 
+
+
+
 Single_Install_Remote_Desktop_by_Anydesk () {
 	write_status "Installing Anydesk remote desktop... "
-	
 	software::from_flathub.org com.anydesk.Anydesk   
 }
+
+
 
 
 
