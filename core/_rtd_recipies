@@ -591,7 +591,7 @@ recipe_Bundle:_Developer_Software () {
 	# below are the features that are provided by nvchad plugins ( our ui plugin, 
 	# base46, extensions, nvterm, nvim-colorizer )... 
 	# Please comment out the folowing line if you do not want NeoVim customizations.
-	hash git && git clone https://github.com/NvChad/NvChad "${SUDO_USER}/.config/nvim" --depth 1 
+	hash git &>/dev/nul && git clone https://github.com/NvChad/NvChad "${SUDO_USER}/.config/nvim" --depth 1 
 
 }
 
@@ -612,7 +612,7 @@ recipe_Bundle:_Compression_Tools () {
 	# been compressed. The ZIP file format permits a number of compression 
 	# algorithms, though DEFLATE is the most common.
 	
-	if hash dnf ; then 
+	if hash dnf &>/dev/nul ; then 
 		write_information "Fedora based software management found, assuming fedora based distribution..."
 		for i in p7zip-gui p7zip p7zip-plugins zip; do
 			check_dependencies $i
@@ -952,19 +952,19 @@ recipe_Bundle:_1_RTD_CONFIG (){
 		# Install hemes (Light and Dark) and more...
 		bash ${_THEME_DIR}/plus-themes.sh
 
-		if hash apt-get 2>/dev/null ; then
+		if hash apt-get &>/dev/nul ; then
 			for i in sassc libcanberra-gtk-module libglib2.0-dev gtk2-engines-murrine gtk2-engines-pixbuf libxml2-utils ; do
 				check_dependencies  $i
 			done
-		elif hash zypper 2>/dev/null ; then
+		elif hash zypper &>/dev/nul ; then
 			for i in gtk-murrine-engine gtk2-engines sassc glib2-devel ; do
 				check_dependencies  $i
 			done
-		elif hash dnf 2>/dev/null ; then
+		elif hash dnf &>/dev/nul ; then
 			for i in gtk-murrine-engine gtk2-engines sassc glib2-devel ; do
 				check_dependencies  $i
 			done
-		elif hash pacman 2>/dev/null ; then
+		elif hash pacman &>/dev/nul ; then
 			for i in gtk-engine-murrine gtk-engines sassc; do
 				check_dependencies  $i
 			done
@@ -1142,11 +1142,11 @@ Single_Install_Remote_Desktop_by_Team_Viewer (){
 
 	# Download either a deb or an rpm depending on what package format this system supports.
 	# Team Viewer has a special package for SUSE; thus we check if OS is suse or not as well.
-	if hash apt ; then
+	if hash apt &>/dev/nul; then
 		software::vendor_download_and_install https://download.teamviewer.com/download/linux/teamviewer_amd64.deb
-	elif hash zypper ; then
+	elif hash zypper &>/dev/nul; then
 		software::vendor_download_and_install https://download.teamviewer.com/download/linux/teamviewer-suse.x86_64.rpm
-	elif hash dnf ; then
+	elif hash dnf &>/dev/nul; then
 		software::vendor_download_and_install https://download.teamviewer.com/download/linux/teamviewer.x86_64.rpm
 	else
 		write_error "No RPM or DEB package managment service was found! ..."
@@ -1224,14 +1224,14 @@ Single_Install_MEGA.nz_Encrypted_Cloud_Storage (){
 Single_Install_Dropbox_Corporate_Cloud_Storage (){
 	# Install Dropbox
 	write_status "Installing Dropbox Cloud Storage Sync..."
-	if hash apt ; then
+	if hash apt &>/dev/nul; then
 		write_warning "Please NOTE that Doropox only supports Ubuntu"
 		software::vendor_download_and_install https://www.dropbox.com/download?dl=packages/ubuntu/dropbox_2022.12.05_amd64.deb
 		InstallSoftwareFromRepo nautilus-dropbox
-	elif hash dnf ; then 
+	elif hash dnf &>/dev/nul; then 
 		software::vendor_download_and_install https://www.dropbox.com/download?dl=packages/fedora/nautilus-dropbox-2022.12.05-1.fedora.x86_64.rpm
 		InstallSoftwareFromRepo nautilus-dropbox
-	elif hash zypper ; then 
+	elif hash zypper &>/dev/nul; then 
 		write_error "SUSE is not supported by Dropbox. You may try to download and compile it yourself
 		at: https://help.dropbox.com/installs/linux-commands"
 	else 
@@ -1258,7 +1258,7 @@ Single_Install_VirtualBox (){
 	if virt-what ; then
 		write_warning "This computer is likely a Virtual Machine ( $(virt-what) ) and using Virtualbox inside a VM is not reccommended."
 	else
-		if hash apt ; then
+		if hash apt &>/dev/nul ; then
 			write_information "--- Installing VirtualBox in Debian based system if available..."
 			# Unlike RPM based systems DEB's are allowed to ask questions in the middle of an install:
 			echo virtualbox virtualbox/module-compilation-allowed boolean true | /usr/bin/debconf-set-selections
@@ -1277,10 +1277,10 @@ Single_Install_VirtualBox (){
 			else
 				usermod -G vboxusers -a $SUDO_USER
 			fi
-		elif hash dnf ; then
+		elif hash dnf &>/dev/nul; then
 			write_information "Installing VirtualBox in a Red Hat based system if available..."
 			InstallSoftwareFromRepo VirtualBox
-		elif hash zypper  ; then
+		elif hash zypper &>/dev/nul ; then
 			write_information "Installing virtualbox in a SUSE based system..."
 			for i in virtualbox virtualbox-dkms virtualbox-ext-pack virtualbox-guest-additions-iso
 			do

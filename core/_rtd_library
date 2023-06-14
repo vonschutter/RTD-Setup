@@ -5807,11 +5807,11 @@ software::display_bundle_install_choices_gtk ()
 					for i in ${selection} ; do
 					current_bundle="${i}"
 					#software::add_software_task 
-					recipe_Bundle:_${current_bundle} && echo "${current_bundle}" >> ${completed_bundles_list} && echo "$($c + 10)"
+					recipe_Bundle:_${current_bundle} && echo "${current_bundle}" >> ${completed_bundles_list} && echo "$($c + 10)"| zenity --progress --no-cancel --auto-close --auto-close --title="Installing Software Prodictivity Bundles" --text="Please wait for the bundle installs to complete..." --percentage=10 --height=200 --width=600
 					((c=c+1))
 					done	
 				}
-				process_bundles_2_add | zenity --progress --no-cancel --auto-close --auto-close --title="Installing Software Prodictivity Bundles" --text="Please wait for the bundle installs to complete..." --percentage=10 --height=200 --width=600
+				process_bundles_2_add 
 
 				completed_bundles="$(cat ${completed_bundles_list} |tail -$c)"
 				zenity --info --timeout 120 --title "Bundles Installed: $c Bundles Previously Installed: $d" --text="The following Software bundles have been installed: \n \n $completed_bundles \n \n Previouly installed bundles: \n \n $previously_completed_bundles" --height=600 --width=800
