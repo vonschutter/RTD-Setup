@@ -6339,7 +6339,7 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 # Omitting any of the arguments will us the default instead.
 #
 # Globals: ${FedoraVersion} ${PRESEED_FILE}
-# Optional arguments: [-c <#CPU>, -m <MB RAM>, -d <GB Disk>]
+# Optional arguments: workstation|ssh-server|ansible-server [-c <#CPU>, -m <MB RAM>, -d <GB Disk>]
 # Outputs: std err
 # Returns: 
 # Usage:
@@ -6397,7 +6397,7 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 	: ${_config="${1:-"workstation"}"}
 	system::generate_ks_cfg_file -u "${_source_url}" -c "${_config}" -p "${_preseed_file}" -e "@workstation-product-environment"
 
-	local vm_name="VDI_Fedora_"${_config}"_"${RANDOM}""
+	local vm_name="#Template_VDI_Fedora_"${_config}"_"${RANDOM}""
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in PRESEED: ${_preseed_file} \n
@@ -6405,14 +6405,14 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 	🌎 - ${_source_url} \n
 	🌎 - ${_mirrorlist_url} \n
 	✅ - Using the network: ${virt_net:=default} \n
-	✅ - Memory: ${_mem:-2048} \n
-	✅ - CPU's: ${_cpu:-2} \n
-	✅ - Disk Size: ${_dsk:-40} \n You may attach to this server and see the progress at IP: $(hostname -I)"
+	✅ - Memory: ${_mem} \n
+	✅ - CPU's: ${_cpu} \n
+	✅ - Disk Size: ${_dsk} \n You may attach to this server and see the progress at IP: $(hostname -I)"
 
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
 		--vcpus "${_cpu}" \
 		--memory "${_mem}" \
-		--network "$virt_net" \
+		--network "${virt_net}" \
 		--disk size="${_dsk}" \
 		--os-variant="fedora30" \
 		--initrd-inject="${_preseed_file}" \
@@ -6455,6 +6455,8 @@ make_kvm_virtual_machine_now_from_redhat_com ()
 # End of Documentation
 
 	dependency::virtualization
+
+	# Check for optional default T-Shirts size overrides... 
 	local OPTIND o a
 	while getopts ':c:m:d:' OPTION; do
 		case "$OPTION" in
@@ -6470,9 +6472,19 @@ make_kvm_virtual_machine_now_from_redhat_com ()
 			local _dsk="${OPTARG}"
 			write_information "Custom disk sizee set to: ${OPTARG}"
 		;;
+		? )
+			write_host --cyan  "Usage: ${FUNCNAME[0]} or ${FUNCNAME[0]} [-c <#CPU>, -m <MB RAM>, -d <GB Disk>]"
+			return 0
+		;;
 		esac
 	done
 	unset OPTIND
+
+	# Set default values for VM T-Shirts sizes...
+	: ${_cpu="${_cpu:-2}"}
+	: ${_mem="${_mem:-2048}"}
+	: ${_dsk="${_dsk:-100}"}
+
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: ${virt_net="$(system::find_vm_bridge)"}
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
@@ -6499,15 +6511,15 @@ make_kvm_virtual_machine_now_from_redhat_com ()
 	🌎 - ${_source_url} \n
 	🌎 - ${_mirrorlist_url} \n
 	✅ - Using the network: ${virt_net:=default} \n
-	✅ - Memory: ${_mem:-2048} \n
-	✅ - CPU's: ${_cpu:-2} \n
-	✅ - Disk Size: ${_dsk:-100} \n You may attach to this server and see the progress at IP: $(hostname -I)"
+	✅ - Memory: ${_mem} \n
+	✅ - CPU's: ${_cpu} \n
+	✅ - Disk Size: ${_dsk} \n You may attach to this server and see the progress at IP: $(hostname -I)"
 
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
-		--vcpus "${_cpu:-2}" \
-		--memory "${_mem:-2048}" \
-		--network "$virt_net" \
-		--disk size="${_dsk:-100}" \
+		--vcpus "${_cpu}" \
+		--memory "${_mem}" \
+		--network "${virt_net}" \
+		--disk size="${_dsk}" \
 		--os-variant="fedora30" \
 		--initrd-inject="${_preseed_file}" \
 		--location="${_source_url}" \
@@ -6548,6 +6560,8 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 # End of Documentation
 
 	dependency::virtualization
+
+	# Check for optional default T-Shirts size overrides... 
 	local OPTIND o a
 	while getopts ':c:m:d:' OPTION; do
 		case "$OPTION" in
@@ -6563,9 +6577,19 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 			local _dsk="${OPTARG}"
 			write_information "Custom disk sizee set to: ${OPTARG}"
 		;;
+		? )
+			write_host --cyan  "Usage: ${FUNCNAME[0]} or ${FUNCNAME[0]} [-c <#CPU>, -m <MB RAM>, -d <GB Disk>]"
+			return 0
+		;;
 		esac
 	done
 	unset OPTIND
+
+	# Set default values for VM T-Shirts sizes...
+	: ${_cpu="${_cpu:-2}"}
+	: ${_mem="${_mem:-2048}"}
+	: ${_dsk="${_dsk:-100}"}
+
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
 
@@ -6582,16 +6606,16 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 	🌎 - ${vm_kernel:="DEFAULT"} \n
 	🌎 - ${vm_initrd:="DEFAULT"} \n
 	✅ - Using the network: ${virt_net} \n
-	✅ - Memory: ${_mem:-2048} \n
-	✅ - CPU's: ${_cpu:-2} \n
-	✅ - Disk Size: ${_dsk:-100} \n You may attach to this server and see the progress at IP: $(hostname -I))"
+	✅ - Memory: ${_mem} \n
+	✅ - CPU's: ${_cpu} \n
+	✅ - Disk Size: ${_dsk} \n You may attach to this server and see the progress at IP: $(hostname -I))"
 
 	# create image and run installer
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
-		--vcpus "${_cpu:-2}" \
-		--memory "${_mem:-2048}" \
-		--network "$virt_net" \
-		--disk size="${_dsk:-100}" \
+		--vcpus "${_cpu}" \
+		--memory "${_mem}" \
+		--network "${virt_net}" \
+		--disk size="${_dsk}" \
 		--os-variant=opensusetumbleweed \
 		--initrd-inject="${PRESEED_FILE}" \
 		--location="${source_url}" \
@@ -6634,6 +6658,8 @@ make_kvm_virtual_machine_now_from_debian_org ()
 # End of Documentation
 
 	dependency::virtualization
+
+	# Check for optional default T-Shirts size overrides... 
 	local OPTIND o a
 	while getopts ':c:m:d:' OPTION; do
 		case "$OPTION" in
@@ -6649,9 +6675,19 @@ make_kvm_virtual_machine_now_from_debian_org ()
 			local _dsk="${OPTARG}"
 			write_information "Custom disk sizee set to: ${OPTARG}"
 		;;
+		? )
+			write_host --cyan  "Usage: ${FUNCNAME[0]} or ${FUNCNAME[0]} [-c <#CPU>, -m <MB RAM>, -d <GB Disk>]"
+			return 0
+		;;
 		esac
 	done
 	unset OPTIND
+
+	# Set default values for VM T-Shirts sizes...
+	: ${_cpu="${_cpu:-2}"}
+	: ${_mem="${_mem:-2048}"}
+	: ${_dsk="${_dsk:-100}"}
+
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet, and set variables.
 	: "${bin_virt_install:=$(type -p virt-install)}"
@@ -6688,17 +6724,17 @@ make_kvm_virtual_machine_now_from_debian_org ()
 	🌎 - ${vm_kernel} \n
 	🌎 - ${vm_initrd} \n
 	✅ - Using the network: ${virt_net} \n
-	✅ - Memory: ${_mem:-2048} \n
-	✅ - CPU's: ${_cpu:-2} \n
-	✅ - Disk Size: ${_dsk:-100} \n You may attach to this server and see the progress at IP: $(hostname -I))"
+	✅ - Memory: ${_mem} \n
+	✅ - CPU's: ${_cpu} \n
+	✅ - Disk Size: ${_dsk} \n You may attach to this server and see the progress at IP: $(hostname -I))"
 
 
 	# create image and run installer
 	"${bin_virt_install}" --name "${vm_name}" \
-		--vcpus "${_cpu:-2}" \
-		--memory "${_mem:-2048}" \
-		--network "$virt_net" \
-		--disk size="${_dsk:-100}" \
+		--vcpus "${_cpu}" \
+		--memory "${_mem}" \
+		--network "${virt_net}" \
+		--disk size="${_dsk}" \
 		--location="${source_url}" \
 		--os-variant="${1:-debian10}" \
 		--video "virtio" --channel "spicevmc" \
@@ -6748,6 +6784,35 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 # End of Documentation
 	ubuntu_flavor="${1}"
 	dependency::virtualization
+
+	# Check for optional default T-Shirts size overrides... 
+	local OPTIND o a
+	while getopts ':c:m:d:' OPTION; do
+		case "$OPTION" in
+		c )
+			local _cpu="${OPTARG}"
+			write_information "Custom CPU set to: ${OPTARG}"
+		;;
+		m )
+			local _mem="${OPTARG}"
+			write_information "Custom memory set to: ${OPTARG}"
+		;;
+		d )
+			local _dsk="${OPTARG}"
+			write_information "Custom disk sizee set to: ${OPTARG}"
+		;;
+		? )
+			write_host --cyan  "Usage: ${FUNCNAME[0]} or ${FUNCNAME[0]} [-c <#CPU>, -m <MB RAM>, -d <GB Disk>]"
+			return 0
+		;;
+		esac
+	done
+	unset OPTIND
+
+	# Set default values for VM T-Shirts sizes...
+	: ${_cpu="${_cpu:-2}"}
+	: ${_mem="${_mem:-2048}"}
+	: ${_dsk="${_dsk:-100}"}
 
 	write_information "🔎 Retreive list of available $ubuntu_flavor versions..."
 	case "$ubuntu_flavor" in
@@ -6799,15 +6864,15 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 	🌎 - ${ubuntu_iso_url} \n
 	🌎 - ${iso} \n
 	✅ - Using the network: ${virt_net} \n
-	✅ - Memory: ${3:-2048} \n
-	✅ - CPU's: ${2:-2} \n
-	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))"
+	✅ - Memory: ${_mem} \n
+	✅ - CPU's: ${_cpu} \n
+	✅ - Disk Size: ${_dsk} \n You may attach to this server and see the progress at IP: $(hostname -I))"
 
 	"${bin_virt_install}" --name ${vm_name} \
-		--vcpus "${2:-2}" \
-		--memory "${3:-2048}" \
+		--vcpus "${_cpu}" \
+		--memory "${_mem}" \
 		--network "${virt_net}" \
-		--disk size="${4:-30}" \
+		--disk size="${_dsk}" \
 		--os-variant="ubuntu21.10" \
 		--video "virtio" --channel "spicevmc" \
 		--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
@@ -6860,6 +6925,35 @@ make_kvm_virtual_machine_now_from_microsoft ()
 # End of Documentation
 	dependency::virtualization
 
+	# Check for optional default T-Shirts size overrides... 
+	local OPTIND o a
+	while getopts ':c:m:d:' OPTION; do
+		case "$OPTION" in
+		c )
+			local _cpu="${OPTARG}"
+			write_information "Custom CPU set to: ${OPTARG}"
+		;;
+		m )
+			local _mem="${OPTARG}"
+			write_information "Custom memory set to: ${OPTARG}"
+		;;
+		d )
+			local _dsk="${OPTARG}"
+			write_information "Custom disk sizee set to: ${OPTARG}"
+		;;
+		? )
+			write_host --cyan  "Usage: ${FUNCNAME[0]} or ${FUNCNAME[0]} [-c <#CPU>, -m <MB RAM>, -d <GB Disk>]"
+			return 0
+		;;
+		esac
+	done
+	unset OPTIND
+
+	# Set default values for VM T-Shirts sizes...
+	: ${_cpu="${_cpu:-2}"}
+	: ${_mem="${_mem:-4098}"}
+	: ${_dsk="${_dsk:-100}"}
+
 	: ${target_winver="${1:-win10}"} || read -p "💥 - Failure to set variable target_winver"
 	case $target_winver in
 		win12 ) ;;
@@ -6877,9 +6971,6 @@ make_kvm_virtual_machine_now_from_microsoft ()
 	: ${virt_net="$(system::find_vm_bridge)"}
 	: ${AutoUnattend="/tmp/autounattend.xml"}
 	: ${PostTasks="/tmp/rtd-me-sh.cmd"}
-	: ${cpu_count="${2:-2}"}
-	: ${mem_size="${3:-6000}"}
-	: ${disk_size="${4:-100}"}
 	: ${preferred_video="${5:-"qxl"}"}
 
 	if [[ ! -e "${WindowsMedia}" ]]; then
@@ -6925,17 +7016,17 @@ make_kvm_virtual_machine_now_from_microsoft ()
 	🌎 - ${WindowsInstructions} \n
 	🌎 - ${PostTasks} \n
 	✅ - Using the network: ${virt_net} \n
-	✅ - Memory: ${mem_size} \n
-	✅ - CPU's: ${cpu_count} \n
-	✅ - Disk Size: ${disk_size} \n You may attach to this server and see the progress at IP: $(hostname -I))"
+	✅ - Memory: ${_mem} \n
+	✅ - CPU's: ${_cpu} \n
+	✅ - Disk Size: ${_dsk} \n You may attach to this server and see the progress at IP: $(hostname -I))"
 
 	write_status "Creating and starting Virtual machine... "
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
-		--vcpus "${cpu_count}" \
-		--memory "${mem_size}" \
+		--vcpus "${_cpu}" \
+		--memory "${_mem}" \
 		--network "${virt_net}" \
+		--disk size="${_dsk}" \
 		--video ${preferred_video} \
-		--disk size="${disk_size}" \
 		--os-variant="$( if osinfo-query -s -f os |grep ${target_winver} &>/dev/null ; then echo ${target_winver} ; else echo win10 ; fi )" \
 		--cdrom "${WindowsMedia}" \
 		--disk "${WindowsInstructions}",device=floppy \
@@ -6980,6 +7071,35 @@ make_kvm_virtual_machine_now_from_iso ()
 
 	dependency::virtualization
 
+	# Check for optional default T-Shirts size overrides... 
+	local OPTIND o a
+	while getopts ':c:m:d:' OPTION; do
+		case "$OPTION" in
+		c )
+			local _cpu="${OPTARG}"
+			write_information "Custom CPU set to: ${OPTARG}"
+		;;
+		m )
+			local _mem="${OPTARG}"
+			write_information "Custom memory set to: ${OPTARG}"
+		;;
+		d )
+			local _dsk="${OPTARG}"
+			write_information "Custom disk sizee set to: ${OPTARG}"
+		;;
+		? )
+			write_host --cyan  "Usage: ${FUNCNAME[0]} or ${FUNCNAME[0]} [-c <#CPU>, -m <MB RAM>, -d <GB Disk>]"
+			return 0
+		;;
+		esac
+	done
+	unset OPTIND
+
+	# Set default values for VM T-Shirts sizes...
+	: ${_cpu="${_cpu:-2}"}
+	: ${_mem="${_mem:-2048}"}
+	: ${_dsk="${_dsk:-100}"}
+
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
 	: "${TARGET_ISO:="/var/lib/libvirt/boot/ubuntu-21.04-desktop-amd64.iso"}"
@@ -7001,8 +7121,6 @@ make_kvm_virtual_machine_now_from_iso ()
 	--cdrom=${TARGET_ISO}
 	--initrd-inject=$PRESEED_FILE
 	--extra-args ks=file:/$(basename $PRESEED_FILE)"
-
-
 
 	# create image and run installer
 	"${BIN_VIRT_INSTALL}" --name VDI_Ubuntu_"$CONFIG"_"$RANDOM" \
@@ -8934,7 +9052,7 @@ system::generate_ks_cfg_file ()
 		return
 	;;
 	* )
-		write_information "${FUNCNAME[0]}: No valid OS configuration requested: 
+		write_information ": No valid OS configuration requested: 
 		Valid requests are: workstation, ssh-server, ansible-server
 		skipping..."
 		return 1
