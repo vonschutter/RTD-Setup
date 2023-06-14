@@ -5803,12 +5803,15 @@ software::display_bundle_install_choices_gtk ()
 				d=0 ; for i in $(cat ${completed_bundles_list}) ; do ((d=d+1)) ; done
 				c=0
 				previously_completed_bundles="$(cat ${completed_bundles_list})"
-				for i in ${selection} ; do
+				process_bundles_2_add () {
+					for i in ${selection} ; do
 					current_bundle="${i}"
 					#software::add_software_task 
-					recipe_Bundle:_${current_bundle} && echo "${current_bundle}" >> ${completed_bundles_list}
+					recipe_Bundle:_${current_bundle} && echo "${current_bundle}" >> ${completed_bundles_list} && echo "$($c + 10)"
 					((c=c+1))
-				done
+					done	
+				}
+				process_bundles_2_add | zenity --progress --no-cancel --auto-close --auto-close --title="Installing Software Prodictivity Bundles" --text="Please wait for the bundle installs to complete..." --percentage=10 --height=200 --width=600
 
 				completed_bundles="$(cat ${completed_bundles_list} |tail -$c)"
 				zenity --info --timeout 120 --title "Bundles Installed: $c Bundles Previously Installed: $d" --text="The following Software bundles have been installed: \n \n $completed_bundles \n \n Previouly installed bundles: \n \n $previously_completed_bundles" --height=600 --width=800
@@ -5863,15 +5866,17 @@ software::display_bundle_removal_choices_gtk ()
 			"${selection}" )
 				c=0
 				removed_bundle_list="$(mktemp)"
-				for i in ${selection} ; do
-					current_bundle="${i}"
-					#software::add_software_task 
-					recipe_Bundle:_${i} --remove
-					sed -i "/${current_bundle}/d" "${completed_bundles_list}"
-					echo ${current_bundle} >> "${removed_bundle_list}"
-					((c=c+1))
-				done
-
+				process_bundles_2_remove () {
+					for i in ${selection} ; do
+						current_bundle="${i}"
+						#software::add_software_task 
+						recipe_Bundle:_${i} --remove 
+						sed -i "/${current_bundle}/d" "${completed_bundles_list}"
+						echo ${current_bundle} >> "${removed_bundle_list}"
+						((c=c+1))
+					done
+				}
+				process_bundles_2_remove | zenity --progress --no-cancel --auto-close --auto-close --title="Removing Software Prodictivity Bundles" --text="Please wait for the bundle removals to complete..." --percentage=10 --height=200 --width=600
 				zenity --info --timeout 120 --title "Bundles Removed: $c " --text="The following Software bundles have been REMOVED: \n \n $(cat ${removed_bundle_list}) " --height=600 --width=800
 			;;
 			* )
@@ -6334,13 +6339,45 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 # Omitting any of the arguments will us the default instead.
 #
 # Globals: ${FedoraVersion} ${PRESEED_FILE}
-# Arguments: None
-# Outputs:
-# Returns:
+# Optional arguments: [-c <#CPU>, -m <MB RAM>, -d <GB Disk>]
+# Outputs: std err
+# Returns: 
 # Usage:
+# 	make_kvm_virtual_machine_now_from_fedora_org
+# 			or
+# 	make_kvm_virtual_machine_now_from_fedora_org -c 4 -m 4096 -d 100
 # End of Documentation
 
 	dependency::virtualization
+
+	# Check for optional default T-Shirts size overrides... 
+	local OPTIND o a
+	while getopts ':c:m:d:' OPTION; do
+		case "$OPTION" in
+		c )
+			local _cpu="${OPTARG}"
+			write_information "Custom CPU set to: ${OPTARG}"
+		;;
+		m )
+			local _mem="${OPTARG}"
+			write_information "Custom memory set to: ${OPTARG}"
+		;;
+		d )
+			local _dsk="${OPTARG}"
+			write_information "Custom disk sizee set to: ${OPTARG}"
+		;;
+		? )
+			write_host --cyan  "Usage: ${FUNCNAME[0]} or ${FUNCNAME[0]} [-c <#CPU>, -m <MB RAM>, -d <GB Disk>]"
+			return 0
+		;;
+		esac
+	done
+	unset OPTIND
+
+	# Set default values for VM T-Shirts sizes...
+	: ${_cpu="${_cpu:-2}"}
+	: ${_mem="${_mem:-2048}"}
+	: ${_dsk="${_dsk:-100}"}
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: ${virt_net="$(system::find_vm_bridge)"}
@@ -6368,15 +6405,15 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 	🌎 - ${_source_url} \n
 	🌎 - ${_mirrorlist_url} \n
 	✅ - Using the network: ${virt_net:=default} \n
-	✅ - Memory: ${3:-2048} \n
-	✅ - CPU's: ${2:-2} \n
-	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I)"
+	✅ - Memory: ${_mem:-2048} \n
+	✅ - CPU's: ${_cpu:-2} \n
+	✅ - Disk Size: ${_dsk:-40} \n You may attach to this server and see the progress at IP: $(hostname -I)"
 
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
-		--vcpus "${2:-2}" \
-		--memory "${3:-2048}" \
+		--vcpus "${_cpu}" \
+		--memory "${_mem}" \
 		--network "$virt_net" \
-		--disk size="${4:-40}" \
+		--disk size="${_dsk}" \
 		--os-variant="fedora30" \
 		--initrd-inject="${_preseed_file}" \
 		--location="${_source_url}" \
@@ -6418,7 +6455,24 @@ make_kvm_virtual_machine_now_from_redhat_com ()
 # End of Documentation
 
 	dependency::virtualization
-
+	local OPTIND o a
+	while getopts ':c:m:d:' OPTION; do
+		case "$OPTION" in
+		c )
+			local _cpu="${OPTARG}"
+			write_information "Custom CPU set to: ${OPTARG}"
+		;;
+		m )
+			local _mem="${OPTARG}"
+			write_information "Custom memory set to: ${OPTARG}"
+		;;
+		d )
+			local _dsk="${OPTARG}"
+			write_information "Custom disk sizee set to: ${OPTARG}"
+		;;
+		esac
+	done
+	unset OPTIND
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: ${virt_net="$(system::find_vm_bridge)"}
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
@@ -6445,15 +6499,15 @@ make_kvm_virtual_machine_now_from_redhat_com ()
 	🌎 - ${_source_url} \n
 	🌎 - ${_mirrorlist_url} \n
 	✅ - Using the network: ${virt_net:=default} \n
-	✅ - Memory: ${3:-2048} \n
-	✅ - CPU's: ${2:-2} \n
-	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I)"
+	✅ - Memory: ${_mem:-2048} \n
+	✅ - CPU's: ${_cpu:-2} \n
+	✅ - Disk Size: ${_dsk:-100} \n You may attach to this server and see the progress at IP: $(hostname -I)"
 
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
-		--vcpus "${2:-2}" \
-		--memory "${3:-2048}" \
+		--vcpus "${_cpu:-2}" \
+		--memory "${_mem:-2048}" \
 		--network "$virt_net" \
-		--disk size="${4:-40}" \
+		--disk size="${_dsk:-100}" \
 		--os-variant="fedora30" \
 		--initrd-inject="${_preseed_file}" \
 		--location="${_source_url}" \
@@ -6494,7 +6548,24 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 # End of Documentation
 
 	dependency::virtualization
-
+	local OPTIND o a
+	while getopts ':c:m:d:' OPTION; do
+		case "$OPTION" in
+		c )
+			local _cpu="${OPTARG}"
+			write_information "Custom CPU set to: ${OPTARG}"
+		;;
+		m )
+			local _mem="${OPTARG}"
+			write_information "Custom memory set to: ${OPTARG}"
+		;;
+		d )
+			local _dsk="${OPTARG}"
+			write_information "Custom disk sizee set to: ${OPTARG}"
+		;;
+		esac
+	done
+	unset OPTIND
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
 
@@ -6511,16 +6582,16 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 	🌎 - ${vm_kernel:="DEFAULT"} \n
 	🌎 - ${vm_initrd:="DEFAULT"} \n
 	✅ - Using the network: ${virt_net} \n
-	✅ - Memory: ${3:-2048} \n
-	✅ - CPU's: ${2:-2} \n
-	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))"
+	✅ - Memory: ${_mem:-2048} \n
+	✅ - CPU's: ${_cpu:-2} \n
+	✅ - Disk Size: ${_dsk:-100} \n You may attach to this server and see the progress at IP: $(hostname -I))"
 
 	# create image and run installer
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
-		--vcpus "${2:-2}" \
-		--memory "${3:-2048}" \
-		--network "${virt_net}" \
-		--disk size="${4:-40}" \
+		--vcpus "${_cpu:-2}" \
+		--memory "${_mem:-2048}" \
+		--network "$virt_net" \
+		--disk size="${_dsk:-100}" \
 		--os-variant=opensusetumbleweed \
 		--initrd-inject="${PRESEED_FILE}" \
 		--location="${source_url}" \
@@ -6563,6 +6634,24 @@ make_kvm_virtual_machine_now_from_debian_org ()
 # End of Documentation
 
 	dependency::virtualization
+	local OPTIND o a
+	while getopts ':c:m:d:' OPTION; do
+		case "$OPTION" in
+		c )
+			local _cpu="${OPTARG}"
+			write_information "Custom CPU set to: ${OPTARG}"
+		;;
+		m )
+			local _mem="${OPTARG}"
+			write_information "Custom memory set to: ${OPTARG}"
+		;;
+		d )
+			local _dsk="${OPTARG}"
+			write_information "Custom disk sizee set to: ${OPTARG}"
+		;;
+		esac
+	done
+	unset OPTIND
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet, and set variables.
 	: "${bin_virt_install:=$(type -p virt-install)}"
@@ -6599,18 +6688,18 @@ make_kvm_virtual_machine_now_from_debian_org ()
 	🌎 - ${vm_kernel} \n
 	🌎 - ${vm_initrd} \n
 	✅ - Using the network: ${virt_net} \n
-	✅ - Memory: ${3:-2048} \n
-	✅ - CPU's: ${2:-2} \n
-	✅ - Disk Size: ${4:-40} \n You may attach to this server and see the progress at IP: $(hostname -I))"
+	✅ - Memory: ${_mem:-2048} \n
+	✅ - CPU's: ${_cpu:-2} \n
+	✅ - Disk Size: ${_dsk:-100} \n You may attach to this server and see the progress at IP: $(hostname -I))"
 
 
 	# create image and run installer
 	"${bin_virt_install}" --name "${vm_name}" \
-		--vcpus "${2:-2}" \
-		--memory "${3:-2048}" \
-		--network "${virt_net}" \
+		--vcpus "${_cpu:-2}" \
+		--memory "${_mem:-2048}" \
+		--network "$virt_net" \
+		--disk size="${_dsk:-100}" \
 		--location="${source_url}" \
-		--disk size="${4:-40}" \
 		--os-variant="${1:-debian10}" \
 		--video "virtio" --channel "spicevmc" \
 		--initrd-inject="${PRESEED_FILE}" \

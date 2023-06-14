@@ -46,14 +46,19 @@
 # export _ERRLOGFILE=
 # export _LOGFILE=
 # export _TLA=
-
-
 : ${_SCRIPTNAME=$(basename $0)}
 : ${_TLA=${_SCRIPTNAME:0:3}}
-: ${_LOG_DIR:="/var/log/${_TLA}"} ; mkdir -p ${_LOG_DIR}
-: ${_ERRLOGFILE:="${_LOG_DIR}/$( basename $0)-$(date +%Y-%m-%d-%H-%M-%S-%s)-error.log}"}
-: ${_LOGFILE:="${_LOG_DIR}/$( basename $0)-$(date +%Y-%m-%d-%H-%M-%S-%s).log}"}
 : ${_GIT_PROFILE:=vonschutter}
+
+if [ "$UID" -eq 0 ]; then
+	: ${_LOG_DIR:="/var/log/${_TLA}"} ; mkdir -p ${_LOG_DIR}
+	: ${_LOGFILE:="${_LOG_DIR}/$( basename $0)-$(date +%Y-%m-%d-%H-%M-%S-%s).log}"}
+	mkdir -p ${_LOG_DIR}
+else
+	: ${_LOG_DIR:="~/.config/rtd/${_TLA}"} ; mkdir -p ${_LOG_DIR}
+	: ${_LOGFILE:="${_LOG_DIR}/$( basename $0)-$(date +%Y-%m-%d-%H-%M-%S-%s).log}"}
+	mkdir -p ${_LOG_DIR}
+fi
 
 
 _ABOUT='
@@ -212,6 +217,9 @@ system::ExecStart::help ()
 	zenity::display_info "$_HELP_MSG"
 }
 
+
+
+
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::          Execute tasks                   ::::::::::::::::::::::
@@ -227,5 +235,5 @@ case ${1} in
 	--about ) zenity::display_info "$_ABOUT";;
 	--more-help ) zenity::display_url "https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/blob/main/modules/RTD-OEM-bundle-manager/README.md" ;;
 	--rtd ) zenity::display_url "/opt/rtd/README.md" ;;
-	* ) system::ExecStart &>/dev/null ;;
+	* ) system::ExecStart &>${_LOGFILE}  ;;
 esac
