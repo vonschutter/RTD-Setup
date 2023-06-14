@@ -52,12 +52,10 @@
 
 if [ "$UID" -eq 0 ]; then
 	: ${_LOG_DIR:="/var/log/${_TLA}"} ; mkdir -p ${_LOG_DIR}
-	: ${_LOGFILE:="${_LOG_DIR}/$( basename $0)-$(date +%Y-%m-%d-%H-%M-%S-%s).log}"}
-	mkdir -p ${_LOG_DIR}
+	: ${_LOGFILE:="${_LOG_DIR}/$( basename $0)-$(date +%Y-%m-%d-%H-%M-%S-%s).log"}
 else
 	: ${_LOG_DIR:="~/.config/rtd/${_TLA}"} ; mkdir -p ${_LOG_DIR}
-	: ${_LOGFILE:="${_LOG_DIR}/$( basename $0)-$(date +%Y-%m-%d-%H-%M-%S-%s).log}"}
-	mkdir -p ${_LOG_DIR}
+	: ${_LOGFILE:="${_LOG_DIR}/$( basename $0)-$(date +%Y-%m-%d-%H-%M-%S-%s).log"}
 fi
 
 
@@ -148,7 +146,6 @@ system::ExecStart () {
 
 	if hash zenity &>/dev/null ; then
 		while true; do
-
 			exec 3>&1
 			selection=$(zenity --name=OEM-Main --list \
 				"Add Bundles to this computer" \
@@ -235,5 +232,5 @@ case ${1} in
 	--about ) zenity::display_info "$_ABOUT";;
 	--more-help ) zenity::display_url "https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/blob/main/modules/RTD-OEM-bundle-manager/README.md" ;;
 	--rtd ) zenity::display_url "/opt/rtd/README.md" ;;
-	* ) system::ExecStart &>${_LOGFILE}  ;;
+	* ) system::ExecStart &>${_LOGFILE} ;;
 esac

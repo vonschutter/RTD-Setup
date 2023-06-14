@@ -87,6 +87,9 @@ export zstatus="$1"
 # Set the background tilte:
 : "${_BACK_TITLE:-"RTD OEM Simple System Setup"}"
 
+# List of bare minimum managmement software that shuold be on a system
+_requirements="dialog wget curl rsync git"
+
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::          Script Functions                ::::::::::::::::::::::
@@ -153,7 +156,9 @@ else
 	dependency::_rtd_library
 	# Allow super user to display gui menu on users screen.
 	# sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
-
+	for i in $_requirements ; do 
+		InstallSoftwareFromRepo $I
+	done
 	rtd_wait_for_internet_availability
 	rtd_oem_reset_default_environment_config
 

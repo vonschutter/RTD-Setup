@@ -4878,8 +4878,8 @@ InstallSoftwareFromRepo ()
 	# Test if package name is installed, if not then...
 	if ! is_software_package_installed "${1}"; then
 		if is_software_package_available "${1}"; then
-			#printf "${PRE}" & $_INSTCMD "${1}" &>>${_LOGFILE} && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR " ||   printf "%b%-6s%b [ ! ] ${RED} FAILED ${ENDCOLOR}"
-			term::animate_while_command "$_INSTCMD ${1}" 
+			printf "${PRE}" & $_INSTCMD "${1}" &>>${_LOGFILE} && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR " ||   printf "%b%-6s%b [ ! ] ${RED} FAILED ${ENDCOLOR}"
+			#term::animate_while_command "$_INSTCMD ${1}" 
 			if [ $? != 0 ];
 			then
 				return 1
@@ -5803,16 +5803,17 @@ software::display_bundle_install_choices_gtk ()
 				d=0 ; for i in $(cat ${completed_bundles_list}) ; do ((d=d+1)) ; done
 				c=0
 				previously_completed_bundles="$(cat ${completed_bundles_list})"
-				process_bundles_2_add () {
+					(
 					for i in ${selection} ; do
 					current_bundle="${i}"
+					echo "# Installing bundle: ${current_bundle}..."
 					#software::add_software_task 
-					recipe_Bundle:_${current_bundle} && echo "${current_bundle}" >> ${completed_bundles_list} && echo "$($c + 10)"| zenity --progress --no-cancel --auto-close --auto-close --title="Installing Software Prodictivity Bundles" --text="Please wait for the bundle installs to complete..." --percentage=10 --height=200 --width=600
+					recipe_Bundle:_${current_bundle} && echo "${current_bundle}" >> ${completed_bundles_list} 
 					((c=c+1))
-					done	
-				}
-				process_bundles_2_add 
-
+					((s=c*10))
+					echo "$s"
+					done
+					) | zenity --progress --no-cancel --auto-close --auto-close --title="Installing Software Prodictivity Bundles" --text="Please wait for the bundle installs to complete..." --percentage=10 --height=200 --width=600
 				completed_bundles="$(cat ${completed_bundles_list} |tail -$c)"
 				zenity --info --timeout 120 --title "Bundles Installed: $c Bundles Previously Installed: $d" --text="The following Software bundles have been installed: \n \n $completed_bundles \n \n Previouly installed bundles: \n \n $previously_completed_bundles" --height=600 --width=800
 			;;
