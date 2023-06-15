@@ -585,14 +585,17 @@ recipe_Bundle:_Developer_Software () {
 	software::from_flathub.org com.helix_editor.Helix $1
 
 	# Neovim is a refactor of the Vim text editor designed to encourage new 
-	# features, advanced UIs, and powerful extensions.
-	software::from_flathub.org io.neovim.nvim $1
+	# features, advanced UIs, and powerful extensions. SUggestion: use the 
+	# snap version to enusre the latest neovm and good terminal (non-gui) integration.
+	# software::from_flathub.org io.neovim.nvim $1
+	software::from_snapcraft.io nvim $1
 	# NvChad is built upon its personal plugins and many general neovim plugins, 
 	# below are the features that are provided by nvchad plugins ( our ui plugin, 
 	# base46, extensions, nvterm, nvim-colorizer )... 
 	# Please comment out the folowing line if you do not want NeoVim customizations.
-	hash git &>/dev/nul && git clone https://github.com/NvChad/NvChad "${SUDO_USER}/.config/nvim" --depth 1 
-
+	git clone https://github.com/NvChad/NvChad "/home/${SUDO_USER}/.config/nvim" --depth 1 
+	chown -R $SUDO_USER "/home/${SUDO_USER}/.config/nvim"
+	mkdir -p /etc/skel/.config ; cp -u -R "/home/${SUDO_USER}/.config/nvim" "/etc/skel/.config/nvim"
 }
 
 

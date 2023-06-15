@@ -5813,7 +5813,11 @@ software::display_bundle_install_choices_gtk ()
 					((s=c*10))
 					echo "$s"
 					done
-					) | zenity --progress --no-cancel --auto-close --auto-close --title="Installing Software Prodictivity Bundles" --text="Please wait for the bundle installs to complete..." --percentage=10 --height=200 --width=600
+					) | zenity --progress --no-cancel --auto-close  \
+					--title="Installing Software Prodictivity Bundles" \
+					--text="Please wait for the bundle installs to complete..." \
+					--percentage=10 --height=200 --width=600
+
 				completed_bundles="$(cat ${completed_bundles_list} |tail -$c)"
 				zenity --info --timeout 120 --title "Bundles Installed: $c Bundles Previously Installed: $d" --text="The following Software bundles have been installed: \n \n $completed_bundles \n \n Previouly installed bundles: \n \n $previously_completed_bundles" --height=600 --width=800
 			;;
@@ -5831,13 +5835,13 @@ software::display_bundle_install_choices_gtk ()
 
 software::display_bundle_removal_choices_gtk ()
 {
-# Function to display the software install otions. All software option are listed in
+# Function to display the Software Prodictivity Bundles removal otions. All software options are listed in
 # the _rtd_recipes recipe book. Leveraging all the useful function in _rtd_library.
-# NOTE: adding a function in _rtd_recipes named "recipes_* ()" will automaticall populete
+# NOTE: adding a function in _rtd_recipes named "recipes_* ()" will automaticall populste
 # the menu displayed to the user.
 #
 # Globals: ${_BACK_TITLE} ${zstatus}
-# Dependencies: _rtd_recipes
+# Dependencies: file: _rtd_recipes
 # Arguments: None
 # Outputs: interactive screen
 # Returns: 0/1 last command executed.
@@ -5867,17 +5871,23 @@ software::display_bundle_removal_choices_gtk ()
 			"${selection}" )
 				c=0
 				removed_bundle_list="$(mktemp)"
-				process_bundles_2_remove () {
+				(
 					for i in ${selection} ; do
 						current_bundle="${i}"
+						echo "# Removing bundle: ${current_bundle}..."
 						#software::add_software_task 
 						recipe_Bundle:_${i} --remove 
 						sed -i "/${current_bundle}/d" "${completed_bundles_list}"
 						echo ${current_bundle} >> "${removed_bundle_list}"
 						((c=c+1))
+						((s=c*10))
+						echo "$s"
 					done
-				}
-				process_bundles_2_remove | zenity --progress --no-cancel --auto-close --auto-close --title="Removing Software Prodictivity Bundles" --text="Please wait for the bundle removals to complete..." --percentage=10 --height=200 --width=600
+				)| zenity --progress --no-cancel --auto-close \
+				--title="Removing Software Prodictivity Bundles" \
+				--text="Please wait for the bundle removals to complete..." \
+				--percentage=10 --height=200 --width=600
+
 				zenity --info --timeout 120 --title "Bundles Removed: $c " --text="The following Software bundles have been REMOVED: \n \n $(cat ${removed_bundle_list}) " --height=600 --width=800
 			;;
 			* )
