@@ -5788,11 +5788,15 @@ software::display_bundle_install_choices_gtk ()
 		local IFS_SAV=$IFS
 		local IFS=$(echo -en "\n\b")
 
-		_text=" Select a Software Bundle below that you want to add to this computer: \n NOTE: only items that are not yet installed are shown. \n"
-		selection=$(zenity --list --checklist --text="${_text}" --height=600 --width=980 --print-column=2 --column="Selected" --column="Bundle" --column="Description" --separator=" " ${DisplayList} )
+		selection=$(zenity --list --checklist \
+			--text=" Select a Software Bundle below that you want to add to this computer: \n NOTE: only items that are not yet installed are shown. \n" \
+			--height=600 --width=980 \
+			--print-column=2 --column="Selected" --column="Bundle" --column="Description" \
+			--separator=" " ${DisplayList} )
 		exit_status=$?
 		IFS=$IFS_SAV
 		exec 3>&-
+
 		case $exit_status in
 			1) clear && echo [Cancel] && return ;;
 			255) clear && echo [ESC] && return ;;
@@ -5800,8 +5804,8 @@ software::display_bundle_install_choices_gtk ()
 
 		case "${selection}" in
 			"${selection}" )
-				d=0 ; for i in $(cat ${completed_bundles_list}) ; do ((d=d+1)) ; done
-				c=0
+				local d=0 ; for i in $(cat ${completed_bundles_list}) ; do ((d=d+1)) ; done
+				local c=0
 				previously_completed_bundles="$(cat ${completed_bundles_list})"
 					(
 					for i in ${selection} ; do
@@ -5851,17 +5855,19 @@ software::display_bundle_removal_choices_gtk ()
 #
 # End of documentation
 
-	local
 	while true; do
 		exec 3>&1
 			DisplayList=$(software::list_bundles --zformat-removable)
 			IFS_SAV=$IFS
 			IFS=$(echo -en "\n\b")
-			_text=" Select a Software Bundle below that you want to REMOVE from this computer: \n \n"
-			selection=$(zenity --list --checklist --text="${_text}" --height=600 --width=980 --print-column=2 --column="Selected" --column="Bundle" --column="Description" --separator=" " ${DisplayList} )
+			selection=$(zenity --list --checklist \
+			--text=" Select a Software Bundle below that you want to REMOVE from this computer: \n \n" \
+			--height=600 --width=980 \
+			--print-column=2 --column="Selected" --column="Bundle" --column="Description" --separator=" " ${DisplayList} )
 			exit_status=$?
 			IFS=$IFS_SAV
 		exec 3>&-
+
 		case $exit_status in
 			1) clear && echo [Cancel] && return ;;
 			255) clear && echo [ESC] && return ;;
@@ -5869,7 +5875,8 @@ software::display_bundle_removal_choices_gtk ()
 
 		case "${selection}" in
 			"${selection}" )
-				c=0
+				local d=0 ; for i in $(cat ${completed_bundles_list}) ; do ((d=d+1)) ; done
+				local c=0
 				removed_bundle_list="$(mktemp)"
 				(
 					for i in ${selection} ; do
