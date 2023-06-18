@@ -4394,6 +4394,108 @@ scan_for_malware ()
 
 
 
+
+
+
+software::package_kit::add_package ()
+{
+# Description: Function to simplify the installation of software by including all display and
+# installation logic for a given software provider. This function should work consistently 
+# on any distribution with the back end:     
+#     Advanced Packaging Tool (APT)
+#     Conary
+#     libdnf[10] & librepo,[11] the libraries upon which DNF, (the successor to yum) builds
+#     Entropy
+#     Opkg
+#     pacman
+#     PiSi
+#     Portage
+#     Smart Package Manager
+#     urpmi
+#     YUM
+#     ZYpp
+# PackageKit is a free and open-source suite of software applications designed to provide a 
+# consistent and high-level front end for a number of different package management systems. 
+# PackageKit was created by Richard Hughes in 2007,[2][3] and first introduced into an 
+# operating system as a default application in May 2008 with the release of Fedora 9.[4]
+# 
+# The suite is cross-platform, though it is primarily targeted at Linux distributions which 
+# follow the interoperability standards set out by the freedesktop.org group. It uses the 
+# software libraries provided by the D-Bus and Polkit projects to handle inter-process 
+# communication and privilege negotiation respectively. 
+# Arguments: package_name
+# Outputs:
+# Returns: Does not return error as it is designed for best effort smooth operation.  
+# Usage: Call the function with one arguments matching then name of the package you need to install.
+#
+# End of documentation
+	ensure_admin
+	: ${_LOGFILE:="/var/log/rtd/$( basename "$0".log )"}
+	
+	if pkcon resolve "${1}" --filter installed | grep "${1}" &>/dev/null ; then
+		write_status "The software package ${1} is Allready installed... " 
+		system::log_item "The software package ${1} is Allready installed... "
+	else
+		if pkcon resolve "${1}" | grep "${1}" &>/dev/null; then
+			write_status "The software package ${1} found in repository, installing... "
+			system::log_item "The software package ${1} found in repository, installing... "
+			pkcon install "${1}" --noninteractive --cache-age 5000 
+			if [ $? = 0 ] ; then
+				write_status "The software package ${1} transaction appears to have been sucessful..."
+				system::log_item "The software package ${1} transaction appears to have been sucessful..."
+			else
+				write_warning "There appears to have been some problem installing the package ${1}..."
+				system::log_item "There appears to have been some problem installing the package ${1}..."
+			fi
+		else
+			write_error "The software package ${1} is not available in any configured repository..." 
+			system::log_item "The software package ${1} is not available in any configured repository..." 
+		fi	
+	fi
+
+}
+
+
+
+
+
+
+software::package_kit::remove_package ()
+{
+# Description: Function to simplify the installation of software by including all display and
+# installation logic for a given software provider. This should be expanded to include flatpak
+# snap for example. It should be the same consistent way no matter flavor of Linux.
+# This function uses the "$_INSTCMD" to install software. "$_INSTCMD" is defined separatley
+# in the "set_install_command" function (a dependency to this function) and could
+# be an RPM or deb string, or even snap or flatpak. A preference order between package system and
+# snap or flatpak use.
+# End of documentation
+	ensure_admin
+	: ${_LOGFILE:="/var/log/rtd/$( basename "$0".log )"}
+
+	(
+	if pkcon resolve "${1}" --filter installed | grep "${1}" &>/dev/null ; then
+		write_status " ✓ The software package ${1} is installed, removing as requested... "
+		pkcon remove "${1}" --noninteractive
+		if [ $? = 0 ] ; then
+			write_status "The software package ${1} transaction appears to have been sucessful..."
+		else
+			write_warning "There appears to have been some problem removing the package ${1}..."
+		fi
+	else
+		write_information "The software package ${1} is not installed, no need for action..." 
+	fi
+	) | tee ${_LOGFILE}
+}
+
+
+
+
+
+
+
+
+
 software::ensure_software_store_available ()
 {
 # Description: Function to ensure that flatpak is installed and flathup enabled.
@@ -4511,8 +4613,8 @@ ensure_flatpak_package_managment ()
 # End of documentation
 	if [[ $(echo "$OSTYPE" |grep "linux") ]] &>/dev/null ; then
 		# these tests focus on the latest versions of the distros evaluated...
-		write_information "ensuring SNAP software distribution system is available..."
-		if hash flatpak ; then
+		write_information "ensuring flatpak software distribution system is available..."
+		if hash flatpak &>/dev/null ; then
 			write_status "flatpak command is available... "
 			if flatpak remotes | grep flathub  &>/dev/null ; then 
 				write_status "flathub remote is present..."
@@ -4532,8 +4634,9 @@ ensure_flatpak_package_managment ()
 		else
 			ensure_admin
 			write_information "Ensuring Flatpak software distribution system is available..."
-				check_dependencies flatpak || write_error "Failed to satisfy dependecy flatpak!"
-				flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || write_error "Failed to add flatpak repo!"
+			check_dependencies flatpak || write_error "Failed to satisfy dependecy flatpak!"
+			flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || write_error "Failed to add flatpak repo!"
+			
 			if flatpak list|grep com.github.tchx84.Flatseal  &>/dev/null ; then 
 				write_status "flatseal security management is also present..."
 			else
@@ -4843,7 +4946,7 @@ is_software_package_available ()
 	elif hash zypper 2>/dev/null; then
 		zypper info "$1" &> /dev/null && return 0 || return 1
 	elif hash apt 2>/dev/null; then
-		apt -qq list "$1" 2>/dev/null | grep -q "$1" && return 0 || return 1
+		apt-get -qq list "$1" 2>/dev/null | grep -q "$1" && return 0 || return 1
 	else
 		return 3
 	fi
@@ -5004,7 +5107,7 @@ check_dependencies ()
 	write_status "Checking for script dependencies and install if not there..."
 	#---------------------------------------------------------------
 	if is_software_package_installed "${1}" ; then
-		write_information "I found that ${1} is present on this system... thankyou for that! "
+		write_information "I found that the dependency ${1} is present on this system... "
 	else
 		write_warning "You seem to have no ${1}... I will try to get it... "
 		if InstallSoftwareFromRepo "${1}" ; then
@@ -5275,7 +5378,31 @@ rtd_oem_remove_software ()
 
 
 
+system::log_item ()
+{
+# Description:
+# The purpose of this function is to consistently write script output to the right log file. 
+# Globals:
+# Arguments: None
+# Outputs:
+# Returns:
+# Usage: z
+# End of documentation
 
+	if [[ -z "$_LOGFILE" ]] ; then
+		local _SCRIPTNAME=$(basename $0)
+		local _TLA=${_SCRIPTNAME:0:3}
+		local _LOG_DIR=/var/log/${_TLA,,}
+		mkdir -p ${_LOG_DIR}
+		local _logfile=${_LOG_DIR}/${_SCRIPTNAME}.log
+		export _LOGFILE="${_logfile}"
+	else 
+		_logfile="${_LOGFILE}"
+	fi
+
+	local _date="$(date '+%Y/%m/%d %H:%M')"
+	echo "${_date} --- : $*" >> "${_logfile}"
+}
 
 
 
@@ -9793,7 +9920,7 @@ write_warning ()
 
 
 	local text=$1
-	[ -n "${text}" ] && echo -e "${yellow}🧩 ${FUNCNAME[1]}: ${text}${endcolor}"
+	[ -n "${text}" ] && echo -e "${yellow}🧩 ⚠ ${FUNCNAME[1]}: ${text}${endcolor}"
 
 }
 
@@ -9813,7 +9940,7 @@ write_status ()
 
 
 	local text=$1
-	[ -n "${text}" ] && echo -e "${green}🧩 ${FUNCNAME[1]}: ${text}${endcolor}"
+	[ -n "${text}" ] && echo -e "${green}🧩 ✓ ${FUNCNAME[1]}: ${text}${endcolor}"
 
 }
 
@@ -9833,7 +9960,7 @@ write_information ()
 
 
 	local text=$1
-	[ -n "${text}" ] && echo -e "${blue}🧩 ${FUNCNAME[1]}: ${text}${endcolor}"
+	[ -n "${text}" ] && echo -e "${blue}🧩 🛈 ${FUNCNAME[1]}: ${text}${endcolor}"
 
 }
 

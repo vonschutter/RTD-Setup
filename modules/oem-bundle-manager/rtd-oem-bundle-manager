@@ -142,7 +142,11 @@ system::ExecStart () {
 	ensure_admin
 	rtd_wait_for_internet_availability
 	# Allow super user to display gui menu on users screen.
-	sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
+	if [[ -f /etc/pam.d/sudo ]] ; then
+		sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
+	else
+		write_warning "The file /etc/pam.d/sudo dows not apear to exist. "
+	fi
 
 	if hash zenity &>/dev/null ; then
 		while true; do
@@ -163,7 +167,7 @@ system::ExecStart () {
 				1) clear && echo [Cancel] && exit ;;
 				255) clear && echo [ESC] && exit ;;
 			esac
-
+ 
 			case "$selection" in
 				"Add Bundles to this computer" ) software::display_bundle_install_choices_gtk  ;;
 				"Remove Bundles from this computer" ) software::display_bundle_removal_choices_gtk  ;;
@@ -232,5 +236,5 @@ case ${1} in
 	--about ) zenity::display_info "$_ABOUT";;
 	--more-help ) zenity::display_url "https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/blob/main/modules/RTD-OEM-bundle-manager/README.md" ;;
 	--rtd ) zenity::display_url "/opt/rtd/README.md" ;;
-	* ) system::ExecStart &>${_LOGFILE} ;;
+	* ) system::ExecStart | tee ${_LOGFILE} ;;
 esac
