@@ -299,6 +299,61 @@ _OEM_DEPENDENCIES="_branding _locations _rtd_recipies"
 #
 #--------------------------------------------------------------------------------------
 
+
+dialog::copy_file_progress ()
+{
+# Description: Function to display a file copy dialog. 
+# This is a simple way to show a progress bar while copying a set of files from one destination
+# in a nice way. To use this function simply call it passing source and destination.
+# 
+# Globals: dialog 
+# Arguments: ["String to display"]
+# Outputs: Message in dialog box
+# Returns: 0 or ESC
+# Usage:
+#
+#
+# dialog::copy_file_progress source destination
+#
+# End of Documentation
+	# Source
+	DIRS=(${1}/* )
+
+	# Destination directory
+	DEST="${2}"
+
+	[ ! -d $DEST ] && mkdir -p $DEST
+
+	dialog --title "Copying files" --gauge "Copying file..." 10 75 < <(
+	# Get total number of files in array
+	n=${#DIRS[*]}; 
+	i=0
+
+	for f in "${DIRS[@]}"
+	do
+		# calculate progress
+		PCT=$(( 100*(++i)/n ))
+
+		# update dialog box 
+		cat <<EOF
+XXX
+$PCT
+Copying file "$f"...
+XXX
+EOF
+		# copy file $f to $DEST 
+		/bin/cp $f ${DEST} &>/dev/null
+	done
+	)
+
+}
+
+
+
+
+
+
+
 dialog::display_notice ()
 {
 # Description: Function to display an information notice. The purpose of this function
@@ -5462,6 +5517,11 @@ rtd_update_system ()
 		PAD="----------------------------------------------"
 		LINE=$(printf "%s %s" "$@" "$PAD" | cut -c 1-${#PAD})
 		echo -ne "Executing $LINE:"\ & "$@" >>"$LOGFILE" 2>&1 && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR   \n" ||printf "%b%-6s%b [ ! ] ${RED} FAILED $ENDCOLOR  \n"
+	}
+	
+	rtd_display_update ()
+	{
+		dialog --backtitle "RTD Update" --prgbox "Updating..." "pkcon update -y" 25 145 && clear
 	}
 
 	if hash dnf 2>/dev/null; then
