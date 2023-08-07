@@ -449,6 +449,7 @@ zenity::display_info ()
 # End of Documentation
 
 	_text="${@}"
+	hash zenity &>/dev/null || check_dependencies zenity &>/dev/null || return 1
 	zenity --info --text --title="${_TITLE:="Notice"}: $selection" --text="$_text" --ellipsize --height=600 --width=800 2>/dev/null
 }
 
@@ -473,6 +474,7 @@ zenity::display_url ()
 # End of Documentation
 
 	_url="${@}"
+	hash zenity &>/dev/null || check_dependencies zenity &>/dev/null || return 1
 	zenity --text-info --html --title="${_TITLE:="$_url"}:" --url="$_url" --width=800 --height=600 &>/dev/null
 
 }
@@ -499,6 +501,7 @@ zenity::display_file ()
 # End of Documentation
 
 	_filename="${@}"
+	hash zenity &>/dev/null || check_dependencies zenity &>/dev/null || return 1
 	zenity --text-info --title="${_TITLE:="$_filename"}:" --filename="$_filename" --width=800 --height=600 &>/dev/null
 
 }
@@ -9755,13 +9758,12 @@ term::start_animation ()
 
 	setterm -cursor off
 	export ANIM_PID="0"
+	PAD="---------------------------------------------------------"
+	LINE=$(printf "%s %s" "${@}" "$PAD" | cut -c 1-${#PAD})
 	(
 	while true; do
 		for i in {0..4}; do
-			PAD="---------------------------------------------------------"
-			LINE=$(printf "%s %s" "${@}" "$PAD" | cut -c 1-${#PAD})
-
-			printf "\r\033[2K $LINE  ${anim[i]}"
+			printf "$LINE  \r\033[2K ${anim[i]}"
 			sleep 0.1
 		done
 
@@ -9795,7 +9797,7 @@ term::stop_animation ()
 #
 # End of documentation
 	[[ -e "/proc/${ANIM_PID}" ]]  && kill -SIGPIPE "${ANIM_PID}"
-	printf "$LINE [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR \n"
+	printf "${erace_line}$LINE [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR \n"
 	unset LINE
 	setterm -cursor on
 }
