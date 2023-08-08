@@ -3055,10 +3055,12 @@ ensure_admin ()
 		fi
 	else
 		if [[ ! -e /etc/pam.d/sudo ]] ; then
-			touch /etc/pam.d/sudo
-			echo 'session  optional       pam_xauth.so' > /etc/pam.d/sudo
+			#touch /etc/pam.d/sudo
+			#echo 'session  optional       pam_xauth.so' > /etc/pam.d/sudo
+			write_information "Not altering sudo configuration..."
 		else
-			sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
+			#sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
+			write_information "Not altering sudo configuration..."
 		fi
 	fi
 }
@@ -5494,7 +5496,7 @@ rtd_update_system ()
 	ensure_admin
 	PUBLICATION="$BRANDING Update Manager for Linux"
 	VERSION="1.14 (built in)"
-
+	DIALOGRC="~/.config/rtd/dialogrc"
 	LOGFILE="${LOGFILE:-$0.log}"
 
 	write_status "${PUBLICATION}: Version ${VERSION}"
@@ -5520,12 +5522,10 @@ rtd_update_system ()
 		PAD="----------------------------------------------"
 		LINE=$(printf "%s %s" "$@" "$PAD" | cut -c 1-${#PAD})
 		echo -ne "Executing $LINE:"\ & "$@" >>"$LOGFILE" 2>&1 && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR   \n" ||printf "%b%-6s%b [ ! ] ${RED} FAILED $ENDCOLOR  \n"
+		# write_status "Executing ${LINE}:"\ & "$@" >>"${LOGFILE}" 2>&1 && printf "%b%-6s%b [ \xE2\x9C\x94 ] OK!  \n" ||printf "%b%-6s%b [ ! ] FAILED  \n"
+
 	}
 	
-	rtd_display_update ()
-	{
-		dialog --backtitle "RTD Update" --prgbox "Updating..." "pkcon update -y" 25 145 && clear
-	}
 
 	if hash dnf 2>/dev/null; then
 		rtd_software_task dnf -y upgrade
@@ -5545,11 +5545,11 @@ rtd_update_system ()
 			rtd_software_task apt-get clean
 		fi
 	elif hash pkcon 2>/dev/null; then
-		if [[ $1 == simple ]]; then disp_option="--plain" ; fi
-		pkcon -y refresh $disp_option
-		pkcon -y update --autoremove $disp_option
+		rtd_software_task pkcon -y refresh
+		rtd_software_task pkcon get-updates
+		rtd_software_task pkcon -y update --autoremove 
 	else
-		echo -e $YELLOW "This system does not seem to have a software managment system" $ENDCOLOR
+		write_error "This system does not seem to have a software managment system" 
 		return 1
 	fi
 
@@ -5567,11 +5567,107 @@ rtd_update_system ()
 	else
 		write_warning "--- flatpak software is not present on this system... skipping..."
 	fi
+
 }
 
 
 
+software::update_all_ui ()
+{
+	ensure_admin
+	local TERMUITXT="nocolor"
+	local PUBLICATION="$BRANDING Update Manager for Linux"
+	local VERSION="1.15 (built in with dialog)"
+	local DIALOGRC="~/.config/rtd/dialogrc"
+	local LOGFILE="${LOGFILE:-$0.log}"
+	local dialog_ui=${RTD_GUI:-"dialog --erase-on-exit --colors "}
 
+	Native_Software_Packages ()
+	{
+		(
+		if hash dnf 2>/dev/null; then
+			dnf -y upgrade
+			write_information "Update task complete."
+		elif hash zypper 2>/dev/null; then
+			zypper up -y
+			write_information "Update task complete."
+		elif hash pkcon 2>/dev/null; then
+			pkcon -y refresh
+			pkcon get-updates
+			pkcon -y update --autoremove 
+			write_information "Update task complete."
+		elif hash apt 2>/dev/null; then
+			apt-get update
+			UPGRADABLE=$(LANG=C apt-get upgrade -s |grep -P '^\d+ upgraded'|cut -d" " -f1)
+			if [ "$UPGRADABLE" -eq 0 ]; then
+				write_information "$UPGRADABLE packages that need updates; Skipping update task... "
+			else
+				write_information "There are $UPGRADABLE packages that need updates..."
+				dpkg --configure -a
+				apt-get upgrade -y
+				apt-get full-upgrade -y
+				apt-get --purge autoremove -y
+				apt-get clean
+			fi
+			write_information "Update task complete."
+		else
+			write_error "This system does not seem to have a software managment system" 
+			return 1
+		fi
+		) | $dialog_ui --backtitle "\Zb\Z5$PUBLICATION             $VERSION\ZB"  --programbox "Updating all natively installed software..." 25 148
+	}
+
+	Snap_Apps ()
+	{
+		(
+		write_status "updating snaps if snap is present on the system..."
+		if hash snap 2>/dev/null; then
+			snap refresh
+			write_information "Update task complete."
+		else
+			write_warning "--- snap software is not present on this system... skipping..."
+		fi
+		) | $dialog_ui --backtitle "\Zb\Z5$PUBLICATION             $VERSION\ZB" --programbox "Updating all Contained Snap Apps..." 25 148
+	}
+
+	Flatpak_Apps ()
+	{
+		(
+		write_status "updating flatpaks if flatpak is present on system..."
+		if hash flatpak 2>/dev/null; then
+			flatpak update --user --noninteractive -y
+			flatpak update --system --noninteractive -y
+			write_information "Update task complete."
+		else
+			write_warning "--- flatpak software is not present on this system... skipping..."
+		fi
+		) | $dialog_ui --backtitle "\Zb\Z5$PUBLICATION             $VERSION\ZB" --programbox "Updating all Contained Flatpaks Apps..." 25 148
+	}
+
+	while true; do
+		exec 3>&1
+			local _proglist=""Native_Software_Packages"  1 "on"  "Snap_Apps" 2 "on" "Flatpak_Apps" 3 "on""
+			_run=$($dialog_ui --ok-label Update --cancel-label QUIT --backtitle "\Zb$PUBLICATION             $VERSION\ZB" --checklist "Select what to update:" 20 80 10 ${_proglist} 2>&1 1>&3 )
+			exit_status=$?
+		exec 3>&-
+
+		case $exit_status in
+			1) clear && echo [Quit] && return ;;
+			255) clear && echo [ESC] && exit ;;
+		esac
+
+		case $_run in
+			$_run )
+				for i in $_run ; do $i 
+				done
+			;;
+			* ) 
+				write_warning "No update actions were requested."
+				exit 
+			;;
+		esac
+	done
+}
 
 
 
@@ -9965,10 +10061,16 @@ write_error ()
 # Usage: write_error "[String]"
 #
 # End of documentation
-
 	local text=$1
-	if [[ -n "${text}" ]]; then
-		echo -e "$(tput bold; tput setaf 1)🧩 💥 ${FUNCNAME[1]}: ${text}${endcolor}"
+
+	if [[ "${TERMUITXT}"=="nocolor" ]]; then
+		if [[ -n "${text}" ]]; then
+			echo "🧩 💥 ${FUNCNAME[1]}: ${text}"
+		fi
+	else
+		if [[ -n "${text}" ]]; then
+			echo -e "$(tput bold; tput setaf 1)🧩 💥 ${FUNCNAME[1]}: ${text}${endcolor}"
+		fi
 	fi
 }
 
@@ -9988,7 +10090,12 @@ write_warning ()
 
 
 	local text=$1
-	[ -n "${text}" ] && echo -e "${yellow}🧩 ⚠ ${FUNCNAME[1]}: ${text}${endcolor}"
+
+	if [[ "${TERMUITXT}" == "nocolor" ]]; then
+		[ -n "${text}" ] && echo "🧩 ⚠ ${FUNCNAME[1]}: ${text}"
+	else
+		[ -n "${text}" ] && echo -e "${yellow}🧩 ⚠ ${FUNCNAME[1]}: ${text}${endcolor}"
+	fi
 
 }
 
@@ -10008,7 +10115,12 @@ write_status ()
 
 
 	local text=$1
-	[ -n "${text}" ] && echo -e "${green}🧩 ✓ ${FUNCNAME[1]}: ${text}${endcolor}"
+
+	if [[ "${TERMUITXT}" == "nocolor" ]] ; then
+		[ -n "${text}" ] && echo "🧩 ✓ ${FUNCNAME[1]}: ${text}"
+	else
+		[ -n "${text}" ] && echo -e "${green}🧩 ✓ ${FUNCNAME[1]}: ${text}${endcolor}"
+	fi
 
 }
 
@@ -10028,7 +10140,12 @@ write_information ()
 
 
 	local text=$1
-	[ -n "${text}" ] && echo -e "${blue}🧩 🛈 ${FUNCNAME[1]}: ${text}${endcolor}"
+
+	if [[ "${TERMUITXT}" == "nocolor" ]] ; then
+		[ -n "${text}" ] && echo -e "🧩 🛈 ${FUNCNAME[1]}: ${text}"
+	else
+		[ -n "${text}" ] && echo -e "${blue}🧩 🛈 ${FUNCNAME[1]}: ${text}${endcolor}"
+	fi
 
 }
 

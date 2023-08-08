@@ -160,7 +160,7 @@ if echo "$OSTYPE" |grep "linux" ; then
 	echo executing $0 >> ${_LOGFILE}
 	for d in git zip ; do 
 		if ! hash ${d} &>> ${_LOGFILE} ; then
-			for pkgmgr in apt yum dnf zypper ; do hash ${pkgmgr} && ${pkgmgr} -y install ${d} | tee ${_LOGFILE} ; done
+			for pkgmgr in apt yum dnf zypper ; do hash ${pkgmgr} && ${pkgmgr} install -y ${d} | tee ${_LOGFILE} ; done
 		fi
 	done
 	git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp | tee ${_LOGFILE}
