@@ -5010,13 +5010,12 @@ is_software_package_available ()
 	if hash yum 2>/dev/null; then
 		yum list available "$1" &> /dev/null && return 0 || return 1
 	elif hash zypper 2>/dev/null; then
-		zypper info "$1" &> /dev/null && return 0 || return 1
+		if zypper se "${1}" |grep "${1}" &> /dev/null ; then return 0 ; else return 1 ; fi
 	elif hash apt 2>/dev/null; then
 		apt-get -qq list "$1" 2>/dev/null | grep -q "$1" && return 0 || return 1
 	else
 		return 3
 	fi
-
 }
 
 
