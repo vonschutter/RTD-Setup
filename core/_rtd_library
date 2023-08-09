@@ -1234,6 +1234,45 @@ oem::rtd_tools_make_launchers ()
 		Type=Application
 		Categories=OEM;
 		EOF
+
+		cat > /usr/share/applications/rtd-software-bundle-manager.desktop <<-EOF
+		[Desktop Entry]
+		Version=2.0
+		Name=RTD Software Bundle Manager
+		Comment=Add and remove bundles of software by task to your computer.
+		Exec=${_MODS_DIR}/oem-bundle-manager/rtd-oem-bundle-manager
+		Path=${_MODS_DIR}/oem-bundle-manager/
+		Icon=${_MODS_DIR}/oem-bundle-manager/image/software.ico
+		Terminal=false
+		Type=Application
+		Categories=OEM;
+		EOF
+
+		cat > /usr/share/applications/rtd-hardware-information.desktop <<-EOF
+		[Desktop Entry]
+		Version=2.0
+		Name=RTD Hardware Information Viewer
+		Comment=Add and remove bundles of software by task to your computer.
+		Exec=${_MODS_DIR}/system-hardware-information/rtd-system-hardware-information
+		Path=${_MODS_DIR}/system-hardware-information/
+		Icon=${_MODS_DIR}/system-hardware-information/image/system-information-icon-3.png
+		Terminal=false
+		Type=Application
+		Categories=OEM;
+		EOF
+		
+		cat > /usr/share/applications/rtd-app-runner.desktop <<-EOF
+		[Desktop Entry]
+		Version=2.0
+		Name=RTD OEM Special App Runner
+		Comment=Run Specialized OEM Applications safely and reliably.
+		Exec=${_MODS_DIR}/oem-app-runner/rtd-oem-run
+		Path=${_MODS_DIR}/oem-app-runner/rtd-oem-run
+		Icon=${_MODS_DIR}/oem-app-runner/image/App-launcher.jpg
+		Terminal=true
+		Type=Application
+		Categories=OEM;
+		EOF
 	fi
  }
 
@@ -4978,7 +5017,7 @@ is_software_package_installed ()
 	if hash dnf 2>/dev/null; then
 		rpm -q "$1" > /dev/null 2>&1 && return 0 || return 1
 	elif hash zypper 2>/dev/null; then
-		zypper -x se "$1" |grep 'status="installed"' > /dev/null 2>&1 && return 0 || return 1
+		zypper se -i "$1" || return 1 && return 0 
 	elif hash apt 2>/dev/null; then
 		dpkg -l "$1" 2>/dev/null |tail -1 |grep "ii  $1" > /dev/null 2>&1 && return 0 || return 1
 	else
@@ -5152,19 +5191,15 @@ software::add_native_package ()
 # use package kit; and this will be registered as an sinstall option.
 #
 # Globals:
-# Arguments: None
+# Arguments: package_name
 # Outputs:
 # Returns:
-# Usage: "set_install_command"
+# Usage: "software::add_native_package <package_name> <package_name> <...n>"
 #
-# Arguments: none.
 #
 # Return Codes:
-# set_install_command will return a global variable ${_INSTCMD}
-# ${_INSTCMD} will expand to teh appropriate install cmmand including options
-# for non interactive install of a package. ${_INSTCMD} package.name will install said pacakge.
-#
-# A return code of "1" will be returned the function was not able to set the install command.
+# 
+# A return code of "1" will be returned the function was not able install the package.
 #
 #
 # End of documentation
@@ -5172,17 +5207,21 @@ software::add_native_package ()
 	if [[ 'echo $OSTYPE" |grep "linux"' ]]; then
 
 		if hash pkcon 2>/dev/null; then
-			write_status  "Setting install options for Package Kit"
+			write_status  "Installing ${@} using Package Kit..."
 			pkcon install -y ${@}
+			return $?
 		elif hash dnf 2>/dev/null; then
-			write_status "Setting install options for DNF"
+			write_status "Installing ${@} using DNF"
 			sudo dnf -y install ${@}
+			return $?
 		elif hash zypper 2>/dev/null; then
-			write_status  "Setting install options for ZYPPER"
+			write_status  "Installing ${@} using ZYPPER"
 			sudo zypper install -y ${@}
+			return $?
 		elif hash apt 2>/dev/null; then
-			write_status  "Setting install options for DEB"
+			write_status  "Installing ${@} using DEB"
 			sudo apt-get -y install ${@}
+			return $?
 		else
 			write_error "This system does not seem to have a software managment system"
 			return 1
