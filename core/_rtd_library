@@ -5046,7 +5046,7 @@ InstallSoftwareFromRepo ()
 	# Test if package name is installed, if not then...
 	if ! is_software_package_installed "${1}"; then
 		if is_software_package_available "${1}"; then
-			printf "${PRE}" & $_INSTCMD "${1}" &>>${_LOGFILE} && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR " ||   printf "%b%-6s%b [ ! ] ${RED} FAILED ${ENDCOLOR}"
+			printf "${PRE}" & software::add_native_package "${1}" &>>${_LOGFILE} && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR " ||   printf "%b%-6s%b [ ! ] ${RED} FAILED ${ENDCOLOR}"
 			#term::animate_while_command "$_INSTCMD ${1}" 
 			if [ $? != 0 ];
 			then
@@ -5135,6 +5135,74 @@ set_install_command ()
 	return $?
 }
 
+
+
+
+
+
+
+software::add_native_package ()
+{
+# Description:
+# add global install command for portability and convenience. This function
+# allows for scripts to add software across many systems.
+# Primarily for Linux: this function will look for the common package managers
+# apt (all debina and ubuntu based distributions), dnf (RedHat, Fedora, Mandriva, and others)
+# zypper (SuSE and Open SUSE). If neither of those package manages are available many systems
+# use package kit; and this will be registered as an sinstall option.
+#
+# Globals:
+# Arguments: None
+# Outputs:
+# Returns:
+# Usage: "set_install_command"
+#
+# Arguments: none.
+#
+# Return Codes:
+# set_install_command will return a global variable ${_INSTCMD}
+# ${_INSTCMD} will expand to teh appropriate install cmmand including options
+# for non interactive install of a package. ${_INSTCMD} package.name will install said pacakge.
+#
+# A return code of "1" will be returned the function was not able to set the install command.
+#
+#
+# End of documentation
+
+	if [[ 'echo $OSTYPE" |grep "linux"' ]]; then
+
+		if hash pkcon 2>/dev/null; then
+			write_status  "Setting install options for Package Kit"
+			pkcon install -y ${@}
+		elif hash dnf 2>/dev/null; then
+			write_status "Setting install options for DNF"
+			sudo dnf -y install ${@}
+		elif hash zypper 2>/dev/null; then
+			write_status  "Setting install options for ZYPPER"
+			sudo zypper install -y ${@}
+		elif hash apt 2>/dev/null; then
+			write_status  "Setting install options for DEB"
+			sudo apt-get -y install ${@}
+		else
+			write_error "This system does not seem to have a software managment system"
+			return 1
+		fi
+
+	elif [[ "$OSTYPE" == "darwin"* ]]; then
+		write_error "Mac OSX is currently not supported..."
+	elif [[ "$OSTYPE" == "cygwin" ]]; then
+		write_error "CYGWIN is currently unsupported..."
+	elif [[ "$OSTYPE" == "msys" ]]; then
+		write_error "Lightweight shell is currently unsupported... "
+	elif [[ "$OSTYPE" == "freebsd"* ]]; then
+		write_error "Free BSD is currently unsupported... "
+	else
+	echo "I have no Idea what this system is"
+		export _INSTCMD="Whatever!"
+		return 1
+	fi
+	return $?
+}
 
 
 

@@ -288,10 +288,10 @@ recipe_Bundle:_Virtualization () {
 	Single_Install_VirtualBox
 
 	# Qemu-KVM GUI for managing virtual machines locally and remote		 
-	InstallSoftwareFromRepo virt-manager
+	software::add_native_package virt-manager
 
 	# Very efficient hypervisor for running virtual machines
-	InstallSoftwareFromRepo qemu-kvm
+	software::add_native_package qemu-kvm
 }
 
 
@@ -567,8 +567,8 @@ recipe_Bundle:_Developer_Software () {
 
 	# Git and build essentials (compiler) is available in the distribution
 	# repository
-	InstallSoftwareFromRepo build-essential
-	InstallSoftwareFromRepo git
+	software::add_native_package build-essential
+	software::add_native_package git
 
   	# For repo management, in-app code editing & issue tracking
 	software::from_snapcraft.io gitkraken $1
@@ -618,11 +618,11 @@ recipe_Bundle:_Compression_Tools () {
 	if hash dnf &>/dev/nul ; then 
 		write_information "Fedora based software management found, assuming fedora based distribution..."
 		for i in p7zip-gui p7zip p7zip-plugins zip; do
-			check_dependencies $i
+			software::add_native_package $i
 		done
 	else
 		for i in p7zip-full p7zip-rar rar zip ; do
-			check_dependencies $i
+			software::add_native_package $i
 		done
 	fi
 }
@@ -701,11 +701,11 @@ recipe_Bundle:_Admin_Tools () {
 
 	for i in ${AdminToolsAppList}
 	do
-		InstallSoftwareFromRepo $i
+		software::add_native_package $i
 	done
 
 	# Installs Java, needed for cross platform software like Minecraft and others
-	InstallSoftwareFromRepo default-jre
+	software::add_native_package default-jre
 
 	# Teamviewer remote admin		
 	Single_Install_Remote_Desktop_by_Team_Viewer			
@@ -718,7 +718,7 @@ recipe_Bundle:_Windows_Subsystem_for_Linux (){
 	# Run windows programs! includes wine, DOS, and Acrobat reader, Notepad++, and more...
 
 	# Wine runtime environment for windows apps.	
-	InstallSoftwareFromRepo wine
+	software::add_native_package wine
 	
 	# A DOS virtual environment!				
 	software::from_snapcraft.io dosbox-x $1
@@ -901,15 +901,15 @@ recipe_Bundle:_1_RTD_CONFIG (){
 		# Special case for Fedora: Add the gnome UI tweak tool...
 		if cat /etc/os-release |grep "Fedora" ; then
 			# Enable the extra repositories in fedora to get access to the espected software.
-			InstallSoftwareFromRepo fedora-workstation-repositories
-			InstallSoftwareFromRepo gnome-tweaks
+			software::add_native_package fedora-workstation-repositories
+			software::add_native_package gnome-tweaks
 		fi
-		InstallSoftwareFromRepo gnome-tweaks
+		software::add_native_package gnome-tweaks
 
 		write_information "--- Optimizig look and feel of the desktop for productivity and aestetics..."
-		check_dependencies make
-		check_dependencies sassc
-		check_dependencies gettext
+		software::add_native_package make
+		software::add_native_package sassc
+		software::add_native_package gettext
 
 		# Install the wanted shell extensions that can be found in the distributions repository
 		# 	615:	appindicator		307:  	dash-to-dock
@@ -925,7 +925,7 @@ recipe_Bundle:_1_RTD_CONFIG (){
 		# 	8: 	Places Status Indicator
 
 		# For critical extensions try to install from package manager first
-		for i in dash-to-dock dash-to-panel gnome-shell-extension-manager ; do check_dependencies gnome-shell-extension-${i} ; done
+		for i in dash-to-dock dash-to-panel gnome-shell-extension-manager ; do software::add_native_package gnome-shell-extension-${i} ; done
 
 		for i in 6 7 8 19 97 307 517 615 906 1160 1319 1852 3628 ; do
 			local extension_installer="$(find /opt -name rtd-gnome-shell-extension-installer )"
@@ -957,19 +957,19 @@ recipe_Bundle:_1_RTD_CONFIG (){
 
 		if hash apt-get &>/dev/nul ; then
 			for i in sassc libcanberra-gtk-module libglib2.0-dev gtk2-engines-murrine gtk2-engines-pixbuf libxml2-utils ; do
-				check_dependencies  $i
+				software::add_native_package  $i
 			done
 		elif hash zypper &>/dev/nul ; then
 			for i in gtk-murrine-engine gtk2-engines sassc glib2-devel ; do
-				check_dependencies  $i
+				software::add_native_package  $i
 			done
 		elif hash dnf &>/dev/nul ; then
 			for i in gtk-murrine-engine gtk2-engines sassc glib2-devel ; do
-				check_dependencies  $i
+				software::add_native_package  $i
 			done
 		elif hash pacman &>/dev/nul ; then
 			for i in gtk-engine-murrine gtk-engines sassc; do
-				check_dependencies  $i
+				software::add_native_package  $i
 			done
 		else
 			write_error "This option requires a supported package manager on your system (deb, zypper, dnf, pacman). Neiter was found!"
@@ -984,7 +984,7 @@ recipe_Bundle:_1_RTD_CONFIG (){
 		# 	for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i mojave-themes:gtk-3-themes ; done
 
 		# # Install basic professional Arc and gnome default themes...
-		InstallSoftwareFromRepo arc-theme
+		software::add_native_package arc-theme
 		# -------------------------------------------------------------------------------------------------------
 
 
