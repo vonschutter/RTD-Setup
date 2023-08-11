@@ -63,7 +63,7 @@ export _git_theme_url="https://github.com/${_git_profile}/RTD-Themes.git"
 export _logfile=${_log_dir}/$(date +%Y-%m-%d-%H-%M-%S-%s)-${_scriptname}.log
 
 # List spciffic commands of software that are needed
-export _software_dependencies="zip dialog"
+export _software_dependencies="zip dialog pkexec"
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -274,6 +274,14 @@ if [[ ${UID} -eq 0 ]] ; then
 else
 	# If privileges are not elevated; then request elevation using the appropriate method:
 	_exec_local="$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/"$( basename ${0} )"
-	if echo $(systemctl get-default ) |grep graphical &>/dev/null ; then pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY ${_exec_local} ${autoconfirm} ; else ensure_admin ; fi
+	if echo $(systemctl get-default ) |grep graphical &>/dev/null ; then 
+		if hash pkexec ; then 
+			pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY ${_exec_local} ${autoconfirm}
+		else
+			ensure_admin
+			exit
+		fi
+	else 
+		ensure_admin ; fi
 	exit
 fi

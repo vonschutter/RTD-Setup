@@ -902,7 +902,6 @@ recipe_Bundle:_1_RTD_CONFIG (){
 		if cat /etc/os-release |grep "Fedora" ; then
 			# Enable the extra repositories in fedora to get access to the espected software.
 			software::add_native_package fedora-workstation-repositories
-			software::add_native_package gnome-tweaks
 		fi
 		software::add_native_package gnome-tweaks
 
@@ -955,25 +954,25 @@ recipe_Bundle:_1_RTD_CONFIG (){
 		# Install hemes (Light and Dark) and more...
 		bash ${_THEME_DIR}/plus-themes.sh
 
-		if hash apt-get &>/dev/nul ; then
-			for i in sassc libcanberra-gtk-module libglib2.0-dev gtk2-engines-murrine gtk2-engines-pixbuf libxml2-utils ; do
-				software::add_native_package  $i
-			done
-		elif hash zypper &>/dev/nul ; then
-			for i in gtk-murrine-engine gtk2-engines sassc glib2-devel ; do
-				software::add_native_package  $i
-			done
-		elif hash dnf &>/dev/nul ; then
-			for i in gtk-murrine-engine gtk2-engines sassc glib2-devel ; do
-				software::add_native_package  $i
-			done
-		elif hash pacman &>/dev/nul ; then
-			for i in gtk-engine-murrine gtk-engines sassc; do
-				software::add_native_package  $i
-			done
-		else
-			write_error "This option requires a supported package manager on your system (deb, zypper, dnf, pacman). Neiter was found!"
-		fi
+		# if hash apt-get &>/dev/nul ; then
+		# 	for i in sassc libcanberra-gtk-module libglib2.0-dev gtk2-engines-murrine gtk2-engines-pixbuf libxml2-utils ; do
+		# 		software::add_native_package  $i
+		# 	done
+		# elif hash zypper &>/dev/nul ; then
+		# 	for i in gtk-murrine-engine gtk2-engines sassc glib2-devel ; do
+		# 		software::add_native_package  $i
+		# 	done
+		# elif hash dnf &>/dev/nul ; then
+		# 	for i in gtk-murrine-engine gtk2-engines sassc glib2-devel ; do
+		# 		software::add_native_package  $i
+		# 	done
+		# elif hash pacman &>/dev/nul ; then
+		# 	for i in gtk-engine-murrine gtk-engines sassc; do
+		# 		software::add_native_package  $i
+		# 	done
+		# else
+		# 	write_error "This option requires a supported package manager on your system (deb, zypper, dnf, pacman). Neiter was found!"
+		# fi
 
 		# # Install theme for a smooth mocka experience in UI (snap, gnome, and icons)...
 		# software::from_snapcraft.io vimix-themes
@@ -1012,14 +1011,14 @@ recipe_Bundle:_1_RTD_CONFIG (){
 		# the OEM tweaks to the UI. If this task sequence is run on a system by a user on a system not
 		# built by the unattended OEM process, then these changes sould only be implemented for the user
 		# running this task.
-		# if [[ -e /opt/rtd ]] ; then
-		# 	write_information "THis system was built by an OEM process: copying tweaks for all new users..."
-		# 	mkdir -p /etc/skel/.config
-		# 	cp -r /home/${SUDO_USER}/.config/dconf /etc/skel/.config/dconf
-		# 	write_information "THis system was built by an OEM process: done..."
-		# else
-		# 	write_information "Only implementing tweaks for the current user..."
-		# fi
+		if [[ -e /opt/rtd ]] ; then
+			write_information "THis system was built by an OEM process: copying tweaks for all new users..."
+			mkdir -p /etc/skel/.config
+			cp -r /home/${SUDO_USER}/.config/dconf /etc/skel/.config/dconf
+			write_information "THis system was built by an OEM process: done..."
+		else
+			write_information "Only implementing tweaks for the current user..."
+		fi
 		# -------------------------------------------------------------------------------------------------------
 	fi
 
