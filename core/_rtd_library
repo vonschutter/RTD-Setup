@@ -3096,10 +3096,10 @@ ensure_admin ()
 		if [[ ! -e /etc/pam.d/sudo ]] ; then
 			#touch /etc/pam.d/sudo
 			#echo 'session  optional       pam_xauth.so' > /etc/pam.d/sudo
-			write_information "Not altering sudo configuration..."
+			write_information "Administrative access granted..."
 		else
 			#sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
-			write_information "Not altering sudo configuration..."
+			write_information "sudo:Administrative access granted..."
 		fi
 	fi
 }
@@ -4985,9 +4985,13 @@ oem::check_boot_splash_screen_enable () {
 # Usage: oem::check_boot_splash_screen_enable /root/original-ks.cfg
 # End of documentation
 	if [[ -n "$1" ]] ; then
-		if cat $1 |grep "-desktop" ; then
-			InstallSoftwareFromRepo splash && echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"'>> /etc/default/grub
-			update-grub
+		if [[ -r "$1" ]]
+			if cat $1 |grep -i "desktop" ; then
+				if check_dependencies splash 
+					echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"'>> /etc/default/grub
+					update-grub
+				fi
+			fi
 		fi
 	fi
 }
@@ -5028,7 +5032,35 @@ is_software_package_installed ()
 
 
 
+software::is_native_package_installed ()
+{
+# Description: Function to check if a piece of software is installed. This function will first check
+# if the package manager is deb, zypper or rpm, and then take one parameter passed
+# and evauate if a software package by that name is installed. This function
+# will return a "0" or "1" return based on the package managers return code.
+# Globals:
+# Arguments: None
+# Outputs:
+# Returns: 1/0 where 0 = package is installed/1 = package is NOT installed
+# Usage:
+# Call this function by:
+# software::is_native_package_installed "package name"
+#                 or
+# software::is_native_package_installed "$1" if calling this function from a script
+# or another function receiving a parameter.
+#
+# End of documentation
 
+	if hash dnf 2>/dev/null; then
+		rpm -q "$1" > /dev/null 2>&1 && return 0 || return 1
+	elif hash zypper 2>/dev/null; then
+		zypper se -i "$1" || return 1 && return 0 
+	elif hash apt 2>/dev/null; then
+		dpkg -l "$1" 2>/dev/null |tail -1 |grep "ii  $1" > /dev/null 2>&1 && return 0 || return 1
+	else
+		return 3
+	fi
+}
 
 
 
@@ -5059,7 +5091,30 @@ is_software_package_available ()
 
 
 
+software::is_native_package_available ()
+{
+# Description: Function to chek if a package is available in whetever repository, and
+# if there return a "0" and if not return a "1" or a "3" if there is no recognizable
+# package manager found. the function expects the name of the package
+# to be a parameter passed to this fuction. Call this function by:
+# is_software_package_available "package name"
+#                 or
+# is_software_package_available "$1" if calling this function from a script
+# or another function receiving a parameter.
+#
+# Supported base distributions: Fedora . SuSE . Debian
+# End of documentation
 
+	if hash yum 2>/dev/null; then
+		yum list available "$1" &> /dev/null && return 0 || return 1
+	elif hash zypper 2>/dev/null; then
+		if zypper se "${1}" |grep "${1}" &> /dev/null ; then return 0 ; else return 1 ; fi
+	elif hash apt 2>/dev/null; then
+		apt-get -qq list "$1" 2>/dev/null | grep -q "$1" && return 0 || return 1
+	else
+		return 3
+	fi
+}
 
 
 
@@ -5102,6 +5157,68 @@ InstallSoftwareFromRepo ()
 
 
 
+software::add_native_package ()
+{
+# Description:
+# add global install command for portability and convenience. This function
+# allows for scripts to add software across many systems.
+# Primarily for Linux: this function will look for the common package managers
+# apt (all debina and ubuntu based distributions), dnf (RedHat, Fedora, Mandriva, and others)
+# zypper (SuSE and Open SUSE). If neither of those package manages are available many systems
+# use package kit; and this will be registered as an sinstall option.
+#
+# Globals:
+# Arguments: package_name
+# Outputs:
+# Returns:
+# Usage: "software::add_native_package <package_name> <package_name> <...n>"
+#
+#
+# Return Codes:
+# 
+# A return code of "1" will be returned the function was not able install the package.
+#
+#
+# End of documentation
+
+	if [[ 'echo $OSTYPE" |grep "linux"' ]]; then
+
+		if hash pkcon 2>/dev/null; then
+			write_status  "Installing ${@} using Package Kit..."
+			pkcon install -y ${@}
+			return $?
+		elif hash dnf 2>/dev/null; then
+			write_status "Installing ${@} using DNF"
+			sudo dnf -y install ${@}
+			return $?
+		elif hash zypper 2>/dev/null; then
+			write_status  "Installing ${@} using ZYPPER"
+			sudo zypper install -y ${@}
+			return $?
+		elif hash apt 2>/dev/null; then
+			write_status  "Installing ${@} using DEB"
+			sudo apt-get -y install ${@}
+			return $?
+		else
+			write_error "This system does not seem to have a software managment system"
+			return 1
+		fi
+
+	elif [[ "$OSTYPE" == "darwin"* ]]; then
+		write_error "Mac OSX is currently not supported..."
+	elif [[ "$OSTYPE" == "cygwin" ]]; then
+		write_error "CYGWIN is currently unsupported..."
+	elif [[ "$OSTYPE" == "msys" ]]; then
+		write_error "Lightweight shell is currently unsupported... "
+	elif [[ "$OSTYPE" == "freebsd"* ]]; then
+		write_error "Free BSD is currently unsupported... "
+	else
+	echo "I have no Idea what this system is"
+		export _INSTCMD="Whatever!"
+		return 1
+	fi
+	return $?
+}
 
 
 
@@ -5180,71 +5297,6 @@ set_install_command ()
 
 
 
-software::add_native_package ()
-{
-# Description:
-# add global install command for portability and convenience. This function
-# allows for scripts to add software across many systems.
-# Primarily for Linux: this function will look for the common package managers
-# apt (all debina and ubuntu based distributions), dnf (RedHat, Fedora, Mandriva, and others)
-# zypper (SuSE and Open SUSE). If neither of those package manages are available many systems
-# use package kit; and this will be registered as an sinstall option.
-#
-# Globals:
-# Arguments: package_name
-# Outputs:
-# Returns:
-# Usage: "software::add_native_package <package_name> <package_name> <...n>"
-#
-#
-# Return Codes:
-# 
-# A return code of "1" will be returned the function was not able install the package.
-#
-#
-# End of documentation
-
-	if [[ 'echo $OSTYPE" |grep "linux"' ]]; then
-
-		if hash pkcon 2>/dev/null; then
-			write_status  "Installing ${@} using Package Kit..."
-			pkcon install -y ${@}
-			return $?
-		elif hash dnf 2>/dev/null; then
-			write_status "Installing ${@} using DNF"
-			sudo dnf -y install ${@}
-			return $?
-		elif hash zypper 2>/dev/null; then
-			write_status  "Installing ${@} using ZYPPER"
-			sudo zypper install -y ${@}
-			return $?
-		elif hash apt 2>/dev/null; then
-			write_status  "Installing ${@} using DEB"
-			sudo apt-get -y install ${@}
-			return $?
-		else
-			write_error "This system does not seem to have a software managment system"
-			return 1
-		fi
-
-	elif [[ "$OSTYPE" == "darwin"* ]]; then
-		write_error "Mac OSX is currently not supported..."
-	elif [[ "$OSTYPE" == "cygwin" ]]; then
-		write_error "CYGWIN is currently unsupported..."
-	elif [[ "$OSTYPE" == "msys" ]]; then
-		write_error "Lightweight shell is currently unsupported... "
-	elif [[ "$OSTYPE" == "freebsd"* ]]; then
-		write_error "Free BSD is currently unsupported... "
-	else
-	echo "I have no Idea what this system is"
-		export _INSTCMD="Whatever!"
-		return 1
-	fi
-	return $?
-}
-
-
-
 
 
 
@@ -5282,7 +5334,7 @@ check_dependencies ()
 		write_information "I found that the dependency ${1} is present on this system... "
 	else
 		write_warning "You seem to have no ${1}... I will try to get it... "
-		if software::add_native_package "${1}" ; then
+		if InstallSoftwareFromRepo "${1}" ; then
 			write_status "OK Done! Continuing..."
 		else
 			write_error "That install didn't work out so well."
@@ -5296,6 +5348,49 @@ check_dependencies ()
 
 
 
+software::check_native_package_dependency ()
+{
+# Description:
+# Function to check that a piece of software is installed and if not install it.
+# Works for apt, zypper, dnf or yum based systems currently. The function will take a parameter 
+# that is expected to match the software name or rather the name of the package. 
+# 
+# 
+# This is done to comply wiht the philosophy to do what it takes to reach the objective, and 
+# just work. Rather than just fail, we want to try and solve the problem and make the software
+# available. 
+# 
+# Globals:
+# Arguments: None
+# Dependencies: [package manager]
+# Function Dependencies: (other functions)
+# ensure_admin, write_status, write_information, write_warning, write_error, is_software_package_installed,
+# InstallSoftwareFromRepo
+# 
+# Outputs:
+# Returns: 1/0
+# Usage: software::check_native_package_dependency [packagename]
+# 
+# EXAMPLE: software::check_native_package_dependency snapd
+# 
+# End of documentation
+	ensure_admin
+	#---------------------------------------------------------------
+	write_status "Checking for script dependencies and install if not there..."
+	#---------------------------------------------------------------
+	if is_software_package_installed "${1}" ; then
+		write_information "I found that the dependency ${1} is present on this system... "
+	else
+		write_warning "You seem to have no ${1}... I will try to get it... "
+		if software::add_native_package "${1}" ; then
+			write_status "OK Done! Continuing..."
+		else
+			write_error "That install didn't work out so well."
+			write_error "Please manually try to add the software since I couldn't do it."
+			return 1
+		fi
+	fi
+}
 
 
 
