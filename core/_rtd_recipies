@@ -930,10 +930,9 @@ recipe_Bundle:_1_RTD_CONFIG (){
 			local extension_installer="$(find /opt -name rtd-gnome-shell-extension-installer )"
 			local gnome_shell_ver=
 			if [[ -n "${extension_installer}" ]] ; then
-				bash ${extension_installer} --yes ${i} || \
-					bash ${extension_installer} --yes ${i} "$(gnome-shell --version |cut -d' '  -f3)" ||\
-						bash ${extension_installer} --yes ${i} --yes ${i} $(sudo -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c  "gnome-shell --version |cut -d' '  -f3")
-				bash bash ${extension_installer} --yes ${i} --restart-shell
+				bash ${extension_installer} --yes ${i} --restart-shell || \
+				bash ${extension_installer} --yes ${i} "$(gnome-shell --version |cut -d' '  -f3)" ||\
+				bash ${extension_installer} --yes ${i} $(sudo -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c  "gnome-shell --version |cut -d' '  -f3")
 			else
 				write_error "I could not find the gnome extension installer anywhere! "
 			fi

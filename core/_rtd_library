@@ -5018,12 +5018,12 @@ is_software_package_installed ()
 #
 # End of documentation
 
-	if hash dnf 2>/dev/null; then
-		rpm -q "$1" > /dev/null 2>&1 && return 0 || return 1
-	elif hash zypper 2>/dev/null; then
-		zypper se -i "$1" || return 1 && return 0 
-	elif hash apt 2>/dev/null; then
-		dpkg -l "$1" 2>/dev/null |tail -1 |grep "ii  $1" > /dev/null 2>&1 && return 0 || return 1
+	if hash dnf &> /dev/null; then
+		rpm -q "$1" &> /dev/null && return 0 || return 1
+	elif hash zypper &> /dev/null; then
+		zypper se -i "$1" &> /dev/null || return 1 && return 0 
+	elif hash apt &> /dev/null; then
+		dpkg -l "$1" &> /dev/null |tail -1 |grep "ii  $1" &> /dev/null && return 0 || return 1
 	else
 		return 3
 	fi
@@ -5051,12 +5051,12 @@ software::is_native_package_installed ()
 #
 # End of documentation
 
-	if hash dnf 2>/dev/null; then
-		rpm -q "$1" > /dev/null 2>&1 && return 0 || return 1
-	elif hash zypper 2>/dev/null; then
-		zypper se -i "$1" || return 1 && return 0 
-	elif hash apt 2>/dev/null; then
-		dpkg -l "$1" 2>/dev/null |tail -1 |grep "ii  $1" > /dev/null 2>&1 && return 0 || return 1
+	if hash dnf &> /dev/null; then
+		rpm -q "$1" &> /dev/null && return 0 || return 1
+	elif hash zypper &> /dev/null; then
+		zypper se -i "$1" &> /dev/null || return 1 && return 0 
+	elif hash apt &> /dev/null; then
+		dpkg -l "$1" &> /dev/null |tail -1 |grep "ii  $1" &> /dev/null && return 0 || return 1
 	else
 		return 3
 	fi
@@ -5620,10 +5620,10 @@ rtd_oem_remove_software ()
 			yum -y remove $*
 			return $?
 		elif hash zypper 2>/dev/null; then
-			zypper -y remove $*
+			zypper remove -y $*
 			return $?
 		elif hash apt 2>/dev/null; then
-			apt-get -y remove $* && apt -y autoremove
+			apt-get -y remove $* && apt-get -y autoremove
 			return $?
 		elif hash pkcon 2>/dev/null; then
 			pkcon remove $* -y --autoremove
@@ -6301,14 +6301,15 @@ software::display_bundle_install_choices_gtk ()
 				local c=0
 				previously_completed_bundles="$(cat ${completed_bundles_list})"
 					(
+					declare -A selection_list
+					selection_list=(${selection})
+					total_count=${#selection_list[@]}
 					for i in ${selection} ; do
-					current_bundle="${i}"
-					echo "# Installing bundle: ${current_bundle}..."
-					#software::add_software_task 
-					recipe_Bundle:_${current_bundle} && echo "${current_bundle}" >> ${completed_bundles_list} 
-					((c=c+1))
-					((s=c*10))
-					echo "$s"
+						current_bundle="${i}"
+						((c=c+1))
+						echo "# Installing bundle: ${c} ${current_bundle}..."
+						recipe_Bundle:_${current_bundle} && echo "${current_bundle}" >> ${completed_bundles_list} 
+						echo $(( 100*${c}/${total_count} ))
 					done
 					) | zenity --progress --no-cancel --auto-close  \
 					--title="Installing Software Prodictivity Bundles" \
