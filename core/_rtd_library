@@ -5083,7 +5083,7 @@ is_software_package_available ()
 	elif hash zypper 2>/dev/null; then
 		if zypper se "${1}" |grep "${1}" &> /dev/null ; then return 0 ; else return 1 ; fi
 	elif hash apt 2>/dev/null; then
-		apt-get -qq list "$1" | grep -q "$1" 2>/dev/null  && return 0 || return 1
+		apt -qq list "$1" | grep -q "$1" 2>/dev/null  && return 0 || return 1
 	else
 		return 3
 	fi
@@ -5184,20 +5184,20 @@ software::add_native_package ()
 	if [[ 'echo $OSTYPE" |grep "linux"' ]]; then
 
 		if hash pkcon 2>/dev/null; then
-			write_status  "Installing ${@} using Package Kit..."
-			pkcon install -y ${@}
+			write_status  "Installing ${1} using Package Kit..."
+			pkcon install -y ${1}
 			return $?
 		elif hash dnf 2>/dev/null; then
-			write_status "Installing ${@} using DNF"
-			sudo dnf -y install ${@}
+			write_status "Installing ${1} using DNF"
+			sudo dnf -y install ${1}
 			return $?
 		elif hash zypper 2>/dev/null; then
-			write_status  "Installing ${@} using ZYPPER"
-			sudo zypper install -y ${@}
+			write_status  "Installing ${1} using ZYPPER"
+			sudo zypper install -y ${1}
 			return $?
 		elif hash apt 2>/dev/null; then
-			write_status  "Installing ${@} using DEB"
-			sudo apt-get -y install ${@}
+			write_status  "Installing ${1} using DEB"
+			sudo apt-get -y install ${1}
 			return $?
 		else
 			write_error "This system does not seem to have a software managment system"
@@ -5815,7 +5815,7 @@ software::update_all_ui ()
 			write_error "This system does not seem to have a software managment system" 
 			return 1
 		fi
-		) | $dialog_ui --backtitle "\Zb\Z5$PUBLICATION             $VERSION\ZB"  --programbox "Updating all natively installed software..." 25 148
+		) | $dialog_ui --backtitle "\Zb\Z5$PUBLICATION             $VERSION\ZB"  --programbox "Updating all natively installed software..." 25 120
 	}
 
 	Snap_Apps ()
@@ -5826,9 +5826,9 @@ software::update_all_ui ()
 			snap refresh
 			write_information "Update task complete."
 		else
-			write_warning "--- snap software is not present on this system... skipping..."
+			write_warning "!snap software is not present on this system... skipping..."
 		fi
-		) | $dialog_ui --backtitle "\Zb\Z5$PUBLICATION             $VERSION\ZB" --programbox "Updating all Contained Snap Apps..." 25 148
+		) | $dialog_ui --backtitle "\Zb\Z5$PUBLICATION             $VERSION\ZB" --programbox "Updating all Contained Snap Apps..." 25 120
 	}
 
 	Flatpak_Apps ()
@@ -5840,9 +5840,9 @@ software::update_all_ui ()
 			flatpak update --system --noninteractive -y
 			write_information "Update task complete."
 		else
-			write_warning "--- flatpak software is not present on this system... skipping..."
+			write_warning "!flatpak software is not present on this system... skipping..."
 		fi
-		) | $dialog_ui --backtitle "\Zb\Z5$PUBLICATION             $VERSION\ZB" --programbox "Updating all Contained Flatpaks Apps..." 25 148
+		) | $dialog_ui --backtitle "\Zb\Z5$PUBLICATION             $VERSION\ZB" --programbox "Updating all Contained Flatpaks Apps..." 25 120
 	}
 
 	while true; do
@@ -6240,7 +6240,8 @@ display_software_installation_choices_gtk ()
 #
 # End of documentation
 
-	DisplayMenu=( zenity  --list  --timeout 120 --width=800 --height=600 --text "$_BACKTITLE" --checklist  --column "ON/OFF" --column "Select Software to add:" --separator " " )
+	DisplayMenu=( zenity  --list  --cancel-label="Go Back" --timeout 120 --width=800 --height=600 --text "$_BACKTITLE" --checklist \
+	--column "ON/OFF" --column "Select Software to add:" --separator " " )
 	SoftwareList=$(list_loaded_software_functions --nonum)
 	MenuOptions=($(for i in $SoftwareList ; do echo -e "${zstatus:=false} ${i}" ; done ))
 
@@ -6281,8 +6282,8 @@ software::display_bundle_install_choices_gtk ()
 		local IFS_SAV=$IFS
 		local IFS=$(echo -en "\n\b")
 
-		selection=$(zenity --list --checklist \
-			--text=" Select a Software Bundle below that you want to add to this computer: \n NOTE: only items that are not yet installed are shown. \n" \
+		selection=$(zenity --list --cancel-label="Go Back" --checklist \
+			--text=" Select a Software Bundle below that you want to add to this computer: \n NOTE: only bundles that are not yet installed are shown. \n" \
 			--height=600 --width=980 \
 			--print-column=2 --column="Selected" --column="Bundle" --column="Description" \
 			--separator=" " ${DisplayList} )
@@ -6306,7 +6307,7 @@ software::display_bundle_install_choices_gtk ()
 					for i in ${selection} ; do
 						current_bundle="${i}"
 						((c=c+1))
-						echo "# Installing bundle: ${c} ${current_bundle}..."
+						echo "# Installing bundle ${c} of ${total_count}: ${current_bundle}..."
 						recipe_Bundle:_${current_bundle} && echo "${current_bundle}" >> ${completed_bundles_list} 
 						echo $(( 100*${c}/${total_count} ))
 					done
@@ -6353,7 +6354,7 @@ software::display_bundle_removal_choices_gtk ()
 			DisplayList=$(software::list_bundles --zformat-removable)
 			IFS_SAV=$IFS
 			IFS=$(echo -en "\n\b")
-			selection=$(zenity --list --checklist \
+			selection=$(zenity --list --cancel-label="Go Back" --checklist \
 			--text=" Select a Software Bundle below that you want to REMOVE from this computer: \n \n" \
 			--height=600 --width=980 \
 			--print-column=2 --column="Selected" --column="Bundle" --column="Description" --separator=" " ${DisplayList} )
@@ -6370,25 +6371,26 @@ software::display_bundle_removal_choices_gtk ()
 			"${selection}" )
 				local d=0 ; for i in $(cat ${completed_bundles_list}) ; do ((d=d+1)) ; done
 				local c=0
+				selection_list=(${selection})
+				total_count=${#selection_list[@]}
 				removed_bundle_list="$(mktemp)"
 				(
 					for i in ${selection} ; do
 						current_bundle="${i}"
-						echo "# Removing bundle: ${current_bundle}..."
+						((c=c+1))
+						echo "# Removing bundle ${c} of ${total_count}: ${current_bundle}..."
 						#software::add_software_task 
 						recipe_Bundle:_${i} --remove 
 						sed -i "/${current_bundle}/d" "${completed_bundles_list}"
 						echo ${current_bundle} >> "${removed_bundle_list}"
-						((c=c+1))
-						((s=c*10))
-						echo "$s"
+						echo $(( 100*${c}/${total_count} ))
 					done
 				)| zenity --progress --no-cancel --auto-close \
 				--title="Removing Software Prodictivity Bundles" \
 				--text="Please wait for the bundle removals to complete..." \
 				--percentage=10 --height=200 --width=600
 
-				zenity --info --timeout 120 --title "Bundles Removed: $c " --text="The following Software bundles have been REMOVED: \n \n $(cat ${removed_bundle_list}) " --height=600 --width=800
+				zenity --info --cancel-label="Go Back" --timeout 120 --title "Bundles Removed: $c " --text="The following Software bundles have been REMOVED: \n \n $(cat ${removed_bundle_list}) " --height=600 --width=800
 			;;
 			* )
 				# Trap unknown conditions so as to not do harm
@@ -10417,9 +10419,9 @@ software::list_bundles ()
 		--zformat-removable )
 			# List software bundles for use with zenity
 			completed_bundles_list="$(cat ${completed_bundles_list} )"
-			for _installed_bundle in $completed_bundles_list ; do
+			for _installed_bundle in ${completed_bundles_list} ; do
 				# Build each line to be displayed in the bundle installer...
-				Description=$(grep -A 1 "recipe_Bundle:_$_installed_bundle ()" _rtd_recipies |tail -1)
+				Description=$(grep -A 1 "recipe_Bundle:_$_installed_bundle ()" "${_OEM_DIR}/core/_rtd_recipies" |tail -1)
 				Description="${Description/"# "/": "}"
 				Description="${Description/"	"/""}"
 				echo -e "true \n ${_installed_bundle} \n ${Description} \n"
