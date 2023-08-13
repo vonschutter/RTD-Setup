@@ -322,7 +322,7 @@ dialog::copy_file_progress ()
 	# Destination directory
 	DEST="${2}"
 
-	[ ! -d $DEST ] && mkdir -p $DEST
+	[ ! -d ${DEST} ] && mkdir -p ${DEST}
 
 	dialog --title "Copying files" --gauge "Copying file..." 10 75 < <(
 	# Get total number of files in array
@@ -337,12 +337,12 @@ dialog::copy_file_progress ()
 		# update dialog box 
 		cat <<EOF
 XXX
-$PCT
-Copying file "$f"...
+${PCT}
+Copying file "${f}"...
 XXX
 EOF
 		# copy file $f to $DEST 
-		/bin/cp $f ${DEST} &>/dev/null
+		/bin/cp ${f} ${DEST} &>/dev/null
 	done
 	)
 
@@ -789,7 +789,7 @@ dependency::virtualization ()
 	count=1
 	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install
 	do
-		write_status "🧩 ${count}	- Verifying dependencies if relevant( ${i} )..."
+		write_status "${count}	- Verifying dependencies if relevant( ${i} )..."
 		check_dependencies $i &>/dev/null
 		count=$((count + 1))
 	done
@@ -3096,10 +3096,10 @@ ensure_admin ()
 		if [[ ! -e /etc/pam.d/sudo ]] ; then
 			#touch /etc/pam.d/sudo
 			#echo 'session  optional       pam_xauth.so' > /etc/pam.d/sudo
-			write_information "Administrative access granted..."
+			system::log_item "${FUNCNAME[0]} sudo:Administrative access granted to ${SUDO_USER:-"unknon user"} as requested by ${FUNCNAME[1]} ..."
 		else
 			#sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
-			write_information "sudo:Administrative access granted..."
+			system::log_item "${FUNCNAME[0]} sudo:Administrative access granted to ${SUDO_USER:-"unknon user"} as requested by ${FUNCNAME[1]} ..."
 		fi
 	fi
 }
@@ -4723,12 +4723,12 @@ ensure_flatpak_package_managment ()
 			write_status "flatpak command is available... "
 			if flatpak remotes | grep flathub  &>/dev/null ; then 
 				write_status "flathub remote is present..."
-				export $PATH=$PATH:/var/lib/flatpak/exports/bin
+				export PATH=$PATH:/var/lib/flatpak/exports/bin
 			else
 				write_warning "flathub remote is not present... adding now... "
 				ensure_admin
 				flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || write_error "Failed to add flatpak repo!"
-				export $PATH=$PATH:/var/lib/flatpak/exports/bin
+				export PATH=$PATH:/var/lib/flatpak/exports/bin
 			fi
 
 			if flatpak list|grep com.github.tchx84.Flatseal  &>/dev/null ; then 
@@ -4743,7 +4743,7 @@ ensure_flatpak_package_managment ()
 			write_information "Ensuring Flatpak software distribution system is available..."
 			if check_dependencies flatpak ; then
 				flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || write_error "Failed to add flatpak repo!"
-				export $PATH=$PATH:/var/lib/flatpak/exports/bin			
+				export PATH=$PATH:/var/lib/flatpak/exports/bin			
 			else
 				write_error "Failed to satisfy dependecy flatpak!"
 			fi
@@ -5029,7 +5029,7 @@ is_software_package_installed ()
 	elif hash zypper &> /dev/null; then
 		zypper se -i "$1" &> /dev/null || return 1 && return 0 
 	elif hash apt &> /dev/null; then
-		dpkg -l "$1" &> /dev/null |tail -1 |grep "ii  $1" &> /dev/null && return 0 || return 1
+		dpkg -l "$1" |tail -1 |grep "ii  $1" &> /dev/null && return 0 || return 1
 	else
 		return 3
 	fi
@@ -5663,6 +5663,7 @@ system::log_item ()
 # End of documentation
 
 	if [[ -z "$_LOGFILE" ]] ; then
+		# If log file not set, set it to defaults a.k.a. script name
 		local _SCRIPTNAME=$(basename $0)
 		local _TLA=${_SCRIPTNAME:0:3}
 		local _LOG_DIR=/var/log/${_TLA,,}
@@ -5674,7 +5675,7 @@ system::log_item ()
 	fi
 
 	local _date="$(date '+%Y/%m/%d %H:%M')"
-	echo "${_date} --- : $*" >> "${_logfile}"
+	echo "${_date} ${FUNCNAME[1]} --- : $*" >> "${_logfile}"
 }
 
 
@@ -5714,17 +5715,9 @@ rtd_update_system ()
 	write_host --cyan "like snap and flatpak ..."
 	echo -e " \n"
 
-
-	log_item ()
-	{
-		DATE=$(date '+%d/%m/%Y %H:%M:%S');
-		echo "$DATE --- : $*" >> "$LOGFILE"
-	}
-
-
 	rtd_software_task ()
 	{
-		log_item "running rtd_software_task with parameters $*"
+		system::log_item "running rtd_software_task with parameters $*"
 		# make some decent display terminal graphics...
 		PAD="----------------------------------------------"
 		LINE=$(printf "%s %s" "$@" "$PAD" | cut -c 1-${#PAD})
@@ -5953,22 +5946,24 @@ software::from_flathub.org ()
 	fi
 
 	if [[ "$remove_flag" == "--remove" ]]; then
-		
+		system::log_item "Request to remove Flatpak app '$app_name'"
+
 		if flatpak uninstall -y "$app_name"; then
-			write_information "Flatpak app '$app_name' has been uninstalled."
+			system::log_item "Flatpak app '$app_name' has been uninstalled."
 		else
-			write_error "Error: Failed to uninstall Flatpak app '$app_name'"
+			system::log_item "Error: Failed to uninstall Flatpak app '$app_name'"
 			return 1
 		fi
 	else
-		
+		system::log_item "Request to install Flatpak app '$app_name'"
+
 		if flatpak info "$app_name" >/dev/null 2>&1; then
 			write_information "Flatpak app '$app_name' is already installed."
 		else
 			if flatpak install -y "$app_name"; then
-				write_information "Flatpak app '$app_name' has been installed."
+				system::log_item "Flatpak app '$app_name' has been installed."
 			else
-				write_error "Error: Failed to install Flatpak app '$app_name'"
+				system::log_item "Error: Failed to install Flatpak app '$app_name'"
 				return 1
 			fi
 		fi
@@ -6062,28 +6057,33 @@ software::from_snapcraft.io ()
 	hash snap || ensure_snap_package_managment
 
 	if [[ "$remove_flag" == "--remove" ]]; then
+
+		system::log_item "Request to remove Snap app '$app_name'"
+
 		if snap remove "$app_name"; then
-			write_information "Snap app '$app_name' has been removed."
+			system::log_item "Snap app '$app_name' has been removed."
 		else
-			write_error "Error: Failed to remove Snap app '$app_name'"
+			system::log_item "Error: Failed to remove Snap app '$app_name'"
 		fi
 	else
+		system::log_item "Request to install Snap app '$app_name'"
+
 		if snap list "$app_name" >/dev/null 2>&1; then
-			write_information "Snap app '$app_name' is already installed."
+			system::log_item "Snap app '$app_name' is already installed."
 		else
 			requires_classic=$(snap info "$app_name" | grep "latest/stable" | grep -o " classic")
 			if [[ -n "$requires_classic" ]]; then
-				write_warning "The app '$app_name' requires classic confinement (less confined)..."
+				system::log_item "The app '$app_name' requires classic confinement (less confined)..."
 				if snap install "$app_name" --classic; then
-					write_information "Snap app '$app_name' has been installed."
+					system::log_item "Snap app '$app_name' has been installed."
 				else
-					write_error "Error: Failed to install Snap app '$app_name'"
+					system::log_item "Error: Failed to install Snap app '$app_name'"
 				fi
 			else
 				if snap install "$app_name"; then
-					write_information "Snap app '$app_name' has been installed."
+					system::log_item "Snap app '$app_name' has been installed."
 				else
-					write_error "Error: Failed to install Snap app '$app_name'"
+					system::log_item "Error: Failed to install Snap app '$app_name'"
 				fi
 			fi
 		fi
@@ -6288,7 +6288,7 @@ software::display_bundle_install_choices_gtk ()
 		local IFS_SAV=$IFS
 		local IFS=$(echo -en "\n\b")
 
-		selection=$(zenity --list --cancel-label="Go Back" --checklist \
+		selection=$(zenity --list --title="${FUNCNAME[1]}: Select Task" --cancel-label="Go Back" --checklist \
 			--text=" Select a Software Bundle below that you want to add to this computer: \n NOTE: only bundles that are not yet installed are shown. \n" \
 			--height=600 --width=980 \
 			--print-column=2 --column="Selected" --column="Bundle" --column="Description" \
@@ -6324,6 +6324,7 @@ software::display_bundle_install_choices_gtk ()
 
 				completed_bundles="$(cat ${completed_bundles_list} |tail -$c)"
 				zenity --info --timeout 120 --title "Bundles Installed: $c Bundles Previously Installed: $d" --text="The following Software bundles have been installed: \n \n $completed_bundles \n \n Previouly installed bundles: \n \n $previously_completed_bundles" --height=600 --width=800
+				return
 			;;
 			* )
 				# Trap unknown conditions so as to not do harm
@@ -6360,7 +6361,7 @@ software::display_bundle_removal_choices_gtk ()
 			DisplayList=$(software::list_bundles --zformat-removable)
 			IFS_SAV=$IFS
 			IFS=$(echo -en "\n\b")
-			selection=$(zenity --list --cancel-label="Go Back" --checklist \
+			selection=$(zenity --list --title="${FUNCNAME[1]}: Select Task" --cancel-label="Go Back" --checklist \
 			--text=" Select a Software Bundle below that you want to REMOVE from this computer: \n \n" \
 			--height=600 --width=980 \
 			--print-column=2 --column="Selected" --column="Bundle" --column="Description" --separator=" " ${DisplayList} )
@@ -6397,6 +6398,7 @@ software::display_bundle_removal_choices_gtk ()
 				--percentage=10 --height=200 --width=600
 
 				zenity --info --cancel-label="Go Back" --timeout 120 --title "Bundles Removed: $c " --text="The following Software bundles have been REMOVED: \n \n $(cat ${removed_bundle_list}) " --height=600 --width=800
+				return
 			;;
 			* )
 				# Trap unknown conditions so as to not do harm

@@ -620,10 +620,18 @@ recipe_Bundle:_Compression_Tools () {
 		for i in p7zip-gui p7zip p7zip-plugins zip; do
 			software::add_native_package $i
 		done
-	else
+	elif hash zypper &>/dev/nul ; then 
+		write_information "OpenSUSE based software management found, assuming OpenSUSE based distribution..."
+		for i in 7zip rar zip ; do
+			software::add_native_package $i
+		done
+	elif hash apt &>/dev/nul ; then 
+		write_information "Debian based software management found, assuming Debian based distribution..."
 		for i in p7zip-full p7zip-rar rar zip ; do
 			software::add_native_package $i
 		done
+	else
+		write_error "No supported software management found, assuming unsupported distribution..."
 	fi
 }
 

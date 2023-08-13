@@ -77,15 +77,17 @@
 
 # Decide where to put log files.
 # Default: log in to the $_LOG_DIR location dated accordingly. If this is already set
-# we use the requested location.
-: "${_LOGFILE:="${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log"}" ; echo "$( basename $0): Logfile is set to: ${_LOGFILE}"
+# we use the requested location. This should also be expoerted to the environment for use when
+# calling other scripts.
+export _LOGFILE="${_LOGFILE:="${_LOG_DIR}/$(basename $0)-$(date +%Y-%m-%d-%H).log"}" 
+
 
 # Normally all choices are checked. Pass the variable "false" to this script to default
 # to unchecked. If none is passed, a default will be used.
 export zstatus="$1"
 
 # Set the background tilte:
-: "${_BACK_TITLE:-"RTD OEM Simple System Setup"}"
+: "${_BACK_TITLE:="RTD OEM Simple System Setup"}"
 
 # List of bare minimum managmement software that shuold be on a system
 _requirements="dialog wget curl rsync git"
@@ -113,10 +115,23 @@ complete_setup () {
 				--text "Please select if you witsh to reseal the sysetm, restart and use the system, or just exit" \
 				--column "Options" --width=1024 --height=768  2>/dev/null )
 	case "$completion" in
-		"Restart system and start using it now" ) write_information "Restarting system..." ; reboot ;;
-		"${ConditionalResealOption:-"Ignore"}" ) write_information "Resealing system..." ; rtd_oem_reseal ;;
-		"Exit now and do no more" ) write_information "Quitting..." ; exit ;;
-		* ) echo unknown option ; exit 1 ;;
+		"Restart system and start using it now" )
+			write_information "Restarting system..." 
+			reboot
+			exit 0
+		;;
+		"${ConditionalResealOption:-"Ignore"}" )
+			write_information "Resealing system..." 
+			rtd_oem_reseal
+			exit 0
+		;;
+		"Exit now and do no more" )
+			write_information "Quitting..." 
+			exit 0
+		;;
+		* ) echo "Unknown exit option (ESC?)"
+			exit 12 
+		;;
 	esac
 }
 
@@ -132,9 +147,9 @@ dependency::_rtd_library ()
 		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name _rtd_library |grep -v bakup )"
 	elif wget ${_src_url} ; then
                 write_information "${FUNCNAME[0]} 4 Using: ${_src_url}"
-		source ./_rtd_library
+		source ./_rtd_library 
 	else
-		echo -e "RTD functions NOT found!"
+		echo -e "RTD functions NOT found!" 
 		return 1
 	fi
 }
@@ -148,34 +163,54 @@ dependency::_rtd_library ()
 # Ensure that this script is run with administrative priveledges such that it may
 # alter system wide configuration.
 # ensure_admin
-if [[ ! $UID -eq 0 ]]; then
-	echo -e "This script needs administrative access..."
-	# Relaunch script in priviledged mode...
-	sudo -E bash $0 $*
-else
-	dependency::_rtd_library
-	# Allow super user to display gui menu on users screen.
-	# sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
-	for i in $_requirements ; do 
-		InstallSoftwareFromRepo $I
-	done
-	rtd_wait_for_internet_availability
-	rtd_oem_reset_default_environment_config
 
-	if [[ -z "$(ps aux |grep X |grep -v grep)" ]]; then
-		echo "No X server at \$DISPLAY [$DISPLAY]"
-		check_dependencies dialog
-		rtd_setup_choices_server
+
+
+
+oem_linux_config ()
+{
+	
+	if [[ ! $UID -eq 0 ]]; then
+		echo -e "This script needs administrative access..."
+		# Relaunch script in priviledged mode...
+		sudo -E bash $0 $*
 	else
-		check_dependencies zenity || exit 1
-		oem::deploy_themes
-		#software::display_bundle_removal_choices_gtk
-		software::display_bundle_install_choices_gtk
-		complete_setup
+		dependency::_rtd_library || exit 1
+		# Allow super user to display gui menu on users screen.
+		# sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
+		system::log_item "**********************************************************************"
+		system::log_item "$(basename $0) was started on $(date +%Y-%m-%d-%H)"
+		system::log_item "$(basename $0): Logfile is set to: ${_LOGFILE}"
+
+		for i in $_requirements ; do 
+			check_dependencies $i 
+		done
+		
+		rtd_wait_for_internet_availability
+		rtd_oem_reset_default_environment_config
+
+		if [[ -z "$(ps aux |grep X |grep -v grep)" ]]; then
+			echo "No X server at \$DISPLAY [$DISPLAY]"
+			if ! hash dialog &>/dev/null ; then check_dependencies dialog || exit 1 ; fi
+			rtd_setup_choices_server
+		else
+			if ! hash zenity &>/dev/null ; then  check_dependencies zenity || exit 1 ; fi
+			if ! hash yad &>/dev/null  ; then check_ependencies yad || write_warning "YAD is not installed. Some features will not be available." ; fi
+
+			if [[ -e ${_THEME_DIR}/plus-themes.sh ]] ; then
+				write_information "Found plus-themes.sh in ${_THEME_DIR}"
+			else
+				write_information "Downloading plus-themes.sh to ${_THEME_DIR}"
+				oem::deploy_themes
+			fi
+			
+			bash ${_MODS_DIR}/oem-bundle-manager/rtd-oem-bundle-manager 
+			complete_setup
+		fi
 	fi
-fi
+}
 
-
+oem_linux_config | tee -a ${_LOGFILE} 2>/dev/null
 
 exit
 EOF

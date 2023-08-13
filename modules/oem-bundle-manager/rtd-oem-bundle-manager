@@ -50,13 +50,9 @@
 : ${_TLA=${_SCRIPTNAME:0:3}}
 : ${_GIT_PROFILE:=vonschutter}
 
-if [ "$UID" -eq 0 ]; then
-	: ${_LOG_DIR:="/var/log/${_TLA}"} ; mkdir -p ${_LOG_DIR}
-	: ${_LOGFILE:="${_LOG_DIR}/$( basename $0)-$(date +%Y-%m-%d-%H-%M-%S-%s).log"}
-else
-	: ${_LOG_DIR:="~/.config/rtd/${_TLA}"} ; mkdir -p ${_LOG_DIR}
-	: ${_LOGFILE:="${_LOG_DIR}/$( basename $0)-$(date +%Y-%m-%d-%H-%M-%S-%s).log"}
-fi
+
+
+
 
 
 _ABOUT='
@@ -148,45 +144,46 @@ system::ExecStart () {
 		write_warning "The file /etc/pam.d/sudo does not apear to exist. "
 	fi
 
-	if hash zenity &>/dev/null ; then
-		while true; do
-			exec 3>&1
-			selection=$(zenity --cancel-label=QUIT  --list \
-				"Add Bundles to this computer" \
-				"Remove Bundles from this computer" \
-				"Information abount this tool" \
-				--column="Select What you Want To Do:" --text='
-				<span font="16" foreground="red">Add or remove bundles on this system</span> \n
-				NOTE: The OEM Bundle Manager, depending on your choices, may download vendor 
-				packages, or containes applications such as snap apps, or flatpak apps, 
-				or even download software from a vendors web site, as well as install 
-				fonts and wallpapeers etc. \n ' \
-				--title="OEM Bundle Manager" --height=400 --width=600 )
-			exit_status=$?
-			exec 3>&-
+	if [ "$UID" -eq 0 ]; then
+		if hash zenity &>/dev/null ; then
+			while true; do
+				exec 3>&1
+				selection=$(zenity --cancel-label=QUIT  --list \
+					"Add Bundles to this computer" \
+					"Remove Bundles from this computer" \
+					"Information abount this tool" \
+					--column="Select What you Want To Do:" --text='
+					<span font="16" foreground="red">Add or remove bundles on this system</span> \n
+					NOTE: The OEM Bundle Manager, depending on your choices, may download vendor 
+					packages, or containes applications such as snap apps, or flatpak apps, 
+					or even download software from a vendors web site, as well as install 
+					fonts and wallpapeers etc. \n ' \
+					--title="OEM Bundle Manager" --height=400 --width=600 )
+				exit_status=$?
+				exec 3>&-
 
-			case $exit_status in
-				1) clear && echo [QUIT] && exit ;;
-				255) clear && echo [ESC] && exit ;;
-			esac
- 
-			case "$selection" in
-				"Add Bundles to this computer" ) software::display_bundle_install_choices_gtk  ;;
-				"Remove Bundles from this computer" ) software::display_bundle_removal_choices_gtk  ;;
-				"Information abount this tool" ) zenity::display_info "$_ABOUT"  ;;
-				* )
-				# Trap unknown exit code...
-				exit
-				;;
-			esac
-		done
-	else
-		check_dependencies zenity || (
-			write_error "zenity is not available to display menus"
-			exit 1
-			)
+				case $exit_status in
+					1) system::log_item "$(basename $0) was told to [QUIT]" & clear && echo [QUIT] && exit ;;
+					255) system::log_item "$(basename $0) user pressed [ESC]" & clear && echo [ESC] && exit ;;
+				esac
+	
+				case "$selection" in
+					"Add Bundles to this computer" ) software::display_bundle_install_choices_gtk  ;;
+					"Remove Bundles from this computer" ) software::display_bundle_removal_choices_gtk  ;;
+					"Information abount this tool" ) zenity::display_info "$_ABOUT"  ;;
+					* )
+					# Trap unknown exit code...
+					exit
+					;;
+				esac
+			done
+		else
+			check_dependencies zenity || (
+				write_error "zenity is not available to display menus"
+				exit 1
+				)
+		fi
 	fi
-
 
 }
 
@@ -231,12 +228,21 @@ system::ExecStart::help ()
 
 
 
-for i in _rtd_library _rtd_recipies ; do dependency::file "$i" &>/dev/null ; done
+if { for i in _rtd_library _rtd_recipies ; do dependency::file "$i" ; done } ; then
+	# Define a log directory and log file name if not already done.
+	if [ "$UID" -eq 0 ]; then
+		: ${_LOG_DIR:-"/var/log/${_TLA}"} ; mkdir -p ${_LOG_DIR}
+		export _LOGFILE="${_LOGFILE:="${_LOG_DIR}/$( basename $0)-$(date +%Y-%m-%d-%H-%M).log"}"
+	else
+		: ${_LOG_DIR:-"~/.config/rtd/${_TLA}"} ; mkdir -p ${_LOG_DIR}
+		export _LOGFILE="${_LOGFILE:="${_LOG_DIR}/$( basename $0)-$(date +%Y-%m-%d-%H-%M-%S-%s).log"}"
+	fi
+fi
 
 case ${1} in
 	--help ) system::ExecStart::help  ;;
 	--about ) zenity::display_info "$_ABOUT";;
 	--more-help ) zenity::display_url "https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/blob/main/modules/RTD-OEM-bundle-manager/README.md" ;;
 	--rtd ) zenity::display_url "/opt/rtd/README.md" ;;
-	* ) system::ExecStart | tee ${_LOGFILE} ;;
+	* ) system::ExecStart | tee -a ${_LOGFILE} ;;
 esac
