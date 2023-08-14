@@ -5188,22 +5188,21 @@ software::add_native_package ()
 # End of documentation
 
 	if [[ 'echo $OSTYPE" |grep "linux"' ]]; then
-
-		if hash pkcon 2>/dev/null; then
-			write_status  "Installing ${1} using Package Kit..."
-			pkcon install -y ${1}
-			return $?
-		elif hash dnf 2>/dev/null; then
-			write_status "Installing ${1} using DNF"
-			sudo dnf -y install ${1}
-			return $?
-		elif hash zypper 2>/dev/null; then
+		if hash zypper 2>/dev/null; then
 			write_status  "Installing ${1} using ZYPPER"
 			sudo zypper install -y ${1}
 			return $?
 		elif hash apt 2>/dev/null; then
 			write_status  "Installing ${1} using DEB"
 			sudo apt-get -y install ${1}
+			return $?
+		elif hash dnf 2>/dev/null; then
+			write_status "Installing ${1} using DNF"
+			sudo dnf -y install ${1}
+			return $?
+		elif hash pkcon 2>/dev/null; then
+			write_status  "Installing ${1} using Package Kit..."
+			pkcon install -y ${1}
 			return $?
 		else
 			write_error "This system does not seem to have a software managment system"
