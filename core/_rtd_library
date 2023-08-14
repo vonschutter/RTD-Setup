@@ -6304,27 +6304,44 @@ software::display_bundle_install_choices_gtk ()
 
 		case "${selection}" in
 			"${selection}" )
-				local d=0 ; for i in $(cat ${completed_bundles_list}) ; do ((d=d+1)) ; done
-				local c=0
+				_done=0 ; for i in $(cat ${completed_bundles_list}) ; do ((_done=_done+1)) ; done
+				_count=0
 				previously_completed_bundles="$(cat ${completed_bundles_list})"
-					(
+
+				run_bundle_install () {
 					selection_list=(${selection})
 					total_count=${#selection_list[@]}
 					for i in ${selection} ; do
 						current_bundle="${i}"
-						((c=c+1))
-						echo "# Installing bundle ${c} of ${total_count}: ${current_bundle}..."
-						recipe_Bundle:_${current_bundle} && echo "${current_bundle}" >> ${completed_bundles_list} 
-						echo $(( 100*${c}/${total_count} ))
+						((_count=_count+1))
+						echo "# Installing bundle ${_count} of ${total_count}: ${current_bundle}..."
+						if recipe_Bundle:_${current_bundle} &>/dev/null  ; then
+							echo "${current_bundle}" >> ${completed_bundles_list}
+							system::log_item "Progress so far: $(( 100*${_count}/${total_count} ))% of bundles installed."
+						else 
+							system::log_item "ERROR: ${_count} of ${total_count}: ${current_bundle} may have installed with errors or failed to install." 
+							echo "${current_bundle}" >> ${completed_bundles_list}
+							system::log_item "Progress so far: $(( 100*${_count}/${total_count} ))% of bundles installed."
+						fi
+						echo $(( 100*${_count}/${total_count} ))
 					done
-					) | zenity --progress --no-cancel --auto-close  \
-					--title="Installing Software Prodictivity Bundles" \
-					--text="Please wait for the bundle installs to complete..." \
-					--percentage=10 --height=200 --width=600
+				}
+				run_bundle_install | zenity --progress --no-cancel --auto-close  \
+				--title="Installing Software Prodictivity Bundles" \
+				--text="Please wait for the bundle installs to complete..." \
+				--percentage=10 --height=200 --width=600
 
-				completed_bundles="$(cat ${completed_bundles_list} |tail -$c)"
-				zenity --info --timeout 120 --title "Bundles Installed: $c Bundles Previously Installed: $d" --text="The following Software bundles have been installed: \n \n $completed_bundles \n \n Previouly installed bundles: \n \n $previously_completed_bundles" --height=600 --width=800
-				return
+				for i in $(cat ${completed_bundles_list}) ; do ((_count=_count+1)) ; done
+				_diff=$(( ${_count} - ${_done} ))
+				completed_bundles="$(tail -${_diff} ${completed_bundles_list} )"
+
+				zenity --info --timeout 120 \
+				--title "Bundles Installed: ${_count} Bundles Previously Installed: ${_done}" \
+				--text="The following Software bundles have been installed: \n \n ${completed_bundles} \n \n Previouly installed bundles: \n \n ${previously_completed_bundles}" \
+				--height=600 \
+				--width=800
+
+				for i in _done _count completed_bundles previously_completed_bundles selection_list total_count current_bundle ; do unset ${i} ; done
 			;;
 			* )
 				# Trap unknown conditions so as to not do harm
@@ -6381,32 +6398,36 @@ software::display_bundle_removal_choices_gtk ()
 				selection_list=(${selection})
 				total_count=${#selection_list[@]}
 				removed_bundle_list="$(mktemp)"
-				(
+				run_bundle_uninstall () {
 					for i in ${selection} ; do
 						current_bundle="${i}"
 						((c=c+1))
 						echo "# Removing bundle ${c} of ${total_count}: ${current_bundle}..."
-						#software::add_software_task 
 						recipe_Bundle:_${i} --remove 
 						sed -i "/${current_bundle}/d" "${completed_bundles_list}"
 						echo ${current_bundle} >> "${removed_bundle_list}"
 						echo $(( 100*${c}/${total_count} ))
 					done
-				)| zenity --progress --no-cancel --auto-close \
+				}
+				run_bundle_uninstall | zenity --progress --no-cancel --auto-close \
 				--title="Removing Software Prodictivity Bundles" \
 				--text="Please wait for the bundle removals to complete..." \
 				--percentage=10 --height=200 --width=600
 
-				zenity --info --cancel-label="Go Back" --timeout 120 --title "Bundles Removed: $c " --text="The following Software bundles have been REMOVED: \n \n $(cat ${removed_bundle_list}) " --height=600 --width=800
-				return
+				zenity --info \
+				--timeout 120 \
+				--title "Bundles Removed: $c " \
+				--text="The following Software bundles have been REMOVED: \n \n $(cat ${removed_bundle_list}) " \
+				--height=600 \
+				--width=800
 			;;
 			* )
 				# Trap unknown conditions so as to not do harm
 				exit
 			;;
 		esac
-		unset DisplayList
-		unset removed_bundle_list
+
+		for i in DisplayList selection_list total_count current_bundle removed_bundle_list ; do unset ${i} ; done
 	done
 	return
 }
@@ -10410,7 +10431,10 @@ software::list_bundles ()
 # Usage: software::list_bundles [] [--zformat-installable | --zformat-removable]
 # End of documentation
 
-	[[ -f ${completed_bundles_list} ]] || ( mkdir -p ${completed_bundles_list%/*} ; touch ${completed_bundles_list}  ) &>>/dev/null
+	if [[ ! -f ${completed_bundles_list} ]] ; then
+		mkdir -p ${completed_bundles_list%/*}
+		touch ${completed_bundles_list}
+	fi
 
 	case "$1" in
 		--zformat-installable )
