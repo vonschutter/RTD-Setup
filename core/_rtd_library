@@ -10402,6 +10402,10 @@ write_host ()
 	esac
 	[[ -z "${_text}" ]] && local _text="${color} 💻 $2 $(tput sgr0)"
 	echo -e "${_text} "
+
+	if [[ -n "${_LOGFILE}" ]] ; then
+		[ -n "${text}" ] && system::log_item "🧩 💻 ${FUNCNAME[1]}: ${text}"
+	fi
 }
 
 
@@ -10429,6 +10433,10 @@ write_error ()
 			echo -e "$(tput bold; tput setaf 1)🧩 💥 ${FUNCNAME[1]}: ${text}${endcolor}"
 		fi
 	fi
+
+	if [[ -n "${_LOGFILE}" ]] ; then
+		[ -n "${text}" ] && system::log_item "🧩 💥 ${FUNCNAME[1]}: ${text}"
+	fi
 }
 
 
@@ -10452,6 +10460,10 @@ write_warning ()
 		[ -n "${text}" ] && echo "🧩 ⚠ ${FUNCNAME[1]}: ${text}"
 	else
 		[ -n "${text}" ] && echo -e "${yellow}🧩 ⚠ ${FUNCNAME[1]}: ${text}${endcolor}"
+	fi
+
+	if [[ -n "${_LOGFILE}" ]] ; then
+		[ -n "${text}" ] && system::log_item "🧩 ⚠ ${FUNCNAME[1]}: ${text}"
 	fi
 
 }
@@ -10479,6 +10491,10 @@ write_status ()
 		[ -n "${text}" ] && echo -e "${green}🧩 ✓ ${FUNCNAME[1]}: ${text}${endcolor}"
 	fi
 
+	if [[ -n "${_LOGFILE}" ]] ; then
+		[ -n "${text}" ] && system::log_item "🧩 ✓ ${FUNCNAME[1]}: ${text}"
+	fi
+
 }
 
 
@@ -10503,6 +10519,10 @@ write_information ()
 	else
 		[ -n "${text}" ] && echo -e "${blue}🧩 🛈 ${FUNCNAME[1]}: ${text}${endcolor}"
 	fi
+
+	if [[ -n "${_LOGFILE}" ]] ; then
+		[ -n "${text}" ] && system::log_item "🧩 🛈 ${FUNCNAME[1]}: ${text}"
+	fi	
 
 }
 
