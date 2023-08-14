@@ -5651,11 +5651,80 @@ rtd_oem_remove_software ()
 
 
 
+
+software::remove_native_software_package ()
+{
+# Description:
+# The OEM remove software function will attempt to remove whatever package name given
+# as an argument using whatever package system found on the system. This is provided
+# for portability and convenience. Currently, this functions will attempt to use
+# pkcon (prefferred as it run on many distributions), apt, yum, dnf, and zypper.
+# Additional package manager may be added as time allows.
+# Globals:
+# Arguments: None
+# Outputs:
+# Returns:
+# Usage:
+# 	call this function using one argument only for reliability reasons;
+#	as per the below example. If there is a need to remove a large number of
+#	packages it is reccommended to use a for loop and call this function,
+#	still realizing the benefit of mylti-distribution support.
+#
+#	software::remove_native_software_package packagename
+#
+# If a failure occurs this function will return a non "0" exit code. (1)
+#
+# End of documentation
+	system::log_item "Requested to remove package $*"
+	ensure_admin
+	if [[ $(echo $OSTYPE |grep "linux") ]]; then
+		system::log_item "Linux system deetected; Trying to remove package $* using native package manager..."
+		if hash dnf 2>/dev/null; then
+			system::log_item "dnf package manager detected; attempting to remove package $*"
+			dnf -y remove $*
+			return $?
+		elif hash yum 2>/dev/null; then
+			system::log_item "yum package manager detected; attempting to remove package $*"
+			yum -y remove $*
+			return $?
+		elif hash zypper 2>/dev/null; then
+			system::log_item "zypper package manager detected; attempting to remove package $*"
+			zypper remove -y $*
+			return $?
+		elif hash apt 2>/dev/null; then
+			system::log_item "apt package manager detected; attempting to remove package $*"
+			apt-get -y remove $* && apt-get -y autoremove
+			return $?
+		elif hash pkcon 2>/dev/null; then
+			system::log_item "pkcon package manager detected; attempting to remove package $*"
+			pkcon remove $* -y --autoremove
+			return $?
+		else
+			write_error "This system does not seem to have a software managment system" 
+			return 1
+		fi
+	elif [[ "$OSTYPE" == "freebsd"* ]]; then
+		write_error "Free BSD is currently unsupported... "
+		return 1
+	else
+		write_error "Though you can run bash, I have no Idea how to remove software here!"
+		return 1
+	fi
+}
+
+
+
+
+
+
+
 system::log_item ()
 {
 # Description:
 # The purpose of this function is to consistently write script output to the right log file. 
-# Globals:
+# By default, the log file will be /var/log/$(basename $0).log. If the log file is not set
+# the function will set it to the default. If the log file is set, it will use the set log file.
+# Globals: _LOGFILE
 # Arguments: None
 # Outputs:
 # Returns:
@@ -5785,16 +5854,8 @@ software::update_all_ui ()
 	Native_Software_Packages ()
 	{
 		(
-		if hash dnf 2>/dev/null; then
-			dnf -y upgrade
-			write_information "Update task complete."
-		elif hash zypper 2>/dev/null; then
+		if hash zypper 2>/dev/null; then
 			zypper up -y
-			write_information "Update task complete."
-		elif hash pkcon 2>/dev/null; then
-			pkcon -y refresh
-			pkcon get-updates
-			pkcon -y update --autoremove 
 			write_information "Update task complete."
 		elif hash apt 2>/dev/null; then
 			apt-get update
@@ -5810,11 +5871,19 @@ software::update_all_ui ()
 				apt-get clean
 			fi
 			write_information "Update task complete."
+		elif hash dnf 2>/dev/null; then
+			dnf -y upgrade
+			write_information "Update task complete."
+		elif hash pkcon 2>/dev/null; then
+			pkcon -y refresh
+			pkcon get-updates
+			pkcon -y update --autoremove 
+			write_information "Update task complete."
 		else
 			write_error "This system does not seem to have a software managment system" 
 			return 1
 		fi
-		) | $dialog_ui --backtitle "\Zb\Z5$PUBLICATION             $VERSION\ZB"  --programbox "Updating all natively installed software..." 25 120
+		) | $dialog_ui --backtitle "\Zb$PUBLICATION             $VERSION\ZB"  --progressbox "Updating all natively installed software..." 25 120
 	}
 
 	Snap_Apps ()
@@ -5827,7 +5896,7 @@ software::update_all_ui ()
 		else
 			write_warning "!snap software is not present on this system... skipping..."
 		fi
-		) | $dialog_ui --backtitle "\Zb\Z5$PUBLICATION             $VERSION\ZB" --programbox "Updating all Contained Snap Apps..." 25 120
+		) | $dialog_ui --backtitle "\Zb$PUBLICATION             $VERSION\ZB" --progressbox "Updating all Contained Snap Apps..." 25 120
 	}
 
 	Flatpak_Apps ()
@@ -5841,7 +5910,7 @@ software::update_all_ui ()
 		else
 			write_warning "!flatpak software is not present on this system... skipping..."
 		fi
-		) | $dialog_ui --backtitle "\Zb\Z5$PUBLICATION             $VERSION\ZB" --programbox "Updating all Contained Flatpaks Apps..." 25 120
+		) | $dialog_ui --backtitle "\Zb$PUBLICATION             $VERSION\ZB" --progressbox "Updating all Contained Flatpaks Apps..." 25 120
 	}
 
 	while true; do
@@ -5860,6 +5929,12 @@ software::update_all_ui ()
 			$_run )
 				for i in $_run ; do $i 
 				done
+				$dialog_ui --backtitle "\Zb$PUBLICATION             $VERSION\ZB" \
+				--title "Updates Complete" \
+				--msgbox '
+				
+				All updates have been processed.' \
+				20 80
 			;;
 			* ) 
 				write_warning "No update actions were requested."
@@ -6131,7 +6206,7 @@ software::ensure_restricted_codecs (){
 # End of documentation	
 	write_status "Install all the required multimedia codecs..."
 	for i in libdvdcss2 ffmpeg ; do
-		InstallSoftwareFromRepo $i || write_error "Failed to install restricted codecs..."
+		check_ependencies $i || write_error "Failed to install restricted codecs..."
 	done
 }
 
@@ -6204,26 +6279,71 @@ SofwareManagmentAvailabilityCHK ()
 # Returns:
 # Usage:
 # End of documentation
-	echo ""
-	echo -e $YELLOW"--- Checking if software maintenance system is available:" $ENDCOLOR
-	i=0
-	tput sc
-	while fuser /var/lib/dpkg/lock >/dev/null 2>&1 ; do
-		case $(($i % 4)) in
-			0 ) j="-" ;;
-			1 ) j="\\" ;;
-			2 ) j="|" ;;
-			3 ) j="/" ;;
-		esac
-		tput rc
-		echo -en "\r[$j] Waiting for other software managers to finish..."\
 
+	if hash apt ; then
+		echo ""
+		write_information "--- Checking if software maintenance system is available:"
+		i=0
+		tput sc
+		while fuser /var/lib/dpkg/lock >/dev/null 2>&1 ; do
+			case $((${i} % 4)) in
+				0 ) j="-" ;;
+				1 ) j="\\" ;;
+				2 ) j="|" ;;
+				3 ) j="/" ;;
+			esac
+			tput rc
+			echo -en "\r[${j}] Waiting for other software managers to finish..."\
 
-		sleep 5
-		((i=i+1))
-	done
+			sleep 5
+			((i=i+1))
+		done
+		write_information "--- Software maintenance system is available."
+	fi
 }
 
+
+
+
+
+sofware::native_managment_availability_check ()
+{
+# Description: Function to check and see if the system software managment is available. In some cases
+# the sofware managment system may be in use. Should this be the case, this function will
+# wait undill the system is free for use.
+# TODO: Add support for fedora, Centos, SuSE.
+# Globals:
+# Arguments: None
+# Outputs:
+# Returns:
+# Usage:
+# End of documentation
+
+	if hash zypper ; then
+		write_information "--- Checking if software maintenance system is available:"
+	elif hash dnf ; then
+		write_information "--- Checking if software maintenance system is available:"
+	elif hash apt ; then
+		echo ""
+		write_information "--- Checking if software maintenance system is available:"
+		i=0
+		tput sc
+		while fuser /var/lib/dpkg/lock >/dev/null 2>&1 ; do
+			case $((${i} % 4)) in
+				0 ) j="-" ;;
+				1 ) j="\\" ;;
+				2 ) j="|" ;;
+				3 ) j="/" ;;
+			esac
+			tput rc
+			echo -en "\r[${j}] Waiting for other software managers to finish..."\
+
+			sleep 5
+			((i=i+1))
+		done
+		write_information "--- Software maintenance system is available."
+	fi
+}
 
 
 
@@ -6242,7 +6362,7 @@ display_software_installation_choices_gtk ()
 # Returns: 0/1 last command executed.
 # Usage:  simply call the function by its name.
 # Arguments: none
-#
+#                           DEPRECATED
 #
 # End of documentation
 
