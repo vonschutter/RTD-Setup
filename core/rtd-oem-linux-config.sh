@@ -195,7 +195,7 @@ oem_linux_config ()
 			rtd_setup_choices_server
 		else
 			if ! hash zenity &>/dev/null ; then  check_dependencies zenity || exit 1 ; fi
-			if ! hash yad &>/dev/null  ; then check_ependencies yad || write_warning "YAD is not installed. Some features will not be available." ; fi
+			if ! hash yad &>/dev/null  ; then check_dependencies yad || write_warning "YAD is not installed. Some features will not be available." ; fi
 
 			if [[ -e ${_THEME_DIR}/plus-themes.sh ]] ; then
 				write_information "Found plus-themes.sh in ${_THEME_DIR}"
