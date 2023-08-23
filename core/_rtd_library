@@ -5243,14 +5243,14 @@ ensure_snap_package_managment ()
 				ensure_admin
 				if hostnamectl |grep -i "tumbleweed" ; then
 					local _repo=$(echo https://download.opensuse.org/repositories/system:/snappy/openSUSE_Tumbleweed snappy)
-					log_item "${_repo}"
+					log_item "Detected OpenSUSE Timbleweed. Adding repo: ${_repo}"
 					zypper addrepo --refresh "${_repo}"
 				else
 					_repo=$(echo https://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_$(cat /etc/os-release |grep VERSION_ID |cut -d= -f2|cut -d\" -f2) snappy)
-					log_item "${_repo}"
-					zypper addrepo --refresh ${_repo}
+					log_item "Detected OpenSUSE Leap. Adding repo:${_repo}"
+					zypper addrepo --refresh "${_repo}"
 				fi
-				zypper --gpg-auto-import-keys refresh || ( write_error "Failed to gpg keys!" ; return 1 )
+				zypper --gpg-auto-import-keys refresh || ( write_error "Failed to gpg keys!" ; return 1 ) 
 				zypper dup --from snappy || ( write_error "Failed to update snap repository!" ; return 1 )
 				check_dependencies snapd || ( write_error "Failed to satisfy dependecy SNAP!" ; return 1 )
 				systemctl enable snapd ; systemctl start snapd
