@@ -5233,13 +5233,21 @@ ensure_snap_package_managment ()
 
 	if [[ $(echo "$OSTYPE" |grep "linux") ]] &>/dev/null ; then
 		# these tests focus on the latest versions of the distros evaluated...
-		write_information "ensuring SNAP software distribution system is available..."
-		if hostnamectl |grep "SUSE" 2>/dev/null ; then
-			write_warning "Special case for suse"
-			if hash snap &>/dev/null ; then
-				write_status "Snap is already present..."
-				return 0
+		log_item "ensuring SNAP software distribution system is available..."
+		if hash snap &>/dev/null ; then
+			log_item "Snap is already present..."
+			if [[ -e /snap ]]; then
+				log_item "SNAP classic support present... "
+				return $?
 			else
+				log_item "SNAP classic support NOT present... "
+				log_item "adding links... "
+				ln -s /var/lib/snapd/snap /snap
+				return $?
+			fi
+		else
+			if hostnamectl |grep "SUSE" 2>/dev/null ; then
+				log_item "Special case for suse..."
 				ensure_admin
 				if hostnamectl |grep -i "tumbleweed" ; then
 					local _repo=$(echo https://download.opensuse.org/repositories/system:/snappy/openSUSE_Tumbleweed snappy)
@@ -5257,40 +5265,23 @@ ensure_snap_package_managment ()
 				systemctl is-active --quiet snapd || ( write_error "Service snapd not started sucessfully!" ; return 1 )
 				ln -s /var/lib/snapd/snap /snap
 				return $?
-			fi
-		elif hostnamectl |grep "Ubuntu" 2>/dev/null ; then
-			write_information "Ubuntu has snap support built in..." ;return 0
-		elif hostnamectl |grep "Zorin" 2>/dev/null ; then
-			write_information "Zorin has snap support built in..." ;return 0
-		else
-			# For distributions that do not need to add a repository to install snap
-			# But would need to install it from their standard reopsitory....
-			if hash snap &>/dev/null ; then
-				write_status "Snap is already present..."
-				if [[ -e /snap ]]; then
-					write_information "SNAP classic support present... "
-				else
-					write_information "SNAP classic support NOT present... "
-					write_information "adding links... "
-					ln -s /var/lib/snapd/snap /snap
-				fi
-				return $?
 			else
+				# For distributions that do not need to add a repository to install snap
+				# But would need to install it from their standard reopsitory....
 				if check_dependencies snapd ; then
 					systemctl enable snapd ; systemctl start snapd
 					echo snapd is $(systemctl is-active snapd) || return 1
+					if [[ -e /snap ]]; then
+						write_information "SNAP classic support present... "
+					else
+						ln -s /var/lib/snapd/snap /snap
+					fi
+					return $?
 				else
 					write_error "Failed to satisfy dependecy SNAP!"
 				fi
-
-				if [[ -e /snap ]]; then
-					write_information "SNAP classic support present... "
-				else
-					ln -s /var/lib/snapd/snap /snap
-				fi
-				return $?
 			fi
-		fi
+		fi	
 
 	elif [[ "$OSTYPE" == "darwin"* ]]; then
 		write_error "${FUNCNAME[0]}: Mac OSX is currently not supported with snap..."  ; return 1
