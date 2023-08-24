@@ -8036,7 +8036,7 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 	ubuntu_flavor="${1}"
 	dependency::virtualization
 
-	# Check for optional default T-Shirts size overrides... 
+	log_item "Check for optional default T-Shirts size overrides... "
 	local OPTIND o a
 	while getopts ':c:m:d:' OPTION; do
 		case "$OPTION" in
@@ -8060,24 +8060,28 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 	done
 	unset OPTIND
 
-	# Set default values for VM T-Shirts sizes...
+	log_item "Set default values for VM T-Shirts sizes... "
 	: ${_cpu="${_cpu:-2}"}
 	: ${_mem="${_mem:-2048}"}
 	: ${_dsk="${_dsk:-100}"}
+	log_item "vcpu=${_cpu}, memory=${_mem}, disk=${_dsk}"
 
 	write_information "🔎 Retreive list of available $ubuntu_flavor versions..."
 	case "$ubuntu_flavor" in
 		ubuntu)
 			declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
 			dist_logo="$ubuntulogo"
+			log_item "Requested Ubuntu."
 		;;
 		kubuntu)
 			declare -a all_lts_versions=($(wget -O- cdimage.ubuntu.com/kubuntu/releases -q | perl -ne '/ (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
 			dist_logo="$kubuntulogo"
+			log_item "Requested Kubuntu."
 		;;
 		*)
 			declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
 			dist_logo="$ubuntulogo"
+			log_item "No flavor of ubuntu requested, defaulting to Ubuntu..."
 		;;
 	esac
 
