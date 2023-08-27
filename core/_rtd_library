@@ -10587,8 +10587,9 @@ autoinstall:
     - wget
     - dialog
   snaps:
-    - name: mc-server-installer
+    - name: nvim
       channel: latest/stable
+      classic: true
   late-commands:
     - echo ******************* Custom cmd ***************************
     - mkdir /target/opt/rtd
@@ -10597,6 +10598,12 @@ autoinstall:
     - curtin in-target --target=/target -- /opt/rtd/core/rtd-oem-enable-config.sh
     - mkdir /target/etc/rtd
     - cp /autoinstall.yaml /target/etc/rtd/
+    - mkdir -p "/target/etc/systemd/system/getty@tty1.service.d"
+    - echo "[Service]" > "/target/etc/systemd/system/getty@tty1.service.d/override.conf"
+    - echo "ExecStart=/sbin/agetty --noissue --autologin tangarora "%I" "$TERM"" >> "/target/etc/systemd/system/getty@tty1.service.d/override.conf"
+    - echo "Type=idle" >> "/etc/systemd/system/getty@tty1.service.d/override.conf"
+    - touch /target/home/tangarora/.bashrc
+    - echo "rtd-minecraft-server" >> /target/home/tangarora/.bashrc
     - echo ******************* Custom cmd complete ******************
   keyboard:
     layout: se
