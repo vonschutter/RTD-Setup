@@ -2033,34 +2033,19 @@ rtd_oem_find_live_release ()
 	case "$distro_flavor" in
 	Ubuntu | ubuntu )
 		case "$live_or_not" in
-		Live | live | current-live | desktop)
-			echo "http://releases.ubuntu.com/$distro_version/$(curl --silent http://releases.ubuntu.com/$distro_version/SHA256SUMS | grep -o 'ubuntu-.*-desktop-amd64.iso')"
+		desktop | live)
+			system::log_item "Providing requested URL: http://releases.ubuntu.com/${distro_version}/$(curl --silent http://releases.ubuntu.com/${distro_version}/SHA256SUMS | grep -o 'ubuntu-.*-desktop-amd64.iso')"
+			echo "http://releases.ubuntu.com/${distro_version}/$(curl --silent http://releases.ubuntu.com/${distro_version}/SHA256SUMS | grep -o 'ubuntu-.*-desktop-amd64.iso')"
 		;;
-		server | netinst | net | mini )
+		server )
 			# 18.04 and later need to use the alternative installer
 			# since the switch to subiquity
-			if [ ${1:0:2} -ge 18 ]; then
-				echo "http://cdimage.ubuntu.com/releases/$distro_version/release/ubuntu-$distro_version-live-server-arm64.iso"
-			else
-				rel=http://releases.ubuntu.com/$1
-				echo "$rel/$(curl --silent $rel/MD5SUMS | \grep -o 'ubuntu-.*-server-amd64.iso')"
-			fi
+			system::log_item "Providing requested URL: http://releases.ubuntu.com/${distro_version}/ubuntu-${distro_version}-live-server-amd64.iso"
+			echo "http://releases.ubuntu.com/${distro_version}/ubuntu-${distro_version}-live-server-amd64.iso"
+
 		;;
 		* )
-			$RTD_GUI --backtitle "$BRANDING" --title "ERROR!" --msgbox "You passed the function ${FUNCNAME[0]} the parameters $*. The 4th parameter should be either of: Live | live | current-live | server | netinst | net | mini! Not $live_or_not" 10 60
-		;;
-		esac
-	;;
-	Kubuntu | kubuntu )
-		case "$live_or_not" in
-		Live | live | current-live | desktop)
-			base_url="https://cdimage.ubuntu.com/kubuntu/releases/$distro_version/release"
-			echo "${base_url}/$(curl --silent ${base_url}/SHA256SUMS | grep -o 'kubuntu-.*-desktop-amd64.iso')"
-		;;
-		server | netinst | net | mini )
-			rtd_oem_pause 1 "${FUNCNAME[0]}: you have requested a server version of Kubuntu. Kubuntu Does not have a server version."
-		;;
-		* )
+			system::log_item "Encountered an error: The 4th parameter should be either of: Live | live | current-live | server | netinst | net | mini! Not $live_or_not"
 			$RTD_GUI --backtitle "$BRANDING" --title "ERROR!" --msgbox "You passed the function ${FUNCNAME[0]} the parameters $*. The 4th parameter should be either of: Live | live | current-live | server | netinst | net | mini! Not $live_or_not" 10 60
 		;;
 		esac
@@ -2076,14 +2061,17 @@ rtd_oem_find_live_release ()
 				echo "$rel/$(curl --silent $rel/MD5SUMS | \grep -o "debian-.*$desktop_env*.iso")"
 			;;
 			* )
+				system::log_item "Encountered an error: The 4th parameter should be wither of: kde | gnome | xfce | cinnamon | lxde | lxqt | mate | standard! Not $live_or_not "
 				$RTD_GUI --backtitle "$BRANDING" --title "ERROR!" --msgbox "You passed the function ${FUNCNAME[0]} the parameters $*. The 4th parameter should be wither of: kde | gnome | xfce | cinnamon | lxde | lxqt | mate | standard! Not $live_or_not " 10 60
 			;;
 			esac
 		;;
 		netinst | net | mini )
 			# Find and download mini iso...
+			system::log_item "Encountered an error: The 2nd parameter netinst  debian is not logical. Please use the kernel params instead."
 		;;
 		* )
+			system::log_item "Encountered an error: The 2nd parameter should be either of: Live | live | current-live | netinst | net | mini ! not $live_or_not"
 			$RTD_GUI --backtitle "$BRANDING" --title "ERROR!" --msgbox "You passed the function ${FUNCNAME[0]} the parameters $*. The 2nd parameter should be either of: Live | live | current-live | netinst | net | mini ! not $live_or_not" 10 60
 		;;
 		esac
@@ -5233,29 +5221,29 @@ ensure_snap_package_managment ()
 
 	if [[ $(echo "$OSTYPE" |grep "linux") ]] &>/dev/null ; then
 		# these tests focus on the latest versions of the distros evaluated...
-		log_item "ensuring SNAP software distribution system is available..."
+		system::log_item "ensuring SNAP software distribution system is available..."
 		if hash snap &>/dev/null ; then
-			log_item "Snap is already present..."
+			system::log_item "Snap is already present..."
 			if [[ -e /snap ]]; then
-				log_item "SNAP classic support present... "
+				system::log_item "SNAP classic support present... "
 				return $?
 			else
-				log_item "SNAP classic support NOT present... "
-				log_item "adding links... "
+				system::log_item "SNAP classic support NOT present... "
+				system::log_item "adding links... "
 				ln -s /var/lib/snapd/snap /snap
 				return $?
 			fi
 		else
 			if hostnamectl |grep "SUSE" 2>/dev/null ; then
-				log_item "Special case for suse..."
+				system::log_item "Special case for suse..."
 				ensure_admin
 				if hostnamectl |grep -i "tumbleweed" ; then
 					local _repo=$(echo https://download.opensuse.org/repositories/system:/snappy/openSUSE_Tumbleweed snappy)
-					log_item "Detected OpenSUSE Timbleweed. Adding repo: ${_repo}"
+					system::log_item "Detected OpenSUSE Timbleweed. Adding repo: ${_repo}"
 					zypper addrepo --refresh "${_repo}"
 				else
 					_repo=$(echo https://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_$(cat /etc/os-release |grep VERSION_ID |cut -d= -f2|cut -d\" -f2) snappy)
-					log_item "Detected OpenSUSE Leap. Adding repo:${_repo}"
+					system::log_item "Detected OpenSUSE Leap. Adding repo:${_repo}"
 					zypper addrepo --refresh "${_repo}"
 				fi
 				zypper --gpg-auto-import-keys refresh || ( write_error "Failed to gpg keys!" ; return 1 ) 
@@ -6151,31 +6139,26 @@ system::log_item ()
 		_logfile="${_LOGFILE}"
 	fi
 	touch "${_logfile}"
+	local _date="$(date '+%Y/%m/%d %H:%M')"
 
 	case "${FUNCNAME[1]}" in
 		"write_error")
-				local _date="$(date '+%Y/%m/%d %H:%M')"
-				echo "${_date}	--- : $*" >> "${_logfile}"
+			echo "${_date}         --- : $*" >> "${_logfile}"
 		;;
 		"write_warning") 
-				local _date="$(date '+%Y/%m/%d %H:%M')"
-				echo "${_date}	--- : $*" >> "${_logfile}"
+			echo "${_date}       --- : $*" >> "${_logfile}"
 		;;
 		"write_information")
-				local _date="$(date '+%Y/%m/%d %H:%M')"
-				echo "${_date}	--- : $*" >> "${_logfile}"
+			echo "${_date}  --- : $*" >> "${_logfile}"
 		;;
 		"write_host")
-				local _date="$(date '+%Y/%m/%d %H:%M')"
-				echo "${_date}	--- : $*" >> "${_logfile}"
+			echo "${_date}         --- : $*" >> "${_logfile}"
 		;;
 		"write_status")
-				local _date="$(date '+%Y/%m/%d %H:%M')"
-				echo "${_date}	--- : $*" >> "${_logfile}"
+			echo "${_date}       --- : $*" >> "${_logfile}"
 		;;
 		*)
-				local _date="$(date '+%Y/%m/%d %H:%M')"
-				echo "${_date} 🧩 ${FUNCNAME[1]}	--- : $*" >> "${_logfile}"
+			echo "${_date} 🧩 ${FUNCNAME[1]}  --- : $*" >> "${_logfile}"
 		;;
 	esac
 }
@@ -7870,18 +7853,20 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 # Returns:
 # Usage: make_kvm_virtual_machine_now_from_ubuntu_com (optional arguments)
 #
-# Example:									   (may be set otherwise defaults are used)
-#                                              vmtype    CPU  RAM   DISK
-# make_kvm_virtual_machine_now_from_ubuntu_com ubuntu
+# Example:	(may be set otherwise defaults are used)
+#                vmtype    CPU  RAM   DISK
+# make_kvm_virtual_machine_now_from_ubuntu_com server|desktop
 #
 # If complete flexibility is needed simply use the virt-install binary and directly write the arguments.
 # Alternatively; edit the function with new defaults that suit the needs.
 # End of Documentation
-	ubuntu_flavor="${1}"
+	ubuntu_flavor="ubuntu"
+	role="${1}"
+	CONFIG="${2}"
 	dependency::virtualization
 
 	# Set default values for VM T-Shirts sizes...
-		local OPTIND o a
+	local OPTIND o a
 	while getopts ':c:m:d:' OPTION; do
 		case "$OPTION" in
 		c )
@@ -7913,15 +7898,15 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 	: ${_dsk="${_dsk:-100}"}
 
 	# Fetch the relevand ISO if necessary...
-	write_information "🔎 Retreive list of available $ubuntu_flavor versions..."
-	case "$ubuntu_flavor" in
-		ubuntu)
+	system::log_item "🔎 Retreive list of available $ubuntu_flavor $role versions..."
+	case "$role" in
+		desktop)
 			declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
 			dist_logo="$ubuntulogo"
 		;;
-		kubuntu)
-			declare -a all_lts_versions=($(wget -O- cdimage.ubuntu.com/kubuntu/releases -q | perl -ne '/ (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
-			dist_logo="$kubuntulogo"
+		server)
+			declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
+			dist_logo="$ubuntulogo"
 		;;
 		*)
 			declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
@@ -7929,7 +7914,7 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 		;;
 	esac
 
-	tgt_ubuntu_ver=$($RTD_GUI --colors --title "Select Release Version of $ubuntu_flavor " --inputbox "\n 👍 Please pick an available \Z1 $ubuntu_flavor \Zn version by entering it below.
+	tgt_ubuntu_ver=$($RTD_GUI --colors --title "Select Release Version of $ubuntu_flavor $role" --inputbox "\n 👍 Please pick an available \Z1 $ubuntu_flavor \Zn version by entering it below.
 	Long Term Support Versions to choose from are the following:\Z4 ${all_lts_versions[*]} \Zn You may also enter an inbetween release version
 	by typing its release number below as well. If you are not sure just let me choose intelligently for you... \n \Z1 ${dist_logo} \Zn"  30 90 "${all_lts_versions[-1]}" 3>&1 1>&2 2>&3)
 	case $? in
@@ -7938,9 +7923,10 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 	esac
 	clear
 
+	# Return the version number selected
 	[ "$tgt_ubuntu_ver" ] || tgt_ubuntu_ver=${all_lts_versions[-1]}
 
-	: ${ubuntu_iso_url=$(rtd_oem_find_live_release $tgt_ubuntu_ver $ubuntu_flavor live)}
+	: ${ubuntu_iso_url=$(rtd_oem_find_live_release $tgt_ubuntu_ver $ubuntu_flavor $role)}
 	: ${iso_filename:="$(basename $ubuntu_iso_url)"}
 	: ${permanent_download_dir:="/var/lib/libvirt/boot/"}
 	
@@ -7956,42 +7942,81 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 	# Detect and set variables for key programs
 	: ${bin_virt_install:=$(type -p virt-install)}
 	: ${virt_net="$(system::find_vm_bridge)"}
+	local vm_name="${CONFIG}-${tgt_ubuntu_ver}-${RANDOM}"
 
 	system::generate_cloudconfig
 
-	read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..."
-	local vm_name="${CONFIG}-${tgt_ubuntu_ver}-${RANDOM}"
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
 	🔧 - And Using this source for the packages and files to download: \n
-			${bin_virt_install} --name ${vm_name} \
-			--vcpus "${_cpu}" \n
-			--memory "${_mem}" \n
-			--network "${virt_net}" \n
-			--disk size="${_dsk}" \n
-			--disk ${CloudConfig}/cidata.iso,device=cdrom \n
-			--os-variant="ubuntu21.10" \n
-			--video "virtio" --channel "spicevmc" \n
-			--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" "
+			${vm_name} \n
+			cpus "${_cpu}" \n
+			memory "${_mem}" \n
+			network "${virt_net}" \n
+			disk size="${_dsk}" \n
+			Config= ${CloudConfig}/cidata.iso,device=cdrom \n
+			os-variant="$tgt_ubuntu_ver" \n
+			video= "virtio" --channel "spicevmc" \n
+			Source="${iso}\n
+			kernel=casper/vmlinuz,initrd=casper/initrd" "
 
+	case $role in 
+		server )
+			read -p "💥 option server chosen."
+			# "${bin_virt_install}" --name ${vm_name} \
+			# 	--vcpus "${_cpu}" \
+			# 	--memory "${_mem}" \
+			# 	--network "${virt_net}" \
+			# 	--disk size="${_dsk}" \
+			# 	--os-variant="ubuntu21.10" \
+			# 	--video "virtio" --channel "spicevmc" \
+			# 	--disk ${CloudConfig}/cidata.iso,device=cdrom \
+			# 	--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
+			# 	--initrd-inject="${CloudConfig}/user-data" \
+			# 	--initrd-inject="${CloudConfig}/meta-data" \
+			# 	--extra-args="autoinstall,ds=nocloud\;s=/cdrom/" \
+			# 	--noautoconsole && dialog::display_summary_message "NOTICE!"  \
 
-		"${bin_virt_install}" --name ${vm_name} \
-			--vcpus "${_cpu}" \
-			--memory "${_mem}" \
-			--network "${virt_net}" \
-			--disk size="${_dsk}" \
-			--disk ${CloudConfig}/cidata.iso,device=cdrom \
-			--os-variant="ubuntu21.10" \
-			--video "virtio" --channel "spicevmc" \
-			--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-			--extra-args="autoinstall,ds=nocloud;s=/cdrom/" \
-			--noautoconsole && dialog::display_summary_message "NOTICE!"  \
-		|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
+			"${bin_virt_install}" --name ${vm_name} \
+				--vcpus "${_cpu}" \
+				--memory "${_mem}" \
+				--network "${virt_net}" \
+				--disk size="${_dsk}" \
+				--os-variant="ubuntu21.10" \
+				--video "virtio" --channel "spicevmc" \
+				--disk ${CloudConfig}/cidata.iso,device=cdrom \
+				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
+				--extra-args="autoinstall" \
+				--noautoconsole && dialog::display_summary_message "NOTICE!"  \
+			|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
+		;;
+		desktop )
+			read -p "💥 option desktop chosen."
+			"${bin_virt_install}" --name ${vm_name} \
+				--vcpus "${_cpu}" \
+				--memory "${_mem}" \
+				--network "${virt_net}" \
+				--disk size="${_dsk}" \
+				--os-variant="ubuntu21.10" \
+				--video "virtio" --channel "spicevmc" \
+				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
+				--extra-args="ks=file:$(basename $PRESEED_FILE) auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=us \
+				netcfg/get_hostname=${CONFIG}${tgt_ubuntu_ver} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
+				localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
+				--initrd-inject="$PRESEED_FILE" \
+				--initrd-inject="$( dirname ${PRESEED_FILE})/ks.cfg" \
+				--noautoconsole && dialog::display_summary_message "NOTICE!"  \
+			|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
+		;;
+		* ) write_error "Unknown option requested!"
+		;;
+	esac
 
 	
 	# extra args: quiet noshell ---			--extra-args="autoinstall ds=nocloud;s=file:///" \
 	# 		--userdata="${CloudConfig}/user-data" \
 	#		--metadata="${CloudConfig}/meta-data" \
+	# 			--disk ${CloudConfig}/cidata.iso,device=cdrom \
 	for i in  PRESEED_FILE vm_kernel vm_initrd source_url CONFIG tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig ; do unset $i ; done
 }
 
@@ -8036,7 +8061,7 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 	ubuntu_flavor="${1}"
 	dependency::virtualization
 
-	log_item "Check for optional default T-Shirts size overrides... "
+	system::log_item "Check for optional default T-Shirts size overrides... "
 	local OPTIND o a
 	while getopts ':c:m:d:' OPTION; do
 		case "$OPTION" in
@@ -8060,28 +8085,28 @@ make_kvm_virtual_machine_now_from_ubuntu_com ()
 	done
 	unset OPTIND
 
-	log_item "Set default values for VM T-Shirts sizes... "
+	system::log_item "Set default values for VM T-Shirts sizes... "
 	: ${_cpu="${_cpu:-2}"}
 	: ${_mem="${_mem:-2048}"}
 	: ${_dsk="${_dsk:-100}"}
-	log_item "vcpu=${_cpu}, memory=${_mem}, disk=${_dsk}"
+	system::log_item "vcpu=${_cpu}, memory=${_mem}, disk=${_dsk}"
 
 	write_information "🔎 Retreive list of available $ubuntu_flavor versions..."
 	case "$ubuntu_flavor" in
 		ubuntu)
 			declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
 			dist_logo="$ubuntulogo"
-			log_item "Requested Ubuntu."
+			system::log_item "Requested Ubuntu."
 		;;
 		kubuntu)
 			declare -a all_lts_versions=($(wget -O- cdimage.ubuntu.com/kubuntu/releases -q | perl -ne '/ (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
 			dist_logo="$kubuntulogo"
-			log_item "Requested Kubuntu."
+			system::log_item "Requested Kubuntu."
 		;;
 		*)
 			declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
 			dist_logo="$ubuntulogo"
-			log_item "No flavor of ubuntu requested, defaulting to Ubuntu..."
+			system::log_item "No flavor of ubuntu requested, defaulting to Ubuntu..."
 		;;
 	esac
 
@@ -9925,9 +9950,9 @@ cat >> $1 <<-'MINECRAFT_EOF'
 		if [ $? -eq 0 ]; then
 			echo "java of some version is present. I respect your choice... and will try to run! --- OK!"
 		else
-			echo Java is now present where expected... will now download:
-			wget https://download.oracle.com/java/19/latest/jdk-19_linux-x64_bin.tar.gz
-			mkdir ~/bin/java && tar xzvf jdk-19_linux-x64_bin.tar.gz --directory ~/bin/java/ --strip 1
+			echo Java is not present where expected... will now download:
+			wget https://download.oracle.com/java/20/latest/jdk-20_linux-x64_bin.tar.gz
+			mkdir ~/bin/java && tar xzvf jdk-20_linux-x64_bin.tar.gz --directory ~/bin/java/ --strip 1
 			#check_dependencies default-jre
 		fi
 	}
@@ -10547,58 +10572,48 @@ echo ${CloudConfig}
 
 touch ${CloudConfig}/meta-data
 
-cat > ${CloudConfig}/user-data << 'EOF'
+cat >> ${CloudConfig}/user-data << CloudConfig0
 #cloud-config
 autoinstall:
   version: 1
+  apt:
+    mirror-selection:
+      primary:
+        - uri: http://mymirror.local/repository/Apt/ubuntu/
+        - country-mirror
+        - uri: http://archive.ubuntu.com/ubuntu
+  packages:
+    - git
+    - wget
+    - dialog
+  snaps:
+    - name: mc-server-installer
+      channel: latest/stable
+  late-commands:
+    - echo ******************* Custom cmd ***************************
+    - mkdir /target/opt/rtd
+    - git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /target/opt/rtd
+    - /usr/bin/chmod 755 /target/opt/rtd/core/rtd*
+    - curtin in-target --target=/target -- /opt/rtd/core/rtd-oem-enable-config.sh
+    - mkdir /target/etc/rtd
+    - cp /autoinstall.yaml /target/etc/rtd/
+    - echo ******************* Custom cmd complete ******************
+  keyboard:
+    layout: se
   identity:
-    hostname: ubuntu-desktop
-    password: letmein1234
-    username: ubuntuF
-EOF
+    hostname: "${vm_name}"
+    username: tangarora
+CloudConfig0
 
+cat >> ${CloudConfig}/user-data << 'CloudConfig1'
+    password: $6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1
+CloudConfig1
 
 write_information "Generate Ubuntu autoinstall instruction media..."
 genisoimage -output ${CloudConfig}/cidata.iso -volid cidata -joliet -rock ${CloudConfig}/user-data ${CloudConfig}/meta-data
 
 
 chmod 777 -R ${CloudConfig}
-
-
-# pushd ${CloudConfig} 
-# python3 -m http.server 3003 &
-# popd
-
-
-# cat >> ${CloudConfig} <<-'EOF'
-# #cloud-config
-# autoinstall:
-#   debconf-selections: |
-#     debconf-set partman-auto/disk $BOOTDEV;\
-#     debconf-set grub-installer/bootdev $BOOTDEV;
-#     tasksel tasksel/first multiselect ubuntu-desktop
-#     in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd  ; \
-#     in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
-#     in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
-#     cp /*.cfg /target/opt/rtd/ ;\
-#     umount -l /media || echo "Empty" ; \
-#     eject || true; \
-#     echo "------  initial Setup Complete!  ------"
-#     ubiquity ubiquity/success_command string \
-#   identity:
-#     hostname: RTD-Client
-#     password: $6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1
-#     realname: RTD User
-#     username: tangarora
-#   keyboard:
-#     layout: se
-#   locale: en_US.UTF-8
-#   network:
-#     ethernets:
-#       manual: {}
-#     version: 2
-#   version: 1
-# EOF
 
 }
 
