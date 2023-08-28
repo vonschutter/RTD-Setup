@@ -142,7 +142,12 @@ function check_java (){
 		echo "java of some version is present. I respect your choice... and will try to run! --- OK!"
 	else
 		echo Java is not present where expected... will now download:
-		wget https://download.oracle.com/java/20/latest/jdk-20_linux-x64_bin.tar.gz
+		for i in {20..40} ; do
+			if wget https://download.oracle.com/java/${i}/latest/jdk-${i}_linux-x64_bin.tar.gz ; then
+				break 
+			fi
+		done
+		# wget https://download.oracle.com/java/20/latest/jdk-20_linux-x64_bin.tar.gz
 		mkdir ~/bin/java 
 		tar xvf jdk-20_linux-x64_bin.tar.gz --directory ~/bin/java/ --strip 1
 		#check_dependencies default-jre

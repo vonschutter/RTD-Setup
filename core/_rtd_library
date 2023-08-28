@@ -4095,37 +4095,69 @@ create_physical_media_from_iso ()
 
 system::process_vm_opt_args ()
 {
+# Description:
+# Function to evaluate input fiven to a VM build finction and set configuration override variables. 
+#
+# Globals:
+# Arguments: None
+# Outputs:
+# Returns:
+# Usage:
+#
+# system::process_vm_opt_args [-c <#CPU>, -m <MB RAM>, -d <GB Disk>, -r <server|desktop>, -t <task>]
+#
+#	Supported overrides:
+#	Role:   -r ${role}
+#	Task:   -t ${CONFIG}
+#	CPU:    -c ${_cpu} VCPU
+#	Memory: -m ${_mem} GB
+#	Disk:   -d ${_dsk} GB
+#
+#
+# call from another function or script:
+# 	system::process_vm_opt_args $@
+#
+# This will call this function and pass all parameters received here. Any parameters that match the expected
+# format will set the variable accordingly. 
+#
+# End of documentation
+
 	# Check for optional default T-Shirts size overrides... 
+	write_information "Set custom values for VM T-Shirts sizes, tasks and roles..."
 	local OPTIND o a
-	while getopts ':c:m:d:' OPTION; do
+	while getopts ':c:m:d:t:r:*' OPTION; do
 		case "$OPTION" in
 		c )
-			local _cpu="${OPTARG}"
+			_cpu="${OPTARG}"
 			write_information "Custom CPU set to: ${OPTARG}"
 		;;
 		m )
-			local _mem="${OPTARG}"
+			_mem="${OPTARG}"
 			write_information "Custom memory set to: ${OPTARG}"
 		;;
 		d )
-			local _dsk="${OPTARG}"
-			write_information "Custom disk sizee set to: ${OPTARG}"
+			_dsk="${OPTARG}"
+			write_information "Custom disk size set to: ${OPTARG}"
+		;;
+		t )
+			_task="${OPTARG}"
+			write_information "Custom task set to: ${OPTARG}"
+		;;
+		r )
+			_role="${OPTARG}"
+			write_information "Custom role set to: ${OPTARG}"
 		;;
 		? )
-			write_host --cyan  "Usage: ${FUNCNAME[0]} or ${FUNCNAME[0]} [-c <#CPU>, -m <MB RAM>, -d <GB Disk>]"
+			write_information "Usage: ${FUNCNAME[1]} or ${FUNCNAME[0]} [-c <#CPU>, -m <MB RAM>, -d <GB Disk>, -r <server|desktop>, -t <task>]"
 			return 0
 		;;
 		*)
-			write_information "Using default VM settings..."
+			echo "Using default VM settings..."
 			return 0
 		;;
 		esac
 	done
 	unset OPTIND
-
-	: ${_cpu="${_cpu:-2}"}
-	: ${_mem="${_mem:-2048}"}
-	: ${_dsk="${_dsk:-100}"}
 }
 
 
@@ -7860,46 +7892,24 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 # If complete flexibility is needed simply use the virt-install binary and directly write the arguments.
 # Alternatively; edit the function with new defaults that suit the needs.
 # End of Documentation
-	ubuntu_flavor="ubuntu"
-	role="${1}"
-	CONFIG="${2}"
-	dependency::virtualization
+
+
+	# Evaluate override arguments to defaults...
+	system::process_vm_opt_args $@
 
 	# Set default values for VM T-Shirts sizes...
-	local OPTIND o a
-	while getopts ':c:m:d:' OPTION; do
-		case "$OPTION" in
-		c )
-			local _cpu="${OPTARG}"
-			write_information "Custom CPU set to: ${OPTARG}"
-		;;
-		m )
-			local _mem="${OPTARG}"
-			write_information "Custom memory set to: ${OPTARG}"
-		;;
-		d )
-			local _dsk="${OPTARG}"
-			write_information "Custom disk sizee set to: ${OPTARG}"
-		;;
-		? )
-			write_host --cyan  "Usage: ${FUNCNAME[0]} or ${FUNCNAME[0]} [-c <#CPU>, -m <MB RAM>, -d <GB Disk>]"
-			return 0
-		;;
-		*)
-			write_information "Using default VM settings..."
-			return 0
-		;;
-		esac
-	done
-	unset OPTIND
+	: ${ubuntu_flavor="ubuntu"}
+	: ${_role:="desktop"}
+	: ${_task:="ssh-server"}
+	: ${_cpu:="${_cpu:=2}"}
+	: ${_mem:="${_mem:=2048}"}
+	: ${_dsk:="${_dsk:=100}"}
 
-	: ${_cpu="${_cpu:-2}"}
-	: ${_mem="${_mem:-2048}"}
-	: ${_dsk="${_dsk:-100}"}
+	dependency::virtualization
 
 	# Fetch the relevand ISO if necessary...
-	system::log_item "🔎 Retreive list of available $ubuntu_flavor $role versions..."
-	case "$role" in
+	system::log_item "🔎 Retreive list of available $ubuntu_flavor $_role versions..."
+	case "$_role" in
 		desktop)
 			declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
 			dist_logo="$ubuntulogo"
@@ -7914,7 +7924,7 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 		;;
 	esac
 
-	tgt_ubuntu_ver=$($RTD_GUI --colors --title "Select Release Version of $ubuntu_flavor $role" --inputbox "\n 👍 Please pick an available \Z1 $ubuntu_flavor \Zn version by entering it below.
+	tgt_ubuntu_ver=$($RTD_GUI --colors --title "Select Release Version of $ubuntu_flavor $_role" --inputbox "\n 👍 Please pick an available \Z1 $ubuntu_flavor \Zn version by entering it below.
 	Long Term Support Versions to choose from are the following:\Z4 ${all_lts_versions[*]} \Zn You may also enter an inbetween release version
 	by typing its release number below as well. If you are not sure just let me choose intelligently for you... \n \Z1 ${dist_logo} \Zn"  30 90 "${all_lts_versions[-1]}" 3>&1 1>&2 2>&3)
 	case $? in
@@ -7926,23 +7936,24 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 	# Return the version number selected
 	[ "$tgt_ubuntu_ver" ] || tgt_ubuntu_ver=${all_lts_versions[-1]}
 
-	: ${ubuntu_iso_url=$(rtd_oem_find_live_release $tgt_ubuntu_ver $ubuntu_flavor $role)}
+	# Set key vars of where to find ubunty ISO files...
+	: ${ubuntu_iso_url=$(rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} ${_role})}
 	: ${iso_filename:="$(basename $ubuntu_iso_url)"}
 	: ${permanent_download_dir:="/var/lib/libvirt/boot/"}
 	
-	
+	# Ensure that the file is available for VM creation... 
 	write_status "Checking if $iso_filename already downloaded..."
 	iso=$(find "$permanent_download_dir" -name "$iso_filename")
 	if [ ! -e "$iso" ]; then
 		write_warning "$iso_filename is not in cache, downloading..."
-		wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "Failure to download ISO file"
+		wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
 		iso="$permanent_download_dir/$iso_filename"
 	fi
 
 	# Detect and set variables for key programs
 	: ${bin_virt_install:=$(type -p virt-install)}
 	: ${virt_net="$(system::find_vm_bridge)"}
-	local vm_name="${CONFIG}-${tgt_ubuntu_ver}-${RANDOM}"
+	local vm_name="${_task}-${tgt_ubuntu_ver}-${RANDOM}"
 
 	system::generate_cloudconfig
 
@@ -7954,29 +7965,15 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 			memory "${_mem}" \n
 			network "${virt_net}" \n
 			disk size="${_dsk}" \n
-			Config= ${CloudConfig}/cidata.iso,device=cdrom \n
+			disk= ${CloudConfig}/cidata.iso,device=cdrom \n
 			os-variant="$tgt_ubuntu_ver" \n
 			video= "virtio" --channel "spicevmc" \n
 			Source="${iso}\n
 			kernel=casper/vmlinuz,initrd=casper/initrd" "
+	system::log_item "${_summary_message}"
 
-	case $role in 
+	case $_role in 
 		server )
-			read -p "💥 option server chosen."
-			# "${bin_virt_install}" --name ${vm_name} \
-			# 	--vcpus "${_cpu}" \
-			# 	--memory "${_mem}" \
-			# 	--network "${virt_net}" \
-			# 	--disk size="${_dsk}" \
-			# 	--os-variant="ubuntu21.10" \
-			# 	--video "virtio" --channel "spicevmc" \
-			# 	--disk ${CloudConfig}/cidata.iso,device=cdrom \
-			# 	--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-			# 	--initrd-inject="${CloudConfig}/user-data" \
-			# 	--initrd-inject="${CloudConfig}/meta-data" \
-			# 	--extra-args="autoinstall,ds=nocloud\;s=/cdrom/" \
-			# 	--noautoconsole && dialog::display_summary_message "NOTICE!"  \
-
 			"${bin_virt_install}" --name ${vm_name} \
 				--vcpus "${_cpu}" \
 				--memory "${_mem}" \
@@ -7984,14 +7981,13 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 				--disk size="${_dsk}" \
 				--os-variant="ubuntu21.10" \
 				--video "virtio" --channel "spicevmc" \
-				--disk ${CloudConfig}/cidata.iso,device=cdrom \
+				--disk path="${CloudConfig}/cidata.iso,device=cdrom" \
 				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 				--extra-args="autoinstall" \
-				--noautoconsole && dialog::display_summary_message "NOTICE!"  \
 			|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 		;;
 		desktop )
-			read -p "💥 option desktop chosen."
+			# read -p "💥 option desktop chosen."
 			"${bin_virt_install}" --name ${vm_name} \
 				--vcpus "${_cpu}" \
 				--memory "${_mem}" \
@@ -8001,7 +7997,7 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 				--video "virtio" --channel "spicevmc" \
 				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 				--extra-args="ks=file:$(basename $PRESEED_FILE) auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=us \
-				netcfg/get_hostname=${CONFIG}${tgt_ubuntu_ver} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
+				netcfg/get_hostname=${_task}${tgt_ubuntu_ver} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
 				localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 				--initrd-inject="$PRESEED_FILE" \
 				--initrd-inject="$( dirname ${PRESEED_FILE})/ks.cfg" \
@@ -8012,17 +8008,12 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 		;;
 	esac
 
-	
-	# extra args: quiet noshell ---			--extra-args="autoinstall ds=nocloud;s=file:///" \
-	# 		--userdata="${CloudConfig}/user-data" \
-	#		--metadata="${CloudConfig}/meta-data" \
-	# 			--disk ${CloudConfig}/cidata.iso,device=cdrom \
-	for i in  PRESEED_FILE vm_kernel vm_initrd source_url CONFIG tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig ; do unset $i ; done
+	for i in  PRESEED_FILE vm_kernel vm_initrd source_url _task _role _cpu _dsk _mem tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig ; do unset $i ; done
 }
 
 
 
-
+# 				--events="on_reboot=restart" \
 
 
 
@@ -10568,8 +10559,6 @@ system::generate_cloudconfig (){
 #
 # End of Documentation
 CloudConfig=$( mktemp -d /tmp/CloudConfig.XXXXXX ) 
-echo ${CloudConfig}
-
 touch ${CloudConfig}/meta-data
 
 cat >> ${CloudConfig}/user-data << CloudConfig0
@@ -10590,6 +10579,15 @@ autoinstall:
     - name: nvim
       channel: latest/stable
       classic: true
+  shutdown: reboot
+  timezone: geoip
+  drivers:
+    install: true
+  ssh:
+    allow-pw: true
+    install-server: true
+    authorized-keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDaHrQkReAZYQrf4LGGL9O7M5jV/ckR7XCVq/TJFHSvnV8l7RiT0MmXAHNcDxbdkERicv8Yc0OSz2cLeJtHaBoh7gW1y5h2pDKDKuY9NUkkvl6AaWHWdqPY76I7iRmMSYCXJ9qUGkI/XPyihQUP+h7sTYY+zXJyigi8BECJRaEKB5CPUsw7VFFUOewmQ5Dn6qIrpBSwyFWjI9Qs+1EdlXZ+VwyfToPL9JrhCYimqqWC5c15pt9KfYIRJYALezKgcIsjOUcGcfR3Hg/3Ul/3695rmLYFWsRF1xHy+3+PfhdQZVfBXOorBcsXnEVsJBEsPH/ZQJdYWkP/C79P4KdoUXUq0ghmDiazM/y9iggEcZNoT8qY0dWqItITVhFM6JMIUuJoAWaYUgaw3a4EAEL2+OJ8Go+iipinP9VAXQ+vVbZcHXU5xE/l965SfaXCf0MngwhzvpHtijLc54O/z6VP2ArPTAOzBKnGqEYUA/wt8LzAQTwsbYiQshYQrnE8A5z8Vkk=
   late-commands:
     - echo ******************* Custom cmd ***************************
     - mkdir /target/opt/rtd
@@ -10598,12 +10596,13 @@ autoinstall:
     - curtin in-target --target=/target -- /opt/rtd/core/rtd-oem-enable-config.sh
     - mkdir /target/etc/rtd
     - cp /autoinstall.yaml /target/etc/rtd/
-    - mkdir -p "/target/etc/systemd/system/getty@tty1.service.d"
-    - echo "[Service]" > "/target/etc/systemd/system/getty@tty1.service.d/override.conf"
-    - echo "ExecStart=/sbin/agetty --noissue --autologin tangarora "%I" "$TERM"" >> "/target/etc/systemd/system/getty@tty1.service.d/override.conf"
-    - echo "Type=idle" >> "/etc/systemd/system/getty@tty1.service.d/override.conf"
-    - touch /target/home/tangarora/.bashrc
-    - echo "rtd-minecraft-server" >> /target/home/tangarora/.bashrc
+    - mkdir -p /target/etc/systemd/system/getty@tty1.service.d
+    - touch /target/etc/systemd/system/getty@tty1.service.d/override.conf
+    - echo [Service] > /target/etc/systemd/system/getty@tty1.service.d/override.conf
+    - echo ExecStart=  >> /target/etc/systemd/system/getty@tty1.service.d/override.conf
+    - echo 'ExecStart=-/sbin/agetty --noissue --autologin tangarora %I \$TERM' >> /target/etc/systemd/system/getty@tty1.service.d/override.conf
+    - echo Type=idle >> /target/etc/systemd/system/getty@tty1.service.d/override.conf
+    - echo NAutoVTs=1 >> /etc/systemd/logind.conf
     - echo ******************* Custom cmd complete ******************
   keyboard:
     layout: se
