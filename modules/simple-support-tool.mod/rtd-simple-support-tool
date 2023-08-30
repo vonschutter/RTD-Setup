@@ -500,7 +500,7 @@ show_manage_vm_gui () {
 		"1" "List all virtual machines on this system" \
 		"2" "Backup all running virtual machines on this server" \
 		"3" "Monitor VM's on this system "\
-		"4" "Deploy a VM on this server" \
+		"4" "Create a VM template on this server" \
 		2>&1 1>&3 )
 		exit_status=$?
 		exec 3>&-
@@ -568,10 +568,10 @@ show_deploy_server_VM_now_menu ()
 		while true; do
 		exec 3>&1
 		selection=$($RTD_GUI \
-		--backtitle "$BRANDING" --title "Deploy VM Server"  --menu "Please select which type of VM to create:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
+		--backtitle "$BRANDING" --title "Create Template VM Server"  --menu "Please select which type of VM to create:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
 		"1" "Ubuntu Server" \
 		"2" "Ubuntu Graphical Server" \
-		"3" "Debian Graphical Server" \
+		"3" "Debian Print Server" \
 		"4" "Debian Minimal Server" \
 		"5" "Minecraft Server" \
 		"6" "Fedora Minimal Server" \
@@ -589,11 +589,10 @@ show_deploy_server_VM_now_menu ()
 		case $selection in
 		0 )
 			clear
-			echo "Program terminated by user..."
+			write_information "Program terminated by user..."
 		;;
 		1 )
-			#make_kvm_virtual_machine_now_from_ubuntu_com ubuntu20.04
-			kvm::make_vm_template_now_from_ubuntu_com -r server 
+			kvm::make_vm_template_now_from_ubuntu_com -r server -t ubuntu-server
 			cleanup_and_finish nomessage
 		;;
 		2 )
@@ -601,13 +600,11 @@ show_deploy_server_VM_now_menu ()
 			cleanup_and_finish nomessage
 		;;
 		3 )
-			make_preseed_cfg "$( mktemp -d )" lxde-desktop
-			make_kvm_virtual_machine_now_from_debian_org debian10
+			kvm::make_vm_template_now_from_debian_org -r server -t print-server
 			cleanup_and_finish nomessage
 		;;
 		4 )
-			make_preseed_cfg "$( mktemp -d )" openssh-server
-			make_kvm_virtual_machine_now_from_debian_org debian10
+			kvm::make_vm_template_now_from_debian_org -r server -t openssh-server
 			cleanup_and_finish nomessage
 		;;
 		5 )
@@ -637,15 +634,16 @@ show_deploy_VDI_VM_now_menu ()
 	while true; do
 		exec 3>&1
 		selection=$($RTD_GUI --backtitle "$BRANDING" --title "Deploy Virtual Desktop (VDI)"  --menu "Please select which VDI to create on this server:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
-		"1" "Ubuntu Standard Desktop (more MAC like)" \
-		"2" "Debian Default Desktop" \
-		"3" "Debian Cinnamon Desktop" \
-		"4" "Debian Plasma Desktop" \
-		"5" "Debian Light Weight Desktop (LXDE)" \
-		"6" "Fedora Workstation VDI" \
-		"7" "SUSE Workstation VDI" \
-		"8" "Windows 10 VDI" \
-		"9" "Windows 11 VDI" \
+		"1"  "Ubuntu Standard Desktop (more MAC like)" \
+		"2"  "Ubuntu KDE Desktop (more Windows like)" \
+		"3"  "Debian Default Desktop" \
+		"4"  "Debian Cinnamon Desktop" \
+		"5"  "Debian Plasma Desktop" \
+		"6"  "Debian Light Weight Desktop (LXDE)" \
+		"7"  "Fedora Workstation VDI" \
+		"8"  "SUSE Workstation VDI" \
+		"9"  "Windows 10 VDI" \
+		"10" "Windows 11 VDI" \
 		2>&1 1>&3)
 		exit_status=$?
 		exec 3>&-
@@ -661,44 +659,43 @@ show_deploy_VDI_VM_now_menu ()
 			echo "Program terminated by user..."
 		;;
 		1 )
-			make_preseed_cfg "$( mktemp -d )" ubuntu-desktop
-			make_kvm_virtual_machine_now_from_ubuntu_com ubuntu
-			# kvm::make_vm_template_now_from_ubuntu_com ubuntu
+			kvm::make_vm_template_now_from_ubuntu_com -r desktop -t ubuntu-desktop -m 4098 -c 4
+			cleanup_and_finish nomessage
 		;;
 		2 )
-			make_preseed_cfg "$( mktemp -d )" gnome-desktop
-			make_kvm_virtual_machine_now_from_debian_org debian10
+			kvm::make_vm_template_now_from_ubuntu_com -r desktop -t kubuntu-desktop -m 4098 -c 4
 			cleanup_and_finish nomessage
 		;;
 		3 )
-			make_preseed_cfg "$( mktemp -d )" cinnamon-desktop
-			make_kvm_virtual_machine_now_from_debian_org debian10
+			kvm::make_vm_template_now_from_debian_org -r desktop -t gnome-desktop 
 			cleanup_and_finish nomessage
 		;;
 		4 )
-			make_preseed_cfg "$( mktemp -d )" kde-desktop
-			make_kvm_virtual_machine_now_from_debian_org debian10
+			kvm::make_vm_template_now_from_debian_org -r desktop -t cinnamon-desktop 
 			cleanup_and_finish nomessage
 		;;
 		5 )
-			make_preseed_cfg "$( mktemp -d )" lxde-desktop
-			make_kvm_virtual_machine_now_from_debian_org debian10
+			kvm::make_vm_template_now_from_debian_org -r desktop -t kde-desktop 
 			cleanup_and_finish nomessage
 		;;
 		6 )
-			make_kvm_virtual_machine_now_from_fedora_org
+			kvm::make_vm_template_now_from_debian_org -r desktop -t lxde-desktop 
 			cleanup_and_finish nomessage
 		;;
 		7 )
+			make_kvm_virtual_machine_now_from_fedora_org
+			cleanup_and_finish nomessage
+		;;
+		8 )
 			PRESEED_FILE="$(mktemp).xml"
 			generate_autoyast_file "${PRESEED_FILE}"
 			make_kvm_virtual_machine_now_from_opensuse_com SUSE
 			cleanup_and_finish nomessage
 		;;
-		8 )
+		9 )
 			make_kvm_virtual_machine_now_from_microsoft win10
 		;;
-		9 )
+		10 )
 			make_kvm_virtual_machine_now_from_microsoft win11
 		;;
 		esac

@@ -81,12 +81,12 @@ export RTD_VERSION=2.01
 	is_software_package_installed			; Checks to see if a software package already is installed
 	list_loaded_internal_functions			; List all internal library functions loaded... for debugging/support purposes.
 	list_loaded_software_functions			; List all software (_rtd_recipes) functions loaded... for debugging/support purposes.
-	make_kvm_virtual_machine_now_from_debian_org 	; Immediately create a virtual machine directly from debian.org
+	kvm::make_vm_template_now_from_debian_org 	; Immediately create a virtual machine directly from debian.org
 	make_kvm_virtual_machine_now_from_fedora_org	; Immediately create a virtual machine directly from Fedora.org
 	make_kvm_virtual_machine_now_from_iso 		; Make a virtual machine from a generated ISO image
 	make_kvm_virtual_machine_now_from_microsoft	; Make a virtual machine running Windows
 	make_kvm_virtual_machine_now_from_opensuse_com	; Immediately create a virtual machine directly from oensuse.org
-	make_kvm_virtual_machine_now_from_ubuntu_com 	; Immediately create a virtual machine from ubuntu.com
+	kvm::make_vm_template_now_from_ubuntu_com 	; Immediately create a virtual machine from ubuntu.com
 	make_preseed_cfg 				; Generate a debian + derivatives preseed file for fully automated installs
 	notice_rtd_loaded				; Notifies a script that RTD functions are loaded
 	make_system_recovery_partition			; Build a system recovery partition
@@ -102,16 +102,6 @@ export RTD_VERSION=2.01
 	oem::register_all_tools                         ; Register all OEM scripts so that they are accessible by terminal
 	rtd_oem_pause 					; Pause function; will only pause if a non zero integet is passed
 	rtd_oem_cloud-config_ubuntu_cfg_KS_CFG_Options  ; TO DO (incomplete)
-	rtd_oem_preseed_cfg_Addon_MinecraftServer 	; MODULE  sets minecraft server setup tasks for a preseed file
-	rtd_oem_preseed_cfg_Addon_Tasks 		; MODULE  sets default post OS install tasks for a preseed file
-	rtd_oem_preseed_cfg_Disk_Layout 		; MODULE  sets encrypted disk defaults and partitioning for a preseed file
-	rtd_oem_preseed_cfg_EFI 			; MODULE  sets EFI boot options for a preseed file
-	rtd_oem_preseed_cfg_GRUB_Bootloader_Installation; MODULE  sets default GRUP boot configuration for a preseed file
-	rtd_oem_preseed_cfg_Localization 		; MODULE  sets default default localization for a preseed file
-	rtd_oem_preseed_cfg_Network_Configuration 	; MODULE  sets default network configuration for a preseed file
-	rtd_oem_preseed_cfg_Package_Selection 		; MODULE  sets default software selection for a preseed file
-	rtd_oem_preseed_cfg_Prevent_Install_On_USB 	; MODULE  settings for a preseed file to prevent auto installation on a USB stick
-	rtd_oem_preseed_cfg_Unattended_Install 		; MODULE  sets fully unattended install for a preseed file
 	rtd_oem_preseed_ubuntu_cfg_KS_CFG_Options 	; MODULE  sets optional elements for a kickstart file normally not needed
 	rtd_oem_release_upgrade 			; Attempt to perform a release upgrade for supported systems
 	rtd_oem_remove_non_western_latin_fonts 		; Remove all non-latin fonts from a distribution. for the western world these are not needed and slow the system
@@ -138,6 +128,7 @@ export RTD_VERSION=2.01
 	system::display_spinner				; Display a spinner in the terminal
 	system::get_Windows_Product_Key			; Retrieves a Microsoft Windows product key if it is stored in BIOS (common for OEM)
 	system::find_vm_bridge                          ; Echo back the name of the bridge device and if one is not found then echo default (nat)
+	system::make_preseed_cfg   		        ; Generate a debian + derivatives preseed file for fully automated installs
 	scan_for_malware				; Scan location for malware
 	set_colors					; Set colors for prompting on screen in human usable variables; $RED, $GEEN etc.
 	set_enable_oem_elevated_privelege		; Set automatic privilege escalation for scripts
@@ -395,6 +386,7 @@ dialog::display_summary_message ()
 #
 # End of Documentation
 
+	system::log_item "Displaying summary message TITLE: $1"
 	hash ${RTD_GUI:-dialog} &>/dev/null || check_dependencies ${RTD_GUI:-dialog} &>/dev/null || return 1
 
 	if echo ${FUNCNAME[1]} | grep "make_kvm_virtual_machine" ; then 
@@ -785,14 +777,41 @@ dependency::virtualization ()
 # End of documentation
 
 
-	write_status "${FUNCNAME[1]}:"
-	count=1
-	for i in qemu-utils qemu-tools qemu-kvm qemu-system-x86 virt-install
-	do
-		write_status "${count}	- Verifying dependencies if relevant( ${i} )..."
-		check_dependencies $i &>/dev/null
-		count=$((count + 1))
-	done
+	write_status "${FUNCNAME[0]}: Checking for virtualization software..."
+	local _os_name=$(hostnamectl |grep "Operating System" |cut -d' ' -f3)
+
+	case $_os_name in
+	openSUSE )
+		write_status "Verrifying/Installing virtualization software for openSUSE..."
+		zypper install -y --recommends -t pattern "kvm_server"  "kvm_tools" | tee -a ${_log_file}
+	;;
+	Tumbleweed )
+		write_status "Verryfying/Installing virtualization software for Tumbleweed..."
+		zypper install -y --recommends -t pattern "kvm_server"  "kvm_tools" | tee -a ${_log_file}
+	;;
+	Fedora ) 
+		local _probable_dependencies="bridge-utils libvirt virt-install qemu-kvm virt-top libguestfs-tools guestfs-tools" 
+	;;
+	Debian ) 
+		local _probable_dependencies="bridge-utils cpu-checker libvirt-clients libvirt-daemon qemu qemu-kvm virtinst" 
+	;;
+	Ubuntu ) 
+		local _probable_dependencies="bridge-utils cpu-checker libvirt-clients libvirt-daemon qemu qemu-kvm virtinst" 
+	;;
+	* ) 
+		local _probable_dependencies="bridge-utils cpu-checker libvirt-clients libvirt-daemon qemu qemu-kvm virtinst" 
+	;;
+	esac
+
+	if [[ -n ${_probable_dependencies} ]] ; then
+		count=1
+		for i in  ${_probable_dependencies} ; do
+			write_status "${count}	- Verifying dependencies if relevant( ${i} )..."
+			software::check_native_package_dependency $i &>/dev/null
+			count=$((count + 1))
+		done
+	fi
+
 }
 
 
@@ -1966,9 +1985,11 @@ rtd_oem_reseal ()
 		oem-config-prepare
 		shutdown -h now
 	elif cat /etc/os-release |grep suse ; then
-		echo "I dont know of any OEM configuration for SuSE"
+		system::log_item "I dont know of any OEM configuration for SuSE"
 	elif cat /etc/os-release |grep fedora ; then
-		echo "I dont know of any OEM configuration for Fedora"
+		system::log_item "I dont know of any OEM configuration for Fedora"
+	else
+		system::log_item "I dont know of any OEM configuration for this distribution"
 	fi
 }
 
@@ -2037,7 +2058,7 @@ rtd_oem_find_live_release ()
 			system::log_item "Providing requested URL: http://releases.ubuntu.com/${distro_version}/$(curl --silent http://releases.ubuntu.com/${distro_version}/SHA256SUMS | grep -o 'ubuntu-.*-desktop-amd64.iso')"
 			echo "http://releases.ubuntu.com/${distro_version}/$(curl --silent http://releases.ubuntu.com/${distro_version}/SHA256SUMS | grep -o 'ubuntu-.*-desktop-amd64.iso')"
 		;;
-		server )
+		server | server-desktop )
 			# 18.04 and later need to use the alternative installer
 			# since the switch to subiquity
 			system::log_item "Providing requested URL: http://releases.ubuntu.com/${distro_version}/ubuntu-${distro_version}-live-server-amd64.iso"
@@ -2186,44 +2207,6 @@ generate_report_disk_space_used_by_directory ()
 
 
 
-
-make_preseed_cfg ()
-{
-# Description: Function to write out a debina preeseed file to a location requested by the first parameter.
-# Other parameters accepted are CONFIG (multiselect de), SRVFUNC (task "Minecraft" "Tasks")
-# some parameters have defaults.
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-# Example:
-# functoin_name          location        config          function
-# make_preseed_cfg       /path/to/file   ssh-server      Minecraft
-# End of documentation
-
-	SAVETO=$1
-	CONFIG=$2
-	SRVFUNC=${3:-Tasks}
-	PRESEED=preseed.cfg
-	PRESEED_FILE="$SAVETO/$PRESEED"
-	TASK_FILE="$SAVETO/task.sh"
-	echo "$PRESEED_FILE"
-
-	touch "$SAVETO/$PRESEED"
-
-	rtd_oem_preseed_cfg_Unattended_Install "$SAVETO"
-	rtd_oem_preseed_cfg_Network_Configuration "$SAVETO"
-	rtd_oem_preseed_cfg_Prevent_Install_On_USB "$SAVETO"
-	rtd_oem_cfg_Account_Setup "$SAVETO"
-	rtd_oem_preseed_cfg_Localization "$SAVETO"
-	rtd_oem_preseed_cfg_EFI "$SAVETO"
-	rtd_oem_preseed_cfg_GRUB_Bootloader_Installation "$SAVETO"
-	rtd_oem_preseed_cfg_Disk_Layout "$SAVETO"
-	rtd_oem_preseed_cfg_Package_Selection "$SAVETO" "$CONFIG"
-	rtd_oem_preseed_cfg_Addon_"${SRVFUNC}" "$SAVETO"
-	rtd_oem_preseed_ubuntu_cfg_KS_CFG_Options "$SAVETO"
-}
 
 
 
@@ -6175,22 +6158,22 @@ system::log_item ()
 
 	case "${FUNCNAME[1]}" in
 		"write_error")
-			echo "${_date}         --- : $*" >> "${_logfile}"
+			echo "${_date}  --- : $*" >> "${_logfile}"
 		;;
 		"write_warning") 
-			echo "${_date}       --- : $*" >> "${_logfile}"
+			echo "${_date}  --- : $*" >> "${_logfile}"
 		;;
 		"write_information")
 			echo "${_date}  --- : $*" >> "${_logfile}"
 		;;
 		"write_host")
-			echo "${_date}         --- : $*" >> "${_logfile}"
+			echo "${_date}  --- : $*" >> "${_logfile}"
 		;;
 		"write_status")
-			echo "${_date}       --- : $*" >> "${_logfile}"
+			echo "${_date}  --- : $*" >> "${_logfile}"
 		;;
 		*)
-			echo "${_date} 🧩 ${FUNCNAME[1]}  --- : $*" >> "${_logfile}"
+			echo "${_date}  --- : 🧩 ${FUNCNAME[1]}: $*" >> "${_logfile}"
 		;;
 	esac
 }
@@ -7743,7 +7726,7 @@ make_kvm_virtual_machine_now_from_opensuse_com ()
 
 
 
-make_kvm_virtual_machine_now_from_debian_org ()
+kvm::make_vm_template_now_from_debian_org ()
 {
 # Description: Function to create a Debian KVM virtual michine disk and define a VM. This function should be
 # used on a Qemu/KVM virtual host that the virtual guest is to be used on.
@@ -7770,53 +7753,36 @@ make_kvm_virtual_machine_now_from_debian_org ()
 	dependency::virtualization
 
 	# Check for optional default T-Shirts size overrides... 
-	local OPTIND o a
-	while getopts ':c:m:d:' OPTION; do
-		case "$OPTION" in
-		c )
-			local _cpu="${OPTARG}"
-			write_information "Custom CPU set to: ${OPTARG}"
-		;;
-		m )
-			local _mem="${OPTARG}"
-			write_information "Custom memory set to: ${OPTARG}"
-		;;
-		d )
-			local _dsk="${OPTARG}"
-			write_information "Custom disk sizee set to: ${OPTARG}"
-		;;
-		? )
-			write_host --cyan  "Usage: ${FUNCNAME[0]} or ${FUNCNAME[0]} [-c <#CPU>, -m <MB RAM>, -d <GB Disk>]"
-			return 0
-		;;
-		esac
-	done
-	unset OPTIND
+	system::process_vm_opt_args "$@"
 
-	# Set default values for VM T-Shirts sizes...
-	: ${_cpu="${_cpu:-2}"}
-	: ${_mem="${_mem:-2048}"}
-	: ${_dsk="${_dsk:-100}"}
+	# Set default values for VM T-Shirts sizes (may vary by OS)...
+	: ${_role:="desktop"}
+	: ${_task:="ssh-server"}
+	: ${_cpu:="${_cpu:=2}"}
+	: ${_mem:="${_mem:=2048}"}
+	: ${_dsk:="${_dsk:=100}"}
 
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet, and set variables.
 	: "${bin_virt_install:=$(type -p virt-install)}"
-	: "${PRESEED_FILE:="$(make_preseed_cfg $( mktemp -d ) ssh-server )"}"
-	if echo "${CONFIG:="ssh-server"}" |grep server &>/dev/null ; then : "${SRVorVDI="server"}" ; else : "${SRVorVDI="desktop"}" ; fi
+
+	# Create a preseed file for the Debian installer
+	#                           <gnome-desktop>   <dir path>     <minecraft>
+	system::make_preseed_cfg -r "${_role}" -p "$( mktemp -d)" -t ${_task}
 
 
-	case "${SRVorVDI}" in
-		server | Server )
-				: "${vm_kernel="${_DEBIAN_FRONTEND_DEFAULT_KERNEL}"}"
-				: "${vm_initrd="${_DEBIAN_FRONTEND_DEFAULT_INITRD}"}"
-				: "${ui_diplay_style="theme=light"}"
-				: "${vm_usecase="Server"}"
-				;;
-		desktop | Desktop )
+	case "${_role}" in
+		desktop | Desktop | gnome-desktop | kde-desktop | lxde-desktop | xfce-desktop | mate-desktop | cinnamon-desktop )
 				: "${vm_kernel="${_DEBIAN_FRONTEND_GTK_KERNEL}"}"
 				: "${vm_initrd="${_DEBIAN_FRONTEND_GTK_INITRD}"}"
 				: "${ui_diplay_style="theme=dark"}"
 				: "${vm_usecase="VDI"}"
+				;;
+		* )
+				: "${vm_kernel="${_DEBIAN_FRONTEND_DEFAULT_KERNEL}"}"
+				: "${vm_initrd="${_DEBIAN_FRONTEND_DEFAULT_INITRD}"}"
+				: "${ui_diplay_style="theme=light"}"
+				: "${vm_usecase="Server"}"
 				;;
 		*)	;;
 	esac
@@ -7825,7 +7791,7 @@ make_kvm_virtual_machine_now_from_debian_org ()
 	: ${virt_net="$(system::find_vm_bridge)"}
 	: ${source_url:="${_DEBIAN_SOURCE_URL}"}
 
-	local vm_name="Debian_${vm_usecase}_${SRVFUNC}_${CONFIG}_${RANDOM}"
+	local vm_name="#Template_Debian_${_task}_${vm_usecase}_$(date +%Y-%m-%d-%H-%M)"
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
@@ -7846,7 +7812,7 @@ make_kvm_virtual_machine_now_from_debian_org ()
 		--network "${virt_net}" \
 		--disk size="${_dsk}" \
 		--location="${source_url}" \
-		--os-variant="${1:-debian10}" \
+		--os-variant="debian10" \
 		--video "virtio" --channel "spicevmc" \
 		--initrd-inject="${PRESEED_FILE}" \
 		--install kernel="${vm_kernel}",initrd="${vm_initrd}" \
@@ -7883,11 +7849,11 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 # Arguments: None
 # Outputs:
 # Returns:
-# Usage: make_kvm_virtual_machine_now_from_ubuntu_com (optional arguments)
+# Usage: kvm::make_vm_template_now_from_ubuntu_com (optional arguments)
 #
 # Example:	(may be set otherwise defaults are used)
 #                vmtype    CPU  RAM   DISK
-# make_kvm_virtual_machine_now_from_ubuntu_com server|desktop
+# kvm::make_vm_template_now_from_ubuntu_com 
 #
 # If complete flexibility is needed simply use the virt-install binary and directly write the arguments.
 # Alternatively; edit the function with new defaults that suit the needs.
@@ -7897,7 +7863,7 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 	# Evaluate override arguments to defaults...
 	system::process_vm_opt_args $@
 
-	# Set default values for VM T-Shirts sizes...
+	# Set default values for VM T-Shirts sizes (may vary by OS)...
 	: ${ubuntu_flavor="ubuntu"}
 	: ${_role:="desktop"}
 	: ${_task:="ssh-server"}
@@ -7909,20 +7875,9 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 
 	# Fetch the relevand ISO if necessary...
 	system::log_item "🔎 Retreive list of available $ubuntu_flavor $_role versions..."
-	case "$_role" in
-		desktop)
-			declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
-			dist_logo="$ubuntulogo"
-		;;
-		server)
-			declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
-			dist_logo="$ubuntulogo"
-		;;
-		*)
-			declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
-			dist_logo="$ubuntulogo"
-		;;
-	esac
+
+	declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
+	dist_logo="$ubuntulogo"
 
 	tgt_ubuntu_ver=$($RTD_GUI --colors --title "Select Release Version of $ubuntu_flavor $_role" --inputbox "\n 👍 Please pick an available \Z1 $ubuntu_flavor \Zn version by entering it below.
 	Long Term Support Versions to choose from are the following:\Z4 ${all_lts_versions[*]} \Zn You may also enter an inbetween release version
@@ -7936,7 +7891,19 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 	# Return the version number selected
 	[ "$tgt_ubuntu_ver" ] || tgt_ubuntu_ver=${all_lts_versions[-1]}
 
-	# Set key vars of where to find ubunty ISO files...
+	# Set the role to server if the Ubuntu version is 23 or greater force using server media (using subiquity)...
+	if [[ ${tgt_ubuntu_ver::2} -ge 23 ]] ; then
+		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: Using subiquity installer..."
+		if [[ "${_role}" == "desktop" ]] ; then
+			system::log_item "Ubuntu role = desktop: changing to server media due to subiquity..."
+			_role="server"
+		fi
+	else
+		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: Using debian installer (d-i)..."
+	fi
+
+	# Set key vars of where to find ubuntu ISO files...
+	system::log_item "🔎 Issuing search command: rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} ${_role}"
 	: ${ubuntu_iso_url=$(rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} ${_role})}
 	: ${iso_filename:="$(basename $ubuntu_iso_url)"}
 	: ${permanent_download_dir:="/var/lib/libvirt/boot/"}
@@ -7956,9 +7923,11 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 	local vm_name="${_task}-${tgt_ubuntu_ver}-${RANDOM}"
 
 	system::generate_cloudconfig
-
-	_summary_message="The virtual machine (${vm_name}) \n
-	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
+	system::make_preseed_cfg -r "${_role}" -p "$( mktemp -d)" -t ${_task}
+	
+	_summary_message="
+	The virtual machine (${vm_name}) \n
+	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} ${CloudConfig}\n
 	🔧 - And Using this source for the packages and files to download: \n
 			${vm_name} \n
 			cpus "${_cpu}" \n
@@ -7972,8 +7941,10 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 			kernel=casper/vmlinuz,initrd=casper/initrd" "
 	system::log_item "${_summary_message}"
 
+	# Create the appropriate VM as requested...
 	case $_role in 
 		server )
+			system::log_item "Ubuntu version ${tgt_ubuntu_version}: Running install options for subiquity..."
 			"${bin_virt_install}" --name ${vm_name} \
 				--vcpus "${_cpu}" \
 				--memory "${_mem}" \
@@ -7984,10 +7955,11 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 				--disk path="${CloudConfig}/cidata.iso,device=cdrom" \
 				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 				--extra-args="autoinstall" \
+				--noautoconsole  |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"  \
 			|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 		;;
 		desktop )
-			# read -p "💥 option desktop chosen."
+			system::log_item "Ubuntu version ${tgt_ubuntu_version}: Running install options for debian installer (d-i)..."
 			"${bin_virt_install}" --name ${vm_name} \
 				--vcpus "${_cpu}" \
 				--memory "${_mem}" \
@@ -8008,173 +7980,13 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 		;;
 	esac
 
+	# Clean up residual variables...
 	for i in  PRESEED_FILE vm_kernel vm_initrd source_url _task _role _cpu _dsk _mem tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig ; do unset $i ; done
 }
 
 
 
-# 				--events="on_reboot=restart" \
 
-
-
-
-
-
-make_kvm_virtual_machine_now_from_ubuntu_com ()
-{
-# Description: Function to create a KVM virtual michine disk and define a VM. This function should be
-# used on a Qemu/KVM virtual host that the virtual guest is to be used on.
-# NOTE: QCOW2 is a storage format for virtual machine disk images.
-# QCOW stands for QEMU copy on write. The QCOW2 format decouples the physical storage
-# layer from the virtual layer by adding a mapping between logical and physical blocks.
-# NOTE2: Kernel-based Virtual Machine (KVM) is an open source virtualization technology built into Linux®.
-# Specifically, KVM lets you turn Linux into a hypervisor that allows a host machine to run multiple,
-# isolated virtual environments called guests or virtual machines (VMs). KVM is part of Linux.
-# For complete info: https://www.redhat.com/en/topics/virtualization/what-is-KVM
-#
-# Usage: Either simply call this function to use the defaults or:
-# Call this function with "function" "RAM_SIZE" "DISK_SIZE" "DISK_FORMAT" "DISK_FILE"
-# Omitting any of the arguments will us the default instead.
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage: make_kvm_virtual_machine_now_from_ubuntu_com (optional arguments)
-#
-# Example:									   (may be set otherwise defaults are used)
-#                                              vmtype    CPU  RAM   DISK
-# make_kvm_virtual_machine_now_from_ubuntu_com ubuntu
-#
-# If complete flexibility is needed simply use the virt-install binary and directly write the arguments.
-# Alternatively; edit the function with new defaults that suit the needs.
-# End of Documentation
-	ubuntu_flavor="${1}"
-	dependency::virtualization
-
-	system::log_item "Check for optional default T-Shirts size overrides... "
-	local OPTIND o a
-	while getopts ':c:m:d:' OPTION; do
-		case "$OPTION" in
-		c )
-			local _cpu="${OPTARG}"
-			write_information "Custom CPU set to: ${OPTARG}"
-		;;
-		m )
-			local _mem="${OPTARG}"
-			write_information "Custom memory set to: ${OPTARG}"
-		;;
-		d )
-			local _dsk="${OPTARG}"
-			write_information "Custom disk sizee set to: ${OPTARG}"
-		;;
-		? )
-			write_host --cyan  "Usage: ${FUNCNAME[0]} or ${FUNCNAME[0]} [-c <#CPU>, -m <MB RAM>, -d <GB Disk>]"
-			return 0
-		;;
-		esac
-	done
-	unset OPTIND
-
-	system::log_item "Set default values for VM T-Shirts sizes... "
-	: ${_cpu="${_cpu:-2}"}
-	: ${_mem="${_mem:-2048}"}
-	: ${_dsk="${_dsk:-100}"}
-	system::log_item "vcpu=${_cpu}, memory=${_mem}, disk=${_dsk}"
-
-	write_information "🔎 Retreive list of available $ubuntu_flavor versions..."
-	case "$ubuntu_flavor" in
-		ubuntu)
-			declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
-			dist_logo="$ubuntulogo"
-			system::log_item "Requested Ubuntu."
-		;;
-		kubuntu)
-			declare -a all_lts_versions=($(wget -O- cdimage.ubuntu.com/kubuntu/releases -q | perl -ne '/ (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
-			dist_logo="$kubuntulogo"
-			system::log_item "Requested Kubuntu."
-		;;
-		*)
-			declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
-			dist_logo="$ubuntulogo"
-			system::log_item "No flavor of ubuntu requested, defaulting to Ubuntu..."
-		;;
-	esac
-
-	tgt_ubuntu_ver=$($RTD_GUI --colors --title "Select Release Version of $ubuntu_flavor " --inputbox "\n 👍 Please pick an available \Z1 $ubuntu_flavor \Zn version by entering it below.
-	Long Term Support Versions to choose from are the following:\Z4 ${all_lts_versions[*]} \Zn You may also enter an inbetween release version
-	by typing its release number below as well. If you are not sure just let me choose intelligently for you... \n \Z1 ${dist_logo} \Zn"  30 90 "${all_lts_versions[-1]}" 3>&1 1>&2 2>&3)
-	case $? in
-		"$DIALOG_CANCEL") return ;;
-		"$DIALOG_ESC") return ;;
-	esac
-	clear
-
-	[ "$tgt_ubuntu_ver" ] || tgt_ubuntu_ver=${all_lts_versions[-1]}
-
-	# Detect and set variables for key programs
-	: ${bin_virt_install:=$(type -p virt-install)}
-	: ${virt_net="$(system::find_vm_bridge)"}
-	: ${ubuntu_iso_url=$(rtd_oem_find_live_release $tgt_ubuntu_ver $ubuntu_flavor live)}
-	: ${iso_filename:="$(basename $ubuntu_iso_url)"}
-	: ${permanent_download_dir:="/var/lib/libvirt/boot/"}
-
-	write_status "Checking if $iso_filename already downloaded..."
-	iso=$(find "$permanent_download_dir" -name "$iso_filename")
-	if [ ! -e "$iso" ]; then
-		write_warning "$iso_filename is not in cache, downloading..."
-		wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "Failure to download ISO file"
-		iso="$permanent_download_dir/$iso_filename"
-	fi
-
-	local vm_name="${CONFIG}-${tgt_ubuntu_ver}-${RANDOM}"
-	_summary_message="The virtual machine (${vm_name}) \n
-	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
-	🔧 - And Using this source for the packages and files to download: \n
-	🌎 - ${ubuntu_iso_url} \n
-	🌎 - ${iso} \n
-	✅ - Using the network: ${virt_net} \n
-	✅ - Memory: ${_mem} \n
-	✅ - CPU's: ${_cpu} \n
-	✅ - Disk Size: ${_dsk} \n You may attach to this server and see the progress at IP: $(hostname -I))"
-
-	if [[ ${tgt_ubuntu_version::2} -ge 23 ]] ; then
-		system::generate_cloudconfig
-		"${bin_virt_install}" --name ${vm_name} \
-			--vcpus "${_cpu}" \
-			--memory "${_mem}" \
-			--network "${virt_net}" \
-			--disk size="${_dsk}" \
-			--os-variant="ubuntu21.10" \
-			--video "virtio" --channel "spicevmc" \
-			--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-			--initrd-inject="${CloudConfig}/user-data" \
-			--initrd-inject="${CloudConfig}/meta-data" \
-			--extra-args="autoinstall ds=nocloud-net;s=/user-data" \
-			--noautoconsole && dialog::display_summary_message "NOTICE!"  \
-		|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
-	else
-		"${bin_virt_install}" --name ${vm_name} \
-			--vcpus "${_cpu}" \
-			--memory "${_mem}" \
-			--network "${virt_net}" \
-			--disk size="${_dsk}" \
-			--os-variant="ubuntu21.10" \
-			--video "virtio" --channel "spicevmc" \
-			--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-			--extra-args="ks=file:$(basename $PRESEED_FILE) auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=us \
-			netcfg/get_hostname=${CONFIG}${tgt_ubuntu_ver} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
-			localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
-			--initrd-inject="$PRESEED_FILE" \
-			--initrd-inject="$( dirname ${PRESEED_FILE})/ks.cfg" \
-			--noautoconsole && dialog::display_summary_message "NOTICE!"  \
-		|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
-	fi
-	# extra args: quiet noshell
-	for i in  PRESEED_FILE vm_kernel vm_initrd source_url CONFIG tgt_ubuntu_ver ubuntu_iso_url iso_filename ; do unset $i ; done
-}
-
-#			--extra-args="autoinstall ds=nocloud-net;s=/user-data" \
 
 
 
@@ -9185,32 +8997,6 @@ generate_autounattend_xml ()
 
 
 
-rtd_oem_cloud-config_ubuntu_cfg_KS_CFG_Options ()
-{
-# Description: generates a preseed section [Ubuntu only] (ks.cfg)
-# Globals: $PRESEED (filename)
-# Arguments: Where to place file (directory)
-# Outputs: one preseed file section
-# Returns: instruction for Ubuntu's convoluted support for both preseed and kickstart files.
-# Usage: rtd_oem_cloud-config_ubuntu_cfg_KS_CFG_Options "directory"
-# End of documentation
-	cat > $1/autoinstall.yaml <<-'EOF'
-#cloud-config
-autoinstall:
-  version: 1
-  identity:
-    hostname: ubuntu-server
-    password: "$6$exDY1mhS4KUYCE/2$zmn9ToZwTKLhCw.b4/b.ZRTIZM30JZ4QrOQ2aOXJ8yk96xpcCof0kxKwuX1kqLG/ygbJ1f8wxED22bTL4F46P0"
-    username: tangarora
-		# # --------------------------------------------------- #
-
-EOF
-}
-
-
-
-
-
 
 rtd_oem_preseed_ubuntu_cfg_KS_CFG_Options ()
 {
@@ -9221,564 +9007,9 @@ rtd_oem_preseed_ubuntu_cfg_KS_CFG_Options ()
 # Returns: instruction for Ubuntu's convoluted support for both preseed and kickstart files.
 # Usage: rtd_oem_preseed_ubuntu_cfg_KS_CFG_Options "directory"
 # End of documentation
+	system::log_item "Saving preeseed file as $1/ks.cfg for legacy Ubuntu installs..."
 	cat $1/preseed.cfg >$1/ks.cfg
 }
-
-
-
-
-
-
-
-
-
-rtd_oem_preseed_cfg_Unattended_Install ()
-{
-# Description: generates a preseed section [Unattended Installation] (d-i debconf string)
-# Globals: $PRESEED (filename)
-# Arguments: Where to place file (directory)
-# Outputs: one preseed file section
-# Returns: suppress any questions.
-# Usage: rtd_oem_preseed_cfg_Unattended_Install "directory"
-# End of documentation
-	cat >> $1/$PRESEED <<-'EOF'
-
-		# --------------------------------------------------- #
-		# Unattended Installation
-		# --------------------------------------------------- #
-		# Simple instruction to tell the debian installer that
-		# this is intended to be an unattended install and to only
-		# ask critical questions (wich we will answer in this file)
-		# End of documentation
-		d-i auto-install/enable boolean true
-		d-i debconf/priority select critical
-		# --------------------------------------------------- #
-
-
-		# --------------------------------------------------- #
-		# Install the KDE/Gnome oem-config frontend
-		# --------------------------------------------------- #
-		# Instructions to tell the installer what front end to display.
-		# The default is to use a console based display with a light
-		# Weight GUI. This is equally informative and stable. It is the
-		# prefferred option for unseen deployments, for example in a
-		# cloud service like AWS or AZURE. However, if the installation
-		# will be seen by end users it may be preferable to show a modern
-		# GUI that users will recognize and not be intimidated by.
-		#
-		# d-i     oem-config-udeb/frontend        string kde
-		d-i     oem-config-udeb/frontend        string gnome
-		# --------------------------------------------------- #
-	EOF
-}
-
-
-
-
-
-
-
-
-
-
-
-rtd_oem_preseed_cfg_Network_Configuration ()
-{
-# Description: generates a preseed section [Network configuration] (d-i netcfg string)
-# Globals: $PRESEED (filename)
-# Arguments: Where to place file (directory)
-# Outputs: one preseed file section
-# Returns: wired + wireless configuration
-# Usage: rtd_oem_preseed_cfg_Network_Configuration "directory"
-# End of documentation
-	cat >> $1/$PRESEED <<-'EOF'
-
-		# --------------------------------------------------- #
-		# Network configuration
-		# --------------------------------------------------- #
-		# Network setup. This can be a static setup or dhcp.
-		# The RTD default prefferred config is to rely on DHCP,
-		# and for wireless networks (systems with only wireless cards)
-		# default to an SSID named "loader" and the guest wpa string
-		# "letmein1234". This allows supported systems to be
-		# installed directly over WiFi with no user input.
-		# End of documentation
-		d-i netcfg/choose_interface select manual
-		d-i netcfg/hostname string RTD-Client
-		d-i netcfg/get_hostname string unassigned-hostname
-		d-i netcfg/get_domain string unassigned-domain
-		d-i hw-detect/load_firmware boolean true
-
-		# We want the preconfiguration file to work on systems both with and
-		# without sucessful dhcp configuration
-		d-i netcfg/dhcp_failed note
-		d-i netcfg/dhcp_options select Configure network manually
-		# d-i netcfg/dhcp_timeout string 60
-
-		d-i netcfg/wireless_show_essids select manual
-		d-i netcfg/wireless_essid string loader
-		d-i netcfg/wireless_essid_again string loader
-		d-i netcfg/wireless_security_type select wpa
-		d-i netcfg/wireless_wpa string letmein1234
-
-		# --------------------------------------------------- #
-
-	EOF
-}
-
-
-
-
-
-
-
-
-rtd_oem_cfg_Account_Setup ()
-{
-# Description: generates a preseed section [Account setup] (d-i passwd string)
-# Globals: $PRESEED (filename)
-# Arguments: Where to place file (directory)
-# Outputs: one preseed file section
-# Returns: user accounts
-# Usage: rtd_oem_cfg_Account_Setup "directory"
-# End of documentation
-	cat >> $1/$PRESEED <<-'EOF'
-
-		# --------------------------------------------------- #
-		# Account setup (temporary user account)
-		# --------------------------------------------------- #
-		# Setup an initial user and disable root login by default.
-		# root login may be re-enabled later by setting a root password.
-		# An encrypted password is set here, and should be changed
-		# ASAP after the system is built. Preferebly connect to LDAP/AD
-		# in a managed environment.
-		# End of documentation
-		d-i passwd/root-login boolean false
-		d-i passwd/user-fullname string RTD User
-		d-i passwd/username string tangarora
-		d-i passwd/user-password seen true
-		d-i user-setup/allow-password-weak boolean true
-		d-i passwd/user-password-crypted password $6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1
-		d-i passwd/auto-login boolean true
-
-		# --------------------------------------------------- #
-
-	EOF
-}
-
-
-
-
-
-
-
-
-rtd_oem_preseed_cfg_Prevent_Install_On_USB ()
-{
-# Description: generates a preseed section [Avoid USB install] (d-i early_command string)
-# Globals: $PRESEED (filename)
-# Arguments: Where to place file (directory)
-# Outputs: one preseed file section
-# Returns: EFI + Legacy ability to boot
-# Usage: rtd_oem_preseed_cfg_Prevent_Install_On_USB "directory"
-# End of documentation
-
-	cat >> $1/$PRESEED <<-'EOF'
-
-		# --------------------------------------------------- #
-		# Do NOT install on the USB stick(!)
-		# --------------------------------------------------- #
-		#
-		# The Debian installer will install on the first disk it finds which can
-		# sometimes be the USB stick itself. Work around this by rolling our own auto
-		# detect logic which disallows installing on USB devices.
-		#
-		# d-i partman/early_command string [ "$(ls -A /tmp)" ] && umount -l /media || echo "Empty" ;
-		# End of documentation
-		d-i partman/early_command string \
-			USBDEV=$(mount | grep hd-media | cut -d" " -f1 | sed "s/\(.*\)./\1/");\
-			BOOTDEV=$(list-devices disk | grep -v \$USBDEV | head -1);\
-			debconf-set partman-auto/disk $BOOTDEV;\
-			debconf-set grub-installer/bootdev $BOOTDEV;
-
-		# --------------------------------------------------- #
-
-	EOF
-}
-
-
-
-
-
-
-
-rtd_oem_preseed_cfg_EFI ()
-{
-# Description: generates a preseed section [EFI] (d-i partman-efi string)
-# Globals: $PRESEED (filename)
-# Arguments: Where to place file (directory)
-# Outputs: one preseed file section
-# Returns: EFI + Legacy ability to boot
-# Usage: rtd_oem_preseed_cfg_EFI "directory"
-# End of documentation
-
-	cat >> $1/$PRESEED <<-'EOF'
-
-		# --------------------------------------------------- #
-		# EFI
-		# --------------------------------------------------- #
-		#
-		# The EFI (Extensible Firmware Interface) system partition is a partition on a data storage device.
-		# UEFI provides backward compatibility with legacy systems by reserving the first block (sector) of
-		# the partition for compatibility code, effectively creating a legacy boot sector. On legacy BIOS-based
-		# systems, the first sector of a partition is loaded into memory and execution is transferred to this code.
-		# Here we tell setup to install EFI boot setup if possible so that both NEW and old systems may be handled
-		# and the installed system can be started.
-		d-i partman-efi/non_efi_system boolean true
-		# End of documentation
-		# --------------------------------------------------- #
-
-	EOF
-}
-
-
-
-
-
-
-
-rtd_oem_preseed_cfg_Localization ()
-{
-# Description: generates a preseed section [Localization] (d-i localechooser string)
-# Globals: $PRESEED (filename)
-# Arguments: Where to place file (directory)
-# Outputs: one preseed file section
-# Returns: time-zone, keyboard-layout, locale
-# Usage: rtd_oem_preseed_cfg_Localization "directory"
-# End of documentation
-
-	cat >> $1/$PRESEED <<-'EOF'
-
-		# --------------------------------------------------- #
-		# Localization
-		# --------------------------------------------------- #
-		# Provide localizaton preferences so that the prefferred
-		# language is used for display and formats. Comparable to
-		# the MUI in Microsoft environments.
-		# End of documentation
-		d-i debian-installer/locale string en_US.UTF-8
-		d-i localechooser/supported-locales multiselect en_US.UTF-8, se_SE.UTF-8
-		d-i console-setup/ask_detect boolean false
-
-		# --------------------------------------------------- #
-
-
-
-		# --------------------------------------------------- #
-		# Set Keyboard layout
-		# --------------------------------------------------- #
-		# Set the prefferred keyboard layout. Keyboards will work
-		# regardless, but the letters and symbols may not actually
-		# be the ones drawn on the keys. Default is us.
-		d-i keyboard-configuration/xkb-keymap select se
-		d-i keyboard-configuration/layoutcode string se
-		d-i debian-installer/keymap select se
-		d-i keymap select se
-		d-i console-setup/layoutcode string se
-		d-i console-setup/ask_detect boolean false
-
-		# --------------------------------------------------- #
-
-
-		# --------------------------------------------------- #
-		# Clock and time zone setup
-		# --------------------------------------------------- #
-		d-i clock-setup/utc boolean true
-		d-i time/zone string Etc/UTC
-		d-i clock-setup/ntp boolean true
-		d-i clock-setup/ntp-server string ntp.ubuntu.com
-
-		# --------------------------------------------------- #
-
-		EOF
-}
-
-
-
-
-
-
-rtd_oem_preseed_cfg_GRUB_Bootloader_Installation ()
-{
-# Description: generates a preseed section [Grub] (d-i grub-installer string)
-# Globals: $PRESEED (filename)
-# Arguments: Where to place file (directory)
-# Outputs: one preseed file section
-# Returns:
-# Usage: rtd_oem_preseed_cfg_GRUB_Bootloader_Installation "directory"
-# End of documentation
-
-	cat >> $1/$PRESEED <<-'EOF'
-
-		# --------------------------------------------------- #
-		# GRUB bootloader installation
-		# --------------------------------------------------- #
-		#
-		# Tell the grub-installer to install to the MBR even if it also finds some other
-		# OS, which is more likely to allow the newly installed Linux OS to boot without issue.
-		# End of documentation
-		d-i grub-installer/only_debian boolean true
-		d-i grub-installer/with_other_os boolean true
-		# --------------------------------------------------- #
-
-	EOF
-}
-
-
-
-
-
-
-
-rtd_oem_preseed_cfg_Disk_Layout ()
-{
-# Description: generates a preseed section [Partitioning] (d-i partman string)
-# Globals: $PRESEED (filename)
-# Arguments: Where to place file (directory)
-# Outputs: one preseed file section
-# Returns:
-# Usage: rtd_oem_preseed_cfg_Disk_Layout "directory"
-# End of documentation
-
-	cat >> $1/$PRESEED <<-'EOF'
-
-		# --------------------------------------------------- #
-		#   Disk layout (default encrypted disk)
-		# --------------------------------------------------- #
-		#
-		# Set option to encrypt the hard disk:
-		# By default the harddisk will be encrypted to pretect data
-		# and will need to be unlocked with a password when the
-		# system is booted. In addition a default is prefferred
-		# where the swap space is set to 200% of RAM so that
-		# hibernate can be supported.
-		# End of documentation
-
-		d-i partman-auto/method string crypto
-		d-i partman-crypto/passphrase password letmein1234
-		d-i partman-crypto/passphrase-again password letmein1234
-		d-i partman-auto-crypto/erase_disks boolean false
-		d-i partman-lvm/device_remove_lvm boolean true
-		d-i partman-lvm/device_remove_lvm_span boolean true
-		d-i partman-auto/purge_lvm_from_device boolean true
-		d-i partman-lvm/confirm boolean true
-		d-i partman-lvm/confirm_nooverwrite boolean true
-		d-i partman-auto-lvm/guided_size string max
-		d-i partman-auto-lvm/new_vg_name string crypt
-		#d-i partman-auto/choose_recipe select root-encrypted
-		d-i partman-auto/expert_recipe string                   \
-		multi-cnx ::                                            \
-			538 538 1075 free                               \
-				$primary                                \
-				$iflabel{ gpt }                         \
-				$reusemethod{ }                         \
-				method{ efi } format{ }                 \
-			.                                               \
-			3500 3500 3500 ext3                             \
-				$primary{ } $bootable{ }                \
-				method{ format } format{ }              \
-				use_filesystem{ } filesystem{ ext4 }    \
-				mountpoint{ /boot }                     \
-			.                                               \
-			200% 25000 200% linux-swap                      \
-			 	$lvmok{ } lv_name{ swap }               \
-			 	in_vg { crypt }                         \
-			 	$primary{ }                             \
-			 	method{ swap } format{ }                \
-			.                                               \
-			500 1000 1000000000 ext4                        \
-				$lvmok{ } lv_name{ root }               \
-				in_vg { crypt }                         \
-				$primary{ }                             \
-				method{ format } format{ }              \
-				use_filesystem{ } filesystem{ ext4 }    \
-				mountpoint{ / }                         \
-			.
-
-		d-i partman-md/device_remove_md boolean true
-		d-i partman-md/confirm boolean true
-		d-i partman-basicfilesystems/no_mount_point boolean false
-		d-i partman-partitioning/confirm_write_new_label boolean true
-		d-i partman/choose_partition select finish
-		d-i partman/confirm boolean true
-		d-i partman/confirm_nooverwrite boolean true
-
-		# --------------------------------------------------- #
-
-	EOF
-}
-
-
-
-
-
-
-
-
-
-rtd_oem_preseed_cfg_Package_Selection ()
-{
-# Description: generates a preseed section [Package selection] (d-i pkgsel string)
-# Globals: $PRESEED (filename)
-# Arguments: Where to place file (directory)
-# Outputs: one preseed file section
-# Returns:
-# Usage: rtd_oem_preseed_cfg_Package_Selection "directory"
-# End of documentation
-
-	cat >> $1/$PRESEED <<-EOF
-
-		# --------------------------------------------------- #
-		# Package selection
-		# --------------------------------------------------- #
-		# Packages may be selected as groups (meta packages) like kde-desktop or
-		# as individual packages. Only one "pkgsel/include" string will be used though!
-		# remembder to fit all the packages you want on one line.
-		# tasksel tasksel/first multiselect standard options:
-		# ubuntu-desktop-minimal kubuntu-desktop, ubuntu-gnome-desktop, lubuntu-desktop, ubuntu-mate-desktop
-		# desktop,  gnome-desktop, kde-desktop, cinnamon-desktop, mate-desktop,
-		# lxde-desktop, web-server, ssh-server, print-server.
-		# The "OEM" line below ist to make it simple to replace the line with a
-		# relevant chice of debian role using "sed" or similar.
-		# End of documentation
-		tasksel tasksel/first multiselect $2
-		d-i pkgsel/include string openssh-server dialog virt-what curl wget spice-vdagent git
-
-		# Valid choices for pkgsel/upgrade are: safe-upgrade full-upgrade none
-		d-i pkgsel/upgrade select safe-upgrade
-		d-i pkgsel/update-policy select unattended-upgrades
-
-		# By default, the system’s locate database will be updated after the
-		# installer has finished installing most packages. This may take a while, so
-		# if you don’t want it, you can set this to "false" to turn it off.
-		# d-i pkgsel/updatedb boolean false
-		# --------------------------------------------------- #
-
-	EOF
-}
-
-
-
-
-
-
-
-
-rtd_oem_preseed_cfg_Addon_MinecraftServer()
-{
-# Description: generates a preseed section [Addon Tasks] (late command string)
-# Globals: $PRESEED (filename)
-# Arguments: Where to place file (directory)
-# Outputs: one preseed file section
-# Returns:
-# Usage: rtd_oem_preseed_cfg_Addon_MinecraftServer "directory"
-# End of documentation
-
-	cat >> $1/$PRESEED <<-'EOF'
-
-		# --------------------------------------------------- #
-		# Addon Tasks for Minecraft Server
-		# --------------------------------------------------- #
-		# End of documentation
-		d-i preseed/late_command string \
-			in-target apt-get -y install git ; \
-			in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
-			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
-			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
-		 	cp /*.cfg /target/opt/rtd/ ; \
-			in-target mkdir -p "/etc/systemd/system/getty@tty1.service.d" ; \
-			in-target echo "[Service]" > "/etc/systemd/system/getty@tty1.service.d/override.conf" ; \
-			in-target echo "ExecStart=-/sbin/agetty --noissue --autologin tangarora "%I" "$TERM"" >> "/etc/systemd/system/getty@tty1.service.d/override.conf" ; \
-			in-target echo "Type=idle" >> "/etc/systemd/system/getty@tty1.service.d/override.conf" ; \
-			in-target echo "bash /home/tangarora/minecraft.server" >> /home/tangarora/.bashrc ; \
-			in-target wget https://github.com/vonschutter/RTD-Minecraft-Server-Manager/raw/master/minecraft-server -O /home/tangarora/minecraft.server ; \
-			in-target chmod 777 /home/tangarora/minecraft.server ; \
-			umount -l /media || echo "Empty"; \
-			eject || true; \
-			reboot; \
-			echo "------  initial Setup Complete!  ------"
-
-		# Answer the last question
-		d-i debian-installer/splash boolean true
-
-		# Option to try to greacefully eject the installation media:
-		d-i cdrom-detect/eject boolean true
-
-		# Shutdown machine
-		d-i finish-install/reboot_in_progress note
-
-		# --------------------------------------------------- #
-	EOF
-}
-
-
-
-
-
-
-
-rtd_oem_preseed_cfg_Addon_Tasks ()
-{
-# Description: generates a preseed section [Addon Tasks] (late command string)
-# Globals: $PRESEED (filename)
-# Arguments: Where to place file (directory)
-# Outputs: one preseed file section
-# Returns:
-# Usage: rtd_oem_preseed_cfg_Addon_Tasks "directory"
-# End of documentation
-
-	cat >> $1/$PRESEED <<-'EOF'
-
-		# --------------------------------------------------- #
-		# Default preseed Addon Tasks
-		# --------------------------------------------------- #
-		# for Debian to work (ignored by Ubuntu)...
-		d-i preseed/late_command string \
-			in-target apt-get -y install git ; \
-			in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
-			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
-			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
-		 	cp /*.cfg /target/opt/rtd/ ; \
-			umount -l /media || echo "Empty" ; \
-			eject || true; \
-			echo "------  initial Setup Complete!  ------"
-
-		# for Ubuntu to work (ignored by Debian)...
-		ubiquity ubiquity/success_command string \
-			in-target apt-get -y install git ; \
-			in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
-			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
-			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
-		 	cp /*.cfg /target/opt/rtd/ ; \
-			umount -l /media || echo "Empty" ; \
-			eject || true; \
-			echo "------  initial Setup Complete!  ------"
-
-		# Answer the last question
-		d-i debian-installer/splash boolean true
-
-		# Option to try to gracefully eject the installation media:
-		d-i cdrom-detect/eject boolean true
-
-		# Shutdown machine
-		d-i finish-install/reboot_in_progress note
-
-		# --------------------------------------------------- #
-
-	EOF
-}
-
-
 
 
 
@@ -10210,8 +9441,8 @@ system::generate_ks_cfg_file ()
 # Usage: system::generate_ks_cfg_file [-p <filename> ] [-u URL ] [-c workstation|ssh-server|ansible-server ]
 # End of documentation
 
-	echo "Function : ${FUNCNAME[0]}"
-	echo "Called by: ${FUNCNAME[-1]}"
+	system::log_item "Function : ${FUNCNAME[0]}"
+	system::log_item "Called by: ${FUNCNAME[-1]}"
 
 	local OPTIND o a
 	while getopts ':u:c:p:e:' OPTION; do
@@ -10558,10 +9789,21 @@ system::generate_cloudconfig (){
 # in the initial server setup for Ubuntu 14.04 guide in order to demonstrate.
 #
 # End of Documentation
-CloudConfig=$( mktemp -d /tmp/CloudConfig.XXXXXX ) 
-touch ${CloudConfig}/meta-data
 
-cat >> ${CloudConfig}/user-data << CloudConfig0
+	# Localized variables based on User preferences, but with speciffic defaults should all fail:
+	Preference_DiskEncryption="$( [[ "$_EncryptDisk" == "YES" ]] && echo "${PreferredDiskPassword:-"letmein1234"}" )"
+	Preference_Password=$( [[ -n "${PrefferredUserPassword}" ]] && echo "${PrefferredUserPassword}" || echo '$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1' )
+	Preference_InitialUser="${_OEM_USER:-"tangarora"}"
+
+	CloudConfig=$( mktemp -d /tmp/CloudConfig.XXXXXX ) 
+	touch ${CloudConfig}/meta-data
+
+# -----------------------------------------------------------------------------------------
+# add common section to the cloud config file
+# -----------------------------------------------------------------------------------------
+
+
+cat >> ${CloudConfig}/user-data << CloudConfigCommon
 #cloud-config
 autoinstall:
   version: 1
@@ -10571,14 +9813,6 @@ autoinstall:
         - uri: http://mymirror.local/repository/Apt/ubuntu/
         - country-mirror
         - uri: http://archive.ubuntu.com/ubuntu
-  packages:
-    - git
-    - wget
-    - dialog
-  snaps:
-    - name: nvim
-      channel: latest/stable
-      classic: true
   shutdown: reboot
   timezone: geoip
   drivers:
@@ -10588,8 +9822,159 @@ autoinstall:
     install-server: true
     authorized-keys:
       - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDaHrQkReAZYQrf4LGGL9O7M5jV/ckR7XCVq/TJFHSvnV8l7RiT0MmXAHNcDxbdkERicv8Yc0OSz2cLeJtHaBoh7gW1y5h2pDKDKuY9NUkkvl6AaWHWdqPY76I7iRmMSYCXJ9qUGkI/XPyihQUP+h7sTYY+zXJyigi8BECJRaEKB5CPUsw7VFFUOewmQ5Dn6qIrpBSwyFWjI9Qs+1EdlXZ+VwyfToPL9JrhCYimqqWC5c15pt9KfYIRJYALezKgcIsjOUcGcfR3Hg/3Ul/3695rmLYFWsRF1xHy+3+PfhdQZVfBXOorBcsXnEVsJBEsPH/ZQJdYWkP/C79P4KdoUXUq0ghmDiazM/y9iggEcZNoT8qY0dWqItITVhFM6JMIUuJoAWaYUgaw3a4EAEL2+OJ8Go+iipinP9VAXQ+vVbZcHXU5xE/l965SfaXCf0MngwhzvpHtijLc54O/z6VP2ArPTAOzBKnGqEYUA/wt8LzAQTwsbYiQshYQrnE8A5z8Vkk=
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACZQDMbsjrigCpMbWRXdssBe0dg7nJZzXzlEN+GHNg1vJH6W1lrLYhlXyQtflF/tUylFfYVNakRvC/KZ5qdl4Zbkb7OQ1A+AyT/Ln54zvilZSp3x+NsUgqPbWDmopzNrTxZyT3btZQG7Rz0hn7Pq0eA6ViIwldQkwwyl5QQg3NkYaE9Vwdz6upXUJsAHUCEDW0ygHggLSUYeA5HMuNgaBrrwLaEptlasYwFyghov+jJoO/EERFLmdfDdF8A6q44iZ2jY5BXeASdnZ0kqPj/sYkmHNcV1bh4e86lp77YDuxBPPeoj9hWpPWvxgPIMT0gvfw8PWgaQNC++kyRGEF6q6eij3MLWXGBrTngu7qSTjQSg5B8UKwcEXGc7cpzW+oT0qYx8hnDCLfESbbn/fZawMFS/uTqV3/VqyknKe8S8tgdyOFNy74IIAkx+pVm5jrlC0gTaNehgH4XWasYZo+Ab8eiJpSCtkTk/1QvmSOczVrRKhkn5gy7t4reMfn7P2RR43JkuaGNx8J9wp7K+H5VRPi/JCMfT0dTy3evQSK59/gOI6J69+zi5mfjMZK/UY7wd6cuAbjH/edilm8ciexkyCtLuDE8dh3Rw/oeerA2HZJs8JulKjEE83B2r1kv2pneV7oIZ3+hI+UZFC1Qg2Gw6OFEjO876VQWAI5aDDQFUiMIhNerEWjULEvPtLZENz0zUGV3UxMHryVAyvlNfu8q6TeRZ+9uwuHpfnIZvlpYifGSQCX3lkYIHC/5h0eMsW1Wxg3YQCBHKf7ycMyiEw2QcjvsEsiS/gV4ZDYlmh74upFlOhmpe13Nds=
+  keyboard:
+    layout: se
+CloudConfigCommon
+
+# Add identity section
+cat >> ${CloudConfig}/user-data << CloudConfigID
+  identity:
+    hostname: "${vm_name}"
+    username: "${Preference_InitialUser}"
+    password: "${Preference_Password}"
+CloudConfigID
+
+# -----------------------------------------------------------------------------------------
+# end common section to the cloud config file
+# -----------------------------------------------------------------------------------------
+
+
+
+if [[ ${_role} == "server" ]] ; then
+	system::log_item "Generating cloud-config for Ubuntu server media..."
+
+
+
+	case ${_task} in
+	# -----------------------------------------------------------------------------------------
+	ubuntu-desktop )
+	system::log_item "Generating cloud-config for the role: ubuntu-desktop"
+	# -----------------------------------------------------------------------------------------
+
+cat >> ${CloudConfig}/user-data << CloudConfig_server-desktop
+  snaps:
+    - name: nvim
+      channel: latest/stable
+      classic: true
+  packages:
+    - dialog
+    - git
+    - curl
+    - wget
+    - zip
+    - ubuntu-desktop
   late-commands:
-    - echo ******************* Custom cmd ***************************
+    - >-
+      curtin in-target --
+      sed -i /etc/default/grub -e
+      's/GRUB_CMDLINE_LINUX_DEFAULT=".*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/'
+    - curtin in-target -- update-grub
+    - rm /target/etc/netplan/00-installer-config*yaml
+    - >-
+      printf "network:\n  version: 2\n  renderer: NetworkManager" 
+      > /target/etc/netplan/01-network-manager-all.yaml
+    - mkdir /target/opt/rtd
+    - git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /target/opt/rtd
+    - /usr/bin/chmod 755 /target/opt/rtd/core/rtd*
+    - curtin in-target --target=/target -- /opt/rtd/core/rtd-oem-enable-config.sh
+    - mkdir /target/etc/rtd
+    - cp /autoinstall.yaml /target/etc/rtd/
+CloudConfig_server-desktop
+	;;
+
+	# -----------------------------------------------------------------------------------------
+	kubuntu-desktop )
+	system::log_item "Generating cloud-config for the role: kubuntu-desktop"
+	# -----------------------------------------------------------------------------------------
+cat >> ${CloudConfig}/user-data << CloudConfig_server-desktop
+  snaps:
+    - name: nvim
+      channel: latest/stable
+      classic: true
+  packages:
+    - dialog
+    - git
+    - curl
+    - wget
+    - zip
+    - kubuntu-desktop
+  late-commands:
+    - >-
+      curtin in-target --
+      sed -i /etc/default/grub -e
+      's/GRUB_CMDLINE_LINUX_DEFAULT=".*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/'
+    - curtin in-target -- update-grub
+    - rm /target/etc/netplan/00-installer-config*yaml
+    - >-
+      printf "network:\n  version: 2\n  renderer: NetworkManager" 
+      > /target/etc/netplan/01-network-manager-all.yaml
+    - mkdir /target/opt/rtd
+    - git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /target/opt/rtd
+    - /usr/bin/chmod 755 /target/opt/rtd/core/rtd*
+    - curtin in-target --target=/target -- /opt/rtd/core/rtd-oem-enable-config.sh
+    - mkdir /target/etc/rtd
+    - cp /autoinstall.yaml /target/etc/rtd/
+CloudConfig_server-desktop
+	;;
+	# -----------------------------------------------------------------------------------------
+	ubuntu-server )
+	system::log_item "Generating cloud-config for ubuntu-server"
+	# -----------------------------------------------------------------------------------------
+cat >> ${CloudConfig}/user-data << CloudConfig_ubuntu-server
+  packages:
+    - dialog
+    - git
+    - curl
+    - wget
+    - zip
+    - p7zip-full
+  late-commands:
+    - echo ******************* Ubuntu Server Generic Config ***********
+    - mkdir /target/opt/rtd
+    - git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /target/opt/rtd
+    - /usr/bin/chmod 755 /target/opt/rtd/core/rtd*
+    - curtin in-target --target=/target -- /opt/rtd/core/rtd-oem-enable-config.sh
+    - mkdir /target/etc/rtd
+    - cp /autoinstall.yaml /target/etc/rtd/
+CloudConfig_ubuntu-server
+	;;
+	# -----------------------------------------------------------------------------------------
+	ssh-server )
+	system::log_item "Generating cloud-config for ubuntu-ssh-server"
+	# -----------------------------------------------------------------------------------------
+cat >> ${CloudConfig}/user-data << CloudConfig_ssh-server
+  packages:
+    - dialog
+    - git
+    - curl
+    - wget
+    - zip
+    - p7zip-full
+    - ansible
+    - byobu
+  late-commands:
+    - echo ******************* SSH Server Config ********************
+    - mkdir /target/opt/rtd
+    - git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /target/opt/rtd
+    - /usr/bin/chmod 755 /target/opt/rtd/core/rtd*
+    - curtin in-target --target=/target -- /opt/rtd/core/rtd-oem-enable-config.sh
+    - mkdir /target/etc/rtd
+    - cp /autoinstall.yaml /target/etc/rtd/
+CloudConfig_ssh-server
+	;;
+	# -----------------------------------------------------------------------------------------
+	minecraft-server )
+	system::log_item "Generating cloud-config for minecraft-server"
+	# -----------------------------------------------------------------------------------------
+cat >> ${CloudConfig}/user-data << CloudConfig_minecraft-server
+  packages:
+    - dialog
+    - git
+    - wget
+    - ansible
+  late-commands:
+    - echo ******************* Minecraft Server Config ***************
     - mkdir /target/opt/rtd
     - git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /target/opt/rtd
     - /usr/bin/chmod 755 /target/opt/rtd/core/rtd*
@@ -10603,25 +9988,458 @@ autoinstall:
     - echo 'ExecStart=-/sbin/agetty --noissue --autologin tangarora %I \$TERM' >> /target/etc/systemd/system/getty@tty1.service.d/override.conf
     - echo Type=idle >> /target/etc/systemd/system/getty@tty1.service.d/override.conf
     - echo NAutoVTs=1 >> /etc/systemd/logind.conf
-    - echo ******************* Custom cmd complete ******************
-  keyboard:
-    layout: se
-  identity:
-    hostname: "${vm_name}"
-    username: tangarora
-CloudConfig0
+    - echo "Please run rtd-minecraft-server to start the Minecraft Server!" >> /target/etc/update-motd.d/00-header
+    - echo rtd-minecraft-server >> /target/etc/profile
+CloudConfig_minecraft-server
+	;;
 
-cat >> ${CloudConfig}/user-data << 'CloudConfig1'
-    password: $6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1
-CloudConfig1
+	# -----------------------------------------------------------------------------------------
+	* )
+		system::log_item "Got: (${_task}) No valid task selected, skipping late commands..."
+	;;
+	esac
+	# -----------------------------------------------------------------------------------------
+elif [[ ${_role} == "desktop" ]] ; then
+	system::log_item "Generating cloud-config for Ubuntu desktop media..."
 
-write_information "Generate Ubuntu autoinstall instruction media..."
-genisoimage -output ${CloudConfig}/cidata.iso -volid cidata -joliet -rock ${CloudConfig}/user-data ${CloudConfig}/meta-data
+else
+	system::log_item "Got: (${_role}) No valid role selected, no role speciffic instructions will be created..."
+fi
 
 
-chmod 777 -R ${CloudConfig}
+
+
+	system::log_item "Configuration data supplied: 
+	$(cat ${CloudConfig}/user-data)"
+	write_information "Generate Ubuntu autoinstall instruction media: "
+	#software::check_native_package_dependency genisoimage
+	genisoimage -output ${CloudConfig}/cidata.iso -volid cidata -joliet -rock ${CloudConfig}/user-data ${CloudConfig}/meta-data  &>>${LOGFILE}
+	chmod 777 -R ${CloudConfig}
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+system::make_preseed_cfg ()
+{
+# Description: Function to write out a debina preeseed file to a location requested by the first parameter.
+# Other parameters accepted are CONFIG (multiselect de), SRVFUNC (task "Minecraft" "Tasks")
+# some parameters have defaults.
+# Globals:
+# Arguments: [-p <path> ] [-r server|desktop|minecraft ] [-t gnome-desktop|kde-desktop|xfce-desktop|mate-desktop|cinnamon-desktop ]
+# Outputs: /path/to/preseed.cfg
+# Returns:
+# Usage: system::make_preseed_cfg -r "${_role}" -p "$( mktemp -d)" -t ${_task}
+# Example:
+# 
+# system::make_preseed_cfg -r "${_role}" -p "$( mktemp -d)" -t ${_task}
+#
+# To install a basic server: 
+# system::make_preseed_cfg -r "default" -p "$( mktemp -d)" -t ssh-server
+#
+# To install a basic ansible server:
+# system::make_preseed_cfg -r "default" -p "$( mktemp -d)" -t ansible-server
+#
+# To autoinstall a basic minecraft server:
+# system::make_preseed_cfg -r "minecraft-server" -p "$( mktemp -d)" -t ssh-server
+# 
+# To autoinstall a basic desktop with gnome:
+# system::make_preseed_cfg -r "default" -p "$( mktemp -d)" -t gnome-desktop
+# 
+# End of documentation
+	system::log_item "Function : ${FUNCNAME[0]}"
+	system::log_item "Called by: ${FUNCNAME[-1]}"
+
+	local OPTIND o a
+	while getopts ':r:p:t:' OPTION; do
+		case "$OPTION" in
+		r )
+			local _role="${OPTARG}"
+			system::log_item "Using Config for: ${_role}"
+		;;
+		p )
+			local _saveto="${OPTARG}"
+			system::log_item  "Saving configuration instructions to: ${_saveto}"
+		;;
+		t )
+			local _task="${OPTARG}"
+			system::log_item "Received optioinal option: ${_task}"
+		;;
+		? )
+			write_error "Usage: $(FUNCNAME[0]) [-p <path> ] [-r server|desktop|minecraft ] [-t gnome-desktop | kde-desktop | ...-desktop | xfce-desktop | mate-desktop | cinnamon-desktop ]"
+			return 1
+		;;
+		esac
+	done
+	unset OPTIND
+
+	local SAVETO=${_saveto}				# Where to save the preseed file
+	local ROLE=${_role:=default}                 	# selects d-i preseed/late_command actions based on role.
+	local TASK=${_task:=ssh-server}			# Package selection: What DE to install, or ssh-server
+	export PRESEED_FILE="$SAVETO/preseed.cfg"	# The name of the preseed file to be created
+	export TASK_FILE="$SAVETO/task.sh"		# The name of the task file to be created (if needed)
+
+	touch "${PRESEED_FILE}"
+
+	# Localized variables based on User preferences, but with speciffic defaults should all fail:
+	local Preference_DiskEncryption="$( [[ "$_EncryptDisk" == "YES" ]] && echo "${PreferredDiskPassword:-"letmein1234"}" )"
+	local Preference_Password=$( [[ -n "${PrefferredUserPassword}" ]] && echo "${PrefferredUserPassword}" || echo '$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1' )
+	local Preference_InitialUser="${_OEM_USER:-"tangarora"}"
+	local Preference_InitialUserFullName="${_OEM_USER_FULLNAME:-"RTD User"}"
+	local Preference_InitialUserGroup="${_OEM_USER_GROUP:-"sudo"}"
+	local Preference_InitialUserPassword="${_OEM_USER_PASSWORD:-"letmein1234"}"
+	local Preference_InitialUserPasswordEncrypted=$( [[ -n "${_OEM_USER_PASSWORD}" ]] && echo '$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1' || echo '$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1' )
+	local Preference_InitialKeyboardLayout="${_OEM_USER_KEYBOARD_LAYOUT:-"us"}"
+	local Preference_InitialTimeZone="${_OEM_USER_TIMEZONE:-"Etc/UTC"}"
+
+	# Write out configurable protions of the preseed file:
+	cat >> ${PRESEED_FILE} <<-EOF
+		# --------------------------------------------------- #
+		# Unattended Installation
+		# --------------------------------------------------- #
+		d-i auto-install/enable boolean true
+		d-i debconf/priority select critical
+		# --------------------------------------------------- #
+
+
+		# --------------------------------------------------- #
+		# Network configuration
+		# --------------------------------------------------- #
+		# Network setup. This can be a static setup or dhcp.
+		# The RTD default prefferred config is to rely on DHCP,
+		# and for wireless networks (systems with only wireless cards)
+		# default to an SSID named "loader" and the guest wpa string
+		# "letmein1234". This allows supported systems to be
+		# installed directly over WiFi with no user input.
+		d-i netcfg/choose_interface select manual
+		d-i netcfg/hostname string RTD-Client
+		d-i netcfg/get_hostname string unassigned-hostname
+		d-i netcfg/get_domain string unassigned-domain
+		d-i hw-detect/load_firmware boolean true
+
+		# We want the preconfiguration file to work on systems both with and
+		# without sucessful dhcp configuration
+		d-i netcfg/dhcp_failed note
+		d-i netcfg/dhcp_options select Configure network manually
+		# d-i netcfg/dhcp_timeout string 60
+
+		d-i netcfg/wireless_show_essids select manual
+		d-i netcfg/wireless_essid string loader
+		d-i netcfg/wireless_essid_again string loader
+		d-i netcfg/wireless_security_type select wpa
+		d-i netcfg/wireless_wpa string ${Preference_InitialUserPassword}
+
+		# --------------------------------------------------- #
+
+
+		# --------------------------------------------------- #
+		# Account setup (temporary user account)
+		# --------------------------------------------------- #
+		# Setup an initial user and disable root login by default.
+		# root login may be re-enabled later by setting a root password.
+		# An encrypted password is set here, and should be changed
+		# ASAP after the system is built. Preferebly connect to LDAP/AD
+		# in a managed environment.
+		d-i passwd/root-login boolean false
+		d-i passwd/user-fullname string RTD User
+		d-i passwd/username string ${Preference_InitialUser}
+		d-i passwd/user-password seen true
+		d-i user-setup/allow-password-weak boolean true
+		d-i passwd/user-password-crypted password ${Preference_Password}
+		d-i passwd/auto-login boolean true
+
+		# --------------------------------------------------- #
+
+		# --------------------------------------------------- #
+		# Localization
+		# --------------------------------------------------- #
+		# Provide localizaton preferences so that the prefferred
+		# language is used for display and formats. Comparable to
+		# the MUI in Microsoft environments.
+		d-i debian-installer/locale string en_US.UTF-8
+		d-i localechooser/supported-locales multiselect en_US.UTF-8, se_SE.UTF-8
+		d-i console-setup/ask_detect boolean false
+
+		# --------------------------------------------------- #
+
+
+		# --------------------------------------------------- #
+		# Set Keyboard layout
+		# --------------------------------------------------- #
+		# Set the prefferred keyboard layout. Keyboards will work
+		# regardless, but the letters and symbols may not actually
+		# be the ones drawn on the keys. Default is us.
+		d-i keyboard-configuration/xkb-keymap select ${Preference_InitialKeyboardLayout}
+		d-i keyboard-configuration/layoutcode string ${Preference_InitialKeyboardLayout}
+		d-i debian-installer/keymap select ${Preference_InitialKeyboardLayout}
+		d-i keymap select ${Preference_InitialKeyboardLayout}
+		d-i console-setup/layoutcode string ${Preference_InitialKeyboardLayout}
+		d-i console-setup/ask_detect boolean false
+
+		# --------------------------------------------------- #
+
+
+		# --------------------------------------------------- #
+		# Clock and time zone setup
+		# --------------------------------------------------- #
+		d-i clock-setup/utc boolean true
+		d-i time/zone string ${Preference_InitialTimeZone}
+		d-i clock-setup/ntp boolean true
+		d-i clock-setup/ntp-server string ntp.ubuntu.com
+
+		# --------------------------------------------------- #
+
+		# --------------------------------------------------- #
+		# GRUB bootloader installation
+		# --------------------------------------------------- #
+		#
+		# Tell the grub-installer to install to the MBR even if it also finds some other
+		# OS, which is more likely to allow the newly installed Linux OS to boot without issue.
+		d-i grub-installer/only_debian boolean true
+		d-i grub-installer/with_other_os boolean true
+		# --------------------------------------------------- #
+
+		# --------------------------------------------------- #
+		# EFI
+		# --------------------------------------------------- #
+		#
+		# The EFI (Extensible Firmware Interface) system partition is a partition on a data storage device.
+		# UEFI provides backward compatibility with legacy systems by reserving the first block (sector) of
+		# the partition for compatibility code, effectively creating a legacy boot sector. On legacy BIOS-based
+		# systems, the first sector of a partition is loaded into memory and execution is transferred to this code.
+		# Here we tell setup to install EFI boot setup if possible so that both NEW and old systems may be handled
+		# and the installed system can be started.
+		d-i partman-efi/non_efi_system boolean true
+		# --------------------------------------------------- #
+
+		# --------------------------------------------------- #
+		# Package selection
+		# --------------------------------------------------- #
+		# Packages may be selected as groups (meta packages) like kde-desktop or
+		# as individual packages. Only one "pkgsel/include" string will be used though!
+		# remembder to fit all the packages you want on one line.
+		# tasksel tasksel/first multiselect standard options:
+		# ubuntu-desktop-minimal kubuntu-desktop, ubuntu-gnome-desktop, lubuntu-desktop, ubuntu-mate-desktop
+		# desktop,  gnome-desktop, kde-desktop, cinnamon-desktop, mate-desktop,
+		# lxde-desktop, web-server, ssh-server, print-server.
+		# The "OEM" line below ist to make it simple to replace the line with a
+		# relevant chice of debian role using "sed" or similar.
+		tasksel tasksel/first multiselect ${TASK}
+		d-i pkgsel/include string openssh-server dialog virt-what curl wget spice-vdagent git
+
+		# Valid choices for pkgsel/upgrade are: safe-upgrade full-upgrade none
+		d-i pkgsel/upgrade select safe-upgrade
+		d-i pkgsel/update-policy select unattended-upgrades
+
+		# By default, the system’s locate database will be updated after the
+		# installer has finished installing most packages. This may take a while, so
+		# if you don’t want it, you can set this to "false" to turn it off.
+		# d-i pkgsel/updatedb boolean false
+		# --------------------------------------------------- #
+
+	EOF
+
+
+
+	# Write out the rest of the preseed file with inconvenient characters escaped by '':
+	cat >> ${PRESEED_FILE} <<-'EOF'
+
+		# --------------------------------------------------- #
+		# Do NOT install on the USB stick(!)
+		# --------------------------------------------------- #
+		#
+		# The Debian installer will install on the first disk it finds which can
+		# sometimes be the USB stick itself. Work around this by rolling our own auto
+		# detect logic which disallows installing on USB devices.
+		#
+		# d-i partman/early_command string [ "$(ls -A /tmp)" ] && umount -l /media || echo "Empty" ;
+		d-i partman/early_command string \
+			USBDEV=$(mount | grep hd-media | cut -d" " -f1 | sed "s/\(.*\)./\1/");\
+			BOOTDEV=$(list-devices disk | grep -v \$USBDEV | head -1);\
+			debconf-set partman-auto/disk $BOOTDEV;\
+			debconf-set grub-installer/bootdev $BOOTDEV;
+
+		# --------------------------------------------------- #
+
+	EOF
+
+	cat >> ${PRESEED_FILE} <<-'EOF'
+
+		# --------------------------------------------------- #
+		#   Disk layout (default encrypted disk)
+		# --------------------------------------------------- #
+		#
+		# Set option to encrypt the hard disk:
+		# By default the harddisk will be encrypted to pretect data
+		# and will need to be unlocked with a password when the
+		# system is booted. In addition a default is prefferred
+		# where the swap space is set to 200% of RAM so that
+		# hibernate can be supported.
+
+		d-i partman-auto/method string crypto
+		d-i partman-crypto/passphrase password letmein1234
+		d-i partman-crypto/passphrase-again password letmein1234
+		d-i partman-auto-crypto/erase_disks boolean false
+		d-i partman-lvm/device_remove_lvm boolean true
+		d-i partman-lvm/device_remove_lvm_span boolean true
+		d-i partman-auto/purge_lvm_from_device boolean true
+		d-i partman-lvm/confirm boolean true
+		d-i partman-lvm/confirm_nooverwrite boolean true
+		d-i partman-auto-lvm/guided_size string max
+		d-i partman-auto-lvm/new_vg_name string crypt
+		#d-i partman-auto/choose_recipe select root-encrypted
+		d-i partman-auto/expert_recipe string                   \
+		multi-cnx ::                                            \
+			538 538 1075 free                               \
+				$primary                                \
+				$iflabel{ gpt }                         \
+				$reusemethod{ }                         \
+				method{ efi } format{ }                 \
+			.                                               \
+			3500 3500 3500 ext3                             \
+				$primary{ } $bootable{ }                \
+				method{ format } format{ }              \
+				use_filesystem{ } filesystem{ ext4 }    \
+				mountpoint{ /boot }                     \
+			.                                               \
+			200% 25000 200% linux-swap                      \
+			 	$lvmok{ } lv_name{ swap }               \
+			 	in_vg { crypt }                         \
+			 	$primary{ }                             \
+			 	method{ swap } format{ }                \
+			.                                               \
+			500 1000 1000000000 ext4                        \
+				$lvmok{ } lv_name{ root }               \
+				in_vg { crypt }                         \
+				$primary{ }                             \
+				method{ format } format{ }              \
+				use_filesystem{ } filesystem{ ext4 }    \
+				mountpoint{ / }                         \
+			.
+
+		d-i partman-md/device_remove_md boolean true
+		d-i partman-md/confirm boolean true
+		d-i partman-basicfilesystems/no_mount_point boolean false
+		d-i partman-partitioning/confirm_write_new_label boolean true
+		d-i partman/choose_partition select finish
+		d-i partman/confirm boolean true
+		d-i partman/confirm_nooverwrite boolean true
+
+		# --------------------------------------------------- #
+
+	EOF
+ 
+
+
+	# write out conditionsl elements of the preseed file:
+	case $ROLE in
+
+		minecraft-server | minecraft )
+			cat >> ${PRESEED_FILE} <<-'EOF'
+			# --------------------------------------------------- #
+			# Addon Tasks for Minecraft Server
+			# --------------------------------------------------- #
+			d-i preseed/late_command string \
+				in-target apt-get -y install git ; \
+				in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
+				in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
+				in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
+				cp /*.cfg /target/opt/rtd/ ; \
+				in-target mkdir -p "/etc/systemd/system/getty@tty1.service.d" ; \
+				in-target echo "[Service]" > "/etc/systemd/system/getty@tty1.service.d/override.conf" ; \
+				in-target echo "ExecStart=-/sbin/agetty --noissue --autologin tangarora "%I" "$TERM"" >> "/etc/systemd/system/getty@tty1.service.d/override.conf" ; \
+				in-target echo "Type=idle" >> "/etc/systemd/system/getty@tty1.service.d/override.conf" ; \
+				in-target echo "bash /home/tangarora/minecraft.server" >> /home/tangarora/.bashrc ; \
+				in-target wget https://github.com/vonschutter/RTD-Minecraft-Server-Manager/raw/master/minecraft-server -O /home/tangarora/minecraft.server ; \
+				in-target chmod 777 /home/tangarora/minecraft.server ; \
+				umount -l /media || echo "Empty"; \
+				eject || true; \
+				reboot; \
+				echo "------  initial Setup Complete!  ------"
+
+			# Answer the last question
+			d-i debian-installer/splash boolean true
+
+			# Option to try to greacefully eject the installation media:
+			d-i cdrom-detect/eject boolean true
+
+			# Shutdown machine
+			d-i finish-install/reboot_in_progress note
+
+			# --------------------------------------------------- #
+		EOF
+		;;
+		* )
+			cat >> ${PRESEED_FILE} <<-'EOF'
+
+			# --------------------------------------------------- #
+			# Default preseed Addon Tasks
+			# --------------------------------------------------- #
+			# for Debian to work (ignored by Ubuntu)...
+			d-i preseed/late_command string \
+				in-target apt-get -y install git ; \
+				in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
+				in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
+				in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
+				cp /*.cfg /target/opt/rtd/ ; \
+				umount -l /media || echo "Empty" ; \
+				eject || true; \
+				echo "------  initial Setup Complete!  ------"
+
+			# for Ubuntu to work (ignored by Debian)...
+			ubiquity ubiquity/success_command string \
+				in-target apt-get -y install git ; \
+				in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
+				in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
+				in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
+				cp /*.cfg /target/opt/rtd/ ; \
+				umount -l /media || echo "Empty" ; \
+				eject || true; \
+				echo "------  initial Setup Complete!  ------"
+
+			# Answer the last question
+			d-i debian-installer/splash boolean true
+
+			# Option to try to gracefully eject the installation media:
+			d-i cdrom-detect/eject boolean true
+
+			# Shutdown machine
+			d-i finish-install/reboot_in_progress note
+
+			# --------------------------------------------------- #
+		EOF
+		;;
+	esac
+
+	rtd_oem_preseed_ubuntu_cfg_KS_CFG_Options ${SAVETO}
+	system::log_item "Preseed file created: ${PRESEED_FILE}
+	Containging DATA:
+	$(cat ${PRESEED_FILE})"
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -11316,6 +11134,17 @@ set_colors
 # Find and load all dependant files... 
 for i in ${_OEM_DEPENDENCIES} ; do dependency::file ${i} &>/dev/null ; done
 
+# if [[ -n "${LOGFILE}" ]] ; then
+# 	system::log_item "🧩 💻 ********************************************************************************"
+# 	system::log_item _LOGFILE="${LOGFILE}"
+# else
+# 	if [[ -n ${_LOG_DIR} ]] ; then
+# 		_LOGFILE="${_LOG_DIR}/${0}.log"
+# 	else
+# 		_LOGFILE="/var/log/${0}.log"
+# 	fi
+# 	_LOGFILE="/dev/null"
+# fi
 
 if [ -z $1 ]; then
 	echo "RTD Power Library $RTD_VERSION OK"
