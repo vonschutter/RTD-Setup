@@ -29,7 +29,7 @@ export RTD_VERSION=2.01
 	Function Name: 					Description:
 	----------------------------------------------------------------------------------------------------------------
 	add_gnome3_favorite_app				; Adds a new favorite app to the gnome favorites bar
-	term::animate_while_command               ; Display terminal output during a silent task execution
+	term::animate_while_command                     ; Display terminal output during a silent task execution
 	term::start_animation                           ; Start simple animation to let user know a silent action is currently executing
 	term::stop_animation                            ; Stop simple animation to let user know a silent action is done executing
 	software::add_software_task 			; Wrapper function to execute a command and display pretty terminal OK or FAIL
@@ -4082,9 +4082,9 @@ system::process_vm_opt_args ()
 # Function to evaluate input fiven to a VM build finction and set configuration override variables. 
 #
 # Globals:
-# Arguments: None
+# Arguments: No[-c <#CPU>, -m <MB RAM>, -d <GB Disk>, -r <server|desktop>, -t <task>]ne
 # Outputs:
-# Returns:
+# Returns: variables; _cpu _mem _dsk _task _role 
 # Usage:
 #
 # system::process_vm_opt_args [-c <#CPU>, -m <MB RAM>, -d <GB Disk>, -r <server|desktop>, -t <task>]
@@ -7846,16 +7846,21 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 # Omitting any of the arguments will us the default instead.
 #
 # Globals:
-# Arguments: None
+# Arguments: [-c <#CPU>, -m <MB RAM>, -d <GB Disk>, -r <server|desktop>, -t <task>]
 # Outputs:
 # Returns:
 # Usage: kvm::make_vm_template_now_from_ubuntu_com (optional arguments)
 #
 # Example:	(may be set otherwise defaults are used)
-#                vmtype    CPU  RAM   DISK
-# kvm::make_vm_template_now_from_ubuntu_com 
+#               
+# kvm::make_vm_template_now_from_ubuntu_com [-c <#CPU>, -m <MB RAM>, -d <GB Disk>, -r <server|desktop>, -t <task>]
 #
-# If complete flexibility is needed simply use the virt-install binary and directly write the arguments.
+# If complete flexibility is needed simply use the virt-install binary and directly write the arguments.However
+# this function is designed to make it easier to create a VM template by using the defaults and only changing
+# the arguments that are needed.For example, if you want to create a VM template for a Ubuntu 20.04 desktop
+# with 4 CPUs, 8GB of RAM and 100GB of disk space you would use the following command:
+# kvm::make_vm_template_now_from_ubuntu_com -c 4 -m 8192 -d 100 -r desktop -t ubuntu-desktop
+#
 # Alternatively; edit the function with new defaults that suit the needs.
 # End of Documentation
 
@@ -9791,11 +9796,12 @@ system::generate_cloudconfig (){
 # End of Documentation
 
 	# Localized variables based on User preferences, but with speciffic defaults should all fail:
-	Preference_DiskEncryption="$( [[ "$_EncryptDisk" == "YES" ]] && echo "${PreferredDiskPassword:-"letmein1234"}" )"
-	Preference_Password=$( [[ -n "${PrefferredUserPassword}" ]] && echo "${PrefferredUserPassword}" || echo '$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1' )
-	Preference_InitialUser="${_OEM_USER:-"tangarora"}"
+	local Preference_DiskEncryption="$( [[ "$_EncryptDisk" == "YES" ]] && echo "${PreferredDiskPassword:-"letmein1234"}" )"
+	local Preference_Password=$( [[ -n "${PrefferredUserPassword}" ]] && echo "${PrefferredUserPassword}" || echo '$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1' )
+	local Preference_InitialUser="${_OEM_USER:="tangarora"}"
 
-	CloudConfig=$( mktemp -d /tmp/CloudConfig.XXXXXX ) 
+	CloudConfig=$( mktemp -d /tmp/CloudConfig.XXXXXX )
+	local _git_src_url="${GIT_RTD_SRC_URL:="https://github.com/${GIT_Profile:=vonschutter}/${_TLA^^}-Setup.git"}"
 	touch ${CloudConfig}/meta-data
 
 # -----------------------------------------------------------------------------------------
@@ -9875,7 +9881,7 @@ cat >> ${CloudConfig}/user-data << CloudConfig_server-desktop
       printf "network:\n  version: 2\n  renderer: NetworkManager" 
       > /target/etc/netplan/01-network-manager-all.yaml
     - mkdir /target/opt/rtd
-    - git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /target/opt/rtd
+    - git clone --depth=1 ${_git_src_url} /target/opt/rtd
     - /usr/bin/chmod 755 /target/opt/rtd/core/rtd*
     - curtin in-target --target=/target -- /opt/rtd/core/rtd-oem-enable-config.sh
     - mkdir /target/etc/rtd
@@ -9918,7 +9924,7 @@ cat >> ${CloudConfig}/user-data << CloudConfig_server-desktop
 CloudConfig_server-desktop
 	;;
 	# -----------------------------------------------------------------------------------------
-	ubuntu-server )
+	ubuntu-server | ubuntu-server-minimal )
 	system::log_item "Generating cloud-config for ubuntu-server"
 	# -----------------------------------------------------------------------------------------
 cat >> ${CloudConfig}/user-data << CloudConfig_ubuntu-server
@@ -9928,7 +9934,6 @@ cat >> ${CloudConfig}/user-data << CloudConfig_ubuntu-server
     - curl
     - wget
     - zip
-    - p7zip-full
   late-commands:
     - echo ******************* Ubuntu Server Generic Config ***********
     - mkdir /target/opt/rtd
@@ -9941,6 +9946,28 @@ CloudConfig_ubuntu-server
 	;;
 	# -----------------------------------------------------------------------------------------
 	ssh-server )
+	system::log_item "Generating cloud-config for ubuntu-ssh-server"
+	# -----------------------------------------------------------------------------------------
+cat >> ${CloudConfig}/user-data << CloudConfig_ssh-server
+  packages:
+    - dialog
+    - git
+    - curl
+    - wget
+    - zip
+    - p7zip-full
+    - byobu
+  late-commands:
+    - echo ******************* SSH Server Config ********************
+    - mkdir /target/opt/rtd
+    - git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /target/opt/rtd
+    - /usr/bin/chmod 755 /target/opt/rtd/core/rtd*
+    - curtin in-target --target=/target -- /opt/rtd/core/rtd-oem-enable-config.sh
+    - mkdir /target/etc/rtd
+    - cp /autoinstall.yaml /target/etc/rtd/
+CloudConfig_ssh-server
+	;;
+	ansible-server )
 	system::log_item "Generating cloud-config for ubuntu-ssh-server"
 	# -----------------------------------------------------------------------------------------
 cat >> ${CloudConfig}/user-data << CloudConfig_ssh-server
