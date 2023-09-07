@@ -1,5 +1,6 @@
 #!/bin/bash
-RTD_UPDATE_SELF_VERSION=1.0
+VERSION=1.01
+PUBLICATION="$(basename "$0") | OEM Power Tools Updater          Version: ${VERSION}    $(hostnamectl |grep Operating) on $(hostnamectl |grep "Hardware Model")"
 GIT_Profile=${GIT_Profile:-vonschutter}
 #::
 #::
@@ -119,7 +120,7 @@ dependency::file ()
 
 system::perform_powertools_update_linux ()
 {
-	cmd=(dialog --backtitle "$( basename $0 )" --title "$_tla^^ PowerTools Updater" --separate-output --checklist "Please select what to include in the update below:" 22 85 16 )
+	cmd=(dialog --backtitle "${PUBLICATION}" --title "${_tla^^} PowerTools Updater" --separate-output --checklist "Please select what to include in the update below:" 22 85 16 )
 	options=(1 "Update Base RTD Powertools" on
 		2 "Update menu shortcuts" on
 		3 "Update Themes (wallpapers, icons, themes, fonts etc.)" $( if [[ -e "${_theme_dir}" ]]; then echo on ; else echo off ; fi )
@@ -175,7 +176,7 @@ system::perform_powertools_update_linux ()
 						write_information "done!"
 					else
 						_err_cmd=" git clone --depth=1 ${_git_theme_url} ${_theme_dir}"
-						dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: ERROR!" --msgbox "\ncommand: \n $_err_cmd ." 20 80 ; clear
+						dialog --backtitle "${PUBLICATION}" --title "${BRAND} tools updater: ERROR!" --msgbox "\ncommand: \n $_err_cmd ." 20 80 ; clear
 					fi
 				;;
 			esac
@@ -221,16 +222,16 @@ do_update ()
 	if task_setup_rtd_basics ; then
 		if [[ ! --autoconfirm == ${autoconfirm} ]] ; then		
 			if [[ "${_pressed}" == "Cancel" ]] ; then
-				dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: CANCELED!" --msgbox "\nQuiting without updateign powertools. \n\n Press OK to confirm." 20 80 ; clear
+				dialog --backtitle "${PUBLICATION}" --title "${_TLA} tools updater: CANCELED!" --msgbox "\nQuiting without updateign powertools. \n\n Press OK to confirm." 20 80 ; clear
 			elif [[ "${_pressed}" == "ESC" ]] ; then
 				echo "[ESC]"
 			else
-				dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: DONE!" --msgbox "\nUpdating the ${BRAND} tools done!. \n\n Press OK to confirm." 20 80 ; clear
+				dialog --backtitle "${PUBLICATION}" --title "${_TLA} tools updater: DONE!" --msgbox "\nUpdating the ${_TLA} tools done!. \n\n Press OK to confirm." 20 80 ; clear
 			fi
 		fi
 		return 0
 	else
-		[[ --autoconfirm == ${autoconfirm} ]] || dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: ERROR!" --msgbox "\nUpdating the ${BRAND} FAILED!. \n\n Press OK to confirm." 20 80 ; clear
+		[[ --autoconfirm == ${autoconfirm} ]] || dialog --backtitle "${PUBLICATION}" --title "${_TLA} tools updater: ERROR!" --msgbox "\nUpdating the ${_TLA} FAILED!. \n\n Press OK to confirm." 20 80 ; clear
 		return 1
 	fi
 }
@@ -258,7 +259,7 @@ if [[ ${UID} -eq 0 ]] ; then
 		;;
 		* )
 			if hash dialog ; then
-				if ( dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: NOTICE!" --yesno "\nMay I update the ${BRAND} OEM tools on your system now? Updating the ${BRAND} tools will ensure that the latest functionality and bug fixes are applied. \n\n Press OK to continue or NO to skip doing this." 20 80 ) ; then
+				if ( dialog --backtitle "${PUBLICATION}" --title "${_TLA} tools updater: NOTICE!" --yesno "\nMay I update the ${_TLA} OEM tools on your system now? Updating the ${_TLA} tools will ensure that the latest functionality and bug fixes are applied. \n\n Press OK to continue or NO to skip doing this." 20 80 ) ; then
 					clear && do_update
 				else
 					clear && exit
