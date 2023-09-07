@@ -24,13 +24,18 @@ PUBLICATION="$(basename "$0") | OEM Application Launcher          Version: ${VER
 #::::::::::::::          Script Settings                 ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# Define the TLA (Three Letter Achronym) to use. The first 3 letters of the name of the script unless predefined.
 _SCRIPTNAME="$(basename "$0")"
-_TLA="${_SCRIPTNAME:0:3}"
+[[ -z "$_TLA" ]] && _TLA="${_SCRIPTNAME:0:3}"
+
+# Set the log dir depending on if this script is being run as root or a user.
 if [[ "$UID" -eq 0 ]] ; then _LOG_DIR=/var/log/${_TLA,,}; else _LOG_DIR=~/.config/${_TLA,,}/log ; fi
 mkdir -p "${_LOG_DIR}"
-_LOGFILE="${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M)-${_SCRIPTNAME}.log"
-_APPS_DIR="$(dirname "$(readlink -f "$0")")/apps"
+_LOGFILE="${_LOG_DIR}/$(date +%Y-%m-%d)-${_SCRIPTNAME}.log"
 
+# Discover apps dir and save it...
+_APPS_DIR="$(dirname "$(readlink -f "$0")")/apps"
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -95,7 +100,7 @@ oem::refresh_apps ()
 		if [[ -e "${_APPS_DIR}/${z}.1" ]] ; then 
 			rm "${_APPS_DIR}/${z}.1"
 		fi
-		wget --backups=1ref "https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/apps/${z##*/}" --directory-prefix="${_APPS_DIR}" || local _err=1
+		wget --backups=1ref "https://github.com/${_GIT_PROFILE:-vonschutter}/${_TLA^^}-Setup/raw/main/modules/oem-app-runner/apps/${z##*/}" --directory-prefix="${_APPS_DIR}" || local _err=1
 	done
 
 	[[ $_err -eq 1 ]] && write_error "At least one problem occurred while transferring files..."
@@ -113,7 +118,7 @@ oem::run_payload ()
 			chmod +x "${2}"/"${1}"
 			if file "${2}"/"${1}" | grep "Windows" ; then
 				if hash wine ; then 
-					wine "${2}"/"${1}" &>/dev/null
+					wine "${2}"/"${1}" &>> ${_LOGFILE}
 					return
 				else
 					dialog --backtitle "RTD Power Tools" \
@@ -134,7 +139,12 @@ oem::run_payload ()
 					esac
 				fi
 			else
-				"${2}"/"${1}" || rtd_oem_pause 1
+				system::log_item "Running application ${1}/${2}"
+				(
+				pushd ${2} 
+				./${1} 
+				popd 
+				) &>> ${_LOGFILE} || rtd_oem_pause 1
 			fi
 			return
 		else
