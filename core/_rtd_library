@@ -1028,13 +1028,13 @@ system::oem_autounlock_disk ()
 	chmod 0400 /boot/keyfile
 
 	# 4. Add the new file as unlock key to the encrypted volume
-	echo letmein1234 | cryptsetup -v luksAddKey $(blkid | grep crypto_LUKS|  cut -d : -f 1) /boot/keyfile -
+	echo letmein1234 | cryptsetup -v luksAddKey "$(blkid | grep crypto_LUKS|  cut -d : -f 1)" /boot/keyfile -
 
 	# 6. Edit /etc/crypttab
 	chmod 0777 /etc/crypttab
 	cp /etc/crypttab /etc/crypttab.temporary
 	sed -i /"$(cat /etc/crypttab | cut -d " " -f 1 )"/d /etc/crypttab.temporary
-	echo $(cat /etc/crypttab | cut -d " " -f 1-2)  /$(udevadm info $(blkid | grep crypto_LUKS|  cut -d : -f 1) |grep by-uuid | cut -d : -f 2 | head -1):/keyfile luks,keyscript=/lib/cryptsetup/scripts/pa$  >> /etc/crypttab.temporary
+	echo "$(cat /etc/crypttab | cut -d " " -f 1-2)"  /"$(udevadm info "$(blkid | grep crypto_LUKS|  cut -d : -f 1)" |grep by-uuid | cut -d : -f 2 | head -1)":/keyfile luks,keyscript=/lib/cryptsetup/scripts/pa$  >> /etc/crypttab.temporary
 	mv /etc/crypttab /etc/crypttab.back
 	mv /etc/crypttab.temporary /etc/crypttab
 
@@ -1042,7 +1042,7 @@ system::oem_autounlock_disk ()
 	chmod 0440 /etc/crypttab
 
 	# Generate new initramfs
-	mkinitramfs -o /boot/initrd.img-$(uname -r)  $(uname -r)
+	mkinitramfs -o /boot/initrd.img-"$(uname -r)"  "$(uname -r)"
 
 }
 
@@ -1129,14 +1129,17 @@ oem::register_all_tools ()
 	if ! grep "xhost local:root" "${_bashrc}" ; then echo 'xhost local:root >/dev/null' >> "${_bashrc}" ; fi
 
 	if [[ -n "${_MODS_DIR}" ]] ; then
-		for d in $( ls -p ${_MODS_DIR}/ ) ; do
+		for d in "${_MODS_DIR}"/*/ ; do
 			write_status "Creating links to $d"
-			chmod +x ${_MODS_DIR}/$d/rtd*
-			ln -f -s ${_MODS_DIR}/$d/${_TLA,,}* -t /bin/
+			chmod +x "${_MODS_DIR}"/"$d"/rtd*
+			for f in "${_MODS_DIR}"/"$d"/"${_TLA,,}"* ;
+			do
+				ln -f -s "${f}" -t /bin/
+			done
 		done
 		write_status "Creating links to ${_OEM_DIR}/core/*.sh"
-		chmod +x ${_OEM_DIR}/core/*.sh
-		ln -f -s ${_OEM_DIR}/core/*.sh -t /bin/
+		chmod +x "${_OEM_DIR}"/core/*.sh
+		ln -f -s "${_OEM_DIR}"/core/*.sh -t /bin/
 		return
 	else
 		write_error "Location variables not set!"
