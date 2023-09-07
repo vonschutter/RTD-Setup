@@ -1,8 +1,8 @@
-# RTD OEM Tool Runner
+# RTD OEM APP Runner
 
 < [Back](https://github.com/vonschutter/RTD-Setup/blob/main/README.md) |
 
-The OEM Support Tool Runner is part of the RTD Power Tools. 
+The OEM App Runner is a tool to run support programs on a computer securely and reliably. This tool is part of the RTD Power Tools.
 
 
 ## Overview
