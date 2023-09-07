@@ -1,6 +1,7 @@
 #!/bin/bash
-PUBLICATION="${_TLA} Simple Global OEM Application Launcher"
 VERSION="1.00"
+PUBLICATION="${_TLA:-"$(basename $0)"} | OEM Application Launcher          Version: ${VERSION}             $(hostnamectl |grep "Machine ID")"
+
 #
 #::             Linux Theme Installer Script
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -44,7 +45,7 @@ dependency::file ()
 	{
 		echo "${FUNCNAME[0]}: Requested dependency file: ${1} ..."
 
-		for i in "./${1}" "../core/${1}" "../../core/${1}" "${0%/*}/../core/${1}" "${0%/*}/../../core/${1}" "$(find /opt -name ${1} |grep -v bakup )" ; do 
+		for i in "./${1}" "../core/${1}" "../../core/${1}" "${0%/*}/../core/${1}" "${0%/*}/../../core/${1}" "$(find /opt -name "${1}" |grep -v bakup )" ; do 
 			echo "${FUNCNAME[0]}: Searching for ${i} ..."
 			if [[ -e "${i}" ]] ; then 
 				echo "${FUNCNAME[0]}: Found ${i}"
@@ -59,9 +60,9 @@ dependency::file ()
 		return 0
 	else
 		echo "$(date) failure to find $1 on the local comuter, now searching online..."
-		if curl -sL $_src_url | source /dev/stdin ; then 
+		if curl -sL "$_src_url" | source /dev/stdin ; then 
 			echo "${FUNCNAME[0]} Using: ${_src_url} directly from URL..."
-		elif wget ${_src_url} &>/dev/null ; then
+		elif wget "${_src_url}" &>/dev/null ; then
 			source ./"${1}"
 			echo "${FUNCNAME[0]} Using: ${_src_url} downloaded..."
 		else 
@@ -80,7 +81,7 @@ oem::refresh_apps ()
 		exec sudo -E bash "$0" --refresh
 		}
 	
-	for z in ${_APPS_DIR}/*.7z ; do
+	for z in "${_APPS_DIR}"/*.7z ; do
 		if [[ -e "${_APPS_DIR}/${z}.1" ]] ; then 
 			rm "${_APPS_DIR}/${z}.1"
 		fi
@@ -97,12 +98,12 @@ oem::refresh_apps ()
 oem::run_payload ()
 {
 	if [[ -r "${_APPS_DIR}/${1}.7z" ]] ; then 
-		if [[ "$(md5sum "${_APPS_DIR}/${1}.7z" |awk '{print $1;}')" = "$(cat "${_CORE_DIR}/sigs/${1}.sig" |awk '{print $1;}')" ]] ; then
-			7z x "${_APPS_DIR}/${1}.7z" -aoa -o${2} &>/dev/null
-			chmod +x ${2}/${1}
-			if file ${2}/${1} | grep "Windows" ; then
+		if [[ "$(md5sum "${_APPS_DIR}/${1}.7z" |awk '{print $1;}')" == "$(cat "${_CORE_DIR}/sigs/${1}.sig" |awk '{print $1;}')" ]] ; then
+			7z x "${_APPS_DIR}/${1}.7z" -aoa -o"${2}" &>/dev/null
+			chmod +x "${2}"/"${1}"
+			if file "${2}"/"${1}" | grep "Windows" ; then
 				if hash wine ; then 
-					wine ${2}/${1} &>/dev/null
+					wine "${2}"/"${1}" &>/dev/null
 					return
 				else
 					dialog --backtitle "RTD Power Tools" \
@@ -123,7 +124,7 @@ oem::run_payload ()
 					esac
 				fi
 			else
-				${2}/${1} || rtd_oem_pause 1
+				"${2}"/"${1}" || rtd_oem_pause 1
 			fi
 			return
 		else
@@ -135,6 +136,8 @@ oem::run_payload ()
 	else 
 		echo "No such application present!"
 	fi
+
+	rm -rf "${2}" &>/dev/null
 }
 
 internal::chk_param_payload ()
@@ -145,7 +148,7 @@ internal::chk_param_payload ()
 	else
 		if [[ -r "${_APPS_DIR}/${1}.7z" ]] ; then 
 			write_information "Runnig OEM application ${1}"
-			oem::run_payload ${1} $( mktemp -d )
+			oem::run_payload "$1" "$( mktemp -d )"
 			return
 		else 
 			case ${1} in 
@@ -170,7 +173,7 @@ display::help ()
 
 	write_information "	Installed OEM applications are: 
 	------------------------------
-$( for i in $(for file in ${_APPS_DIR}/*.7z ; do echo "${file##*/}" ; done ); do write_host --red "	${i::-3}" ; done )
+$( for i in $(for file in "${_APPS_DIR}"/*.7z ; do echo "${file##*/}" ; done ); do write_host --red "	${i::-3}" ; done )
 	"
 	write_host --cyan "
 	To use the menu of apps to start, please run ${BASH_SOURCE[0]} with no parameters at all.
@@ -191,14 +194,15 @@ display::oem_program_list ()
 	while true; do
 		exec 3>&1
 			local n=1
-			local _proglist="$(
-				for i in $(for file in ${_APPS_DIR}/*.7z ; do echo "${file##*/}" ; done );
+			local _proglist
+			_proglist="$(
+				for i in $(for file in "${_APPS_DIR}"/*.7z ; do echo "${file##*/}" ; done );
 				do 
 					echo  "${i::-3}"
 					((n=n+1)) 
 				done
 				)"
-			_run=$(dialog --backtitle "RTD Power Tools" --no-items --ok-label "Start" --cancel-label "EXIT" --menu "Please Choose an OEM Application to Start"  25 80 20 $_proglist 2>&1 1>&3 )
+			_run=$(dialog --backtitle "${PUBLICATION}" --no-items --ok-label "Start" --cancel-label "EXIT" --menu "Please Choose an OEM Application to Start"  25 80 20 ${_proglist} 2>&1 1>&3 )
 			exit_status=$?
 			clear
 		exec 3>&-
@@ -208,9 +212,10 @@ display::oem_program_list ()
 			255) clear && echo [ESC] && exit ;;
 		esac
 
-		case $_run in
-			$_run )
-				oem::run_payload ${_run} $( mktemp -d )
+		case "$_run" in
+			"$_run" )
+				write_information "Runnig OEM application ${_run}"
+				oem::run_payload "${_run}" "$( mktemp -d )"
 				display::oem_program_list
 			;;
 			* ) exit ;;
@@ -231,10 +236,4 @@ dependency::file _rtd_library &>/dev/null
 hash 7z &>/dev/null || check_dependencies p7zip
 hash wine &>/dev/null || check_dependencies wine
 hash md5sum &>/dev/null || (echo "I cannot start OEM apps without security validation software!" ; exit 1)
-internal::chk_param_payload ${1}
-
-
-
-
-
-
+internal::chk_param_payload "${1}"

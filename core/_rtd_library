@@ -1,6 +1,6 @@
 #!/bin/bash
-export RTD_VERSION=2.01
-<<Library_Documentation
+export RTD_VERSION=2.02
+:<<Library_Documentation
 ::				R T D   F u n c t i o n   L i b r a r y
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::// Linux //:::::::
@@ -29,14 +29,6 @@ export RTD_VERSION=2.01
 	Function Name: 					Description:
 	----------------------------------------------------------------------------------------------------------------
 	add_gnome3_favorite_app				; Adds a new favorite app to the gnome favorites bar
-	term::animate_while_command                     ; Display terminal output during a silent task execution
-	term::start_animation                           ; Start simple animation to let user know a silent action is currently executing
-	term::stop_animation                            ; Stop simple animation to let user know a silent action is done executing
-	software::add_software_task 			; Wrapper function to execute a command and display pretty terminal OK or FAIL
-	software::list_bundles				; Lists software bundles defined in _rtd_recipes
-	software::ensure_software_store_available	; Ensure that the appropriate software store is available with Flatpak & Snap support
-	software::display_bundle_install_choices_gtk	; Show a menu of all installable software bundles defined in _rtd_recipes
-	software::display_bundle_removal_choices_gtk	; Show a menu of installed softwrae bundles that may be removed
 	backup_running_vm 				; Backs up all running virtual machines on the local computer
 	check_dependencies 				; Checks that software requirements are met so scripts do not fail
 	check_if_password_pOwned 			; Allows user to check if an intended password is already in well known dictionaries
@@ -47,106 +39,112 @@ export RTD_VERSION=2.01
 	create_iso_image 				; Creates an OS iso image
 	create_iso_image_debian 			; Creates a Debian iso image
 	create_physical_media_from_iso			; Create physical media thumb drive from an ISO file
-	debug_list_loaded_functions			; Lists all loaded RTD functions in the environment
 	create_swapfile					; Create a new swapfile
-	dependency::file				; Find and source an external script of a any name provided
+	debug_list_loaded_functions			; Lists all loaded RTD functions in the environment
 	dependency::desktop                             ; Check if you are running a given desktop (kde, gnome, xfce)
+	dependency::file				; Find and source an external script of a any name provided
 	dependency::os_linux                            ; Verify if we are running bash in a linux session
-	dependency::virtualization                      ; Check that Virtualization is supported and handle deviations
 	dependency::search_local			; Internal function to search defined paths for a given files name...
-	dialog::display_notice 				; Display a supplied string as an OK box for a terminal user
+	dependency::virtualization                      ; Check that Virtualization is supported and handle deviations
+	dialog::copy_file_progress                      ; Display a progressbox in terminal while copying files from one place to another
+	dialog::display_summary_message                 ; Display all text in _summary_message with automatic/manual width
 	display_result 					; Displays command results in a pretty terminal box
 	display_software_installation_choices_gtk	; Show software installation options defined in recipe file (external)
 	display_software_installation_choices_term	; Show software installation options defined in recipe file (external)
-	dialog::display_summary_message                 ; Display all text in _summary_message with automatic/manual width
-	software::vendor_download_and_install		; Downloads and installs a package from the internet
 	download_and_manipulate_iso_debian 		; Download and modify a debian iso to automatically install OEM addons
 	enable_firewall					; Will turn on UFW and add the Allow SSH rule
 	ensure_admin					; Elevates privileges to admin root for the whole script asks for password
 	ensure_flatpak_package_managment		; Ensure that the flatpak software management is available
 	ensure_snap_package_managment			; Ensure that the snap software management system is installed
 	err_no_menu_system_found 			; Function to handle what to do if it is not possible to currently display menus in a terminal
-	system::generate_cloudconfig                    ; Function to generate a cloud config file for use in deploying servers
 	generate_autounattend_xml			; Creates an autounattend.xml for Windows setup
 	generate_autoyast_file				; Generates an installation configuration file for SUSE builds.
-	system::generate_ks_cfg_file			; Creates a kickstart file for fedora
 	generate_minecraft_server_launcher		; Creates a minecraft server launcher, w. automatic dependeny resolutions
 	generate_report_disk_space_used_by_directory 	; Generate a disk usage report
 	generate_rtd_me_sh_cmd				; Creates a rtd bootstrap script for system/software install for Windows, Linux, MAC OS, BSD etc.
 	github::clone_repo_user                         ; Clone all repositories for a given user at github.com
 	github::list_all_user_repositories              ; List all repositories for a given user
 	InstallSoftwareFromRepo				; Installs a package from a repository supports SUSE, Fedora, Cent OS, Ubuntu Deian etc.
-	is_software_package_available			; Checks to see if a software package is available in a repository
 	io_on_notify_wait				; Wait for a disk change and then execute a command
+	is_software_package_available			; Checks to see if a software package is available in a repository
 	is_software_package_installed			; Checks to see if a software package already is installed
+	kvm::make_vm_template_now_from_debian_org 	; Generate a Debian virtual machine template directly from debian.org
+	kvm::make_vm_template_now_from_ubuntu_com 	; Immediately create a virtual machine from ubuntu.com
 	list_loaded_internal_functions			; List all internal library functions loaded... for debugging/support purposes.
 	list_loaded_software_functions			; List all software (_rtd_recipes) functions loaded... for debugging/support purposes.
-	kvm::make_vm_template_now_from_debian_org 	; Immediately create a virtual machine directly from debian.org
-	make_kvm_virtual_machine_now_from_fedora_org	; Immediately create a virtual machine directly from Fedora.org
 	make_kvm_virtual_machine_now_from_iso 		; Make a virtual machine from a generated ISO image
 	make_kvm_virtual_machine_now_from_microsoft	; Make a virtual machine running Windows
 	make_kvm_virtual_machine_now_from_opensuse_com	; Immediately create a virtual machine directly from oensuse.org
-	kvm::make_vm_template_now_from_ubuntu_com 	; Immediately create a virtual machine from ubuntu.com
-	make_preseed_cfg 				; Generate a debian + derivatives preseed file for fully automated installs
-	notice_rtd_loaded				; Notifies a script that RTD functions are loaded
 	make_system_recovery_partition			; Build a system recovery partition
+	notice_rtd_loaded				; Notifies a script that RTD functions are loaded
+	oem::check_boot_splash_screen_enable            ; Check if the boot splash screen should be anabled
+	oem::register_all_tools                         ; Register all OEM scripts so that they are accessible by terminal
+	oem::register_wallpapers_for_gnome		; Register wallpapers for Gnome (so they show up in the appearance tool)
+	oem::rtd_tools_make_launchers			; Creates a default set of pre-defined launchers
+	pause_a_given_time                              ; Pause while showing a count down in seconds
 	prepare_environment_for_iso_creation 		; Ensure that all prerequisites are met for downloadeing; extracting; and creating a modified ISO file
-	rtd_oem_cfg_Account_Setup 			; MODULE; sets default user account and encrypted password for a preseed file
 	rtd_oem_cfg_Account_Setup			; Generates a preseed section [Account setup] (d-i passwd string)
+	rtd_oem_cfg_Account_Setup 			; MODULE; sets default user account and encrypted password for a preseed file
 	rtd_oem_check_inet_access 			; Verifies that the internet is accessible
+	rtd_oem_cloud-config_ubuntu_cfg_KS_CFG_Options  ; TO DO (incomplete)
 	rtd_oem_find_live_release 			; locate and download live media for debian and ubuntu
 	rtd_oem_kde_set_wallpaper 			; Sets wallpaper in the plasma workspace
-	oem::rtd_tools_make_launchers			; Creates a default set of pre-defined launchers
-	oem::check_boot_splash_screen_enable            ; Check if the boot splash screen should be anabled
-	oem::register_wallpapers_for_gnome		; Register wallpapers for Gnome (so they show up in the appearance tool)
-	oem::register_all_tools                         ; Register all OEM scripts so that they are accessible by terminal
 	rtd_oem_pause 					; Pause function; will only pause if a non zero integet is passed
-	rtd_oem_cloud-config_ubuntu_cfg_KS_CFG_Options  ; TO DO (incomplete)
 	rtd_oem_preseed_ubuntu_cfg_KS_CFG_Options 	; MODULE  sets optional elements for a kickstart file normally not needed
 	rtd_oem_release_upgrade 			; Attempt to perform a release upgrade for supported systems
 	rtd_oem_remove_non_western_latin_fonts 		; Remove all non-latin fonts from a distribution. for the western world these are not needed and slow the system
 	rtd_oem_remove_software 			; Removes the software title requested on all supported distributions
 	rtd_oem_reseal 					; Reseals the system for delivery to a new user user will be asked for password and locale etc.
 	rtd_oem_reset_default_environment_config 	; Removes previously configured auto-login and running of setup scripts
-	rtd_oem_turn_on_gui_network_management		; Set network managers to manage network interfaces if not set
 	rtd_oem_setup_brand_splash_screen 		; Brands splash screens on a bootable distribution install media
+	rtd_oem_turn_on_gui_network_management		; Set network managers to manage network interfaces if not set
 	rtd_oem_ubuntu_auto_install_iso_builder 	; Creates automatic install media for Ubuntu
 	rtd_ppa_checker 				; Checks PPA archives on supported distributions
 	rtd_server_setup_choices_productivity		; Builtin Server terminal productivity software install options
-	rtd_setup_choices_server                        ; Software installation choices for servers (over remote ssh)
 	rtd_server_setup_choices_services		; Builtin Server software options
 	rtd_setup_choices_for_preseed			; Write out a Debian pre-defined preeseed file to a location requested
 	rtd_setup_choices_preseed 			; Allows for user specified choices to be added to a preseed file
+	rtd_setup_choices_server                        ; Software installation choices for servers (over remote ssh)
 	rtd_setup_choices_term_fallback			; For server setup, displays a menu where you may chose CLI productivity software
 	rtd_update_system 				; Performs a software update/refresh on supported distributions
 	rtd_wait_for_internet_availability 		; Checks that the internet is reachable and waits until it is...
-	system::oem_autounlock_disk                     ; To DO (Incomplete) to setup automatic unloc of system disk... maybe using TPM 
-	system::run_command_in_gnome_user_session 	; Running with elevated privileges; will allow to switch back to user who started process to execute script in that environment
-	system::restart_sound                           ; Restart sound service in user session on system... 
-	system::change_disk_pass			; Allows user to change password of the system partition encrypted disk
-	system_config::tune_system_power_profile        ; Tune the system power profile based on detected Laptop or PC or VM
-	system::display_spinner				; Display a spinner in the terminal
-	system::get_Windows_Product_Key			; Retrieves a Microsoft Windows product key if it is stored in BIOS (common for OEM)
-	system::find_vm_bridge                          ; Echo back the name of the bridge device and if one is not found then echo default (nat)
-	system::make_preseed_cfg   		        ; Generate a debian + derivatives preseed file for fully automated installs
 	scan_for_malware				; Scan location for malware
-	set_colors					; Set colors for prompting on screen in human usable variables; $RED, $GEEN etc.
+	set_colors					; Set colors for prompting on screen in human usable variables; '$RED', '$GEEN' etc.
 	set_enable_oem_elevated_privelege		; Set automatic privilege escalation for scripts
 	set_gnome_ui_common_tweaks_for_user		; Set common UI usability tweaks
+	set_gnome_ui_corprate_crisp_tweaks_for_user	; Set corporate/business friendly UI tweaks
 	set_gnome_ui_mac_tweaks_for_user		; Set MAC UI usability tweaks
 	set_gnome_ui_moca_tweaks_for_user		; Set eye strain friendly flat theme UI tweaks
 	set_gnome_ui_tweak_no_media_error               ; Funciton to handle missing themes for gnome
 	set_gnome_ui_win10_tweaks_for_user		; Set Windows 10 UI usability tweaks
-	set_gnome_ui_corprate_crisp_tweaks_for_user	; Set corporate/business friendly UI tweaks
 	set_install_command				; Determines what install command should be used to install packages from repositories
 	set_oem_elevated_privilege_gui			; Set x-authority toallow root GUI
+	software::add_software_task 			; Wrapper function to execute a command and display pretty terminal OK or FAIL
+	software::display_bundle_install_choices_gtk	; Show a menu of all installable software bundles defined in _rtd_recipes
+	software::display_bundle_removal_choices_gtk	; Show a menu of installed softwrae bundles that may be removed
+	software::ensure_software_store_available	; Ensure that the appropriate software store is available with Flatpak & Snap support
+	software::list_bundles				; Lists software bundles defined in _rtd_recipes
+	software::vendor_download_and_install		; Downloads and installs a package from the internet
 	SofwareManagmentAvailabilityCHK			; Checks to see that the software managment system is not busy
+	system_config::tune_system_power_profile        ; Tune the system power profile based on detected Laptop or PC or VM
+	system::change_disk_pass			; Allows user to change password of the system partition encrypted disk
+	system::display_spinner				; Display a spinner in the terminal
+	system::find_vm_bridge                          ; Echo back the name of the bridge device and if one is not found then echo default (nat)
+	system::generate_cloudconfig                    ; Function to generate a cloud config file for use in deploying servers
+	system::generate_ks_cfg_file			; Creates a kickstart file for fedora
+	system::get_Windows_Product_Key			; Retrieves a Microsoft Windows product key if it is stored in BIOS (common for OEM)
+	system::make_preseed_cfg   		        ; Generate a debian + derivatives preseed file for fully automated installs
+	system::oem_autounlock_disk                     ; To DO (Incomplete) to setup automatic unloc of system disk... maybe using TPM 
 	system::remove_old_kernel			; Removes all old linux kernels
+	system::restart_sound                           ; Restart sound service in user session on system... 
+	system::run_command_in_gnome_user_session 	; Running with elevated privileges; will allow to switch back to user who started process to execute script in that environment
+	term::animate_while_command                     ; Display terminal output during a silent task execution
+	term::start_animation                           ; Start simple animation to let user know a silent action is currently executing
+	term::stop_animation                            ; Stop simple animation to let user know a silent action is done executing
+	test_iso_boot_media				; Test bootable media using QEMU
 	toggle_oem_auto_login				; Toggle the auto login option for the user
 	toggle_oem_run_once				; Toggle the oem run once of a script at login
-	test_iso_boot_media				; Test bootable media using QEMU
 	up_2_date					; Older universal software update function
-	pause_a_given_time                              ; Pause while showing a count down in seconds
 	write_error					; Prints an error message to terminal in RED
 	write_host 					; Prints a message to the terminal w. a choice of color
 	write_information 				; Prints a message to the terminal in BLUE
@@ -154,6 +152,10 @@ export RTD_VERSION=2.01
 	write_warning 					; Prints a message to the terminal in YELLOW
 	zenity::display_info				; Displays any string passed in a GUI information box
 	zenity::display_url				; Display the contents of a URL passed to the function in a box
+        dialog::display_notice 				; Display a supplied string as an OK box for a terminal user
+        kvm::make_vm_template_now_from_redhat_com       ; Generate a RedHat (or compatible) vm template to be cloned later
+        make_kvm_virtual_machine_now_from_fedora_org	; Generate a Fedora virtual machine template directly from Fedora.org
+        make_preseed_cfg 				; Generate a debian + derivatives preseed file for fully automated installs
 
 
 Use Google Coding standards:
@@ -260,7 +262,6 @@ _OEM_DEPENDENCIES="_branding _locations _rtd_recipies"
 
 
 
-
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::           Function Section               ::::::::::::::::::::::
@@ -291,6 +292,32 @@ _OEM_DEPENDENCIES="_branding _locations _rtd_recipies"
 #--------------------------------------------------------------------------------------
 
 
+dialog::display_cmd_output ()
+{
+# Description: Function to display a command output in a dialog box. 
+# 
+# Globals: dialog 
+# Arguments: ["String to execute"]
+# Outputs: Message in dialog box
+# Returns: 0 or ESC
+# Usage:
+#
+#
+# dialog::display_cmd_output apt -y upgrade
+#
+# End of Documentation
+	_cmd="$*"
+
+
+	${_cmd} | ${RTD_GUI:-dialog} --backtitle "\Zb$PUBLICATION             $VERSION\ZB"  --progressbox "RUNNING: ${_cmd}" 25 120
+
+
+}
+
+
+
+
+
 dialog::copy_file_progress ()
 {
 # Description: Function to display a file copy dialog. 
@@ -313,7 +340,7 @@ dialog::copy_file_progress ()
 	# Destination directory
 	DEST="${2}"
 
-	[ ! -d ${DEST} ] && mkdir -p ${DEST}
+	[ ! -d "${DEST}" ] && mkdir -p "${DEST}"
 
 	dialog --title "Copying files" --gauge "Copying file..." 10 75 < <(
 	# Get total number of files in array
@@ -333,7 +360,7 @@ Copying file "${f}"...
 XXX
 EOF
 		# copy file $f to $DEST 
-		/bin/cp ${f} ${DEST} &>/dev/null
+		/bin/cp "${f}" "${DEST}" &>/dev/null
 	done
 	)
 
@@ -362,9 +389,9 @@ dialog::display_notice ()
 #
 # End of Documentation
 
-	hash ${RTD_GUI:-dialog} &>/dev/null || check_dependencies ${RTD_GUI:-dialog} &>/dev/null || return 1
+	hash "${RTD_GUI:-dialog}" &>/dev/null || check_dependencies "${RTD_GUI:-dialog}" &>/dev/null || return 1
 
-	${RTD_GUI:-dialog} --backtitle "${PUBLICATION:-"Notice"}" --colors --no-collapse --title "Notice" --msgbox "\n ${@} \n" 15 78
+	${RTD_GUI:-dialog} --backtitle "${PUBLICATION:-"Notice"}" --colors --no-collapse --title "Notice" --msgbox "\n ${*} \n" 15 78
 	clear
 }
 
@@ -387,12 +414,12 @@ dialog::display_summary_message ()
 # End of Documentation
 
 	system::log_item "Displaying summary message TITLE: $1"
-	hash ${RTD_GUI:-dialog} &>/dev/null || check_dependencies ${RTD_GUI:-dialog} &>/dev/null || return 1
+	hash "${RTD_GUI:-dialog}" &>/dev/null || check_dependencies "${RTD_GUI:-dialog}" &>/dev/null || return 1
 
-	if echo ${FUNCNAME[1]} | grep "make_kvm_virtual_machine" ; then 
-		${RTD_GUI} --backtitle "$BRANDING" --colors --no-collapse --title "$1" --msgbox "\n ${_summary_message} \n" 0 0
+	if echo "${FUNCNAME[1]}" | grep "make_kvm_virtual_machine" ; then 
+		${RTD_GUI:-dialog} --backtitle "$BRANDING" --colors --no-collapse --title "$1" --msgbox "\n ${_summary_message} \n" 0 0
 	else 
-		${RTD_GUI} --backtitle "$BRANDING" --colors --no-collapse --title "$1" --msgbox "${_summary_message}" ${HEIGHT:-"20"} ${WIDTH:-"80"}
+		${RTD_GUI:-dialog} --backtitle "$BRANDING" --colors --no-collapse --title "$1" --msgbox "${_summary_message}" "${HEIGHT:-"20"}" "${WIDTH:-"80"}"
 	fi
 	clear
 }
@@ -415,9 +442,9 @@ display_result ()
 # display_result "title of the mesage"
 #
 # End of Documentation
-	hash ${RTD_GUI:-dialog} &>/dev/null || check_dependencies ${RTD_GUI:-dialog} &>/dev/null || return 1
+	hash "${RTD_GUI:-dialog}" &>/dev/null || check_dependencies "${RTD_GUI:-dialog}" &>/dev/null || return 1
 
-	${RTD_GUI:-dialog} --backtitle "$BRANDING" --colors --no-collapse --title "$1" --msgbox "$result" ${HEIGHT:-"20"} ${WIDTH:-"80"}
+	${RTD_GUI:-dialog} --backtitle "$BRANDING" --colors --no-collapse --title "$1" --msgbox "$result" "${HEIGHT:-"20"}" "${WIDTH:-"80"}"
 	clear
 }
 
@@ -440,7 +467,7 @@ zenity::display_info ()
 #
 # End of Documentation
 
-	_text="${@}"
+	_text="${*}"
 	hash zenity &>/dev/null || check_dependencies zenity &>/dev/null || return 1
 	zenity --info --text --title="${_TITLE:="Notice"}: $selection" --text="$_text" --ellipsize --height=600 --width=800 2>/dev/null
 }
@@ -465,7 +492,7 @@ zenity::display_url ()
 #
 # End of Documentation
 
-	_url="${@}"
+	_url="${*}"
 	hash zenity &>/dev/null || check_dependencies zenity &>/dev/null || return 1
 	zenity --text-info --html --title="${_TITLE:="$_url"}:" --url="$_url" --width=800 --height=600 &>/dev/null
 
@@ -492,7 +519,7 @@ zenity::display_file ()
 #
 # End of Documentation
 
-	_filename="${@}"
+	_filename="${*}"
 	hash zenity &>/dev/null || check_dependencies zenity &>/dev/null || return 1
 	zenity --text-info --title="${_TITLE:="$_filename"}:" --filename="$_filename" --width=800 --height=600 &>/dev/null
 
@@ -524,7 +551,7 @@ term::animate_while_command ()
 		write_error "Specifying a command to wait for is required! "
 		return 1
 	else
-		term::start_animation "${@}" ; ${@} &>/dev/null; term::stop_animation 
+		term::start_animation "${@}" ; "${@}" &>/dev/null; term::stop_animation 
 	fi
 
 }
@@ -613,25 +640,28 @@ dependency::desktop ()
 # Usage: 	dependency::desktop gnome|kde|xfce|mate
 # End of documentation
 	local _sought="${1,,}"
+	system::log_item "checking if there is a running $_sought desktop session..."
+	local _desktop
 
 	# Try to find the currently running desktop environment reliably... 
-	if [ "$XDG_CURRENT_DESKTOP" = "" ] ; then
-		local _desktop=$(echo "$XDG_DATA_DIRS" | sed 's/.*\(xfce\|kde\|gnome\|mate\).*/\1/')
-	elif  ps -e |grep "plasmashell" ; then
+	if [[ "$XDG_CURRENT_DESKTOP" == "" ]] ; then
+		system::log_item "XDG_CURRENT_DESKTOP appears to be unset, attempting to search processes for dektop match... "
+	elif  pgrep -f "plasmashell" ; then
 		local _desktop="kde"
-	elif  ps -e |grep "gnome-shell"; then
+	elif  pgrep -f "gnome-shell"; then
 		local _desktop="gnome"
-	elif  ps -e |grep "mate"; then
+	elif  pgrep -f "mate"; then
 		local _desktop="mate"
-	elif  ps -e |grep "xfce"; then
+	elif  pgrep -f "xfce"; then
 		local _desktop="xfce"
 	else
 		local _desktop="$XDG_CURRENT_DESKTOP"
 	fi
 
 	# Check what we found...
+	system::log_item "Found: _desktop=$_desktop"
 	local _desktop="${_desktop,,}"
-	if [[ "$_desktop" == *"$_sought"* ]]; then 
+	if [[ "$_desktop" == *"$_sought"* ]]; then
 		return 0
 	else 
 		return 1
@@ -651,7 +681,8 @@ dependency::os_linux ()
 # Returns:	0 = Running in Linux. 1 = is not running in Linux.
 # Usage: 	dependency::os_linux
 # End of documentation
-       	if [[ $(echo "$OSTYPE" |grep "linux") ]]; then
+
+       	if echo "$OSTYPE" |grep -q "linux" ; then
 		return 0
 	elif [[ "$OSTYPE" == "darwin"* ]]; then
 		write_error "${FUNCNAME[0]}: Mac OSX is currently not supported ..."  ; return 1
@@ -717,9 +748,9 @@ dependency::file ()
 		return 0
 	else
 		echo "$(date) failure to find $1 on the local comuter, now searching online..."
-		if curl -sL $_src_url | source /dev/stdin ; then 
+		if curl -sL "$_src_url" | source /dev/stdin ; then 
 			echo "${FUNCNAME[0]} Using: ${_src_url} directly from URL..."
-		elif wget ${_src_url} &>/dev/null ; then
+		elif wget "${_src_url}" &>/dev/null ; then
 			source ./"${1}"
 			echo "${FUNCNAME[0]} Using: ${_src_url} downloaded..."
 		else 
@@ -747,8 +778,8 @@ oem::deploy_themes ()
 
 	local GIT_Theme_URL="${1:-"$GIT_Theme_URL"}"
 	local _THEME_DIR="${_THEME_DIR:-"/opt/${_TLA:-"rtd",,}/themes"}"
-	mkdir -p ${_THEME_DIR}
-	[[ -z ${GIT_Theme_URL} ]] && (
+	mkdir -p "${_THEME_DIR}"
+	[[ -z "${GIT_Theme_URL}" ]] && (
 		write_error "No theme URL found! It need to be set in the _locations file or passed as an argument."
 		return 1
 	)
@@ -760,7 +791,6 @@ oem::deploy_themes ()
 		return 1
 	fi
 }
-
 
 
 
@@ -778,16 +808,17 @@ dependency::virtualization ()
 
 
 	write_status "${FUNCNAME[0]}: Checking for virtualization software..."
-	local _os_name=$(hostnamectl |grep "Operating System" |cut -d' ' -f3)
+	local _os_name
+	_os_name=$(hostnamectl |grep "Operating System" |cut -d' ' -f3)
 
 	case $_os_name in
 	openSUSE )
 		write_status "Verrifying/Installing virtualization software for openSUSE..."
-		zypper install -y --recommends -t pattern "kvm_server"  "kvm_tools" | tee -a ${_log_file}
+		zypper install -y --recommends -t pattern "kvm_server"  "kvm_tools" | tee -a "${_LOGFILE}"
 	;;
 	Tumbleweed )
 		write_status "Verryfying/Installing virtualization software for Tumbleweed..."
-		zypper install -y --recommends -t pattern "kvm_server"  "kvm_tools" | tee -a ${_log_file}
+		zypper install -y --recommends -t pattern "kvm_server"  "kvm_tools" | tee -a "${_LOGFILE}"
 	;;
 	Fedora ) 
 		local _probable_dependencies="bridge-utils libvirt virt-install qemu-kvm virt-top libguestfs-tools guestfs-tools" 
@@ -874,13 +905,13 @@ system::remove_old_kernel ()
 # Usage: simply call function in a script
 # End of documentation
 
-        if [[ $(echo "$OSTYPE" |grep "linux") ]]; then
+        if echo "$OSTYPE" |grep -q "linux" &>/dev/null ; then
                 # these tests focus on the latest versions of the distros evaluated...
+		ensure_admin
                 if hash apt-get &>/dev/null ; then
                         dialog::display_notice "🧩 ${FUNCNAME[0]}: An apt based system has been found... proceeding... "
                         if [[ $? -eq 0 ]] ; then
-                                ensure_admin
-                                dpkg -l linux-* | awk '/^ii/{print $2}' | egrep [0-9] | sort -t- -k3,4 --version-sort -r | sed -e "1,/$(uname -r | cut -f1,2 -d"-")/d" | grep -v -e `uname -r | cut -f1,2 -d"-"` | xargs sudo apt-get -y purge
+                                dpkg -l linux-* | awk '/^ii/{print $2}' | grep -E "[0-9]" | sort -t- -k3,4 --version-sort -r | sed -e "1,/$(uname -r | cut -f1,2 -d"-")/d" | grep -v -e "$(uname -r | cut -f1,2 -d"-")" | xargs sudo apt-get -y purge
                                 return $?
                         else
                                 return 1
@@ -888,7 +919,6 @@ system::remove_old_kernel ()
                 elif hash zypper &>/dev/null ; then
                         dialog::display_notice "🧩 ${FUNCNAME[0]}: An Zypper based package management system has been found... proceeding... "
                         if [[ $? -eq 0 ]] ; then
-                                ensure_admin
                                 zypper purge-kernels
                                 return $?
                         else
@@ -897,8 +927,7 @@ system::remove_old_kernel ()
                 elif hash dnf &>/dev/null ; then
                         dialog::display_notice "🧩 ${FUNCNAME[0]}: An DNF based package management system has been found... proceeding... "
                         if [[ $? -eq 0 ]] ; then
-                                ensure_admin
-                                dnf remove $(dnf repoquery --installonly --latest-limit 2 -q)
+                                dnf remove "$(dnf repoquery --installonly --latest-limit 2 -q)"
                                 return $?
                         else
                                 return 1
@@ -1478,7 +1507,7 @@ io_on_notify_wait ()
 
 	if [ -z "$1" ]; then
 		write_error "Usage: $0 rsync -avt . host:/remote/dir ..."
-		exit -1;
+		exit 1;
 	fi
 
 	inotifywait -e "$EVENTS" -m -r --format '%:e %f' . | (
@@ -1497,8 +1526,8 @@ io_on_notify_wait ()
 		done) | (
 		while true; do
 		read TMP;
-		echo $@
-		$@
+		echo "$@"
+		"$@"
 		done
 	)
 }
@@ -3023,7 +3052,7 @@ ensure_admin ()
 						0)
 							export HISTIGNORE='*sudo -S*'
 							echo ${token} | sudo -S -v || ensure_admin
-							sudo -E SUDO_USER=$USER /bin/bash "${0}" $@ || rtd_oem_pause 1
+							sudo -E SUDO_USER=$USER /bin/bash "${0}" "$*" || rtd_oem_pause 1
 						;;
 						1) echo "Request cancelled" ;;
 						255) echo "[esc] Request aborted" ;;
@@ -3050,7 +3079,7 @@ ensure_admin ()
 					0)
 						export HISTIGNORE='*sudo -S*'
 						echo ${token} | sudo -S -v || ensure_admin
-						sudo -E SUDO_USER=$USER /bin/bash "${0}" $@ || rtd_oem_pause 1
+						sudo -E SUDO_USER=$USER /bin/bash "${0}" "$@" || rtd_oem_pause 1
 					;;
 					1) echo "Request cancelled" ;;
 					255) echo "[esc] Request aborted" ;;
@@ -4631,8 +4660,13 @@ compress_provided_items ()
 #
 # End of documentation
 list="$*"
-	if echo ${@} |grep "--encrypt" ; then
-		passtoken=$(dialog --title "${Title:="$( basename $0 )"}" --backtitle "${BRANDING:-"${FUNCNAME[0]}"}" --stdout --insecure --passwordbox "\n To encrypt the content you have to give me a phrase to encrypt it with. \n This can be anything in one long word, but never forget it!" 10 90 )
+	if echo "${@}" |grep "--encrypt" ; then
+		passtoken=$(dialog --title "${Title:="$( basename $0 )"}" \
+                  --backtitle "${BRANDING:-"${FUNCNAME[0]}"}" \
+                  --stdout \
+                  --insecure \
+                  --passwordbox "\n To encrypt the content you have to give me a phrase to encrypt it with. \n This can be anything in one long word, but never forget it!" \
+                  10 90 )
 		ret=$? ; clear
 		case $ret in
 			0)
@@ -4668,7 +4702,7 @@ list="$*"
 		IFS=$(echo -en "\n\b")
 		write_information "☕ Please be patient, Large sets of files may take serious time..."
 
-		for line in $@ ;
+		for line in ${*} ;
 		do
 			case $line in
 				--noprompt ) echo sipp >/dev/null ;;
@@ -4682,12 +4716,12 @@ list="$*"
 		\n STATUS	FILENAME
 		$(
 		echo \\n
-		for d in $@; do
+		for d in ${*} ; do
 		[[ -e $d.7z ]] && echo "Confirmed	:  $d.z7 \\n" || echo " Failed!	:  $d.z7 \\n"
 		done
 		)
 		\n Please review the above: ⏫"
-		if echo ${@} |grep "--noprompt" ; then
+		if echo ${*} |grep "--noprompt" ; then
 			echo $result
 		else
 			display_result "Done creating encrypted archives"
@@ -4832,7 +4866,7 @@ scan_for_malware ()
 
 	___________________________________________________
 	Starting scan....
-	Scanning folder: $@"
+	Scanning folder: ${*}"
 
 	# Run the scan function
 	clamscan $SCANDIR -r -a -i -l $CLAMSCANLOGFILE --bytecode=yes --stdout  --phishing-sigs --bell --algorithmic-detection=yes --move="$QUARANINE"
@@ -5330,12 +5364,12 @@ up_2_date ()
 		apt-get upgrade -y
 		apt-get autoremove -y
 	elif hash zypper 2>/dev/null; then
-		return zypper up -y
+		zypper --terse --color --table-style=6 list-updates
+                zypper --terse --color --table-style=6 update -y
 	else
 		return 3
 	fi
 }
-
 
 
 
@@ -5468,7 +5502,7 @@ software::is_native_package_installed ()
 	elif hash zypper &> /dev/null; then
 		zypper se -i "$1" &> /dev/null || return 1 && return 0 
 	elif hash apt &> /dev/null; then
-		dpkg -l "$1" &> /dev/null |tail -1 |grep "ii  $1" &> /dev/null && return 0 || return 1
+		dpkg -l "$1" |tail -1 |grep "ii  $1" &> /dev/null && return 0 || return 1
 	else
 		return 3
 	fi
@@ -5593,7 +5627,7 @@ software::add_native_package ()
 #
 # End of documentation
 
-	if [[ 'echo $OSTYPE" |grep "linux"' ]]; then
+        if [[ $(echo $OSTYPE | grep "linux") ]]; then
 		if hash zypper 2>/dev/null; then
 			write_status  "Installing ${1} using ZYPPER"
 			sudo zypper install -y ${1}
@@ -5663,7 +5697,7 @@ set_install_command ()
 #
 # End of documentation
 
-	if [[ 'echo $OSTYPE" |grep "linux"' ]]; then
+                if [[ $(echo $OSTYPE |grep "linux") ]]; then
 
 		if hash dnf 2>/dev/null; then
 			# Try dnf (RedHat, Cent OS, Fedora)
@@ -6617,7 +6651,7 @@ software::add_software_task ()
 	PAD="---------------------------------------------------------"
 	LINE=$(printf "%s %s" "$@" "$PAD" | cut -c 1-${#PAD})
 	#display_spinner start
-	echo -ne "Task: ${LINE/recipe_/}:" & $@ &>${_LOGFILE:-"/var/log/rtd/$($FUNCNAME[0])$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log"} && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR   \n" ||printf "%b%-6s%b [ ! ] ${RED} FAILED $ENDCOLOR  \n"
+	echo -ne "Task: ${LINE/recipe_/}:" & ${*} &>>${_LOGFILE:-"/var/log/rtd/${FUNCNAME[0]}$(date +%Y-%m-%d-%H)-oem-setup.log"} && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR   \n" ||printf "%b%-6s%b [ ! ] ${RED} FAILED $ENDCOLOR  \n"
 	#display_spinner stop
 }
 
@@ -7523,7 +7557,7 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 
 
 
-make_kvm_virtual_machine_now_from_redhat_com ()
+kvm::make_vm_template_now_from_redhat_com ()
 {
 # Description: Function to create a Alma Linux KVM virtual michine disk and define a VM. This function should be
 # used on a Qemu/KVM virtual host that the virtual guest is to be used on.
@@ -7753,7 +7787,7 @@ kvm::make_vm_template_now_from_debian_org ()
 	dependency::virtualization
 
 	# Check for optional default T-Shirts size overrides... 
-	system::process_vm_opt_args "$@"
+	system::process_vm_opt_args "${@}"
 
 	# Set default values for VM T-Shirts sizes (may vary by OS)...
 	: ${_role:="desktop"}
@@ -7866,7 +7900,7 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 
 
 	# Evaluate override arguments to defaults...
-	system::process_vm_opt_args $@
+	system::process_vm_opt_args "${@}"
 
 	# Set default values for VM T-Shirts sizes (may vary by OS)...
 	: ${ubuntu_flavor="ubuntu"}
@@ -7876,7 +7910,7 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 	: ${_mem:="${_mem:=2048}"}
 	: ${_dsk:="${_dsk:=100}"}
 
-	dependency::virtualization
+	dependency::virtualization:
 
 	# Fetch the relevand ISO if necessary...
 	system::log_item "🔎 Retreive list of available $ubuntu_flavor $_role versions..."
@@ -10691,6 +10725,8 @@ set_colors ()
 	"   ${magenta}•${blue}•${green}•${red}• "
 	"    ${blue}•${green}•${red}•${magenta}•"
 	)
+
+	echo -e "$yellow * $darkyellow * $red * $darkred * $green * $darkgreen * $blue * $darkblue * $cyan * $darkcyan * $gray * $darkgray * $purple * $darkpurple * $endcolor"
 }
 
 
@@ -10928,7 +10964,7 @@ write_error ()
 # End of documentation
 	local text=$1
 
-	if [[ "${TERMUITXT}"=="nocolor" ]]; then
+	if [[ "${TERMUITXT}" == "nocolor" ]]; then
 		if [[ -n "${text}" ]]; then
 			echo "🧩 💥 ${FUNCNAME[1]}: ${text}"
 		fi
