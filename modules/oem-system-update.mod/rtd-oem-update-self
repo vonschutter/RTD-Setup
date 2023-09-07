@@ -56,11 +56,11 @@ export _theme_dir=/opt/${_tla,,}/themes
 export _git_profile="${_GIT_PROFILE:-vonschutter}"
 
 # Location of base administrative scripts and command-lets to get.
-export _git_src_url=https://github.com/${_git_profile}/${_tla^^}-Setup.git
+export _git_src_url="https://github.com/${_git_profile}/${_tla^^}-Setup.git"
 export _git_theme_url="https://github.com/${_git_profile}/RTD-Themes.git"
 
 # Determine log file names for this session
-export _logfile=${_log_dir}/$(date +%Y-%m-%d-%H-%M-%S-%s)-${_scriptname}.log
+export _logfile="${_log_dir}/$(date +%Y-%m-%d-%H-%M)-${_scriptname}.log"
 
 # List spciffic commands of software that are needed
 export _software_dependencies="zip dialog pkexec"
@@ -81,7 +81,11 @@ dependency::file ()
 	{
 		echo "${FUNCNAME[0]}: Requested dependency file: ${1} ..."
 
-		for i in "./${1}" "../core/${1}" "../../core/${1}" "${0%/*}/../core/${1}" "${0%/*}/../../core/${1}" "$(find /opt -name ${1} |grep -v bakup )" ; do 
+		for i in "./${1}" "../core/${1}" \
+		"../../core/${1}" \
+		"${0%/*}/../core/${1}" \
+		"${0%/*}/../../core/${1}" \
+		"$(find /opt -name ${1} |grep -v bakup )" ; do
 			echo "${FUNCNAME[0]}: Searching for ${i} ..."
 			if [[ -e "${i}" ]] ; then 
 				echo "${FUNCNAME[0]}: Found ${i}"
@@ -137,19 +141,19 @@ system::perform_powertools_update_linux ()
 					if git clone --depth=1 ${_git_src_url} /opt/${_tla,,}.tmp ; then
 						write_information "Powertools successfully retrieved..."
 						if [[ -d /opt/${_tla,,}  ]] ; then
-							mv /opt/${_tla,,} ${_BackupFolderName:="/opt/${_tla,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"} 
+							mv /opt/${_tla,,} ${_BackupFolderName:="/opt/backup/${_tla,,}.$(date +%Y-%m-%d-%H-%M).bakup"}
 							write_warning "Backing up old (${_tla,,} ) to ${_BackupFolderName}.zip..." 
-							zip -m -r -5 -q ${_BackupFolderName}.zip  ${_BackupFolderName} 
-							rm -r ${_BackupFolderName} 
+							zip -m -r -5 -q "${_BackupFolderName}.zip"  "${_BackupFolderName}"
+							rm -r "${_BackupFolderName}"
 						fi
 
-						mv /opt/${_tla,,}.tmp /opt/${_tla,,} ; rm -rf /opt/${_tla,,}/.git 
-						source /opt/${_tla,,}/core/_rtd_library 
+						mv "/opt/${_tla,,}.tmp" "/opt/${_tla,,}" ; rm -rf /opt/${_tla,,}/.git
+						source "/opt/${_tla,,}/core/_rtd_library"
 						oem::register_all_tools
-						ln -s -f ${_log_dir} -T ${_OEM_DIR}/log
+						ln -s -f "${_log_dir}" -T "${_OEM_DIR}/log"
 						oem::rtd_tools_make_launchers
 					else
-						echo "Failed to retrieve powertools correctly! "
+						echo "Failed to retrieve power tools correctly! "
 						echo "Suggestion: check write permission in "/opt" or internet connectivity."
 						exit 1
 					fi
