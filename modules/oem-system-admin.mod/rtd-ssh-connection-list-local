@@ -5,7 +5,7 @@
 #::::::::::::::::::::::::::::::::::::::// Simple Admin Tool //::::::::::::::::::::::::::::::::::::::::// Linux  //:::::::
 #::     Author:   	SLS
 #::     Version 	1.00
-:	${GIT_Profile:=vonschutter}
+:	"${GIT_Profile:=vonschutter}"
 #::
 #::	Monday 27 November, 2017  - SLS.
 #::		* File originally created.
@@ -93,9 +93,9 @@ system::show_local_ssh_list ()
 			255) clear && echo [ESC] && exit ;;
 		esac
 
-		case $selected in
-			$selected )
-				ssh ${_remote_user:-"$USER"}@${selected} 
+		case ${selected} in
+			"${selected}" )
+				ssh "${_remote_user:-"$USER"}"@"${selected}" 
 			;;
 			* ) exit ;;
 		esac
@@ -105,8 +105,8 @@ system::show_local_ssh_list ()
 
 system::get_remote_user ()
 {
-        if [[ -e $HOME/.config/$_TLA/remote.pref ]] ; then
-                _remote_user="$(cat $HOME/.config/$_TLA/remote.pref)" 
+        if [[ -e $HOME/.config/"${_TLA,,}"/remote.pref ]] ; then
+                _remote_user="$(cat "${HOME}"/.config/"${_TLA,,}"/remote.pref)" 
                 if [[ "${_remote_user}" == "default" ]] ; then
                         unset _remote_user
                 fi
@@ -120,7 +120,7 @@ system::configure_remote_user ()
 {
         local _param=$1
 
-        mkdir -p $HOME/.config/$_TLA/
+        mkdir -p "${HOME}"/.config/"${_TLA,,}"/
         _remote_user=$(dialog --title "ssh default username" --backtitle "${_BACK_TITLE}    |     My IP = ${_LOCALNET}    |     Subnet = /${_LOCALSUB}" --insecure --stdout --passwordbox "\n No default remote user has been chosen. Type the name of the remote user you want to use by default here. If you do not want to store a remore user just shose 'Cancel', if you want to always use your own username then type 'default'." 10 90)
         exit_status=$?
         clear
@@ -130,7 +130,7 @@ system::configure_remote_user ()
                 255) clear && echo [ESC] && exit ;;
         esac
 
-        echo "${_remote_user}" > "$HOME/.config/$_TLA/remote.pref"
+        echo "${_remote_user}" > "$HOME/.config/"${_TLA,,}"/remote.pref"
 
         case $_param in 
                 --quit ) exit ;;

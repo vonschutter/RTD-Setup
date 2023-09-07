@@ -1,6 +1,6 @@
 #!/bin/bash
 export RTD_VERSION=2.02
-:<<Library_Documentation
+<<Library_Documentation
 ::				R T D   F u n c t i o n   L i b r a r y
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::// Linux //:::::::
@@ -11198,19 +11198,20 @@ list_loaded_software_functions ()
 
 set_colors
 # Find and load all dependant files... 
-for i in ${_OEM_DEPENDENCIES} ; do dependency::file ${i} &>/dev/null ; done
+for i in ${_OEM_DEPENDENCIES} ; do dependency::file ${i} ; done
+#&>/dev/null ; done
 
-# if [[ -n "${LOGFILE}" ]] ; then
-# 	system::log_item "🧩 💻 ********************************************************************************"
-# 	system::log_item _LOGFILE="${LOGFILE}"
-# else
-# 	if [[ -n ${_LOG_DIR} ]] ; then
-# 		_LOGFILE="${_LOG_DIR}/${0}.log"
-# 	else
-# 		_LOGFILE="/var/log/${0}.log"
-# 	fi
-# 	_LOGFILE="/dev/null"
-# fi
+if [[ -n "${LOGFILE}" ]] ; then
+	system::log_item "🧩 💻 ********************************************************************************"
+	system::log_item _LOGFILE="${LOGFILE}"
+else
+	if [[ -n ${_LOG_DIR} ]] ; then
+		_LOGFILE="${_LOG_DIR}/${0}.log"
+	else
+		_LOGFILE="/var/log/${0}.log"
+	fi
+	_LOGFILE="/dev/null"
+fi
 
 if [ -z $1 ]; then
 	echo "RTD Power Library $RTD_VERSION OK"
