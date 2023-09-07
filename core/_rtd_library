@@ -1129,10 +1129,11 @@ oem::register_all_tools ()
 	if ! grep "xhost local:root" "${_bashrc}" ; then echo 'xhost local:root >/dev/null' >> "${_bashrc}" ; fi
 
 	if [[ -n "${_MODS_DIR}" ]] ; then
-		for d in "${_MODS_DIR}"/*/ ; do
+		for d in ${_MODS_DIR}/*/ ; do
 			write_status "Creating links to $d"
-			for f in "${_MODS_DIR}"/"$d"/"${_TLA,,}"* ;
+			for f in ${_MODS_DIR}/$d/${_TLA,,}* ;
 			do
+				write_status "Processing: ${f}"
 				chmod +x "${f}"
 				ln -f -s "${f}" -t /bin/
 			done

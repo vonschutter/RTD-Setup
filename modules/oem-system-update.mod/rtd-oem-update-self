@@ -49,7 +49,7 @@ export _tla=${_scriptname:0:3}
 export _log_dir=/var/log/${_tla,,}
 mkdir -p ${_log_dir}
 autoconfirm=${1}
-export _theme_dir=/opt/${_tla,,}/themes
+export _theme_dir="/opt/${_tla,,}/themes"
 
 
 # Set the GIT profile name to be used if not set elsewhere:
@@ -65,6 +65,9 @@ export _logfile="${_log_dir}/$(date +%Y-%m-%d-%H-%M)-${_scriptname}.log"
 # List spciffic commands of software that are needed
 export _software_dependencies="zip dialog pkexec"
 
+# Decide where to put the backed up old versions of the tools... 
+export _bakup_dir=/opt/backup
+mkdir -p ${_bakup_dir}
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -124,7 +127,7 @@ system::perform_powertools_update_linux ()
 
 		choices=$("${cmd[@]}" "${options[@]}" 2>&1 >/dev/tty)
 		exit_status=$?
-
+		export choices
 		case $exit_status in
 			1) clear && _pressed=Cancel && return ;;
 			255) clear && _pressed=ESC && return ;;
@@ -138,11 +141,11 @@ system::perform_powertools_update_linux ()
 					write_information "Attempting to get the latest RTD tools..."
 					hash git &>> ${_logfile} || check_dependencies git
 				
-					if git clone --depth=1 ${_git_src_url} /opt/${_tla,,}.tmp ; then
+					if git clone --depth=1 "${_git_src_url}" "/opt/${_tla,,}.tmp" ; then
 						write_information "Powertools successfully retrieved..."
 						if [[ -d /opt/${_tla,,}  ]] ; then
-							mv /opt/${_tla,,} ${_BackupFolderName:="/opt/backup/${_tla,,}.$(date +%Y-%m-%d-%H-%M).bakup"}
-							write_warning "Backing up old (${_tla,,} ) to ${_BackupFolderName}.zip..." 
+							mv "/opt/${_tla,,}" "${_BackupFolderName:="${_bakup_dir}/${_tla,,}-$(date +%Y-%m-%d-%H-%M).bakup"}"
+							write_warning "Backing up old (/opt/${_tla,,}) to ${_BackupFolderName}.zip..." 
 							zip -m -r -5 -q "${_BackupFolderName}.zip"  "${_BackupFolderName}"
 							rm -r "${_BackupFolderName}"
 						fi
@@ -163,20 +166,20 @@ system::perform_powertools_update_linux ()
 					oem::rtd_tools_make_launchers				
 				;;
 				3)
-					write_information "Updating themes..."
-					[[ -e "${_theme_dir}" ]] && zip -m -r -5 -q ${_bakup_dir}/themes-$(date +%Y-%m-%d-%H-%M-%S-%s).bakup.zip "${_theme_dir}" && rm -r "${_theme_dir}"
+					write_information "Updating themes in ${_theme_dir}..."
+					[[ -e "${_theme_dir}" ]] && zip -m -r -5 -q ${_bakup_dir}/themes-$(date +%Y-%m-%d-%H-%M-%S-%s).bakup.zip "${_theme_dir}" ; rm -r "${_theme_dir}"
 					mkdir -p "${_theme_dir}"
 					
+
 					if git clone --depth=1 "${_git_theme_url}" "${_theme_dir}" ; then
-						echo done! 
+						write_information "done!"
 					else
 						_err_cmd=" git clone --depth=1 ${_git_theme_url} ${_theme_dir}"
 						dialog --backtitle "$( basename $0 )" --title "${BRAND} tools updater: ERROR!" --msgbox "\ncommand: \n $_err_cmd ." 20 80 ; clear
 					fi
-
 				;;
 			esac
-		done
+		done	
 }
 
 
