@@ -1,9 +1,10 @@
 # System Admin Tools
+
 < [Back](https://github.com/vonschutter/RTD-Setup/blob/main/README.md) |
 
 ![RTD Blind Install Media Header](https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/media_files/header-time.jpg "Executing the Script")
 
-###	Purpose: To simplify common support tasks
+## Purpose: To simplify common support tasks
 
         - Compress and encrypt items in a folder
         - Update system software

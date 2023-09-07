@@ -911,7 +911,7 @@ system::remove_old_kernel ()
                 if hash apt-get &>/dev/null ; then
                         dialog::display_notice "🧩 ${FUNCNAME[0]}: An apt based system has been found... proceeding... "
                         if [[ $? -eq 0 ]] ; then
-                                dpkg -l linux-* | awk '/^ii/{print $2}' | grep -E "[0-9]" | sort -t- -k3,4 --version-sort -r | sed -e "1,/$(uname -r | cut -f1,2 -d"-")/d" | grep -v -e "$(uname -r | cut -f1,2 -d"-")" | xargs sudo apt-get -y purge
+                                dpkg -l linux-* | awk '/^ii/{print $2}' | grep -E "[0-9]" | sort -t- -k3,4 --version-sort -r | sed -e "1,/$(uname -r | cut -f1,2 -d"-")/d" | grep -v -e "$(uname -r | cut -f1,2 -d"-")" | xargs apt-get -y purge
                                 return $?
                         else
                                 return 1
@@ -927,14 +927,12 @@ system::remove_old_kernel ()
                 elif hash dnf &>/dev/null ; then
                         dialog::display_notice "🧩 ${FUNCNAME[0]}: An DNF based package management system has been found... proceeding... "
                         if [[ $? -eq 0 ]] ; then
-                                dnf remove "$(dnf repoquery --installonly --latest-limit 2 -q)"
+                                dnf remove "$(dnf repoquery --installonly --latest-limit 2 -q)" 
                                 return $?
                         else
                                 return 1
                         fi
                 else
-                        # For distributions that do not need to add a repository to install snap
-                        # But would need to install it from their standard reopsitory....
                         dialog::display_notice "${FUNCNAME[0]}: a supported package manager was not found for this action..."
                         return 1
                 fi
@@ -11194,25 +11192,36 @@ list_loaded_software_functions ()
 # request this. If no arguments are provided, then all the functions in this
 # library will simply be loaded in to memory.
 
-
-
-
 set_colors
-# Find and load all dependant files... 
-for i in ${_OEM_DEPENDENCIES} ; do dependency::file ${i} ; done
-#&>/dev/null ; done
 
-if [[ -n "${LOGFILE}" ]] ; then
-	system::log_item "🧩 💻 ********************************************************************************"
-	system::log_item _LOGFILE="${LOGFILE}"
-else
+# check if library is loaded frrom a terminal or another script (behavior may differ)...
+if (return 0 2>/dev/null) ; 
+then 
+	sourced=0
+	write_warning "Library sourced in a terminal! "
 	if [[ -n ${_LOG_DIR} ]] ; then
-		_LOGFILE="${_LOG_DIR}/${0}.log"
+		_LOGFILE="${_LOG_DIR}/_rtd_library.log"
 	else
-		_LOGFILE="/var/log/${0}.log"
+		_LOGFILE="/var/log/_rtd_library.log"
 	fi
-	_LOGFILE="/dev/null"
+else 
+	sourced=1
+	if [[ -n "${LOGFILE}" ]] ; then
+		system::log_item "🧩 💻 ********************************************************************************"
+		system::log_item _LOGFILE="${LOGFILE}"
+	else
+		if [[ -n ${_LOG_DIR} ]] ; then
+			_LOGFILE="${_LOG_DIR}/${0}.log"
+		else
+			_LOGFILE="/var/log/${0}.log"
+		fi
+		mkdir -p ${_LOGFILE%$base}
+	fi
 fi
+
+# Find and load all dependant files... 
+for i in ${_OEM_DEPENDENCIES} ; do dependency::file ${i} &>/dev/null ; done 
+
 
 if [ -z $1 ]; then
 	echo "RTD Power Library $RTD_VERSION OK"
