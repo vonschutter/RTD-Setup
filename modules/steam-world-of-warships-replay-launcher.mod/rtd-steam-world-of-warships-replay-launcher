@@ -40,13 +40,38 @@ rtd::load_replays ()
 {
 	if [[ -d ~/.local/share/Steam/steamapps/common/World\ of\ Warships/replays ]] ; then
 		pushd ~/.local/share/Steam/steamapps/common/World\ of\ Warships/replays
-			_replay=$( zenity --file-selection )
+  
+                _replay=$( yad \
+                  --title="RTD World of Warships Replay Selector" \
+                  --text='<span foreground="red" font-size="xx-large" > \n Please select the replay that you want to see below:\n </span> '\
+                  --width=880 \
+                  --height=640 \
+                  --posx=80 \
+                  --posy=80 \
+                  --file-selection )
 			if [[ -n ${_replay}  ]] ; then
 				steam -applaunch 552990 "./replays/$( basename "${_replay}")"
 			else
 				echo "No file selected"
 			fi
 		popd
+ 	elif [[ -d ~/.steam/debian-installation/steamapps/common/World\ of\ Warships/replays ]] ; then
+		pushd ~/.steam/debian-installation/steamapps/common/World\ of\ Warships/replays
+                _replay=$( yad \
+                  --title="RTD World of Warships Replay Selector" \
+                  --text='<span foreground="red" font-size="xx-large" > \n Please select the replay that you want to see below:\n </span> '\
+                  --width=880 \
+                  --height=640 \
+                  --posx=80 \
+                  --posy=80 \
+                  --file-selection )
+			if [[ -n ${_replay}  ]] ; then
+				steam -applaunch 552990 "./replays/$( basename "${_replay}")"
+			else
+				echo "No file selected"
+			fi
+		popd
+           
 	else
 		zenity --error --text "It appears that you do not have world of warships installed, or replays are not enabled... Please install World of Warships in steam to use this tool."
 		exit 1
@@ -69,7 +94,7 @@ if echo "$OSTYPE" |grep "linux" ; then
 	else
 		echo "zenity is needed to select files... adding now..."
 		for i in zypper apt dnf ; do
-			if hash $i; then sudo $i install zenity || exit 1  ; fi
+			if hash $i; then sudo $i install yad -y || exit 1  ; fi
 		done
 		rtd::load_replays
 	fi
