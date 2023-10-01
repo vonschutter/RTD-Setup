@@ -176,7 +176,7 @@ if echo "$OSTYPE" |grep "linux" ; then
 			source /opt/${_TLA,,}/core/_rtd_library
 			oem::register_all_tools
 			ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
-			bash ${_OEM_DIR}/core/rtd-oem-linux-config.sh ${@}
+			bash ${_OEM_DIR}/core/rtd-oem-linux-config.sh ${*}
 		else
 			echo "Failed to retrieve instructions correctly! "
 			echo "Suggestion: check write permission in "/opt" or internet connectivity."
