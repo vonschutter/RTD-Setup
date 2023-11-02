@@ -297,6 +297,8 @@ echo			-	RTD System System Managment Bootstrap Script      -
 	ver | find "6.3" > %_LOGDIR%\%0.log && call :PS2 Windows 8
 	ver | find "6.3" > %_LOGDIR%\%0.log && call :PS2 Windows 8
 	ver | find "10.0" > %_LOGDIR%\%0.log && call :PS2 Windows 10
+	ver | find "11.0" > %_LOGDIR%\%0.log && call :PS2 Windows 11
+	ver | find "12.0" > %_LOGDIR%\%0.log && call :PS2 Windows 12
 
 	:: Windows Server OS Versions:
 	ver | find "NT 6.2" > %_LOGDIR%\%0.log && call :PS2 Windows Server 2012
