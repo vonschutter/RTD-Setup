@@ -159,7 +159,7 @@ if echo "$OSTYPE" |grep "linux" ; then
 	echo "Linux OS Found: Attempting to get instructions for Linux..."
 	echo executing $0 >> ${_LOGFILE}
 	for d in git zip ; do 
-		if ! hash ${d} &>> ${_LOGFILE} ; then
+		if ! command -v "${d}" 2&1>> "${_LOGFILE}" ; then
 			for pkgmgr in apt yum dnf zypper ; do hash ${pkgmgr} && ${pkgmgr} install -y ${d} | tee -a ${_LOGFILE} ; done
 		fi
 	done
