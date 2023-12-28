@@ -707,7 +707,7 @@ recipe_Bundle:_Admin_Tools () {
 	# NOT REMOVABLE. Bundle contains downloaded software from sites. 
 	# Loop through each item in this list of software and perform an install
 	# using the relevant packaging system.
-	AdminToolsAppList="nmap synaptic ssh sshfs htop iftop nethogs glances bmon \
+	AdminToolsAppList="nmap synaptic ssh sshfs htop iftop nethogs glances bmon btop \
 		vim vim-scripts variety diodon polari filezilla tilix dialog byobu bleachbit"
 
 	for i in ${AdminToolsAppList}
@@ -716,7 +716,7 @@ recipe_Bundle:_Admin_Tools () {
 	done
 
 	# Installs Java, needed for cross platform software like Minecraft and others
-	software::add_native_package default-jre
+	# software::add_native_package default-jre
 
 	# Teamviewer remote admin		
 	Single_Install_Remote_Desktop_by_Team_Viewer			
@@ -755,14 +755,14 @@ recipe_Bundle:_Digital_Art_and_Imaging () {
 
 	# It is perfect for sketching and painting, and presents an end–to–end solution for creating 
 	# digital painting files from scratch by masters.
-	software::from_snapcraft.io org.kde.krita $1
+	software::from_flathub.org org.kde.krita $1
 
 	# Whether you are a graphic designer, photographer, illustrator, or scientist, GIMP provides 
 	# you with sophisticated tools to get your job done.
-	software::from_snapcraft.io org.gimp.GIMP $1
+	software::from_flathub.org org.gimp.GIMP $1
 
 	# Inkscape is a Free and open source vector graphics editor.				
-	software::from_snapcraft.io org.inkscape.Inkscape $1
+	software::from_flathub.org org.inkscape.Inkscape $1
 
 	# PhotoScape is a fun and easy photo editing software that enables you to fix and enhance photos		
 	software::from_snapcraft.io photoscape $1
@@ -789,6 +789,7 @@ recipe_Bundle:_Secure_Communication () {
 	# meaning that they cannot access the wich is not granted explicitly.
 	
 	# Encrypted person to person chat/call/conferencing  
+	# The signal snap package integrates bettwer than the flatpak package.
 	software::from_snapcraft.io signal-desktop $1
 
 	# Encrypted chat, group commmunications
@@ -805,13 +806,17 @@ recipe_Bundle:_Social_Non_Secured_Communication () {
 	# This bundle includes social media communications software: Discord, Skype
 	# for privacy, but may be encrypted. This software is often useful for legacy reasons
 	# or used for gaming.
-	  
-	software::from_snapcraft.io discord $1				# Official Snap: All-in-one voice and text chat for gamers that's free, and works on both your desktop and phone.
-		snap connect discord:system-observe
-	software::from_snapcraft.io skype $1				# Official Snap:  Connect, Create, Talk & Discover, now with Bing GPT-4
-	software::from_flathub.com com.viber.Viber $1			# Send free messages and make free calls to other Viber users on any device and network, in any country!
-}
 
+	# Official Snap: All-in-one voice and text chat for gamers that's free, and works on both your desktop and phone.  
+	software::from_snapcraft.io discord $1				
+		snap connect discord:system-observe
+
+	# Official Snap:  Connect, Create, Talk & Discover, now with Bing GPT-4
+	software::from_snapcraft.io skype $1	
+
+	# Send free messages and make free calls to other Viber users on any device and network, in any country!
+	software::from_flathub.com com.viber.Viber $1			
+}
 
 
 
@@ -823,8 +828,12 @@ recipe_Bundle:_CLOUD_Storage () {
 	# includes the 5 eyes english speaking intelligence agencies cooperation and information
 	# sharing.
 	# 
-	Single_Install_MEGA.nz_Encrypted_Cloud_Storage	megasync	# Secure cloud storage
-	Single_Install_Dropbox_Corporate_Cloud_Storage			# Common cloud storage (vendor has access to crypto keys)
+
+	# Secure cloud storage (vendor does not have access to crypto keys)
+	Single_Install_MEGA.nz_Encrypted_Cloud_Storage	megasync	
+
+	# Common cloud storage (vendor has access to crypto keys)
+	Single_Install_Dropbox_Corporate_Cloud_Storage			
 }
 
 

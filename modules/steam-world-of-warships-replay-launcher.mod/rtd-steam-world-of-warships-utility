@@ -1,0 +1,385 @@
+#!/bin/bash
+:<<"::CMDLITERAL"
+@ECHO OFF
+GOTO :CMDSCRIPT
+::CMDLITERAL
+
+
+#                              STEAM LINUX REPLAY LAUNCHER
+# ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# ::::::::::::::::::::::::::::::::::::::::::::// OEM ENABLE CONFIG //::::::::::::::::// Linux //::::::::
+DOC="
+Author:   	Vonschutter
+Version 	1.10
+
+
+Purpose: 
+
+The purpose of this script is to simplify managing you World of Warships game in 
+Steam on any supported distribution of Linux.This script will allow you to install 
+Steam, World of Warships, and Proton GE. It will also allow you to launch 
+World of Warships and select which replay you want to watch.
+
+As per the writing of this script World of Warships automatically stores the last 30
+replays on your system. There have been many posts asking how to watch them so this
+script helps facilitate that. Because a Windows user may be tempted to download 
+this script; this script will terminate whenever anyone tries to run it on a Windows
+PC so no harm can come to the Windows user's PC.
+
+Usage:	
+
+Simply execute this script to accomplish this task. No parameters required.
+
+To install GE-Proton simply select the version you want to install and click install.
+To install Steam simply click install steam.
+To install World of Warships simply click install World of Warships.
+To watch a replay simply click watch replay and select the replay you want to watch.
+
+"
+# :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# This script is shared in the hopes that someone will find it useful.
+# This script is intended to live in the ~/bin/ or /bin/ folder, alternatively in the $PATH.
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Setings                  ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+_wow_location_steam_old=".local/share/Steam/steamapps/common/World of Warships/replays"
+_wow_location_steam_deb=".steam/debian-installation/steamapps/common/World of Warships/replays"
+_wow_location_steam_new=".steam/root/steamapps/common/World of Warships/replays"
+_wow_location_steam_flatpak=".var/app/com.valvesoftware.Steam/steamapps/common/World of Warships/replays"
+_wow_location_steam_snap="snap/steam/steamapps/common/World of Warships/replays"
+_title="RTD Unofficial Steam World of Warships Utility"
+_steam_install_url_rpm="https://steamcdn-a.akamaihd.net/client/installer/steam.rpm"
+_steam_install_url_deb="https://steamcdn-a.akamaihd.net/client/installer/steam.deb"
+_ui_side_bar="/opt/rtd/modules/steam-world-of-warships-replay-launcher.mod/media_files/sideimg.png"
+_ui_header="/opt/rtd/modules/steam-world-of-warships-replay-launcher.mod/media_files/header-sm.png"
+_ge_proton_target_dir="$HOME/.steam/root/compatibilitytools.d/"
+_ge_proton_repo="https://github.com/GloriousEggroll/proton-ge-custom/releases"
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+
+software::vendor_download_and_install ()
+{
+# Description: Function to ease and make consistent the downloading of the non repository
+# packages and install them. It can install any package that Package Kit can manage (available on most Linux dists)
+
+
+	download_url="$1"
+	fetch_file () { wget -P ${_OEM_DIR}/cache "${download_url}"  ; }
+
+	echo  "${FUNCNAME[0]}: getting package ${download_url}..."
+	if hash wget ; then
+		fetch_file
+	elif check_dependencies wget ; then
+		fetch_file
+	else
+		write_error "Unable to download requested file:  ${download_url}..."
+		write_error "Please check if wget is available since this is used to download files..."
+		write_error "You may also want to check that the internet is reachable from this computer?"
+		return 1
+	fi
+
+	echo "${FUNCNAME[0]}: Installing package $(basename ${download_url}) ..."
+	if hash pkcon ; then
+		pkcon install-local -y ${_OEM_DIR}/cache/"$(basename "${download_url}")"
+		return $?
+	else
+		check_dependencies packagekit-tools
+		pkcon install-local -y ${_OEM_DIR}/cache/"$(basename "${download_url}")"
+		return $?
+	fi
+}
+
+
+
+
+
+
+
+steam::install_proton_ge ()
+{
+	gelist="$(curl -s "${_ge_proton_repo}" | grep 'GE-Proton*-*' | grep -v 'span' | grep -v 'div' | grep -v 'href' | grep -v 'class')"
+	versions=($( for i in ${gelist} ; do echo FALSE $i ; done))
+
+	selected_versions=$(yad --title "Select GE-Proton Versions to Install" \
+		--list --checklist \
+		--column "Select" --column "Version" \
+		--width 780 --height 300 \
+		"${versions[@]}" \
+		--button="Install:0" --button="Cancel:1" \
+		--print-column="2" --multiple --separator=" " \
+		--separator=" " \
+		--image="${_ui_side_bar}" )
+
+	if [ $? -ne 0 ]; then
+		echo "Installation canceled."
+		exit 1
+	fi
+	action_items=($( for i in ${selected_versions} ; do echo $i ; done))
+	echo "Installing the following versions: ${action_items[@]}"
+	get_ge_proton () {
+		target_dir="$_ge_proton_target_dir"
+		mkdir -p "${target_dir}"
+		local _total_count=${#action_items[@]}
+		local _count=1
+
+		for version in ${action_items[@]} ; do
+			echo "# Processing ${_count} of ${_total_count}: ${version}..."
+			url="${_ge_proton_repo}/download/$version/$version.tar.gz"
+
+			if [[ -d "${target_dir}/${version}" ]]; then
+				echo "# $version is allready installed..." 
+			else
+				echo "# Downloading ${version}: Please wait..."
+				if wget -q "${url}" -P "${target_dir}" ; then
+					echo "# Downloaded ${version} successfully!"
+				else 
+					echo "# Failed to download ${version}! "  
+				fi
+
+				echo "# Extracting ${version}: Please wait..."
+				if tar -xvf "${target_dir}/${version}.tar.gz" -C "${target_dir}" ; then
+					echo "# extracted ${version}"  
+				else
+					echo "# Failed to extract ${version}! " 
+				fi
+				rm "${target_dir}/${version}.tar.gz" 
+			fi
+			((_count=_count+1))
+			echo $(( 100*${_count}/${_total_count} ))
+		done
+	}
+	get_ge_proton | yad --progress --auto-close  \
+		--title="$_title" \
+		--text="Installing GE-Proton:" \
+		--image="${_ui_side_bar}" \
+		--percentage=0 \
+		--auto-kill \
+		--auto-close \
+		--width 800 --height 600 \
+		--no-buttons \
+		--enable-log \
+		--log-on-top \
+		--log-expanded \
+		--log-height 400 \
+		--center 
+	rtd_say "${action_items[@]} ${_ui_message_003}" 
+	exit 0
+}
+
+
+steam::find_replays ()
+{
+	if [[ -d ~/${_wow_location_steam_old} ]] ; then
+		wow_path="$_wow_location_steam_old"
+		export wow_path
+ 	elif [[ -d ~/"${_wow_location_steam_deb}" ]] ; then
+		wow_path="$_wow_location_steam_deb"
+		export wow_path
+ 	elif [[ -d ~/"${_wow_location_steam_new}" ]] ; then
+		wow_path="$_wow_location_steam_new"
+		export wow_path
+ 	elif [[ -d ~/${_wow_location_steam_flatpak} ]] ; then
+		wow_path="$_wow_location_steam_flatpak"
+		export wow_path
+ 	elif [[ -d ~/${_wow_location_steam_snap} ]] ; then
+		wow_path="$_wow_location_steam_snap"
+		export wow_path
+	else
+		yad --error --text "It appears that you do not have world of warships installed, or replays are not enabled... Please install World of Warships in steam to use this tool."
+		exit 1
+	fi
+}
+
+
+
+
+steam::load_replays ()
+{
+	steam::find_replays
+	while true ; do
+		echo "WoW Path = $wow_path"
+		pushd ~/"$wow_path"
+		_replay=$( yad \
+			--title="$_title" \
+			--text='<span font-size="xx-large" > \n Please select the replay that you want to see below:\n </span> '\
+			--width=880 \
+			--height=640 \
+			--button=Quit:1 \
+			--button=Watch:0 \
+			--posx=90 \
+			--posy=90 \
+			--file-selection ) 
+			ret=$?
+
+			case $ret in 
+				0 )
+					if [[ -n ${_replay}  ]] ; then
+						steam -applaunch 552990 "./replays/$( basename "${_replay}")"
+					else
+						rtd_say "No file selected"
+					fi
+				;;
+				1) clear && echo [Quit] && break ;;
+				252) clear && echo [ESC] && break ;;
+				* ) clear && echo "[Unknown Request]" && break ;;
+			esac
+		popd  
+		unset _replay
+	done
+}
+
+
+
+steam::wow_manager_ui ()
+{
+	while true ; do
+		_replay=$( yad \
+			--form \
+			--image="$_ui_header" \
+			--title="$_title" \
+			--width=800 \
+			--height=300 \
+			--button="Watch WoW replay":0 \
+			--button="Install WoW":2 \
+			--button="Install Steam":3 \
+			--button="Install Proton GE":4 \
+			--button="About":5 \
+			--button="Quit":1 \
+			--posx=80 \
+			--posy=80 \
+			--buttons-layout=center )
+			ret=$?
+
+			case $ret in 
+				0 ) steam::load_replays & disown  ;;
+				1 ) clear && echo [Quit] && break ;;
+				2 ) clear && if hash steam ; then steam -applaunch 552990 ; else rtd_say "$_error_message_003" ; fi ;;
+				3 ) clear && steam::install_steam  & disown ;;
+				4 ) clear && steam::install_proton_ge  & disown ;;
+				5 ) clear && rtd_say "${DOC}"  & disown ;;
+				252) clear && echo [ESC] && break ;;
+				* ) clear && echo "[Unknown Request]" && break ;;
+			esac
+	done
+}
+
+
+steam::install_steam ()
+{
+	if hash steam ; then
+		rtd_say "$_error_message_007"
+	else
+		if hash rpm &>/dev/null; then
+			software::vendor_download_and_install "$_steam_install_url_rpm"
+		elif hash apt &>/dev/null; then
+			software::vendor_download_and_install "$_steam_install_url_deb"
+		else
+			rtd_say "$_error_message_005" && return 1
+		fi
+	fi
+
+}
+ 
+
+
+
+rtd_say ()
+{
+	echo -e "
+	$*" | \
+	yad  \
+	--fontname="Bold 12" \
+	--margins=20 \
+	--title="$_title" \
+	--tail --listen --wrap --monitor --text-info \
+	--width=800 \
+	--height=600 \
+	--image="$_ui_side_bar" \
+	--posx=90 \
+	--posy=90 \
+	--buttons-layout=center \
+	--no-cancel 
+
+}
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::               Messages                   ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+_error_message_001="It appears that you do not have world of warships installed, or replays are not enabled... Please install World of Warships in steam to use this tool."
+_error_message_002="Some required packages eed to be installed for this app to work... 
+	Doing so now... 
+	Please provide admin password:"
+_error_message_003=" To install World of Warships please install Steam and then install World of Warships from steam or here."
+_error_message_004=" NO! Just say no! Please install Linux instead of Windows and then Steam and then World of Warships"
+_error_message_005=" 
+	I am not sure how to find the Steam download. Please try to download it manually and install it from the website: 
+	
+	https://store.steampowered.com/about/ 
+	"
+_error_message_006="Failed to load the RTD library: cannot install steam"
+_error_message_007="Steam is already installed!"
+_ui_message_001=" Welcome to the RTD Steam WoW manager.  Please Select what you want to do below:
+		\n 1. Watch a World of Warships game replay
+		\n 2. Quit"
+_ui_message_002=" Please select the replay that you want to see below:"
+_ui_message_003="
+Have now been processed. To use these versions of proton select them in steam under the properties of the game you want to use them with. 
+Please NOTE: you need to restart steam to be able to select the new versions of proton."
+
+
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Execute tasks                   ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+if echo "$OSTYPE" |grep "linux" ; then
+	if hash yad ; then
+		steam::wow_manager_ui 
+	else
+		echo "$_error_message_002"
+		for i in zypper apt dnf ; do
+			if hash $i; then sudo $i install yad -y || exit 1  ; fi
+		done
+		steam::wow_manager_ui 
+	fi
+        exit $?
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "Mac OSX is currently not supported..."
+elif [[ "$OSTYPE" == "cygwin" ]]; then
+        echo "CYGWIN is currently unsupported..."
+elif [[ "$OSTYPE" == "msys" ]]; then
+        echo "Lightweight shell is currently unsupported... "
+elif [[ "$OSTYPE" == "freebsd"* ]]; then
+        echo "Free BSD is currently unsupported... "
+else
+       echo "I litterally have no IDEA what this OS could POSSIBLY be!"
+fi
+exit $?
+
+:CMDSCRIPT
+echo "NO! Just say no! Please install Linux instead of Windows and then Steam and then World of Warships"

@@ -159,7 +159,7 @@ if echo "$OSTYPE" |grep "linux" ; then
 	echo "Linux OS Found: Attempting to get instructions for Linux..."
 	echo executing $0 >> ${_LOGFILE}
 	for d in git zip ; do 
-		if ! hash ${d} &>> ${_LOGFILE} ; then
+		if ! command -v "${d}" 2&1>> "${_LOGFILE}" ; then
 			for pkgmgr in apt yum dnf zypper ; do hash ${pkgmgr} && ${pkgmgr} install -y ${d} | tee -a ${_LOGFILE} ; done
 		fi
 	done
@@ -176,7 +176,7 @@ if echo "$OSTYPE" |grep "linux" ; then
 			source /opt/${_TLA,,}/core/_rtd_library
 			oem::register_all_tools
 			ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
-			bash ${_OEM_DIR}/core/rtd-oem-linux-config.sh ${@}
+			bash ${_OEM_DIR}/core/rtd-oem-linux-config.sh ${*}
 		else
 			echo "Failed to retrieve instructions correctly! "
 			echo "Suggestion: check write permission in "/opt" or internet connectivity."
@@ -297,6 +297,8 @@ echo			-	RTD System System Managment Bootstrap Script      -
 	ver | find "6.3" > %_LOGDIR%\%0.log && call :PS2 Windows 8
 	ver | find "6.3" > %_LOGDIR%\%0.log && call :PS2 Windows 8
 	ver | find "10.0" > %_LOGDIR%\%0.log && call :PS2 Windows 10
+	ver | find "11.0" > %_LOGDIR%\%0.log && call :PS2 Windows 11
+	ver | find "12.0" > %_LOGDIR%\%0.log && call :PS2 Windows 12
 
 	:: Windows Server OS Versions:
 	ver | find "NT 6.2" > %_LOGDIR%\%0.log && call :PS2 Windows Server 2012
