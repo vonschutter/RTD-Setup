@@ -317,6 +317,29 @@ dialog::display_cmd_output ()
 
 
 
+yad::display_cmd_output ()
+{
+# Description: Function to display a command output in a progress box. 
+# 
+# Globals: yad 
+# Arguments: ["String to execute"]
+# Outputs: Message in dialog box
+# Returns: 0 or ESC
+# Usage:
+#
+#
+# yad::display_cmd_output apt -y upgrade
+#
+# End of Documentation
+	_cmd="$*"
+
+
+	${_cmd} | yad --title="$PUBLICATION $VERSION" --progress --pulsate --auto-close --auto-kill --text="RUNNING: ${_cmd}" --width=300 --height=100
+
+}
+
+
+
 
 dialog::copy_file_progress ()
 {
@@ -389,9 +412,9 @@ dialog::display_notice ()
 #
 # End of Documentation
 
-	hash "${RTD_GUI:-dialog}" &>/dev/null || check_dependencies "${RTD_GUI:-dialog}" &>/dev/null || return 1
+	hash dialog &>/dev/null || check_dependencies "${RTD_GUI:-dialog}" &>/dev/null || return 1
 
-	${RTD_GUI:-dialog} --backtitle "${PUBLICATION:-"Notice"}" --colors --no-collapse --title "Notice" --msgbox "\n ${*} \n" 15 78
+	dialog --backtitle "${PUBLICATION:-"Notice"}" --colors --no-collapse --title "Notice" --msgbox "\n ${*} \n" 15 78
 	clear
 }
 
@@ -413,13 +436,18 @@ dialog::display_summary_message ()
 #
 # End of Documentation
 
-	system::log_item "Displaying summary message TITLE: $1"
-	hash "${RTD_GUI:-dialog}" &>/dev/null || check_dependencies "${RTD_GUI:-dialog}" &>/dev/null || return 1
+	if ! hash dialog &>/dev/null ; then	
+		system::log_item "dialog not found..."
+		check_dependencies dialog &>/dev/null || return 1
+	else
+		system::log_item "dialog found..."
+	fi
 
+	system::log_item "Displaying summary message TITLE: $1 and the message: ${_summary_message}"
 	if echo "${FUNCNAME[1]}" | grep "make_kvm_virtual_machine" ; then 
-		${RTD_GUI:-dialog} --backtitle "$BRANDING" --colors --no-collapse --title "$1" --msgbox "\n ${_summary_message} \n" 0 0
+		dialog --backtitle "$BRANDING" --colors --no-collapse --title "$1" --msgbox "\n ${_summary_message} \n" 0 0
 	else 
-		${RTD_GUI:-dialog} --backtitle "$BRANDING" --colors --no-collapse --title "$1" --msgbox "${_summary_message}" "${HEIGHT:-"20"}" "${WIDTH:-"80"}"
+		dialog --backtitle "$BRANDING" --colors --no-collapse --title "$1" --msgbox "${_summary_message}" "${HEIGHT:-"20"}" "${WIDTH:-"80"}"
 	fi
 	clear
 }
@@ -442,8 +470,15 @@ display_result ()
 # display_result "title of the mesage"
 #
 # End of Documentation
-	hash "${RTD_GUI:-dialog}" &>/dev/null || check_dependencies "${RTD_GUI:-dialog}" &>/dev/null || return 1
+	system::log_item "checking for dialog..."
+	if ! hash "${RTD_GUI:-dialog}" &>/dev/null ; then
+		system::log_item "${RTD_GUI:-dialog} not found..."
+		check_dependencies "${RTD_GUI:-dialog}" &>/dev/null || return 1
+	else
+		system::log_item "${RTD_GUI:-dialog} found..."
+	fi
 
+	system::log_item "Displaying result: $1 "
 	${RTD_GUI:-dialog} --backtitle "$BRANDING" --colors --no-collapse --title "$1" --msgbox "$result" "${HEIGHT:-"20"}" "${WIDTH:-"80"}"
 	clear
 }
@@ -702,10 +737,8 @@ dependency::os_linux ()
 
 
 
-dependency::file ()
-{
+dependency::file () {
 # Description: Function to check for a bash library or script file and source it.
-#
 #
 # Globals:
 # Arguments: Filename
@@ -716,56 +749,63 @@ dependency::file ()
 
 	local _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
 	local _tgt="${1}"
+	
+	dependency::search_local () {
+		# Description: Internal function!
+		# It may not be useful to call this directly. This function searches 
+		# a predetermined set of paths for a given file, and source it if found.
+		# it is part of the function dependency::file -- use this instead.
+		# End of Documentation
 
-	dependency::search_local ()
-	{
-	# Description: Internal function!
-	# It may not be useful to call this directly. This function searches 
-	# a predetermined set of paths for a given file, and source it if found.
-	# it is part of the function dependency::file -- use this instead.
-	# End of Documentation
+		system::log_item "Requested dependency file: ${1} ..."
 
-		echo "${FUNCNAME[0]}: Requested dependency file: ${1} ..."
+		local paths=(
+			"./${1}"
+			"../core/${1}"
+			"../../core/${1}"
+			"${0%/*}/../core/${1}"
+			"${0%/*}/../../core/${1}"
+			"/usr/local/lib/${1}"
+			"/usr/lib/${1}"
+			"/opt/${1}"
+		)
 
-		for i in "./${1}" \
-                 "../core/${1}" \
-                 "../../core/${1}" \
-                 "${0%/*}/../core/${1}" \
-                 "${0%/*}/../../core/${1}" \
-                 "$(find /opt -name ${1} \
-                 |grep -v bakup )" ; do 
-			echo "${FUNCNAME[0]}: Searching for ${i} ..."
-			if [[ -e "${i}" ]] ; then 
-				echo "${FUNCNAME[0]}: Found ${i}"
-				source "${i}" ""
+		for path in "${paths[@]}"; do 
+			system::log_item "Searching for ${path} ..."
+			if [[ -e "${path}" ]]; then 
+				system::log_item "Found ${path}"
+				source "${path}" ""
 				return 0
 			fi
 		done
+
 		return 1
 	}
 
 	if dependency::search_local "${1}" ; then
 		return 0
 	else
-		echo "$(date) failure to find $1 on the local comuter, now searching online..."
-		if curl -sL "$_src_url" | source /dev/stdin ; then 
-			echo "${FUNCNAME[0]} Using: ${_src_url} directly from URL..."
-		elif wget "${_src_url}" &>/dev/null ; then
-			source ./"${1}"
-			echo "${FUNCNAME[0]} Using: ${_src_url} downloaded..."
+		system::log_item "$(date) failure to find $1 on the local computer, now searching online..."
+		local tmpdir=$(mktemp -d)
+		if curl -sL "$_src_url" -o "${tmpdir}/${1}" ; then 
+			system::log_item "Using: ${_src_url} directly from URL..."
+			source "${tmpdir}/${1}"
+		elif wget "${_src_url}" -O "${tmpdir}/${1}" &>/dev/null ; then
+			source "${tmpdir}/${1}"
+			system::log_item "Using: ${_src_url} downloaded..."
 		else 
-			echo "${FUNCNAME[0]} Failed to find  ${1} "
+			system::log_item "Failed to find  ${1} "
 			exit 1
 		fi
+		rm -rf "${tmpdir}"
 	fi 
 }
 
 
 
 
-oem::deploy_themes ()
-{
-# Description: Function to dowload and deploy themes from Github.
+oem::deploy_themes () {
+# Description: Function to download and deploy themes from Github.
 #              The github location is defined in the _locations file for consistency.
 #
 # Globals:
@@ -777,17 +817,22 @@ oem::deploy_themes ()
 # End of documentation
 
 	local GIT_Theme_URL="${1:-"$GIT_Theme_URL"}"
-	local _THEME_DIR="${_THEME_DIR:-"/opt/${_TLA:-"rtd",,}/themes"}"
-	mkdir -p "${_THEME_DIR}"
-	[[ -z "${GIT_Theme_URL}" ]] && (
-		write_error "No theme URL found! It need to be set in the _locations file or passed as an argument."
+	local _THEME_DIR="${_THEME_DIR:-"/opt/${_TLA:-rtd}/themes"}"
+
+	if ! mkdir -p "${_THEME_DIR}"; then
+		write_error "Failed to create directory ${_THEME_DIR}"
 		return 1
-	)
+	fi
+
+	if [[ -z "${GIT_Theme_URL}" ]]; then
+		write_error "No theme URL found! It needs to be set in the _locations file or passed as an argument."
+		return 1
+	fi
 	
-	if git clone --depth=1 "${GIT_Theme_URL}" "${_THEME_DIR}" ; then
-		write_status "Cloned ${GIT_Theme_URL} sucessfully. " 
+	if git clone --depth=1 "${GIT_Theme_URL}" "${_THEME_DIR}"; then
+		write_status "Cloned ${GIT_Theme_URL} successfully."
 	else
-		write_error "An error occurred while cloinging ${GIT_Theme_URL} "
+		write_error "An error occurred while cloning ${GIT_Theme_URL}."
 		return 1
 	fi
 }
@@ -823,10 +868,7 @@ dependency::virtualization ()
 	Fedora ) 
 		local _probable_dependencies="bridge-utils libvirt virt-install qemu-kvm virt-top libguestfs-tools guestfs-tools" 
 	;;
-	Debian ) 
-		local _probable_dependencies="bridge-utils cpu-checker libvirt-clients libvirt-daemon qemu qemu-kvm virtinst" 
-	;;
-	Ubuntu ) 
+	Debian | Ubuntu) 
 		local _probable_dependencies="bridge-utils cpu-checker libvirt-clients libvirt-daemon qemu qemu-kvm virtinst" 
 	;;
 	* ) 
@@ -842,7 +884,6 @@ dependency::virtualization ()
 			count=$((count + 1))
 		done
 	fi
-
 }
 
 
@@ -998,6 +1039,7 @@ system::oem_autounlock_disk ()
 # Usage: oem_autounlock_disk
 #
 # End of Documentation
+	local _pass="$1"
 	cp  /boot/initrd.img-$(uname -r)  /boot/initrd.img-$(uname -r).bak
 
 	cat > /boot/grub/grub.cfg <<- OEM_CRYPTLOCK_OPTION
@@ -1026,7 +1068,7 @@ system::oem_autounlock_disk ()
 	chmod 0400 /boot/keyfile
 
 	# 4. Add the new file as unlock key to the encrypted volume
-	echo letmein1234 | cryptsetup -v luksAddKey "$(blkid | grep crypto_LUKS|  cut -d : -f 1)" /boot/keyfile -
+	echo ${_pass} | cryptsetup -v luksAddKey "$(blkid | grep crypto_LUKS|  cut -d : -f 1)" /boot/keyfile -
 
 	# 6. Edit /etc/crypttab
 	chmod 0777 /etc/crypttab
@@ -7912,7 +7954,7 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 	: ${_mem:="${_mem:=2048}"}
 	: ${_dsk:="${_dsk:=100}"}
 
-	dependency::virtualization:
+	dependency::virtualization
 
 	# Fetch the relevand ISO if necessary...
 	system::log_item "🔎 Retreive list of available $ubuntu_flavor $_role versions..."
@@ -7937,7 +7979,7 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: Using subiquity installer..."
 		if [[ "${_role}" == "desktop" ]] ; then
 			system::log_item "Ubuntu role = desktop: changing to server media due to subiquity..."
-			_role="server"
+			#_role="server"
 		fi
 	else
 		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: Using debian installer (d-i)..."
@@ -7961,7 +8003,7 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 	# Detect and set variables for key programs
 	: ${bin_virt_install:=$(type -p virt-install)}
 	: ${virt_net="$(system::find_vm_bridge)"}
-	local vm_name="${_task}-${tgt_ubuntu_ver}-${RANDOM}"
+	local vm_name="#Template_${_task}-${tgt_ubuntu_ver}-$(date +%Y-%m-%d-%s)"
 
 	system::generate_cloudconfig
 	system::make_preseed_cfg -r "${_role}" -p "$( mktemp -d)" -t ${_task}
@@ -7978,8 +8020,8 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 			disk= ${CloudConfig}/cidata.iso,device=cdrom \n
 			os-variant="$tgt_ubuntu_ver" \n
 			video= "virtio" --channel "spicevmc" \n
-			Source="${iso}\n
-			kernel=casper/vmlinuz,initrd=casper/initrd" "
+			Source="${iso}" \n
+			kernel="casper/vmlinuz,initrd=casper/initrd" "
 	system::log_item "${_summary_message}"
 
 	# Create the appropriate VM as requested...
@@ -8014,7 +8056,7 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 				localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 				--initrd-inject="$PRESEED_FILE" \
 				--initrd-inject="$( dirname ${PRESEED_FILE})/ks.cfg" \
-				--noautoconsole && dialog::display_summary_message "NOTICE!"  \
+				--noautoconsole |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"  \
 			|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 		;;
 		* ) write_error "Unknown option requested!"
@@ -8022,7 +8064,7 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 	esac
 
 	# Clean up residual variables...
-	for i in  PRESEED_FILE vm_kernel vm_initrd source_url _task _role _cpu _dsk _mem tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig ; do unset $i ; done
+	for i in  PRESEED_FILE vm_kernel vm_initrd source_url _task _role _cpu _dsk _mem tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig _summary_message ; do unset $i ; done
 }
 
 
