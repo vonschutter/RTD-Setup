@@ -1022,7 +1022,7 @@ system::change_disk_pass ()
 
 system::oem_autounlock_disk ()
 {
-# Setup automatic unlocking of the encrypted system disk (encryption is default on RTD systems).
+# Setup automatic unlocking of the encrypted system disk.
 # NOTE: This will render the encryption useless since the key to unlock the encrypted
 # volume will be located on an unencrypted location on the same system as the encrypted volume.
 # This is the same as locking your door and leaving the key by the door outside.
@@ -1221,7 +1221,12 @@ check_menu_availability ()
 	elif hash whiptail 2>/dev/null ; then
 		: "${RTD_GUI:="whiptail --fb"}"
 		export RTD_GUI
-		if ( $RTD_GUI --backtitle "$BRANDING" --title "System Information Menu" --no-button "NO: Use whiptail" --yes-button "YES: Install dialog" --yesno "Please NOTE that we are using WHIPTAIL as a terminal menu system, which is missing several features compared to the default: DIALOG menu system. There are a few reasons we may be using WHIPTAIL instead: I was forced to use it or it is the only terminal menu system available... If you continue with the current WHIPTAIL some things might not work. \n \n May I please try to install the dialog system in stead? . \n  " 20 90 ); then
+		if ( $RTD_GUI --backtitle "$BRANDING" \
+			--title "System Information Menu" \
+			--no-button "NO: Use whiptail" \
+			--yes-button "YES: Install dialog" \
+			--yesno "Please NOTE that we are using WHIPTAIL as a terminal menu system, which is missing several features compared to the default: DIALOG menu system. There are a few reasons we may be using WHIPTAIL instead: I was forced to use it or it is the only terminal menu system available... If you continue with the current WHIPTAIL some things might not work. \n \n May I please try to install the dialog system in stead? . \n  " \
+			20 90 ); then
 			RTD_GUI=dialog
 			err_no_menu_system_found
 		else
@@ -8177,15 +8182,18 @@ make_kvm_virtual_machine_now_from_microsoft ()
 
 	if [[ ! -e "${WindowsInstructions}" ]]; then
 		write_information "Generate Windows Instruction media..."
-		mkfs.msdos -C ${WindowsInstructions} 1440 || rtd_oem_pause 1
+			if ! hash mkfs.msdos ; then check_dependencies dosfstools ; fi
+			mkfs.msdos -C ${WindowsInstructions} 1440 || rtd_oem_pause 1
 
 		write_information "Generate installations instructions for Windows..."
-		generate_autounattend_xml "${AutoUnattend}" || rtd_oem_pause 1
+			generate_autounattend_xml "${AutoUnattend}" || rtd_oem_pause 1
 
 		write_information "Generate post install bootstrap script..."
-		generate_rtd_me_sh_cmd ${PostTasks}
-		mcopy -i ${WindowsInstructions} ${PostTasks} ::/ || rtd_oem_pause 1
-		mcopy -i ${WindowsInstructions} ${AutoUnattend} ::/ || rtd_oem_pause 1
+			generate_rtd_me_sh_cmd ${PostTasks}
+			if ! hash mcopy ; then check_dependencies mtools ; fi
+			mcopy -i ${WindowsInstructions} ${PostTasks} ::/ || rtd_oem_pause 1
+			mcopy -i ${WindowsInstructions} ${AutoUnattend} ::/ || rtd_oem_pause 1
+
 		for i in ${_OEM_DIR}/modules/Windows.mod/_* ; do
 			mcopy -i ${WindowsInstructions} ${i} ::/ || rtd_oem_pause 1
 		done
@@ -8215,8 +8223,8 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		--cdrom "${WindowsMedia}" \
 		--disk "${WindowsInstructions}",device=floppy \
 		--livecd \
-        --tpm default \
-        ${uefi_option} \
+		--tpm default \
+		${uefi_option} \
 		--noautoconsole && dialog::display_summary_message "NOTICE!"  \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
