@@ -6269,7 +6269,7 @@ rtd_update_system ()
 # Description:
 # System update function. The purpose of this function is to update installed software from
 # distribution reopositories and the newer self contained universal software stores like
-# snap and flatpak.
+# snap and flatpak with a cleaned up oputput only displaying status.
 # Function does not expect any argument. However it will respect one argument \"simple\"
 # The simple argument instructs this functions [pkcon] action to display simple output
 # rather than more user friendly output.
@@ -6282,7 +6282,7 @@ rtd_update_system ()
 # Arguments: None
 # Outputs:
 # Returns:
-# Usage: z
+# Usage: rtd_update_system
 # End of documentation
 	ensure_admin
 	PUBLICATION="$BRANDING Update Manager for Linux"
@@ -6352,6 +6352,90 @@ rtd_update_system ()
 	fi
 
 }
+
+
+
+
+
+software::update_system_txt ()
+{
+# Description:
+# System update function. The purpose of this function is to update installed software from
+# distribution reopositories and the newer self contained universal software stores like
+# snap and flatpak with normal text only default output.
+# Function does not expect any argument. However it will respect one argument \"simple\"
+# The simple argument instructs this functions [pkcon] action to display simple output
+# rather than more user friendly output.
+# Update native software packages; since it is not known what distribution
+# this script is being executed on, it is best to check and see if we are able
+# to perform an update and then do the update...
+# One could choose to check for a supported exact version: e.g. Ubuntu, but we would
+# like to be nice and add value for as many as we can. Specially if it is this easy! :)
+# Globals:
+# Arguments: None
+# Outputs:
+# Returns:
+# Usage: software::update_system_txt
+# End of documentation
+	ensure_admin
+	PUBLICATION="$BRANDING Update Manager for Linux"
+	VERSION="1.14 (built in)"
+	DIALOGRC="~/.config/rtd/dialogrc"
+	LOGFILE="${LOGFILE:-$0.log}"
+
+	write_status "${PUBLICATION}: Version ${VERSION}"
+	write_status "------------------------------------------------------------------"
+
+	write_host --cyan "I am updating software from all channels I can find on the system."
+	write_host --cyan "I will update via the native package manager as well as newer formats"
+	write_host --cyan "like snap and flatpak ..."
+	echo -e " \n"
+
+	if hash dnf 2>/dev/null; then
+		dnf -y upgrade
+	elif hash zypper 2>/dev/null; then
+		zypper up -y
+	elif hash apt 2>/dev/null; then
+		apt-get update
+		UPGRADABLE=$(LANG=C apt-get upgrade -s |grep -P '^\d+ upgraded'|cut -d" " -f1)
+		if [ "$UPGRADABLE" -eq 0 ]; then
+			write_information "$UPGRADABLE packages that need updates; Skipping update task... "
+		else
+			write_information "There are $UPGRADABLE packages that need updates..."
+			dpkg --configure -a
+			apt-get upgrade -y
+			apt-get full-upgrade -y
+			apt-get --purge autoremove -y
+			apt-get clean
+		fi
+	elif hash pkcon 2>/dev/null; then
+		pkcon -y refresh
+		pkcon get-updates
+		pkcon -y update --autoremove 
+	else
+		write_error "This system does not seem to have a software managment system" 
+		return 1
+	fi
+
+	write_status "updating snaps if snap is present on the system..."
+	if hash snap 2>/dev/null; then
+		snap refresh
+	else
+		write_warning "--- snap software is not present on this system... skipping..."
+	fi
+
+	write_status "updating flatpaks if flatpak is present on system..."
+	if hash flatpak 2>/dev/null; then
+		flatpak update --user --noninteractive -y
+		flatpak update --system --noninteractive -y
+	else
+		write_warning "--- flatpak software is not present on this system... skipping..."
+	fi
+
+}
+
+
+
 
 
 
