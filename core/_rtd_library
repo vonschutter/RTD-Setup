@@ -6381,7 +6381,7 @@ software::update_system_txt ()
 	PUBLICATION="$BRANDING Update Manager for Linux"
 	VERSION="1.14 (built in)"
 	DIALOGRC="~/.config/rtd/dialogrc"
-	LOGFILE="${LOGFILE:-$0.log}"
+	if [[ ! -z $1 ]] ; then LOGFILE="$1" ; else LOGFILE="${_LOGFILE:-$0.log}" ; fi
 
 	write_status "${PUBLICATION}: Version ${VERSION}"
 	write_status "------------------------------------------------------------------"
@@ -6390,11 +6390,11 @@ software::update_system_txt ()
 	write_host --cyan "I will update via the native package manager as well as newer formats"
 	write_host --cyan "like snap and flatpak ..."
 	echo -e " \n"
-
+	(
 	if hash dnf 2>/dev/null; then
-		dnf -y upgrade
+		dnf -y upgrade 
 	elif hash zypper 2>/dev/null; then
-		zypper up -y
+		zypper up -y 
 	elif hash apt 2>/dev/null; then
 		apt-get update
 		UPGRADABLE=$(LANG=C apt-get upgrade -s |grep -P '^\d+ upgraded'|cut -d" " -f1)
@@ -6411,16 +6411,16 @@ software::update_system_txt ()
 	elif hash pkcon 2>/dev/null; then
 		pkcon -y refresh
 		pkcon get-updates
-		pkcon -y update --autoremove 
+		pkcon -y update --autoremove
 	else
 		write_error "This system does not seem to have a software managment system" 
 		return 1
 	fi
+	) | tee -a "$LOGFILE"
 
 	write_status "updating snaps if snap is present on the system..."
 	if hash snap 2>/dev/null; then
 		snap refresh
-		snap changes
 	else
 		write_warning "--- snap software is not present on this system... skipping..."
 	fi
@@ -6428,11 +6428,30 @@ software::update_system_txt ()
 	write_status "updating flatpaks if flatpak is present on system..."
 	if hash flatpak 2>/dev/null; then
 		flatpak update --user -y
-		flatpak update --system -y
+		flatpak update --system -y 
+
 	else
 		write_warning "--- flatpak software is not present on this system... skipping..."
 	fi
 
+	echo "
+	
+	$(write_information "All updates have been processed.")
+	NATIVE PACKAGES:
+	$(
+		if hash apt ; then cat /var/log/dpkg.log | grep "\ upgrade\ "
+		elif hash dnf ; then cat /var/log/dnf.log | grep "\ upgrade\ "
+		elif hash zypper ; then cat /var/log/zypp/history | grep "\ upgrade\ "
+		elif hash pkcon ; then pkcon get-updates
+		fi
+	)
+
+	SNAPS:
+	$(snap changes)
+
+	FLATPAKS:
+	$(flatpak history --system --since=1h
+	  flatpak history --user --since=1h)" | tee -a "$LOGFILE"
 }
 
 
@@ -6530,10 +6549,28 @@ software::update_all_ui ()
 				done
 				$dialog_ui --backtitle "\Zb$PUBLICATION             $VERSION\ZB" \
 				--title "Updates Complete" \
-				--msgbox '
+				--msgbox "
 				
-				All updates have been processed.' \
-				20 80
+				All updates have been processed.
+				NATIVE PACKAGES:
+				$(
+					if hash apt ; then cat /var/log/dpkg.log | grep "\ upgrade\ "
+					elif hash dnf ; then cat /var/log/dnf.log | grep "\ upgrade\ "
+					elif hash zypper ; then cat /var/log/zypp/history | grep "\ upgrade\ "
+					elif hash pkcon ; then pkcon get-updates
+					fi
+				)
+
+				SNAPS:
+				$(snap changes)
+
+				FLATPAKS:
+				$(flatpak history --system --since=1h
+				flatpak history --user --since=1h)
+				
+				
+				" \
+				20 120
 			;;
 			* ) 
 				write_warning "No update actions were requested."

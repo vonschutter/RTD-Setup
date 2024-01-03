@@ -36,6 +36,7 @@
 	ENDCOLOR="\033[0m"
 	GREEN="\033[1;32m"
 	BLUE="\033[1;34m"
+	
 # Put a convenient link to the logs where logs are normally found...
 # capture the 3 first letters as org TLA (Three Letter Acronym)
 export _SCRIPTNAME=$(basename $0)
@@ -44,14 +45,10 @@ export _LOG_DIR=/var/log/${_TLA}
 mkdir -p ${_LOG_DIR}
 
 # Determine log file names for this session
-export _LOGFILE=${_LOG_DIR}/${_SCRIPTNAME}.log
-
-# Ensure administrative privileges.
-[ "$UID" -eq 0 ] && echo -e "Administrative Access OK" $ENDCOLOR || echo -e $YELLOW"This script needs administrative access..." $ENDCOLOR
-[ "$UID" -eq 0 ] || exec sudo bash "$0" "$@"
+export LOGFILE=${_LOG_DIR}/${_SCRIPTNAME}.log
 
 # Identify
-# clear
+
 echo -e $GREEN"$PUBLICATION: Version $VERSION" $ENDCOLOR
 echo -e $GREEN"--------------------------------------------------------" $ENDCOLOR
 
@@ -59,12 +56,6 @@ echo This tool makes it simple to update software from all channels
 echo available on the system at once. It will update via the native
 echo -e "package manager as well as newer formats like $YELLOW"snap"$ENDCOLOR and $YELLOW"flatpak"$ENDCOLOR..."
 echo " "
-echo This update script supports the following instructions:
-echo " "
-echo -e " - $YELLOW"Default"$ENDCOLOR : Just running this script will update via all configured channels."
-echo -e " - $YELLOW"update"$ENDCOLOR :  Parameter "update" will update the updater to the latest version. "
-echo -e " - $YELLOW"setup"$ENDCOLOR :   Parameter "setup" make sure that you are using all software channels "
-echo -e "      "
 echo " "
 
 if [ "$1" == "update" ]; then
@@ -123,11 +114,42 @@ check_rtd_library ()
 
 
 
+script::help ()
+{
+	echo -e "
+	This tool makes it simple to update software from all channels
+	available on the system at once. It will update via the native
+	package manager as well as newer formats like snap and flatpak...
+
+	This update script supports the following instructions:
+
+	- $YELLOW"Default"$ENDCOLOR : Just running this script will update via all configured channels.
+	- $YELLOW"update"$ENDCOLOR: Parameter 'update' will update the updater to the latest version.
+	- $YELLOW"setup"$ENDCOLOR: Parameter 'setup' makes sure that you are using all software channels.
+
+	Usage: rtd-oem-update-system [instruction]
+
+	Instructions:
+	- $YELLOW"update"$ENDCOLOR : Update the updater to the latest version.
+	- $YELLOW"config"$ENDCOLOR : Configure the script (no configuration available at the moment).
+	- $YELLOW"setup"$ENDCOLOR : Make sure that you are using all software channels.
+
+	Options:
+	--$YELLOW"help"$ENDCOLOR : Display this help text.
+	--$YELLOW"noui"$ENDCOLOR : Update the system without displaying the user interface.
+
+	Example usage:
+	- Update the updater: $YELLOW"rtd-oem-update-system update"$ENDCOLOR
+	- Configure the script: $YELLOW"rtd-oem-update-system config"$ENDCOLOR
+	- Update the system without UI: $YELLOW"rtd-oem-update-system --noui"$ENDCOLOR
+	"
+}
+
 
 log_item ()
 {
 DATE=$(date '+%d/%m/%Y %H:%M:%S');
-echo "$DATE --- : $*" >> "${_LOGFILE}".log
+echo "$DATE --- : $*" >> "${LOGFILE}"
 }
 
 
@@ -165,30 +187,58 @@ setup_me ()
 	check_dependencies  snapd
 }
 
+
+become_root ()
+{
+	if [[ $EUID -ne 0 ]]; then
+		# Ensure administrative privileges.
+		echo -e $YELLOW"This script needs administrative access..." $ENDCOLOR
+		exec sudo -E SUDO_USER=$USER /bin/bash "${0}" "$*" || rtd_oem_pause 1
+	else
+		# We are root, so no need to become root.
+		echo -e $GREEN"Administrative access granted..." $ENDCOLOR
+		echo -e " "
+	fi
+}
+
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::          Script Executive                ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-check_rtd_library
+
 
 # Execute the fist instruction passed to this script...
 if [ ! -z $INSTRUCTION ]; then
+	become_root "$1"
 	log_item The instruction $INSTRUCTION was given...
+	check_rtd_library
 	$INSTRUCTION
 	exit
 else
-	log_item No instructions passed to $0... Continuing with default behavior.
+	if [[ ! -z "$1" ]]; then
+		echo "Request: $1"
+	fi
+	
 fi
 
-write_status "Updating installed software..."
+
 
 # Updating software managed by distribution speciffic software manager...
-# Unless the RTD Functions are loaded, then use that.
-
-if [[ "$1" == "--noui" ]] ; then
-	software::update_system_txt
+# Unless help was requested. 
+if [[ "$1" == "--help" ]] ; then
+	script::help
+elif [[ "$1" == "--noui" ]] ; then
+	echo  "${LOGFILE}"
+	become_root "$1" 	|| rtd_oem_pause 1 "$0: $* Failed to elevate privileges!"
+	check_rtd_library 	|| rtd_oem_pause 1 "$0: $* Failed to load RTD Library!"
+	write_status "Updating installed software text display only..."
+	write_status  "${LOGFILE}"
+	software::update_system_txt "${LOGFILE}"
 else 
-	software::update_all_ui
+	become_root "$1" 	|| rtd_oem_pause 1 "$0: $* Failed to elevate privileges!"
+	check_rtd_library	|| rtd_oem_pause 1 "$0: $* Failed to load RTD Library!"
+	write_status "Updating installed software..."
+	software::update_all_ui  "${LOGFILE}"
 fi
