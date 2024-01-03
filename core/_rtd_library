@@ -6420,14 +6420,15 @@ software::update_system_txt ()
 	write_status "updating snaps if snap is present on the system..."
 	if hash snap 2>/dev/null; then
 		snap refresh
+		snap changes
 	else
 		write_warning "--- snap software is not present on this system... skipping..."
 	fi
 
 	write_status "updating flatpaks if flatpak is present on system..."
 	if hash flatpak 2>/dev/null; then
-		flatpak update --user --noninteractive -y
-		flatpak update --system --noninteractive -y
+		flatpak update --user -y
+		flatpak update --system -y
 	else
 		write_warning "--- flatpak software is not present on this system... skipping..."
 	fi
