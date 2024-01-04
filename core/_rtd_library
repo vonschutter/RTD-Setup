@@ -349,8 +349,11 @@ yad::display_cmd_output ()
 # Returns: 0 or ESC
 # Usage:
 #
+# This function takes a command as an argument and executes it. The command output is displayed in a progress box using the 'yad' command.
+# The progress box shows a pulsating animation and automatically closes when the command execution is complete.
 #
-# yad::display_cmd_output apt -y upgrade
+# Example usage:
+# yad::display_cmd_output "apt -y upgrade"
 #
 # End of Documentation
 	_cmd="$*"
@@ -359,7 +362,6 @@ yad::display_cmd_output ()
 	${_cmd} | yad --title="$PUBLICATION $VERSION" --progress --pulsate --auto-close --auto-kill --text="RUNNING: ${_cmd}" --width=300 --height=100
 
 }
-
 
 
 
@@ -375,39 +377,53 @@ dialog::copy_file_progress ()
 # Returns: 0 or ESC
 # Usage:
 #
-#
 # dialog::copy_file_progress source destination
+#
+# Example:
+# dialog::copy_file_progress "/path/to/source" "/path/to/destination"
+#
+# This function takes two arguments: the source directory containing the files to be copied,
+# and the destination directory where the files will be copied to. It creates a progress bar
+# dialog using the 'dialog' command and updates it as each file is copied. The progress bar
+# shows the percentage of files copied and the name of the current file being copied.
+# The function returns 0 if the copying process completes successfully, or ESC if the user
+# cancels the operation.
+#
+# Note: The 'dialog' command must be installed for this function to work.
 #
 # End of Documentation
 	# Source
-	DIRS=(${1}/* )
+	_dirs=(${1}/* )
 
 	# Destination directory
-	DEST="${2}"
+	_dest="${2}"
 
-	[ ! -d "${DEST}" ] && mkdir -p "${DEST}"
+	[ ! -d "${_dest}" ] && mkdir -p "${_dest}"
 
 	dialog --title "Copying files" --gauge "Copying file..." 10 75 < <(
 	# Get total number of files in array
-	n=${#DIRS[*]}; 
+	n=${#_dirs[*]}; 
 	i=0
 
-	for f in "${DIRS[@]}"
-	do
+	for f in "${_dirs[@]}" ; do
 		# calculate progress
-		PCT=$(( 100*(++i)/n ))
+		_pct=$(( 100*(++i)/n ))
 
 		# update dialog box 
 		cat <<EOF
 XXX
-${PCT}
+${_pct}
 Copying file "${f}"...
 XXX
 EOF
-		# copy file $f to $DEST 
-		/bin/cp "${f}" "${DEST}" &>/dev/null
+		# copy file $f to $_dest 
+		/bin/cp "${f}" "${_dest}" &>/dev/null
 	done
 	)
+
+	unset _dirs
+	unset _dest
+	unset _pct
 
 }
 
@@ -420,15 +436,15 @@ EOF
 dialog::display_notice ()
 {
 # Description: Function to display an information notice. The purpose of this function
-# is simply to make it easy and convenient to display a mesage to an end user in a terminal
-# in a nice way. To use this function simply call it passing whaterver string you want displayed
+# is simply to make it easy and convenient to display a message to an end user in a terminal
+# in a nice way. To use this function, simply call it passing whatever string you want displayed
 # using dialog.
 # Globals: ${RTD_GUI} (will default to dialog), ${PUBLICATION} (optional)
 # Arguments: ["String to display"]
 # Outputs: Message in dialog box
 # Returns: 0 or ESC
 # Usage:
-#
+
 #
 # dialog::display_notice "The message that you want to display"
 #
