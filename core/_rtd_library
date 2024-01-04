@@ -48,6 +48,8 @@ export RTD_VERSION=2.02
 	dependency::virtualization                      ; Check that Virtualization is supported and handle deviations
 	dialog::copy_file_progress                      ; Display a progressbox in terminal while copying files from one place to another
 	dialog::display_summary_message                 ; Display all text in _summary_message with automatic/manual width
+	dialog::display_cmd_output                      ; Display a command output in a dialog box
+	dialog::display_notice                          ; Display a supplied string as an OK box for a terminal user
 	display_result 					; Displays command results in a pretty terminal box
 	display_software_installation_choices_gtk	; Show software installation options defined in recipe file (external)
 	display_software_installation_choices_term	; Show software installation options defined in recipe file (external)
@@ -81,6 +83,7 @@ export RTD_VERSION=2.02
 	oem::register_all_tools                         ; Register all OEM scripts so that they are accessible by terminal
 	oem::register_wallpapers_for_gnome		; Register wallpapers for Gnome (so they show up in the appearance tool)
 	oem::rtd_tools_make_launchers			; Creates a default set of pre-defined launchers
+	oem::deploy_themes				; Deploy themes to the system supplied by OEM (see RTD-Setup/themes)
 	pause_a_given_time                              ; Pause while showing a count down in seconds
 	prepare_environment_for_iso_creation 		; Ensure that all prerequisites are met for downloadeing; extracting; and creating a modified ISO file
 	rtd_oem_cfg_Account_Setup			; Generates a preseed section [Account setup] (d-i passwd string)
@@ -120,21 +123,39 @@ export RTD_VERSION=2.02
 	set_install_command				; Determines what install command should be used to install packages from repositories
 	set_oem_elevated_privilege_gui			; Set x-authority toallow root GUI
 	software::add_software_task 			; Wrapper function to execute a command and display pretty terminal OK or FAIL
+	software::add_native_package			; Installs a package from a repository supports SUSE, Fedora, Cent OS, Ubuntu Deian etc.
+	software::add_native_package_dependency		; Installs a package from a repository supports SUSE, Fedora, Cent OS, Ubuntu Deian etc. if not already present			
 	software::display_bundle_install_choices_gtk	; Show a menu of all installable software bundles defined in _rtd_recipes
 	software::display_bundle_removal_choices_gtk	; Show a menu of installed softwrae bundles that may be removed
 	software::ensure_software_store_available	; Ensure that the appropriate software store is available with Flatpak & Snap support
+	software::ensure_restricted_codecs		; Ensure that restricted codecs are installed
+	software::from_flathub.org			; Install software from flathub.org
+	software::from_snapcraft.io			; Install software from snapcraft.io automatically adjusting for classic or restricted access.
 	software::list_bundles				; Lists software bundles defined in _rtd_recipes
+	software::is_native_package_available		; Checks to see if a software package is available in a repository
+	software::is_native_package_installed		; Checks to see if a software package already is installed
+	software::package_kit::add_package		; Installs a package from a repository supports SUSE, Fedora, Cent OS, Ubuntu Deian etc.
+	software::package_kit::remove_package		; Removes a package from a repository supports SUSE, Fedora, Cent OS, Ubuntu Deian etc.
+	software::remove_native_software_package	; Removes a package from a repository supports SUSE, Fedora, Cent OS, Ubuntu Deian etc.
+	software::update_all_ui				; Updates all software on the system using the native package manager, snap and flatpak
+	software::update_system_txt			; Updates all software on the system using the native package manager, snap and flatpak with no UI
+	software::native_managment_availability_check	; Checks to see that the native software managment system is not busy
+	software::check_native_package_dependency	; Checks to see if a software package already is installed
 	software::vendor_download_and_install		; Downloads and installs a package from the internet
-	SofwareManagmentAvailabilityCHK			; Checks to see that the software managment system is not busy
+	SoftwareManagmentAvailabilityCHK		; Checks to see that the software managment system is not busy
 	system_config::tune_system_power_profile        ; Tune the system power profile based on detected Laptop or PC or VM
 	system::change_disk_pass			; Allows user to change password of the system partition encrypted disk
+	system::create_physical_media_from_ubuntu_iso	; Create physical media thumb drive from an Ubuntu ISO file
+	system::find_download_ubuntu_iso		; Find and download an Ubuntu ISO file
 	system::display_spinner				; Display a spinner in the terminal
 	system::find_vm_bridge                          ; Echo back the name of the bridge device and if one is not found then echo default (nat)
 	system::generate_cloudconfig                    ; Function to generate a cloud config file for use in deploying servers
 	system::generate_ks_cfg_file			; Creates a kickstart file for fedora
 	system::get_Windows_Product_Key			; Retrieves a Microsoft Windows product key if it is stored in BIOS (common for OEM)
 	system::make_preseed_cfg   		        ; Generate a debian + derivatives preseed file for fully automated installs
+	system::log_item				; Log an item to the log file prefferring '$_LOGFILE' if it is defined
 	system::oem_autounlock_disk                     ; To DO (Incomplete) to setup automatic unloc of system disk... maybe using TPM 
+	system::process_vm_opt_args			; Process optional arguments for virtual machine creation
 	system::remove_old_kernel			; Removes all old linux kernels
 	system::restart_sound                           ; Restart sound service in user session on system... 
 	system::run_command_in_gnome_user_session 	; Running with elevated privileges; will allow to switch back to user who started process to execute script in that environment
@@ -145,6 +166,7 @@ export RTD_VERSION=2.02
 	toggle_oem_auto_login				; Toggle the auto login option for the user
 	toggle_oem_run_once				; Toggle the oem run once of a script at login
 	up_2_date					; Older universal software update function
+	yad::display_cmd_output                         ; Display a command output in a progress box
 	write_error					; Prints an error message to terminal in RED
 	write_host 					; Prints a message to the terminal w. a choice of color
 	write_information 				; Prints a message to the terminal in BLUE
@@ -152,7 +174,7 @@ export RTD_VERSION=2.02
 	write_warning 					; Prints a message to the terminal in YELLOW
 	zenity::display_info				; Displays any string passed in a GUI information box
 	zenity::display_url				; Display the contents of a URL passed to the function in a box
-        dialog::display_notice 				; Display a supplied string as an OK box for a terminal user
+	zenity::display_file				; Display the contents of a file passed to the function in a box
         kvm::make_vm_template_now_from_redhat_com       ; Generate a RedHat (or compatible) vm template to be cloned later
         make_kvm_virtual_machine_now_from_fedora_org	; Generate a Fedora virtual machine template directly from Fedora.org
         make_preseed_cfg 				; Generate a debian + derivatives preseed file for fully automated installs
@@ -4227,7 +4249,7 @@ system::process_vm_opt_args ()
 
 
 
-system::find_dolwload_ubuntu_iso ()
+system::find_download_ubuntu_iso ()
 {
 
 	ubuntu_flavor="${1}"
@@ -6903,10 +6925,10 @@ software::vendor_download_and_install ()
 
 
 
-SofwareManagmentAvailabilityCHK ()
+SoftwareManagmentAvailabilityCHK ()
 {
 # Description: Function to check and see if the system software managment is available. In some cases
-# the sofware managment system may be in use. Should this be the case, this function will
+# the software managment system may be in use. Should this be the case, this function will
 # wait undill the system is free for use.
 # TODO: Add support for fedora, Centos, SuSE.
 # Globals:
@@ -6942,10 +6964,10 @@ SofwareManagmentAvailabilityCHK ()
 
 
 
-sofware::native_managment_availability_check ()
+software::native_managment_availability_check ()
 {
 # Description: Function to check and see if the system software managment is available. In some cases
-# the sofware managment system may be in use. Should this be the case, this function will
+# the software managment system may be in use. Should this be the case, this function will
 # wait undill the system is free for use.
 # TODO: Add support for fedora, Centos, SuSE.
 # Globals:
@@ -9291,7 +9313,7 @@ cat >> $1 <<-'MINECRAFT_EOF'
 	#
 
 	function check_dependencies (){
-		# Simple function to check if sofware is available and take action
+		# Simple function to check if software is available and take action
 		# if it is not. Software name must match command to envoke it.
 		#---------------------------------------------------------------
 		echo "Checking for script dependencies and install if not there..."
@@ -10982,7 +11004,7 @@ rtd_oem_pause ()
 # and wait for the end user to press ENTER to continue execution.
 #
 # Globals:
-# Arguments: 0 - !0 "[optional error message]"
+# Arguments: 0 - !0 "[error message]"
 # Outputs: Standard out
 # Returns:
 # Usage:  suggestion stop on execution error:
@@ -10992,6 +11014,15 @@ rtd_oem_pause ()
 #
 # In both of these cases script execution will halt and wait for confirmation
 # before continuing.
+#
+# Calling the function with no parameters will cause the function to simply continue. 
+# This is useful in scripts when using with a captured return variable: $?
+#
+# EXPRESSION ; rtd_oem_pause $?
+#
+# in this case the script will continue if the EXPRESSION was successful, but will
+# pause if the EXPRESSION failed.
+#
 # End of documentation
 	ERRMSG=$@
 
@@ -11448,7 +11479,7 @@ else
 							[[ "$printline" == "yes" ]]			&& echo "$line" |grep "# " |cut -c 2-
 						done < $0 )
 						dialog --clear --no-collapse --backtitle "${0##*/} :: RunTime Data Library HELP ::" --title "RTD Functon: $selection" --msgbox "$result" "${HEIGHT:-25}" "${WIDTH:-110}"
-						exit
+						return
 					;;
 					* ) exit ;;
 				esac
