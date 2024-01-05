@@ -457,21 +457,25 @@ dialog::display_notice ()
 }
 
 
-
 dialog::display_summary_message ()
 {
 # Description: Function to read a variable "result" and display its contents. The purpose of this function
-# is simply to make it easy and convenient to display a mesage to an end user in a terminal
-# in a nice way. To use this function simply call it after populating the variable result.
+# is simply to make it easy and convenient to display a message to an end user in a terminal
+# in a nice way. To use this function, simply call it after populating the variable result.
+# 
 # Globals: ${result}, ${BRANDING}
+# 
 # Arguments: ["Title to display"]
+# 
 # Outputs: Message in dialog box
+# 
 # Returns: 0 or ESC
+# 
 # Usage:
-#
+# 
 # result=$( command with output)
-# display_result "title of the mesage"
-#
+# display_result "title of the message"
+# 
 # End of Documentation
 
 	if ! hash dialog &>/dev/null ; then	
@@ -496,8 +500,8 @@ dialog::display_summary_message ()
 display_result ()
 {
 # Description: Function to read a variable "result" and display its contents. The purpose of this function
-# is simply to make it easy and convenient to display a mesage to an end user in a terminal
-# in a nice way. To use this function simply call it after populating the variable result.
+# is simply to make it easy and convenient to display a message to an end user in a terminal
+# in a nice way. To use this function, simply call it after populating the variable result.
 # Globals: ${result}, ${BRANDING}
 # Arguments: ["Title to display"]
 # Outputs: Message in dialog box
@@ -505,7 +509,7 @@ display_result ()
 # Usage:
 #
 # result=$( command with output)
-# display_result "title of the mesage"
+# display_result "title of the message"
 #
 # End of Documentation
 	system::log_item "checking for dialog..."
@@ -522,21 +526,17 @@ display_result ()
 }
 
 
-
 zenity::display_info ()
 {
-# Description: Function to display an information notice. The purpose of this function
-# is simply to make it easy and convenient to display a mesage to an end user in a GUI
-# in a nice way. To use this function simply call it passing whaterver string you want displayed
+# Description: Function to display an information notice.
+# The purpose of this function is to make it easy and convenient to display a message to an end user in a GUI in a nice way.
+# To use this function, simply call it passing whatever string you want displayed.
 #
-# Globals: $_TITLE (optional) $selection (optional)
+# Globals: $_TITLE (optional), $selection (optional)
 # Arguments: ["String to display"]
 # Outputs: Message in zenity info box
-# Returns:
-# Usage:
-#
-#
-# zenity::display_info  "The message that you want to display"
+# Returns: None
+# Usage: zenity::display_info "The message that you want to display"
 #
 # End of Documentation
 
@@ -550,27 +550,24 @@ zenity::display_info ()
 
 zenity::display_url ()
 {
-# Description: Function to display the content of a URL. The purpose of this function
-# is simply to make it easy and convenient to display web content to an end user in a GUI
-# in a nice way. To use this function simply call it passing whaterver URL you need.
+# Description: to display the content of a URL in a GUI using zenity.
+# This function makes it easy and convenient to display web content to an end user in a nice way.
+# To use this function, simply call it passing the URL as an argument.
 #
 # Globals: $_TITLE (optional)
 # Arguments: ["URL"]
-# Outputs: Formatted html message in zenity window
-# Returns:
+# Outputs: Formatted HTML message in a zenity window
+# Returns: None
 # Usage:
 #
-#
-# zenity::display_url  "https://www.someplace.com/index.html"
+# zenity::display_url "https://www.someplace.com/index.html"
 #
 # End of Documentation
 
 	_url="${*}"
 	hash zenity &>/dev/null || check_dependencies zenity &>/dev/null || return 1
 	zenity --text-info --html --title="${_TITLE:="$_url"}:" --url="$_url" --width=800 --height=600 &>/dev/null
-
 }
-
 
 
 
@@ -579,7 +576,7 @@ zenity::display_file ()
 {
 # Description: Function to display the content of a text file. The purpose of this function
 # is simply to make it easy and convenient to display text content to an end user in a GUI
-# in a nice way. To use this function simply call it passing whaterver file path you need.
+# in a nice way. To use this function simply call it passing whatever file path you need.
 #
 # Globals: $_TITLE (optional)
 # Arguments: ["/path/to/file.txt"]
@@ -587,8 +584,7 @@ zenity::display_file ()
 # Returns:
 # Usage:
 #
-#
-# zenity::display_file  "/path/to/file.txt"
+#   zenity::display_file  "/path/to/file.txt"
 #
 # End of Documentation
 
@@ -597,8 +593,6 @@ zenity::display_file ()
 	zenity --text-info --title="${_TITLE:="$_filename"}:" --filename="$_filename" --width=800 --height=600 &>/dev/null
 
 }
-
-
 
 
 
@@ -686,39 +680,50 @@ term::animate_while_command ()
 
 dependency::desktop ()
 {
-# Description: This function simplifies identifying the currently running desktop. 
-# 
-# The main problem with checking the DESKTOP_SESSION is that it is set by the display 
-# manager rather than the desktop session and is subject to inconsistencies. 
-# For lightdm on Debian, the values come from the names of files under /usr/share/xsessions/. 
-# DESKTOP_SESSION reflects the desktop environment if a specific selection is made at log in, 
+# Description: This function simplifies identifying the currently running desktop.
+#
+# The main problem with checking the DESKTOP_SESSION is that it is set by the display
+# manager rather than the desktop session and is subject to inconsistencies.
+# For lightdm on Debian, the values come from the names of files under /usr/share/xsessions/.
+# DESKTOP_SESSION reflects the desktop environment if a specific selection is made at log in,
 # however the lightdm-xsession is always used the default session.
 #
-# GDMSESSION is another option, but seems to have a similar predicament 
-# (it is often the same value as DESKTOP_SESSION ).
+# GDMSESSION is another option, but seems to have a similar predicament
+# (it is often the same value as DESKTOP_SESSION).
 #
-# XDG_CURRENT_DESKTOP looks like a good choice, however it is currently not in the XDG 
-# standard and thus not always implemented. See here for a discussion of this. This 
+# XDG_CURRENT_DESKTOP looks like a good choice, however it is currently not in the XDG
+# standard and thus not always implemented. See here for a discussion of this. This
 # answer shows its values for different distros/desktops.
 #
-# The reasonable fallback for XDG_CURRENT_DESKTOP not existing would be to try 
-# XDG_DATA_DIRS. Provided the data files for the desktop environment are installed 
-# in a directory bearing its name, this approach should work. This will hopefully 
+# The reasonable fallback for XDG_CURRENT_DESKTOP not existing would be to try
+# XDG_DATA_DIRS. Provided the data files for the desktop environment are installed
+# in a directory bearing its name, this approach should work. This will hopefully
 # be the case for all distros/desktops!
 #
-# Globals:	None
-# Arguments:	None
-# Outputs:	Standard error 1/0
-# Returns:	0 = desktop is what you are searching for. 1 = is not what you are searching for.
-# Usage: 	dependency::desktop gnome|kde|xfce|mate
+# Globals:    None
+# Arguments:  None
+# Outputs:    Standard error 1/0
+# Returns:    0 = desktop is what you are searching for. 1 = is not what you are searching for.
+# Usage:      dependency::desktop gnome|kde|xfce|mate
+# 
+# This function checks if there is a running desktop session that matches the specified desktop environment.
+# It attempts to find the currently running desktop environment reliably by checking various environment variables
+# and processes. If the specified desktop environment is found, it returns 0; otherwise, it returns 1.
+#
+# Example usage:
+#   dependency::desktop gnome   # Check if there is a running GNOME desktop session
+#   dependency::desktop kde     # Check if there is a running KDE desktop session
+#   dependency::desktop xfce    # Check if there is a running Xfce desktop session
+#   dependency::desktop mate    # Check if there is a running MATE desktop session
+#
 # End of documentation
 	local _sought="${1,,}"
 	system::log_item "checking if there is a running $_sought desktop session..."
 	local _desktop
 
-	# Try to find the currently running desktop environment reliably... 
+	# Try to find the currently running desktop environment reliably...
 	if [[ "$XDG_CURRENT_DESKTOP" == "" ]] ; then
-		system::log_item "XDG_CURRENT_DESKTOP appears to be unset, attempting to search processes for dektop match... "
+		system::log_item "XDG_CURRENT_DESKTOP appears to be unset, attempting to search processes for desktop match... "
 	elif  pgrep -f "plasmashell" ; then
 		local _desktop="kde"
 	elif  pgrep -f "gnome-shell"; then
@@ -736,7 +741,7 @@ dependency::desktop ()
 	local _desktop="${_desktop,,}"
 	if [[ "$_desktop" == *"$_sought"* ]]; then
 		return 0
-	else 
+	else
 		return 1
 	fi
 }
@@ -949,12 +954,16 @@ system::restart_sound ()
 {
 # Description: Function to check for PipeWire or Pulse Audio and attempt to restart sound.
 #
+# This function checks if the system has PipeWire or Pulse Audio installed. If PipeWire is 
+# installed, it restarts the pipewire.service. If Pulse Audio is installed, it kills the pulseaudio 
+# process and reloads the ALSA sound driver. If neither PipeWire nor Pulse Audio is found, 
+# it displays an error message.
 #
-# Globals:
+# Globals: None
 # Arguments: None
-# Outputs:
+# Outputs: None
 # Returns: Standard error level.
-# Usage: simply call function in a script
+# Usage: Simply call this function in a script.
 # End of documentation
 
 	if hash pw-cli ; then 
@@ -962,10 +971,9 @@ system::restart_sound ()
 	elif hash pactl ; then
 		pulseaudio -k && sudo alsa force-reload
 	else 
-		write_error "Pules Audio or PipeWire sound software was not found..." 
+		write_error "Pulse Audio or PipeWire sound software was not found..." 
 	fi
 }
-
 
 
 
@@ -1247,10 +1255,10 @@ check_menu_availability ()
 # RTD_GUI respected as default value. If unset it will be set to "dialog" or "whiptail"
 # depending on which is present. IF both are present, the dialog is prefferred.
 #
-# Arguments: None accepted
-# Outputs: Interactive
-# Returns: Default exit status of the last command run.
-# Usage: check_menu_availability
+# Arguments: 	None accepted
+# Outputs: 	Interactive
+# Returns: 	Default exit status of the last command run.
+# Usage: 	check_menu_availability
 #
 # End of documentation
 	if hash dialog 2>/dev/null ; then
@@ -8354,7 +8362,7 @@ make_kvm_virtual_machine_now_from_microsoft ()
 			mcopy -i ${WindowsInstructions} ${PostTasks} ::/ || rtd_oem_pause 1
 			mcopy -i ${WindowsInstructions} ${AutoUnattend} ::/ || rtd_oem_pause 1
 
-		for i in ${_OEM_DIR}/modules/Windows.mod/_* ; do
+		for i in ${_OEM_DIR}/modules/windows.mod/_* ; do
 			mcopy -i ${WindowsInstructions} ${i} ::/ || rtd_oem_pause 1
 		done
 	fi
