@@ -350,7 +350,7 @@ yad::display_cmd_output ()
 # Usage:
 #
 # This function takes a command as an argument and executes it. The command output is displayed in a progress box using the 'yad' command.
-# The progress box shows a pulsating animation and automatically closes when the command execution is complete.
+# The progress box shows a pulsating animatprepare_environment_for_iso_creationion and automatically closes when the command execution is complete.
 #
 # Example usage:
 # yad::display_cmd_output "apt -y upgrade"
@@ -3395,8 +3395,8 @@ prepare_environment_for_iso_creation ()
 
 
 	: "${TARGET_ISO="$PUT_ISO_FILE_HERE_WHEN_DONE/$TARGET_ISO_FILE_NAME"}"
-	: "${_DEPENDENCIES="dos2unix cpio gzip genisoimage whois pwgen wget fakeroot xorriso"}"
-	set -e
+	: "${_DEPENDENCIES="dos2unix cpio gzip genisoimage wget fakeroot xorriso isolinux"}"
+
 	for i in $_DEPENDENCIES
 	do
 		check_dependencies $i
@@ -3418,10 +3418,16 @@ prepare_environment_for_iso_creation ()
 		: "${ISOHDPFX_BIN:="/usr/lib/ISOLINUX/isohdpfx.bin"}"
 	else
 		write_warning "An important file (isohdpfx.bin) was not found in the expected location. Attepting to workaround the issue..."
-		check_dependencies isolinux
-		check_dependencies mlocate && ( write_warning "Updating file location DB, this may take a long time if there are a lot of files on the system..." ; updatedb )
-		locate isohdpfx.bin || ( write_error "The file isohdpfx.bin could not be found or fetched. Please correct manually!" ; rtd_oem_pause 1 )
-		: "${ISOHDPFX_BIN:=$(locate isohdpfx.bin  | head -n 1)}"
+		if hash locate 2>/dev/null ; then
+			locate isohdpfx.bin || ( write_error "The file isohdpfx.bin could not be found or fetched. Please correct manually!" ; rtd_oem_pause 1 )
+			: "${ISOHDPFX_BIN:=$(locate isohdpfx.bin  | head -n 1)}"
+			write_information "Found: $ISOHDPFX_BIN"
+		else
+			check_dependencies plocate && ( write_warning "Updating file location DB, this may take a long time if there are a lot of files on the system..." ; updatedb )
+			locate isohdpfx.bin || ( write_error "The file isohdpfx.bin could not be found or fetched. Please correct manually!" ; rtd_oem_pause 1 )
+			: "${ISOHDPFX_BIN:=$(locate isohdpfx.bin  | head -n 1)}"
+			write_information "Found: $ISOHDPFX_BIN"
+		fi
 	fi
 
 	if [ ! -f "$SSH_PUBLIC_KEY_FILE" ];
@@ -3846,7 +3852,7 @@ download_and_manipulate_iso_debian ()
 	echo -e $BLUE ; ls $TMP_DISC_DIR/firmware ; echo -e $ENDCOLOR
 
 	# Load the installation answers template.
-		echo -e $YELLOW Getting intall instructions template... $ENDCOLOR
+	echo -e $YELLOW Getting intall instructions template... $ENDCOLOR
 	make_preseed_cfg "$TMP_INITRD_DIR" "$PREFERENCE"
 
 # ------------------- Patch 1 grub .cfg ------------------------ #
