@@ -4768,7 +4768,7 @@ list="$*"
                   --insecure \
                   --passwordbox "\n To encrypt the content you have to give me a phrase to encrypt it with. \n This can be anything in one long word, but never forget it!" \
                   10 90 )
-		ret=$? ; clear
+		ret=$?
 		case $ret in
 			0)
 
@@ -4803,11 +4803,11 @@ list="$*"
 		IFS=$(echo -en "\n\b")
 		write_information "☕ Please be patient, Large sets of files may take serious time..."
 
-		for line in ${*} ;
+		for item in ${list} ;
 		do
-			case $line in
-				--noprompt ) echo sipp >/dev/null ;;
-				* ) 7z a -t7z -m0=lzma2 -mx=5 -mfb=64 -md=64m -ms=on -mhe=on $line.7z $line ;;
+			case $item in
+				--noprompt ) echo skipp >/dev/null ;;
+				* ) 7z a -t7z -m0=lzma2 -mx=5 -mfb=64 -md=64m -ms=on -mhe=on $item.7z $item ;;
 			esac
 		done
 
@@ -4817,8 +4817,11 @@ list="$*"
 		\n STATUS	FILENAME
 		$(
 		echo \\n
-		for d in ${*} ; do
-		[[ -e $d.7z ]] && echo "Confirmed	:  $d.z7 \\n" || echo " Failed!	:  $d.z7 \\n"
+		for d in ${list} ; do
+			case $d in
+				--noprompt ) echo skipp >/dev/null ;;
+				* ) [[ -e $d.7z ]] && echo "Confirmed	:  $d.z7 \\n" || echo " Failed!	:  $d.z7 \\n" ;;
+			esac
 		done
 		)
 		\n Please review the above: ⏫"
@@ -4834,8 +4837,23 @@ list="$*"
 
 
 
+# recompress_all_items_here ()
+# {
+
+# for i in *.zip ; do mkdir "${i::-4}" && unzip "${i}" -d ./"${i::-4}"/ && 7z a -t7z -m0=lzma2 -mx=5 -mfb=64 -md=64m -ms=on -mhe=on  "${i::-4}.7z" "${i::-4}" && rm -r "${i::-4}" ; done
+# for i in *.rar ; do mkdir "${i::-4}" && unzip "${i}" -d ./"${i::-4}"/ && 7z a -t7z -m0=lzma2 -mx=5 -mfb=64 -md=64m -ms=on -mhe=on  "${i::-4}.7z" "${i::-4}" && rm -r "${i::-4}" ; done
+# for i in *.rar ; do mkdir "${i::-4}" && rar x "${i}" ./"${i::-4}"/ && 7z a -t7z -m0=lzma2 -mx=5 -mfb=64 -md=64m -ms=on -mhe=on  "${i::-4}.7z" "${i::-4}" && rm -r "${i::-4}" ; done
+# }
 
 
+# recompress_provided_items ()
+# {
+
+# for i in *.zip ; do mkdir "${i::-4}" && unzip "${i}" -d ./"${i::-4}"/ && 7z a -t7z -m0=lzma2 -mx=5 -mfb=64 -md=64m -ms=on -mhe=on  "${i::-4}.7z" "${i::-4}" && rm -r "${i::-4}" ; done
+# for i in *.rar ; do mkdir "${i::-4}" && unzip "${i}" -d ./"${i::-4}"/ && 7z a -t7z -m0=lzma2 -mx=5 -mfb=64 -md=64m -ms=on -mhe=on  "${i::-4}.7z" "${i::-4}" && rm -r "${i::-4}" ; done
+# for i in *.rar ; do mkdir "${i::-4}" && rar x "${i}" ./"${i::-4}"/ && 7z a -t7z -m0=lzma2 -mx=5 -mfb=64 -md=64m -ms=on -mhe=on  "${i::-4}.7z" "${i::-4}" && rm -r "${i::-4}" ; done
+
+# }
 
 create_swapfile ()
 {
@@ -6493,7 +6511,7 @@ software::update_system_txt ()
 	$(
 		if hash apt ; then cat /var/log/dpkg.log | grep "\ upgrade\ "
 		elif hash dnf ; then cat /var/log/dnf.log | grep "\ upgrade\ "
-		elif hash zypper ; then cat /var/log/zypp/history | grep "\ upgrade\ "
+		elif hash zypper ; then for i in $(cat /var/log/zypp/history |grep '|install|' | cut -f3 -d'|' ) ; do echo -n "* $i "  ;done
 		elif hash pkcon ; then pkcon get-updates
 		fi
 	)
