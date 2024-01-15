@@ -177,7 +177,7 @@ export RTD_VERSION=2.02
 	zenity::display_file				; Display the contents of a file passed to the function in a box
         kvm::make_vm_template_now_from_redhat_com       ; Generate a RedHat (or compatible) vm template to be cloned later
         make_kvm_virtual_machine_now_from_fedora_org	; Generate a Fedora virtual machine template directly from Fedora.org
-        make_preseed_cfg 				; Generate a debian + derivatives preseed file for fully automated installs
+
 
 
 Use Google Coding standards:
@@ -3458,6 +3458,61 @@ prepare_environment_for_iso_creation ()
 
 
 
+rtd_oem_setup_brand_splash_screen()
+{
+# Description: Function to brand the installer splash screen for the customized installer
+# downloaded from a ginve vendor. This function expects a few simple peices of information:
+# parameter 1: full path to image file to be branded.
+# parameter 2: quoted text to be incerted.
+#
+# Globals:
+# Arguments: None
+# Outputs:
+# Returns:
+# Usage:
+# rtd_oem_setup_brand_splash_screen [string] [string]
+#
+# [string]: /path/to/imagefile.png, "text to brand image with"
+#
+# rtd_oem_setup_brand_splash_screen /tmp/splash.png "Hi! I am a lable!"
+#
+# End of Documentation
+
+	image_file_to_brand=$1
+	text_to_brand_with=$2
+
+	# Ensure that imagemagik is installed so images can be manipulated.
+	check_dependencies imagemagick
+
+	# Default locations and splash screens based on debian and ubuntu, meaning this function will assume you are
+	# making an ubuntu or debian boot iso as this is generally what this function was written to do. However these values
+	# can be overridden by passing the 2 parameters to this script.
+	: "${image_file_to_brand:="$(
+		if [ -f $TMP_DISC_DIR/splash.png ]; then
+			echo "$TMP_DISC_DIR/splash.png"
+		elif  [ -f $TMP_DISC_DIR/isolinux/splash.png ]; then
+			echo "$TMP_DISC_DIR/isolinux/splash.png"
+		elif [ -f $TMP_DISC_DIR/isolinux/splash.png ]; then
+			echo "$TMP_DISC_DIR/isolinux/splash.png"
+		fi )" }"
+	: "${text_to_brand_with:="$( echo " RunTime Data OEM Install: $PREFERENCE" )" }"
+
+	echo -e $GREEN "found: $image_file_to_brand"  $ENDCOLOR
+	echo -e $GREEN "branding with: $text_to_brand_with " $ENDCOLOR
+
+	if [ -f $image_file_to_brand ]; then
+		convert $image_file_to_brand -gravity north -stroke '#000C' -strokewidth 3 -annotate 0 "$text_to_brand_with" -stroke none -strokewidth 3 -fill white -annotate 0 " $text_to_brand_with "  edit-out.png
+		rm $image_file_to_brand
+		mv edit-out.png $image_file_to_brand || write_error "Image [ $image_file_to_brand ] NOT branded!  " 
+	fi
+}
+
+
+
+
+
+
+
 rtd_oem_ubuntu_auto_install_iso_builder ()
 {
 # Description: Function to generate an edited ISO file from a folder.
@@ -3539,7 +3594,7 @@ rtd_oem_ubuntu_auto_install_iso_builder ()
 				append  file=/cdrom/preseed.cfg auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=us console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US localechooser/supported-locales=en_US.UTF-8 boot=casper automatic-ubiquity initrd=/casper/initrd quiet splash noprompt noshell ---
 			EOF
 
-			make_preseed_cfg $auto $CONFIG
+			system::make_preseed_cfg  $auto $CONFIG
 
 		;;
 		*)
@@ -3565,7 +3620,7 @@ rtd_oem_ubuntu_auto_install_iso_builder ()
 			set menu_color_highlight=black/light-gray
 			EOF
 
-			make_preseed_cfg $auto $CONFIG
+			system::make_preseed_cfg  $auto $CONFIG
 
 		;;
 	esac
@@ -3596,208 +3651,6 @@ rtd_oem_ubuntu_auto_install_iso_builder ()
 	fi
 }
 
-
-
-
-
-
-
-rtd_oem_setup_brand_splash_screen()
-{
-# Description: Function to brand the installer splash screen for the customized installer
-# downloaded from a ginve vendor. This function expects a few simple peices of information:
-# parameter 1: full path to image file to be branded.
-# parameter 2: quoted text to be incerted.
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-# rtd_oem_setup_brand_splash_screen [string] [string]
-#
-# [string]: /path/to/imagefile.png, "text to brand image with"
-#
-# rtd_oem_setup_brand_splash_screen /tmp/splash.png "Hi! I am a lable!"
-#
-# End of Documentation
-
-	image_file_to_brand=$1
-	text_to_brand_with=$2
-
-	# Ensure that imagemagik is installed so images can be manipulated.
-	check_dependencies imagemagick
-
-	# Default locations and splash screens based on debian and ubuntu, meaning this function will assume you are
-	# making an ubuntu or debian boot iso as this is generally what this function was written to do. However these values
-	# can be overridden by passing the 2 parameters to this script.
-	: "${image_file_to_brand:="$(
-		if [ -f $TMP_DISC_DIR/splash.png ]; then
-			echo "$TMP_DISC_DIR/splash.png"
-		elif  [ -f $TMP_DISC_DIR/isolinux/splash.png ]; then
-			echo "$TMP_DISC_DIR/isolinux/splash.png"
-		elif [ -f $TMP_DISC_DIR/isolinux/splash.png ]; then
-			echo "$TMP_DISC_DIR/isolinux/splash.png"
-		fi )" }"
-	: "${text_to_brand_with:="$( echo " RunTime Data OEM Install: $PREFERENCE" )" }"
-
-	echo -e $GREEN "found: $image_file_to_brand"  $ENDCOLOR
-	echo -e $GREEN "branding with: $text_to_brand_with " $ENDCOLOR
-
-	if [ -f $image_file_to_brand ]; then
-		convert $image_file_to_brand -gravity north -stroke '#000C' -strokewidth 3 -annotate 0 "$text_to_brand_with" -stroke none -strokewidth 3 -fill white -annotate 0 " $text_to_brand_with "  edit-out.png
-		rm $image_file_to_brand
-		mv edit-out.png $image_file_to_brand || write_error "Image [ $image_file_to_brand ] NOT branded!  " 
-	fi
-}
-
-
-
-
-
-
-
-
-
-
-rtd_oem_ubuntu_auto_install_iso_builder()
-{
-# Description: Function to generate an edited ISO file from a folder.
-# this function expects a minimum of one parameter: ssh-server, ubuntu-desktop, kubuntu-desktop, xubuntu-desktop, lubuntu-desktop etc.
-# By default the server ISO image will be downloaded and manipulated. Optionally this function can be told to use the
-# Ubuntu Desktop ISO instead of the server iso by passing a second parameter:
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-
-# :: function name				:: target		:: iso version to download
-# rtd_oem_ubuntu_auto_install_iso_builder 	ubuntu-desktop       	desktop ⏭ creates auoinstall iso using the Ubuntu live dvd
-# rtd_oem_ubuntu_auto_install_iso_builder 	ubuntu-desktop       	live	⏭ creates auoinstall iso using the Ubuntu live dvd
-# rtd_oem_ubuntu_auto_install_iso_builder 	ubuntu-desktop       	server	⏭ creates auoinstall iso using the Ubuntu server dvd
-#
-# End of Documentation
-
-
-	CONFIG=$1
-	ISO_VER=$2
-	prepare_environment_for_iso_creation
-
-	write_information "Retreive list of available Ubuntu versions..."
-	all=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
-
-	# Ask for desired version to use:
-	ubuntu_ver=$($RTD_GUI --title "Select Release Version of Ubuntu" --inputbox "Please pick an available ubuntu version by entering it below. Versions to choose from: ${all[*]} If you are not sure just let me choose for you... \n $picachu "  25 110 "${all[-1]}" 3>&1 1>&2 2>&3) ;clear
-	[ "$ubuntu_ver" ] || ubuntu_ver=${all[-1]}
-
-	write_information Find the precice location of the requested ISO image:
-	ISO_URL=$(rtd_oem_find_live_release $ubuntu_ver ubuntu $ISO_VER)
-		echo "requested iso for download : $ISO_URL"
-		ISO_FILENAME=$(basename $ISO_URL)
-		BASE=$(basename $ISO_URL .iso)
-
-	write_status "Checking if $ISO_FILENAME already downloaded..."
-	iso=$(find "$PERMANENT_DOWNLOAD_DIR" -name "$ISO_FILENAME")
-	if [ ! -e "$iso" ]; then
-		echo "$ISO_FILENAME is not in cache, downloading..."
-		wget -nc $ISO_URL -P "$PERMANENT_DOWNLOAD_DIR" || read -p "Failure to download ISO file"
-		iso="$PERMANENT_DOWNLOAD_DIR/$ISO_FILENAME"
-	fi
-
-	mnt="${TMP_DISC_DIR:=$(mktemp -d )}"
-	TMP_DISC_DIR=$mnt
-	write_status "Mounting intallation media..."
-	mount $iso $mnt -o user,ro || rtd_oem_pause 1
-	write_status "Verifying media presence..."
-	cat $mnt/.disk/*info || rtd_oem_pause 1
-	auto="$BRANDING_ORG-$CONFIG-auto-install-from-${BASE}"
-	write_information "Creating Installations media: $auto "
-	if [ ! -e $auto ]; then
-		cp -a $mnt $auto
-		chmod -R +w $auto
-	fi
-	write_status "Modifying startup instructions...  "
-		for f in splash.pcx splash.png ; do
-			rtd_oem_setup_brand_splash_screen $auto/isolinux/$f
-		done
-		pushd ./$auto/isolinux/
-			find splash.pcx | cpio -ov >>bootlogo
-			find splash.png | cpio -ov >>bootlogo
-		popd
-	write_status "Unmounting $mnt... "
-	umount $mnt || rtd_oem_pause 1
-
-
-	case "$2" in
-		desktop | Desktop | live | Live)
-			#configure_auto_unattended_ubuntu_live_boot_media $auto $CONFIG && echo -e "$GREEN OK! $ENDCOLOR" || rtd_oem_pause 1
-			write_status "Modifying installation instructions in live media... "
-			cat > $auto/isolinux/txt.cfg <<- EOF
-				default live-install
-				label live-install
-				menu label ^^Auto Install Ubuntu $CONFIG
-				kernel /casper/vmlinuz
-				append  file=/cdrom/preseed.cfg auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=us console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US localechooser/supported-locales=en_US.UTF-8 boot=casper automatic-ubiquity initrd=/casper/initrd quiet splash noprompt noshell ---
-			EOF
-
-			make_preseed_cfg $auto $CONFIG
-
-		;;
-		*)
-			#configure_auto_unattended_ubuntu_server_boot_media $auto $CONFIG && echo -e "$GREEN OK! $ENDCOLOR" || rtd_oem_pause 1
-			write_status "Modifying installation instructions in server image... "
-			cat > $auto/isolinux/isolinux.cfg <<- EOF
-				default install
-				label install
-				gfxmode=791
-				ui gfxboot bootlogo
-				path
-				timeout 100
-				menu label ^Auto Install Ubuntu $CONFIG
-				kernel /install/vmlinuz
-				append file=/cdrom/preseed/ubuntu-server.seed initrd=/install/initrd.gz ks=cdrom:/ks.cfg preseed/file=/cdrom/preseed.cfg --
-			EOF
-
-			touch $auto/preseed.cfg
-			cat > $auto/boot/grub/grub.cfg <<- 'EOF'
-			set timeout=10
-			GRUB_GFXMODE="1024x768"
-			set menu_color_normal=white/black
-			set menu_color_highlight=black/light-gray
-			EOF
-
-			make_preseed_cfg $auto $CONFIG
-
-		;;
-	esac
-
-
-	TARGET_ISO="$PUT_ISO_FILE_HERE_WHEN_DONE/$auto.iso"
-
-
-	if [[ -f $TARGET_ISO ]]; then
-		rm $TARGET_ISO
-	fi
-
-	$BIN_XORRISO -as mkisofs -isohybrid-mbr "$ISOHDPFX_BIN" \
-		-c isolinux/boot.cat -b isolinux/isolinux.bin \
-		-no-emul-boot -boot-load-size 4 -boot-info-table \
-		-eltorito-alt-boot -e boot/grub/efi.img -no-emul-boot \
-		-isohybrid-gpt-basdat -o "$PUT_ISO_FILE_HERE_WHEN_DONE/$auto.iso" $auto
-	rtd_oem_pause $?
-	umount -l $mnt
-	rm -rf $mnt $auto
-
-	if ($RTD_GUI --title "Media ready" --yesno "Created $auto.iso Would you like to test the new image?." 0 0); then
-		check_dependencies qemu-kvm
-		qemu-img create -f qcow2 "$PUT_QCOW_FILE_HERE_WHEN_DONE/$auto.qcow2" 10G
-		qemu-system-x86_64 -smp 2 -enable-kvm -m 4G --cdrom "$TARGET_ISO" "$PUT_QCOW_FILE_HERE_WHEN_DONE/$auto.qcow2"
-	else
-		echo "User selected No, exit status was $?."
-	fi
-}
 
 
 
@@ -3840,20 +3693,20 @@ download_and_manipulate_iso_debian ()
 	TARGET_ISO="$PUT_ISO_FILE_HERE_WHEN_DONE/$TARGET_ISO_FILE_NAME"
 	PREFERENCE=$2
 
-		echo -e $YELLOW Geting install image...
-		echo -e $GREEN Download: $SOURCE_ISO_URL $ENDCOLOR
+		write_status "Geting install image..."
+		write_information "Download: $SOURCE_ISO_URL"
 
 	wget -4  -q --show-progress "$SOURCE_ISO_URL" -O "$TMP_DOWNLOAD_DIR/netboot.iso" && "$BIN_7Z" x "$TMP_DOWNLOAD_DIR/netboot.iso" "-o$TMP_DISC_DIR" || write_error  "FAILED to download and extract $SOURCE_ISO_URL" 
-		echo -e $BLUE; ls $TMP_DISC_DIR ; echo -e $ENDCOLOR
-		echo -e $YELLOW Geting non-free firmware...
-		echo -e $GREEN Download: $SOURCE_FIRMWARE $ENDCOLOR
+		write_information "$(ls $TMP_DISC_DIR)"
+		write_status "Geting non-free firmware..."
+		write_information "Download: $SOURCE_FIRMWARE"
 	wget -4  -q --show-progress "$SOURCE_FIRMWARE" -O "$TMP_DOWNLOAD_DIR/firmware.zip" && ( mkdir "$TMP_DISC_DIR/firmware" & "$BIN_7Z" x "$TMP_DOWNLOAD_DIR/firmware.zip" "-o$TMP_DISC_DIR/firmware" )
 
-	echo -e $BLUE ; ls $TMP_DISC_DIR/firmware ; echo -e $ENDCOLOR
+	write_information "$(ls $TMP_DISC_DIR/firmware )"
 
 	# Load the installation answers template.
-	echo -e $YELLOW Getting intall instructions template... $ENDCOLOR
-	make_preseed_cfg "$TMP_INITRD_DIR" "$PREFERENCE"
+	write_status "Getting intall instructions template... "
+	system::make_preseed_cfg -r "default" -p "$TMP_INITRD_DIR" -t ssh-server
 
 # ------------------- Patch 1 grub .cfg ------------------------ #
 
@@ -7498,7 +7351,7 @@ rtd_setup_choices_for_preseed () {
 # Usage:
 # Example:
 # functoin_name          location        config          function
-# make_preseed_cfg       /path/to/file   ssh-server      Minecraft
+# system::make_preseed_cfg       /path/to/file   ssh-server      Minecraft
 # End of documentation
 
 	SAVETO=$1
