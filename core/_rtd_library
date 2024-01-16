@@ -780,15 +780,33 @@ dependency::os_linux ()
 
 
 
-dependency::file () {
+dependency::file () 
+{
 # Description: Function to check for a bash library or script file and source it.
 #
+# This function searches a predetermined set of paths for a given file and sources it if found.
+# It first searches for the file locally in a set of predefined paths. If the file is found, it is sourced.
+# If the file is not found locally, the function attempts to download it from a specified URL and source it.
+# If the download is successful, the file is sourced. If the download fails, the function logs an error and exits.
+#
 # Globals:
-# Arguments: Filename
+#   _GIT_PROFILE: The GitHub profile to use for downloading the file (default: vonschutter)
+# Arguments:
+#   Filename: The name of the file to search for and source
 # Outputs:
-# Returns: Standard error
-# Usage: dependency::file _filename.sh
-# End of documentation	
+#   None
+# Returns:
+#   Standard error level
+# Usage:
+#   dependency::file <filename>
+#   Example: dependency::file _config.ini
+#
+# Dependencies:
+#   This function depends on the following functions:
+#   - system::log_item: A function to log messages
+#
+# End of documentation
+
 
 	local _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
 	local _tgt="${1}"
@@ -808,14 +826,14 @@ dependency::file () {
 			"../../core/${1}"
 			"${0%/*}/../core/${1}"
 			"${0%/*}/../../core/${1}"
-			"/usr/local/lib/${1}"
-			"/usr/lib/${1}"
-			"/opt/${1}"
-		)
+			"$(dirname $(find /opt -name ${1} 2>/dev/null | head -n 1 ))/${1}"
+			"$(dirname $(find ${HOME}/GIT -name ${1} 2>/dev/null | head -n 1 ))/${1}"
+			"$(dirname $(find ${HOME}/bin -name ${1} 2>/dev/null | head -n 1 ))/${1}"
+			)
 
 		for path in "${paths[@]}"; do 
 			system::log_item "Searching for ${path} ..."
-			if [[ -e "${path}" ]]; then 
+			if [[ -e "${path}" ]]; then
 				system::log_item "Found ${path}"
 				source "${path}" ""
 				return 0
@@ -3693,16 +3711,15 @@ download_and_manipulate_iso_debian ()
 	TARGET_ISO="$PUT_ISO_FILE_HERE_WHEN_DONE/$TARGET_ISO_FILE_NAME"
 	PREFERENCE=$2
 
-		write_status "Geting install image..."
-		write_information "Download: $SOURCE_ISO_URL"
-
+	write_status "Geting install image..."
+	write_information "Download: $SOURCE_ISO_URL"
 	wget -4  -q --show-progress "$SOURCE_ISO_URL" -O "$TMP_DOWNLOAD_DIR/netboot.iso" && "$BIN_7Z" x "$TMP_DOWNLOAD_DIR/netboot.iso" "-o$TMP_DISC_DIR" || write_error  "FAILED to download and extract $SOURCE_ISO_URL" 
-		write_information "$(ls $TMP_DISC_DIR)"
-		write_status "Geting non-free firmware..."
-		write_information "Download: $SOURCE_FIRMWARE"
-	wget -4  -q --show-progress "$SOURCE_FIRMWARE" -O "$TMP_DOWNLOAD_DIR/firmware.zip" && ( mkdir "$TMP_DISC_DIR/firmware" & "$BIN_7Z" x "$TMP_DOWNLOAD_DIR/firmware.zip" "-o$TMP_DISC_DIR/firmware" )
+	write_information "Retreived: $(ls $TMP_DISC_DIR)"
 
-	write_information "$(ls $TMP_DISC_DIR/firmware )"
+	write_status "Geting non-free firmware..."
+	write_information "Download: $SOURCE_FIRMWARE"
+	wget -4  -q --show-progress "$SOURCE_FIRMWARE" -O "$TMP_DOWNLOAD_DIR/firmware.zip" && ( mkdir "$TMP_DISC_DIR/firmware" & "$BIN_7Z" x "$TMP_DOWNLOAD_DIR/firmware.zip" "-o$TMP_DISC_DIR/firmware" )
+	write_information "Retreived: $(ls $TMP_DISC_DIR/firmware )"
 
 	# Load the installation answers template.
 	write_status "Getting intall instructions template... "
@@ -6152,7 +6169,7 @@ system::log_item ()
 		# If log file not set, set it to defaults a.k.a. script name
 		local _SCRIPTNAME=$(basename $0)
 		local _TLA=${_SCRIPTNAME:0:3}
-		local _LOG_DIR=/var/log/${_TLA,,}
+		local _LOG_DIR=${_LOG_DIR:-"/var/log/${_TLA,,}"}
 		mkdir -p ${_LOG_DIR}
 		local _logfile=${_LOG_DIR}/${_SCRIPTNAME}.log
 		export _LOGFILE="${_logfile}"
@@ -10220,8 +10237,14 @@ system::make_preseed_cfg ()
 	system::log_item "Function : ${FUNCNAME[0]}"
 	system::log_item "Called by: ${FUNCNAME[-1]}"
 
+	# Defaults:
+	local _saveto="$( mktemp -d )"	# Where to save the preseed file
+	local _role="default"		# selects d-i preseed/late_command actions based on role.
+	local _task="ssh-server"	# Package selection: What DE to install, or ssh-server
+	local _ask=			# Ask for variables to be used in the preseed file
+
 	local OPTIND o a
-	while getopts ':r:p:t:' OPTION; do
+	while getopts ':r:p:t:a:' OPTION; do
 		case "$OPTION" in
 		r )
 			local _role="${OPTARG}"
@@ -10235,6 +10258,10 @@ system::make_preseed_cfg ()
 			local _task="${OPTARG}"
 			system::log_item "Received optioinal option: ${_task}"
 		;;
+		a )
+			local _ask="${OPTARG}"
+			system::log_item "Received optioinal option: ${_ask}"
+		;;
 		? )
 			write_error "Usage: $(FUNCNAME[0]) [-p <path> ] [-r server|desktop|minecraft ] [-t gnome-desktop | kde-desktop | ...-desktop | xfce-desktop | mate-desktop | cinnamon-desktop ]"
 			return 1
@@ -10243,13 +10270,11 @@ system::make_preseed_cfg ()
 	done
 	unset OPTIND
 
-	local SAVETO=${_saveto}				# Where to save the preseed file
-	local ROLE=${_role:=default}                 	# selects d-i preseed/late_command actions based on role.
-	local TASK=${_task:=ssh-server}			# Package selection: What DE to install, or ssh-server
-	export PRESEED_FILE="$SAVETO/preseed.cfg"	# The name of the preseed file to be created
-	export TASK_FILE="$SAVETO/task.sh"		# The name of the task file to be created (if needed)
+	export PRESEED_FILE="${_saveto}/preseed.cfg"	# The name of the preseed file to be created
+	export TASK_FILE="${_saveto}/task.sh"		# The name of the task file to be created (if needed)
 
 	touch "${PRESEED_FILE}"
+	touch "${TASK_FILE}"
 
 	# Localized variables based on User preferences, but with speciffic defaults should all fail:
 	local Preference_DiskEncryption="$( [[ "$_EncryptDisk" == "YES" ]] && echo "${PreferredDiskPassword:-"letmein1234"}" )"
@@ -10261,6 +10286,44 @@ system::make_preseed_cfg ()
 	local Preference_InitialUserPasswordEncrypted=$( [[ -n "${_OEM_USER_PASSWORD}" ]] && echo '$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1' || echo '$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1' )
 	local Preference_InitialKeyboardLayout="${_OEM_USER_KEYBOARD_LAYOUT:-"us"}"
 	local Preference_InitialTimeZone="${_OEM_USER_TIMEZONE:-"Etc/UTC"}"
+	local Preference_Wireless_ID="${_OEM_WIRELESS_ID:-"loader"}"
+	local Preference_Wireless_Password="${_OEM_WIRELESS_PASSWORD:-"letmein1234"}"
+
+
+	if [[ -n $_ask ]] ; then
+		# Use dialog --form to ask for variables
+		dialog --form "Configure Automatic Install for Debian/Ubuntu" 20 80 0 \
+			"DiskEncryption (YES/NO):" 1 1 "${Preference_DiskEncryption:-}" 1 40 40 0 \
+			"Disk Unlock Password:" 2 1 "${Preference_Password:-}" 2 40 40 0 \
+			"Admin User Name:" 3 1 "${Preference_InitialUser:-}" 3 40 40 0 \
+			"Admin User Full Name:" 4 1 "${Preference_InitialUserFullName:-}" 4 40 40 0 \
+			"Admin User Initial UserGroup:" 5 1 "${Preference_InitialUserGroup:-}" 5 40 40 0 \
+			"Admin User Password:" 6 1 "${Preference_InitialUserPassword:-}" 6 40 40 0 \
+			"Initial Keyboard Layout:" 7 1 "${Preference_InitialKeyboardLayout:-}" 7 40 40 0 \
+			"Initial Time Zone:" 8 1 "${Preference_InitialTimeZone:-}" 8 40 40 0 \
+			"Wireless Network SSID:" 9 1 "${Preference_Wireless_ID:-}" 9 40 40 0 \
+			"Wireless Network Password:" 10 1 "${Preference_Wireless_Password:-}" 10 40 40 0
+
+		# Assign variables from dialog input
+		read -r Preference_DiskEncryption \
+		Preference_Password \
+		Preference_InitialUser \
+		Preference_InitialUserFullName \
+		Preference_InitialUserGroup \
+		Preference_InitialUserPassword \
+		Preference_InitialKeyboardLayout \
+		Preference_InitialTimeZone \
+		Preference_Wireless_ID \
+		Preference_Wireless_Password
+
+		clear
+
+		Preference_Wireless_Password=$(printf "${Preference_Wireless_Password}" | mkpasswd -s -m md5)
+
+	else
+		write_information "Generating preseed.cfg for: ${_role} ${_task} automatically..."
+	fi
+
 
 	# Write out configurable protions of the preseed file:
 	cat >> ${PRESEED_FILE} <<-EOF
@@ -10294,10 +10357,10 @@ system::make_preseed_cfg ()
 		# d-i netcfg/dhcp_timeout string 60
 
 		d-i netcfg/wireless_show_essids select manual
-		d-i netcfg/wireless_essid string loader
-		d-i netcfg/wireless_essid_again string loader
+		d-i netcfg/wireless_essid string ${Preference_Wireless_ID}
+		d-i netcfg/wireless_essid_again string ${Preference_Wireless_ID}
 		d-i netcfg/wireless_security_type select wpa
-		d-i netcfg/wireless_wpa string ${Preference_InitialUserPassword}
+		d-i netcfg/wireless_wpa string ${Preference_Wireless_Password}
 
 		# --------------------------------------------------- #
 
@@ -10315,7 +10378,7 @@ system::make_preseed_cfg ()
 		d-i passwd/username string ${Preference_InitialUser}
 		d-i passwd/user-password seen true
 		d-i user-setup/allow-password-weak boolean true
-		d-i passwd/user-password-crypted password ${Preference_Password}
+		d-i passwd/user-password-crypted password ${Preference_InitialUserPassword}
 		d-i passwd/auto-login boolean true
 
 		# --------------------------------------------------- #
@@ -10394,7 +10457,7 @@ system::make_preseed_cfg ()
 		# lxde-desktop, web-server, ssh-server, print-server.
 		# The "OEM" line below ist to make it simple to replace the line with a
 		# relevant chice of debian role using "sed" or similar.
-		tasksel tasksel/first multiselect ${TASK}
+		tasksel tasksel/first multiselect ${_task}
 		d-i pkgsel/include string openssh-server dialog virt-what curl wget spice-vdagent git
 
 		# Valid choices for pkgsel/upgrade are: safe-upgrade full-upgrade none
@@ -10502,7 +10565,7 @@ system::make_preseed_cfg ()
 
 
 	# write out conditionsl elements of the preseed file:
-	case $ROLE in
+	case $_role in
 
 		minecraft-server | minecraft )
 			cat >> ${PRESEED_FILE} <<-'EOF'
@@ -10585,6 +10648,24 @@ system::make_preseed_cfg ()
 	system::log_item "Preseed file created: ${PRESEED_FILE}
 	Containging DATA:
 	$(cat ${PRESEED_FILE})"
+	nano ${PRESEED_FILE}
+
+	unset Preference_DiskEncryption \
+	Preference_Password \
+	Preference_InitialUser \
+	Preference_InitialUserFullName \
+	Preference_InitialUserGroup \
+	Preference_InitialUserPassword \
+	Preference_InitialKeyboardLayout \
+	Preference_InitialTimeZone \
+	Preference_Wireless_ID \
+	Preference_Wireless_Password\
+	PRESEED_FILE \
+	TASK_FILE \
+	_role \
+	_task \
+	Preference_InitialUserPasswordEncrypted 
+
 }
 
 
@@ -11296,37 +11377,61 @@ list_loaded_software_functions ()
 # request this. If no arguments are provided, then all the functions in this
 # library will simply be loaded in to memory.
 
+# Load base color sheme for use in the library...
 set_colors
 
-# check if library is loaded frrom a terminal or another script (behavior may differ)...
-if (return 0 2>/dev/null) ; 
-then 
+
+# Set log location and name...
+_SCRIPTNAME=$(basename "${BASH_SOURCE[0]}")
+
+if [[ $EUID -ne 0 ]]; then
+	_LOG_DIR="${HOME}/.config/rtd/logs"
+	mkdir -p ${_LOG_DIR}
+else
+	_LOG_DIR="${_LOG_DIR:-"/var/log/rtd"}"
+	mkdir -p ${_LOG_DIR}
+fi
+
+_LOGFILE=${_LOGFILE:-"${_LOG_DIR}/${_SCRIPTNAME}.log"}
+touch ${_LOGFILE}
+
+system::log_item "🧩 💻 ********************************************************************************"
+system::log_item "🧩 _LOG_DIR=${_LOG_DIR}"
+system::log_item "🧩 _LOGFILE=${_LOG_DIR}/${_SCRIPTNAME}.log"
+
+
+
+# check if library is loaded from a terminal or another script (behavior may differ)...
+# This may be useful to log for support reasons.
+if (return 0 2>/dev/null) ; then 
 	sourced=0
-	write_warning "Library sourced in a terminal! "
-	if [[ -n ${_LOG_DIR} ]] ; then
-		_LOGFILE="${_LOG_DIR}/_rtd_library.log"
+	write_warning "Library is sourced from a script or terminal! "
+
+	if [[ "$(basename $0)" == "bash" ]] ; then
+		write_information "Script is sourced from bash in a terminal: $0 $@"
 	else
-		_LOGFILE="/var/log/_rtd_library.log"
+		write_information "Script is being sourced from a script: $(basename $0) $@"
 	fi
 else 
 	sourced=1
-	if [[ -n "${LOGFILE}" ]] ; then
-		system::log_item "🧩 💻 ********************************************************************************"
-		system::log_item _LOGFILE="${LOGFILE}"
-	else
-		if [[ -n ${_LOG_DIR} ]] ; then
-			_LOGFILE="${_LOG_DIR}/${0}.log"
-		else
-			_LOGFILE="/var/log/${0}.log"
-		fi
-		mkdir -p ${_LOGFILE%$base}
-	fi
+	write_warning "Library is run directly! $(basename $0) $@"
 fi
 
-# Find and load all dependant files... 
+
+
+
+
+# Find and load all dependant files for this library... 
 for i in ${_OEM_DEPENDENCIES} ; do dependency::file ${i} &>/dev/null ; done 
 
+# log variables for support reasons...
+system::log_item "Library Loaded Variables: 
+.........................................
+$(env | grep '^_')
+.........................................
+"
 
+# Check if this library is asked to do anything or just load...
 if [ -z $1 ]; then
 	echo "RTD Power Library $RTD_VERSION OK"
 	export RTDFUNCTIONS=1
