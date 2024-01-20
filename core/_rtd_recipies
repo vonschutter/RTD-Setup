@@ -1268,6 +1268,32 @@ Single_Install_Dropbox_Corporate_Cloud_Storage (){
 
 
 
+Single_Install_Citrix_App (){
+	# Install Citrix Workspace
+	write_status "Installing Citrix Workspace..."
+	if hash apt &>/dev/nul; then
+		write_warning "Please NOTE that Citrix only supports Ubuntu"
+		software::vendor_download_and_install "https://downloads.citrix.com/22439/icaclient_23.11.0.82_amd64.deb?__gda__=exp=1705538522~acl=/*~hmac=6a7fae42307cba95d027460b757da754de67be03b83e91475a1004be65bfbecd"
+	elif hash dnf &>/dev/nul; then
+		write_warning "Please NOTE that Citrix only supports Ubuntu"
+		software::vendor_download_and_install "https://downloads.citrix.com/22439/ICAClient-rhel-23.11.0.82-0.x86_64.rpm?__gda__=exp=1705538522~acl=/*~hmac=6a7fae42307cba95d027460b757da754de67be03b83e91475a1004be65bfbecd"
+	elif hash zypper &>/dev/nul; then
+		write_warning "Please NOTE that Citrix only supports Ubuntu"
+		software::vendor_download_and_install "https://downloads.citrix.com/22439/ICAClient-suse-23.11.0.82-0.x86_64.rpm?__gda__=exp=1705538522~acl=/*~hmac=6a7fae42307cba95d027460b757da754de67be03b83e91475a1004be65bfbecd"
+	else
+		write_error "No supported packaging system detected for special case of installing Citrix Workspace! "
+	fi
+
+	[[ hash apt ]] && apt-get install libunwind-12 libc++-12-dev
+}
+
+
+
+
+
+
+
+
 
 Single_Install_VirtualBox (){
 	# Install Virtual Box from Oracle. However avoid installing it in a VM, as tis usecase may be counterproductive.

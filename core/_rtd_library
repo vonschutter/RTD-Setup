@@ -1,4 +1,8 @@
 #!/bin/bash
+if [[ -z "$BASH_VERSINFO" ]]; then
+	echo "ERROR: You must execute this script in a BASH Shell"
+	exit 255
+fi
 export RTD_VERSION=2.02
 <<Library_Documentation
 ::				R T D   F u n c t i o n   L i b r a r y
@@ -85,7 +89,7 @@ export RTD_VERSION=2.02
 	oem::rtd_tools_make_launchers			; Creates a default set of pre-defined launchers
 	oem::deploy_themes				; Deploy themes to the system supplied by OEM (see RTD-Setup/themes)
 	pause_a_given_time                              ; Pause while showing a count down in seconds
-	prepare_environment_for_iso_creation 		; Ensure that all prerequisites are met for downloadeing; extracting; and creating a modified ISO file
+	system::prepare_environment_for_iso_creation 		; Ensure that all prerequisites are met for downloadeing; extracting; and creating a modified ISO file
 	rtd_oem_cfg_Account_Setup			; Generates a preseed section [Account setup] (d-i passwd string)
 	rtd_oem_cfg_Account_Setup 			; MODULE; sets default user account and encrypted password for a preseed file
 	rtd_oem_check_inet_access 			; Verifies that the internet is accessible
@@ -220,12 +224,13 @@ Library_Documentation
 ##                        Library Settings                               ##
 ##                                                                       ##
 ###########################################################################
+# shellcheck disable=SC1090
 
 # Online source for scripts and configuraions
 _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
 
 # load branding informaton:
-_OEM_DEPENDENCIES="_branding _locations _rtd_recipies"
+_OEM_dependencies="_branding _locations _rtd_recipies"
 
 
 
@@ -350,7 +355,7 @@ yad::display_cmd_output ()
 # Usage:
 #
 # This function takes a command as an argument and executes it. The command output is displayed in a progress box using the 'yad' command.
-# The progress box shows a pulsating animatprepare_environment_for_iso_creationion and automatically closes when the command execution is complete.
+# The progress box shows a pulsating animatsystem::prepare_environment_for_iso_creationion and automatically closes when the command execution is complete.
 #
 # Example usage:
 # yad::display_cmd_output "apt -y upgrade"
@@ -455,6 +460,34 @@ dialog::display_notice ()
 	dialog --backtitle "${PUBLICATION:-"Notice"}" --colors --no-collapse --title "Notice" --msgbox "\n ${*} \n" 15 78
 	clear
 }
+
+
+
+
+dialog::display_error ()
+{
+# Description: Function to display an error notice. The purpose of this function
+# is simply to make it easy and convenient to display an ERROR message to an end user in a terminal
+# in a nice way. To use this function, simply call it passing whatever string you want displayed
+# using dialog.
+# Globals: ${RTD_GUI} (will default to dialog), ${PUBLICATION} (optional)
+# Arguments: ["String to display"]
+# Outputs: Message in dialog box
+# Returns: 0 or ESC
+# Usage:
+#
+# dialog::display_error "The message that you want to display"
+#
+# End of Documentation
+
+	hash dialog &>/dev/null || check_dependencies "${RTD_GUI:-dialog}" &>/dev/null || return 1
+
+	dialog --backtitle "${PUBLICATION:-"ERROR"}" --colors --no-collapse --title "ERROR" --msgbox "\n ${*} \n" 15 78
+	clear
+}
+
+
+
 
 
 dialog::display_summary_message ()
@@ -826,9 +859,9 @@ dependency::file ()
 			"../../core/${1}"
 			"${0%/*}/../core/${1}"
 			"${0%/*}/../../core/${1}"
-			"$(dirname $(find /opt -name ${1} 2>/dev/null | head -n 1 ))/${1}"
-			"$(dirname $(find ${HOME}/GIT -name ${1} 2>/dev/null | head -n 1 ))/${1}"
-			"$(dirname $(find ${HOME}/bin -name ${1} 2>/dev/null | head -n 1 ))/${1}"
+			"$(dirname "$(find /opt -name ${1} 2>/dev/null | head -n 1 )")/${1}"
+			"$(dirname "$(find ${HOME}/GIT -name ${1} 2>/dev/null | head -n 1 )")/${1}"
+			"$(dirname "$(find ${HOME}/bin -name ${1} 2>/dev/null | head -n 1 )")/${1}"
 			)
 
 		for path in "${paths[@]}"; do 
@@ -865,6 +898,7 @@ dependency::file ()
 
 
 
+# shellcheck disable=SC2120
 oem::deploy_themes () {
 # Description: Function to download and deploy themes from Github.
 #              The github location is defined in the _locations file for consistency.
@@ -2262,16 +2296,16 @@ cleanup_and_finish ()
 # Usage:
 # End of documentation
 
-	cd "$CURRENT_DIR" && echo "returned to $CURRENT_DIR" || echo "No directory to return to... never mind."
+	cd "$current_dir" && echo "returned to $current_dir" || echo "No directory to return to... never mind."
 	# Cleanup folder structure...
-	rm -r "$TMP_DOWNLOAD_DIR"
-	rm -r "$TMP_DISC_DIR"
-	rm -r "$TMP_INITRD_DIR"
-	rm -r "$SCRIPT_DIR/custom"
+	rm -r "$tmp_download_dir"
+	rm -r "$tmp_disc_dir"
+	rm -r "$tmp_initrd_dir"
+	rm -r "$script_dir/custom"
 
 	if [[  "$1" != "nomessage" ]]; then
 		COMPLETION_MESSAGE="	Your ISO image is ready!
-		It is placed in the folder: $PUT_ISO_FILE_HERE_WHEN_DONE/
+		It is placed in the folder: $put_iso_file_here_when_done/
 
 		Next steps:
 		- Burn the ISO to a USB (ex: using MULTIBOOT from Pendrive Linux)
@@ -2285,14 +2319,14 @@ cleanup_and_finish ()
 		echo "Cleanup..."
 	fi
 
-	unset BIN_7Z
-	unset BIN_XORRISO
-	unset BIN_CPIO
-	unset ISOHDPFX_BIN
+	unset bin_7z
+	unset bin_xorriso
+	unset bin_cpio
+	unset isohdpfx_bin
 	unset VOLUME_TITLE
-	unset TARGET_ISO_FILE_NAME
-	unset SOURCE_ISO_URL
-	unset SSH_PUBLIC_KEY_FILE
+	unset target_iso_file_name
+	unset _SOURCE_ISO_URL
+	unset ssh_public_key_file
 	unset PRESEED_TEMPLATE
 	unset CONFIG
 	unset PRESEED_FILE
@@ -3056,7 +3090,7 @@ rtd_oem_turn_on_gui_network_management ()
 		systemctl stop systemd-networkd
 		systemctl restart  NetworkManager
 	else
-		write_error "No graphical session appear to be availabl ein this system! Skipping netconfig..."
+		write_error "No graphical session appear to be availabl in this system! Skipping netconfig..."
 	fi
 }
 
@@ -3110,7 +3144,7 @@ system::run_command_in_gnome_user_session () {
 # End of documentation
 	echo -------------------------- Begin as user: $SUDO_USER ---------------------
 	echo "$*"
-	sudo -H -u $SUDO_USER DISPLAY=$DISPLAY DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u "$SUDO_USER")/bus $*
+	sudo -H -u "$SUDO_USER" DISPLAY=$DISPLAY DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u "$SUDO_USER")/bus $*
 	echo " "
 	echo -------------------------- End as user: $SUDO_USER   ---------------------
 }
@@ -3346,12 +3380,12 @@ rtd_oem_setup_brand_splash_screen ()
 	# making an ubuntu or debian boot iso as this is generally what this function was written to do. However these values
 	# can be overridden by passing the 2 parameters to this script.
 	: "${image_file_to_brand:="$(
-		if [ -f $TMP_DISC_DIR/splash.png ]; then
-			echo "$TMP_DISC_DIR/splash.png"
-		elif  [ -f $TMP_DISC_DIR/isolinux/splash.png ]; then
-			echo "$TMP_DISC_DIR/isolinux/splash.png"
-		elif [ -f $TMP_DISC_DIR/isolinux/splash.png ]; then
-			echo "$TMP_DISC_DIR/isolinux/splash.png"
+		if [ -f $tmp_disc_dir/splash.png ]; then
+			echo "$tmp_disc_dir/splash.png"
+		elif  [ -f $tmp_disc_dir/isolinux/splash.png ]; then
+			echo "$tmp_disc_dir/isolinux/splash.png"
+		elif [ -f $tmp_disc_dir/isolinux/splash.png ]; then
+			echo "$tmp_disc_dir/isolinux/splash.png"
 		fi )" }"
 	: "${text_to_brand_with:="$( echo " RunTime Data OEM Install: $PREFERENCE" )" }"
 
@@ -3369,7 +3403,7 @@ rtd_oem_setup_brand_splash_screen ()
 
 
 
-prepare_environment_for_iso_creation ()
+system::prepare_environment_for_iso_creation ()
 {
 # Description: Function to check that all dependencies are available for manipulating the
 # net install ISO from Ubuntu. Subsequently, the temporary file locations
@@ -3389,17 +3423,17 @@ prepare_environment_for_iso_creation ()
 # added, they may not be found in the current $PATH.
 #
 #	Software PATH insurance:
-#	: "${BIN_7Z:=$(type -P 7z)}"
-#	: "${BIN_XORRISO:=$(type -P xorriso)}"
-#	: "${BIN_CPIO:=$(type -P gnucpio || type -P cpio)}"
-#	: "${BIN_QEMU_IMG:=$(type -P qemu-img)}"
-#	: "${BIN_KVM:=$(type -P kvm)}"
-#	: "${BIN_QEMU_SYSTEM_X86_64:=$(type -P qemu-system-x86_64 )}"
-#	: "${PUT_ISO_FILE_HERE_WHEN_DONE:="/home/$SUDO_USER/Virtual-DVDs"}"
-#	: "${PUT_QCOW_FILE_HERE_WHEN_DONE:="/home/$SUDO_USER/Virtual-HDs"}"
+#	: "${bin_7z:=$(type -P 7z)}"
+#	: "${bin_xorriso:=$(type -P xorriso)}"
+#	: "${bin_cpio:=$(type -P gnucpio || type -P cpio)}"
+#	: "${bin_qemu_img:=$(type -P qemu-img)}"
+#	: "${bin_kvm:=$(type -P kvm)}"
+#	: "${bin_qemu_system_x86_64:=$(type -P qemu-system-x86_64 )}"
+#	: "${put_iso_file_here_when_done:="/home/$SUDO_USER/Virtual-DVDs"}"
+#	: "${put_qcow_file_here_when_done:="/home/$SUDO_USER/Virtual-HDs"}"
 #	: "${VOLUME_TITLE:="RTD Auto Installer"}"
-#	: "${SSH_PUBLIC_KEY_FILE:="/home/$SUDO_USER/.ssh/id_rsa.pub"}"
-#	: "${PERMANENT_DOWNLOAD_DIR:="/home/$SUDO_USER/Virtual-DVDs/Downloaded"}"
+#	: "${ssh_public_key_file:="/home/$SUDO_USER/.ssh/id_rsa.pub"}"
+#	: "${permanent_download_dir:="/home/$SUDO_USER/Virtual-DVDs/Downloaded"}"
 #
 # The main tool to create ISO files system is "xorriso".
 # [xorriso] copies file objects from POSIX compliant filesystems into Rock Ridge
@@ -3411,63 +3445,458 @@ prepare_environment_for_iso_creation ()
 #
 # End of Documentation
 
+	system::log_item "Preparing environment for ISO creation..."
 
-	: "${TARGET_ISO="$PUT_ISO_FILE_HERE_WHEN_DONE/$TARGET_ISO_FILE_NAME"}"
-	: "${_DEPENDENCIES="dos2unix cpio gzip genisoimage wget fakeroot xorriso isolinux"}"
+	: "${target_iso="$put_iso_file_here_when_done/$target_iso_file_name"}"
+	if cat "/etc/os-release" | grep "debian" ; then
+		_dependencies="dos2unix cpio gzip genisoimage wget fakeroot xorriso isolinux qemu-system libvirt-daemon-system"
+	elif cat "/etc/os-release" | grep "fedora" ; then
+		_dependencies="dos2unix cpio gzip genisoimage wget fakeroot xorriso isolinux qemu-system libvirt-daemon-system"
+	elif  cat "/etc/os-release" | grep "suse" ; then
+		_dependencies="dos2unix cpio gzip genisoimage wget fakeroot xorriso isolinux qemu-x86 libvirt-daemon-qemu"
+	else
+		write_error "Neither debian, fedora, or suse base distros or derivatives could be found; NOT installing dependencies."
+		return 1
+	fi
 
-	for i in $_DEPENDENCIES
-	do
-		check_dependencies $i
-	done
+	for i in $_dependencies; do check_dependencies $i ; done
 
-	: "${BIN_7Z:=$(type -P 7z)}"
-	: "${BIN_XORRISO:=$(type -P xorriso)}"
-	: "${BIN_CPIO:=$(type -P gnucpio || type -P cpio)}"
-	: "${BIN_QEMU_IMG:=$(type -P qemu-img)}"
-	: "${BIN_KVM:=$(type -P kvm)}"
-	: "${BIN_QEMU_SYSTEM_X86_64:=$(type -P qemu-system-x86_64 )}"
-	: "${PUT_ISO_FILE_HERE_WHEN_DONE:="/home/$SUDO_USER/Virtual-DVDs"}"
-	: "${PUT_QCOW_FILE_HERE_WHEN_DONE:="/home/$SUDO_USER/Virtual-HDs"}"
+	: "${bin_7z:=$(type -P 7z)}"
+	: "${bin_xorriso:=$(type -P xorriso)}"
+	: "${bin_cpio:=$(type -P gnucpio || type -P cpio)}"
+	: "${bin_qemu_img:=$(type -P qemu-img)}"
+	: "${bin_kvm:=$(type -P kvm)}"
+	: "${bin_qemu_system_x86_64:=$(type -P qemu-system-x86_64 )}"
+	: "${put_iso_file_here_when_done:="/home/$SUDO_USER/Virtual-DVDs"}"
+	: "${put_qcow_file_here_when_done:="/home/$SUDO_USER/Virtual-HDs"}"
 	: "${VOLUME_TITLE:="RTD Auto Installer"}"
-	: "${SSH_PUBLIC_KEY_FILE:="/home/$SUDO_USER/.ssh/id_rsa.pub"}"
-	: "${PERMANENT_DOWNLOAD_DIR:="/home/$SUDO_USER/Virtual-DVDs/Downloaded"}"
+	: "${ssh_public_key_file:="/home/$SUDO_USER/.ssh/id_rsa.pub"}"
+	: "${permanent_download_dir:="/home/$SUDO_USER/Virtual-DVDs/Downloaded"}"
 
+	system::log_item "Checking for presence of (isohdpfx.bin)..."
 	if [[ -e /usr/lib/ISOLINUX/isohdpfx.bin ]]; then
-		: "${ISOHDPFX_BIN:="/usr/lib/ISOLINUX/isohdpfx.bin"}"
+		: "${isohdpfx_bin:="/usr/lib/ISOLINUX/isohdpfx.bin"}"
 	else
 		write_warning "An important file (isohdpfx.bin) was not found in the expected location. Attepting to workaround the issue..."
 		if hash locate 2>/dev/null ; then
-			locate isohdpfx.bin || ( write_error "The file isohdpfx.bin could not be found or fetched. Please correct manually!" ; rtd_oem_pause 1 )
-			: "${ISOHDPFX_BIN:=$(locate isohdpfx.bin  | head -n 1)}"
-			write_information "Found: $ISOHDPFX_BIN"
+			locate isohdpfx.bin || ( write_error "The file isohdpfx.bin could not be found or fetched. Please correct manually!" ; rtd_oem_pause 1 ; return 1 )
+			: "${isohdpfx_bin:=$(locate isohdpfx.bin  | head -n 1)}"
+			write_information "Found: $isohdpfx_bin"
 		else
 			check_dependencies plocate && ( write_warning "Updating file location DB, this may take a long time if there are a lot of files on the system..." ; updatedb )
-			locate isohdpfx.bin || ( write_error "The file isohdpfx.bin could not be found or fetched. Please correct manually!" ; rtd_oem_pause 1 )
-			: "${ISOHDPFX_BIN:=$(locate isohdpfx.bin  | head -n 1)}"
-			write_information "Found: $ISOHDPFX_BIN"
+			locate isohdpfx.bin || ( write_error "The file isohdpfx.bin could not be found or fetched. Please correct manually!" ; rtd_oem_pause 1 ; return 1 )
+			: "${isohdpfx_bin:=$(locate isohdpfx.bin  | head -n 1)}"
+			write_information "Found: $isohdpfx_bin"
 		fi
 	fi
 
-	if [ ! -f "$SSH_PUBLIC_KEY_FILE" ];
-	then
-		echo "Error: public SSH key $SSH_PUBLIC_KEY_FILE not found!"
-		echo "You will need to setup automatic login using ssh manually each time you build a server with this media."
-		read -p "Press [Enter] to continue..."
+	if [[ ! -f "$ssh_public_key_file" ]] ; then
+		write_warning "Error: public SSH key $ssh_public_key_file not found!
+		You will need to setup automatic login using ssh manually each time you build a server with this media."
 	fi
 
-	CURRENT_DIR="$(pwd)"
-	SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-	TMP_DOWNLOAD_DIR=$(mktemp -d )
-	TMP_DISC_DIR=$(mktemp -d )
-	TMP_INITRD_DIR=$(mktemp -d )
+	current_dir="$(pwd)"
+	script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+	tmp_download_dir=$(mktemp -d )
+	tmp_disc_dir=$(mktemp -d )
+	tmp_initrd_dir=$(mktemp -d )
 
-	for i in $PUT_QCOW_FILE_HERE_WHEN_DONE\
-		$PUT_ISO_FILE_HERE_WHEN_DONE\
-		$PERMANENT_DOWNLOAD_DIR
+	for i in $put_qcow_file_here_when_done\
+		$put_iso_file_here_when_done\
+		$permanent_download_dir
 	do
 		mkdir -p "$i" && chown "$SUDO_USER":"$SUDO_USER" "$i"
 	done
 }
+
+
+
+
+
+
+
+download_and_manipulate_iso_debian ()
+{
+# Description:
+# download_and_manipulate_iso_debian "debian" "openssh-server" "MinecraftTasks"
+# This is a simple command sequence to read the preference of distribution to install
+# and what release to get... then download the network install file from debian
+# and manipulate the iso file to complete the edited instruction in the preseed.cfg...
+#
+# Globals:
+# Arguments: None
+# Outputs:
+# Returns:
+# Usage:
+#
+# download_and_manipulate_iso_debian [ISO Name] [Environment] [Addon Task]
+#
+# where [ISO Name] may be: any string to starte the file name with
+# where [Environment] may be: any debian supported desktop environment
+# where [Addon Task] may be: additional pre determined configuration
+#
+# EXAMPLE:
+# download_and_manipulate_iso_debian openssh-server MinecraftTasks
+# download_and_manipulate_iso_debian gnome-desktop
+# download_and_manipulate_iso_debian xfce-desktop
+#
+# End of Documentation
+	system::prepare_environment_for_iso_creation
+	# Determine the name of the ISO file to create, and wich iso to download using default values if none are provided.
+	# Capitlal variable names are generally global and set in the _loctations file.
+	# Variables will be populated either from the default _locations file or detected.
+	: "${_SOURCE_ISO_URL:="https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/$(curl --silent  https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/SHA256SUMS | \grep -o "debian-.*netinst*.iso" |grep -v mac |grep -v edu)"}"
+	: "${_SOURCE_FIRMWARE:="http://cdimage.debian.org/cdimage/unofficial/non-free/firmware/buster/current/firmware.zip"}"
+	: "${_CURRENT_DEB_ISO:="$(curl --silent  https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/SHA256SUMS | \grep -o "debian-.*netinst*.iso" |grep -v mac |grep -v edu)"}"
+	: "${target_iso_file_name="${2:-"ssh-server"}-$_CURRENT_DEB_ISO"}"
+	target_iso="$put_iso_file_here_when_done/$target_iso_file_name"
+	iso_store="$put_iso_file_here_when_done/Downloaded/$_CURRENT_DEB_ISO"
+	PREFERENCE=$2
+
+	if [[ ! -f "$iso_store" ]]; then
+		write_status "Geting install image..."
+		write_information "Download: $_SOURCE_ISO_URL"
+		wget -4  -q --show-progress "$_SOURCE_ISO_URL" -O "$iso_store" 
+		write_information "Retreived: $(ls $iso_store)"
+	fi
+
+	$bin_7z x "$iso_store" "-o$tmp_disc_dir" || write_error  "FAILED to download and/or extract $_SOURCE_ISO_URL" 
+
+	write_status "Geting non-free firmware..."
+	write_information "Download: $_SOURCE_FIRMWARE"
+	wget -4  -q --show-progress "$_SOURCE_FIRMWARE" -O "$tmp_download_dir/firmware.zip" && ( mkdir "$tmp_disc_dir/firmware" & "$bin_7z" x "$tmp_download_dir/firmware.zip" "-o$tmp_disc_dir/firmware" )
+	write_information "Retreived: $(ls "$tmp_disc_dir"/firmware )"
+
+	# Load the installation answers template.
+	write_status "Getting intall instructions template... "
+	system::make_preseed_cfg -a ask -p "$tmp_initrd_dir/" -r $PREFERENCE || write_error "Failed to create preseed.cfg template"
+
+# ------------------- Patch 1 grub .cfg ------------------------ #
+
+patch "$tmp_disc_dir/boot/grub/grub.cfg" <<PATCH
+11a12
+> set timeout=10
+PATCH
+
+sed -i s/"menuentry --hotkey=g 'Graphical install' {"/"menuentry --hotkey=g 'Automatic Graphical install' {"/g "$tmp_disc_dir/boot/grub/grub.cfg"
+sed -i s/"menuentry --hotkey=g 'install' {"/"menuentry --hotkey=g 'Automatic install' {"/g "$tmp_disc_dir/boot/grub/grub.cfg"
+sed -i s/"menu label ^Graphical install"/"menu label ^Automatic Graphical install"/g "$tmp_disc_dir/isolinux/gtk.cfg"
+sed -i s/"menu label ^Install"/"menu label ^Automatic Install"/g "$tmp_disc_dir/isolinux/txt.cfg"
+# -------------------------------------------------------------- #
+
+
+# ---------------------Patch 2 isolinux.cfg -------------------- #
+
+dos2unix "$tmp_disc_dir/isolinux/isolinux.cfg"
+patch "$tmp_disc_dir/isolinux/isolinux.cfg" <<PATCH_II
+7c7
+< timeout 0
+---
+> timeout 100
+PATCH_II
+
+# -------------------------------------------------------------- #
+
+	# Edit the installation instructions file...
+	sed -i s/oem-replace-me-desktop-selection/$PREFERENCE/g "$tmp_initrd_dir/preseed.cfg"
+	mkdir "$tmp_initrd_dir/custom" && cp "$ssh_public_key_file" "$tmp_initrd_dir/custom/userkey.pub" || write_error "Failed to create $tmp_initrd_dir/custom" 
+
+# ---------------------Create ssh key service ------------------ #
+
+cat << SSH_KEY_KEYGEN > "$tmp_initrd_dir/custom/ssh-host-keygen.service"
+[Unit]
+Description=OpenSSH Server Key Generation
+Before=ssh.service
+
+[Service]
+ExecStart=/usr/bin/ssh-keygen -A
+Type=oneshot
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+SSH_KEY_KEYGEN
+
+# -------------------------------------------------------------- #
+
+	# Inject created content into the new ISO...
+	write_host --green "# Modify the CLI Installer" 
+	pushd "$tmp_initrd_dir" || write_error "failed to enter init directory: $tmp_initrd_dir"
+		gzip -d -c "$tmp_disc_dir/install.amd/initrd.gz" > "./initrd"
+		echo "./preseed.cfg" | fakeroot "$bin_cpio" -o -H newc -A -F "./initrd"
+		echo "./task.sh" | fakeroot "$bin_cpio" -o -H newc -A -F "./initrd"
+		find ./custom | fakeroot "$bin_cpio" -o -H newc -A -F ./initrd
+		cat ./initrd | gzip -9c > "$tmp_disc_dir/install.amd/initrd.gz"
+		rm "$tmp_initrd_dir/initrd"
+
+		echo -e $GREEN "# Modify the GTK Installer" $ENDCOLOR
+		gzip -d -c  "$tmp_disc_dir/install.amd/gtk/initrd.gz"  > "./initrd"
+		echo "./preseed.cfg" | fakeroot "$bin_cpio" -o -H newc -A -F "./initrd"
+		echo "./task.sh" | fakeroot "$bin_cpio" -o -H newc -A -F "./initrd"
+		find "./custom" | fakeroot "$bin_cpio" -o -H newc -A -F "./initrd"
+		cat "./initrd" | gzip -9c > "$tmp_disc_dir/install.amd/gtk/initrd.gz"
+	popd || (write_error  "Failed to popd"  & rtd_oem_pause 1)
+	rtd_oem_setup_brand_splash_screen
+}
+
+
+
+
+
+
+
+
+
+
+create_iso_image_debian ()
+{
+# Description: Function to generate the new ISO file from the extracted and
+# altered original ISO.
+# Delete old iso file if there...
+#
+# Globals:
+# Arguments: None
+# Outputs:
+# Returns:
+# Usage:
+# End of Documentation
+
+	# Check for other input and create them if not defined...
+	# : "${target_iso}"
+	# : "${put_iso_file_here_when_done}"
+
+	# Check for required input...
+	# [[ -z "${target_iso}" ]] || rtd_oem_pause 1 "${FUNCNAME[0]} requires atleast one parameter."
+
+	write_status "------ CREATING ISO: ${target_iso}    --------"
+	if [ -f "${target_iso}" ]; then
+		rm -f "${target_iso}"
+	fi
+	system::log_item "Creating ISO: ${target_iso}"
+	cd "$tmp_disc_dir" || system::log_item  "Failed to enter $tmp_disc_dir"
+	rm -r '[BOOT]' || system::log_item  "Failed to delete [BOOT] directory"
+	"$bin_xorriso" -as mkisofs -r \
+		-V "${VOLUME_TITLE:-"Made by ${FUNCNAME[0]}"}" \
+		-J -b "isolinux/isolinux.bin" \
+		-c boot.cat \
+		-no-emul-boot \
+		-boot-load-size 4 \
+		-boot-info-table \
+		-input-charset utf-8 \
+		-isohybrid-mbr "${isohdpfx_bin}" \
+		-eltorito-alt-boot \
+		-e boot/grub/efi.img \
+		-no-emul-boot \
+		-isohybrid-gpt-basdat -o "${target_iso}" ./ &>> "${_LOGFILE}" || rtd_oem_pause 1 "${FUNCNAME[0]}: An error may have occurred (review above outout) then: Press [ENTER] to continue:"
+	chmod 777 "${target_iso}" &>>"${_LOGFILE}" || rtd_oem_pause 1 "${FUNCNAME[0]}: An error may have occurred (review above outout) then: Press [ENTER] to continue:"
+
+	test_iso_boot_media "${target_iso}"
+	if ${RTD_GUI} --yesno "Would you like to make a bootable thumbdrive from this ISO media?" "${HEIGHT}" "${WIDTH}" ; then
+		create_physical_media_from_iso "${target_iso}" || create_physical_media_from_iso
+	else
+		return
+	fi
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+create_iso_image ()
+{
+# Description: Function to generate a bootable ISO file from source folder or an extracted and
+# altered original ISO. The function takes 3 arguments: target file name, folder to use as source
+# and volume title. The first argument is mandatory since it makes not sense unless it is known
+# what source to use for makeing the ISO file.
+#
+# Globals:
+# Arguments: None
+# Outputs:
+# Returns:
+# Usage:
+# create_iso_image  ~/mybootablecdfolder ~/mybootable.iso "My cool bootable iso title"
+#
+# This function will over write the old iso file if there...
+#
+# End of Documentation
+
+	# Check for required input...
+
+	write_status "------ CREATING ISO: $target_iso    --------"
+	if [ -f "$target_iso" ]; then
+		rm -f "$target_iso"
+	fi
+
+	cd "$tmp_disc_dir" || echo "failed to enter $tmp_disc_dir "
+	rm -r '[BOOT]'
+	"$bin_xorriso" -as mkisofs -r -V "$VOLUME_TITLE" \
+			-J -b isolinux.bin \
+			-c boot.cat \
+			-no-emul-boot \
+			-boot-load-size 4 \
+			-boot-info-table \
+			-input-charset utf-8 \
+			-isohybrid-mbr "$isohdpfx_bin" \
+			-eltorito-alt-boot \
+			-e boot/grub/efi.img \
+			-no-emul-boot \
+			-isohybrid-gpt-basdat \
+			-o "$target_iso" ./ || rtd_oem_pause 1 "${FUNCNAME[0]}: An error may have occurred (review above outout) then: Press [ENTER] to continue:"
+	chmod 777 "$target_iso" || rtd_oem_pause 1 "${FUNCNAME[0]}: An error may have occurred (review above outout) then: Press [ENTER] to continue:"
+}
+
+
+
+
+
+create_physical_media_from_iso ()
+{
+# Description:
+# Function to automatically write ISO (virtual DVD/CD/BlueRay) to a thumb drive. No argumenst are
+# required, but a source ISO file location can may be provided when calling the function.
+# If information is required, but not provided, the end user will be interactively prompted.
+# This function requires elevated priviledges to be able to write media to a thumb drive
+# (boot sector) and other system restrictied activities. If the function is NOT called in a
+# script with elevated priviledges, it will attempt to elevate priviledges and prompt for a password.
+# Since writing a new bootable thumb drive is inherrently an interactive activity; a prompt will
+# be displayed asking what media to write to. If no media is present, a warning error
+# message will be displayed.
+#
+# Globals:
+# Arguments: None
+# Outputs:
+# Returns:
+# Usage:
+#
+# "create_physical_media_from_iso" or "create_physical_media_from_iso path/to/file.iso"
+#
+# NOTE:
+# [Note 1] An ISO file, often called an ISO image, is a single file that's a perfect representation of an
+# entire CD, DVD, or BD. The entire contents of a disc can be precisely duplicated in a single ISO file.
+# An optical disc image (or ISO image, from the ISO 9660 file system used with CD-ROM media) is a disk image
+# that contains everything that would be written to an optical disc, disk sector by disc sector, including the
+# optical disc file system. ISO images are expected to contain the binary image of an optical media file system
+# (usually ISO 9660 and its extensions or UDF), including the data in its files in binary format, copied exactly
+# as they were stored on the disc. The data inside the ISO image will be structured according to the file system
+# that was used on the optical disc from which it was created.
+#
+# [Note 2] A USB flash drive is a data storage device that includes flash memory with an integrated USB interface.
+# It is typically removable, rewritable and much smaller than an optical disc. Most weigh less than 30 g (1 oz).
+# Since first appearing on the market in late 2000
+# End of documentation
+
+
+	: ${BackTitle="Physical Installation Media Creator"}
+	: ${Title="OS Media Manger"}
+
+	if [ ! "$UID" -eq 0 ]; then
+		# find  a diferent way... tempfile not universal...
+		data=$(tempfile 2>/dev/null)
+		trap "rm -f $data" 0 1 2 5 15
+		dialog --title "${Title}" --backtitle "${BackTitle}" --insecure --passwordbox "\n This functionality requires elevated priviledges. \n Please provide your (sudo) password" 10 90 2> $data
+		ret=$? ; clear
+		case $ret in
+			0) cat $data | sudo -S bash "$0" "$*" ;;
+			1) echo "Request cancelled" ;;
+			255) [ -s $data ] && rm $data &>/dev/null || echo "[esc] Request aborted" ;;
+			* ) rm $data &>/dev/null ; exit 1
+		esac
+		rm $data &>/dev/null
+		exit
+	fi
+
+	if [[ -z "$1" ]]; then
+		[[ -d /home/${SUDO_USER}/Virtual-DVDs ]] && SuggestedFolder="/home/${SUDO_USER}/Virtual-DVDs/" || SuggestedFolder="/home/${SUDO_USER}"
+		target_iso=$(dialog --stdout --title "${Title}" --backtitle "${BackTitle}" --fselect "${SuggestedFolder}" 15 110 2)
+		UserResponse=$? ; clear
+		case ${UserResponse} in
+			  1) echo "Request cancelled"; return 0 ;;
+			  255) echo "[ESC] key pressed."; return 255 ;;
+		esac
+	else
+		target_iso=$1
+	fi
+
+	if [[ -z "${target_iso}" ]]; then
+		DIALOGRC=~/.dialogrc
+		if [[ -e ${DIALOGRC} ]]; then
+			mv ${DIALOGRC} ${DIALOGRC}.bak
+		fi
+
+		echo 'screen_color = (CYAN,RED,ON)' >${DIALOGRC}
+		dialog --title "${Title}" --backtitle "${BackTitle}" --msgbox "\n You must provide an ISO file as argument! \n Usage: ${0##*/} ~/filename.iso"  14 90
+		clear ; rm ${DIALOGRC}
+
+		if [[ -e ${DIALOGRC}.bak ]]; then
+			mv ${DIALOGRC}.bak ${DIALOGRC}
+		fi
+		return 1
+	else
+		#          List removable dev : not loop dev: not CD    : not nvme HD : filter: header w. name
+		devlist="$(lsblk -ndo name,rm |grep -v loop |grep -v sr |grep -v nvme |grep 1 | cut -f1 -d' ')"
+
+		if [[ -z ${devlist} ]]; then
+			DIALOGRC=~/.dialogrc
+			echo 'screen_color = (CYAN,RED,ON)' >${DIALOGRC}
+			dialog --title "${Title}" --backtitle "${BackTitle}" --msgbox "\n No removable media could be found! Please insert a thumb drive and try again."  14 90
+			clear ; rm ${DIALOGRC}
+			return 1
+		else
+			declare -A RemovableMediaList
+			index=1
+
+			for media in ${devlist};
+			do
+				SuggestedRemovableDevice="${media}"
+				RemovableMediaList[$index]=$(echo -e \'$(fdisk -l /dev/$media |head -1)\')
+				(( index++ ))
+			done
+
+			DiscoveredItems="\n
+			\n Removable media found: ${#RemovableMediaList[@]}
+			\n --------------------------------------------------------
+
+			$(until [ $i -gt ${#RemovableMediaList[@]} ]
+			do
+				[[ $i -gt 0 ]] && echo -e "Removable Disk $i:   ${RemovableMediaList[$i]} \n"
+				((i=i+1))
+			done
+			)"
+
+			USBTargetDevice=$( dialog --stdout --no-collapse --title "${Title}" --backtitle "${BackTitle}"  --inputbox "${DiscoveredItems}" 15 110 /dev/${SuggestedRemovableDevice} )
+			Response=$?
+			clear
+			case ${Response} in
+				0 )
+					dialog --title "${Title}" --backtitle "${BackTitle}" --yesno "Please Confirm:\n Write the ISO file: \n ${target_iso} \n To the drive: \n ${USBTargetDevice}" 25 90
+						case $? in
+							0 ) ( dd if=${target_iso} of=${USBTargetDevice} status=progress 2>&1 |dialog --title "${Title}" --backtitle "${BackTitle}" --programbox "Please wait, writing disk now:" 25 90) ;;
+							1 ) echo "Request cancelled"; create_physical_media_from_iso ;;
+							255 ) echo "[ESC] key pressed."; return 255 ;;
+							* ) echo "An unknown event occurred!" ; return 1 ;;
+						esac
+					clear ; return
+				;;
+				1 ) echo "Request cancelled"; return 0 ;;
+				255 ) echo "[ESC] key pressed."; return 255 ;;
+				* ) echo "An unknown event occurred!" ; return 1 ;;
+			esac
+			return
+		fi
+	fi
+	return
+}
+
 
 
 
@@ -3506,12 +3935,12 @@ rtd_oem_setup_brand_splash_screen()
 	# making an ubuntu or debian boot iso as this is generally what this function was written to do. However these values
 	# can be overridden by passing the 2 parameters to this script.
 	: "${image_file_to_brand:="$(
-		if [ -f $TMP_DISC_DIR/splash.png ]; then
-			echo "$TMP_DISC_DIR/splash.png"
-		elif  [ -f $TMP_DISC_DIR/isolinux/splash.png ]; then
-			echo "$TMP_DISC_DIR/isolinux/splash.png"
-		elif [ -f $TMP_DISC_DIR/isolinux/splash.png ]; then
-			echo "$TMP_DISC_DIR/isolinux/splash.png"
+		if [ -f $tmp_disc_dir/splash.png ]; then
+			echo "$tmp_disc_dir/splash.png"
+		elif  [ -f $tmp_disc_dir/isolinux/splash.png ]; then
+			echo "$tmp_disc_dir/isolinux/splash.png"
+		elif [ -f $tmp_disc_dir/isolinux/splash.png ]; then
+			echo "$tmp_disc_dir/isolinux/splash.png"
 		fi )" }"
 	: "${text_to_brand_with:="$( echo " RunTime Data OEM Install: $PREFERENCE" )" }"
 
@@ -3553,7 +3982,7 @@ rtd_oem_ubuntu_auto_install_iso_builder ()
 
 	CONFIG=$1
 	ISO_VER=$2
-	prepare_environment_for_iso_creation
+	system::prepare_environment_for_iso_creation
 
 	write_information "Retreive list of available Ubuntu versions..."
 	all=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
@@ -3569,15 +3998,15 @@ rtd_oem_ubuntu_auto_install_iso_builder ()
 		BASE=$(basename $ISO_URL .iso)
 
 	write_status "Checking if $ISO_FILENAME already downloaded..."
-	iso=$(find "$PERMANENT_DOWNLOAD_DIR" -name "$ISO_FILENAME")
+	iso=$(find "$permanent_download_dir" -name "$ISO_FILENAME")
 	if [ ! -e "$iso" ]; then
 		echo "$ISO_FILENAME is not in cache, downloading..."
-		wget -nc $ISO_URL -P "$PERMANENT_DOWNLOAD_DIR" || read -p "Failure to download ISO file"
-		iso="$PERMANENT_DOWNLOAD_DIR/$ISO_FILENAME"
+		wget -nc $ISO_URL -P "$permanent_download_dir" || read -p "Failure to download ISO file"
+		iso="$permanent_download_dir/$ISO_FILENAME"
 	fi
 
-	mnt="${TMP_DISC_DIR:=$(mktemp -d )}"
-	TMP_DISC_DIR=$mnt
+	mnt="${tmp_disc_dir:=$(mktemp -d )}"
+	tmp_disc_dir=$mnt
 	write_status "Mounting intallation media..."
 	mount $iso $mnt -o user,ro || rtd_oem_pause 1
 	write_status "Verifying media presence..."
@@ -3644,26 +4073,26 @@ rtd_oem_ubuntu_auto_install_iso_builder ()
 	esac
 
 
-	TARGET_ISO="$PUT_ISO_FILE_HERE_WHEN_DONE/$auto.iso"
+	target_iso="$put_iso_file_here_when_done/$auto.iso"
 
 
-	if [[ -f $TARGET_ISO ]]; then
-		rm $TARGET_ISO
+	if [[ -f $target_iso ]]; then
+		rm $target_iso
 	fi
 
-	$BIN_XORRISO -as mkisofs -isohybrid-mbr "$ISOHDPFX_BIN" \
+	$bin_xorriso -as mkisofs -isohybrid-mbr "$isohdpfx_bin" \
 		-c isolinux/boot.cat -b isolinux/isolinux.bin \
 		-no-emul-boot -boot-load-size 4 -boot-info-table \
 		-eltorito-alt-boot -e boot/grub/efi.img -no-emul-boot \
-		-isohybrid-gpt-basdat -o "$PUT_ISO_FILE_HERE_WHEN_DONE/$auto.iso" $auto
+		-isohybrid-gpt-basdat -o "$put_iso_file_here_when_done/$auto.iso" $auto
 	rtd_oem_pause $?
 	umount -l $mnt
 	rm -rf $mnt $auto
 
 	if ($RTD_GUI --title "Media ready" --yesno "Created $auto.iso Would you like to test the new image?." 0 0); then
 		check_dependencies qemu-kvm
-		qemu-img create -f qcow2 "$PUT_QCOW_FILE_HERE_WHEN_DONE/$auto.qcow2" 10G
-		qemu-system-x86_64 -smp 2 -enable-kvm -m 4G --cdrom "$TARGET_ISO" "$PUT_QCOW_FILE_HERE_WHEN_DONE/$auto.qcow2"
+		qemu-img create -f qcow2 "$put_qcow_file_here_when_done/$auto.qcow2" 10G
+		qemu-system-x86_64 -smp 2 -enable-kvm -m 4G --cdrom "$target_iso" "$put_qcow_file_here_when_done/$auto.qcow2"
 	else
 		echo "User selected No, exit status was $?."
 	fi
@@ -3675,400 +4104,6 @@ rtd_oem_ubuntu_auto_install_iso_builder ()
 
 
 
-
-
-
-download_and_manipulate_iso_debian ()
-{
-# Description:
-# download_and_manipulate_iso_debian "debian" "openssh-server" "MinecraftTasks"
-# This is a simple command sequence to read the preference of distribution to install
-# and what release to get... then download the network install file from debian
-# and manipulate the iso file to complete the edited instruction in the preseed.cfg...
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-#
-# download_and_manipulate_iso_debian [ISO Name] [Environment] [Addon Task]
-#
-# where [ISO Name] may be: any string to starte the file name with
-# where [Environment] may be: any debian supported desktop environment
-# where [Addon Task] may be: additional pre determined configuration
-#
-# EXAMPLE:
-# download_and_manipulate_iso_debian openssh-server MinecraftTasks
-# download_and_manipulate_iso_debian gnome-desktop
-# download_and_manipulate_iso_debian xfce-desktop
-#
-# End of Documentation
-
-	: "${TARGET_ISO_FILE_NAME:="$1-$2-mini-netinstall-auto.iso"}"
-	: "${SOURCE_ISO_URL:="https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/$(curl --silent  https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/SHA256SUMS | \grep -o "debian-.*netinst*.iso" |grep -v mac |grep -v edu)"}"
-	: "${SOURCE_FIRMWARE:="http://cdimage.debian.org/cdimage/unofficial/non-free/firmware/buster/current/firmware.zip"}"
-	TARGET_ISO="$PUT_ISO_FILE_HERE_WHEN_DONE/$TARGET_ISO_FILE_NAME"
-	PREFERENCE=$2
-
-	write_status "Geting install image..."
-	write_information "Download: $SOURCE_ISO_URL"
-	wget -4  -q --show-progress "$SOURCE_ISO_URL" -O "$TMP_DOWNLOAD_DIR/netboot.iso" && "$BIN_7Z" x "$TMP_DOWNLOAD_DIR/netboot.iso" "-o$TMP_DISC_DIR" || write_error  "FAILED to download and extract $SOURCE_ISO_URL" 
-	write_information "Retreived: $(ls $TMP_DISC_DIR)"
-
-	write_status "Geting non-free firmware..."
-	write_information "Download: $SOURCE_FIRMWARE"
-	wget -4  -q --show-progress "$SOURCE_FIRMWARE" -O "$TMP_DOWNLOAD_DIR/firmware.zip" && ( mkdir "$TMP_DISC_DIR/firmware" & "$BIN_7Z" x "$TMP_DOWNLOAD_DIR/firmware.zip" "-o$TMP_DISC_DIR/firmware" )
-	write_information "Retreived: $(ls $TMP_DISC_DIR/firmware )"
-
-	# Load the installation answers template.
-	write_status "Getting intall instructions template... "
-	system::make_preseed_cfg -r "default" -p "$TMP_INITRD_DIR" -t ssh-server
-
-# ------------------- Patch 1 grub .cfg ------------------------ #
-
-patch "$TMP_DISC_DIR/boot/grub/grub.cfg" <<PATCH
-11a12
-> set timeout=10
-PATCH
-
-sed -i s/"menuentry --hotkey=g 'Graphical install' {"/"menuentry --hotkey=g 'Automatic Graphical install' {"/g "$TMP_DISC_DIR/boot/grub/grub.cfg"
-sed -i s/"menuentry --hotkey=g 'install' {"/"menuentry --hotkey=g 'Automatic install' {"/g "$TMP_DISC_DIR/boot/grub/grub.cfg"
-sed -i s/"menu label ^Graphical install"/"menu label ^Automatic Graphical install"/g "$TMP_DISC_DIR/isolinux/gtk.cfg"
-sed -i s/"menu label ^Install"/"menu label ^Automatic Install"/g "$TMP_DISC_DIR/isolinux/txt.cfg"
-# -------------------------------------------------------------- #
-
-
-# ---------------------Patch 2 isolinux.cfg -------------------- #
-
-dos2unix "$TMP_DISC_DIR/isolinux/isolinux.cfg"
-patch "$TMP_DISC_DIR/isolinux/isolinux.cfg" <<PATCH_II
-7c7
-< timeout 0
----
-> timeout 100
-PATCH_II
-
-# -------------------------------------------------------------- #
-
-	# Edit the installation instructions file...
-	sed -i s/oem-replace-me-desktop-selection/$PREFERENCE/g "$TMP_INITRD_DIR/preseed.cfg"
-	mkdir "$TMP_INITRD_DIR/custom" && cp "$SSH_PUBLIC_KEY_FILE" "$TMP_INITRD_DIR/custom/userkey.pub" || write_error "Failed to create $TMP_INITRD_DIR/custom" 
-
-# ---------------------Create ssh key service ------------------ #
-
-cat << SSH_KEY_KEYGEN > "$TMP_INITRD_DIR/custom/ssh-host-keygen.service"
-[Unit]
-Description=OpenSSH Server Key Generation
-Before=ssh.service
-
-[Service]
-ExecStart=/usr/bin/ssh-keygen -A
-Type=oneshot
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-SSH_KEY_KEYGEN
-
-# -------------------------------------------------------------- #
-
-	# Inject created content into the new ISO...
-	echo -e $GREEN "# Modify the CLI Installer" $ENDCOLOR
-	pushd "$TMP_INITRD_DIR" || write_error "failed to enter init directory: $TMP_INITRD_DIR" 
-		gzip -d -c "$TMP_DISC_DIR/install.amd/initrd.gz" > "./initrd"
-		echo "./preseed.cfg" | fakeroot "$BIN_CPIO" -o -H newc -A -F "./initrd"
-		echo "./task.sh" | fakeroot "$BIN_CPIO" -o -H newc -A -F "./initrd"
-		find ./custom | fakeroot "$BIN_CPIO" -o -H newc -A -F ./initrd
-		cat ./initrd | gzip -9c > "$TMP_DISC_DIR/install.amd/initrd.gz"
-		rm "$TMP_INITRD_DIR/initrd"
-
-		echo -e $GREEN "# Modify the GTK Installer" $ENDCOLOR
-		gzip -d -c  "$TMP_DISC_DIR/install.amd/gtk/initrd.gz"  > "./initrd"
-		echo "./preseed.cfg" | fakeroot "$BIN_CPIO" -o -H newc -A -F "./initrd"
-		echo "./task.sh" | fakeroot "$BIN_CPIO" -o -H newc -A -F "./initrd"
-		find "./custom" | fakeroot "$BIN_CPIO" -o -H newc -A -F "./initrd"
-		cat "./initrd" | gzip -9c > "$TMP_DISC_DIR/install.amd/gtk/initrd.gz"
-	popd || (write_error  "Failed to popd"  & rtd_oem_pause 1)
-	rtd_oem_setup_brand_splash_screen
-}
-
-
-
-
-
-
-
-
-
-
-create_iso_image_debian ()
-{
-# Description: Function to generate the new ISO file from the extracted and
-# altered original ISO.
-# Delete old iso file if there...
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-# End of Documentation
-
-	# Check for other input and create them if not defined...
-	: "${TARGET_ISO:-"~/${TLA}-${FUNCNAME[0]}.iso"}"
-	: "${PUT_ISO_FILE_HERE_WHEN_DONE:="/home/$SUDO_USER/Virtual-DVDs"}"
-
-	if [[ -e /usr/lib/ISOLINUX/isohdpfx.bin ]]; then
-		: "${ISOHDPFX_BIN:="/usr/lib/ISOLINUX/isohdpfx.bin"}"
-	else
-		write_warning "An important file (isohdpfx.bin) was not found in the expected location. Attepting to workaround the issue..."
-		check_dependencies isolinux
-		check_dependencies mlocate && ( write_warning "Updating file location DB, this may take a long time if there are a lot of files on the system..." ; updatedb )
-		locate isohdpfx.bin || ( write_error "The file isohdpfx.bin could not be found or fetched. Please correct manually!" ; rtd_oem_pause 1 )
-		: "${ISOHDPFX_BIN:=$(locate isohdpfx.bin  | head -n 1)}"
-	fi
-
-	write_status "------ CREATING ISO: $TARGET_ISO    --------"
-	if [ -f "$TARGET_ISO" ]; then
-		rm -f "$TARGET_ISO"
-	fi
-
-	cd "$TMP_DISC_DIR" || echo "Failed to enter $TMP_DISC_DIR"
-	rm -r '[BOOT]'
-	"$BIN_XORRISO" -as mkisofs -r \
-		-V "${VOLUME_TITLE:-"Made by ${FUNCNAME[0]}"}" \
-		-J -b "isolinux/isolinux.bin" \
-		-c boot.cat \
-		-no-emul-boot \
-		-boot-load-size 4 \
-		-boot-info-table \
-		-input-charset utf-8 \
-		-isohybrid-mbr "${ISOHDPFX_BIN}" \
-		-eltorito-alt-boot \
-		-e boot/grub/efi.img \
-		-no-emul-boot \
-		-isohybrid-gpt-basdat -o "$TARGET_ISO" ./ || rtd_oem_pause 1 "${FUNCNAME[0]}: An error may have occurred (review above outout) then: Press [ENTER] to continue:"
-	chmod 777 "$TARGET_ISO" || rtd_oem_pause 1 "${FUNCNAME[0]}: An error may have occurred (review above outout) then: Press [ENTER] to continue:"
-
-	test_iso_boot_media ${TARGET_ISO}
-	if ${RTD_GUI} --yesno "Would you like to make a bootable thumbdrive from this ISO media?" ${HEIGHT} ${WIDTH} ; then
-		create_physical_media_from_iso ${TARGET_ISO} || create_physical_media_from_iso
-	else
-		return
-	fi
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-create_iso_image ()
-{
-# Description: Function to generate a bootable ISO file from source folder or an extracted and
-# altered original ISO. The function takes 3 arguments: target file name, folder to use as source
-# and volume title. The first argument is mandatory since it makes not sense unless it is known
-# what source to use for makeing the ISO file.
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-# create_iso_image  ~/mybootablecdfolder ~/mybootable.iso "My cool bootable iso title"
-#
-# This function will over write the old iso file if there...
-#
-# End of Documentation
-
-	# Check for required input...
-	TMP_DISC_DIR=$1
-	[[ -z "$TMP_DISC_DIR" ]] || rtd_oem_pause 1 "${FUNCNAME[0]} requires atleast one parameter."
-
-	# Check for other input and create them if not defined...
-	TARGET_ISO=$2
-	: "${TARGET_ISO:-"~/${TLA}-${FUNCNAME[0]}.iso"}"
-	VOLUME_TITLE=$3
-	: "${VOLUME_TITLE:-"Made by ${FUNCNAME[0]}"}"
-
-	check_dependencies isolinux
-	check_dependencies mlocate && updatedb
-	: "${ISOHDPFX_BIN:=$(locate isohdpfx.bin  | head -n 1)}"
-
-	write_status "------ CREATING ISO: $TARGET_ISO    --------"
-	if [ -f "$TARGET_ISO" ]; then
-		rm -f "$TARGET_ISO"
-	fi
-
-	cd "$TMP_DISC_DIR" || echo "failed to enter $TMP_DISC_DIR "
-	rm -r '[BOOT]'
-	"$BIN_XORRISO" -as mkisofs -r -V "$VOLUME_TITLE" \
-			-J -b isolinux.bin \
-			-c boot.cat \
-			-no-emul-boot \
-			-boot-load-size 4 \
-			-boot-info-table \
-			-input-charset utf-8 \
-			-isohybrid-mbr "$ISOHDPFX_BIN" \
-			-eltorito-alt-boot \
-			-e boot/grub/efi.img \
-			-no-emul-boot \
-			-isohybrid-gpt-basdat \
-			-o "$TARGET_ISO" ./ || rtd_oem_pause 1 "${FUNCNAME[0]}: An error may have occurred (review above outout) then: Press [ENTER] to continue:"
-	chmod 777 "$TARGET_ISO" || rtd_oem_pause 1 "${FUNCNAME[0]}: An error may have occurred (review above outout) then: Press [ENTER] to continue:"
-}
-
-
-
-
-
-create_physical_media_from_iso ()
-{
-# Description:
-# Function to automatically write ISO (virtual DVD/CD/BlueRay) to a thumb drive. No argumenst are
-# required, but a source ISO file location can may be provided when calling the function.
-# If information is required, but not provided, the end user will be interactively prompted.
-# This function requires elevated priviledges to be able to write media to a thumb drive
-# (boot sector) and other system restrictied activities. If the function is NOT called in a
-# script with elevated priviledges, it will attempt to elevate priviledges and prompt for a password.
-# Since writing a new bootable thumb drive is inherrently an interactive activity; a prompt will
-# be displayed asking what media to write to. If no media is present, a warning error
-# message will be displayed.
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-#
-# "create_physical_media_from_iso" or "create_physical_media_from_iso path/to/file.iso"
-#
-# NOTE:
-# [Note 1] An ISO file, often called an ISO image, is a single file that's a perfect representation of an
-# entire CD, DVD, or BD. The entire contents of a disc can be precisely duplicated in a single ISO file.
-# An optical disc image (or ISO image, from the ISO 9660 file system used with CD-ROM media) is a disk image
-# that contains everything that would be written to an optical disc, disk sector by disc sector, including the
-# optical disc file system. ISO images are expected to contain the binary image of an optical media file system
-# (usually ISO 9660 and its extensions or UDF), including the data in its files in binary format, copied exactly
-# as they were stored on the disc. The data inside the ISO image will be structured according to the file system
-# that was used on the optical disc from which it was created.
-#
-# [Note 2] A USB flash drive is a data storage device that includes flash memory with an integrated USB interface.
-# It is typically removable, rewritable and much smaller than an optical disc. Most weigh less than 30 g (1 oz).
-# Since first appearing on the market in late 2000
-# End of documentation
-
-
-	: ${BackTitle="Physical Installation Media Creator"}
-	: ${Title="OS Media Manger"}
-
-	if [ ! "$UID" -eq 0 ]; then
-		# find  a diferent way... tempfile not universal...
-		data=$(tempfile 2>/dev/null)
-		trap "rm -f $data" 0 1 2 5 15
-		dialog --title "${Title}" --backtitle "${BackTitle}" --insecure --passwordbox "\n This functionality requires elevated priviledges. \n Please provide your (sudo) password" 10 90 2> $data
-		ret=$? ; clear
-		case $ret in
-			0) cat $data | sudo -S bash "$0" "$*" ;;
-			1) echo "Request cancelled" ;;
-			255) [ -s $data ] && rm $data &>/dev/null || echo "[esc] Request aborted" ;;
-			* ) rm $data &>/dev/null ; exit 1
-		esac
-		rm $data &>/dev/null
-		exit
-	fi
-
-	if [[ -z "$1" ]]; then
-		[[ -d /home/${SUDO_USER}/Virtual-DVDs ]] && SuggestedFolder="/home/${SUDO_USER}/Virtual-DVDs/" || SuggestedFolder="/home/${SUDO_USER}"
-		TARGET_ISO=$(dialog --stdout --title "${Title}" --backtitle "${BackTitle}" --fselect "${SuggestedFolder}" 15 110 2)
-		UserResponse=$? ; clear
-		case ${UserResponse} in
-			  1) echo "Request cancelled"; return 0 ;;
-			  255) echo "[ESC] key pressed."; return 255 ;;
-		esac
-	else
-		TARGET_ISO=$1
-	fi
-
-	if [[ -z "${TARGET_ISO}" ]]; then
-		DIALOGRC=~/.dialogrc
-		if [[ -e ${DIALOGRC} ]]; then
-			mv ${DIALOGRC} ${DIALOGRC}.bak
-		fi
-
-		echo 'screen_color = (CYAN,RED,ON)' >${DIALOGRC}
-		dialog --title "${Title}" --backtitle "${BackTitle}" --msgbox "\n You must provide an ISO file as argument! \n Usage: ${0##*/} ~/filename.iso"  14 90
-		clear ; rm ${DIALOGRC}
-
-		if [[ -e ${DIALOGRC}.bak ]]; then
-			mv ${DIALOGRC}.bak ${DIALOGRC}
-		fi
-		return 1
-	else
-		#          List removable dev : not loop dev: not CD    : not nvme HD : filter: header w. name
-		devlist="$(lsblk -ndo name,rm |grep -v loop |grep -v sr |grep -v nvme |grep 1 | cut -f1 -d' ')"
-
-		if [[ -z ${devlist} ]]; then
-			DIALOGRC=~/.dialogrc
-			echo 'screen_color = (CYAN,RED,ON)' >${DIALOGRC}
-			dialog --title "${Title}" --backtitle "${BackTitle}" --msgbox "\n No removable media could be found! Please insert a thumb drive and try again."  14 90
-			clear ; rm ${DIALOGRC}
-			return 1
-		else
-			declare -A RemovableMediaList
-			index=1
-
-			for media in ${devlist};
-			do
-				SuggestedRemovableDevice="${media}"
-				RemovableMediaList[$index]=$(echo -e \'$(fdisk -l /dev/$media |head -1)\')
-				(( index++ ))
-			done
-
-			DiscoveredItems="\n
-			\n Removable media found: ${#RemovableMediaList[@]}
-			\n --------------------------------------------------------
-
-			$(until [ $i -gt ${#RemovableMediaList[@]} ]
-			do
-				[[ $i -gt 0 ]] && echo -e "Removable Disk $i:   ${RemovableMediaList[$i]} \n"
-				((i=i+1))
-			done
-			)"
-
-			USBTargetDevice=$( dialog --stdout --no-collapse --title "${Title}" --backtitle "${BackTitle}"  --inputbox "${DiscoveredItems}" 15 110 /dev/${SuggestedRemovableDevice} )
-			Response=$?
-			clear
-			case ${Response} in
-				0 )
-					dialog --title "${Title}" --backtitle "${BackTitle}" --yesno "Please Confirm:\n Write the ISO file: \n ${TARGET_ISO} \n To the drive: \n ${USBTargetDevice}" 25 90
-						case $? in
-							0 ) ( dd if=${TARGET_ISO} of=${USBTargetDevice} status=progress 2>&1 |dialog --title "${Title}" --backtitle "${BackTitle}" --programbox "Please wait, writing disk now:" 25 90) ;;
-							1 ) echo "Request cancelled"; create_physical_media_from_iso ;;
-							255 ) echo "[ESC] key pressed."; return 255 ;;
-							* ) echo "An unknown event occurred!" ; return 1 ;;
-						esac
-					clear ; return
-				;;
-				1 ) echo "Request cancelled"; return 0 ;;
-				255 ) echo "[ESC] key pressed."; return 255 ;;
-				* ) echo "An unknown event occurred!" ; return 1 ;;
-			esac
-			return
-		fi
-	fi
-	return
-}
 
 
 
@@ -5916,21 +5951,21 @@ rtd_oem_release_upgrade ()
 	ensure_admin
 	local set interactive=$1
 	unset result
-	TMP_DISC_DIR=$(mktemp -d )
+	tmp_disc_dir=$(mktemp -d )
 		if hostnamectl |grep "Ubuntu" 2>/dev/null ; then
 			write_warning "this may take some time, please be patient!"
 			apt clean && apt update -m ; dpkg --configure -a ; apt install -f ; apt dist-upgrade ; apt autoremove --purge
-			do-release-upgrade 1> >(tee "$TMP_DISC_DIR"/stdout ) 2> >(tee "$TMP_DISC_DIR"/stderr >&2 )
-			result="$( cat "$TMP_DISC_DIR"/stdout; cat "$TMP_DISC_DIR"/stderr)"
+			do-release-upgrade 1> >(tee "$tmp_disc_dir"/stdout ) 2> >(tee "$tmp_disc_dir"/stderr >&2 )
+			result="$( cat "$tmp_disc_dir"/stdout; cat "$tmp_disc_dir"/stderr)"
 			display_result "Release Upgrade Attempt Result: "
-			rm -r "$TMP_DISC_DIR" ; unset TMP_DISC_DIR
+			rm -r "$tmp_disc_dir" ; unset tmp_disc_dir
 		elif hostnamectl |grep "Pop!_OS" 2>/dev/null ; then
 			write_warning "this may take some time, please be patient!"
 			apt clean && apt update -m ; dpkg --configure -a ; apt install -f ; apt dist-upgrade ; apt autoremove --purge
-			do-release-upgrade 1> >(tee "$TMP_DISC_DIR"/stdout ) 2> >(tee "$TMP_DISC_DIR"/stderr >&2 )
-			result="$( cat "$TMP_DISC_DIR"/stdout; cat "$TMP_DISC_DIR"/stderr)"
+			do-release-upgrade 1> >(tee "$tmp_disc_dir"/stdout ) 2> >(tee "$tmp_disc_dir"/stderr >&2 )
+			result="$( cat "$tmp_disc_dir"/stdout; cat "$tmp_disc_dir"/stderr)"
 			display_result "Release Upgrade Attempt Result: "
-			rm -r "$TMP_DISC_DIR" ; unset TMP_DISC_DIR
+			rm -r "$tmp_disc_dir" ; unset tmp_disc_dir
 		elif hostnamectl |grep "Debian" 2>/dev/null ; then
 			write_error "Debian does not provide an upgrade tool between major releases... Please use the manual upgrade method."
 			result="Debian does not have an in place upgrade tool. Please edit the /etc/apt/sources.list and use the disd-upgrade option"
@@ -6044,6 +6079,7 @@ rtd_oem_remove_software ()
 #
 # If a failure occurs this function will return a non "0" exit code. (1)
 # End of documentation
+
 	ensure_admin
 	if [[ $(echo $OSTYPE |grep "linux") ]]; then
 		echo "Trying to remove package $*"
@@ -6153,50 +6189,69 @@ system::log_item ()
 # By default, the log file will be /var/log/$(basename $0).log. If the log file is not set
 # the function will set it to the default. If the log file is set, it will use the set log file.
 # 
-# This function will log itmes prepending the time and date, as well as the calling function. 
-# If the calling function is write_warning or write_error, write_information, or write_status, 
-# the function will prepend the log item with the preceding calling function name otherwise 
-# simply the calling function name.
+# This function will log items by prepending the time and date, as well as the calling function. 
+# If the calling function is write_warning, write_error, write_information, or write_status, 
+# the function will prepend the log item with the preceding calling function name. Otherwise, 
+# it will simply prepend the calling function name.
 # 
 # Globals: _LOGFILE
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage: z
+# Arguments: "Text to log"
+# Outputs: Writes to log file
+#
+# Example:
+# 2024/01/17 11:43  --- : 🧩 source: 🧩 _LOG_DIR=/home/tangaroa/.config/rtd/logs
+# 2024/01/17 11:43  --- : 🧩 source: 🧩 _LOGFILE=/home/tangaroa/.config/rtd/logs/_rtd_library.log
+# 2024/01/17 11:43  --- : 🧩 ⚠ source: Library is sourced from a script or terminal! 
+# 2024/01/17 11:43  --- : 🧩 🛈 source: Script is sourced from bash in a terminal: /bin/bash 
+# 2024/01/17 11:43  --- : 🧩 dependency::search_local: Requested dependency file: _branding ...
+#
+# Returns: None
+# Usage:
+#
+# Call this function by: 
+# system::log_item "Text to log"
+#
 # End of documentation
 
-	if [[ -z "$_LOGFILE" ]] ; then
-		# If log file not set, set it to defaults a.k.a. script name
-		local _SCRIPTNAME=$(basename $0)
-		local _TLA=${_SCRIPTNAME:0:3}
-		local _LOG_DIR=${_LOG_DIR:-"/var/log/${_TLA,,}"}
-		mkdir -p ${_LOG_DIR}
-		local _logfile=${_LOG_DIR}/${_SCRIPTNAME}.log
-		export _LOGFILE="${_logfile}"
+	if [[ -z $_LOGFILE ]] ; then
+		# If log file not set globally, set it to defaults for this function a.k.a. script name
+		local _scriptname=$(basename "${BASH_SOURCE[0]}")
+		local _tla=${_scriptname:0:3}
+
+		if [[ $EUID -ne 0 ]]; then
+			_log_dir="${HOME}/.config/rtd/logs"
+		else
+			local _log_dir=${_LOG_DIR:-"/var/log/${_tla,,}"}
+		fi
+
+		mkdir -p ${_log_dir}
+		local _logfile=${_log_dir}/${_scriptname}.log
 	else 
-		_logfile="${_LOGFILE}"
+		local _logfile="${_LOGFILE}"
 	fi
+
 	touch "${_logfile}"
 	local _date="$(date '+%Y/%m/%d %H:%M')"
 
+	# Format the log item based on the calling function for clear reading
 	case "${FUNCNAME[1]}" in
 		"write_error")
-			echo "${_date}  --- : $*" >> "${_logfile}"
+			echo "${_date}  --- ERROR: $*" >> "${_logfile}"
 		;;
 		"write_warning") 
-			echo "${_date}  --- : $*" >> "${_logfile}"
+			echo "${_date}  --- WARN : $*" >> "${_logfile}"
 		;;
 		"write_information")
-			echo "${_date}  --- : $*" >> "${_logfile}"
+			echo "${_date}  --- INFO : $*" >> "${_logfile}"
 		;;
 		"write_host")
-			echo "${_date}  --- : $*" >> "${_logfile}"
+			echo "${_date}  --- HOST : $*" >> "${_logfile}"
 		;;
 		"write_status")
-			echo "${_date}  --- : $*" >> "${_logfile}"
+			echo "${_date}  --- STAT : $*" >> "${_logfile}"
 		;;
 		*)
-			echo "${_date}  --- : 🧩 ${FUNCNAME[1]}: $*" >> "${_logfile}"
+			echo "${_date}  --- LOGD : 🧩 ${FUNCNAME[1]}: $*" >> "${_logfile}"
 		;;
 	esac
 }
@@ -6224,11 +6279,11 @@ rtd_update_system ()
 # Returns:
 # Usage: rtd_update_system
 # End of documentation
-	ensure_admin
+	#ensure_admin
 	PUBLICATION="$BRANDING Update Manager for Linux"
 	VERSION="1.14 (built in)"
 	DIALOGRC="~/.config/rtd/dialogrc"
-	LOGFILE="${LOGFILE:-$0.log}"
+	_LOGFILE="${_LOGFILE:-$0.log}"
 
 	write_status "${PUBLICATION}: Version ${VERSION}"
 	write_status "------------------------------------------------------------------"
@@ -6244,8 +6299,8 @@ rtd_update_system ()
 		# make some decent display terminal graphics...
 		PAD="----------------------------------------------"
 		LINE=$(printf "%s %s" "$@" "$PAD" | cut -c 1-${#PAD})
-		echo -ne "Executing $LINE:"\ & "$@" >>"$LOGFILE" 2>&1 && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR   \n" ||printf "%b%-6s%b [ ! ] ${RED} FAILED $ENDCOLOR  \n"
-		# write_status "Executing ${LINE}:"\ & "$@" >>"${LOGFILE}" 2>&1 && printf "%b%-6s%b [ \xE2\x9C\x94 ] OK!  \n" ||printf "%b%-6s%b [ ! ] FAILED  \n"
+		echo -ne "Executing $LINE:"\ & "$@" >>"$_LOGFILE" 2>&1 && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR   \n" ||printf "%b%-6s%b [ ! ] ${RED} FAILED $ENDCOLOR  \n"
+		# write_status "Executing ${LINE}:"\ & "$@" >>"${_LOGFILE}" 2>&1 && printf "%b%-6s%b [ \xE2\x9C\x94 ] OK!  \n" ||printf "%b%-6s%b [ ! ] FAILED  \n"
 
 	}
 	
@@ -6321,7 +6376,7 @@ software::update_system_txt ()
 	PUBLICATION="$BRANDING Update Manager for Linux"
 	VERSION="1.14 (built in)"
 	DIALOGRC="~/.config/rtd/dialogrc"
-	if [[ ! -z $1 ]] ; then LOGFILE="$1" ; else LOGFILE="${_LOGFILE:-$0.log}" ; fi
+	_LOGFILE="${_LOGFILE:-$0.log}"
 
 	write_status "${PUBLICATION}: Version ${VERSION}"
 	write_status "------------------------------------------------------------------"
@@ -6356,7 +6411,7 @@ software::update_system_txt ()
 		write_error "This system does not seem to have a software managment system" 
 		return 1
 	fi
-	) | tee -a "$LOGFILE"
+	) | tee -a "$_LOGFILE"
 
 	write_status "updating snaps if snap is present on the system..."
 	if hash snap 2>/dev/null; then
@@ -6406,7 +6461,7 @@ software::update_all_ui ()
 	local PUBLICATION="$BRANDING Update Manager for Linux"
 	local VERSION="1.15 (built in with dialog)"
 	local DIALOGRC="~/.config/rtd/dialogrc"
-	local LOGFILE="${LOGFILE:-$0.log}"
+	local _LOGFILE="${_LOGFILE:-$0.log}"
 	local dialog_ui=${RTD_GUI:-"dialog --erase-on-exit --colors "}
 
 	Native_Software_Packages ()
@@ -7512,7 +7567,7 @@ rtd_setup_choices_for_preseed () {
 test_iso_boot_media ()
 {
 # Description: Function to test a created ISO file by booting it in a temporary VM using QEMU.
-# This function requires one argument or one variable (TARGET_ISO) to be set; since it needs
+# This function requires one argument or one variable (iso_test) to be set; since it needs
 # to now what media to test.
 #
 # QEMU is a free and open-source emulator and virtualizer that
@@ -7529,26 +7584,44 @@ test_iso_boot_media ()
 #
 # test_iso_boot_media /path/to/media
 # 	OR
-# TARGET_ISO=/path/to/media
+# iso_test=/path/to/media
 # test_iso_boot_media
 #
 # End of Documentation
-	: "${TARGET_ISO:-"${1}"}"
-	if [[ -z "${TARGET_ISO}" ]]; then
-		rtd_oem_pause 1 "${FUNCNAME[0]}: requires one argument OR one variable set (TARGET_ISO)"
+	iso_test="${1}"
+	if [[ -z "${iso_test}" ]]; then
+		dialog::display_error "${FUNCNAME[0]}: requires one argument (ISO file to test). Please read ${_LOGFILE} for more information."
 		return 1
 	else
-		if ($RTD_GUI --title "BOOT Media Testing" --yesno "\n Would you like to test your boot media ${TARGET_ISO} to see if it works?" 10 80); then
-			write_information "TESTING ${TARGET_ISO}."
-			check_dependencies qemu-kvm
-			: "${BIN_QEMU_IMG:=$(type -P qemu-img)}"
-			: "${BIN_QEMU_SYSTEM_X86_64:=$(type -P qemu-system-x86_64 )}"
-			: "${PUT_QCOW_FILE_HERE_WHEN_DONE:="/home/$SUDO_USER/Virtual-HDs"}"
+		system::log_item "Testing ${iso_test}..."
+		if ($RTD_GUI --title "BOOT Media Testing" --yesno "\n Would you like to test your boot media ${iso_test} to see if it works?" 10 80); then
+			clear
+			write_information "TESTING ${iso_test}."
+			if ! hash qemu-system-x86_64 ; then check_dependencies qemu-system-x86_64 ; fi
+			: "${bin_qemu_img:=$(type -P qemu-img)}"
+			: "${bin_qemu_system_x86_64:=$(type -P qemu-system-x86_64 )}"
+			: "${put_qcow_file_here_when_done:="/home/$SUDO_USER/Virtual-HDs"}"
+			: "${qcow2_file:="${put_qcow_file_here_when_done}/$(basename "$iso_test" .iso).qcow2"}"
 
-			${BIN_QEMU_IMG} create -f qcow2 "$PUT_QCOW_FILE_HERE_WHEN_DONE/$(basename $TARGET_ISO .iso).qcow2" 10G
-			${BIN_QEMU_SYSTEM_X86_64} -smp 2 -enable-kvm -m 4G --cdrom "$PUT_ISO_FILE_HERE_WHEN_DONE/$(basename $TARGET_ISO .iso).iso" "$PUT_QCOW_FILE_HERE_WHEN_DONE/$(basename $TARGET_ISO .iso).qcow2"
+			system::log_item "executing command: ${bin_qemu_img} create -f qcow2 ${qcow2_file} 10G"
+
+			[[ -f ${qcow2_file} ]] && rm -f "${qcow2_file}"
+			if ${bin_qemu_img} create -f qcow2 "${qcow2_file}" 10G 2>&1 | tee -a "${_LOGFILE}" ; then 
+				write_information "Created QCOW2 file: ${qcow2_file}"
+			else
+				write_error "Failed to create QCOW2 file: ${qcow2_file}"
+			fi
+
+			system::log_item "Executing command: ${bin_qemu_system_x86_64} -smp 2 -enable-kvm -m 4G --cdrom ${iso_test} ${qcow2_file}" 
+			if ${bin_qemu_system_x86_64} -smp 2 -enable-kvm -m 4G --cdrom "${iso_test}" "${qcow2_file}" 2>&1 | tee -a "${_LOGFILE}" ; then
+				write_information "Successfully tested ${iso_test}."
+			else
+				write_error "Failed to test ${iso_test}."
+			fi
 		else
-			echo "User selected No, exit status was $?."
+			clear
+			dialog::display_notice "User selected No, exit status was $?."
+			system::log_item "User selected No, exit status was $?."
 		fi
 	fi
 }
@@ -7619,7 +7692,7 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: ${virt_net="$(system::find_vm_bridge)"}
-	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
+	: ${BIN_VIRT_INSTALL:=$(type -p virt-install)}
 	: ${_os_version=$( $RTD_GUI --title "Select Release Version of Fedora" --inputbox "Please pick an available OS version by entering it below. \
 	If you are not sure just let me choose for you... \n ${fedoralogo} "  25 110 "${_DEFAULT_FEDORA_VER}" 3>&1 1>&2 2>&3)}
 	case $? in
@@ -8356,10 +8429,10 @@ make_kvm_virtual_machine_now_from_iso ()
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
-	: "${TARGET_ISO:="/var/lib/libvirt/boot/ubuntu-21.04-desktop-amd64.iso"}"
+	: "${target_iso:="/var/lib/libvirt/boot/ubuntu-21.04-desktop-amd64.iso"}"
 
 	#Verify ISO presesnce
-		if [[ ! -f "$TARGET_ISO" ]]; then
+		if [[ ! -f "$target_iso" ]]; then
 			$RTD_GUI --backtitle "${BRANDING:-"rtd"}" --title "NOTICE!" --msgbox "OOOPS! I cannot find the ISO image to build the VM... " 10 60
 			clear
 		fi
@@ -8371,8 +8444,8 @@ make_kvm_virtual_machine_now_from_iso ()
 	--network ${virt_net}
 	--disk size=${4:-"30"}
 	--os-variant=${1:-"ubuntu20.04"}
-	--location=${TARGET_ISO}
-	--cdrom=${TARGET_ISO}
+	--location=${target_iso}
+	--cdrom=${target_iso}
 	--initrd-inject=$PRESEED_FILE
 	--extra-args ks=file:/$(basename $PRESEED_FILE)"
 
@@ -8383,7 +8456,7 @@ make_kvm_virtual_machine_now_from_iso ()
 		--network "${virt_net}" \
 		--disk size="${4:-30}" \
 		--os-variant="${1:-debian10}" \
-		--cdrom="${TARGET_ISO}" \
+		--cdrom="${target_iso}" \
 		--cloud-init meta-data=
 		--noautoconsole &&  dialog::display_summary_message "NOTICE!"  \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
@@ -10188,7 +10261,7 @@ fi
 	$(cat ${CloudConfig}/user-data)"
 	write_information "Generate Ubuntu autoinstall instruction media: "
 	#software::check_native_package_dependency genisoimage
-	genisoimage -output ${CloudConfig}/cidata.iso -volid cidata -joliet -rock ${CloudConfig}/user-data ${CloudConfig}/meta-data  &>>${LOGFILE}
+	genisoimage -output ${CloudConfig}/cidata.iso -volid cidata -joliet -rock ${CloudConfig}/user-data ${CloudConfig}/meta-data  &>>${_LOGFILE}
 	chmod 777 -R ${CloudConfig}
 
 }
@@ -10234,6 +10307,7 @@ system::make_preseed_cfg ()
 # system::make_preseed_cfg -r "default" -p "$( mktemp -d)" -t gnome-desktop
 # 
 # End of documentation
+
 	system::log_item "Function : ${FUNCNAME[0]}"
 	system::log_item "Called by: ${FUNCNAME[-1]}"
 
@@ -10252,7 +10326,9 @@ system::make_preseed_cfg ()
 		;;
 		p )
 			local _saveto="${OPTARG}"
+			write_information "Overriding default save location: ${_saveto} with user supplied: ${OPTARG}"
 			system::log_item  "Saving configuration instructions to: ${_saveto}"
+
 		;;
 		t )
 			local _task="${OPTARG}"
@@ -10276,59 +10352,92 @@ system::make_preseed_cfg ()
 	touch "${PRESEED_FILE}"
 	touch "${TASK_FILE}"
 
-	# Localized variables based on User preferences, but with speciffic defaults should all fail:
-	local Preference_DiskEncryption="$( [[ "$_EncryptDisk" == "YES" ]] && echo "${PreferredDiskPassword:-"letmein1234"}" )"
-	local Preference_Password=$( [[ -n "${PrefferredUserPassword}" ]] && echo "${PrefferredUserPassword}" || echo '$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1' )
-	local Preference_InitialUser="${_OEM_USER:-"tangarora"}"
-	local Preference_InitialUserFullName="${_OEM_USER_FULLNAME:-"RTD User"}"
-	local Preference_InitialUserGroup="${_OEM_USER_GROUP:-"sudo"}"
-	local Preference_InitialUserPassword="${_OEM_USER_PASSWORD:-"letmein1234"}"
-	local Preference_InitialUserPasswordEncrypted=$( [[ -n "${_OEM_USER_PASSWORD}" ]] && echo '$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1' || echo '$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1' )
-	local Preference_InitialKeyboardLayout="${_OEM_USER_KEYBOARD_LAYOUT:-"us"}"
-	local Preference_InitialTimeZone="${_OEM_USER_TIMEZONE:-"Etc/UTC"}"
-	local Preference_Wireless_ID="${_OEM_WIRELESS_ID:-"loader"}"
-	local Preference_Wireless_Password="${_OEM_WIRELESS_PASSWORD:-"letmein1234"}"
+	# Load saved preferences from the config file, or use defaults for the preseed file:
+	 Preference_DiskEncryption="${_ENCRYPT_DISK:-"YES"}"
+	 Preference_Disk_Password="${_TEMP_DISK_PASSWORD:-"letmein1234"}"
+	 Preference_InitialUser="${_OEM_USER:-"tangarora"}"
+	 Preference_InitialUserFullName="${_OEM_USER_FULLNAME:-"RTD User"}"
+	 Preference_InitialUserGroup="${_OEM_USER_GROUP:-"sudo"}"
+	 Preference_InitialUserPassword="${_OEM_USER_PASSWORD:-"letmein1234"}"
+	#local Preference_InitialUserPasswordEncrypted=$( [[ -n "${_OEM_USER_PASSWORD}" ]] && echo '$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1' || echo '$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1' )
+	 Preference_InitialKeyboardLayout="${_OEM_USER_KEYBOARD_LAYOUT:-"us"}"
+	 Preference_InitialTimeZone="${_OEM_USER_TIMEZONE:-"Etc/UTC"}"
+	 Preference_Wireless_ID="${_OEM_WIRELESS_ID:-"loader"}"
+	 Preference_Wireless_Password="${_OEM_WIRELESS_PASSWORD:-"letmein1234"}"
+	 Preference_Role="${_role:-"default"}"
 
 
 	if [[ -n $_ask ]] ; then
-		# Use dialog --form to ask for variables
-		dialog --form "Configure Automatic Install for Debian/Ubuntu" 20 80 0 \
-			"DiskEncryption (YES/NO):" 1 1 "${Preference_DiskEncryption:-}" 1 40 40 0 \
-			"Disk Unlock Password:" 2 1 "${Preference_Password:-}" 2 40 40 0 \
-			"Admin User Name:" 3 1 "${Preference_InitialUser:-}" 3 40 40 0 \
-			"Admin User Full Name:" 4 1 "${Preference_InitialUserFullName:-}" 4 40 40 0 \
-			"Admin User Initial UserGroup:" 5 1 "${Preference_InitialUserGroup:-}" 5 40 40 0 \
-			"Admin User Password:" 6 1 "${Preference_InitialUserPassword:-}" 6 40 40 0 \
-			"Initial Keyboard Layout:" 7 1 "${Preference_InitialKeyboardLayout:-}" 7 40 40 0 \
-			"Initial Time Zone:" 8 1 "${Preference_InitialTimeZone:-}" 8 40 40 0 \
-			"Wireless Network SSID:" 9 1 "${Preference_Wireless_ID:-}" 9 40 40 0 \
-			"Wireless Network Password:" 10 1 "${Preference_Wireless_Password:-}" 10 40 40 0
-
-		# Assign variables from dialog input
-		read -r Preference_DiskEncryption \
-		Preference_Password \
-		Preference_InitialUser \
-		Preference_InitialUserFullName \
-		Preference_InitialUserGroup \
-		Preference_InitialUserPassword \
-		Preference_InitialKeyboardLayout \
-		Preference_InitialTimeZone \
-		Preference_Wireless_ID \
-		Preference_Wireless_Password
-
+		# If 'ask' is requested, then request user input for the preseed file:
+		preseed_choices=$(dialog --backtitle "$BRANDING" --title "RTD Preseed Creator" --mixedform "Enter your preferences in to the form below. Please note that the password fields do not show anything but will capture what you type in" 22 80 0 \
+		"DiskEncryption (YES/NO):" 	1 1 "${Preference_DiskEncryption}" 1 40 40 0 0 \
+		"Disk Unlock Password (temp):" 	2 1 "${Preference_Disk_Password}" 2 40 40 0 0 \
+		"Admin User Name:" 		3 1 "${Preference_InitialUser}" 3 40 40 0 0 \
+		"Admin User Full Name:" 	4 1 "${Preference_InitialUserFullName}" 4 40 40 0 0 \
+		"Admin User Initial UserGroup:" 5 1 "${Preference_InitialUserGroup}" 5 40 40 0 0 \
+		"Admin User Password (temp):" 	6 1 "${Preference_InitialUserPassword}" 6 40 40 0 0 \
+		"Initial Keyboard Layout:" 	7 1 "${Preference_InitialKeyboardLayout}" 7 40 40 0 0 \
+		"Initial Time Zone:" 		8 1 "${Preference_InitialTimeZone}" 8 40 40 0 0 \
+		"Wireless Network SSID:" 	9 1 "${Preference_Wireless_ID}" 9 40 40 0 0 \
+		"Wireless Network Password:" 	10 1 "${Preference_Wireless_Password}" 10 40 40 0 0 \
+		"Role (Default, KVM, Minecraft):" 11 1 "${Preference_Role}" 11 40 40 0 0 \
+		3>&1 1>&2 2>&3)
+		exit_status=$?
+		
 		clear
+		# Check if dialog was cancelled
+		if [ $exit_status != 0 ]; then
+			echo "Dialog cancelled."
+			return 1
+		fi
 
-		Preference_Wireless_Password=$(printf "${Preference_Wireless_Password}" | mkpasswd -s -m md5)
+		# Parse the output and assign to variables by capturing to an array:
+		IFS=$'\n' read -r -d '' -a input_array <<< "$preseed_choices"
+			 export Preference_DiskEncryption=${input_array[0]}
+			 Preference_Disk_Password=${input_array[1]}
+			 Preference_InitialUser=${input_array[2]}
+			 Preference_InitialUserFullName=${input_array[3]}
+			 Preference_InitialUserGroup=${input_array[4]}
+			 Preference_InitialUserPassword=${input_array[5]}
+			 Preference_InitialKeyboardLayout=${input_array[6]}
+			 Preference_InitialTimeZone=${input_array[7]}
+			 Preference_Wireless_ID=${input_array[8]}
+			 Preference_Wireless_Password=${input_array[9]}
+			 Preference_Role=${input_array[10]}
 
+		# Encrypt the user/admin password for use in the preseed file:
+		Preference_InitialUserPassword=$(printf ${Preference_InitialUserPassword} | mkpasswd -s -m sha-512)
 	else
 		write_information "Generating preseed.cfg for: ${_role} ${_task} automatically..."
 	fi
 
 
+	# Write out the preseed file header with 'EOF' to prevent variable expansion:
+	cat >> ${PRESEED_FILE} <<-'EOF'
+
+		# --------------------------------------------------- #
+		# C.4.1. Do NOT install on the USB stick(!)
+		# --------------------------------------------------- #
+		#
+		# The Debian installer will install on the first disk it finds which can
+		# sometimes be the USB stick itself. Work around this by rolling our own auto
+		# detect logic which disallows installing on USB devices.
+		#
+		# d-i partman/early_command string [ "$(ls -A /tmp)" ] && umount -l /media || echo "Empty" ;
+		d-i partman/early_command string \
+			USBDEV=$(mount | grep hd-media | cut -d" " -f1 | sed "s/\(.*\)./\1/");\
+			BOOTDEV=$(list-devices disk | grep -v \$USBDEV | head -1);\
+			debconf-set partman-auto/disk $BOOTDEV;\
+			debconf-set grub-installer/bootdev $BOOTDEV;
+
+		# --------------------------------------------------- #
+
+	EOF
+	
 	# Write out configurable protions of the preseed file:
 	cat >> ${PRESEED_FILE} <<-EOF
 		# --------------------------------------------------- #
-		# Unattended Installation
+		# C.4.2. Unattended Installation $(date)
 		# --------------------------------------------------- #
 		d-i auto-install/enable boolean true
 		d-i debconf/priority select critical
@@ -10336,7 +10445,7 @@ system::make_preseed_cfg ()
 
 
 		# --------------------------------------------------- #
-		# Network configuration
+		# C.4.3. Network configuration
 		# --------------------------------------------------- #
 		# Network setup. This can be a static setup or dhcp.
 		# The RTD default prefferred config is to rely on DHCP,
@@ -10366,7 +10475,7 @@ system::make_preseed_cfg ()
 
 
 		# --------------------------------------------------- #
-		# Account setup (temporary user account)
+		# C.4.4. Account setup (temporary user account)
 		# --------------------------------------------------- #
 		# Setup an initial user and disable root login by default.
 		# root login may be re-enabled later by setting a root password.
@@ -10378,13 +10487,13 @@ system::make_preseed_cfg ()
 		d-i passwd/username string ${Preference_InitialUser}
 		d-i passwd/user-password seen true
 		d-i user-setup/allow-password-weak boolean true
-		d-i passwd/user-password-crypted password ${Preference_InitialUserPassword}
+		d-i passwd/user-password-crypted password "${Preference_InitialUserPassword}"
 		d-i passwd/auto-login boolean true
 
 		# --------------------------------------------------- #
 
 		# --------------------------------------------------- #
-		# Localization
+		# C.4.5. Localization
 		# --------------------------------------------------- #
 		# Provide localizaton preferences so that the prefferred
 		# language is used for display and formats. Comparable to
@@ -10397,7 +10506,7 @@ system::make_preseed_cfg ()
 
 
 		# --------------------------------------------------- #
-		# Set Keyboard layout
+		# C.4.6. Set Keyboard layout
 		# --------------------------------------------------- #
 		# Set the prefferred keyboard layout. Keyboards will work
 		# regardless, but the letters and symbols may not actually
@@ -10413,7 +10522,7 @@ system::make_preseed_cfg ()
 
 
 		# --------------------------------------------------- #
-		# Clock and time zone setup
+		# C.4.7. Clock and time zone setup
 		# --------------------------------------------------- #
 		d-i clock-setup/utc boolean true
 		d-i time/zone string ${Preference_InitialTimeZone}
@@ -10423,40 +10532,48 @@ system::make_preseed_cfg ()
 		# --------------------------------------------------- #
 
 		# --------------------------------------------------- #
-		# GRUB bootloader installation
+		# C.4.8. GRUB bootloader installation
 		# --------------------------------------------------- #
 		#
-		# Tell the grub-installer to install to the MBR even if it also finds some other
-		# OS, which is more likely to allow the newly installed Linux OS to boot without issue.
+		# Tell the grub-installer to install to the MBR even if it 
+		# also finds some other OS, which is more likely to allow 
+		# the newly installed Linux OS to boot without issue.
 		d-i grub-installer/only_debian boolean true
 		d-i grub-installer/with_other_os boolean true
 		# --------------------------------------------------- #
 
 		# --------------------------------------------------- #
-		# EFI
+		# C.4.9. EFI
 		# --------------------------------------------------- #
 		#
-		# The EFI (Extensible Firmware Interface) system partition is a partition on a data storage device.
-		# UEFI provides backward compatibility with legacy systems by reserving the first block (sector) of
-		# the partition for compatibility code, effectively creating a legacy boot sector. On legacy BIOS-based
-		# systems, the first sector of a partition is loaded into memory and execution is transferred to this code.
-		# Here we tell setup to install EFI boot setup if possible so that both NEW and old systems may be handled
+		# The EFI (Extensible Firmware Interface) system partition 
+		# is a partition on a data storage device. UEFI provides 
+		# backward compatibility with legacy systems by reserving 
+		# the first block (sector) of the partition for compatibility 
+		# code, effectively creating a legacy boot sector. On 
+		# legacy BIOS-based systems, the first sector of a partition 
+		# is loaded into memory and execution is transferred to this 
+		# code. Here we tell setup to install EFI boot setup if 
+		# possible so that both NEW and old systems may be handled
 		# and the installed system can be started.
 		d-i partman-efi/non_efi_system boolean true
 		# --------------------------------------------------- #
 
 		# --------------------------------------------------- #
-		# Package selection
+		# C.4.10. Package selection
 		# --------------------------------------------------- #
-		# Packages may be selected as groups (meta packages) like kde-desktop or
-		# as individual packages. Only one "pkgsel/include" string will be used though!
-		# remembder to fit all the packages you want on one line.
+		# Packages may be selected as groups (meta packages) like 
+		# kde-desktop or as individual packages. Only one "pkgsel/include" 
+		# string will be used though! remembder to fit all the 
+		# packages you want on one line.
+		#
 		# tasksel tasksel/first multiselect standard options:
-		# ubuntu-desktop-minimal kubuntu-desktop, ubuntu-gnome-desktop, lubuntu-desktop, ubuntu-mate-desktop
-		# desktop,  gnome-desktop, kde-desktop, cinnamon-desktop, mate-desktop,
-		# lxde-desktop, web-server, ssh-server, print-server.
-		# The "OEM" line below ist to make it simple to replace the line with a
-		# relevant chice of debian role using "sed" or similar.
+		# ubuntu-desktop-minimal kubuntu-desktop, ubuntu-gnome-desktop,
+		# lubuntu-desktop, ubuntu-mate-desktop, gnome-desktop, 
+		# kde-desktop, cinnamon-desktop, mate-desktop, lxde-desktop, 
+		# web-server, ssh-server, print-server.
+		# The "OEM" line below ist to make it simple to replace the 
+		# line with a relevant chice of debian role using "sed" or similar.
 		tasksel tasksel/first multiselect ${_task}
 		d-i pkgsel/include string openssh-server dialog virt-what curl wget spice-vdagent git
 
@@ -10470,36 +10587,9 @@ system::make_preseed_cfg ()
 		# d-i pkgsel/updatedb boolean false
 		# --------------------------------------------------- #
 
-	EOF
-
-
-
-	# Write out the rest of the preseed file with inconvenient characters escaped by '':
-	cat >> ${PRESEED_FILE} <<-'EOF'
 
 		# --------------------------------------------------- #
-		# Do NOT install on the USB stick(!)
-		# --------------------------------------------------- #
-		#
-		# The Debian installer will install on the first disk it finds which can
-		# sometimes be the USB stick itself. Work around this by rolling our own auto
-		# detect logic which disallows installing on USB devices.
-		#
-		# d-i partman/early_command string [ "$(ls -A /tmp)" ] && umount -l /media || echo "Empty" ;
-		d-i partman/early_command string \
-			USBDEV=$(mount | grep hd-media | cut -d" " -f1 | sed "s/\(.*\)./\1/");\
-			BOOTDEV=$(list-devices disk | grep -v \$USBDEV | head -1);\
-			debconf-set partman-auto/disk $BOOTDEV;\
-			debconf-set grub-installer/bootdev $BOOTDEV;
-
-		# --------------------------------------------------- #
-
-	EOF
-
-	cat >> ${PRESEED_FILE} <<-'EOF'
-
-		# --------------------------------------------------- #
-		#   Disk layout (default encrypted disk)
+		#   C.4.11. Disk layout (default encrypted disk)
 		# --------------------------------------------------- #
 		#
 		# Set option to encrypt the hard disk:
@@ -10509,18 +10599,40 @@ system::make_preseed_cfg ()
 		# where the swap space is set to 200% of RAM so that
 		# hibernate can be supported.
 
-		d-i partman-auto/method string crypto
-		d-i partman-crypto/passphrase password letmein1234
-		d-i partman-crypto/passphrase-again password letmein1234
+		$( if [[ "${Preference_DiskEncryption}" == "YES" || "${Preference_DiskEncryption}" == "yes" ]] ; then
+		echo "d-i partman-auto/method string crypto
+		d-i partman-crypto/passphrase password "${Preference_Disk_Password}"
+		d-i partman-crypto/passphrase-again password "${Preference_Disk_Password}"
 		d-i partman-auto-crypto/erase_disks boolean false
+		d-i partman-auto-lvm/new_vg_name string rtd-crypt
+		#d-i partman-auto/choose_recipe select root-encrypted"
+		else
+		echo "d-i partman-auto/method string lvm
+		d-i partman-auto-lvm/new_vg_name string rtd-lvm"
+		fi )
 		d-i partman-lvm/device_remove_lvm boolean true
 		d-i partman-lvm/device_remove_lvm_span boolean true
 		d-i partman-auto/purge_lvm_from_device boolean true
 		d-i partman-lvm/confirm boolean true
 		d-i partman-lvm/confirm_nooverwrite boolean true
 		d-i partman-auto-lvm/guided_size string max
-		d-i partman-auto-lvm/new_vg_name string crypt
-		#d-i partman-auto/choose_recipe select root-encrypted
+		d-i partman-md/device_remove_md boolean true
+		d-i partman-md/confirm boolean true
+		d-i partman-basicfilesystems/no_mount_point boolean false
+		d-i partman-partitioning/confirm_write_new_label boolean true
+		d-i partman/choose_partition select finish
+		d-i partman/confirm boolean true
+		d-i partman/confirm_nooverwrite boolean true
+		# You can choose one of the three predefined partitioning recipes:
+		# - atomic: all files in one partition
+		# - home:   separate /home partition
+		# - multi:  separate /home, /var, and /tmp partitions
+		# d-i partman-auto/choose_recipe select atomic
+
+	EOF
+
+	cat >> ${PRESEED_FILE} <<-'EOF'
+
 		d-i partman-auto/expert_recipe string                   \
 		multi-cnx ::                                            \
 			538 538 1075 free                               \
@@ -10550,14 +10662,6 @@ system::make_preseed_cfg ()
 				mountpoint{ / }                         \
 			.
 
-		d-i partman-md/device_remove_md boolean true
-		d-i partman-md/confirm boolean true
-		d-i partman-basicfilesystems/no_mount_point boolean false
-		d-i partman-partitioning/confirm_write_new_label boolean true
-		d-i partman/choose_partition select finish
-		d-i partman/confirm boolean true
-		d-i partman/confirm_nooverwrite boolean true
-
 		# --------------------------------------------------- #
 
 	EOF
@@ -10566,11 +10670,10 @@ system::make_preseed_cfg ()
 
 	# write out conditionsl elements of the preseed file:
 	case $_role in
-
-		minecraft-server | minecraft )
+		minecraft-server | minecraft | Minecraft | MINECRAFT | minecraft_server | Minecraft-server)
 			cat >> ${PRESEED_FILE} <<-'EOF'
 			# --------------------------------------------------- #
-			# Addon Tasks for Minecraft Server
+			# C.4.12. Addon Tasks for Minecraft Server
 			# --------------------------------------------------- #
 			d-i preseed/late_command string \
 				in-target apt-get -y install git ; \
@@ -10600,27 +10703,15 @@ system::make_preseed_cfg ()
 			d-i finish-install/reboot_in_progress note
 
 			# --------------------------------------------------- #
-		EOF
+			EOF
 		;;
-		* )
+		kvm_server | kvm | KVM | Kvm | kvm-server )
 			cat >> ${PRESEED_FILE} <<-'EOF'
-
 			# --------------------------------------------------- #
-			# Default preseed Addon Tasks
+			# C.4.12. Addon Tasks for KVM Server
 			# --------------------------------------------------- #
-			# for Debian to work (ignored by Ubuntu)...
 			d-i preseed/late_command string \
-				in-target apt-get -y install git ; \
-				in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
-				in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
-				in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
-				cp /*.cfg /target/opt/rtd/ ; \
-				umount -l /media || echo "Empty" ; \
-				eject || true; \
-				echo "------  initial Setup Complete!  ------"
-
-			# for Ubuntu to work (ignored by Debian)...
-			ubiquity ubiquity/success_command string \
+				in-target apt-get -y install qemu-system libvirt-daemon-system ; \
 				in-target apt-get -y install git ; \
 				in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
 				in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
@@ -10640,7 +10731,36 @@ system::make_preseed_cfg ()
 			d-i finish-install/reboot_in_progress note
 
 			# --------------------------------------------------- #
-		EOF
+			EOF
+		;;
+		* )
+			cat >> ${PRESEED_FILE} <<-'EOF'
+
+			# --------------------------------------------------- #
+			# C.4.12. Default preseed Addon Tasks
+			# --------------------------------------------------- #
+			# for Debian to work (ignored by Ubuntu)...
+			d-i preseed/late_command string \
+				in-target apt-get -y install git ; \
+				in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
+				in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
+				in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
+				cp /*.cfg /target/opt/rtd/ ; \
+				umount -l /media || echo "Empty" ; \
+				eject || true; \
+				echo "------  initial Setup Complete!  ------"
+
+			# Answer the last question
+			d-i debian-installer/splash boolean true
+
+			# Option to try to gracefully eject the installation media:
+			d-i cdrom-detect/eject boolean true
+
+			# Shutdown machine
+			d-i finish-install/reboot_in_progress note
+
+			# --------------------------------------------------- #
+			EOF
 		;;
 	esac
 
@@ -10648,7 +10768,6 @@ system::make_preseed_cfg ()
 	system::log_item "Preseed file created: ${PRESEED_FILE}
 	Containging DATA:
 	$(cat ${PRESEED_FILE})"
-	nano ${PRESEED_FILE}
 
 	unset Preference_DiskEncryption \
 	Preference_Password \
@@ -11130,9 +11249,9 @@ write_host ()
 	[[ -z "${_text}" ]] && local _text="${color} 💻 $2 $(tput sgr0)"
 	echo -e "${_text} "
 
-	if [[ -n "${_LOGFILE}" ]] ; then
-		[ -n "${text}" ] && system::log_item "🧩 💻 ${FUNCNAME[1]}: ${text}"
-	fi
+	# Tell the loging function to log the message requested...
+	system::log_item "🧩 💻 ${FUNCNAME[1]}: ${_text}"
+
 }
 
 
@@ -11161,9 +11280,9 @@ write_error ()
 		fi
 	fi
 
-	if [[ -n "${_LOGFILE}" ]] ; then
-		[ -n "${text}" ] && system::log_item "🧩 💥 ${FUNCNAME[1]}: ${text}"
-	fi
+	# Tell the loging function to log the message requested...
+	[ -n "${text}" ] && system::log_item "🧩 💥 ${FUNCNAME[1]}: ${text}"
+
 }
 
 
@@ -11189,10 +11308,9 @@ write_warning ()
 		[ -n "${text}" ] && echo -e "${yellow}🧩 ⚠ ${FUNCNAME[1]}: ${text}${endcolor}"
 	fi
 
-	if [[ -n "${_LOGFILE}" ]] ; then
-		[ -n "${text}" ] && system::log_item "🧩 ⚠ ${FUNCNAME[1]}: ${text}"
-	fi
-
+	# Tell the loging function to log the message requested...
+	[ -n "${text}" ] && system::log_item "🧩 ⚠ ${FUNCNAME[1]}: ${text}"
+	
 }
 
 
@@ -11218,10 +11336,9 @@ write_status ()
 		[ -n "${text}" ] && echo -e "${green}🧩 ✓ ${FUNCNAME[1]}: ${text}${endcolor}"
 	fi
 
-	if [[ -n "${_LOGFILE}" ]] ; then
-		[ -n "${text}" ] && system::log_item "🧩 ✓ ${FUNCNAME[1]}: ${text}"
-	fi
-
+	# Tell the loging function to log the message requested...
+	[ -n "${text}" ] && system::log_item "🧩 ✓ ${FUNCNAME[1]}: ${text}"
+	
 }
 
 
@@ -11247,10 +11364,9 @@ write_information ()
 		[ -n "${text}" ] && echo -e "${blue}🧩 🛈 ${FUNCNAME[1]}: ${text}${endcolor}"
 	fi
 
-	if [[ -n "${_LOGFILE}" ]] ; then
-		[ -n "${text}" ] && system::log_item "🧩 🛈 ${FUNCNAME[1]}: ${text}"
-	fi	
-
+	# Tell the loging function to log the message requested...
+	system::log_item "🧩 🛈 ${FUNCNAME[1]}: ${text}"
+	
 }
 
 
@@ -11382,23 +11498,25 @@ set_colors
 
 
 # Set log location and name...
-_SCRIPTNAME=$(basename "${BASH_SOURCE[0]}")
-
 if [[ $EUID -ne 0 ]]; then
-	_LOG_DIR="${HOME}/.config/rtd/logs"
+	${_LOG_DIR:="${HOME}/.config/rtd/logs"}
 	mkdir -p ${_LOG_DIR}
 else
-	_LOG_DIR="${_LOG_DIR:-"/var/log/rtd"}"
+	${_LOG_DIR:="${_LOG_DIR:-"/var/log/rtd"}"}
 	mkdir -p ${_LOG_DIR}
 fi
 
-_LOGFILE=${_LOGFILE:-"${_LOG_DIR}/${_SCRIPTNAME}.log"}
+# Set the log file to be used by the library...
+: ${_SCRIPTNAME:=$(basename "${BASH_SOURCE[0]}")}
+: ${_LOGFILE:="${_LOG_DIR}/${_SCRIPTNAME}.log"}
+
+
+# initialize loging and provide process details...
+export _LOGFILE
 touch ${_LOGFILE}
-
-system::log_item "🧩 💻 ********************************************************************************"
-system::log_item "🧩 _LOG_DIR=${_LOG_DIR}"
-system::log_item "🧩 _LOGFILE=${_LOG_DIR}/${_SCRIPTNAME}.log"
-
+system::log_item "💻 ********** : $(basename ${BASH_SOURCE[0]}) loaded by $(basename "${0}") on $HOSTNAME  : ************************************"
+system::log_item "💻 Basic System Information: 
+$(hostnamectl)"
 
 
 # check if library is loaded from a terminal or another script (behavior may differ)...
@@ -11422,12 +11540,16 @@ fi
 
 
 # Find and load all dependant files for this library... 
-for i in ${_OEM_DEPENDENCIES} ; do dependency::file ${i} &>/dev/null ; done 
+for i in ${_OEM_dependencies} ; do dependency::file ${i} &>/dev/null ; done 
 
 # log variables for support reasons...
 system::log_item "Library Loaded Variables: 
 .........................................
 $(env | grep '^_')
+
+_LOG_DIR=${_LOG_DIR}
+_LOGFILE=${_LOGFILE}
+_SCRIPTNAME=${_SCRIPTNAME}
 .........................................
 "
 
@@ -11531,7 +11653,13 @@ else
 		* )
 			echo "No RECOGNIZED arguments provided: loading ${0:BASENAME}" ; echo "Use ${0:BASENAME} --help to see supported arguments"
 			echo "Parameter provided: $1"
-			echo "$0 launched with unknown parameters" >${LOGFILE:-"/var/log/$(basename $0)"}
+			echo "$0 launched with unknown parameters" >${_LOGFILE:-"/var/log/$(basename $0)"}
 		;;
 	esac
 fi
+
+
+# Cleanup on exit: 
+# for var in $(compgen -v | grep '^_'); do
+#     unset $var
+# done

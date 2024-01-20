@@ -1,10 +1,14 @@
 #!/bin/bash
+if [[ -z "$BASH_VERSINFO" ]]; then
+	echo "ERROR: You must execute this script in a BASH Shell"
+	exit 255
+fi
+
 #::				S I M P L E     S Y S T E M   S U P P O R T    T O O L
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::// Linux //::::::::
-#:: Author(s):   	SLS, KLS, NB.  Buffalo Center, IA & Avarua, Cook Islands
+#:: 	Author(s):   	SLS, KLS, NB.  Buffalo Center, IA & Avarua, Cook Islands
 	RTD_Version=2.1.2
-:	${GIT_Profile:=vonschutter}
 #::
 #::
 #::	Purpose: To simplify support tasks
@@ -15,7 +19,8 @@
 #::               - Show systems physical location
 #::		  - Check if a password you intend to use is for sale on the Darknet
 #::
-#::     Usage: run the script "bash /path/to/rtd" or if installed in the $PATH; by rtd simply type "rtd" in a terminal.
+#::     Usage: run the script "bash /path/to/rtd-simple-support-tool" or if installed in the $PATH; by rtd simply 
+#::	       type "rtd-sim + [TAB]" in a terminal.
 #::
 #::     This script is shared in the hopes that
 #::     someone will find it usefull.
@@ -72,7 +77,7 @@
 #
 # You may comment out or edit items as you deem necessary.
 # Some formatting options for cli graphic display.
-: ${_SCRIPTNAME=$(basename $0)}
+: ${_SCRIPTNAME=$(basename "${BASH_SOURCE[0]}")}
 : ${_TLA=${_SCRIPTNAME:0:3}}
 : ${BRANDING_ORG:="RTD"}
 : ${BRANDING:="Simple Support Tool"}
@@ -81,8 +86,10 @@
 : ${HEIGHT:="20"}
 : ${WIDTH:="90"}
 : ${LIST_HEIGHT:="12"}
+: ${_GIT_PROFILE:=vonschutter}
 
-
+# load documentation for this script in a variable for later use.
+: ${_SIMPLE_SUPPORT_TOOL_DOC="$(tail -n +6 "$0" | head -n 25)"}
 
 
 # Terminal Color Setup definitions. These settings allow the simlified use of
@@ -111,17 +118,25 @@
 # PUT_ISO_FILE_HERE_WHEN_DONE=
 # PUT_QCOW_FILE_HERE_WHEN_DONE=
 # VOLUME_TITLE=
+# VOLUME_SIZE=
+# _src_url=
+# _LOG_DIR=
+# _LOGFILE=
+
 
 
 # Set location to where to log information:
 # in the system log directory in a file named the same as this script.
-: ${LOGDIR:="/var/log/rtd"}
-LOGFILE="${LOGDIR}/$( basename $0 ).log"
+if [[ $EUID -ne 0 ]]; then
+	_LOG_DIR="${_LOG_DIR:="${HOME}/.config/rtd/logs"}" ; mkdir -p ${_LOG_DIR}
+	_LOGFILE="${_LOGFILE:="${_LOG_DIR}/${_SCRIPTNAME}.log"}" ; touch ${_LOGFILE}
 
+else
+	_LOG_DIR="${_LOG_DIR:="/var/log/${_TLA,,}"}" ; mkdir -p ${_LOG_DIR}
+	_LOGFILE="${_LOGFILE:="${_LOG_DIR}/${_SCRIPTNAME}.log"}" ; touch ${_LOGFILE}
 
-# Seting entries to conform to internal naming standard for max compatability.
-_ERRLOGFILE="${LOGFILE}"
-_LOGFILE="${LOGFILE}"
+fi
+
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -133,65 +148,112 @@ _LOGFILE="${LOGFILE}"
 # Below please find the executive functions of this script. These are the functions
 # that actually do the work requested.
 
-check_rtd_library ()
+
+
+
+dependency::file () 
 {
-	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+# Function: dependency::file
+# Description: This function is used to search for and load a dependency file. It first searches for the 
+# file locally in various paths, and if not found, it attempts to download it from a specified URL. 
+# If both local and online search fails, it logs an error and exits.
+# Parameters:
+#   - $1: The name of the dependency file to search for and load.
+# Returns:
+#   - 0: If the dependency file is found and successfully loaded.
+#   - 1: If the dependency file is not found or fails to load.
+# End of documentation
 
-	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
-		# Library found in relative path...
-		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library
-	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
-		# Library not found in relative path: search the typical location...
-		write_information "${FUNCNAME[0]} 2 Using: $(find /opt -name _rtd_library |grep -v bakup )"
-	elif wget ${_src_url} ; then
-		# Critical failure: downloaded copy from github.com
-		source ./_rtd_library
-	else
-		# Abort condition: No mitigation steps worked.
-		echo -e "RTD functions NOT loaded!"
-		echo -e " "
-		echo -e "Cannot ensure that the correct functionality is available"
-		echo -e "Quiting rather than cause potential damage..."
-		exit 1
-	fi
-}
-
-
-dependency::file ()
-{
 	local _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
 	local _tgt="${1}"
+	
+	dependency::search_local () {
+		system::log_item "Requested dependency file: ${1} ..."
 
-	dependency::search_local ()
-	{
-		echo "${FUNCNAME[0]}: Requested dependency file: ${1} ..."
+		local paths=(
+			"./${1}"
+			"../core/${1}"
+			"../../core/${1}"
+			"${0%/*}/../core/${1}"
+			"${0%/*}/../../core/${1}"
+			"$(dirname $(find /opt -name ${1} 2>/dev/null | head -n 1 ))/${1}"
+			"$(dirname $(find ${HOME}/GIT -name ${1} 2>/dev/null | head -n 1 ))/${1}"
+			"$(dirname $(find ${HOME}/bin -name ${1} 2>/dev/null | head -n 1 ))/${1}"
+			)
 
-		for i in "./${1}" "../core/${1}" "../../core/${1}" "${0%/*}/../core/${1}" "${0%/*}/../../core/${1}" "$(find /opt -name ${1} |grep -v bakup )" ; do 
-			echo "${FUNCNAME[0]}: Searching for ${i} ..."
-			if [[ -e "${i}" ]] ; then 
-				echo "${FUNCNAME[0]}: Found ${i}"
-				source "${i}" ""
+		for path in "${paths[@]}"; do 
+			system::log_item "Searching for ${path} ..."
+			if [[ -e "${path}" ]]; then
+				system::log_item "Found ${path}"
+				source "${path}" ""
 				return 0
 			fi
 		done
+
 		return 1
 	}
 
 	if dependency::search_local "${1}" ; then
 		return 0
 	else
-		echo "$(date) failure to find $1 on the local comuter, now searching online..."
-		if curl -sL $_src_url | source /dev/stdin ; then 
-			echo "${FUNCNAME[0]} Using: ${_src_url} directly from URL..."
-		elif wget ${_src_url} &>/dev/null ; then
-			source ./"${1}"
-			echo "${FUNCNAME[0]} Using: ${_src_url} downloaded..."
+		system::log_item "$(date) failure to find $1 on the local computer, now searching online..."
+		local tmpdir=$(mktemp -d)
+		if curl -sL "$_src_url" -o "${tmpdir}/${1}" ; then 
+			system::log_item "Using: ${_src_url} directly from URL..."
+			source "${tmpdir}/${1}"
+		elif wget "${_src_url}" -O "${tmpdir}/${1}" &>/dev/null ; then
+			source "${tmpdir}/${1}"
+			system::log_item "Using: ${_src_url} downloaded..."
 		else 
-			echo "${FUNCNAME[0]} Failed to find  ${1} "
+			system::log_item "Failed to find  ${1} "
 			exit 1
 		fi
+		rm -rf "${tmpdir}"
 	fi 
 }
+
+
+
+
+
+
+
+system::log_item ()
+{
+# Description:
+# The purpose of this function is to consistently write script output to the right log file. 
+# By default, the log file will be /var/log/$(basename $0).log. 
+# 
+# This function will be used until it is replaced by the more extensive logging function in the
+# _rtd_library file when it is sourced.
+# 
+# End of documentation
+	local _logfile="${_LOGFILE}"
+
+	local _date="$(date '+%Y/%m/%d %H:%M')"
+
+	case "${FUNCNAME[1]}" in
+		"write_error")
+			echo "${_date}  --- : $*" >> "${_logfile}"
+		;;
+		"write_warning") 
+			echo "${_date}  --- : $*" >> "${_logfile}"
+		;;
+		"write_information")
+			echo "${_date}  --- : $*" >> "${_logfile}"
+		;;
+		"write_host")
+			echo "${_date}  --- : $*" >> "${_logfile}"
+		;;
+		"write_status")
+			echo "${_date}  --- : $*" >> "${_logfile}"
+		;;
+		*)
+			echo "${_date}  --- : 🧩 ${FUNCNAME[1]}: $*" >> "${_logfile}"
+		;;
+	esac
+}
+
 
 
 
@@ -218,12 +280,20 @@ rtd_oem_check_inet_access ()
 
 
 
+
 check_menu_availability ()
 {
-# First discover what menu system is installed. Some systems use "dialog" and
-# other systems use whiptail for the terminal to show menus and dialogs.
-# If nothing is found, then make sure it is available before continuing.
+# Description: This function checks the availability of the menu system installed on the system.
+# It first checks if "dialog" is installed, and if not, it checks if "whiptail" is installed.
+# If neither is found, it displays an error message and exits.
+# If "dialog" is found, it sets the RTD_GUI variable to "dialog --clear".
+# If "whiptail" is found, it sets the RTD_GUI variable to "whiptail --fb".
+# If the user chooses to install "dialog" instead of using "whiptail", it installs "dialog" and sets RTD_GUI to "dialog".
+# If the user chooses not to install "dialog", it displays a message and exits.
+# Parameters: None
+# Returns: None
 # End of documentation
+
 	if hash dialog 2>/dev/null ; then
 		: "${RTD_GUI:=dialog --clear}"
 		export RTD_GUI
@@ -390,7 +460,7 @@ show_make_media_gui_server ()
 
 		case $exit_status in
 			"$DIALOG_CANCEL") return	;;
-			"$DIALOG_ESC") return ;;
+			"$DIALOG_ESC") return 		;;
 		esac
 
 		case $selection in
@@ -406,19 +476,16 @@ show_make_media_gui_server ()
 			cleanup_and_finish
 		;;
 		3 )
-			prepare_environment_for_iso_creation
 			download_and_manipulate_iso_debian debian lxde-desktop server
 			create_iso_image_debian
 			cleanup_and_finish
 		;;
 		4 )
-			prepare_environment_for_iso_creation
-			download_and_manipulate_iso_debian debian openssh-server server
+			download_and_manipulate_iso_debian kvm-server openssh-server server
 			create_iso_image_debian
 			cleanup_and_finish
 		;;
 		5 )
-			prepare_environment_for_iso_creation
 			download_and_manipulate_iso_debian debian openssh-server MinecraftServer
 			create_iso_image_debian
 			cleanup_and_finish
@@ -473,19 +540,16 @@ show_make_media_gui_desktop () {
 			cleanup_and_finish
 		;;
 		5 )
-			prepare_environment_for_iso_creation
 			download_and_manipulate_iso_debian debian-desktop desktop
 			create_iso_image_debian
 			cleanup_and_finish
 		;;
 		6 )
-			prepare_environment_for_iso_creation
 			download_and_manipulate_iso_debian debian cinnamon-desktop
 			create_iso_image_debian
 			cleanup_and_finish
 		;;
 		7 )
-			prepare_environment_for_iso_creation
 			download_and_manipulate_iso_debian debian kde-desktop
 			create_iso_image_debian
 			cleanup_and_finish
@@ -1188,9 +1252,10 @@ case $1 in
 	;;
 	* )
 		if [[ "$TERM" == screen* ]]; then
+			echo "$_SIMPLE_SUPPORT_TOOL_DOC" >> ${_LOGFILE}
 			rtd_oem_check_inet_access
 			dependency::file _rtd_library &>/dev/null
-			ensure_admin
+			if [[ $EUID -ne 0 ]]; then ensure_admin ; fi
 			if [ "$UID" -eq 0 ]; then
 				check_menu_availability
 				show_notice_on_fist_run
@@ -1203,7 +1268,7 @@ case $1 in
 			else
 				rtd_oem_check_inet_access
 				dependency::file _rtd_library &>/dev/null
-				ensure_admin
+				if [[ $EUID -ne 0 ]]; then ensure_admin ; fi
 				if [ "$UID" -eq 0 ]; then
 					check_dependencies byobu && echo -e "$RED" "A critical component needed for this script to work properly was attempted to be added... Attempting to run the script again"
 					su -c "$0 $*" "$SUDO_USER"
@@ -1214,3 +1279,8 @@ case $1 in
 		fi
 	;;
 esac
+
+# Clean up the environment just in case...
+for var in $(compgen -v | grep '^_'); do
+    unset $var
+done
