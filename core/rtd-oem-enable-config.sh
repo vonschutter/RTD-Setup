@@ -60,7 +60,11 @@ _LOGFILE=${_LOG_DIR}/$( basename $0).log
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-
+ISSUE_FILE="/etc/issue"
+echo '\n' >> ${ISSUE_FILE}
+echo 'Host: \n' >> ${ISSUE_FILE}
+echo 'Hostname: \H' >> ${ISSUE_FILE}
+echo 'IP Address: \4' >> ${ISSUE_FILE}
 toggle_oem_run_once "/opt/rtd/core/rtd-oem-linux-config.sh"	&>> $_LOGFILE
 set_enable_oem_elevated_privelege	        		&>> $_LOGFILE
 toggle_oem_auto_login						&>> $_LOGFILE
