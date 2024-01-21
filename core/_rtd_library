@@ -10365,6 +10365,7 @@ system::make_preseed_cfg ()
 	 Preference_Wireless_ID="${_OEM_WIRELESS_ID:-"loader"}"
 	 Preference_Wireless_Password="${_OEM_WIRELESS_PASSWORD:-"letmein1234"}"
 	 Preference_Role="${_role:-"default"}"
+	 Preference_CopySSHKey="${_OEM_COPY_SSH_KEY:-"NO"}"
 
 
 	if [[ -n $_ask ]] ; then
@@ -10381,6 +10382,7 @@ system::make_preseed_cfg ()
 		"Wireless Network SSID:" 	9 1 "${Preference_Wireless_ID}" 9 40 40 0 0 \
 		"Wireless Network Password:" 	10 1 "${Preference_Wireless_Password}" 10 40 40 0 0 \
 		"Role (Default, KVM, Minecraft):" 11 1 "${Preference_Role}" 11 40 40 0 0 \
+		"Copy you ssh public key to host?" 12 1 "${Preference_CopySSHKey}" 12 40 40 0 0 \
 		3>&1 1>&2 2>&3)
 		exit_status=$?
 		
@@ -10404,13 +10406,17 @@ system::make_preseed_cfg ()
 			 Preference_Wireless_ID=${input_array[8]}
 			 Preference_Wireless_Password=${input_array[9]}
 			 Preference_Role=${input_array[10]}
+			 Preference_CopySSHKey=${input_array[11]}
 
 		# Encrypt the user/admin password for use in the preseed file:
 		Preference_InitialUserPassword=$(printf ${Preference_InitialUserPassword} | mkpasswd -s -m sha-512)
 	else
 		write_information "Generating preseed.cfg for: ${_role} ${_task} automatically..."
 	fi
-
+	
+	if [[ "${Preference_CopySSHKey}" == "yes" || "${Preference_CopySSHKey}" == "YES" ]] ; then
+		Preference_ssh_pub_key="$(cat /home/$SUDO_USER/.ssh/*.pub | head -1)"
+	fi
 
 	# Write out the preseed file header with 'EOF' to prevent variable expansion:
 	cat >> ${PRESEED_FILE} <<-'EOF'
@@ -10501,7 +10507,7 @@ system::make_preseed_cfg ()
 		# language is used for display and formats. Comparable to
 		# the MUI in Microsoft environments.
 		d-i debian-installer/locale string en_US.UTF-8
-		d-i localechooser/supported-locales multiselect en_US.UTF-8, se_SE.UTF-8
+		d-i localechooser/supported-locales multiselect en_US.UTF-8, sv_SE.UTF-8
 		d-i console-setup/ask_detect boolean false
 
 		# --------------------------------------------------- #
@@ -10682,8 +10688,8 @@ system::make_preseed_cfg ()
 			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
 			in-target mkdir -p /root/.ssh ; \
 			in-target mkdir -p /home/${Preference_InitialUser}/.ssh ; \
-			in-target /bin/sh -c "cat /home/$SUDO_USER/.ssh/*.pub >> /root/.ssh/authorized_keys" ; \
-			in-target /bin/sh -c "cat /home/$SUDO_USER/.ssh/*.pub >> /HOME/${Preference_InitialUser}/.ssh/authorized_keys" ; \
+			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /root/.ssh/authorized_keys" ; \
+			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /HOME/${Preference_InitialUser}/.ssh/authorized_keys" ; \
 			cp /*.cfg /target/opt/rtd/ ; \
 			in-target mkdir -p "/etc/systemd/system/getty@tty1.service.d" ; \
 			in-target echo "[Service]" > "/etc/systemd/system/getty@tty1.service.d/override.conf" ; \
@@ -10709,7 +10715,7 @@ system::make_preseed_cfg ()
 			# --------------------------------------------------- #
 			EOF
 		;;
-		kvm_server | kvm | KVM | Kvm | kvm-server )
+		kvm_server | kvm | KVM | kvm | kvm-server )
 			cat >> ${PRESEED_FILE} <<-EOF
 			# --------------------------------------------------- #
 			# C.4.12. Addon Tasks for KVM Server
@@ -10722,8 +10728,8 @@ system::make_preseed_cfg ()
 			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
 			in-target mkdir -p /root/.ssh ; \
 			in-target mkdir -p /home/${Preference_InitialUser}/.ssh ; \
-			in-target /bin/sh -c "cat /home/$SUDO_USER/.ssh/*.pub >> /root/.ssh/authorized_keys" ; \
-			in-target /bin/sh -c "cat /home/$SUDO_USER/.ssh/*.pub >> /HOME/${Preference_InitialUser}/.ssh/authorized_keys" ; \
+			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /root/.ssh/authorized_keys" ; \
+			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /HOME/${Preference_InitialUser}/.ssh/authorized_keys" ; \
 			cp /*.cfg /target/opt/rtd/ ; \
 			umount -l /media || echo "Empty" ; \
 			eject || true; \
@@ -10755,8 +10761,8 @@ system::make_preseed_cfg ()
 			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
 			in-target mkdir -p /root/.ssh ; \
 			in-target mkdir -p /home/${Preference_InitialUser}/.ssh ; \
-			in-target /bin/sh -c "cat /home/$SUDO_USER/.ssh/*.pub >> /root/.ssh/authorized_keys" ; \
-			in-target /bin/sh -c "cat /home/$SUDO_USER/.ssh/*.pub >> /HOME/${Preference_InitialUser}/.ssh/authorized_keys" ; \
+			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /root/.ssh/authorized_keys" ; \
+			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /HOME/${Preference_InitialUser}/.ssh/authorized_keys" ; \
 			cp /*.cfg /target/opt/rtd/ ; \
 			umount -l /media || echo "Empty" ; \
 			eject || true; \
