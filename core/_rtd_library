@@ -10432,10 +10432,12 @@ system::make_preseed_cfg ()
 
 		# --------------------------------------------------- #
 
-	EOF
-	
+		EOF
+
+
 	# Write out configurable protions of the preseed file:
 	cat >> ${PRESEED_FILE} <<-EOF
+
 		# --------------------------------------------------- #
 		# C.4.2. Unattended Installation $(date)
 		# --------------------------------------------------- #
@@ -10598,17 +10600,17 @@ system::make_preseed_cfg ()
 		# system is booted. In addition a default is prefferred
 		# where the swap space is set to 200% of RAM so that
 		# hibernate can be supported.
+		# d-i partman-auto/choose_recipe select root-encrypted
 
-		$( if [[ "${Preference_DiskEncryption}" == "YES" || "${Preference_DiskEncryption}" == "yes" ]] ; then
-		echo "d-i partman-auto/method string crypto
-		d-i partman-crypto/passphrase password "${Preference_Disk_Password}"
-		d-i partman-crypto/passphrase-again password "${Preference_Disk_Password}"
-		d-i partman-auto-crypto/erase_disks boolean false
-		d-i partman-auto-lvm/new_vg_name string rtd-crypt
-		#d-i partman-auto/choose_recipe select root-encrypted"
+		$( if [ "${Preference_DiskEncryption}" = "YES" ] || [ "${Preference_DiskEncryption}" = "yes" ]; then
+			echo "d-i partman-auto/method string crypto
+			d-i partman-crypto/passphrase password ${Preference_Disk_Password}
+			d-i partman-crypto/passphrase-again password ${Preference_Disk_Password}
+			d-i partman-auto-crypto/erase_disks boolean false
+			d-i partman-auto-lvm/new_vg_name string rtd-crypt"
 		else
-		echo "d-i partman-auto/method string lvm
-		d-i partman-auto-lvm/new_vg_name string rtd-lvm"
+			echo "d-i partman-auto/method string lvm
+			d-i partman-auto-lvm/new_vg_name string rtd-lvm"
 		fi )
 		d-i partman-lvm/device_remove_lvm boolean true
 		d-i partman-lvm/device_remove_lvm_span boolean true
@@ -10628,10 +10630,9 @@ system::make_preseed_cfg ()
 		# - home:   separate /home partition
 		# - multi:  separate /home, /var, and /tmp partitions
 		# d-i partman-auto/choose_recipe select atomic
-
 	EOF
-
-	cat >> ${PRESEED_FILE} <<-'EOF'
+read -p " done Launching main config Press any key to continue..."
+		cat >> ${PRESEED_FILE} <<-'EOF'
 
 		d-i partman-auto/expert_recipe string                   \
 		multi-cnx ::                                            \
@@ -10663,8 +10664,7 @@ system::make_preseed_cfg ()
 			.
 
 		# --------------------------------------------------- #
-
-	EOF
+		EOF
  
 
 
@@ -10768,7 +10768,7 @@ system::make_preseed_cfg ()
 	system::log_item "Preseed file created: ${PRESEED_FILE}
 	Containging DATA:
 	$(cat ${PRESEED_FILE})"
-
+	vim ${PRESEED_FILE}
 	unset Preference_DiskEncryption \
 	Preference_Password \
 	Preference_InitialUser \
