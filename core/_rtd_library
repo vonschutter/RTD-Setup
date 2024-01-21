@@ -10671,27 +10671,31 @@ system::make_preseed_cfg ()
 	# write out conditionsl elements of the preseed file:
 	case $_role in
 		minecraft-server | minecraft | Minecraft | MINECRAFT | minecraft_server | Minecraft-server)
-			cat >> ${PRESEED_FILE} <<-'EOF'
+			cat >> ${PRESEED_FILE} <<-EOF
 			# --------------------------------------------------- #
 			# C.4.12. Addon Tasks for Minecraft Server
 			# --------------------------------------------------- #
 			d-i preseed/late_command string \
-				in-target apt-get -y install git ; \
-				in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
-				in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
-				in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
-				cp /*.cfg /target/opt/rtd/ ; \
-				in-target mkdir -p "/etc/systemd/system/getty@tty1.service.d" ; \
-				in-target echo "[Service]" > "/etc/systemd/system/getty@tty1.service.d/override.conf" ; \
-				in-target echo "ExecStart=-/sbin/agetty --noissue --autologin tangarora "%I" "$TERM"" >> "/etc/systemd/system/getty@tty1.service.d/override.conf" ; \
-				in-target echo "Type=idle" >> "/etc/systemd/system/getty@tty1.service.d/override.conf" ; \
-				in-target echo "bash /home/tangarora/minecraft.server" >> /home/tangarora/.bashrc ; \
-				in-target wget https://github.com/vonschutter/RTD-Minecraft-Server-Manager/raw/master/minecraft-server -O /home/tangarora/minecraft.server ; \
-				in-target chmod 777 /home/tangarora/minecraft.server ; \
-				umount -l /media || echo "Empty"; \
-				eject || true; \
-				reboot; \
-				echo "------  initial Setup Complete!  ------"
+			in-target apt-get -y install git ; \
+			in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
+			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
+			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
+			in-target mkdir -p /root/.ssh ; \
+			in-target mkdir -p /home/${Preference_InitialUser}/.ssh ; \
+			in-target /bin/sh -c "cat /home/$SUDO_USER/.ssh/*.pub >> /root/.ssh/authorized_keys" ; \
+			in-target /bin/sh -c "cat /home/$SUDO_USER/.ssh/*.pub >> /HOME/${Preference_InitialUser}/.ssh/authorized_keys" ; \
+			cp /*.cfg /target/opt/rtd/ ; \
+			in-target mkdir -p "/etc/systemd/system/getty@tty1.service.d" ; \
+			in-target echo "[Service]" > "/etc/systemd/system/getty@tty1.service.d/override.conf" ; \
+			in-target echo "ExecStart=-/sbin/agetty --noissue --autologin tangarora "%I" "$TERM"" >> "/etc/systemd/system/getty@tty1.service.d/override.conf" ; \
+			in-target echo "Type=idle" >> "/etc/systemd/system/getty@tty1.service.d/override.conf" ; \
+			in-target echo "bash /home/tangarora/minecraft.server" >> /home/tangarora/.bashrc ; \
+			in-target wget https://github.com/vonschutter/RTD-Minecraft-Server-Manager/raw/master/minecraft-server -O /home/tangarora/minecraft.server ; \
+			in-target chmod 777 /home/tangarora/minecraft.server ; \
+			umount -l /media || echo "Empty"; \
+			eject || true; \
+			reboot; \
+			echo "------  initial Setup Complete!  ------"
 
 			# Answer the last question
 			d-i debian-installer/splash boolean true
@@ -10711,19 +10715,19 @@ system::make_preseed_cfg ()
 			# C.4.12. Addon Tasks for KVM Server
 			# --------------------------------------------------- #
 			d-i preseed/late_command string \
-				in-target apt-get -y install qemu-system libvirt-daemon-system ; \
-				in-target apt-get -y install git ; \
-				in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
-				in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
-				in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
-				in-target mkdir -p /root/.ssh; \
-				in-target mkdir -p /home/$SUDO_USER/.ssh; \
-				in-target /bin/sh -c "cat /root/.ssh/*.pub >> /root/.ssh/authorized_keys"; \
-				in-target /bin/sh -c "cat /home/$SUDO_USER/.ssh/*.pub >> /HOME/${Preference_InitialUser}/.ssh/authorized_keys"; \
-				cp /*.cfg /target/opt/rtd/ ; \
-				umount -l /media || echo "Empty" ; \
-				eject || true; \
-				echo "------  initial Setup Complete!  ------"
+			in-target apt-get -y install qemu-system libvirt-daemon-system ; \
+			in-target apt-get -y install git ; \
+			in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
+			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
+			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
+			in-target mkdir -p /root/.ssh ; \
+			in-target mkdir -p /home/${Preference_InitialUser}/.ssh ; \
+			in-target /bin/sh -c "cat /home/$SUDO_USER/.ssh/*.pub >> /root/.ssh/authorized_keys" ; \
+			in-target /bin/sh -c "cat /home/$SUDO_USER/.ssh/*.pub >> /HOME/${Preference_InitialUser}/.ssh/authorized_keys" ; \
+			cp /*.cfg /target/opt/rtd/ ; \
+			umount -l /media || echo "Empty" ; \
+			eject || true; \
+			echo "------  initial Setup Complete!  ------"
 
 			# Answer the last question
 			d-i debian-installer/splash boolean true
@@ -10745,18 +10749,18 @@ system::make_preseed_cfg ()
 			# --------------------------------------------------- #
 			# for Debian to work (ignored by Ubuntu)...
 			d-i preseed/late_command string \
-				in-target apt-get -y install git ; \
-				in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
-				in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
-				in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
-				in-target mkdir -p /root/.ssh; \
-				in-target mkdir -p /home/$SUDO_USER/.ssh; \
-				in-target /bin/sh -c "cat /root/.ssh/*.pub >> /root/.ssh/authorized_keys"; \
-				in-target /bin/sh -c "cat /home/$SUDO_USER/.ssh/*.pub >> /HOME/${Preference_InitialUser}/.ssh/authorized_keys"; \
-				cp /*.cfg /target/opt/rtd/ ; \
-				umount -l /media || echo "Empty" ; \
-				eject || true; \
-				echo "------  initial Setup Complete!  ------"
+			in-target apt-get -y install git ; \
+			in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
+			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
+			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
+			in-target mkdir -p /root/.ssh ; \
+			in-target mkdir -p /home/${Preference_InitialUser}/.ssh ; \
+			in-target /bin/sh -c "cat /home/$SUDO_USER/.ssh/*.pub >> /root/.ssh/authorized_keys" ; \
+			in-target /bin/sh -c "cat /home/$SUDO_USER/.ssh/*.pub >> /HOME/${Preference_InitialUser}/.ssh/authorized_keys" ; \
+			cp /*.cfg /target/opt/rtd/ ; \
+			umount -l /media || echo "Empty" ; \
+			eject || true; \
+			echo "------  initial Setup Complete!  ------"
 
 			# Answer the last question
 			d-i debian-installer/splash boolean true
