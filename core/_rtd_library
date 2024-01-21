@@ -10706,7 +10706,7 @@ system::make_preseed_cfg ()
 			EOF
 		;;
 		kvm_server | kvm | KVM | Kvm | kvm-server )
-			cat >> ${PRESEED_FILE} <<-'EOF'
+			cat >> ${PRESEED_FILE} <<-EOF
 			# --------------------------------------------------- #
 			# C.4.12. Addon Tasks for KVM Server
 			# --------------------------------------------------- #
@@ -10716,6 +10716,10 @@ system::make_preseed_cfg ()
 				in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
 				in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
 				in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
+				in-target mkdir -p /root/.ssh; \
+				in-target mkdir -p /home/$SUDO_USER/.ssh; \
+				in-target /bin/sh -c "cat /root/.ssh/*.pub >> /root/.ssh/authorized_keys"; \
+				in-target /bin/sh -c "cat /home/$SUDO_USER/.ssh/*.pub >> /HOME/${Preference_InitialUser}/.ssh/authorized_keys"; \
 				cp /*.cfg /target/opt/rtd/ ; \
 				umount -l /media || echo "Empty" ; \
 				eject || true; \
@@ -10734,7 +10738,7 @@ system::make_preseed_cfg ()
 			EOF
 		;;
 		* )
-			cat >> ${PRESEED_FILE} <<-'EOF'
+			cat >> ${PRESEED_FILE} <<-EOF
 
 			# --------------------------------------------------- #
 			# C.4.12. Default preseed Addon Tasks
@@ -10745,6 +10749,10 @@ system::make_preseed_cfg ()
 				in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
 				in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
 				in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
+				in-target mkdir -p /root/.ssh; \
+				in-target mkdir -p /home/$SUDO_USER/.ssh; \
+				in-target /bin/sh -c "cat /root/.ssh/*.pub >> /root/.ssh/authorized_keys"; \
+				in-target /bin/sh -c "cat /home/$SUDO_USER/.ssh/*.pub >> /HOME/${Preference_InitialUser}/.ssh/authorized_keys"; \
 				cp /*.cfg /target/opt/rtd/ ; \
 				umount -l /media || echo "Empty" ; \
 				eject || true; \
