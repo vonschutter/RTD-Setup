@@ -3515,10 +3515,10 @@ system::prepare_environment_for_iso_creation ()
 
 
 
-download_and_manipulate_iso_debian ()
+system::download_and_manipulate_iso_debian ()
 {
 # Description:
-# download_and_manipulate_iso_debian "debian" "openssh-server" "MinecraftTasks"
+# system::download_and_manipulate_iso_debian "debian" "openssh-server" "MinecraftTasks"
 # This is a simple command sequence to read the preference of distribution to install
 # and what release to get... then download the network install file from debian
 # and manipulate the iso file to complete the edited instruction in the preseed.cfg...
@@ -3529,16 +3529,16 @@ download_and_manipulate_iso_debian ()
 # Returns:
 # Usage:
 #
-# download_and_manipulate_iso_debian [ISO Name] [Environment] [Addon Task]
+# system::download_and_manipulate_iso_debian [ISO Name] [Environment] [Addon Task]
 #
 # where [ISO Name] may be: any string to starte the file name with
 # where [Environment] may be: any debian supported desktop environment
 # where [Addon Task] may be: additional pre determined configuration
 #
 # EXAMPLE:
-# download_and_manipulate_iso_debian openssh-server MinecraftTasks
-# download_and_manipulate_iso_debian gnome-desktop
-# download_and_manipulate_iso_debian xfce-desktop
+# system::download_and_manipulate_iso_debian openssh-server MinecraftTasks
+# system::download_and_manipulate_iso_debian gnome-desktop
+# system::download_and_manipulate_iso_debian xfce-desktop
 #
 # End of Documentation
 	system::prepare_environment_for_iso_creation
@@ -3562,62 +3562,37 @@ download_and_manipulate_iso_debian ()
 
 	$bin_7z x "$iso_store" "-o$tmp_disc_dir" || write_error  "FAILED to download and/or extract $_SOURCE_ISO_URL" 
 
-	write_status "Geting non-free firmware..."
-	write_information "Download: $_SOURCE_FIRMWARE"
-	wget -4  -q --show-progress "$_SOURCE_FIRMWARE" -O "$tmp_download_dir/firmware.zip" && ( mkdir "$tmp_disc_dir/firmware" & "$bin_7z" x "$tmp_download_dir/firmware.zip" "-o$tmp_disc_dir/firmware" )
-	write_information "Retreived: $(ls "$tmp_disc_dir"/firmware )"
+	# write_status "Geting non-free firmware..."
+	# write_information "Download: $_SOURCE_FIRMWARE"
+	# wget -4  -q --show-progress "$_SOURCE_FIRMWARE" -O "$tmp_download_dir/firmware.zip" && ( mkdir "$tmp_disc_dir/firmware" & "$bin_7z" x "$tmp_download_dir/firmware.zip" "-o$tmp_disc_dir/firmware" )
+	# write_information "Retreived: $(ls "$tmp_disc_dir"/firmware )"
 
 	# Load the installation answers template.
 	write_status "Getting intall instructions template... "
-	system::make_preseed_cfg -a ask -p "$tmp_initrd_dir/" -r $PREFERENCE || write_error "Failed to create preseed.cfg template"
-
-# ------------------- Patch 1 grub .cfg ------------------------ #
-
-patch "$tmp_disc_dir/boot/grub/grub.cfg" <<PATCH
-11a12
-> set timeout=10
-PATCH
-
-sed -i s/"menuentry --hotkey=g 'Graphical install' {"/"menuentry --hotkey=g 'Automatic Graphical install' {"/g "$tmp_disc_dir/boot/grub/grub.cfg"
-sed -i s/"menuentry --hotkey=g 'install' {"/"menuentry --hotkey=g 'Automatic install' {"/g "$tmp_disc_dir/boot/grub/grub.cfg"
-sed -i s/"menu label ^Graphical install"/"menu label ^Automatic Graphical install"/g "$tmp_disc_dir/isolinux/gtk.cfg"
-sed -i s/"menu label ^Install"/"menu label ^Automatic Install"/g "$tmp_disc_dir/isolinux/txt.cfg"
-# -------------------------------------------------------------- #
+	system::make_preseed_cfg -a ask -p "$tmp_initrd_dir/" -r $ || write_error "Failed to create preseed.cfg template"
 
 
-# ---------------------Patch 2 isolinux.cfg -------------------- #
+	# ----------------------- Modify Boot Media --------------------------- #
+	# Edit the grub.cfg file...
+	#sed -i '/timeout/s/.*/set timeout=10/' "$tmp_disc_dir/boot/grub/grub.cfg"
+	sed -i s/"menuentry --hotkey=g 'Graphical install' {"/"menuentry --hotkey=g 'Automatic Graphical install' {"/g "$tmp_disc_dir/boot/grub/grub.cfg"
+	sed -i s/"menuentry --hotkey=i 'install' {"/"menuentry --hotkey=g 'Automatic install' {"/g "$tmp_disc_dir/boot/grub/grub.cfg"
+	#sed -i '/insmod play/d' "$tmp_disc_dir/boot/grub/grub.cfg"
+	sed -i 's/^[[:space:]]*set gfxmode=800x600$/  set gfxmode=1024x768/' "$tmp_disc_dir/boot/grub/grub.cfg"
 
-dos2unix "$tmp_disc_dir/isolinux/isolinux.cfg"
-patch "$tmp_disc_dir/isolinux/isolinux.cfg" <<PATCH_II
-7c7
-< timeout 0
----
-> timeout 100
-PATCH_II
+	# Edit the gtk.cfg file...
+	sed -i s/"menu label ^Graphical install"/"menu label ^Automatic Graphical install"/g "$tmp_disc_dir/isolinux/gtk.cfg"
 
-# -------------------------------------------------------------- #
+	# Edit the txt.cfg file...
+	sed -i s/"menu label ^Install"/"menu label ^Automatic Install"/g "$tmp_disc_dir/isolinux/txt.cfg"
 
-	# Edit the installation instructions file...
-	sed -i s/oem-replace-me-desktop-selection/$PREFERENCE/g "$tmp_initrd_dir/preseed.cfg"
-	mkdir "$tmp_initrd_dir/custom" && cp "$ssh_public_key_file" "$tmp_initrd_dir/custom/userkey.pub" || write_error "Failed to create $tmp_initrd_dir/custom" 
+	# Edit the spkgtk.cfg file...
+	sed -i 's|ontimeout /install.amd/vmlinuz vga=788 initrd=/install.amd/gtk/initrd.gz speakup.synth=soft --- quiet|ontimeout /install.amd/vmlinuz vga=788 initrd=/install.amd/gtk/initrd.gz theme=dark --- quiet|' "$tmp_disc_dir/isolinux/spkgtk.cfg"
 
-# ---------------------Create ssh key service ------------------ #
+	dos2unix "$tmp_disc_dir/isolinux/isolinux.cfg"
+	sed -i 's/^timeout 0$/timeout 100/' "$tmp_disc_dir/isolinux/isolinux.cfg"
+	# --------------------------------------------------------------------- #
 
-cat << SSH_KEY_KEYGEN > "$tmp_initrd_dir/custom/ssh-host-keygen.service"
-[Unit]
-Description=OpenSSH Server Key Generation
-Before=ssh.service
-
-[Service]
-ExecStart=/usr/bin/ssh-keygen -A
-Type=oneshot
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-SSH_KEY_KEYGEN
-
-# -------------------------------------------------------------- #
 
 	# Inject created content into the new ISO...
 	write_host --green "# Modify the CLI Installer" 
@@ -3625,7 +3600,7 @@ SSH_KEY_KEYGEN
 		gzip -d -c "$tmp_disc_dir/install.amd/initrd.gz" > "./initrd"
 		echo "./preseed.cfg" | fakeroot "$bin_cpio" -o -H newc -A -F "./initrd"
 		echo "./task.sh" | fakeroot "$bin_cpio" -o -H newc -A -F "./initrd"
-		find ./custom | fakeroot "$bin_cpio" -o -H newc -A -F ./initrd
+		#ind ./custom | fakeroot "$bin_cpio" -o -H newc -A -F ./initrd
 		cat ./initrd | gzip -9c > "$tmp_disc_dir/install.amd/initrd.gz"
 		rm "$tmp_initrd_dir/initrd"
 
@@ -3633,7 +3608,7 @@ SSH_KEY_KEYGEN
 		gzip -d -c  "$tmp_disc_dir/install.amd/gtk/initrd.gz"  > "./initrd"
 		echo "./preseed.cfg" | fakeroot "$bin_cpio" -o -H newc -A -F "./initrd"
 		echo "./task.sh" | fakeroot "$bin_cpio" -o -H newc -A -F "./initrd"
-		find "./custom" | fakeroot "$bin_cpio" -o -H newc -A -F "./initrd"
+		#find "./custom" | fakeroot "$bin_cpio" -o -H newc -A -F "./initrd"
 		cat "./initrd" | gzip -9c > "$tmp_disc_dir/install.amd/gtk/initrd.gz"
 	popd || (write_error  "Failed to popd"  & rtd_oem_pause 1)
 	rtd_oem_setup_brand_splash_screen
@@ -3754,6 +3729,8 @@ create_iso_image ()
 			-o "$target_iso" ./ || rtd_oem_pause 1 "${FUNCNAME[0]}: An error may have occurred (review above outout) then: Press [ENTER] to continue:"
 	chmod 777 "$target_iso" || rtd_oem_pause 1 "${FUNCNAME[0]}: An error may have occurred (review above outout) then: Press [ENTER] to continue:"
 }
+
+
 
 
 
@@ -10272,7 +10249,186 @@ fi
 
 
 
+system::update_config () 
+{
+# Description: This function updates a configuration file with key-value pairs.
+# Parameters:
+#   - config_file: The path to the configuration file.
+#   - key-value pairs: The key-value pairs to be updated or added to the configuration file.
+# Returns: None
+# 
+# Example: 
+# 
+# system::update_config /home/user/.config/myapp/config.conf key1 value1 key2 value2
+#
+# End of documentation
 
+	local config_file=$1
+	shift  # Shift past the first argument (the config file path)
+	system::log_item "Updating configuration file with key-value pairs: $@"
+	mkdir -p ${config_file%/*}  ; touch $config_file || system::log_item "Failed to create config file: $config_file"
+	
+	while (( "$#" )); do
+		local key=$1
+		local value=$2
+		shift 2  # Shift past the processed key-value pair
+
+		if grep -q "^$key=" "$config_file"; then
+			system::log_item "Update existing entry $key=$value in $config_file"
+			sed -i "s|^$key=.*|$key=$value|" "$config_file"
+		else
+			system::log_item "Add new entry $key=$value to $config_file"
+			echo "$key=$value" >> "$config_file"
+		fi
+	done
+}
+
+
+
+
+system::read_config () 
+{
+# Description: This function reads a configuration file with key-value pairs.
+# Parameters:
+#   - config_file: The path to the configuration file.
+#   
+# Returns: None
+# 
+# Example: 
+# 
+# system::update_config /home/user/.config/myapp/config.conf 
+#
+# End of documentation
+	# Specify the path to your configuration file
+	local config_file=$1
+
+	system::log_item "Reading configuration file: $config_file"
+	# Read each line in the configuration file
+	while IFS='=' read -r key value; do
+		if [[ $key && $value ]]; then
+			# Use declare to safely assign value to the variable named by 'key'
+			declare -g "$key=$value"
+			system::log_item "Read key-value pair: $key=$value"
+		fi
+	done < "$config_file"
+}
+
+
+
+
+system::get_vm_config() 
+{
+# Description: This function gets a value from a configuration file.
+# Parameters:
+#   - config_file: The path to the configuration file.
+#   - key: The key to get the value for.
+# Returns: The value for the key.
+#
+# Example:
+#
+# End of documentation
+	local _config_file=${_OEM_USER_VM_PREFERENCES:-"/home/${SUDO_USER}/.config/${_TLA,,}/build_defaults.inf"}
+	[[ "$1" == "--ask" ]] && local _ask="YES" || local _ask="NO"
+
+	system::log_item "Loading Global Config if available otherwise use defaults..."
+	Preference_DiskEncryption="${_ENCRYPT_DISK:-"YES"}"
+	Preference_Disk_Password="${_TEMP_DISK_PASSWORD:-"letmein1234"}"
+	Preference_InitialUser="${_OEM_USER:-"tangarora"}"
+	Preference_InitialUserFullName="${_OEM_USER_FULLNAME:-"RTD User"}"
+	Preference_InitialUserGroup="${_OEM_USER_GROUP:-"sudo"}"
+	Preference_InitialUserPassword="${_OEM_USER_PASSWORD:-"letmein1234"}"
+	Preference_InitialKeyboardLayout="${_OEM_USER_KEYBOARD_LAYOUT:-"us"}"
+	Preference_InitialTimeZone="${_OEM_USER_TIMEZONE:-"Etc/UTC"}"
+	Preference_Wireless_ID="${_OEM_WIRELESS_ID:-"loader"}"
+	Preference_Wireless_Password="${_OEM_WIRELESS_PASSWORD:-"letmein1234"}"
+	Preference_Role="${_role:-"default"}"
+	Preference_CopySSHKey="${_OEM_COPY_SSH_KEY:-"NO"}"
+
+	system::log_item "Load saved preferences from the config file everriding the _branding global config or defaults for preseed file..."
+	[[ -f "${_config_file}" ]] && system::read_config "${_config_file}" || system::log_item "Failed to load config file: ${_config_file}"
+
+	# If 'task' is defined, then alter teh role to match the task (user can override this if 'ask' is requested):
+	[[ -n $_task ]] && Preference_Role="${_task}"
+
+	if [[ -n $_ask ]] ; then
+
+		system::log_item "'ask' is requested, requesting user input for the preseed file:"
+		preseed_choices=$(dialog --backtitle "$BRANDING" --title "RTD Preseed Creator" --mixedform "Enter your preferences in to the form below. Please note that the password fields do not show anything but will capture what you type in" 22 80 0 \
+		"DiskEncryption (YES/NO):" 	        1 1 "${Preference_DiskEncryption}" 1 40 40 0 0 \
+		"Disk Unlock Password (temp):"          2 1 "${Preference_Disk_Password}" 2 40 40 0 0 \
+		"Admin User Name:"                      3 1 "${Preference_InitialUser}" 3 40 40 0 0 \
+		"Admin User Full Name:"                 4 1 "${Preference_InitialUserFullName}" 4 40 40 0 0 \
+		"Admin User Initial UserGroup:"         5 1 "${Preference_InitialUserGroup}" 5 40 40 0 0 \
+		"Admin User Password (8 30 char):"      6 1 "${Preference_InitialUserPassword}" 6 40 128 0 0 \
+		"Initial Keyboard Layout:"              7 1 "${Preference_InitialKeyboardLayout}" 7 40 40 0 0 \
+		"Initial Time Zone:"                    8 1 "${Preference_InitialTimeZone}" 8 40 40 0 0 \
+		"Wireless Network SSID:"                9 1 "${Preference_Wireless_ID}" 9 40 40 0 0 \
+		"Wireless Network Password:"           10 1 "${Preference_Wireless_Password}" 10 40 40 0 0 \
+		"Role (Default, KVM, Minecraft):"      11 1 "${Preference_Role}" 11 40 40 0 0 \
+		"Copy you ssh public key to host?"     12 1 "${Preference_CopySSHKey}" 12 40 40 0 0 \
+		3>&1 1>&2 2>&3)
+		exit_status=$?
+
+		clear
+
+		case $exit_status in
+		0 )   system::log_item "Save coices and continue..." ;;
+		1 )   system::log_item "[Cancel] pressed; not updating or changing any configuration items..." ; return 1 ;;
+		255 ) system::log_item "[ESC] pressed, exiting the dialog immediatley..." ; return 1 ;;
+		* )   system::log_item "[ERROR] Dialog closed or unexpected error." ; rtd_oem_pause 1 "Dialog closed or unexpected error." ;;
+		esac
+		
+		# Convert the dialog output to an array and asign the variables:
+		IFS=$'\n' read -r -d '' -a input_array <<< "$preseed_choices"
+		Preference_DiskEncryption=${input_array[0]}
+		Preference_Disk_Password=${input_array[1]}
+		Preference_InitialUser=${input_array[2]}
+		Preference_InitialUserFullName=${input_array[3]}
+		Preference_InitialUserGroup=${input_array[4]}
+		Preference_InitialUserPassword=${input_array[5]}
+		Preference_InitialKeyboardLayout=${input_array[6]}
+		Preference_InitialTimeZone=${input_array[7]}
+		Preference_Wireless_ID=${input_array[8]}
+		Preference_Wireless_Password=${input_array[9]}
+		Preference_Role=${input_array[10]}
+		Preference_CopySSHKey=${input_array[11]}
+
+		# Encrypt the user/admin password before saving & for use in the preseed file
+		# If the password is already encrypted, then skip this step:
+		if [[ ${#Preference_InitialUserPassword} -ge 30 ]] ; then
+			system::log_item "Password appears to be encrypted already so skipping encryption..."
+		else
+			system::log_item "Password appears to be clear text, encrypting password..."
+			Preference_InitialUserPassword=$(printf "%s" "$Preference_InitialUserPassword" | mkpasswd -s -m sha-512)
+			if system::update_config "$_config_file" "Preference_InitialUserPassword" "${Preference_InitialUserPassword}" ; then
+				system::log_item "Stored encrypted password in user preferences: $_config_file"
+			else 
+				system::log_item "[ERROR] Failed to store encrypted password in user preferences: $_config_file"
+			fi
+		fi
+
+		system::log_item "Save as defaults and continue..."
+		write_information "Saving preferences to: $_config_file"
+		
+		system::update_config "$_config_file" "Preference_DiskEncryption" "${Preference_DiskEncryption}" \
+		"Preference_Disk_Password" "${Preference_Disk_Password}" \
+		"Preference_InitialUser" "${Preference_InitialUser}" \
+		"Preference_InitialUserFullName" "${Preference_InitialUserFullName}" \
+		"Preference_InitialUserGroup" "${Preference_InitialUserGroup}" \
+		"Preference_InitialKeyboardLayout" "${Preference_InitialKeyboardLayout}" \
+		"Preference_InitialTimeZone" "${Preference_InitialTimeZone}" \
+		"Preference_Wireless_ID" "${Preference_Wireless_ID}" \
+		"Preference_Wireless_Password" "${Preference_Wireless_Password}" \
+		"Preference_Role" "${Preference_Role}" \
+		"Preference_CopySSHKey" "${Preference_CopySSHKey}" 
+		
+		return $?
+	else
+		write_information "Generating preseed.cfg for: ${_role} ${_task} automatically using defaults..."
+		return 0
+	fi
+
+}
 
 
 
@@ -10308,14 +10464,13 @@ system::make_preseed_cfg ()
 # 
 # End of documentation
 
-	system::log_item "Function : ${FUNCNAME[0]}"
 	system::log_item "Called by: ${FUNCNAME[-1]}"
 
 	# Defaults:
 	local _saveto="$( mktemp -d )"	# Where to save the preseed file
 	local _role="default"		# selects d-i preseed/late_command actions based on role.
 	local _task="ssh-server"	# Package selection: What DE to install, or ssh-server
-	local _ask=			# Ask for variables to be used in the preseed file
+	unset _ask			# If set to "YES" then ask for user input to generate preseed file.
 
 	local OPTIND o a
 	while getopts ':r:p:t:a:' OPTION; do
@@ -10349,71 +10504,19 @@ system::make_preseed_cfg ()
 	export PRESEED_FILE="${_saveto}/preseed.cfg"	# The name of the preseed file to be created
 	export TASK_FILE="${_saveto}/task.sh"		# The name of the task file to be created (if needed)
 
-	touch "${PRESEED_FILE}"
-	touch "${TASK_FILE}"
+	touch "${PRESEED_FILE}" 2>&1 | tee -a "${_LOGFILE}"
+	touch "${TASK_FILE}"    2>&1 | tee -a "${_LOGFILE}"
 
-	# Load saved preferences from the config file, or use defaults for the preseed file:
-	 Preference_DiskEncryption="${_ENCRYPT_DISK:-"YES"}"
-	 Preference_Disk_Password="${_TEMP_DISK_PASSWORD:-"letmein1234"}"
-	 Preference_InitialUser="${_OEM_USER:-"tangarora"}"
-	 Preference_InitialUserFullName="${_OEM_USER_FULLNAME:-"RTD User"}"
-	 Preference_InitialUserGroup="${_OEM_USER_GROUP:-"sudo"}"
-	 Preference_InitialUserPassword="${_OEM_USER_PASSWORD:-"letmein1234"}"
-	#local Preference_InitialUserPasswordEncrypted=$( [[ -n "${_OEM_USER_PASSWORD}" ]] && echo '$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1' || echo '$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1' )
-	 Preference_InitialKeyboardLayout="${_OEM_USER_KEYBOARD_LAYOUT:-"us"}"
-	 Preference_InitialTimeZone="${_OEM_USER_TIMEZONE:-"Etc/UTC"}"
-	 Preference_Wireless_ID="${_OEM_WIRELESS_ID:-"loader"}"
-	 Preference_Wireless_Password="${_OEM_WIRELESS_PASSWORD:-"letmein1234"}"
-	 Preference_Role="${_role:-"default"}"
-	 Preference_CopySSHKey="${_OEM_COPY_SSH_KEY:-"NO"}"
-
-
+	# Load Global Config if available otherwise use defaults or preferences:
 	if [[ -n $_ask ]] ; then
-		# If 'ask' is requested, then request user input for the preseed file:
-		preseed_choices=$(dialog --backtitle "$BRANDING" --title "RTD Preseed Creator" --mixedform "Enter your preferences in to the form below. Please note that the password fields do not show anything but will capture what you type in" 22 80 0 \
-		"DiskEncryption (YES/NO):" 	1 1 "${Preference_DiskEncryption}" 1 40 40 0 0 \
-		"Disk Unlock Password (temp):" 	2 1 "${Preference_Disk_Password}" 2 40 40 0 0 \
-		"Admin User Name:" 		3 1 "${Preference_InitialUser}" 3 40 40 0 0 \
-		"Admin User Full Name:" 	4 1 "${Preference_InitialUserFullName}" 4 40 40 0 0 \
-		"Admin User Initial UserGroup:" 5 1 "${Preference_InitialUserGroup}" 5 40 40 0 0 \
-		"Admin User Password (temp):" 	6 1 "${Preference_InitialUserPassword}" 6 40 40 0 0 \
-		"Initial Keyboard Layout:" 	7 1 "${Preference_InitialKeyboardLayout}" 7 40 40 0 0 \
-		"Initial Time Zone:" 		8 1 "${Preference_InitialTimeZone}" 8 40 40 0 0 \
-		"Wireless Network SSID:" 	9 1 "${Preference_Wireless_ID}" 9 40 40 0 0 \
-		"Wireless Network Password:" 	10 1 "${Preference_Wireless_Password}" 10 40 40 0 0 \
-		"Role (Default, KVM, Minecraft):" 11 1 "${Preference_Role}" 11 40 40 0 0 \
-		"Copy you ssh public key to host?" 12 1 "${Preference_CopySSHKey}" 12 40 40 0 0 \
-		3>&1 1>&2 2>&3)
-		exit_status=$?
-		
-		clear
-		# Check if dialog was cancelled
-		if [ $exit_status != 0 ]; then
-			echo "Dialog cancelled."
-			return 1
-		fi
-
-		# Parse the output and assign to variables by capturing to an array:
-		IFS=$'\n' read -r -d '' -a input_array <<< "$preseed_choices"
-			 export Preference_DiskEncryption=${input_array[0]}
-			 Preference_Disk_Password=${input_array[1]}
-			 Preference_InitialUser=${input_array[2]}
-			 Preference_InitialUserFullName=${input_array[3]}
-			 Preference_InitialUserGroup=${input_array[4]}
-			 Preference_InitialUserPassword=${input_array[5]}
-			 Preference_InitialKeyboardLayout=${input_array[6]}
-			 Preference_InitialTimeZone=${input_array[7]}
-			 Preference_Wireless_ID=${input_array[8]}
-			 Preference_Wireless_Password=${input_array[9]}
-			 Preference_Role=${input_array[10]}
-			 Preference_CopySSHKey=${input_array[11]}
-
-		# Encrypt the user/admin password for use in the preseed file:
-		Preference_InitialUserPassword=$(printf ${Preference_InitialUserPassword} | mkpasswd -s -m sha-512)
+		system::log_item "Prompting for configuration options..."
+		system::get_vm_config --ask || rtd_oem_pause 1 "Failed to get VM config"
 	else
-		write_information "Generating preseed.cfg for: ${_role} ${_task} automatically..."
+		system::log_item "Using default configuration options..."
+		system::get_vm_config || rtd_oem_pause 1 "Failed to get VM config"
 	fi
-	
+
+	# If the user has requested to copy their SSH key to the host, then do so:
 	if [[ "${Preference_CopySSHKey}" == "yes" || "${Preference_CopySSHKey}" == "YES" ]] ; then
 		Preference_ssh_pub_key="$(cat /home/$SUDO_USER/.ssh/*.pub | head -1)"
 	fi
@@ -10635,42 +10738,42 @@ system::make_preseed_cfg ()
 		# - atomic: all files in one partition
 		# - home:   separate /home partition
 		# - multi:  separate /home, /var, and /tmp partitions
-		# d-i partman-auto/choose_recipe select atomic
+		d-i partman-auto/choose_recipe select atomic
 	EOF
 
-	cat >> ${PRESEED_FILE} <<-'EOF'
+	# cat >> ${PRESEED_FILE} <<-'EOF'
 
-		d-i partman-auto/expert_recipe string                   \
-		multi-cnx ::                                            \
-			538 538 1075 free                               \
-				$primary                                \
-				$iflabel{ gpt }                         \
-				$reusemethod{ }                         \
-				method{ efi } format{ }                 \
-			.                                               \
-			3500 3500 3500 ext3                             \
-				$primary{ } $bootable{ }                \
-				method{ format } format{ }              \
-				use_filesystem{ } filesystem{ ext4 }    \
-				mountpoint{ /boot }                     \
-			.                                               \
-			200% 25000 200% linux-swap                      \
-			 	$lvmok{ } lv_name{ swap }               \
-			 	in_vg { crypt }                         \
-			 	$primary{ }                             \
-			 	method{ swap } format{ }                \
-			.                                               \
-			500 1000 1000000000 ext4                        \
-				$lvmok{ } lv_name{ root }               \
-				in_vg { crypt }                         \
-				$primary{ }                             \
-				method{ format } format{ }              \
-				use_filesystem{ } filesystem{ ext4 }    \
-				mountpoint{ / }                         \
-			.
+	# 	d-i partman-auto/expert_recipe string                   \
+	# 	multi-cnx ::                                            \
+	# 		538 538 1075 free                               \
+	# 			$primary                                \
+	# 			$iflabel{ gpt }                         \
+	# 			$reusemethod{ }                         \
+	# 			method{ efi } format{ }                 \
+	# 		.                                               \
+	# 		3500 3500 3500 ext3                             \
+	# 			$primary{ } $bootable{ }                \
+	# 			method{ format } format{ }              \
+	# 			use_filesystem{ } filesystem{ ext4 }    \
+	# 			mountpoint{ /boot }                     \
+	# 		.                                               \
+	# 		200% 25000 200% linux-swap                      \
+	# 		 	$lvmok{ } lv_name{ swap }               \
+	# 		 	in_vg { crypt }                         \
+	# 		 	$primary{ }                             \
+	# 		 	method{ swap } format{ }                \
+	# 		.                                               \
+	# 		500 1000 1000000000 ext4                        \
+	# 			$lvmok{ } lv_name{ root }               \
+	# 			in_vg { crypt }                         \
+	# 			$primary{ }                             \
+	# 			method{ format } format{ }              \
+	# 			use_filesystem{ } filesystem{ ext4 }    \
+	# 			mountpoint{ / }                         \
+	# 		.
 
-		# --------------------------------------------------- #
-	EOF
+	# 	# --------------------------------------------------- #
+	# EOF
  
 
 
@@ -10689,7 +10792,7 @@ system::make_preseed_cfg ()
 			in-target mkdir -p /root/.ssh ; \
 			in-target mkdir -p /home/${Preference_InitialUser}/.ssh ; \
 			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /root/.ssh/authorized_keys" ; \
-			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /HOME/${Preference_InitialUser}/.ssh/authorized_keys" ; \
+			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /home/${Preference_InitialUser}/.ssh/authorized_keys" ; \
 			cp /*.cfg /target/opt/rtd/ ; \
 			in-target mkdir -p "/etc/systemd/system/getty@tty1.service.d" ; \
 			in-target echo "[Service]" > "/etc/systemd/system/getty@tty1.service.d/override.conf" ; \
@@ -10729,7 +10832,7 @@ system::make_preseed_cfg ()
 			in-target mkdir -p /root/.ssh ; \
 			in-target mkdir -p /home/${Preference_InitialUser}/.ssh ; \
 			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /root/.ssh/authorized_keys" ; \
-			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /HOME/${Preference_InitialUser}/.ssh/authorized_keys" ; \
+			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /home/${Preference_InitialUser}/.ssh/authorized_keys" ; \
 			cp /*.cfg /target/opt/rtd/ ; \
 			umount -l /media || echo "Empty" ; \
 			eject || true; \
@@ -10762,7 +10865,7 @@ system::make_preseed_cfg ()
 			in-target mkdir -p /root/.ssh ; \
 			in-target mkdir -p /home/${Preference_InitialUser}/.ssh ; \
 			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /root/.ssh/authorized_keys" ; \
-			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /HOME/${Preference_InitialUser}/.ssh/authorized_keys" ; \
+			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /home/${Preference_InitialUser}/.ssh/authorized_keys" ; \
 			cp /*.cfg /target/opt/rtd/ ; \
 			umount -l /media || echo "Empty" ; \
 			eject || true; \
