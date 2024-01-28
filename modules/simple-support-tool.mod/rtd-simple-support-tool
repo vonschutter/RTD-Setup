@@ -176,9 +176,9 @@ dependency::file ()
 			"../../core/${1}"
 			"${0%/*}/../core/${1}"
 			"${0%/*}/../../core/${1}"
-			"$(dirname $(find /opt -name ${1} 2>/dev/null | head -n 1 ))/${1}"
-			"$(dirname $(find ${HOME}/GIT -name ${1} 2>/dev/null | head -n 1 ))/${1}"
-			"$(dirname $(find ${HOME}/bin -name ${1} 2>/dev/null | head -n 1 ))/${1}"
+			"$(dirname "$(find /opt -name ${1} 2>/dev/null | head -n 1 )")/${1}"
+			"$(dirname "$(find ${HOME}/GIT -name ${1} 2>/dev/null | head -n 1 )")/${1}"
+			"$(dirname "$(find ${HOME}/bin -name ${1} 2>/dev/null | head -n 1 )")/${1}"
 			)
 
 		for path in "${paths[@]}"; do 
@@ -476,17 +476,17 @@ show_make_media_gui_server ()
 			cleanup_and_finish
 		;;
 		3 )
-			system::download_and_manipulate_iso_debian debian kvm-server server
+			system::download_and_manipulate_iso_debian  kvm-server 
 			create_iso_image_debian
 			cleanup_and_finish
 		;;
 		4 )
-			system::download_and_manipulate_iso_debian debian openssh-server server
+			system::download_and_manipulate_iso_debian  openssh-server 
 			create_iso_image_debian
 			cleanup_and_finish
 		;;
 		5 )
-			system::download_and_manipulate_iso_debian debian openssh-server MinecraftServer
+			system::download_and_manipulate_iso_debian  minecraft-server
 			create_iso_image_debian
 			cleanup_and_finish
                 ;;
@@ -497,7 +497,7 @@ show_make_media_gui_server ()
 
 
 show_make_media_gui_desktop () {
-	# List Options to be available for choice in the RTD System Configurator...
+	# List Options to be available for choice in the RTD System Configuration...
 	while true; do
 		exec 3>&1
 		selection=$($RTD_GUI \
@@ -760,7 +760,7 @@ show_deploy_VDI_VM_now_menu ()
 		8 )
 			PRESEED_FILE="$(mktemp).xml"
 			generate_autoyast_file "${PRESEED_FILE}"
-			make_kvm_virtual_machine_now_from_opensuse_com SUSE
+			make_kvm_virtual_machine_now_from_opensuse_org SUSE
 			cleanup_and_finish nomessage
 		;;
 		9 )
@@ -969,7 +969,7 @@ show_manage_software_gui () {
 	while true; do
 		exec 3>&1
 		selection=$($RTD_GUI \
-		--backtitle "$BRANDING" --title "Software Managment Menu"  --menu "" $HEIGHT $WIDTH $LIST_HEIGHT \
+		--backtitle "$BRANDING" --title "Software Management Menu"  --menu "" $HEIGHT $WIDTH $LIST_HEIGHT \
 		"1" "Update all software on this system" \
 		"2" "Show what Personal Package Archives (PPA's) are defined on this system" \
 		"3" "Remove all Personal Package Archives (PPA's) NOT in use on this system" \
@@ -982,8 +982,8 @@ show_manage_software_gui () {
 		clear
 
 		case $exit_status in
-			$DIALOG_CANCEL) return	;;
-			$DIALOG_ESC) return ;;
+			"$DIALOG_CANCEL") return	;;
+			"$DIALOG_ESC") return ;;
 		esac
 
 		case $selection in
@@ -995,10 +995,10 @@ show_manage_software_gui () {
 		;;
 		2 )
 			dist_info="$(hostnamectl)"
-			if echo $dist_info |grep ".*buntu" &>/dev/null ; then
+			if echo "$dist_info" |grep ".*buntu" &>/dev/null ; then
 				result="$(rtd_ppa_checker)"
 				display_result "Packages Installed from Personal Package Archives"
-			elif echo $dist_info |grep "Pop!_OS" 2>/dev/null ; then
+			elif echo "$dist_info" |grep "Pop!_OS" 2>/dev/null ; then
 				result="$(rtd_ppa_checker)"
 				display_result "Packages Installed from Personal Package Archives"
 			else
@@ -1008,9 +1008,9 @@ show_manage_software_gui () {
 		;;
 		3 )
 			dist_info="$(hostnamectl)"
-			if echo $dist_info |grep ".*buntu" &>/dev/null ; then
+			if echo "$dist_info" |grep ".*buntu" &>/dev/null ; then
 				rtd_ppa_checker --delete | $RTD_GUI --programbox "Personal Package Archive Check:" $HEIGHT $WIDTH
-			elif echo $dist_info |grep "Pop!_OS" 2>/dev/null ; then
+			elif echo "$dist_info" |grep "Pop!_OS" 2>/dev/null ; then
 				rtd_ppa_checker --delete | $RTD_GUI --programbox "Personal Package Archive Check:" $HEIGHT $WIDTH
 			else
 				result="Non Ubuntu based distributions do not Support the use of Personal Package Archives \n Press [ OK ] to return to the prevous menu."
@@ -1041,29 +1041,28 @@ show_main_menu () {
 			"4" "🔧 Manage Virtual Machines (KVM) on this system" \
 			"5" "🔧 Manage encryption phrases and passwords" \
 			"6" "💽 Make media to automatically install OS (for VM's and CD burning)" \
-			"7" "🆙 Shortcut: Update this system now"\
-			"8" "ℹ️  About this tool" \
-			2>&1 1>&3)
+			"7" "🆙 Shortcut: Update this system now" \
+			"8" "💡  About this tool" 2>&1 1>&3 )
 		exit_status=$?
 		exec 3>&-
 		clear
 
 		case $exit_status in
-			$DIALOG_CANCEL)
+			"$DIALOG_CANCEL")
 				clear
-				echo "Program terminated."
+				write_status "Program terminated."
 				exit 0
 			;;
-			$DIALOG_ESC)
+			"$DIALOG_ESC")
 				clear
-				echo "Program aborted." >&2
+				write_status "Program aborted."
 				exit 0
 			;;
 		esac
 
 		case $selection in
 			0 )
-				echo "Program terminated."
+				write_status "Program terminated."
 			;;
 			1 ) show_monitor_informaion_about_this_system
 			;;
@@ -1087,8 +1086,8 @@ show_main_menu () {
 				clear
 
 				case $exit_status in
-					$DIALOG_CANCEL) show_main_menu ;;
-					$DIALOG_ESC) return ;;
+					"$DIALOG_CANCEL") show_main_menu ;;
+					"$DIALOG_ESC") return ;;
 				esac
 
 				case $subselection1 in
@@ -1122,15 +1121,15 @@ show_manage_crypt_sec () {
 			--menu "" $HEIGHT $WIDTH $LIST_HEIGHT \
 			"1" "Check if a password is stolen" \
 			"2" "Change systems disk encrytion pass phrase" \
-			"3" "Change "$SUDO_USER" password" \
+			"3" "Change $SUDO_USER password" \
 			2>&1 1>&3)
 		exit_status=$?
 		exec 3>&-
 		clear
 
 		case $exit_status in
-			$DIALOG_CANCEL) return ;;
-			$DIALOG_ESC) return ;;
+			"$DIALOG_CANCEL") return ;;
+			"$DIALOG_ESC") return ;;
 		esac
 
 		case $selection in
@@ -1138,7 +1137,7 @@ show_manage_crypt_sec () {
 				echo "Program terminated."
 			;;
 			1 )
-				check_if_password_p0wned
+				check_if_password_pOwned
 			;;
 			2 )
 				system::change_disk_pass
@@ -1159,7 +1158,7 @@ show_manage_crypt_sec () {
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # Useful code sniplet templates. Copy and paste these and the edit them
-# as necessary to extend the functoinality of this tool.
+# as necessary to extend the functionality of this tool.
 #
 
 
@@ -1183,12 +1182,12 @@ menu_template () {
 
 		# Cases for how program exited...
 		case $exit_status in
-			$DIALOG_CANCEL)
+			"$DIALOG_CANCEL")
 				clear
 				echo "Program terminated."
 				exit
 			;;
-			$DIALOG_ESC)
+			"$DIALOG_ESC")
 				clear
 				echo "Program aborted." >&2
 				exit 1
@@ -1253,7 +1252,7 @@ case $1 in
 	* )
 		if [[ "$TERM" == screen* ]]; then
 			echo "$_SIMPLE_SUPPORT_TOOL_DOC" >> ${_LOGFILE}
-			rtd_oem_check_inet_access
+			rtd_oem_check_inet_access  "$@"
 			dependency::file _rtd_library &>/dev/null
 			if [[ $EUID -ne 0 ]]; then ensure_admin ; fi
 			if [ "$UID" -eq 0 ]; then
@@ -1266,7 +1265,7 @@ case $1 in
 			if hash byobu 2>/dev/null; then
 				byobu new-session -s "RTD Simple Server Support Tools" $0
 			else
-				rtd_oem_check_inet_access
+				rtd_oem_check_inet_access "$@"
 				dependency::file _rtd_library &>/dev/null
 				if [[ $EUID -ne 0 ]]; then ensure_admin ; fi
 				if [ "$UID" -eq 0 ]; then
@@ -1282,5 +1281,5 @@ esac
 
 # Clean up the environment just in case...
 for var in $(compgen -v | grep '^_'); do
-    unset $var
+    unset "$var"
 done
