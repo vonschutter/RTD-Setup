@@ -58,10 +58,25 @@ _wow_location_steam_snap="snap/steam/steamapps/common/World of Warships/replays"
 _title="RTD Unofficial Steam World of Warships Utility"
 _steam_install_url_rpm="https://steamcdn-a.akamaihd.net/client/installer/steam.rpm"
 _steam_install_url_deb="https://steamcdn-a.akamaihd.net/client/installer/steam.deb"
-_ui_side_bar="/opt/rtd/modules/steam-world-of-warships-replay-launcher.mod/media_files/sideimg.png"
-_ui_header="/opt/rtd/modules/steam-world-of-warships-replay-launcher.mod/media_files/header-sm.png"
+_ui_side_bar="$(find /opt -name swow-sideimg.png)"
+_ui_header="$(find /opt -name swow-header-sm.png)"
 _ge_proton_target_dir="$HOME/.steam/root/compatibilitytools.d/"
 _ge_proton_repo="https://github.com/GloriousEggroll/proton-ge-custom/releases"
+_scriptname="$(basename $0)"
+_tla="${_scriptname:0:3}"
+_log_dir="$HOME/.config/${_tla}/logs" ; mkdir -p $_log_dir
+_log_file="$_log_dir/${_scriptname}.log" ; touch $_log_file
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+echo "Library Loaded Variables: 
+.........................................
+$(env | grep '^_')
+
+_LOG_DIR=${_LOG_DIR}
+_LOGFILE=${_LOGFILE}
+_SCRIPTNAME=${_SCRIPTNAME}
+.........................................
+" 2&1>> "$_log_file"
 
 
 
@@ -70,6 +85,7 @@ _ge_proton_repo="https://github.com/GloriousEggroll/proton-ge-custom/releases"
 #::::::::::::::          Script Functions                ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 
 
 
@@ -217,6 +233,7 @@ steam::load_replays ()
 		pushd ~/"$wow_path"
 		_replay=$( yad \
 			--title="$_title" \
+			--image="${_ui_header}" \
 			--text='<span font-size="xx-large" > \n Please select the replay that you want to see below:\n </span> '\
 			--width=880 \
 			--height=640 \
@@ -246,38 +263,102 @@ steam::load_replays ()
 
 
 
-steam::wow_manager_ui ()
-{
-	while true ; do
-		_replay=$( yad \
-			--form \
-			--image="$_ui_header" \
-			--title="$_title" \
-			--width=800 \
-			--height=300 \
-			--button="Watch WoW replay":0 \
-			--button="Install WoW":2 \
-			--button="Install Steam":3 \
-			--button="Install Proton GE":4 \
-			--button="About":5 \
-			--button="Quit":1 \
-			--posx=80 \
-			--posy=80 \
-			--buttons-layout=center )
-			ret=$?
+# steam::wow_manager_ui ()
+# {
+# 	while true ; do
+# 		_replay=$( yad \
+# 			--form \
+# 			--image="${_ui_header}" \
+# 			--title="${_title}" \
+# 			--width=800 \
+# 			--height=300 \
+# 			--button="Watch WoW replay":0 \
+# 			--button="Install WoW":2 \
+# 			--button="Install Steam":3 \
+# 			--button="Install Proton GE":4 \
+# 			--button="About":5 \
+# 			--button="Quit":1 \
+# 			--posx=80 \
+# 			--posy=80 \
+# 			--buttons-layout=center )
+# 			ret=$?
 
-			case $ret in 
-				0 ) steam::load_replays & disown  ;;
-				1 ) clear && echo [Quit] && break ;;
-				2 ) clear && if hash steam ; then steam -applaunch 552990 ; else rtd_say "$_error_message_003" ; fi ;;
-				3 ) clear && steam::install_steam  & disown ;;
-				4 ) clear && steam::install_proton_ge  & disown ;;
-				5 ) clear && rtd_say "${DOC}"  & disown ;;
-				252) clear && echo [ESC] && break ;;
-				* ) clear && echo "[Unknown Request]" && break ;;
-			esac
+# 			case $ret in 
+# 				0 ) clear && steam::load_replays  ;;
+# 				1 ) clear && echo [Quit] && break ;;
+# 				2 ) clear && if hash steam ; then steam -applaunch 552990 ; else rtd_say "$_error_message_003" ; fi ;;
+# 				3 ) clear && steam::install_steam  & disown ;;
+# 				4 ) clear && steam::install_proton_ge  & disown ;;
+# 				5 ) clear && rtd_say "${DOC}"  & disown ;;
+# 				252) clear && echo [ESC] && break ;;
+# 				* ) clear && echo "[Unknown Request]" && break ;;
+# 			esac
+# 	done
+# }
+
+
+
+steam::wow_manager_ui() {
+	# Ensure all required variables and commands are available
+	local required_commands=("yad" "steam")
+	local required_variables=("_ui_header" "_title" "_error_message_003" "DOC")
+
+	for cmd in "${required_commands[@]}"; do
+		if ! command -v "$cmd" &> /dev/null; then
+		echo "Error: Required command '$cmd' is not available." | tee -a "$_log_file"
+		return 1
+		fi
+	done
+
+	for var in "${required_variables[@]}"; do
+		if [ -z "${!var}" ]; then
+		echo "Error: Required variable '$var' is not set." | tee -a "$_log_file"
+		return 1
+		fi
+	done
+
+	while true; do
+		# Display the yad form and capture the selected button
+		_replay=$(yad --form \
+		--image="${_ui_header}" \
+		--title="${_title}" \
+		--width=800 \
+		--height=300 \
+		--button="Watch WoW replay:0" \
+		--button="Install WoW:2" \
+		--button="Install Steam:3" \
+		--button="Install Proton GE:4" \
+		--button="About:5" \
+		--button="Quit:1" \
+		--posx=80 \
+		--posy=80 \
+		--buttons-layout=center)
+		ret=$?
+
+		# Handle the user's selection
+		case $ret in
+		0) clear && steam::load_replays ;;
+		1) clear && echo "[Quit]" && break ;;
+		2) clear
+			if command -v steam &> /dev/null; then
+				steam -applaunch 552990
+			else
+				echo "$_error_message_003"
+			fi
+		;;
+		3) clear && steam::install_steam ;;
+		4) clear && steam::install_proton_ge ;;
+		5) clear && echo "${DOC}" ;;
+		252) clear && echo "[ESC]" && break ;;
+		*) clear && echo "[Unknown Request]" && break ;;
+		esac
+		unset _ret
 	done
 }
+
+
+
+
 
 
 steam::install_steam ()
@@ -358,14 +439,16 @@ Please NOTE: you need to restart steam to be able to select the new versions of 
 
 
 if echo "$OSTYPE" |grep "linux" ; then
+	echo "Linux detected..." 2&1>> "$_log_file"
 	if hash yad ; then
-		steam::wow_manager_ui 
+		echo "Yad is installed..." 2&1>> "$_log_file"
+		steam::wow_manager_ui 2&1>> "$_log_file"
 	else
 		echo "$_error_message_002"
 		for i in zypper apt dnf ; do
 			if hash $i; then sudo $i install yad -y || exit 1  ; fi
 		done
-		steam::wow_manager_ui 
+		steam::wow_manager_ui 2&1>> "$_log_file"
 	fi
         exit $?
 elif [[ "$OSTYPE" == "darwin"* ]]; then

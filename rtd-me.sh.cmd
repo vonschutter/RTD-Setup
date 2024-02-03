@@ -156,14 +156,15 @@ export _STATUSLOG=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-status.log
 
 
 if echo "$OSTYPE" |grep "linux" ; then
-	echo "Linux OS Found: Attempting to get instructions for Linux..."
+	echo "Linux OS Found: Attempting to get instructions for Linux..." | tee -a ${_LOGFILE} ${_STATUSLOG}
 	echo executing $0 >> ${_LOGFILE}
 	for d in git zip ; do 
-		if ! command -v "${d}" 2&1>> "${_LOGFILE}" ; then
-			for pkgmgr in apt yum dnf zypper ; do hash ${pkgmgr} && ${pkgmgr} install -y ${d} | tee -a ${_LOGFILE} ; done
+		if ! command -V "${d}" 2&1>> "${_LOGFILE}" ; then
+			for pkgmgr in apt yum dnf zypper ; do hash ${pkgmgr} 2&1>> "${_LOGFILE}" && ${pkgmgr} install -y ${d} | tee -a ${_LOGFILE} ; done
 		fi
 	done
-	git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp | tee ${_LOGFILE}
+	(
+	git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp 
 		if [ $? -eq 0 ]
 		then
 			echo "Instructions successfully retrieved..."
@@ -182,7 +183,8 @@ if echo "$OSTYPE" |grep "linux" ; then
 			echo "Suggestion: check write permission in "/opt" or internet connectivity."
 			exit 1
 		fi
-        exit $?
+	) | tee -a ${_LOGFILE}
+	exit $?
 elif [[ "$OSTYPE" == "darwin"* ]]; then
         echo "Mac OSX is currently not supported..."
 elif [[ "$OSTYPE" == "cygwin" ]]; then
@@ -201,7 +203,7 @@ exit $?
 # Anything after this exit statment below will be dangerous and meaningless
 # command syntax to POSIX based systems...
 # Make sure to exit no matter what...
-exit $?
+# -----------------------------------------------------------------------------------------------------------------------
 :CMDSCRIPT
 @echo off
 echo			-	RTD System System Managment Bootstrap Script      -
