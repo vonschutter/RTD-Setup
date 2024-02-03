@@ -348,31 +348,6 @@ dialog::display_cmd_output ()
 
 
 
-yad::display_cmd_output ()
-{
-# Description: Function to display a command output in a progress box. 
-# 
-# Globals: yad 
-# Arguments: ["String to execute"]
-# Outputs: Message in dialog box
-# Returns: 0 or ESC
-# Usage:
-#
-# This function takes a command as an argument and executes it. The command output is displayed in a progress box using the 'yad' command.
-# The progress box shows a pulsating animatsystem::prepare_environment_for_iso_creationion and automatically closes when the command execution is complete.
-#
-# Example usage:
-# yad::display_cmd_output "apt -y upgrade"
-#
-# End of Documentation
-	_cmd="$*"
-
-
-	${_cmd} | yad --title="$PUBLICATION $VERSION" --progress --pulsate --auto-close --auto-kill --text="RUNNING: ${_cmd}" --width=300 --height=100
-
-}
-
-
 
 dialog::copy_file_progress ()
 {
@@ -448,7 +423,7 @@ dialog::display_notice ()
 # is simply to make it easy and convenient to display a message to an end user in a terminal
 # in a nice way. To use this function, simply call it passing whatever string you want displayed
 # using dialog.
-# Globals: ${RTD_GUI} (will default to dialog), ${PUBLICATION} (optional)
+# Globals: "${RTD_GUI}" (will default to dialog), "${PUBLICATION}" (optional)
 # Arguments: ["String to display"]
 # Outputs: Message in dialog box
 # Returns: 0 or ESC
@@ -474,7 +449,7 @@ dialog::display_error ()
 # is simply to make it easy and convenient to display an ERROR message to an end user in a terminal
 # in a nice way. To use this function, simply call it passing whatever string you want displayed
 # using dialog.
-# Globals: ${RTD_GUI} (will default to dialog), ${PUBLICATION} (optional)
+# Globals: "${RTD_GUI}" (will default to dialog), "${PUBLICATION}" (optional)
 # Arguments: ["String to display"]
 # Outputs: Message in dialog box
 # Returns: 0 or ESC
@@ -563,13 +538,83 @@ display_result ()
 }
 
 
+
+
+
+
+yad::display_cmd_output ()
+{
+# Description: Function to display a command output in a yad box. 
+# 
+# Globals: dialog 
+# Arguments: ["String to execute"]
+# Outputs: Message in dialog box
+# Returns: 0 or ESC
+# Usage:
+#
+# This function takes a command as an argument and executes it. The output of the command is displayed in a yad dialog box.
+# Any error messages are also displayed in the dialog box.
+# The function returns 0 if the command execution is successful or if the dialog box is closed with the "Close" button.
+# If the dialog box is closed with the "ESC" key, the function returns "ESC".
+#
+# Example usage:
+# yad::display_cmd_output "apt -y upgrade"
+#
+# End of Documentation
+	# Command to execute
+	local cmd=$@
+
+	# Execute the command and pipe its output to yad
+	( 
+		# Ensure any error messages are sent to standard output so yad can display them
+		exec 2>&1 
+		
+		# Execute the command
+		echo "Executing: $cmd"
+		$cmd
+		
+		echo "Command completed. You can close this window."
+	) | yad --text-info --width=700 --height=400 --title "Command Output"
+}
+
+
+
+
+yad::display_progressbar_pulsating ()
+{
+# Description: Function to display a command output in a progress box. 
+# 
+# Globals: yad 
+# Arguments: ["String to execute"]
+# Outputs: Message in dialog box
+# Returns: 0 or ESC
+# Usage:
+#
+# This function takes a command as an argument and executes it. The command output is displayed in a progress box using the 'yad' command.
+# The progress box shows a pulsating animatsystem::prepare_environment_for_iso_creationion and automatically closes when the command execution is complete.
+#
+# Example usage:
+# yad::display_cmd_output "apt -y upgrade"
+#
+# End of Documentation
+	_cmd="$*"
+
+
+	${_cmd} | yad --title="$PUBLICATION $VERSION" --progress --pulsate --auto-close --auto-kill --text="RUNNING: ${_cmd}" --width=300 --height=100
+
+}
+
+
+
+
+
 zenity::display_info ()
 {
 # Description: Function to display an information notice.
 # The purpose of this function is to make it easy and convenient to display a message to an end user in a GUI in a nice way.
 # To use this function, simply call it passing whatever string you want displayed.
 #
-# Globals: $_TITLE (optional), $selection (optional)
+# Globals: "$_TITLE" (optional), "$selection" (optional)
 # Arguments: ["String to display"]
 # Outputs: Message in zenity info box
 # Returns: None
@@ -581,6 +626,8 @@ zenity::display_info ()
 	hash zenity &>/dev/null || check_dependencies zenity &>/dev/null || return 1
 	zenity --info --text --title="${_TITLE:="Notice"}: $selection" --text="$_text" --ellipsize --height=600 --width=800 2>/dev/null
 }
+
+
 
 
 
@@ -674,7 +721,7 @@ term::animate_while_command ()
 #             /                                                \
 #            |    _________________________________________     |
 #            |   |                                         |    |
-#            |   |  C:\> _                                 |    |
+#            |   |  user@host:\> _                         |    |
 #            |   |                                         |    |
 #            |   |                                         |    |
 #            |   |                                         |    |
@@ -6506,6 +6553,7 @@ software::update_system_txt ()
 		dnf -y upgrade 
 	elif hash zypper 2>/dev/null; then
 		zypper up -y 
+		zypper dup -y --auto-agree-with-licenses --allow-vendor-change 
 	elif hash apt 2>/dev/null; then
 		apt-get update
 		UPGRADABLE=$(LANG=C apt-get upgrade -s |grep -P '^\d+ upgraded'|cut -d" " -f1)
@@ -6535,6 +6583,7 @@ software::update_system_txt ()
 	else
 		write_warning "--- snap software is not present on this system... skipping..."
 	fi
+	
 
 	write_status "updating flatpaks if flatpak is present on system..."
 	if hash flatpak 2>/dev/null; then
@@ -6555,7 +6604,7 @@ software::update_system_txt ()
 		elif hash zypper ; then for i in $(cat /var/log/zypp/history |grep '|install|' | cut -f3 -d'|' ) ; do echo -n "* $i "  ;done
 		elif hash pkcon ; then pkcon get-updates
 		fi
-	)
+	) 
 
 	SNAPS:
 	$(snap changes)
@@ -6612,7 +6661,7 @@ software::update_all_ui ()
 			write_error "This system does not seem to have a software managment system" 
 			return 1
 		fi
-		) | $dialog_ui --backtitle "\Zb$PUBLICATION             $VERSION\ZB"  --progressbox "Updating all natively installed software..." 25 120
+		) | tee -a "$_LOGFILE" | $dialog_ui --backtitle "\Zb$PUBLICATION             $VERSION\ZB"  --progressbox "Updating all natively installed software..." 25 120
 	}
 
 	Snap_Apps ()
@@ -6625,7 +6674,7 @@ software::update_all_ui ()
 		else
 			write_warning "!snap software is not present on this system... skipping..."
 		fi
-		) | $dialog_ui --backtitle "\Zb$PUBLICATION             $VERSION\ZB" --progressbox "Updating all Contained Snap Apps..." 25 120
+		) | tee -a "$_LOGFILE" | $dialog_ui --backtitle "\Zb$PUBLICATION             $VERSION\ZB" --progressbox "Updating all Contained Snap Apps..." 25 120
 	}
 
 	Flatpak_Apps ()
@@ -6639,7 +6688,7 @@ software::update_all_ui ()
 		else
 			write_warning "!flatpak software is not present on this system... skipping..."
 		fi
-		) | $dialog_ui --backtitle "\Zb$PUBLICATION             $VERSION\ZB" --progressbox "Updating all Contained Flatpaks Apps..." 25 120
+		) | tee -a "$_LOGFILE" | $dialog_ui --backtitle "\Zb$PUBLICATION             $VERSION\ZB" --progressbox "Updating all Contained Flatpaks Apps..." 25 120
 	}
 
 	while true; do
@@ -8235,10 +8284,12 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: Using subiquity installer..."
 		if [[ "${_role}" == "desktop" ]] ; then
 			system::log_item "Ubuntu role = desktop: changing to server media due to subiquity..."
-			#_role="server"
+			system::generate_cloudconfig
 		fi
 	else
+		${_saveto:="$( mktemp -d)"}
 		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: Using debian installer (d-i)..."
+		system::make_preseed_cfg -r "${_role}" -p ${_saveto} -t ${_task}
 	fi
 
 	# Set key vars of where to find ubuntu ISO files...
@@ -8261,13 +8312,12 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 	: ${virt_net="$(system::find_vm_bridge)"}
 	local vm_name="#Template_${_task}-${tgt_ubuntu_ver}-$(date +%Y-%m-%d-%s)"
 
-	system::generate_cloudconfig
-	system::make_preseed_cfg -r "${_role}" -p "$( mktemp -d)" -t ${_task}
+	
 	
 	_summary_message="
 	The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} ${CloudConfig}\n
-	🔧 - And Using this source for the packages and files to download: \n
+	🔧 - Configuring the following VM: \n
 			${vm_name} \n
 			cpus "${_cpu}" \n
 			memory "${_mem}" \n
@@ -8307,11 +8357,11 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 				--os-variant="ubuntu21.10" \
 				--video "virtio" --channel "spicevmc" \
 				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-				--extra-args="ks=file:$(basename $PRESEED_FILE) auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=us \
+				--extra-args="ks=file:${_saveto}/preseed.cfg auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=us \
 				netcfg/get_hostname=${_task}${tgt_ubuntu_ver} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
 				localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
-				--initrd-inject="$PRESEED_FILE" \
-				--initrd-inject="$( dirname ${PRESEED_FILE})/ks.cfg" \
+				--initrd-inject="${_saveto}/preseed.cfg" \
+				--initrd-inject="${_saveto}/ks.cfg" \
 				--noautoconsole |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"  \
 			|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 		;;
@@ -10982,7 +11032,7 @@ system::make_preseed_cfg ()
 		;;
 	esac
 
-	rtd_oem_preseed_ubuntu_cfg_KS_CFG_Options ${SAVETO}
+	rtd_oem_preseed_ubuntu_cfg_KS_CFG_Options ${_saveto}
 	system::log_item "Preseed file created: ${PRESEED_FILE}
 	Containging DATA:
 	$(cat ${PRESEED_FILE})"
