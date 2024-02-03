@@ -375,7 +375,28 @@ system::log_item ()
 
 	touch "${_log_file}"
 	local _date="$(date '+%Y/%m/%d %H:%M')"
-	echo "${_date}  --- LOGD : 🧩 ${FUNCNAME[1]}: $*" >> "${_log_file}"
+	
+	# Format the log item based on the calling function for clear reading
+	case "${FUNCNAME[1]}" in
+		"write_error")
+			echo "${_date}  --- ERROR: $*" >> "${_logfile}"
+		;;
+		"write_warning") 
+			echo "${_date}  --- WARN : $*" >> "${_logfile}"
+		;;
+		"write_information")
+			echo "${_date}  --- INFO : $*" >> "${_logfile}"
+		;;
+		"write_host")
+			echo "${_date}  --- HOST : $*" >> "${_logfile}"
+		;;
+		"write_status")
+			echo "${_date}  --- STAT : $*" >> "${_logfile}"
+		;;
+		*)
+			echo "${_date}  --- LOGD : 🧩 ${FUNCNAME[1]}: $*" >> "${_log_file}"
+		;;
+	esac
 
 }
 
@@ -399,6 +420,28 @@ rtd_say ()
 	--posy=90 \
 	--buttons-layout=center \
 	--no-cancel 
+
+}
+
+
+
+
+write_error ()
+{
+	local text=$1
+
+	if [[ "${TERMUITXT}" == "nocolor" ]]; then
+		if [[ -n "${text}" ]]; then
+			echo "🧩 💥 ${FUNCNAME[1]}: ${text}"
+		fi
+	else
+		if [[ -n "${text}" ]]; then
+			echo -e "$(tput bold; tput setaf 1)🧩 💥 ${FUNCNAME[1]}: ${text}${endcolor}"
+		fi
+	fi
+
+	# Tell the loging function to log the message requested...
+	[ -n "${text}" ] && system::log_item "🧩 💥 ${FUNCNAME[1]}: ${text}"
 
 }
 
