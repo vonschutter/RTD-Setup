@@ -49,7 +49,10 @@ To watch a replay simply click watch replay and select the replay you want to wa
 #::::::::::::::          Script Setings                  ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
+_scriptname="$(basename $0)"
+_tla="${_scriptname:0:3}"
+_log_dir="$HOME/.config/${_tla}/logs" ; mkdir -p $_log_dir
+_log_file="$_log_dir/${_scriptname}.log" ; touch $_log_file
 _wow_location_steam_old=".local/share/Steam/steamapps/common/World of Warships/replays"
 _wow_location_steam_deb=".steam/debian-installation/steamapps/common/World of Warships/replays"
 _wow_location_steam_new=".steam/root/steamapps/common/World of Warships/replays"
@@ -58,27 +61,28 @@ _wow_location_steam_snap="snap/steam/steamapps/common/World of Warships/replays"
 _title="RTD Unofficial Steam World of Warships Utility"
 _steam_install_url_rpm="https://steamcdn-a.akamaihd.net/client/installer/steam.rpm"
 _steam_install_url_deb="https://steamcdn-a.akamaihd.net/client/installer/steam.deb"
-_ui_side_bar="$(find /opt -name swow-sideimg.png)"
-_ui_header="$(find /opt -name swow-header-sm.png)"
+_ui_side_bar="$(find /opt/$_tla -name swow-sideimg.png)"
+_ui_header="$(find /opt/$_tla -name swow-header-sm.png)"
 _ge_proton_target_dir="$HOME/.steam/root/compatibilitytools.d/"
 _ge_proton_repo="https://github.com/GloriousEggroll/proton-ge-custom/releases"
-_scriptname="$(basename $0)"
-_tla="${_scriptname:0:3}"
-_log_dir="$HOME/.config/${_tla}/logs" ; mkdir -p $_log_dir
-_log_file="$_log_dir/${_scriptname}.log" ; touch $_log_file
+
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+
+
 echo "Library Loaded Variables: 
 .........................................
 $(env | grep '^_')
 
-_LOG_DIR=${_LOG_DIR}
-_LOGFILE=${_LOGFILE}
-_SCRIPTNAME=${_SCRIPTNAME}
+Loging to directory: ${_log_dir}
+Login to file: ${_log_file}
+SCRIPTNAME: ${_scriptname}
 .........................................
-" 2&1>> "$_log_file"
+" 
 
-
+read -p "Press enter to continue..."
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -263,42 +267,11 @@ steam::load_replays ()
 
 
 
-# steam::wow_manager_ui ()
-# {
-# 	while true ; do
-# 		_replay=$( yad \
-# 			--form \
-# 			--image="${_ui_header}" \
-# 			--title="${_title}" \
-# 			--width=800 \
-# 			--height=300 \
-# 			--button="Watch WoW replay":0 \
-# 			--button="Install WoW":2 \
-# 			--button="Install Steam":3 \
-# 			--button="Install Proton GE":4 \
-# 			--button="About":5 \
-# 			--button="Quit":1 \
-# 			--posx=80 \
-# 			--posy=80 \
-# 			--buttons-layout=center )
-# 			ret=$?
-
-# 			case $ret in 
-# 				0 ) clear && steam::load_replays  ;;
-# 				1 ) clear && echo [Quit] && break ;;
-# 				2 ) clear && if hash steam ; then steam -applaunch 552990 ; else rtd_say "$_error_message_003" ; fi ;;
-# 				3 ) clear && steam::install_steam  & disown ;;
-# 				4 ) clear && steam::install_proton_ge  & disown ;;
-# 				5 ) clear && rtd_say "${DOC}"  & disown ;;
-# 				252) clear && echo [ESC] && break ;;
-# 				* ) clear && echo "[Unknown Request]" && break ;;
-# 			esac
-# 	done
-# }
 
 
 
-steam::wow_manager_ui() {
+steam::wow_manager_ui() 
+{
 	# Ensure all required variables and commands are available
 	local required_commands=("yad" "steam")
 	local required_variables=("_ui_header" "_title" "_error_message_003" "DOC")
@@ -320,8 +293,9 @@ steam::wow_manager_ui() {
 	while true; do
 		# Display the yad form and capture the selected button
 		_replay=$(yad --form \
-		--image="${_ui_header}" \
+		--image="${_ui_side_bar}" \
 		--title="${_title}" \
+		--text="$_ui_message_004" \
 		--width=800 \
 		--height=300 \
 		--button="Watch WoW replay:0" \
@@ -346,9 +320,9 @@ steam::wow_manager_ui() {
 				echo "$_error_message_003"
 			fi
 		;;
-		3) clear && steam::install_steam ;;
-		4) clear && steam::install_proton_ge ;;
-		5) clear && echo "${DOC}" ;;
+		3) clear && steam::install_steam & disown ;;
+		4) clear && steam::install_proton_ge & disown ;;
+		5) clear && rtd_say "${DOC}"  & disown ;;
 		252) clear && echo "[ESC]" && break ;;
 		*) clear && echo "[Unknown Request]" && break ;;
 		esac
@@ -389,7 +363,7 @@ rtd_say ()
 	--margins=20 \
 	--title="$_title" \
 	--tail --listen --wrap --monitor --text-info \
-	--width=800 \
+	--width=1024 \
 	--height=600 \
 	--image="$_ui_side_bar" \
 	--posx=90 \
@@ -426,6 +400,28 @@ _ui_message_002=" Please select the replay that you want to see below:"
 _ui_message_003="
 Have now been processed. To use these versions of proton select them in steam under the properties of the game you want to use them with. 
 Please NOTE: you need to restart steam to be able to select the new versions of proton."
+_ui_message_004="<span font-size='xx-large'>
+Please select the option you need below:
+</span>
+
+<span font-size='large'>
+This script ($_scriptname) makes it easy to manage World of Warships in Steam for Linux. It will do the following for you:
+1. Install any dependency packages needed automatically
+2. Let you select your latest game replays 
+3. Install Worls of Warships
+4. Let you pick what versions of GE-Proton to download and install
+5. install steam for Linux
+6. Launch World of Warships replay through Steam with the right parameters (World of Warships automatically stores the last 30 replays on your system)
+</span>
+
+<span font='Monospace'>
+Watch WoW replay:  Select replay files to watch your past battles\n\
+Install WoW:       Install World of Warships in steam\n\
+Install Steam:     Install Steam if you do not already have it installed\n\
+Install Proton GE: Install the Glorious Eggroll version of Proton \n\
+About:             Information about this utility\n\
+Quit:              Exit this utility\n\
+</span>"
 
 
 
