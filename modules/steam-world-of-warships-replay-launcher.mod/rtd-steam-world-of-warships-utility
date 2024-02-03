@@ -74,13 +74,13 @@ _ge_proton_repo="https://github.com/GloriousEggroll/proton-ge-custom/releases"
 
 echo "Library Loaded Variables: 
 .........................................
-$(env | grep '^_')
+$(declare -p | grep 'declare -- _')
 
 Loging to directory: ${_log_dir}
-Login to file: ${_log_file}
+Loging to file: ${_log_file}
 SCRIPTNAME: ${_scriptname}
 .........................................
-" 2&1>> "$_log_file"
+" | tee -a "$_log_file"
 
 
 
@@ -214,10 +214,10 @@ steam::find_replays ()
  	elif [[ -d ~/"${_wow_location_steam_new}" ]] ; then
 		wow_path="$_wow_location_steam_new"
 		export wow_path
- 	elif [[ -d ~/${_wow_location_steam_flatpak} ]] ; then
+ 	elif [[ -d ~/"${_wow_location_steam_flatpak}" ]] ; then
 		wow_path="$_wow_location_steam_flatpak"
 		export wow_path
- 	elif [[ -d ~/${_wow_location_steam_snap} ]] ; then
+ 	elif [[ -d ~/"${_wow_location_steam_snap}" ]] ; then
 		wow_path="$_wow_location_steam_snap"
 		export wow_path
 	else
@@ -237,10 +237,9 @@ steam::load_replays ()
 		pushd ~/"$wow_path"
 		_replay=$( yad \
 			--title="$_title" \
-			--image="${_ui_side_bar}" \
 			--text='<span font-size="xx-large" > \n Please select the replay that you want to see below:\n </span> '\
-			--width=880 \
-			--height=640 \
+			--width=1024 \
+			--height=768 \
 			--button=Quit:1 \
 			--button=Watch:0 \
 			--posx=90 \
@@ -251,14 +250,15 @@ steam::load_replays ()
 			case $ret in 
 				0 )
 					if [[ -n ${_replay}  ]] ; then
-						steam -applaunch 552990 "./replays/$( basename "${_replay}")"
+						system::log_item "Launching replay: ${_replay}"
+						steam -applaunch 552990 "./replays/$( basename "${_replay}")" && break
 					else
-						rtd_say "No file selected"
+						rtd_say "No file selected" && break
 					fi
 				;;
-				1) clear && echo [Quit] && break ;;
-				252) clear && echo [ESC] && break ;;
-				* ) clear && echo "[Unknown Request]" && break ;;
+				1) clear && echo "[Quit]" | tee -a "$_log_file" && break ;;
+				252) clear && echo "[ESC]" | tee -a "$_log_file" && break ;;
+				* ) clear && echo "[Unknown Request]" | tee -a "$_log_file" && break ;;
 			esac
 		popd  
 		unset _replay
@@ -311,20 +311,20 @@ steam::wow_manager_ui()
 
 		# Handle the user's selection
 		case $ret in
-		0) clear && steam::load_replays ;;
-		1) clear && echo "[Quit]" && break ;;
+		0) clear && system::log_item "Loading replays..." ; steam::load_replays ;;
+		1) clear && echo "[Quit]" | tee -a "${_log_file}" ; break ;;
 		2) clear
 			if command -v steam &> /dev/null; then
-				steam -applaunch 552990
+				steam -applaunch 552990 | tee -a "${_log_file}"
 			else
-				echo "$_error_message_003"
+				echo "$_error_message_003" | tee -a "${_log_file}"
 			fi
 		;;
-		3) clear && steam::install_steam & disown ;;
-		4) clear && steam::install_proton_ge & disown ;;
-		5) clear && rtd_say "${DOC}"  & disown ;;
-		252) clear && echo "[ESC]" && break ;;
-		*) clear && echo "[Unknown Request]" && break ;;
+		3) clear && system::log_item "Attemption to install Steam..." ; steam::install_steam  ;;
+		4) clear && system::log_item "Attempting to install Proton GE..." ; steam::install_proton_ge  ;;
+		5) clear && system::log_item "Showing About information: ${DOC} " ; rtd_say "${DOC}"  ;;
+		252) clear && echo "[ESC]" | tee -a "${_log_file}" && break ;;
+		*) clear && echo "[Unknown Request]" | tee -a "$${_log_file}" && break ;;
 		esac
 		unset _ret
 	done
@@ -351,6 +351,35 @@ steam::install_steam ()
 
 }
  
+
+
+
+system::log_item ()
+{
+	if [[ -z $_log_file ]] ; then
+		# If log file not set globally, set it to defaults for this function a.k.a. script name
+		local _scriptname=$(basename "${BASH_SOURCE[0]}")
+		local _tla=${_scriptname:0:3}
+
+		if [[ $EUID -ne 0 ]]; then
+			_log_dir="${HOME}/.config/rtd/logs"
+		else
+			local _log_dir=${_log_dir:-"/var/log/${_tla,,}"}
+		fi
+
+		mkdir -p ${_log_dir}
+		local _log_file=${_log_dir}/${_scriptname}.log
+	else 
+		local _log_file="${_log_file}"
+	fi
+
+	touch "${_log_file}"
+	local _date="$(date '+%Y/%m/%d %H:%M')"
+	echo "${_date}  --- LOGD : 🧩 ${FUNCNAME[1]}: $*" >> "${_log_file}"
+
+}
+
+
 
 
 
@@ -435,16 +464,16 @@ Quit:              Exit this utility\n\
 
 
 if echo "$OSTYPE" |grep "linux" ; then
-	echo "Linux detected..." 2&1>> "$_log_file"
+	system::log_item "Linux detected..." 
 	if hash yad ; then
-		echo "Yad is installed..." 2&1>> "$_log_file"
-		steam::wow_manager_ui 2&1>> "$_log_file"
+		system::log_item "Yad is installed..."
+		steam::wow_manager_ui  
 	else
-		echo "$_error_message_002"
+		echo "$_error_message_002" | tee -a "$_log_file"
 		for i in zypper apt dnf ; do
-			if hash $i; then sudo $i install yad -y || exit 1  ; fi
+			if hash $i; then sudo $i install yad -y &>>"$_log_file"  || exit 1  ; fi
 		done
-		steam::wow_manager_ui 2&1>> "$_log_file"
+		steam::wow_manager_ui  
 	fi
         exit $?
 elif [[ "$OSTYPE" == "darwin"* ]]; then
