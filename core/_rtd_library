@@ -234,7 +234,7 @@ Library_Documentation
 _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
 
 # load branding informaton:
-_OEM_dependencies="_branding _locations _rtd_recipies"
+_OEM_dependencies="_branding.info _locations.info _rtd_recipies.info"
 
 
 
@@ -6345,11 +6345,87 @@ software::remove_native_software_package ()
 
 
 
-system::log_item ()
-{
+# system::log_item ()
+# {
+# # Description:
+# # The purpose of this function is to consistently write script output to the right log file. 
+# # By default, the log file will be /var/log/$(basename $0).log. If the log file is not set
+# # the function will set it to the default. If the log file is set, it will use the set log file.
+# # 
+# # This function will log items by prepending the time and date, as well as the calling function. 
+# # If the calling function is write_warning, write_error, write_information, or write_status, 
+# # the function will prepend the log item with the preceding calling function name. Otherwise, 
+# # it will simply prepend the calling function name.
+# # 
+# # Globals: _LOGFILE
+# # Arguments: "Text to log"
+# # Outputs: Writes to log file
+# #
+# # Example:
+# # 2024/01/17 11:43  --- : 🧩 source: 🧩 _LOG_DIR=/home/tangaroa/.config/rtd/logs
+# # 2024/01/17 11:43  --- : 🧩 source: 🧩 _LOGFILE=/home/tangaroa/.config/rtd/logs/_rtd_library.log
+# # 2024/01/17 11:43  --- : 🧩 ⚠ source: Library is sourced from a script or terminal! 
+# # 2024/01/17 11:43  --- : 🧩 🛈 source: Script is sourced from bash in a terminal: /bin/bash 
+# # 2024/01/17 11:43  --- : 🧩 dependency::search_local: Requested dependency file: _branding ...
+# #
+# # Returns: None
+# # Usage:
+# #
+# # Call this function by: 
+# # system::log_item "Text to log"
+# #
+# # End of documentation
+
+# 	if [[ -z $_LOGFILE ]] ; then
+# 		# If log file not set globally, set it to defaults for this function a.k.a. script name
+# 		local _scriptname=$(basename "${BASH_SOURCE[0]}")
+# 		local _tla=${_scriptname:0:3}
+
+# 		if [[ $EUID -ne 0 ]]; then
+# 			_log_dir="${HOME}/.config/rtd/logs"
+# 		else
+# 			local _log_dir=${_LOG_DIR:-"/var/log/${_tla,,}"}
+# 		fi
+
+# 		mkdir -p ${_log_dir}
+# 		local _logfile=${_log_dir}/${_scriptname}.log
+# 	else 
+# 		local _logfile="${_LOGFILE}"
+# 	fi
+
+# 	touch "${_logfile}"
+# 	local _date="$(date '+%Y/%m/%d %H:%M')"
+
+# 	# Format the log item based on the calling function for clear reading
+# 	case "${FUNCNAME[1]}" in
+# 		"write_error")
+# 			echo "${_date}  --- ERROR: $*" >> "${_logfile}"
+# 		;;
+# 		"write_warning") 
+# 			echo "${_date}  --- WARN : $*" >> "${_logfile}"
+# 		;;
+# 		"write_information")
+# 			echo "${_date}  --- INFO : $*" >> "${_logfile}"
+# 		;;
+# 		"write_host")
+# 			echo "${_date}  --- HOST : $*" >> "${_logfile}"
+# 		;;
+# 		"write_status")
+# 			echo "${_date}  --- STAT : $*" >> "${_logfile}"
+# 		;;
+# 		*)
+# 			echo "${_date}  --- LOGD : 🧩 ${FUNCNAME[1]}: $*" >> "${_logfile}"
+# 		;;
+# 	esac
+# }
+
+
+
+
+system::log_item () {
 # Description:
 # The purpose of this function is to consistently write script output to the right log file. 
-# By default, the log file will be /var/log/$(basename $0).log. If the log file is not set
+# By default, the log file will be /var/log/$(basename "$0").log. If the log file is not set
 # the function will set it to the default. If the log file is set, it will use the set log file.
 # 
 # This function will log items by prepending the time and date, as well as the calling function. 
@@ -6376,48 +6452,65 @@ system::log_item ()
 #
 # End of documentation
 
-	if [[ -z $_LOGFILE ]] ; then
+	if [[ -z $_LOGFILE ]]; then
 		# If log file not set globally, set it to defaults for this function a.k.a. script name
-		local _scriptname=$(basename "${BASH_SOURCE[0]}")
-		local _tla=${_scriptname:0:3}
+		local scriptname=$(basename "${BASH_SOURCE[0]}")
+		local tla=${scriptname:0:3}
 
 		if [[ $EUID -ne 0 ]]; then
-			_log_dir="${HOME}/.config/rtd/logs"
+			local log_dir="${HOME}/.config/rtd/logs"
 		else
-			local _log_dir=${_LOG_DIR:-"/var/log/${_tla,,}"}
+			local log_dir=${_LOG_DIR:-"/var/log/${tla,,}"}
 		fi
 
-		mkdir -p ${_log_dir}
-		local _logfile=${_log_dir}/${_scriptname}.log
+		if ! mkdir -p "$log_dir"; then
+			printf "Error: could not create log directory %s\n" "$log_dir" >&2
+			return 1
+		fi
+
+		local logfile="${log_dir}/${scriptname}.log"
 	else 
-		local _logfile="${_LOGFILE}"
+		local logfile="${_LOGFILE}"
 	fi
 
-	touch "${_logfile}"
-	local _date="$(date '+%Y/%m/%d %H:%M')"
+	touch "$logfile"
+	local date="$(date '+%Y/%m/%d %H:%M')"
 
 	# Format the log item based on the calling function for clear reading
+	local log_prefix="${date}  ---"
+	local log_type=""
+	local log_message=""
+
 	case "${FUNCNAME[1]}" in
-		"write_error")
-			echo "${_date}  --- ERROR: $*" >> "${_logfile}"
+		write_error)
+			log_type="ERROR"
+			log_message="$*"
 		;;
-		"write_warning") 
-			echo "${_date}  --- WARN : $*" >> "${_logfile}"
+		write_warning)
+			log_type="WARN"
+			log_message="$*"
 		;;
-		"write_information")
-			echo "${_date}  --- INFO : $*" >> "${_logfile}"
+		write_information)
+			log_type="INFO"
+			log_message="$*"
 		;;
-		"write_host")
-			echo "${_date}  --- HOST : $*" >> "${_logfile}"
+		write_host)
+			log_type="HOST"
+			log_message="$*"
 		;;
-		"write_status")
-			echo "${_date}  --- STAT : $*" >> "${_logfile}"
+		write_status)
+			log_type="STAT"
+			log_message="$*"
 		;;
 		*)
-			echo "${_date}  --- LOGD : 🧩 ${FUNCNAME[1]}: $*" >> "${_logfile}"
+			log_type="LOGD"
+			log_message="${FUNCNAME[1]}: $*"
 		;;
 	esac
+
+	echo "${log_prefix} ${log_type} : 🧩 ${log_message}" >> "$logfile"
 }
+
 
 
 
@@ -11035,7 +11128,7 @@ system::make_preseed_cfg ()
 	rtd_oem_preseed_ubuntu_cfg_KS_CFG_Options ${_saveto}
 	system::log_item "Preseed file created: ${PRESEED_FILE}
 	Containging DATA:
-	$(cat ${PRESEED_FILE})
+	$(cat ${PRESEED_FILE})"
 
 	unset Preference_DiskEncryption \
 	Preference_Password \
@@ -11767,10 +11860,10 @@ set_colors
 
 # Set log location and name...
 if [[ $EUID -ne 0 ]]; then
-	: ${_LOG_DIR:="${HOME}/.config/rtd/logs"}
+	: ${_LOG_DIR:="${HOME}/.config/${_RTD:-"rtd"}/logs"}
 	mkdir -p ${_LOG_DIR}
 else
-	: ${_LOG_DIR:="/var/log/rtd"}
+	: ${_LOG_DIR:="/var/log/${_RTD:-"rtd"}"}
 	mkdir -p ${_LOG_DIR}
 fi
 

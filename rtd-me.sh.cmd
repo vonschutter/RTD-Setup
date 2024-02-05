@@ -1,12 +1,17 @@
 #!/bin/bash
-
+#				-	RTD System System Managment Bootstrap Script      -
+#
+#::::::::::::::::::::::::::::::::::::::::::::: HEADER DO NOT REMOVE :::::::::::::::::::::::::::::::::::::::::::::::::::::
 :<<"::CMDLITERAL"
 cls
 @ECHO OFF
 GOTO :CMDSCRIPT
 ::CMDLITERAL
 
-echo				-	RTD System System Managment Bootstrap Script      -
+:<<'::POWERSHELLITERAL'
+Write-Host "Do not attempt to run this script in PowerShell"
+exit 1
+::POWERSHELLITERAL
 #::
 #::
 #:: 						Shell Script Section
@@ -205,8 +210,7 @@ exit $?
 # Make sure to exit no matter what...
 # -----------------------------------------------------------------------------------------------------------------------
 :CMDSCRIPT
-@echo off
-echo			-	RTD System System Managment Bootstrap Script      -
+@title			-	RTD System System Managment Bootstrap Script      -
 ::
 ::
 ::					Windows CMD Shell Script Section

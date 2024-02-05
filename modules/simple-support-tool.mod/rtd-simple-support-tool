@@ -123,7 +123,11 @@ fi
 # _LOG_DIR=
 # _LOGFILE=
 
-
+# Set the primary shell library to use for this script. This is the file that contains
+# the primary functions for this script. If the file is not found, the script will exit.
+# The file is searched for in the same directory as the script, and if not found, it
+# will be searched for in the /opt/$_TLA/scripts directory.
+: ${_dependency_lib:="_rtd_library"}
 
 # Set location to where to log information:
 # in the system log directory in a file named the same as this script.
@@ -185,7 +189,7 @@ dependency::file ()
 			system::log_item "Searching for ${path} ..."
 			if [[ -e "${path}" ]]; then
 				system::log_item "Found ${path}"
-				source "${path}" ""
+				source "${path}" "" || return 1
 				return 0
 			fi
 		done
@@ -1253,7 +1257,7 @@ case $1 in
 		if [[ "$TERM" == screen* ]]; then
 			echo "$_SIMPLE_SUPPORT_TOOL_DOC" >> ${_LOGFILE}
 			rtd_oem_check_inet_access  "$@"
-			dependency::file _rtd_library &>/dev/null
+			dependency::file ${_dependency_lib} &>/dev/null || ( read -p "There was a problem loading ${_dependency_lib}" exit 1 )
 			if [[ $EUID -ne 0 ]]; then ensure_admin ; fi
 			if [ "$UID" -eq 0 ]; then
 				check_menu_availability
@@ -1266,7 +1270,7 @@ case $1 in
 				byobu new-session -s "RTD Simple Server Support Tools" $0
 			else
 				rtd_oem_check_inet_access "$@"
-				dependency::file _rtd_library &>/dev/null
+				dependency::file ${_dependency_lib} &>/dev/null || ( read -p "There was a problem loading ${_dependency_lib}" exit 1 )
 				if [[ $EUID -ne 0 ]]; then ensure_admin ; fi
 				if [ "$UID" -eq 0 ]; then
 					check_dependencies byobu && echo -e "$RED" "A critical component needed for this script to work properly was attempted to be added... Attempting to run the script again"
