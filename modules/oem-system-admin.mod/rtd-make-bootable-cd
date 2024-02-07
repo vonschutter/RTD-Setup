@@ -86,10 +86,10 @@ CD_LABEL=$(dialog --title "${Title:="$( basename $0 )"}" --backtitle "${BRANDING
 # The folder where the files are:
 RH_BUILD_DIR=$(dialog --title "${Title:="$( basename $0 )"}" --backtitle "${BRANDING:-"$( basename $0 )"}" --stdout --inputbox "\n Please enter the fileder containging the files to be contained in the CD \n For example: ~/SLSBOOTCD" 10 90 ); clear
 
-check_dependencies mkisofs
+check_dependencies mkisofs || write_error "mkisofs is not installed. Please install it and try again." ; exit 1
 
 if ! -f  "${RH_BUILD_DIR}"; then
-        echo  "${RH_BUILD_DIR} does not exist! Please try again." ; exit 1
+        write_error  "${RH_BUILD_DIR} does not exist! Please try again." ; exit 1
 fi
 
 mkisofs -r -J -T \
@@ -99,6 +99,6 @@ mkisofs -r -J -T \
         -boot-info-table \
         -o "${ISO_IMAGE}" \
         -V "${CD_LABEL}" \
-        "${RH_BUILD_DIR}"
+        "${RH_BUILD_DIR}" || { write_error "Failed to create the ISO file!" ; exit 1 ; }
 
 

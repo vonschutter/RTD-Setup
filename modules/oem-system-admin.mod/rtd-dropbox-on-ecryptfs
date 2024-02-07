@@ -55,22 +55,26 @@ dependency::_rtd_library ()
 
 
 
-dependency::_rtd_library
+if dependency::_rtd_library ; then
+        if [[ -d ~/Dropbox ]]; then
+                killall dropbox
+                mv Dropbox Dropbox.bak
+                mkdir Dropbox
+                dd if=/dev/zero of=~/.dropbox/storage bs=1M count=14072
+                mkfs.ext4 /home/$USER/.dropbox/storage
+                chattr +i /home/$USER/Dropbox
+                /home/$USER/.dropbox/storage /home/$USER/Dropbox ext4 defaults,user_xattr,loop 0 0
+                mount /home/$USER/Dropbox/
 
-if [[ -d ~/Dropbox ]]; then
-        killall dropbox
-        mv Dropbox Dropbox.bak
-        mkdir Dropbox
-        dd if=/dev/zero of=~/.dropbox/storage bs=1M count=14072
-        mkfs.ext4 /home/$USER/.dropbox/storage
-        chattr +i /home/$USER/Dropbox
-        /home/$USER/.dropbox/storage /home/$USER/Dropbox ext4 defaults,user_xattr,loop 0 0
-        mount /home/$USER/Dropbox/
 
-
-        chown -R $USER /home/$USER/Dropbox
-        cp -a Dropbox.bak/* Dropbox/
+                chown -R $USER /home/$USER/Dropbox
+                cp -a Dropbox.bak/* Dropbox/
+        else
+                echo "Dropbox folder not found!"
+                exit 1
+        fi
 else
-        echo "Dropbox folder not found!"
+        write_information "RTD functions NOT found!"
         exit 1
 fi
+

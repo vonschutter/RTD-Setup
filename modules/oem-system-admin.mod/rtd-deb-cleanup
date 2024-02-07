@@ -107,45 +107,50 @@ rtd_oem_clean_deb ()
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 # Ensure access to the rtd library functions:
-dependency::_rtd_library
+if dependency::_rtd_library ; then
+	conditional_run ()
+	{
+		if [[ $(echo "$OSTYPE" |grep "linux") ]]; then
 
+			# Only run these cleanup function on a debian based system.
+			if cat /etc/os-release |grep "debian" 2>/dev/null ; then
+				# Ensure elevated privs:
+				ensure_admin
 
+				# Display information about script:
+				result="This utility will clean up old kernels, orphaned configurations, and cached packages from completed installs. Please note that you may run this utility more than once if a cleanup changes the profile of the system; for example if an updated kernel is added ass part of the process."
+				display_result $( basename $0 : Notice!)
 
-conditional_run ()
-{
-	if [[ $(echo "$OSTYPE" |grep "linux") ]]; then
+				# Complete cleanup:
+				rtd_oem_clean_deb
+				return $?
+			else
+				# Notify if this system is not debian.
+				result="This system does not appear to be Debian based. This cleanup is only intended for the debian based systems that use the 'apt' software managment system."
+				display_result $( basename $0 : Notice!)
+			fi
 
-		# Only run these cleanup function on a debian based system.
-		if cat /etc/os-release |grep "debian" 2>/dev/null ; then
-			# Ensure elevated privs:
-			ensure_admin
-
-			# Display information about script:
-			result="This utility will clean up old kernels, orphaned configurations, and cached packages from completed installs. Please note that you may run this utility more than once if a cleanup changes the profile of the system; for example if an updated kernel is added ass part of the process."
-			display_result $( basename $0 : Notice!)
-
-			# Complete cleanup:
-			rtd_oem_clean_deb
-			return $?
+		elif [[ "$OSTYPE" == "darwin"* ]]; then
+			write_error "${FUNCNAME[0]}: Mac OSX is currently not supported ..."  ; return 1
+		elif [[ "$OSTYPE" == "cygwin" ]]; then
+			write_error "${FUNCNAME[0]}: CYGWIN is currently unsupported ..."  ; return 1
+		elif [[ "$OSTYPE" == "msys" ]]; then
+			write_error "${FUNCNAME[0]}: Lightweight shell is currently unsupported ... "  ; return 1
+		elif [[ "$OSTYPE" == "freebsd"* ]]; then
+			write_error "${FUNCNAME[0]}: Free BSD is currently unsupported ... " ; return 1
 		else
-			# Notify if this system is not debian.
-			result="This system does not appear to be Debian based. This cleanup is only intended for the debian based systems that use the 'apt' software managment system."
-			display_result $( basename $0 : Notice!)
+			echo "I have no Idea what this system is: aborting!" ; return 1
 		fi
+	}
+	conditional_run
+else
+	write_error "RTD functions NOT found!"
+	exit 1
+fi
 
-	elif [[ "$OSTYPE" == "darwin"* ]]; then
-		write_error "${FUNCNAME[0]}: Mac OSX is currently not supported ..."  ; return 1
-	elif [[ "$OSTYPE" == "cygwin" ]]; then
-		write_error "${FUNCNAME[0]}: CYGWIN is currently unsupported ..."  ; return 1
-	elif [[ "$OSTYPE" == "msys" ]]; then
-		write_error "${FUNCNAME[0]}: Lightweight shell is currently unsupported ... "  ; return 1
-	elif [[ "$OSTYPE" == "freebsd"* ]]; then
-		write_error "${FUNCNAME[0]}: Free BSD is currently unsupported ... " ; return 1
-	else
-		echo "I have no Idea what this system is: aborting!" ; return 1
-	fi
-}
-conditional_run
+
+
+
 
 
 

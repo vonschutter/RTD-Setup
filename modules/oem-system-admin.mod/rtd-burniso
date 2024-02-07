@@ -76,7 +76,7 @@ dependency::_rtd_library ()
 ###########################################################################
 
 # Ensure access to the rtd library functions:
-dependency::_rtd_library
+dependency::_rtd_library || { write_error "clamav not found!" ; exit 1 ; }
 
 # Check syntax this script is called with:
 if [[ -z "$1" ]]; then
@@ -92,9 +92,17 @@ if [[ ! -f "$1" ]]; then
 fi
 
 # Ensure that "cdrecord" is available on the system:
-check_dependencies cdrecord
+if check_dependencies cdrecord ; then
+	write_error "The cdrecord command is not available for this system!"
+	exit 1
+fi 
 
 # Write iso to device:
 IN=${ARGV}[0];
 print "Writing the ISO file $IN to the cd... \n";
 print 'dd if=$IN | cdrecord -speed=16 dev=0,0,0 -eject -data -'
+if [[ $? -eq 0 ]]; then
+	write_information "The ISO file $IN was successfully written to the cd!"
+else
+	write_error "The ISO file $IN was not written to the cd!"
+fi

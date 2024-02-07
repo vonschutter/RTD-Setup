@@ -66,7 +66,7 @@ dependency::_rtd_library ()
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 # Ensure access to the rtd library functions:
-dependency::_rtd_library
+dependency::_rtd_library || { write_error "clamav not found!" ; exit 1 ; }
 # Ensure elevated privs:
 ensure_admin
 # Ensure all updates are applied:
@@ -78,18 +78,37 @@ check_dependencies dialog
 LOCALSERVER=$(dialog --title "${Title:="$( basename $0 )"}" --backtitle "${BRANDING:-"$( basename $0 )"}" --stdout --inputbox "\n Please enter the name of the local landscape server. \n " 10 90 )
 LOCALSERVERIP=$(dialog --title "${Title:="$( basename $0 )"}" --backtitle "${BRANDING:-"$( basename $0 )"}" --stdout --inputbox "\n Please enter the IP Address of the local landscape server. \n " 10 90 )
 
-# Since landscape is only relevant for Ubuntu; its OK to you distro speciffic commands...
-add-apt-repository --update ppa:landscape/self-hosted-23.03 -y
-apt install landscape-server-quickstart -y
-echo "ssl_public_key = /etc/landscape/landscape_server_ca.crt" >>/etc/landscape/client.conf
-write_status "---------------- clinet.conf  -----------"
-cat /etc/landscape/client.conf
-echo "${LOCALSERVERIP}       ${LOCALSERVER}" >>/etc/hosts
-write_status "----------------  hosts -----------------"
-cat /etc/hosts
-write_status "---------  Get CA from ${LOCALSERVER} ---------"
-echo Enter password for ${LOCALSERVER} below:
-scp ${USER}@${LOCALSERVER}:/etc/landscape/*.crt /etc/landscape/
-landscape-config --computer-title "${HOSTNAME}" --account-name standalone  -p ${PASSTOKEN} --url https://${LOCALSERVER}/message-system --ping-url http://${LOCALSERVER}/ping && result="Sucessfully enrolled with the lanscape server ${LOCALSERVER}" || result="Failed to enroll with the lanscape server ${LOCALSERVER}"
-display_result "$( basename $0 )"
+if [[ -z "${LOCALSERVER}" ]] || [[ -z "${LOCALSERVERIP}" ]]; then
+	write_error "You must provide the name and IP address of the local landscape server!"
+	exit 1
+fi
+
+
+if ! ping -c 1 ${LOCALSERVERIP} ; then
+	write_error "The local landscape server ${LOCALSERVERIP} is not reachable!"
+	exit 1
+fi
+
+if hostnamectl |grep -q "Operating System: Ubuntu" ; then
+	write_information "This is an Ubuntu system."
+	# Since landscape is only relevant for Ubuntu; its OK to use distro speciffic commands...
+	add-apt-repository --update ppa:landscape/self-hosted-23.03 -y
+	apt install landscape-server-quickstart -y
+	echo "ssl_public_key = /etc/landscape/landscape_server_ca.crt" >>/etc/landscape/client.conf
+	write_status "---------------- clinet.conf  -----------"
+	write_information "$( cat /etc/landscape/client.conf )"
+	echo "${LOCALSERVERIP}       ${LOCALSERVER}" >>/etc/hosts
+	write_status "----------------  hosts -----------------"
+	write_information "$( cat /etc/hosts )"
+	write_status "---------  Get CA from ${LOCALSERVER} ---------"
+	echo Enter password for ${LOCALSERVER} below:
+	scp ${USER}@${LOCALSERVER}:/etc/landscape/*.crt /etc/landscape/
+	landscape-config --computer-title "${HOSTNAME}" --account-name standalone  -p ${PASSTOKEN} --url https://${LOCALSERVER}/message-system --ping-url http://${LOCALSERVER}/ping && result="Sucessfully enrolled with the lanscape server ${LOCALSERVER}" || result="Failed to enroll with the lanscape server ${LOCALSERVER}"
+	display_result "$( basename $0 )"
+
+else
+	write_error "This script is intended for Ubuntu systems only!"
+	exit 1
+fi
+
 

@@ -71,10 +71,11 @@ dependency::_rtd_library ()
 #::::::::::::::          Script Executive                ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+dependency::_rtd_library || { write_error "clamav not found!" ; exit 1 ; }
 
 if ! hash mencoder 2>/dev/null; then
 	if [[ "$UID" == "0" ]]; then
-		check_dependencies mencoder
+		check_dependencies mencoder || write_error "Software needed to join AVI files is missing. Please install it and try again." 
 		exit
 	else
 		write_error "Software needed to join AVI files is missing. Please run $( basename $0 ) again with sudo so that I may correct the problem."
@@ -86,7 +87,7 @@ if [[ -z $1 ]]; then
 	write_error "You need to provide at least one argument!
 	for example: $( basename $0 ) *.avi
 	so that I know what files to process! "
-	exit
+	exit 1
 fi
 
 
@@ -95,6 +96,6 @@ rtd_join_avis () {
         mencoder -oac copy -ovc copy $@ -o WHOLE-THING.avi
 }
 
-dependency::_rtd_library
-rtd_join_avis
+
+rtd_join_avis $@
 

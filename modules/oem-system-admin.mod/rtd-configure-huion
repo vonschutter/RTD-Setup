@@ -64,8 +64,15 @@ dependency::_rtd_library ()
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 # Ensure access to the rtd library functions:
-dependency::_rtd_library
-# Ensure elevated privs.
-ensure_admin
-# Attempt config of HUION:
-config_huion610
+if dependency::_rtd_library ; then
+	# Ensure elevated privs.
+	ensure_admin
+
+	# Attempt config of HUION:
+	config_huion610
+else
+	write_error "RTD functions NOT found!"
+	exit 1
+fi
+
+
