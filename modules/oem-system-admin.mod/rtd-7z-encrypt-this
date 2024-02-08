@@ -1,36 +1,84 @@
 #!/bin/bash
-#
-#::                                      A D M I N   C O M M A N D
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::// Simple Compression Tool //::::::::::::::::::::::::::::::::::// Linux //::::::::
-#::
-#::     Author:   	SLS
-#::     Version 	1.02
-:	${GIT_Profile:=vonschutter}
-#::
-#::
-#::	Purpose: To compress all files and folders provided as argument.
-#::
-#::
-#::     Usage:	rtd-7z-encrypt-this file1 file2 directory1
-#::
-#::
-#::
-#::
-#::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#
-# This script is shared in the hopes that someone will find it useful.
-# For convenience and supportability most actions (work) is stored in a common library used bu multiple scripts.
-# To use these functions in the library, simply load the library using the "source" bash built in command. All
-# functions will then be available for use. This script demonstrates the simplicity of using these functions.
-#
-# This script is intended to live in the ~/bin/ or /bin/ folder, alternatively in the $PATH.
-# By default this script is placed in /opt/rtd/scrips/
-#
-# 1 - To see options to use the rtd library type: "bash _rtd_library --help"
-# 2 - To see usefull documentation on each function in this library: "bash _rtd_library --devhelp"
+: <<'Script_Documentation'
+                                          -    RTD Power Toy Script      -
+
+:::::::::::::::::::::::::::::::::::::::::: PREVENT RUNING IN WINDOWS	 ::::::::::::::::::::::::::::::::::::::::::::::::
+
+cls & color 0C & echo Do not attempt to run this script in CMD.EXE & pause & color 0F & exit /b
+
+::::::::::::::::::::::::::::::::::::::::::::: HEADER DO NOT REMOVE ::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+
+                                             A D M I N   C O M M A N D 
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:::::::::::::::::::::::::::::::::::::::::::::// Simple Compression Toy //::::::::::::::::::::::::::::// Linux //::::::::
+::
+:: 	Author:   	SLS
+:: 	Version 	1.03
+::
+::
+::	Purpose: To compress all files and folders provided as argument.
+::
+::
+::      Usage:    rtd-7z-encrypt-this file1 file2 directory1
+::
+::
+::
+::
+::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+ This script is shared in the hopes that it will be useful.
+
+ This script is part of the RTD Power Toy collection. The RTD Power Toy collection consists of scripts designed
+ to be used together to accomplish a wide range of tasks. These scripts are simple, easy to use, and easy to
+ understand, making them suitable for use in a Linux environment, though they may be adaptable to other environments.
+ A special header is included to either prevent execution in Windows or to execute the proper section if run in Windows,
+ thereby preventing accidental execution of the script in a Windows (CMD) environment and avoiding potential harm.
+
+ For convenience and supportability, most actions (work) are stored in a common library used by multiple scripts.
+ While using this library is optional, it may save time. Typically, if a function is useful in more than one script, 
+ it is included in the library. This script demonstrates the ease of using these functions.
+ To utilize these functions, simply load the library using the "source" bash built-in command. All
+ functions will then be available for use.
+
+ This script is intended to reside in the ~/bin/ or /bin/ directory, or alternatively, in the $PATH.
+ By default, this script is placed in /opt/rtd/modules/{collection or name}.
+
+ 1 - To view options for using the RTD library, type: "bash _rtd_library --help"
+ 2 - To view detailed documentation for each function in this library, type: "bash _rtd_library --devhelp | --devhelp-gtk"
+
+ Function: dependency::_library
+ Description: This function ensures access to the RTD library functions by sourcing the appropriate script.
+ It first sources the library from a relative path, then from ~/bin, and finally from the /opt directory. Using the 
+ relative path is beneficial for development and testing, ~/bin is useful for user-specific scripts, and /opt 
+ is suitable for system-wide scripts. Additionally, the function downloads the library from the GitHub repository 
+ and sources it if it is not found in any of the  previous locations. If all attempts fail, it displays an error 
+ message and returns 1.
+
+ Function: compress_all_items_here
+ Description: This function compresses files and folders passed as an argumentin the modern 7z format. Archives will be 
+ encrypted as well as compressed. The user will be prompted for a passphrase to use for encryption. 
+ The function will return 0 if successful, 1 if not.
+
+Script_Documentation
+
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# Variables that govern the behavior or the script and location of files are
+# set here. There should be no reason to change any of this abcent strong preferences.
+
+:	${LIBFILE:="_rtd_library"} 	# The name of the library file.
+:	${GIT_Profile:=vonschutter} 	# The name of the GitHub profile where the library is located.
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -38,24 +86,28 @@
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-dependency::_rtd_library ()
+dependency::_library ()
 {
-	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/${LIBFILE}
 
-	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library ; then
-		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
-	elif source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
-		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
-	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
-		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name _rtd_library |grep -v bakup )"
+	# Try to source the library from relative path, ~/bin, and finally from the /opt directory.
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/${LIBFILE} ; then
+		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/${LIBFILE}
+	elif source "$(find ${HOME}/bin -name ${LIBFILE} |grep -v bakup )" ; then
+		write_information "${FUNCNAME[0]} 1 Using:  $(find ${HOME}/bin -name ${LIBFILE} |grep -v bakup )"
+	elif source $(find /opt -name ${LIBFILE} |grep -v bakup ) ; then
+		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name ${LIBFILE} |grep -v bakup )"
 	elif wget ${_src_url} ; then
                 write_information "${FUNCNAME[0]} 4 Using: ${_src_url}"
-		source ./_rtd_library
+		source ./${LIBFILE}
 	else
 		echo -e "RTD functions NOT found!"
 		return 1
 	fi
 }
+
+
+
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

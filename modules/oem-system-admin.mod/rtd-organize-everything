@@ -1,0 +1,90 @@
+#!/bin/bash
+#				-	RTD Power Toy Script      -
+#
+#::::::::::::::::::::::::::::::::::::::::::::: HEADER DO NOT REMOVE :::::::::::::::::::::::::::::::::::::::::::::::::::::
+:<<"::CMDLITERAL"
+cls
+@ECHO "Do not attempt to run this script in PowerShell"
+exit /b 1
+::CMDLITERAL
+
+:<<'::POWERSHELLITERAL'
+Write-Host "Do not attempt to run this script in PowerShell"
+exit 1
+::POWERSHELLITERAL
+#::
+#::
+#::
+#::                                      A D M I N   C O M M A N D
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::// Simple Organization Toy //::::::::::::::::::::::::::::::::::// Linux //::::::::
+#::
+#:: 	Author:   	SLS
+#:: 	Version 	1.00
+:	${GIT_Profile:=vonschutter}
+#::
+#::
+#::	Purpose: To organize all the files found in the current folder by extention.
+#::		 The current folder refers to the present working directory "PWD".
+#::
+#::	Usage:	Simply execute this script to accomplish this task. No parameters required.
+#::
+#::
+#::
+#::
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+# This script is shared in the hopes that someone will find it useful.
+# For convenience and supportability most actions (work) is stored in a common library used by multiple scripts.
+# This library is optional to use, but may save time. Generally, if a function may be useful in more than one script, it is
+# placed in the library. This script demonstrates the simplicity of using these functions.
+# To use these functions in the library, simply load the library using the "source" bash built in command. All
+# functions will then be available for use. This script demonstrates the simplicity of using these functions.
+#
+# This script is intended to live in the ~/bin/ or /bin/ folder, alternatively in the $PATH.
+# By default this script is placed in /opt/rtd/scrips/
+#
+# 1 - To see options to use the rtd library type: "bash _rtd_library --help"
+# 2 - To see usefull documentation on each function in this library: "bash _rtd_library --devhelp"
+#
+# This script iterates over all files in the current directory, extracts their extensions, creates a directory for each 
+# unique extension (if it doesn't already exist), and then copies the files into the corresponding directory 
+# based on their extension.
+#
+#     for f in *.*; iterates over all files in the current directory that have an extension.
+#     do d="${f##*.}"; extracts the file extension and assigns it to variable d. This effectively isolates the extension 
+#     from the filename. mkdir -p "$d" creates a directory named after the file extension if it doesn't already exist. 
+#     The -p flag ensures that mkdir does not throw an error if the directory already exists.
+#     && mv "$f" "$d"; moves the file into the newly created directory. "done" marks the end of the loop.
+#
+# This assumes that files are named in a conventional manner with a single dot before the file extension (e.g., file.txt). 
+# It will not correctly handle files with multiple dots in their names (e.g., archive.tar.gz) or files without extensions.
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# Variables that govern the behavior or the script and location of files are
+# set here. There should be no reason to change any of this abcent strong preferences.
+
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Execute tasks                   ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# Ensure that we are running on a Linux system. We cannot guarantee that this script will work on other systems.
+if hostnamectl | grep -i "linux" ; then
+        for f in *.*; do d="${f##*.}"; mkdir -p "$d" && mv "$f" "$d"; done
+else
+        echo "This script is intended to run on a Linux system."
+        exit 1
+fi
+
