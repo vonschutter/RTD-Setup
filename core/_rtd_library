@@ -438,6 +438,7 @@ dialog::display_notice ()
 
 	dialog --backtitle "${PUBLICATION:-"Notice"}" --colors --no-collapse --title "Notice" --msgbox "\n ${*} \n" 15 78
 	clear
+	return 0
 }
 
 
@@ -2362,13 +2363,13 @@ rtd_oem_find_live_release ()
 # rtd_oem_find_live_release 	      10              debian         net            ssh-server
 # rtd_oem_find_live_release 	      19.04.2         ubuntu         live
 # End of documentation
-	local distro_version="${1:-10}"
+	local distro_version="${1:-12}"
 	local distro_flavor="${2:-debian}"
 	local live_or_not="${3:-live}"
 	local desktop_env="${4:-standard}"
 
 	case "$distro_flavor" in
-	Ubuntu | ubuntu )
+	Ubuntu | ubuntu | ubuntu-desktop | Ubuntu-desktop)
 		case "$live_or_not" in
 		desktop | live)
 			system::log_item "Providing requested URL: http://releases.ubuntu.com/${distro_version}/$(curl --silent http://releases.ubuntu.com/${distro_version}/SHA256SUMS | grep -o 'ubuntu-.*-desktop-amd64.iso')"
@@ -2654,7 +2655,6 @@ set_gnome_ui_common_tweaks_for_user ()
 		gsettings set org.gnome.nautilus.list-view default-zoom-level 'small'
 
 	# Set the GNOME Shell Apps Dashboard sort app in categories based on the FreeDesktop standard.
-		# Set the GNOME Shell Apps Dashboard sort app in categories based on the FreeDesktop standard.
 		gsettings set org.gnome.desktop.app-folders folder-children "['accessories', 'chrome-apps', 'games', 'graphics', 'internet', 'office', 'programming', 'science', 'sound---video', 'system-tools', 'universal-access', 'wine', 'OEM', '3D-Printing', 'Cloud']"
 		gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/accessories/ name "Accessories"
 		gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/accessories/ categories "['Utility']"
@@ -8317,46 +8317,115 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 # isolated virtual environments called guests or virtual machines (VMs). KVM is part of Linux.
 # For complete info: https://www.redhat.com/en/topics/virtualization/what-is-KVM
 #
-# Usage: Either simply call this function to use the defaults or:
-# Call this function with "function" "RAM_SIZE" "DISK_SIZE" "DISK_FORMAT" "DISK_FILE"
-# Omitting any of the arguments will us the default instead.
+# Function Documentation: kvm::make_vm_template_now_from_ubuntu_com
+# Overview
 #
-# Globals:
-# Arguments: [-c <#CPU>, -m <MB RAM>, -d <GB Disk>, -r <server|desktop>, -t <task>]
-# Outputs:
-# Returns:
-# Usage: kvm::make_vm_template_now_from_ubuntu_com (optional arguments)
+# The kvm::make_vm_template_now_from_ubuntu_com function is designed to automate the process of creating a virtual 
+# machine (VM) template based on Ubuntu. It allows for customization of various VM parameters such as CPU, memory, 
+# disk size, and more. The function supports different versions and flavors of Ubuntu and adapts the installation 
+# process accordingly.
 #
-# Example:	(may be set otherwise defaults are used)
-#               
-# kvm::make_vm_template_now_from_ubuntu_com [-c <#CPU>, -m <MB RAM>, -d <GB Disk>, -r <server|desktop>, -t <task>]
+# Parameters
 #
-# If complete flexibility is needed simply use the virt-install binary and directly write the arguments.However
-# this function is designed to make it easier to create a VM template by using the defaults and only changing
-# the arguments that are needed.For example, if you want to create a VM template for a Ubuntu 20.04 desktop
-# with 4 CPUs, 8GB of RAM and 100GB of disk space you would use the following command:
-# kvm::make_vm_template_now_from_ubuntu_com -c 4 -m 8192 -d 100 -r desktop -t ubuntu-desktop
+#     --ram <value>: Sets the amount of RAM for the VM. The value is specified in megabytes.
+#     --cpus or --cpu <value>: Sets the number of CPU cores for the VM.
+#     --disk or --dsk <value>: Sets the disk size for the VM. The value is specified in gigabytes.
+#     --flavor or --Flavor <value>: Specifies the Ubuntu flavor to use (e.g., ubuntu, kubuntu, lubuntu, xubuntu, etc.).
+#     --role or --Role <value>: Sets the role of the Ubuntu VM (e.g., desktop, server).
 #
-# Alternatively; edit the function with new defaults that suit the needs.
+# Default Values
+#
+#     ubuntu_flavor: Default flavor of Ubuntu (default: "ubuntu").
+#     _role: Default role of the Ubuntu VM (default: "desktop").
+#     _task: Default task to perform on the Ubuntu VM (default: "ssh-server").
+#     _cpu: Default number of CPUs (default: 2).
+#     _mem: Default amount of memory in MB (default: 2048).
+#     _dsk: Default disk size in GB (default: 100).
+#     permanent_download_dir: Default location for KVM ISO files (default: "/var/lib/libvirt/boot/").
+#     _saveto: Default location for preseed files (temporary directory in /tmp).
+#     CloudConfigDir: Default location for cidata files (same as _saveto).
+#     bin_virt_install: Default path for the virt-install binary.
+#     virt_net: Default network to use for the VM.
+#
+# Functionality
+#
+#     Parameter Parsing: The function starts by parsing optional parameters to override default values for VM configuration.
+#     Dependency Check: Ensures that all necessary dependencies for VM creation are present.
+#     ISO Retrieval: Fetches the relevant Ubuntu ISO based on the specified version and flavor.
+#     VM Configuration: Formats the name of the VM and prepares the configuration summary.
+#     Installation Process: Depending on the Ubuntu version, the function chooses the appropriate installer and method (debian installer, cloud config, modern installer).
+#     VM Creation: Executes the virt-install command with the specified parameters to create the VM.
+#     Logging and Cleanup: Logs the summary message and cleans up residual variables.
+#
+# Usage
+#
+# To use this function, invoke it with the desired parameters. For example:
+#
+# bash
+#
+# kvm::make_vm_template_now_from_ubuntu_com --ram 4096 --cpu 4 --disk 200 --flavor ubuntu --role desktop
+#
+# Notes
+#
+#     The function is part of a larger system presumably dealing with VM management, and it expects certain utilities and conventions to be present in the environment.
+#     It is designed to be flexible with various Ubuntu versions and handles different installation methods based on the version.
+#     Error handling is incorporated to manage issues during the VM creation process.
+#     The function includes logging capabilities for tracking the VM creation process.
+#
 # End of Documentation
 
+	# Set default values for VM T-Shirts sizes (may vary by OS)...
+	: ${ubuntu_flavor="ubuntu"} 				# This is the default flavor of Ubuntu to use.
+	: ${_role:="desktop"} 					# This is the default role of the Ubuntu VM to create.
+	: ${_task:="ssh-server"} 				# This is the default task to perform on the Ubuntu VM.
+	: ${_cpu:="${_cpu:=2}"} 				# This is the default number of CPUs to use.
+	: ${_mem:="${_mem:=2048}"} 				# This is the default amount of memory to use.
+	: ${_dsk:="${_dsk:=100}"} 				# This is the default size of the disk to use.
+	: ${permanent_download_dir:="/var/lib/libvirt/boot/"} 	# This is the default location for KVM ISO files.
+	: ${_saveto:="$( mktemp -d /tmp/CloudConfig.XXXXXX )"}	# This is the default location preseed files.
+	: ${CloudConfigDir:="$_saveto"} 			# This is the default location cidata files.
+	: ${bin_virt_install:=$(type -p virt-install)} 		# This is the default location for the virt-install binary.
+	: ${virt_net="$(system::find_vm_bridge)"} 		# This is the default network to use for the VM.
+
+	# Check for optional parameters overrides...
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--ram)
+			ram="$2"
+			shift # Remove argument name from processing
+		;;
+		--cpus | --cpu )
+			cpu="$2"
+			shift # Remove argument name from processing
+		;;
+		--disk | --dsk )
+			disk="$2"
+			shift # Remove argument name from processing
+		;;
+		--flavor | --Flavor )
+			# Ubuntu flavor to use (e.g. ubuntu, kubuntu, lubuntu, xubuntu, etc.)
+			local _flavor="$2"
+			shift # Remove argument name from processing
+		;;
+		--role | --Role )
+			local _role="$2"
+			shift # Remove argument name from processing
+		;;
+		*)
+			write_error "Unknown parameter: $1"
+		;;
+		esac
+		shift # Remove argument value from processing
+	done
 
 	# Evaluate override arguments to defaults...
 	system::process_vm_opt_args "${@}"
 
-	# Set default values for VM T-Shirts sizes (may vary by OS)...
-	: ${ubuntu_flavor="ubuntu"}
-	: ${_role:="desktop"}
-	: ${_task:="ssh-server"}
-	: ${_cpu:="${_cpu:=2}"}
-	: ${_mem:="${_mem:=2048}"}
-	: ${_dsk:="${_dsk:=100}"}
-
+	# Ensure everything for creating VMs is in place...
 	dependency::virtualization
 
 	# Fetch the relevand ISO if necessary...
 	system::log_item "🔎 Retreive list of available $ubuntu_flavor $_role versions..."
-
 	declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
 	dist_logo="$ubuntulogo"
 
@@ -8372,95 +8441,131 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 	# Return the version number selected
 	[ "$tgt_ubuntu_ver" ] || tgt_ubuntu_ver=${all_lts_versions[-1]}
 
-	# Set the role to server if the Ubuntu version is 23 or greater force using server media (using subiquity)...
-	if [[ ${tgt_ubuntu_ver::2} -ge 23 ]] ; then
-		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: Using subiquity installer..."
-		if [[ "${_role}" == "desktop" ]] ; then
-			system::log_item "Ubuntu role = desktop: changing to server media due to subiquity..."
-			system::generate_cloudconfig
-		fi
-	else
-		${_saveto:="$( mktemp -d)"}
-		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: Using debian installer (d-i)..."
-		system::make_preseed_cfg -r "${_role}" -p ${_saveto} -t ${_task}
-	fi
+	# Format the name of the VM to be created...
+	local vm_name="#Template_Ubuntu_${tgt_ubuntu_ver}_Desktop_$(date +%Y-%m-%d-%s)"
 
-	# Set key vars of where to find ubuntu ISO files...
-	system::log_item "🔎 Issuing search command: rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} ${_role}"
-	: ${ubuntu_iso_url=$(rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} ${_role})}
-	: ${iso_filename:="$(basename $ubuntu_iso_url)"}
-	: ${permanent_download_dir:="/var/lib/libvirt/boot/"}
-	
-	# Ensure that the file is available for VM creation... 
-	write_status "Checking if $iso_filename already downloaded..."
-	iso=$(find "$permanent_download_dir" -name "$iso_filename")
-	if [ ! -e "$iso" ]; then
-		write_warning "$iso_filename is not in cache, downloading..."
-		wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
-		iso="$permanent_download_dir/$iso_filename"
-	fi
-
-	# Detect and set variables for key programs
-	: ${bin_virt_install:=$(type -p virt-install)}
-	: ${virt_net="$(system::find_vm_bridge)"}
-	local vm_name="#Template_${_task}-${tgt_ubuntu_ver}-$(date +%Y-%m-%d-%s)"
-
-	
-	
 	_summary_message="
 	The virtual machine (${vm_name}) \n
-	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} ${CloudConfig}\n
+	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} ${CloudConfigDir}\n
 	🔧 - Configuring the following VM: \n
 			${vm_name} \n
 			cpus "${_cpu}" \n
 			memory "${_mem}" \n
 			network "${virt_net}" \n
 			disk size="${_dsk}" \n
-			disk= ${CloudConfig}/cidata.iso,device=cdrom \n
+			disk= ${CloudConfigDir}/cidata.iso,device=cdrom \n
 			os-variant="$tgt_ubuntu_ver" \n
 			video= "virtio" --channel "spicevmc" \n
-			Source="${iso}" \n
-			kernel="casper/vmlinuz,initrd=casper/initrd" "
+			Source="${iso}" \n"
+
+	# Check the version of Ubuntu and use the appropriate installer...
+	# Ubuntu is migration installers and methods, so we need to check the version and use the appropriate installer...
+	if [[ ${tgt_ubuntu_ver::2} -lt 23 ]] ; then
+
+		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: is less than 23, so using debian installer (d-i) and desktop media..."
+		system::make_preseed_cfg -r "${_role}" -p "$( mktemp -d)" -t ${_task}
+		system::log_item "🔎 Issuing search command: rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} ${_role}"
+
+		: ${ubuntu_iso_url=$(rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} live)}
+		: ${iso_filename:="$(basename $ubuntu_iso_url)"}
+
+		# Ensure that the file is available for VM creation... 
+		write_status "Checking if $iso_filename already downloaded..."
+		iso=$(find "$permanent_download_dir" -name "$iso_filename")
+		if [ ! -e "$iso" ]; then
+			write_warning "$iso_filename is not in cache, downloading..."
+			wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
+			iso="$permanent_download_dir/$iso_filename"
+		fi
+
+		system::log_item "Ubuntu version ${tgt_ubuntu_version}: Running install options for debian installer (d-i)..."
+		"${bin_virt_install}" --name ${vm_name} \
+			--vcpus "${_cpu}" \
+			--memory "${_mem}" \
+			--network "${virt_net}" \
+			--disk size="${_dsk}" \
+			--os-variant="ubuntu21.10" \
+			--video "virtio" --channel "spicevmc" \
+			--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
+			--extra-args="ks=file:${_saveto}/preseed.cfg auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=us \
+			netcfg/get_hostname=${_task}${tgt_ubuntu_ver} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
+			localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
+			--initrd-inject="${_saveto}/preseed.cfg" \
+			--initrd-inject="${_saveto}/ks.cfg" \
+			--noautoconsole \
+			|tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"  \
+		|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
+
+	elif [[ ${tgt_ubuntu_ver::2} -ge 23 || ${tgt_ubuntu_ver::2} -lt 24 ]] ; then
+
+		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: is greated than 23 but less than 24, so using cloud config and server media to build desktop..."
+		system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor "${_flavor}"
+
+		: ${ubuntu_iso_url=$(rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} server)}
+		: ${iso_filename:="$(basename $ubuntu_iso_url)"}
+
+		# Ensure that the file is available for VM creation... 
+		write_status "Checking if $iso_filename already downloaded..."
+		iso=$(find "$permanent_download_dir" -name "$iso_filename")
+		if [ ! -e "$iso" ]; then
+			write_warning "$iso_filename is not in cache, downloading..."
+			wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
+			iso="$permanent_download_dir/$iso_filename"
+		fi
+		
+		system::log_item "Ubuntu version ${tgt_ubuntu_version}: Running install options for subiquity..."
+
+		"${bin_virt_install}" --name ${vm_name} \
+			--vcpus "${_cpu}" \
+			--memory "${_mem}" \
+			--network "${virt_net}" \
+			--disk size="${_dsk}" \
+			--os-variant="ubuntu21.10" \
+			--video "virtio" --channel "spicevmc" \
+			--disk path="${CloudConfigDir}/cidata.iso,device=cdrom" \
+			--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
+			--extra-args="autoinstall" \
+			--noautoconsole  \
+			|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 ) |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+
+	elif [[ ${tgt_ubuntu_ver::2} -ge 24 ]] ; then
+
+		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: Using MODERN installer..."
+		system::generate_cloudconfig
+
+		: ${ubuntu_iso_url=$(rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} live)}
+		: ${iso_filename:="$(basename $ubuntu_iso_url)"}
+
+		# Ensure that the file is available for VM creation... 
+		write_status "Checking if $iso_filename already downloaded..."
+		iso=$(find "$permanent_download_dir" -name "$iso_filename")
+		if [ ! -e "$iso" ]; then
+			write_warning "$iso_filename is not in cache, downloading..."
+			wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
+			iso="$permanent_download_dir/$iso_filename"
+		fi
+		
+		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: is greated than 23 but less than 24, so using cloud config and desktop media to build desktop..."
+		"${bin_virt_install}" --name ${vm_name} \
+			--vcpus "${_cpu}" \
+			--memory "${_mem}" \
+			--network "${virt_net}" \
+			--disk size="${_dsk}" \
+			--os-variant="ubuntu21.10" \
+			--video "virtio" --channel "spicevmc" \
+			--disk path="${CloudConfigDir}/cidata.iso,device=cdrom" \
+			--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
+			--extra-args="autoinstall" \
+			--noautoconsole  |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"  \
+		|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
+
+	fi
+
+
+
 	system::log_item "${_summary_message}"
 
-	# Create the appropriate VM as requested...
-	case $_role in 
-		server )
-			system::log_item "Ubuntu version ${tgt_ubuntu_version}: Running install options for subiquity..."
-			"${bin_virt_install}" --name ${vm_name} \
-				--vcpus "${_cpu}" \
-				--memory "${_mem}" \
-				--network "${virt_net}" \
-				--disk size="${_dsk}" \
-				--os-variant="ubuntu21.10" \
-				--video "virtio" --channel "spicevmc" \
-				--disk path="${CloudConfig}/cidata.iso,device=cdrom" \
-				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-				--extra-args="autoinstall" \
-				--noautoconsole  |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"  \
-			|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
-		;;
-		desktop )
-			system::log_item "Ubuntu version ${tgt_ubuntu_version}: Running install options for debian installer (d-i)..."
-			"${bin_virt_install}" --name ${vm_name} \
-				--vcpus "${_cpu}" \
-				--memory "${_mem}" \
-				--network "${virt_net}" \
-				--disk size="${_dsk}" \
-				--os-variant="ubuntu21.10" \
-				--video "virtio" --channel "spicevmc" \
-				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-				--extra-args="ks=file:${_saveto}/preseed.cfg auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=us \
-				netcfg/get_hostname=${_task}${tgt_ubuntu_ver} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
-				localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
-				--initrd-inject="${_saveto}/preseed.cfg" \
-				--initrd-inject="${_saveto}/ks.cfg" \
-				--noautoconsole |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"  \
-			|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
-		;;
-		* ) write_error "Unknown option requested!"
-		;;
-	esac
+
 
 	# Clean up residual variables...
 	for i in  PRESEED_FILE vm_kernel vm_initrd source_url _task _role _cpu _dsk _mem tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig _summary_message ; do unset $i ; done
@@ -10275,21 +10380,83 @@ system::generate_cloudconfig (){
 #
 # End of Documentation
 
-	# Localized variables based on User preferences, but with speciffic defaults should all fail:
-	local Preference_DiskEncryption="$( [[ "$_EncryptDisk" == "YES" ]] && echo "${PreferredDiskPassword:-"letmein1234"}" )"
-	local Preference_Password=$( [[ -n "${PrefferredUserPassword}" ]] && echo "${PrefferredUserPassword}" || echo '$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1' )
-	local Preference_InitialUser="${_OEM_USER:="tangarora"}"
+	# get default VM configurations options from the system::get_vm_config
+	system::get_vm_config
 
-	CloudConfig=$( mktemp -d /tmp/CloudConfig.XXXXXX )
+	# Directory for cloud config files, if not set, create a temporary directory and use that.
+	local CloudConfigDir="${CloudConfigDir:=$( mktemp -d /tmp/CloudConfig.XXXXXX )}"
 	local _git_src_url="${GIT_RTD_SRC_URL:="https://github.com/${GIT_Profile:=vonschutter}/${_TLA^^}-Setup.git"}"
-	touch ${CloudConfig}/meta-data
+
+	touch ${CloudConfigDir}/meta-data
+	touch ${CloudConfigDir}/user-data
+
+	# Parse the command line options overwriting the defaults or saved preferences
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--CloudConfigDir | cloudconfigdir )
+			# where to save cloud config files to incerted into the VM
+			local CloudConfigDir="$2"
+			shift # Remove argument name from processing
+			;;
+		--flavor | --Flavor | --FLAVOR | --flavour | --Flavour | --FLAVOUR )
+			# The role of the VM, e.g. ubuntu-desktop, ubuntu-server, kubuntu-desktop, etc.
+			local Preference_Role="$2"
+			case ${Preference_Role} in 
+			ubuntu-desktop | ubuntu-server | kubuntu-desktop | ssh-server | ansible-server | minecraft-server )
+				write_information "Role: ${Preference_Role}"
+				;;
+			* )
+				system::log_item "ERROR: Unknown ubuntu flavor: ${Preference_Role}"
+				dialog::display_error "ERROR: Unknown role: ${Preference_Role}
+				Usage: $(FUNCNAME[0]) [--CloudConfigDir <directory>] [--vmname <hostname> ] [--flavor <ubuntu-flavor>]
+				Where <role> is the type of VM to create, e.g. :
+				ubuntu-desktop, 
+				ubuntu-server, 
+				kubuntu-desktop, 
+				ssh-server,
+				ansible-server,
+				minecraft-server"
+				return 1
+				;;
+			esac
+			shift # Remove argument name from processing
+			;;
+		--vmname | --VMName | --vm_name | --VmName )
+			# The hostname of the VM to be created
+			local vm_name="$2"
+			[[ "$vm_name" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,253}[a-zA-Z0-9])?$ ]] && [[ ${#vm_name} -le 255 ]] && system::log_item "$vm_name: Valid hostname" || system::log_item "$vm_name: Invalid hostname"
+			shift # Remove argument name from processing
+			;;
+		*)
+			write_error "ERROR: Unknown parameter: $1
+			Usage: $(FUNCNAME[0]) [--CloudConfigDir <directory>] [--vmname <hostname> ] [--flavor <ubuntu-flavor>]
+			Where <role> is the type of VM to create
+			where <hostname> is the hostname of the VM to be configured 
+			You have passed an unknown parameter: $1"
+			dialog::display_error " An ERROR has occured: the function $(FUNCNAME[0]) has been called with an unknown parameter: $1"
+			return 1
+			;;
+		esac
+		shift # Remove argument value from processing
+	done
+
+
+	# If the user has requested to copy their SSH key to the host, capture it and store in a 
+	# var for use in the config file:
+	if [[ "${Preference_CopySSHKey}" == "yes" || "${Preference_CopySSHKey}" == "YES" ]] ; then
+		local Preference_ssh_pub_key="$(cat /home/$SUDO_USER/.ssh/*.pub | head -1)"
+	fi
+	
+
+
+
 
 # -----------------------------------------------------------------------------------------
-# add common section to the cloud config file
+# Add COMMON section to the cloud config file based on preferences
 # -----------------------------------------------------------------------------------------
 
 
-cat >> ${CloudConfig}/user-data << CloudConfigCommon
+cat >> ${CloudConfigDir}/user-data << CloudConfigCommon
 #cloud-config
 autoinstall:
   version: 1
@@ -10307,38 +10474,31 @@ autoinstall:
     allow-pw: true
     install-server: true
     authorized-keys:
-      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDaHrQkReAZYQrf4LGGL9O7M5jV/ckR7XCVq/TJFHSvnV8l7RiT0MmXAHNcDxbdkERicv8Yc0OSz2cLeJtHaBoh7gW1y5h2pDKDKuY9NUkkvl6AaWHWdqPY76I7iRmMSYCXJ9qUGkI/XPyihQUP+h7sTYY+zXJyigi8BECJRaEKB5CPUsw7VFFUOewmQ5Dn6qIrpBSwyFWjI9Qs+1EdlXZ+VwyfToPL9JrhCYimqqWC5c15pt9KfYIRJYALezKgcIsjOUcGcfR3Hg/3Ul/3695rmLYFWsRF1xHy+3+PfhdQZVfBXOorBcsXnEVsJBEsPH/ZQJdYWkP/C79P4KdoUXUq0ghmDiazM/y9iggEcZNoT8qY0dWqItITVhFM6JMIUuJoAWaYUgaw3a4EAEL2+OJ8Go+iipinP9VAXQ+vVbZcHXU5xE/l965SfaXCf0MngwhzvpHtijLc54O/z6VP2ArPTAOzBKnGqEYUA/wt8LzAQTwsbYiQshYQrnE8A5z8Vkk=
-      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACZQDMbsjrigCpMbWRXdssBe0dg7nJZzXzlEN+GHNg1vJH6W1lrLYhlXyQtflF/tUylFfYVNakRvC/KZ5qdl4Zbkb7OQ1A+AyT/Ln54zvilZSp3x+NsUgqPbWDmopzNrTxZyT3btZQG7Rz0hn7Pq0eA6ViIwldQkwwyl5QQg3NkYaE9Vwdz6upXUJsAHUCEDW0ygHggLSUYeA5HMuNgaBrrwLaEptlasYwFyghov+jJoO/EERFLmdfDdF8A6q44iZ2jY5BXeASdnZ0kqPj/sYkmHNcV1bh4e86lp77YDuxBPPeoj9hWpPWvxgPIMT0gvfw8PWgaQNC++kyRGEF6q6eij3MLWXGBrTngu7qSTjQSg5B8UKwcEXGc7cpzW+oT0qYx8hnDCLfESbbn/fZawMFS/uTqV3/VqyknKe8S8tgdyOFNy74IIAkx+pVm5jrlC0gTaNehgH4XWasYZo+Ab8eiJpSCtkTk/1QvmSOczVrRKhkn5gy7t4reMfn7P2RR43JkuaGNx8J9wp7K+H5VRPi/JCMfT0dTy3evQSK59/gOI6J69+zi5mfjMZK/UY7wd6cuAbjH/edilm8ciexkyCtLuDE8dh3Rw/oeerA2HZJs8JulKjEE83B2r1kv2pneV7oIZ3+hI+UZFC1Qg2Gw6OFEjO876VQWAI5aDDQFUiMIhNerEWjULEvPtLZENz0zUGV3UxMHryVAyvlNfu8q6TeRZ+9uwuHpfnIZvlpYifGSQCX3lkYIHC/5h0eMsW1Wxg3YQCBHKf7ycMyiEw2QcjvsEsiS/gV4ZDYlmh74upFlOhmpe13Nds=
+      - ssh-rsa ${Preference_ssh_pub_key}
   keyboard:
-    layout: se
-CloudConfigCommon
-
-# Add identity section
-cat >> ${CloudConfig}/user-data << CloudConfigID
+    layout: ${Preference_InitialKeyboardLayout}
   identity:
     hostname: "${vm_name}"
     username: "${Preference_InitialUser}"
-    password: "${Preference_Password}"
-CloudConfigID
+    password: "${Preference_InitialUserPassword}"
+CloudConfigCommon
 
 # -----------------------------------------------------------------------------------------
-# end common section to the cloud config file
+# End COMMON section to the cloud config file
 # -----------------------------------------------------------------------------------------
 
 
+# -----------------------------------------------------------------------------------------
+# Add CUSTOM section to the cloud config file based on the role of the VM
+# -----------------------------------------------------------------------------------------
 
-if [[ ${_role} == "server" ]] ; then
-	system::log_item "Generating cloud-config for Ubuntu server media..."
+case ${Preference_Role} in
+ubuntu-desktop )
+system::log_item "Generating cloud-config for the role: ubuntu-desktop"
+# -----------------------------------------------------------------------------------------
 
 
-
-	case ${_task} in
-	# -----------------------------------------------------------------------------------------
-	ubuntu-desktop )
-	system::log_item "Generating cloud-config for the role: ubuntu-desktop"
-	# -----------------------------------------------------------------------------------------
-
-cat >> ${CloudConfig}/user-data << CloudConfig_server-desktop
+cat >> ${CloudConfigDir}/user-data << CloudConfig_server-desktop
   snaps:
     - name: nvim
       channel: latest/stable
@@ -10361,19 +10521,18 @@ cat >> ${CloudConfig}/user-data << CloudConfig_server-desktop
       printf "network:\n  version: 2\n  renderer: NetworkManager" 
       > /target/etc/netplan/01-network-manager-all.yaml
     - mkdir /target/opt/rtd
-    - git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /target/opt/rtd
+    - git clone --depth=1 ${_git_src_url} /target/opt/rtd
     - /usr/bin/chmod 755 /target/opt/rtd/core/rtd*
     - curtin in-target --target=/target -- /opt/rtd/core/rtd-oem-enable-config.sh
     - mkdir /target/etc/rtd
     - cp /autoinstall.yaml /target/etc/rtd/
 CloudConfig_server-desktop
-	;;
+;;
+kubuntu-desktop )
+system::log_item "Generating cloud-config for the role: kubuntu-desktop"
+# -----------------------------------------------------------------------------------------
 
-	# -----------------------------------------------------------------------------------------
-	kubuntu-desktop )
-	system::log_item "Generating cloud-config for the role: kubuntu-desktop"
-	# -----------------------------------------------------------------------------------------
-cat >> ${CloudConfig}/user-data << CloudConfig_server-desktop
+cat >> ${CloudConfigDir}/user-data << CloudConfig_server-desktop
   snaps:
     - name: nvim
       channel: latest/stable
@@ -10396,18 +10555,18 @@ cat >> ${CloudConfig}/user-data << CloudConfig_server-desktop
       printf "network:\n  version: 2\n  renderer: NetworkManager" 
       > /target/etc/netplan/01-network-manager-all.yaml
     - mkdir /target/opt/rtd
-    - git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /target/opt/rtd
+    - git clone --depth=1 ${_git_src_url} /target/opt/rtd
     - /usr/bin/chmod 755 /target/opt/rtd/core/rtd*
     - curtin in-target --target=/target -- /opt/rtd/core/rtd-oem-enable-config.sh
     - mkdir /target/etc/rtd
     - cp /autoinstall.yaml /target/etc/rtd/
 CloudConfig_server-desktop
-	;;
-	# -----------------------------------------------------------------------------------------
-	ubuntu-server | ubuntu-server-minimal )
-	system::log_item "Generating cloud-config for ubuntu-server"
-	# -----------------------------------------------------------------------------------------
-cat >> ${CloudConfig}/user-data << CloudConfig_ubuntu-server
+;;
+ubuntu-server | ubuntu-server-minimal )
+system::log_item "Generating cloud-config for ubuntu-server"
+# -----------------------------------------------------------------------------------------
+
+cat >> ${CloudConfigDir}/user-data << CloudConfig_ubuntu-server
   packages:
     - dialog
     - git
@@ -10417,18 +10576,18 @@ cat >> ${CloudConfig}/user-data << CloudConfig_ubuntu-server
   late-commands:
     - echo ******************* Ubuntu Server Generic Config ***********
     - mkdir /target/opt/rtd
-    - git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /target/opt/rtd
+    - git clone --depth=1 ${_git_src_url} /target/opt/rtd
     - /usr/bin/chmod 755 /target/opt/rtd/core/rtd*
     - curtin in-target --target=/target -- /opt/rtd/core/rtd-oem-enable-config.sh
     - mkdir /target/etc/rtd
     - cp /autoinstall.yaml /target/etc/rtd/
 CloudConfig_ubuntu-server
-	;;
-	# -----------------------------------------------------------------------------------------
-	ssh-server )
-	system::log_item "Generating cloud-config for ubuntu-ssh-server"
-	# -----------------------------------------------------------------------------------------
-cat >> ${CloudConfig}/user-data << CloudConfig_ssh-server
+;;
+ssh-server )
+system::log_item "Generating cloud-config for ubuntu-ssh-server"
+# -----------------------------------------------------------------------------------------
+
+cat >> ${CloudConfigDir}/user-data << CloudConfig_ssh-server
   packages:
     - dialog
     - git
@@ -10440,17 +10599,18 @@ cat >> ${CloudConfig}/user-data << CloudConfig_ssh-server
   late-commands:
     - echo ******************* SSH Server Config ********************
     - mkdir /target/opt/rtd
-    - git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /target/opt/rtd
+    - git clone --depth=1 ${_git_src_url} /target/opt/rtd
     - /usr/bin/chmod 755 /target/opt/rtd/core/rtd*
     - curtin in-target --target=/target -- /opt/rtd/core/rtd-oem-enable-config.sh
     - mkdir /target/etc/rtd
     - cp /autoinstall.yaml /target/etc/rtd/
 CloudConfig_ssh-server
-	;;
-	ansible-server )
-	system::log_item "Generating cloud-config for ubuntu-ssh-server"
-	# -----------------------------------------------------------------------------------------
-cat >> ${CloudConfig}/user-data << CloudConfig_ssh-server
+;;
+ansible-server )
+system::log_item "Generating cloud-config for ubuntu-ssh-server"
+# -----------------------------------------------------------------------------------------
+
+cat >> ${CloudConfigDir}/user-data << CloudConfig_ssh-server
   packages:
     - dialog
     - git
@@ -10463,18 +10623,18 @@ cat >> ${CloudConfig}/user-data << CloudConfig_ssh-server
   late-commands:
     - echo ******************* SSH Server Config ********************
     - mkdir /target/opt/rtd
-    - git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /target/opt/rtd
+    - git clone --depth=1 ${_git_src_url} /target/opt/rtd
     - /usr/bin/chmod 755 /target/opt/rtd/core/rtd*
     - curtin in-target --target=/target -- /opt/rtd/core/rtd-oem-enable-config.sh
     - mkdir /target/etc/rtd
     - cp /autoinstall.yaml /target/etc/rtd/
 CloudConfig_ssh-server
-	;;
-	# -----------------------------------------------------------------------------------------
-	minecraft-server )
-	system::log_item "Generating cloud-config for minecraft-server"
-	# -----------------------------------------------------------------------------------------
-cat >> ${CloudConfig}/user-data << CloudConfig_minecraft-server
+;;
+minecraft-server )
+system::log_item "Generating cloud-config for minecraft-server"
+# -----------------------------------------------------------------------------------------
+
+cat >> ${CloudConfigDir}/user-data << CloudConfig_minecraft-server
   packages:
     - dialog
     - git
@@ -10483,7 +10643,7 @@ cat >> ${CloudConfig}/user-data << CloudConfig_minecraft-server
   late-commands:
     - echo ******************* Minecraft Server Config ***************
     - mkdir /target/opt/rtd
-    - git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /target/opt/rtd
+    - git clone --depth=1 ${_git_src_url} /target/opt/rtd
     - /usr/bin/chmod 755 /target/opt/rtd/core/rtd*
     - curtin in-target --target=/target -- /opt/rtd/core/rtd-oem-enable-config.sh
     - mkdir /target/etc/rtd
@@ -10498,30 +10658,24 @@ cat >> ${CloudConfig}/user-data << CloudConfig_minecraft-server
     - echo "Please run rtd-minecraft-server to start the Minecraft Server!" >> /target/etc/update-motd.d/00-header
     - echo rtd-minecraft-server >> /target/etc/profile
 CloudConfig_minecraft-server
-	;;
-
-	# -----------------------------------------------------------------------------------------
-	* )
-		system::log_item "Got: (${_task}) No valid task selected, skipping late commands..."
-	;;
-	esac
-	# -----------------------------------------------------------------------------------------
-elif [[ ${_role} == "desktop" ]] ; then
-	system::log_item "Generating cloud-config for Ubuntu desktop media..."
-
-else
-	system::log_item "Got: (${_role}) No valid role selected, no role speciffic instructions will be created..."
-fi
+;;
+* )
+	system::log_item "Got: ${Preference_Role} No valid task selected, skipping late commands..."
+;;
+esac
+# -----------------------------------------------------------------------------------------
 
 
-
+# -----------------------------------------------------------------------------------------
+# Add CUSTOM section to the cloud config file
+# -----------------------------------------------------------------------------------------
 
 	system::log_item "Configuration data supplied: 
-	$(cat ${CloudConfig}/user-data)"
+	$(cat ${CloudConfigDir}/user-data)"
 	write_information "Generate Ubuntu autoinstall instruction media: "
 	#software::check_native_package_dependency genisoimage
-	genisoimage -output ${CloudConfig}/cidata.iso -volid cidata -joliet -rock ${CloudConfig}/user-data ${CloudConfig}/meta-data  &>>${_LOGFILE}
-	chmod 777 -R ${CloudConfig}
+	genisoimage -output ${CloudConfigDir}/cidata.iso -volid cidata -joliet -rock ${CloudConfigDir}/user-data ${CloudConfigDir}/meta-data  &>>${_LOGFILE}
+	chmod -R 777 "${CloudConfigDir}"
 
 }
 
@@ -10542,10 +10696,17 @@ system::get_vm_config()
 # Returns: The value for the key.
 #
 # Example:
+#	system::get_vm_config
+#	system::get_vm_config --ask
+#
 #
 # End of documentation
 	local _config_file=${_OEM_USER_VM_PREFERENCES:-"/home/${SUDO_USER}/.config/${_TLA,,}/build_defaults.inf"}
-	[[ "$1" == "--ask" ]] && local _ask="YES" || local _ask="NO"
+	if [[ "$1" == "--ask" ]] ; then 
+		local _ask="YES"
+	else 
+		local _ask="NO"
+	fi
 
 	system::log_item "Loading Global Config if available otherwise use defaults..."
 	Preference_DiskEncryption="${_ENCRYPT_DISK:-"YES"}"
@@ -10628,7 +10789,8 @@ system::get_vm_config()
 		system::log_item "Save as defaults and continue..."
 		write_information "Saving preferences to: $_config_file"
 		
-		system::update_config "$_config_file" "Preference_DiskEncryption" "${Preference_DiskEncryption}" \
+		system::update_config "$_config_file" \
+		"Preference_DiskEncryption" "${Preference_DiskEncryption}" \
 		"Preference_Disk_Password" "${Preference_Disk_Password}" \
 		"Preference_InitialUser" "${Preference_InitialUser}" \
 		"Preference_InitialUserFullName" "${Preference_InitialUserFullName}" \
@@ -10682,7 +10844,7 @@ system::make_preseed_cfg ()
 # 
 # End of documentation
 
-	system::log_item "Called by: ${FUNCNAME[-1]}"
+	system::log_item "Called by: ${FUNCNAME[1]}"
 
 	# Defaults:
 	local _saveto="$( mktemp -d )"	# Where to save the preseed file
@@ -11014,17 +11176,26 @@ system::make_preseed_cfg ()
 
 	# 	# --------------------------------------------------- #
 	# EOF
- 
+
+	system::log_item "Adding late commands to the preseed file..."
+	if echo "${FUNCNAME[1]}" | grep -i ubuntu ; then
+		system::log_item "Ubuntu requested, using ubiquity/success_command"
+		_d_i_post_statment_ubunto_or_deb="ubiquity ubiquity/success_command string" 
+	else
+		system::log_item "Debian requested, using d-i preseed/late_command"
+		_d_i_post_statment_ubunto_or_deb="d-i preseed/late_command string" 
+	fi
+	
 
 
-	# write out conditionsl elements of the preseed file:
+	# write out conditional elements of the preseed file:
 	case $_role in
 		minecraft-server | minecraft | Minecraft | MINECRAFT | minecraft_server | Minecraft-server)
 			cat >> ${PRESEED_FILE} <<-EOF
 			# --------------------------------------------------- #
 			# C.4.12. Addon Tasks for Minecraft Server
 			# --------------------------------------------------- #
-			d-i preseed/late_command string \
+			${_d_i_post_statment_ubunto_or_deb} \
 			in-target apt-get -y install git ; \
 			in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
 			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
@@ -11063,7 +11234,7 @@ system::make_preseed_cfg ()
 			# --------------------------------------------------- #
 			# C.4.12. Addon Tasks for KVM Server
 			# --------------------------------------------------- #
-			d-i preseed/late_command string \
+			${_d_i_post_statment_ubunto_or_deb} \
 			in-target apt-get -y install qemu-system libvirt-daemon-system ; \
 			in-target apt-get -y install git ; \
 			in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
@@ -11097,7 +11268,7 @@ system::make_preseed_cfg ()
 			# C.4.12. Default preseed Addon Tasks
 			# --------------------------------------------------- #
 			# for Debian to work (ignored by Ubuntu)...
-			d-i preseed/late_command string \
+			${_d_i_post_statment_ubunto_or_deb} \
 			in-target apt-get -y install git ; \
 			in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
 			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
