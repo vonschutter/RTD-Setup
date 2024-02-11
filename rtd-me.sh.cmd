@@ -7,12 +7,7 @@ cls
 @ECHO OFF
 GOTO :CMDSCRIPT
 ::CMDLITERAL
-
-:<<'::POWERSHELLITERAL'
-Write-Host "Do not attempt to run this script in PowerShell"
-exit 1
-::POWERSHELLITERAL
-#::
+#::::::::::::::::::::::::::::::::::::::::::::: HEADER DO NOT REMOVE :::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::
 #:: 						Shell Script Section
 #::
