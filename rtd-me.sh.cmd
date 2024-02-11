@@ -155,6 +155,7 @@ export _LOGFILE=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log
 
 
 if echo "$OSTYPE" |grep "linux" ; then
+	{
 	echo "Linux OS Found: Attempting to get instructions for Linux..." | tee -a ${_LOGFILE} ${_STATUSLOG}
 	echo executing $0 >> ${_LOGFILE}
 	for d in git zip ; do 
@@ -162,7 +163,7 @@ if echo "$OSTYPE" |grep "linux" ; then
 			for pkgmgr in apt yum dnf zypper ; do hash ${pkgmgr} 2&1>> "${_LOGFILE}" && ${pkgmgr} install -y ${d} | tee -a ${_LOGFILE} ; done
 		fi
 	done
-	(
+	
 	git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp 
 		if [ $? -eq 0 ]
 		then
@@ -182,7 +183,7 @@ if echo "$OSTYPE" |grep "linux" ; then
 			echo "Suggestion: check write permission in "/opt" or internet connectivity."
 			exit 1
 		fi
-	) | tee -a ${_LOGFILE}
+	} | tee -a ${_LOGFILE}
 	exit $?
 elif [[ "$OSTYPE" == "darwin"* ]]; then
         echo "Mac OSX is currently not supported..."
