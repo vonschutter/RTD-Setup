@@ -228,21 +228,33 @@ system::ExecStart::help ()
 
 
 
-if { for i in _rtd_library _rtd_recipies ; do dependency::file "$i" ; done } ; then
-	# Define a log directory and log file name if not already done.
-	if [ "$UID" -eq 0 ]; then
-		: ${_LOG_DIR:-"/var/log/${_TLA}"} ; mkdir -p ${_LOG_DIR}
-		export _LOGFILE="${_LOGFILE:="${_LOG_DIR}/$( basename $0)-$(date +%Y-%m-%d-%H-%M).log"}"
+dependency::file "_rtd_library" || { echo "Failed to find _rtd_library" ; exit 1 ; }
+
+if [[ -z ${_LOG_DIR} ]] ; then
+	if [[ $EUID -eq 0 ]] ; then
+		_LOG_DIR="/var/log/${_TLA}"
 	else
-		: ${_LOG_DIR:-"~/.config/rtd/${_TLA}"} ; mkdir -p ${_LOG_DIR}
-		export _LOGFILE="${_LOGFILE:="${_LOG_DIR}/$( basename $0)-$(date +%Y-%m-%d-%H-%M-%S-%s).log"}"
+		_LOG_DIR="${HOME}/.log/${_TLA}"
 	fi
+	_LOGFILE="${_LOG_DIR}/$(basename $0)-$(date +%Y-%m-%d-%H%M%S).log"
 fi
 
 case ${1} in
-	--help ) system::ExecStart::help  ;;
-	--about ) zenity::display_info "$_ABOUT";;
-	--more-help ) zenity::display_url "https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/blob/main/modules/RTD-OEM-bundle-manager/README.md" ;;
-	--rtd ) zenity::display_url "/opt/rtd/README.md" ;;
-	* ) system::ExecStart | tee -a ${_LOGFILE} ;;
+	--help )
+		system::log_item "Displaying help message" 
+		system::ExecStart::help  
+	;;
+	--about )
+		system::log_item "Displaying about message"
+		zenity::display_info "$_ABOUT"
+	;;
+	--more-help ) 
+		system::log_item "Displaying more help online"
+		zenity::display_url "https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/blob/main/modules/RTD-OEM-bundle-manager/README.md" ;;
+	--rtd )
+		system::log_item "Displaying RTD README"
+		zenity::display_url "/opt/rtd/README.md" ;;
+	* ) 
+		system::log_item "Starting the OEM Bundle Manager"
+		system::ExecStart | tee -a ${_LOGFILE} ;;
 esac
