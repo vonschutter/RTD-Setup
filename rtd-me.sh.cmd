@@ -136,9 +136,8 @@ export _GIT_PROFILE="${_GIT_PROFILE:-vonschutter}"
 _git_src_url=https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git
 
 # Determine log file names for this session
-export _ERRLOGFILE=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-error.log
 export _LOGFILE=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log
-export _STATUSLOG=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-status.log
+
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
