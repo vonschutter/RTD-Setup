@@ -1,73 +1,99 @@
 #!/bin/bash
-if [[ -z "$BASH_VERSINFO" ]]; then
-	echo "ERROR: You must execute this script in a BASH Shell"
-	exit 255
-fi
+RTD_Version=2.1.2
+: <<'Script_Documentation'
+										  -    RTD Power Toy Script      -
 
-#::				S I M P L E     S Y S T E M   S U P P O R T    T O O L
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::// Linux //::::::::
-#:: 	Author(s):   	SLS, KLS, NB.  Buffalo Center, IA & Avarua, Cook Islands
-	RTD_Version=2.1.2
-#::
-#::
-#::	Purpose: To simplify support tasks
-#::		  - Display system information
-#::		  - Update system software
-#:: 		  - Bakup virtual machines
-#::               - Cleanup/Report on PPA's (Ubuntu only)
-#::               - Show systems physical location
-#::		  - Check if a password you intend to use is for sale on the Darknet
-#::
-#::     Usage: run the script "bash /path/to/rtd-simple-support-tool" or if installed in the $PATH; by rtd simply 
-#::	       type "rtd-sim + [TAB]" in a terminal.
-#::
-#::     This script is shared in the hopes that
-#::     someone will find it usefull.
-#::
-#::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#
-#	NOTE:	This terminal program is written to be readable and documented to a very high degree. The reason is that
-#		these apps are seldom changed and when they are, it is usefull to be able to understand why and how
-#		things were built. Obviously, this becomes a useful learning tool as well; for all people that want to
-#		learn how to write admin scripts. It is a good and necessary practice to document extensively and follow
-#		patterns when building your own apps and config scripts. Failing to do so will result in a costly mess
-#		for any organization after some years and people turnover.
-#
-#		As a general rule, we prefer using functions extensively because this makes it easier to manage the script
-#		and facilitates several users working on the same scripts over time.
-#
-#
-#	RTD admin scrips are placed in /opt/rtd/scripts. Optionally scripts may use the common
-#	functions in _rtd_functions and _rtd_recipies:
-#
-#	  _rtd_functions -- contain usefull admin functions for scripts, such as "how to install software" on different systems.
-#	  _rtd_recipies  -- contain software installation and configuration "recipies".
-#
-#	Scripts may also be stand-alone if there is a reason for this. This script is written to function independently
-#	so that it is easy to copy to many server systems, or just to use once on a remote system. This is accomplished by
-#	including all functions and dependency checking in this script; as well as avoidnig relying on external files like
-#	*.diff files. As a consequence of the portability benefit this script becomes rather large and time consuming to navigate.
-#
-#	Taxonomy of this script: we prioritize the use of functions over monolithic script writing, and proper indentation
-#	to make the script more readable. Each function shall also be documented to the point of the obvious.
-#	Suggested function structure per google guidelines:
-#
-#	function_descriptive_name () {
-#		# Documentation and comments...
-#		...code...
-#	}
-#
-#
-#	Our scripts are also structured in to three major sections: "settings", "functions", and "execute".
-#	Settings, contain configurable options for the script. Functions, contain all functions. Execute,
-#	contains all the actual logic and control of the script.
-#
-#
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:::::::::::::::::::::::::::::::::::::::::: PREVENT RUNING IN WINDOWS	 ::::::::::::::::::::::::::::::::::::::::::::::::
+
+cls & color 0C & echo Do not attempt to run this script in CMD.EXE & pause & color 0F & exit /b
+
+::::::::::::::::::::::::::::::::::::::::::::: HEADER DO NOT REMOVE ::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+
+                                             A D M I N   C O M M A N D 
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:::::::::::::::::::::::::::::::::::::::::::::// Simple Compression Toy //::::::::::::::::::::::::::::// Linux //::::::::
+:: 	Author(s):   	SLS, KLS, NB.  Buffalo Center, IA & Avarua, Cook Islands
+::
+::
+::	Purpose: To simplify support tasks
+::		  - Display system information
+::		  - Update system software
+:: 		  - Bakup virtual machines
+::                - Cleanup/Report on PPA's (Ubuntu only)
+::                - Show systems physical location
+::		  - Check if a password you intend to use is for sale on the Darknet
+::
+::     Usage: run the script "bash /path/to/rtd-simple-support-tool" or if installed in the $PATH; by rtd simply 
+::	       type "rtd-sim + [TAB]" in a terminal.
+::
+::     This script is shared in the hopes that
+::     someone will find it usefull.
+::
+::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+NOTE:	This terminal program is written to be readable and documented to a very high degree. The reason is that
+	these apps are seldom changed and when they are, it is usefull to be able to understand why and how
+	things were built. Obviously, this becomes a useful learning tool as well; for all people that want to
+	learn how to write admin scripts. It is a good and necessary practice to document extensively and follow
+	patterns when building your own apps and config scripts. Failing to do so will result in a costly mess
+	for any organization after some years and people turnover.
+
+	As a general rule, we prefer using functions extensively because this makes it easier to manage the script
+	and facilitates several users working on the same scripts over time.
+
+
+ This script is shared in the hopes that it will be useful.
+
+ This script is part of the RTD Power Toy collection. The RTD Power Toy collection consists of scripts designed
+ to be used together to accomplish a wide range of tasks. These scripts are simple, easy to use, and easy to
+ understand, making them suitable for use in a Linux environment, though they may be adaptable to other environments.
+ A special header is included to either prevent execution in Windows or to execute the proper section if run in Windows,
+ thereby preventing accidental execution of the script in a Windows (CMD) environment and avoiding potential harm.
+
+ For convenience and supportability, most actions (work) are stored in a common library used by multiple scripts.
+ While using this library is optional, it may save time. Typically, if a function is useful in more than one script, 
+ it is included in the library. This script demonstrates the ease of using these functions.
+ To utilize these functions, simply load the library using the "source" bash built-in command. All
+ functions will then be available for use.
+
+ This script is intended to reside in the ~/bin/ or /bin/ directory, or alternatively, in the $PATH.
+ By default, this script is placed in /opt/rtd/modules/{collection or name}.
+
+ 1 - To view options for using the RTD library, type: "bash _rtd_library --help"
+ 2 - To view detailed documentation for each function in this library, type: "bash _rtd_library --devhelp | --devhelp-gtk"
+
+ Function: dependency::_library
+ Description: This function ensures access to the RTD library functions by sourcing the appropriate script.
+ It first sources the library from a relative path, then from ~/bin, and finally from the /opt directory. Using the 
+ relative path is beneficial for development and testing, ~/bin is useful for user-specific scripts, and /opt 
+ is suitable for system-wide scripts. Additionally, the function downloads the library from the GitHub repository 
+ and sources it if it is not found in any of the  previous locations. If all attempts fail, it displays an error 
+ message and returns 1.
+
+Scripts may also be stand-alone if there is a reason for this. 
+
+Taxonomy of this script: we prioritize the use of functions over monolithic script writing, and proper indentation
+to make the script more readable. Each function shall also be documented to the point of the obvious.
+Suggested function structure per google guidelines:
+
+function_descriptive_name () {
+	# Documentation and comments...
+	...code...
+}
+
+
+Our scripts are also structured in to three major sections: "settings", "functions", and "execute".
+Settings, contain configurable options for the script. Functions, contain all functions. Execute,
+contains all the actual logic and control of the script.
+
+
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+Script_Documentation
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -115,8 +141,8 @@ fi
 
 # Override default values here:
 # SSH_PUBLIC_KEY_FILE=
-# PUT_ISO_FILE_HERE_WHEN_DONE=
-# PUT_QCOW_FILE_HERE_WHEN_DONE=
+# put_iso_file_here_when_done=
+# put_qcow_file_here_when_done=
 # VOLUME_TITLE=
 # VOLUME_SIZE=
 # _src_url=
@@ -734,11 +760,11 @@ show_deploy_VDI_VM_now_menu ()
 			echo "Program terminated by user..."
 		;;
 		1 )
-			kvm::make_vm_template_now_from_ubuntu_com -r desktop -t ubuntu-desktop -m 4098 -c 4
+			kvm::make_vm_template_now_from_ubuntu_com --role desktop --flavor ubuntu-desktop --ram 4098 --cpus 4
 			cleanup_and_finish nomessage
 		;;
 		2 )
-			kvm::make_vm_template_now_from_ubuntu_com -r desktop -t kubuntu-desktop -m 4098 -c 4
+			kvm::make_vm_template_now_from_ubuntu_com --role desktop --flavor  kubuntu-desktop --ram 4098 --cpus 4
 			cleanup_and_finish nomessage
 		;;
 		3 )
@@ -1042,11 +1068,12 @@ show_main_menu () {
 			"1" "📈 Monitor performance and statistics" \
 			"2" "📋 View information about this system" \
 			"3" "🔧 Manage Software on this system" \
-			"4" "🔧 Manage Virtual Machines (KVM) on this system" \
+			"4" "🃏 Manage KVM on this system" \
 			"5" "🔧 Manage encryption phrases and passwords" \
 			"6" "💽 Make media to automatically install OS (for VM's and CD burning)" \
 			"7" "🆙 Shortcut: Update this system now" \
-			"8" "💡  About this tool" 2>&1 1>&3 )
+			"8" "🛠  Quick Fixes" \
+			"9" "💡 About this tool" 2>&1 1>&3 )
 		exit_status=$?
 		exec 3>&-
 		clear
@@ -1109,6 +1136,9 @@ show_main_menu () {
 				#read -p "Press [Enter] key to return to the main menu: "
 			;;
 			8 )
+				show_menu_quick_fixes
+			;;
+			9 )
 			display_notice
 			;;
 		esac
@@ -1154,6 +1184,130 @@ show_manage_crypt_sec () {
 }
 
 
+
+show_menu_quick_fixes () {
+	while true; do
+		exec 3>&1
+		# Dialog Display Menu Items...
+			selection=$($RTD_GUI \
+				--backtitle "$BRANDING" \
+				--title "Quick Fixes" \
+				--menu "Please select a quick fix to run:" $HEIGHT $WIDTH $LIST_HEIGHT \
+				"1" "Fix VirtualBox USB issues" \
+				"2" "Fix GNOME Shell Apps Dashboard sort app in categories" \
+				"3" "Restart sound system" \
+				2>&1 1>&3)
+			exit_status=$?
+			exec 3>&-
+			clear
+
+		# Cases for how program exited...
+		case $exit_status in
+			"$DIALOG_CANCEL")
+				clear ; write_status "Cancel pressed." ; return 0
+			;;
+			"$DIALOG_ESC")
+				clear ; write_status "Program aborted." ; return 0
+			;;
+		esac
+
+		# What to do depending on selection...
+		case $selection in
+			0 )
+				clear
+				echo "Program terminated."
+			;;
+			1 )
+				local vbox_usbnode_path=$(find / -name VBoxCreateUSBNode.sh 2> /dev/null | head -n 1)
+				if [[ -z ${vbox_usbnode_path} ]]; then
+					write_warning "Warning: VBoxCreateUSBNode.sh file has not been found."
+					return 1
+				fi
+
+				if [[ ! -w ${vbox_usbnode_path} ]]; then
+					write_warning "Warning: VBoxCreateUSBNode.sh file is not writable."
+					return 1
+				fi
+
+				chmod 755 ${vbox_usbnode_path}
+				chown root:root ${vbox_usbnode_path}
+
+				local vboxusers_gid=$(getent group vboxusers | awk -F: '{printf "%d\n", $3}')
+				local vbox_rules="SUBSYSTEM==\"usb_device\", ACTION==\"add\", RUN+=\"${vbox_usbnode_path} \$major \$minor \$attr{bDeviceClass} ${vboxusers_gid}\"
+				SUBSYSTEM==\"usb\", ACTION==\"add\", ENV{DEVTYPE}==\"usb_device\", RUN+=\"${vbox_usbnode_path} \$major \$minor \$attr{bDeviceClass} ${vboxusers_gid}\"
+				SUBSYSTEM==\"usb_device\", ACTION==\"remove\", RUN+=\"${vbox_usbnode_path} --remove \$major \$minor\"
+				SUBSYSTEM==\"usb\", ACTION==\"remove\", ENV{DEVTYPE}==\"usb_device\", RUN+=\"${vbox_usbnode_path} --remove \$major \$minor\""
+
+				echo "${vbox_rules}" > /etc/udev/rules.d/virtualbox.rules
+				rm -f /etc/udev/rules.d/*-virtualbox.rules || { write_warning "Warning: Failed to remove old virtualbox rules."; return 1;}
+				udevadm control --reload || { write_warning "Warning: Failed to reload udev rules."; return 1;}
+
+				local logname=$(logname)
+				if [[ -z ${logname} ]]; then
+					write_warning "Warning: Failed to get current user."
+					return 1
+				fi
+				adduser ${logname} vboxusers
+
+				dialog::display_notice " All actions succeeded.
+				Log out and log in to see if the issue go fixed."
+				return 0
+
+			;;
+			2 )
+			if command gsettings &>/dev/null; then
+				tempfile=$( mktemp )
+				chmod 777 ${tempfile}
+				cat > ${tempfile} <<-EOF
+				#!/bin/bash
+				gsettings set org.gnome.desktop.app-folders folder-children "['accessories', 'chrome-apps', 'games', 'graphics', 'internet', 'office', 'programming', 'science', 'sound---video', 'system-tools', 'universal-access', 'wine', 'OEM', '3D-Printing', 'Cloud']"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/accessories/ name "Accessories"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/accessories/ categories "['Utility']"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/chrome-apps/ name "Chrome Apps"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/chrome-apps/ categories "['chrome-apps']"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/games/ name "Games"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/games/ categories "['Game']"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/graphics/ name "Graphics"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/graphics/ categories "['Graphics']"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/internet/ name "Internet"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/internet/ categories "['Network', 'WebBrowser', 'Email']"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/office/ name "Office"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/office/ categories "['Office']"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/programming/ name "Programming"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/programming/ categories "['Development']"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/science/ name "Science"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/science/ categories "['Science']"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/sound---video/ name "Sound & Video"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/sound---video/ categories "['AudioVideo', 'Audio', 'Video']"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/system-tools/ name "System Tools"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/system-tools/ categories "['System', 'Settings']"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/universal-access/ name "Universal Access"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/universal-access/ categories "['Accessibility']"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/wine/ name "Wine"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/wine/ categories "['Wine', 'X-Wine', 'Wine-Programs-Accessories']"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/OEM/ name "OEM"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/OEM/ categories "['OEM']"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/3D-Printing/ name "3D-Printing"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/3D-Printing/ categories "['3D-Printing', 'CAD', '3D', '3DGraphics']"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/Cloud/ name "Cloud"
+				gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/Cloud/ categories "['Cloud-Management', 'Cloud', 'aws', 'azure', 'gcp']"
+				EOF
+				system::run_command_in_gnome_user_session /bin/bash ${tempfile}
+				return 0
+			else
+				write_warning "Warning: gsettings command not found."
+				return 1
+			fi
+			;;
+			3 )
+				write_warning "Do you want to try and restart sound on this syystem?"
+				read -p "Press [ENTER] to restart sound or [CTRL]+[C] to exit"
+				system::restart_sound || write_error "Failed to restart sound!"
+				read -p "Press [ENTER] key to return to the main menu: "
+			;;
+		esac
+	done
+}
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
