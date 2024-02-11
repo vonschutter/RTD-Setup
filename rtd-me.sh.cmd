@@ -160,7 +160,9 @@ if echo "$OSTYPE" |grep "linux" ; then
 	echo executing $0 >> ${_LOGFILE}
 	for d in git zip ; do 
 		if ! command -V "${d}" 2&1>> "${_LOGFILE}" ; then
-			for pkgmgr in apt yum dnf zypper ; do hash ${pkgmgr} 2&1>> "${_LOGFILE}" && ${pkgmgr} install -y ${d} | tee -a ${_LOGFILE} ; done
+			for pkgmgr in apt yum dnf zypper ; do
+				hash ${pkgmgr} 2&1>> "${_LOGFILE}" && ${pkgmgr} install -y ${d}
+			done
 		fi
 	done
 	
