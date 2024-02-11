@@ -8376,8 +8376,8 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 
 	# Set default values for VM T-Shirts sizes (may vary by OS)...
 	: ${ubuntu_flavor="ubuntu"} 				# This is the default flavor of Ubuntu to use.
-	: ${_role:="desktop"} 					# This is the default role of the Ubuntu VM to create.
-	: ${_task:="ssh-server"} 				# This is the default task to perform on the Ubuntu VM.
+	: ${_role:="server"} 					# This is the default role of the Ubuntu VM to create.
+	: ${_task:="ubuntu-desktop"} 				# This is the default task to perform on the Ubuntu VM.
 	: ${_cpu:="${_cpu:=2}"} 				# This is the default number of CPUs to use.
 	: ${_mem:="${_mem:=2048}"} 				# This is the default amount of memory to use.
 	: ${_dsk:="${_dsk:=100}"} 				# This is the default size of the disk to use.
@@ -8431,7 +8431,9 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 
 	tgt_ubuntu_ver=$($RTD_GUI --colors --title "Select Release Version of $ubuntu_flavor $_role" --inputbox "\n 👍 Please pick an available \Z1 $ubuntu_flavor \Zn version by entering it below.
 	Long Term Support Versions to choose from are the following:\Z4 ${all_lts_versions[*]} \Zn You may also enter an inbetween release version
-	by typing its release number below as well. If you are not sure just let me choose intelligently for you... \n \Z1 ${dist_logo} \Zn"  30 90 "${all_lts_versions[-1]}" 3>&1 1>&2 2>&3)
+	by typing its release number below as well. Please realize that, if you select a really old version, it may only be supported to a limited extent and may fail. 
+	If you are not sure just let me choose intelligently for you... 
+	\Z1 \n${dist_logo} \Zn"  30 90 "${all_lts_versions[-1]}" 3>&1 1>&2 2>&3)
 	case $? in
 		"$DIALOG_CANCEL") return ;;
 		"$DIALOG_ESC") return ;;
@@ -8442,20 +8444,19 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 	[ "$tgt_ubuntu_ver" ] || tgt_ubuntu_ver=${all_lts_versions[-1]}
 
 	# Format the name of the VM to be created...
-	local vm_name="#Template_Ubuntu_${tgt_ubuntu_ver}_Desktop_$(date +%Y-%m-%d-%s)"
+	local vm_name="#Template_Ubuntu_${tgt_ubuntu_ver}_${_role}_$(date +%Y-%m-%d-%s)"
 
 	_summary_message="
 	The virtual machine (${vm_name}) \n
-	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} ${CloudConfigDir}\n
+	📋 - Using the instructions in PRESEED: ${CloudConfigDir}/${PRESEED_FILE} \n
+	📋 - Or the instructions in CloudConfig: ${CloudConfigDir}/cidata.iso,device=cdrom \n
 	🔧 - Configuring the following VM: \n
 			${vm_name} \n
 			cpus "${_cpu}" \n
 			memory "${_mem}" \n
 			network "${virt_net}" \n
 			disk size="${_dsk}" \n
-			disk= ${CloudConfigDir}/cidata.iso,device=cdrom \n
 			os-variant="$tgt_ubuntu_ver" \n
-			video= "virtio" --channel "spicevmc" \n
 			Source="${iso}" \n"
 
 	# Check the version of Ubuntu and use the appropriate installer...
@@ -8463,7 +8464,7 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 	if [[ ${tgt_ubuntu_ver::2} -lt 23 ]] ; then
 
 		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: is less than 23, so using debian installer (d-i) and desktop media..."
-		system::make_preseed_cfg -r "${_role}" -p "$( mktemp -d)" -t ${_task}
+		system::make_preseed_cfg -r "${_role}" -p "${_saveto}" -t ${_task}
 		system::log_item "🔎 Issuing search command: rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} ${_role}"
 
 		: ${ubuntu_iso_url=$(rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} live)}
@@ -8476,6 +8477,8 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 			write_warning "$iso_filename is not in cache, downloading..."
 			wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
 			iso="$permanent_download_dir/$iso_filename"
+		else
+			write_information "💿 - $iso_filename already in cache, using it for VM greenfield creation..."
 		fi
 
 		system::log_item "Ubuntu version ${tgt_ubuntu_version}: Running install options for debian installer (d-i)..."
@@ -8492,9 +8495,7 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 			localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 			--initrd-inject="${_saveto}/preseed.cfg" \
 			--initrd-inject="${_saveto}/ks.cfg" \
-			--noautoconsole \
-			|tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"  \
-		|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
+			--noautoconsole || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 ) |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 
 	elif [[ ${tgt_ubuntu_ver::2} -ge 23 || ${tgt_ubuntu_ver::2} -lt 24 ]] ; then
 
@@ -8511,6 +8512,8 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 			write_warning "$iso_filename is not in cache, downloading..."
 			wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
 			iso="$permanent_download_dir/$iso_filename"
+		else
+			write_information "📦 - $iso_filename already in cache, using it for VM greenfield creation..."
 		fi
 		
 		system::log_item "Ubuntu version ${tgt_ubuntu_version}: Running install options for subiquity..."
@@ -8543,6 +8546,8 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 			write_warning "$iso_filename is not in cache, downloading..."
 			wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
 			iso="$permanent_download_dir/$iso_filename"
+		else
+			write_information "📦 - $iso_filename already in cache, using it for VM greenfield creation..."
 		fi
 		
 		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: is greated than 23 but less than 24, so using cloud config and desktop media to build desktop..."
@@ -8556,8 +8561,7 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 			--disk path="${CloudConfigDir}/cidata.iso,device=cdrom" \
 			--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 			--extra-args="autoinstall" \
-			--noautoconsole  |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"  \
-		|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
+			--noautoconsole  || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 ) |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 
 	fi
 
@@ -10402,8 +10406,8 @@ system::generate_cloudconfig (){
 			# The role of the VM, e.g. ubuntu-desktop, ubuntu-server, kubuntu-desktop, etc.
 			local Preference_Role="$2"
 			case ${Preference_Role} in 
-			ubuntu-desktop | ubuntu-server | kubuntu-desktop | ssh-server | ansible-server | minecraft-server )
-				write_information "Role: ${Preference_Role}"
+			ubuntu-desktop | ubuntu-server | kubuntu-desktop | ssh-server | ansible-server | minecraft-server | ubuntu-server-minimal )
+				system::log_item "Requested Role: ${Preference_Role}"
 				;;
 			* )
 				system::log_item "ERROR: Unknown ubuntu flavor: ${Preference_Role}"
@@ -10428,13 +10432,7 @@ system::generate_cloudconfig (){
 			shift # Remove argument name from processing
 			;;
 		*)
-			write_error "ERROR: Unknown parameter: $1
-			Usage: $(FUNCNAME[0]) [--CloudConfigDir <directory>] [--vmname <hostname> ] [--flavor <ubuntu-flavor>]
-			Where <role> is the type of VM to create
-			where <hostname> is the hostname of the VM to be configured 
-			You have passed an unknown parameter: $1"
-			dialog::display_error " An ERROR has occured: the function $(FUNCNAME[0]) has been called with an unknown parameter: $1"
-			return 1
+			system::log_item "INFO: No known long parameters provided. Parameter: $1"
 			;;
 		esac
 		shift # Remove argument value from processing
@@ -10474,13 +10472,18 @@ autoinstall:
     allow-pw: true
     install-server: true
     authorized-keys:
-      - ssh-rsa ${Preference_ssh_pub_key}
+      $([[ -n ${Preference_ssh_pub_key} ]] && echo - ) ${Preference_ssh_pub_key}
   keyboard:
     layout: ${Preference_InitialKeyboardLayout}
   identity:
     hostname: "${vm_name}"
     username: "${Preference_InitialUser}"
     password: "${Preference_InitialUserPassword}"
+  storage:
+    layout:
+      name: lvm
+      sizing-policy: all
+      #password: "${Preference_Disk_Password}"
 CloudConfigCommon
 
 # -----------------------------------------------------------------------------------------
@@ -10503,13 +10506,16 @@ cat >> ${CloudConfigDir}/user-data << CloudConfig_server-desktop
     - name: nvim
       channel: latest/stable
       classic: true
+  package_update: true
+  package_upgrade: true
   packages:
     - dialog
     - git
     - curl
     - wget
     - zip
-    - ubuntu-desktop
+    - tasksel
+    - ubuntu-desktop^
   late-commands:
     - >-
       curtin in-target --
@@ -10672,10 +10678,25 @@ esac
 
 	system::log_item "Configuration data supplied: 
 	$(cat ${CloudConfigDir}/user-data)"
-	write_information "Generate Ubuntu autoinstall instruction media: "
+	write_information "Generating Ubuntu autoinstall instruction media: ${CloudConfigDir}/cidata.iso"
 	#software::check_native_package_dependency genisoimage
-	genisoimage -output ${CloudConfigDir}/cidata.iso -volid cidata -joliet -rock ${CloudConfigDir}/user-data ${CloudConfigDir}/meta-data  &>>${_LOGFILE}
-	chmod -R 777 "${CloudConfigDir}"
+	if genisoimage -output ${CloudConfigDir}/cidata.iso -volid cidata -joliet -rock ${CloudConfigDir}/user-data ${CloudConfigDir}/meta-data  &>>${_LOGFILE} ; then
+		{ system::log_item "Generated: ${CloudConfigDir}/cidata.iso" success ; }
+	else
+		{ system::log_item "Failed to generate: ${CloudConfigDir}/cidata.iso" ; return 200; }
+	fi
+
+	# Secure the cloud config directory
+	if chown $(stat -c "%U:%G" /var/lib/libvirt/qemu/) "${CloudConfigDir}" ; then
+		if chmod $(stat -c "%a" /var/lib/libvirt/qemu/) "${CloudConfigDir}" ; then
+			system::log_item "Changed ownership and permissions of ${CloudConfigDir} successfully"
+		else
+			system::log_item "Failed to change permissions of ${CloudConfigDir} to $(stat -c "%a" /var/lib/libvirt/qemu/) "
+		fi
+	else
+		system::log_item "Failed to change ownership of ${CloudConfigDir} to $(stat -c "%U:%G" /var/lib/libvirt/qemu/)"
+	fi
+	return 0
 
 }
 
@@ -10729,7 +10750,7 @@ system::get_vm_config()
         [[ -n $_role ]] && Preference_Role="${_role}" 
 
         # If the user has requested to be asked for the preseed file, then ask them:
-	if [[ -n $_ask ]] ; then
+	if [[ "$_ask" == "YES" ]] ; then
 
 		system::log_item "'ask' is requested, requesting user input for the preseed file:"
 		preseed_choices=$(dialog --backtitle "$BRANDING" --title "RTD Preseed Creator" --mixedform "Enter your preferences in to the form below. Please note that the password fields do not show anything but will capture what you type in" 22 80 0 \
@@ -10751,10 +10772,21 @@ system::get_vm_config()
 		clear
 
 		case $exit_status in
-		0 )   system::log_item "Save coices and continue..." ;;
-		1 )   system::log_item "[Cancel] pressed; not updating or changing any configuration items..." ; return 1 ;;
-		255 ) system::log_item "[ESC] pressed, exiting the dialog immediatley..." ; return 1 ;;
-		* )   system::log_item "[ERROR] Dialog closed or unexpected error." ; rtd_oem_pause 1 "Dialog closed or unexpected error." ;;
+			0 )   
+				system::log_item "Save coices and continue..." 
+			;;
+			1 )   
+				system::log_item "[Cancel] pressed; not updating or changing any configuration items..."
+				return 1 
+			;;
+			255 ) 
+				system::log_item "[ESC] pressed, exiting the dialog immediatley..." 
+				return 1 
+			;;
+			* )   
+				system::log_item "[ERROR] Dialog closed or unexpected error." 
+				rtd_oem_pause 1 "Dialog closed or unexpected error." 
+			;;
 		esac
 		
 		# Convert the dialog output to an array and asign the variables:
@@ -10890,21 +10922,28 @@ system::make_preseed_cfg ()
         # system::get_vm_config will load the preferences from the config file if it exists
         # otherwise it will use the defaults set in the function.
         # it will return predefined variables that can be used in the preseed file.
-	if [[ -n $_ask ]] ; then
+	if [[ "$_ask" == "YES" ]] ; then
 		system::log_item "Prompting for configuration options..."
-		system::get_vm_config --ask || dialog::yesno "Cancelled or sommething went wrion... continue with defaults?"
+		system::get_vm_config --ask || dialog::yesno "Cancelled or sommething went wrong... continue with defaults?"
                 exit_status=$?
 
                 case $exit_status in
-                0 )   system::log_item "Save coices and continue..." ;;
-                1 )   system::log_item "[Cancel] pressed; not updating or changing any configuration items..." ;;
-                255 ) system::log_item "[ESC] pressed, exiting the dialog immediatley..." ; return 1 ;;
-                * )   system::log_item "[ERROR] Dialog closed or unexpected error." ; rtd_oem_pause 1 "Dialog closed or unexpected error." ;;
+			0 )   
+				system::log_item "Save coices and continue..." 
+			;;
+			1 )   
+				system::log_item "[Cancel] pressed; not updating or changing any configuration items..." 
+			;;
+			255 )
+				 ystem::log_item "[ESC] pressed, exiting the dialog immediatley..." ; return 1 
+			;;
+			* )   
+				system::log_item "[ERROR] Dialog closed or unexpected error." ; rtd_oem_pause 1 "Dialog closed or unexpected error." 
+			;;
                 esac
 	else
 		system::log_item "Using default configuration options..."
-		system::get_vm_config || system::log_item "Failed to get configuration options..."
-                exit_status=$?
+		system::get_vm_config || system::log_item "Failed to get configuration options from saved preferences..."
 	fi
 
 	# If the user has requested to copy their SSH key to the host, then do so:

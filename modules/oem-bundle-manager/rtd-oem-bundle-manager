@@ -49,8 +49,12 @@
 : ${_SCRIPTNAME=$(basename $0)}
 : ${_TLA=${_SCRIPTNAME:0:3}}
 : ${_GIT_PROFILE:=vonschutter}
-
-
+if [[ $EUID -eq 0 ]] ; then
+	_LOG_DIR="/var/log/${_TLA}"
+else
+	_LOG_DIR="${HOME}/.log/${_TLA}"
+fi
+: ${_LOGFILE:="${_LOG_DIR}/$(basename $0)-$(date +%Y-%m-%d-%H%M%S).log"}
 
 
 
@@ -229,15 +233,6 @@ system::ExecStart::help ()
 
 
 dependency::file "_rtd_library" || { echo "Failed to find _rtd_library" ; exit 1 ; }
-
-if [[ -z ${_LOG_DIR} ]] ; then
-	if [[ $EUID -eq 0 ]] ; then
-		_LOG_DIR="/var/log/${_TLA}"
-	else
-		_LOG_DIR="${HOME}/.log/${_TLA}"
-	fi
-	_LOGFILE="${_LOG_DIR}/$(basename $0)-$(date +%Y-%m-%d-%H%M%S).log"
-fi
 
 case ${1} in
 	--help )
