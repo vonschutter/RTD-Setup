@@ -150,6 +150,7 @@ export RTD_VERSION=2.02
 	SoftwareManagmentAvailabilityCHK                ; Checks to see that the software managment system is not busy
 	system_config::tune_system_power_profile        ; Tune the system power profile based on detected Laptop or PC or VM
 	system::change_disk_pass                        ; Allows user to change password of the system partition encrypted disk
+	system::check_required_variables                ; Check that all required variables are set
 	system::create_physical_media_from_ubuntu_iso   ; Create physical media thumb drive from an Ubuntu ISO file
 	system::display_spinner                         ; Display a spinner in the terminal
         system::download_and_manipulate_iso_debian      ; Download and modify a debian iso to automatically install OEM addons
@@ -229,12 +230,23 @@ Library_Documentation
 ##                                                                       ##
 ###########################################################################
 # shellcheck disable=SC1090
+# shellcheck disable=SC1091
+# shellcheck disable=SC2034
+# shellcheck disable=SC2039
+# shellcheck disable=SC2154
+
+
+# Define the name of the library files required for this script
+# For flexibility we use variables with default values that can be overridden by the script that sources this library
+_branding.info=${_branding.info:-"_branding.info"}
+_locations.info=${_locations.info:-"_locations.info"}
+_rtd_recipies.info=${_rtd_recipies.info:-"_rtd_recipies.info"}
 
 # Online source for scripts and configuraions
 _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
 
 # load branding informaton:
-_OEM_dependencies="_branding.info _locations.info _rtd_recipies.info"
+_OEM_dependencies="${_branding.info} ${_locations.info} ${_rtd_recipies.info}"
 
 
 
@@ -434,7 +446,14 @@ dialog::display_notice ()
 #
 # End of Documentation
 
-	hash dialog &>/dev/null || check_dependencies "${RTD_GUI:-dialog}" &>/dev/null || return 1
+	system::log_item "checking for dialog..."
+	if ! hash "${RTD_GUI:-dialog}" &>/dev/null ; then
+		system::log_item "${RTD_GUI:-dialog} not found..."
+		check_dependencies "${RTD_GUI:-dialog}" &>/dev/null || return 1
+	else
+		system::log_item "${RTD_GUI:-dialog} found..."
+	fi
+	system::log_item "Notice: ${*}"
 
 	dialog --backtitle "${PUBLICATION:-"Notice"}" --colors --no-collapse --title "Notice" --msgbox "\n ${*} \n" 15 78
 	clear
@@ -460,10 +479,18 @@ dialog::display_error ()
 #
 # End of Documentation
 
-	hash dialog &>/dev/null || check_dependencies "${RTD_GUI:-dialog}" &>/dev/null || return 1
+	system::log_item "checking for dialog..."
+	if ! hash "${RTD_GUI:-dialog}" &>/dev/null ; then
+		system::log_item "${RTD_GUI:-dialog} not found..."
+		check_dependencies "${RTD_GUI:-dialog}" &>/dev/null || return 1
+	else
+		system::log_item "${RTD_GUI:-dialog} found..."
+	fi
+	system::log_item "Notice: ${*}"
 
 	dialog --backtitle "${PUBLICATION:-"ERROR"}" --colors --no-collapse --title "ERROR" --msgbox "\n ${*} \n" 15 78
 	clear
+	return 0
 }
 
 
@@ -505,6 +532,8 @@ dialog::display_summary_message ()
 		dialog --backtitle "$BRANDING" --colors --no-collapse --title "$1" --msgbox "${_summary_message}" "${HEIGHT:-"20"}" "${WIDTH:-"80"}"
 	fi
 	clear
+
+	return 0
 }
 
 
@@ -565,6 +594,14 @@ yad::display_cmd_output ()
 	# Command to execute
 	local cmd=$@
 
+	system::log_item "checking for dialog..."
+	if ! hash "yad" &>/dev/null ; then
+		system::log_item "yad not found..."
+		check_dependencies "yad" &>/dev/null || return 1
+	else
+		system::log_item "yad found..."
+	fi
+
 	# Execute the command and pipe its output to yad
 	( 
 		# Ensure any error messages are sent to standard output so yad can display them
@@ -600,6 +637,13 @@ yad::display_progressbar_pulsating ()
 # End of Documentation
 	_cmd="$*"
 
+	system::log_item "checking for dialog..."
+	if ! hash "yad" &>/dev/null ; then
+		system::log_item "yad not found..."
+		check_dependencies "yad" &>/dev/null || return 1
+	else
+		system::log_item "yad found..."
+	fi
 
 	${_cmd} | yad --title="$PUBLICATION $VERSION" --progress --pulsate --auto-close --auto-kill --text="RUNNING: ${_cmd}" --width=300 --height=100
 
@@ -1037,15 +1081,118 @@ dependency::virtualization ()
 
 
 
+
+system::check_required_variables () 
+{
+# Description: Function to check for the presence and non-emptiness of a list of variables.
+# This function checks for the presence and non-emptiness of a list of variables. 
+# It is designed to validate that certain required variables are both defined (set) 
+# and have a non-empty value. This is particularly useful in scripts where specific 
+# variables are essential for correct execution.
+#
+# Arguments:
+#     $@: A list of variable names (as strings) to be checked. Each argument should 
+#     be the name of a variable to check.
+#
+# Outputs:
+#     If any variables are found to be unset, it prints a message listing these variables.
+#     If any variables are found to be set but empty, it prints a message listing these variables.
+#
+# Return Values:
+#     Returns 0 (success) if all variables are set and non-empty.
+#     Returns 1 (failure) if any variable is either unset or set but empty.
+#
+# Usage:
+# To use this function, pass the names of the variables you want to check as arguments. For example:
+#
+# system::check_required_variables "VAR1" "VAR2" "VAR3"
+#
+# Example:
+# VAR1="data"
+# VAR2=""
+# VAR3=
+#
+# if system::check_required_variables "VAR1" "VAR2" "VAR3"; then
+#     echo "All required variables are set and non-empty."
+# else
+#     echo "Some required variables are either unset or empty."
+# fi
+#
+# Notes:
+#     This function is useful in scenarios where the correct configuration of the environment or 
+#     script depends on certain variables. It helps in early detection of misconfigurations 
+#     or missing data, allowing for more robust and error-resistant scripts. The function 
+#     does not modify any of the variables it checks; it only reports on their status.
+# End of documentation
+
+	local unset_vars=()
+	local empty_vars=()
+
+	for var in "$@"; do
+		if [ -z "${!var+x}" ]; then
+			unset_vars+=("$var")
+		elif [ -z "${!var}" ]; then
+			empty_vars+=("$var")
+		fi
+	done
+
+	if [ ${#unset_vars[@]} -ne 0 ]; then
+		write_error "The following requred variables are unset: ${unset_vars[*]}"
+	fi
+
+	if [ ${#empty_vars[@]} -ne 0 ]; then
+		write_error  "The following required variables are set but empty: ${empty_vars[*]}"
+	fi
+
+	if [ ${#unset_vars[@]} -ne 0 ] || [ ${#empty_vars[@]} -ne 0 ]; then
+		return 1
+	fi
+}
+
+
+
+
+
+
 system::find_vm_bridge ()
 {
-# Description: Common function to find the default bridge network device. 
-#              If there is no br/bridge we likely have a nat device "default"
+# Description:
+# This function searches for the default bridge network device on the system. It is designed to 
+# work in environments where virtual machines (VMs) are managed, typically using bridge networks for 
+# VM connectivity. If no bridge network device is found (prefixed with br or named bridge), the 
+# function defaults to a NAT device named "default".
+#
 # Globals:
-# Arguments: None
+# None. This function does not depend on or modify any global variables.
+#
+# Arguments:
+# None. The function does not take any arguments.
+#
 # Outputs:
-# Returns: br0 | bridge0 | default
-# Usage: simply call function in a script
+# The function outputs one of the following, depending on the system's network configuration:
+#
+#     The name of the first bridge network device found (e.g., br0, bridge0).
+#     default if no bridge network device is found.
+#
+# Returns:
+#     The name of a bridge network device (e.g., br0, bridge0) if one is found.
+#     default if no bridge network device is found.
+#
+# Usage:
+# To use this function, simply call it within a script. For example:
+#
+# bridge_device=$(system::find_vm_bridge)
+# echo "The default bridge device is: $bridge_device"
+#
+# This will store the name of the default bridge network device (or default if none is found) 
+# in the variable bridge_device and then print it.
+#
+# Additional Notes:
+#
+#     This function is particularly useful in virtualized environments where network bridging is 
+#     a common requirement.It assumes a standard naming convention for bridge devices (starting with br or named bridge).
+#     The function uses grep to filter the network devices and ls to list them from /sys/class/net, 
+#     which is a standard location for network interface information in Linux.
 # End of documentation
 
 	if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi
@@ -8266,8 +8413,10 @@ kvm::make_vm_template_now_from_debian_org ()
 	write_status "🔎 	- Discovering what the appropriate VM net interface is (default or br'0 - n')"
 	: ${virt_net="$(system::find_vm_bridge)"}
 	: ${source_url:="${_DEBIAN_SOURCE_URL}"}
-
 	local vm_name="#Template_Debian_${_task}_${vm_usecase}_$(date +%Y-%m-%d-%H-%M)"
+
+	system::check_required_variables "vm_name" "vm_kernel" "vm_initrd" "source_url" "virt_net" "_mem" "_cpu" "_dsk" "bin_virt_install" "PRESEED_FILE" \
+	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
@@ -8296,7 +8445,8 @@ kvm::make_vm_template_now_from_debian_org ()
 		--noautoconsole && dialog::display_summary_message "NOTICE!"  \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
-	for i in  PRESEED_FILE vm_kernel vm_initrd source_url CONFIG ui_diplay_style ; do unset $i ; done
+	for i in  PRESEED_FILE vm_kernel vm_initrd source_url ui_diplay_style vm_name vm_usecase ; do unset $i ; done
+
 }
 
 
@@ -8499,7 +8649,10 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 
 	elif [[ ${tgt_ubuntu_ver::2} -ge 23 || ${tgt_ubuntu_ver::2} -lt 24 ]] ; then
 
-		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: is greated than 23 but less than 24, so using cloud config and server media to build desktop..."
+		dialog::display_notice "Ubuntu version ${tgt_ubuntu_ver} no longer supports Debian preseed and not yet 
+		CloudCOnfig so using cloud config and server media to build desktop...
+		\n This is a temporary measure until the new installer is available and it is buggy and unreliable."
+		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: is greater than 23 but less than 24, so using cloud config and server media to build desktop..."
 		system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor "${_flavor}"
 
 		: ${ubuntu_iso_url=$(rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} server)}
@@ -8513,7 +8666,7 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 			wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
 			iso="$permanent_download_dir/$iso_filename"
 		else
-			write_information "📦 - $iso_filename already in cache, using it for VM greenfield creation..."
+			write_information "💿 - $iso_filename already in cache, using it for VM greenfield creation..."
 		fi
 		
 		system::log_item "Ubuntu version ${tgt_ubuntu_version}: Running install options for subiquity..."
@@ -8547,7 +8700,7 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 			wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
 			iso="$permanent_download_dir/$iso_filename"
 		else
-			write_information "📦 - $iso_filename already in cache, using it for VM greenfield creation..."
+			write_information "💿 - $iso_filename already in cache, using it for VM greenfield creation..."
 		fi
 		
 		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: is greated than 23 but less than 24, so using cloud config and desktop media to build desktop..."
@@ -11340,7 +11493,7 @@ system::make_preseed_cfg ()
 	Containging DATA:
 	$(cat ${PRESEED_FILE})"
 
-	system::log_item "Unseting variables: ${PRESEED_FILE} ${TASK_FILE} _saveto _role _task _ask Preference_InitialUserPasswordEncrypted ..."
+	system::log_item "Unseting variables: TASK_FILE _saveto _role _task _ask Preference_InitialUserPasswordEncrypted ..."
 	unset Preference_DiskEncryption \
 	Preference_Password \
 	Preference_InitialUser \
@@ -11351,7 +11504,6 @@ system::make_preseed_cfg ()
 	Preference_InitialTimeZone \
 	Preference_Wireless_ID \
 	Preference_Wireless_Password\
-	PRESEED_FILE \
 	TASK_FILE \
 	_role \
 	_task \
@@ -11996,7 +12148,7 @@ software::list_bundles ()
 			for _bundle in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" |grep "recipe_" |grep -v "Single_Install" )
 			do
 				# Build each line to be displayed in the bundle installer...
-				Description=$(grep -A 1 "$_bundle ()" "${_OEM_DIR}/core/_rtd_recipies" |tail -1)
+				Description=$(grep -A 1 "$_bundle ()" "${_OEM_DIR}/core/${_rtd_recipies.info}" |tail -1)
 				Description="${Description/"# "/": "}"
 				Description="${Description/"	"/""}"
 				cat ${completed_bundles_list} |grep "${_bundle/recipe_Bundle:_/}" &>/dev/null || echo -en "true \n ${_bundle/recipe_Bundle:_/} \n ${Description} \n"
@@ -12007,7 +12159,7 @@ software::list_bundles ()
 			completed_bundles_list="$(cat ${completed_bundles_list} )"
 			for _installed_bundle in ${completed_bundles_list} ; do
 				# Build each line to be displayed in the bundle installer...
-				Description=$(grep -A 1 "recipe_Bundle:_$_installed_bundle ()" "${_OEM_DIR}/core/_rtd_recipies" |tail -1)
+				Description=$(grep -A 1 "recipe_Bundle:_$_installed_bundle ()" "${_OEM_DIR}/core/${_rtd_recipies.info}" |tail -1)
 				Description="${Description/"# "/": "}"
 				Description="${Description/"	"/""}"
 				echo -e "true \n ${_installed_bundle} \n ${Description} \n"
