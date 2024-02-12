@@ -113,14 +113,11 @@ GOTO :CMDSCRIPT
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # Variables that govern the behavior or the script and location of files are
 # set here. There should be no reason to change any of this abcent strong preferences.
-printf '\n'
-
 YELLOW="$(tput setaf 3 2>/dev/null || printf '')"
 NO_COLOR="$(tput sgr0 2>/dev/null || printf '')"
 
 # Ensure administrative privileges.
-[ "$UID" -eq 0 ] || echo -e $YELLOW "This script needs administrative access..." $NO_COLOR
-[ "$UID" -eq 0 ] || exec sudo -E bash "$0" "$@"
+[ "$UID" -eq 0 ] || { printf -e $YELLOW "This script needs administrative access..." $NO_COLOR ; exec sudo -E bash "$0" "$@" ; }
 
 # Put a convenient link to the logs where logs are normally found...
 # capture the 3 first letters as org TLA (Three Letter Acronym)
@@ -154,14 +151,16 @@ export _LOGFILE=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log
 #:: In this case it is easier to manage a straight table than a for loop or array:
 
 
-if echo "$OSTYPE" |grep "linux" ; then
+if [[ "$OSTYPE" == *"linux"* ]]; then
 	{
-	echo "Linux OS Found: Attempting to get instructions for Linux..." | tee -a ${_LOGFILE} ${_STATUSLOG}
-	echo executing $0 >> ${_LOGFILE}
-	for d in git zip ; do 
-		if ! command -V "${d}" 2&1>> "${_LOGFILE}" ; then
-			for pkgmgr in apt yum dnf zypper ; do
-				hash ${pkgmgr} 2&1>> "${_LOGFILE}" && ${pkgmgr} install -y ${d}
+	printf "Linux OS Found: Attempting to get instructions for Linux: \n executing $0"
+
+	for d in git zip; do 
+		if ! command -v "$d" &>/dev/null; then
+			for pkgmgr in apt yum dnf zypper; do
+				if hash "${pkgmgr}" &>/dev/null; then
+				"${pkgmgr}" install -y "$d" && break
+				fi
 			done
 		fi
 	done
@@ -169,7 +168,7 @@ if echo "$OSTYPE" |grep "linux" ; then
 	git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp 
 		if [ $? -eq 0 ]
 		then
-			echo "Instructions successfully retrieved..."
+			printf "Instructions successfully retrieved..."
 			if [[ -d /opt/${_TLA,,}  ]] ; then
 				mv /opt/${_TLA,,} ${_BackupFolderName:="/opt/${_TLA,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"}
 				zip -m -r -5 ${_BackupFolderName}.zip  ${_BackupFolderName}
@@ -181,8 +180,7 @@ if echo "$OSTYPE" |grep "linux" ; then
 			ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
 			bash ${_OEM_DIR}/core/rtd-oem-linux-config.sh ${*}
 		else
-			echo "Failed to retrieve instructions correctly! "
-			echo "Suggestion: check write permission in "/opt" or internet connectivity."
+			printf "Failed to retrieve instructions correctly! "
 			exit 1
 		fi
 	} | tee -a ${_LOGFILE}
