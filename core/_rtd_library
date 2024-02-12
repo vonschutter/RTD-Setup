@@ -238,15 +238,15 @@ Library_Documentation
 
 # Define the name of the library files required for this script
 # For flexibility we use variables with default values that can be overridden by the script that sources this library
-_branding.info=${_branding.info:-"_branding.info"}
-_locations.info=${_locations.info:-"_locations.info"}
-_rtd_recipies.info=${_rtd_recipies.info:-"_rtd_recipies.info"}
+: ${_branding_info:="_branding.info"}
+: ${_locations_info:="_locations.info"}
+: ${_rtd_recipies_info:="_rtd_recipies.info"}
 
 # Online source for scripts and configuraions
 _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
 
 # load branding informaton:
-_OEM_dependencies="${_branding.info} ${_locations.info} ${_rtd_recipies.info}"
+_OEM_dependencies="${_branding_info} ${_locations_info} ${_rtd_recipies_info}"
 
 
 
@@ -12148,7 +12148,7 @@ software::list_bundles ()
 			for _bundle in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" |grep "recipe_" |grep -v "Single_Install" )
 			do
 				# Build each line to be displayed in the bundle installer...
-				Description=$(grep -A 1 "$_bundle ()" "${_OEM_DIR}/core/${_rtd_recipies.info}" |tail -1)
+				Description=$(grep -A 1 "$_bundle ()" "${_OEM_DIR}/core/${_rtd_recipies_info}" |tail -1)
 				Description="${Description/"# "/": "}"
 				Description="${Description/"	"/""}"
 				cat ${completed_bundles_list} |grep "${_bundle/recipe_Bundle:_/}" &>/dev/null || echo -en "true \n ${_bundle/recipe_Bundle:_/} \n ${Description} \n"
@@ -12159,7 +12159,7 @@ software::list_bundles ()
 			completed_bundles_list="$(cat ${completed_bundles_list} )"
 			for _installed_bundle in ${completed_bundles_list} ; do
 				# Build each line to be displayed in the bundle installer...
-				Description=$(grep -A 1 "recipe_Bundle:_$_installed_bundle ()" "${_OEM_DIR}/core/${_rtd_recipies.info}" |tail -1)
+				Description=$(grep -A 1 "recipe_Bundle:_$_installed_bundle ()" "${_OEM_DIR}/core/${_rtd_recipies_info}" |tail -1)
 				Description="${Description/"# "/": "}"
 				Description="${Description/"	"/""}"
 				echo -e "true \n ${_installed_bundle} \n ${Description} \n"
