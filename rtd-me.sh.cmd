@@ -125,6 +125,7 @@ export _SCRIPTNAME=$(basename $0)
 export _TLA=${_SCRIPTNAME:0:3}
 export _LOG_DIR=/var/log/${_TLA}
 mkdir -p ${_LOG_DIR}
+export _LOGFILE=${_LOG_DIR}/$( basename ${0} )-$(date +%Y-%m-%d)-oem.log
 
 # Set the GIT profile name to be used if not set elsewhere:
 export _GIT_PROFILE="${_GIT_PROFILE:-vonschutter}"
@@ -132,8 +133,6 @@ export _GIT_PROFILE="${_GIT_PROFILE:-vonschutter}"
 # Location of base administrative scripts and command-lets to get.
 _git_src_url=https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git
 
-# Determine log file names for this session
-export _LOGFILE=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log
 
 
 
@@ -165,25 +164,23 @@ if [[ "$OSTYPE" == *"linux"* ]]; then
 		fi
 	done
 	
-	git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp 
-		if [ $? -eq 0 ]
-		then
-			printf "Instructions successfully retrieved..."
-			if [[ -d /opt/${_TLA,,}  ]] ; then
-				mv /opt/${_TLA,,} ${_BackupFolderName:="/opt/${_TLA,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"}
-				zip -m -r -5 ${_BackupFolderName}.zip  ${_BackupFolderName}
-				rm -r ${_BackupFolderName}
-			fi
-			mv /opt/${_TLA,,}.tmp /opt/${_TLA,,} ; rm -rf /opt/${_TLA,,}/.git
-			source /opt/${_TLA,,}/core/_rtd_library
-			oem::register_all_tools
-			ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
-			bash ${_OEM_DIR}/core/rtd-oem-linux-config.sh ${*}
-		else
-			printf "Failed to retrieve instructions correctly! "
-			exit 1
+	if git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp ; then
+		printf "Instructions successfully retrieved..."
+		if [[ -d /opt/${_TLA,,}  ]] ; then
+			mv /opt/${_TLA,,} ${_BackupFolderName:="/opt/${_TLA,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"}
+			zip -m -r -5 ${_BackupFolderName}.zip  ${_BackupFolderName}
+			rm -r ${_BackupFolderName}
 		fi
-	} | tee -a ${_LOGFILE}
+		mv /opt/${_TLA,,}.tmp /opt/${_TLA,,} ; rm -rf /opt/${_TLA,,}/.git
+		source /opt/${_TLA,,}/core/_rtd_library
+		oem::register_all_tools
+		ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
+		bash ${_OEM_DIR}/core/rtd-oem-linux-config.sh ${*}
+	else
+		printf "Failed to retrieve instructions correctly! "
+		exit 1
+	fi
+	} |& tee -a ${_LOGFILE}
 	exit $?
 elif [[ "$OSTYPE" == "darwin"* ]]; then
         echo "Mac OSX is currently not supported..."
@@ -194,7 +191,7 @@ elif [[ "$OSTYPE" == "msys" ]]; then
 elif [[ "$OSTYPE" == "freebsd"* ]]; then
         echo "Free BSD is currently unsupported... "
 else
-       echo "This system is Unknown to this script"
+	echo "This system is Unknown to this script"
 fi
 exit $?
 
