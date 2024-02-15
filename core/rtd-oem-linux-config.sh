@@ -73,14 +73,12 @@
 # Logically, this script will not run, ever, unless downloaded along with the functions and the
 # rtd software recipie book by rtd-me.sh, or on a RTD OEM system where these components would have been
 # downloaded by the preseed or kickstart process as part of the install.
-: "${_LOG_DIR:="/var/log/rtd"}" ; mkdir -p ${_LOG_DIR}
+: ${_SCRIPTNAME="$(basename $0)"}
+: ${_TLA:="${_SCRIPTNAME:0:3}"}
+: ${_LOG_DIR:="/var/log/rtd"} ; mkdir -p ${_LOG_DIR}
 
-# Decide where to put log files.
-# Default: log in to the $_LOG_DIR location dated accordingly. If this is already set
-# we use the requested location. This should also be expoerted to the environment for use when
-# calling other scripts.
-export _LOGFILE="${_LOGFILE:="${_LOG_DIR}/$(basename $0)-$(date +%Y-%m-%d-%H).log"}" 
-
+# Determine log file directory
+_LOGFILE=${_LOG_DIR}/$( basename $0).log
 
 # Normally all choices are checked. Pass the variable "false" to this script to default
 # to unchecked. If none is passed, a default will be used.
@@ -112,7 +110,7 @@ complete_setup () {
 	completion=$(printf "Restart system and start using it now\nExit now and do no more\n${ConditionalResealOption}\n" | zenity \
 				--list \
 				--title "System Setup Complete" \
-				--text "Please select if you witsh to reseal the sysetm, restart and use the system, or just exit" \
+				--text "Please select if you witsh to reseal the system (not available for some distributtions), restart and use the system, or just exit" \
 				--column "Options" --width=1024 --height=768  2>/dev/null )
 	case "$completion" in
 		"Restart system and start using it now" )
@@ -134,6 +132,9 @@ complete_setup () {
 		;;
 	esac
 }
+
+
+
 
 dependency::_rtd_library ()
 {
@@ -176,8 +177,6 @@ oem_linux_config ()
 		sudo -E bash $0 $*
 	else
 		dependency::_rtd_library || exit 1
-		# Allow super user to display gui menu on users screen.
-		# sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
 		system::log_item "**********************************************************************"
 		system::log_item "$(basename $0) was started on $(date +%Y-%m-%d-%H)"
 		system::log_item "$(basename $0): Logfile is set to: ${_LOGFILE}"
@@ -187,7 +186,11 @@ oem_linux_config ()
 		done
 		
 		rtd_wait_for_internet_availability
-		rtd_oem_reset_default_environment_config
+		#rtd_oem_reset_default_environment_config
+		system::setup_or_remove_login_script "/opt/rtd/core/rtd-oem-linux-config.sh"
+		system::toggle_oem_auto_login 
+		system::toggle_oem_auto_elevated_privilege
+		system::set_oem_elevated_privilege_gui
 
 		if [[ -z "$(ps aux |grep X |grep -v grep)" ]]; then
 			echo "No X server at \$DISPLAY [$DISPLAY]"
@@ -210,7 +213,7 @@ oem_linux_config ()
 	fi
 }
 
-oem_linux_config | tee -a ${_LOGFILE} 2>/dev/null
+oem_linux_config |& tee -a ${_LOGFILE} 2>/dev/null
 
 exit
 EOF
