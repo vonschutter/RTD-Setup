@@ -67,7 +67,6 @@ export RTD_VERSION=2.02
         generate_autoyast_file                          ; Generates an installation configuration file for SUSE builds.
         generate_minecraft_server_launcher              ; Creates a minecraft server launcher, w. automatic dependeny resolutions
 	generate_report_disk_space_used_by_directory    ; Generate a disk usage report
-	generate_rtd_me_sh_cmd                          ; Creates a rtd bootstrap script for system/software install for Windows, Linux, MAC OS, BSD etc.
 	github::clone_repo_user                         ; Clone all repositories for a given user at github.com
 	github::list_all_user_repositories              ; List all repositories for a given user
 	InstallSoftwareFromRepo                         ; Installs a package from a repository supports SUSE, Fedora, Cent OS, Ubuntu Deian etc.
@@ -82,7 +81,7 @@ export RTD_VERSION=2.02
 	list_loaded_software_functions                  ; List all software (_rtd_recipes) functions loaded... for debugging/support purposes.
 	make_kvm_virtual_machine_now_from_fedora_org    ; Generate a Fedora virtual machine template directly from Fedora.org
 	make_kvm_virtual_machine_now_from_iso           ; Make a virtual machine from a generated ISO image
-	make_kvm_virtual_machine_now_from_microsoft     ; Make a virtual machine running Windows
+	kvm::make_vm_template_now_from_microsoft        ; Make a virtual machine running Windows
         make_kvm_virtual_machine_now_from_opensuse_org  ; Generate an OpenSUSE virtual machine template directly from opensuse.org
 	make_system_recovery_partition                  ; Build a system recovery partition
 	notice_rtd_loaded                               ; Notifies a script that RTD functions are loaded
@@ -91,6 +90,7 @@ export RTD_VERSION=2.02
 	oem::register_all_tools                         ; Register all OEM scripts so that they are accessible by terminal
 	oem::register_wallpapers_for_gnome              ; Register wallpapers for Gnome (so they show up in the appearance tool)
 	oem::rtd_tools_make_launchers                   ; Creates a default set of pre-defined launchers
+	oem::generate_rtd_me_sh_cmd                     ; Creates a rtd bootstrap script for system/software install for Windows, Linux, MAC OS, BSD etc.
 	pause_a_given_time                              ; Pause while showing a count down in seconds
 	rtd_oem_cfg_Account_Setup                       ; Generates a preseed section [Account setup] (d-i passwd string)
 	rtd_oem_check_inet_access                       ; Verifies that the internet is accessible
@@ -994,7 +994,7 @@ dependency::file ()
 
 
 
-# shellcheck disable=SC2120
+
 oem::deploy_themes () {
 # Description: Function to download and deploy themes from Github.
 #              The github location is defined in the _locations file for consistency.
@@ -1042,39 +1042,46 @@ dependency::virtualization ()
 # Usage: simply call function in a script
 # End of documentation
 
-
+	OS_NAME=$(hostnamectl | awk '/Operating System/ {print $3}')
 	write_status "${FUNCNAME[0]}: Checking for virtualization software..."
-	local _os_name
-	_os_name=$(hostnamectl |grep "Operating System" |cut -d' ' -f3)
 
-	case $_os_name in
-	openSUSE )
-		write_status "Verrifying/Installing virtualization software for openSUSE..."
-		zypper install -y --recommends -t pattern "kvm_server"  "kvm_tools" | tee -a "${_LOGFILE}"
-	;;
-	Tumbleweed )
-		write_status "Verryfying/Installing virtualization software for Tumbleweed..."
-		zypper install -y --recommends -t pattern "kvm_server"  "kvm_tools" | tee -a "${_LOGFILE}"
-	;;
-	Fedora ) 
-		local _probable_dependencies="bridge-utils libvirt virt-install qemu-kvm virt-top libguestfs-tools guestfs-tools" 
-	;;
-	Debian | Ubuntu) 
-		local _probable_dependencies="bridge-utils cpu-checker libvirt-clients libvirt-daemon qemu qemu-kvm virtinst" 
-	;;
-	* ) 
-		local _probable_dependencies="bridge-utils cpu-checker libvirt-clients libvirt-daemon qemu qemu-kvm virtinst" 
-	;;
+	local _probable_dependencies
+	case $OS_NAME in
+		openSUSE|Tumbleweed)
+			if ! command -v qemu-system-x86_64 >/dev/null 2>&1; then
+				write_status "KVM or QEMU not found. Installing virtualization software for $OS_NAME..."
+				zypper install -y --recommends -t pattern "kvm_server" "kvm_tools" | tee -a "${_LOGFILE}"
+				sudo systemctl enable --now libvirtd
+			else
+				write_status "KVM and QEMU are available..."
+			fi
+		;;
+		Fedora | RHEL | CentOS)
+			if ! command -v qemu-system-x86_64 >/dev/null 2>&1; then
+				write_status "KVM or QEMU not found. Installing virtualization software for $OS_NAME..."
+				software::add_native_package "@virtualization"
+				sudo systemctl enable --now libvirtd
+			else
+				write_status "KVM and QEMU are available..."
+			fi
+		;;
+		Debian | Ubuntu | TUXEDO | *)
+			if ! command -v qemu-system-x86_64 >/dev/null 2>&1; then
+				write_status "KVM or QEMU not found. Installing virtualization software for $OS_NAME..."
+				local count=1
+				for dependency in qemu-kvm libvirt-daemon  bridge-utils virtinst libvirt-daemon-system ; do
+					write_status "${count} - Verifying dependency (${dependency})..."
+					software::add_native_package "$dependency" 
+					count=$((count + 1))
+				done
+				sudo systemctl enable --now libvirtd
+			else
+				write_status "KVM and QEMU are available..."
+			fi
+
+		;;
 	esac
-
-	if [[ -n ${_probable_dependencies} ]] ; then
-		count=1
-		for i in  ${_probable_dependencies} ; do
-			write_status "${count}	- Verifying dependencies if relevant( ${i} )..."
-			software::check_native_package_dependency $i &>/dev/null
-			count=$((count + 1))
-		done
-	fi
+	wait # Wait for all background processes to finish
 }
 
 
@@ -1791,14 +1798,19 @@ rtd_oem_reset_default_environment_config ()
 
 	# Disable the automatically trying to install OEM software
 	mkdir -p ${_OEM_DIR}/cache/
-	[[ -f /etc/xdg/autostart/org.runtimedata.oem.cofig.desktop ]] && mv /etc/xdg/autostart/org.runtimedata.oem.cofig.desktop ${_OEM_DIR}/cache/
 	[[ -f /etc/sudoers.d/99_sudo_include_file ]] && mv /etc/sudoers.d/99_sudo_include_file ${_OEM_DIR}/cache/
 	cp /home/${SUDO_USER}/.bashrc ${_OEM_DIR}/cache/bashrc
-	# Keep ability for root to open dialog boxes for a user.
-	sed -i '/xhost\ local:root/d' /home/${SUDO_USER}/.bashrc
-	toggle_oem_auto_login
-}
 
+	file_path="/home/${SUDO_USER}/.bashrc"
+	if [ -L "$file_path" ]; then  
+		real_path=$(readlink "$file_path")
+		sed -i '/xhost\ local:root/d' "$real_path"
+	else
+		sed -i '/xhost\ local:root/d' "$file_path"
+	fi
+
+	system::toggle_oem_auto_login
+}
 
 
 
@@ -2034,6 +2046,37 @@ toggle_oem_run_once () {
 
 
 
+system::setup_or_remove_login_script () 
+{
+# Description: Sets up or removes a .desktop launcher to run a script at login.
+# Arguments:
+#   1. Path to the script to be executed.
+#   2. Optional: Path to the .desktop launcher (default: /etc/xdg/autostart/oem-run.desktop).
+# Usage:
+#   setup_or_remove_oem_login_script /path/to/script.sh
+
+	local script_path="$1"
+	local file_path="${2:-"/etc/xdg/autostart/oem-run.desktop"}"
+
+	if [[ ! -f "${script_path}" ]]; then
+			write_error "Script not found: ${script_path}"
+		return 1
+	fi
+
+	if [[ -e "$file_path" ]]; then
+		write_information "Removing execution on login of (${file_path})"
+		if ! sudo rm "${file_path}"; then
+			write_error "Failed to remove file: ${file_path}"
+		return 1
+		fi
+	else
+		write_information "Adding execution on login of (${file_path})"
+		if ! printf '[Desktop Entry]\nType=Application\nExec=sudo -E %s\nTerminal=true\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
+			write_error "Failed to create file: ${file_path}"
+		return 1
+		fi
+	fi
+}
 
 
 
@@ -2286,6 +2329,115 @@ toggle_oem_auto_login ()
 
 
 
+system::toggle_oem_auto_login () 
+{
+# Description:  
+#
+# This function toggles automatic login for various display managers. It is designed to enable or disable 
+# auto-login for administrative purposes, such as performing interactive administrative logins and 
+# running configuration scripts. This function supports a range of popular display managers and 
+# applies SUSE-specific configurations when necessary.
+#
+# Globals:
+# None. The function does not depend on or modify any global variables.
+#
+# Arguments:
+# None. The function does not take any arguments.
+#
+# Outputs:
+# The function outputs status messages, warnings, and error information using the write_status, 
+# write_warning, write_information, and write_error functions. These messages indicate the actions 
+# being taken (e.g., enabling or disabling auto-login) and any issues encountered.
+#
+# Returns:
+# None. The function does not return a value.
+#
+# Usage:
+#
+# Call toggle_oem_auto_login without any arguments to toggle the auto-login feature. For example:
+#
+# toggle_oem_auto_login
+#
+# This will enable auto-login if it is currently disabled, or disable it if it is currently enabled.
+#
+# Function Behavior:
+#
+#     The function first checks if the system is running SUSE. If not, it proceeds to check for the 
+#     presence of configuration files for LightDM, SDDM, GDM3, and GDM. For each display manager found, 
+#     the function toggles the auto-login setting. If auto-login is enabled, it will disable it, and vice versa.
+#     In the case of SUSE, the function modifies the SUSE-specific display manager file in /etc/sysconfig/ 
+#     instead of the individual display manager configuration files.
+#     The function also handles toggling auto-login for terminal environments (TTY) without a graphical user interface.
+#
+# Special Notes:
+#
+#     This function should be used with caution as enabling auto-login can have security implications.
+#     It is particularly useful for scenarios like OEM setup or automatic template generation for KVM.
+#     The function assumes that the current user has the necessary permissions to modify system configuration files.
+#
+# Implementation Details:
+#
+#     The function uses conditional checks to determine the presence of various display manager configuration files.
+#     Backup files with the suffix .rtd-bak are used to preserve the original configuration before making changes.
+#
+# End of documentation
+
+	local dm_conf lightdm_conf="/etc/lightdm/lightdm.conf" sddm_conf="/etc/sddm.conf"
+	local gdm3_conf="/etc/gdm3/daemon.conf" gdm_conf="/etc/gdm/custom.conf"
+	local suse_dm_conf="/etc/sysconfig/displaymanager"
+	local tty_conf="/etc/systemd/system/getty@tty1.service.d/override.conf"
+	local backup_suffix=".rtd-bak"
+
+	# Function to toggle auto login for a display manager
+	toggle_dm_auto_login() {
+		local dm_conf="$1"
+		if [[ -f "${dm_conf}${backup_suffix}" ]]; then
+			write_status "Auto login is enabled for $(basename "$dm_conf"): toggling off..."
+			rm "${dm_conf}" && mv "${dm_conf}${backup_suffix}" "${dm_conf}"
+		else
+			write_status "Auto login is disabled for $(basename "$dm_conf"): toggling on..."
+			cp "${dm_conf}" "${dm_conf}${backup_suffix}"
+			# Add specific auto login configuration here
+		fi
+	}
+
+	if ! hostnamectl | grep -qi suse; then
+		[[ -f "$lightdm_conf" ]] && toggle_dm_auto_login "$lightdm_conf"
+		[[ -f "$sddm_conf" ]] && toggle_dm_auto_login "$sddm_conf"
+		[[ -f "$gdm3_conf" ]] && toggle_dm_auto_login "$gdm3_conf"
+		[[ -f "$gdm_conf" ]] && toggle_dm_auto_login "$gdm_conf"
+	else
+		if [[ -e "$suse_dm_conf" ]]; then
+			if [[ -e "${suse_dm_conf}${backup_suffix}" ]]; then
+				write_status "SUSE auto login is enabled: toggling off..."
+				rm "$suse_dm_conf" && mv "${suse_dm_conf}${backup_suffix}" "$suse_dm_conf"
+			else
+				write_status "SUSE auto login is disabled: toggling on..."
+				cp "$suse_dm_conf" "${suse_dm_conf}${backup_suffix}" || write_error "Could not backup: $suse_dm_conf"
+				sed -i 's/DISPLAYMANAGER_AUTOLOGIN=""/DISPLAYMANAGER_AUTOLOGIN="tangarora"/' "$suse_dm_conf" || write_error "Could not write to file: $suse_dm_conf"
+			fi
+		fi
+	fi
+
+	if [[ ! -f "$tty_conf" ]]; then
+		write_status "TTY auto login is disabled: toggling on..."
+		mkdir -p "$(dirname "$tty_conf")"
+		cat > "$tty_conf" <<-OEM_TTY_LOGIN_OPTION
+		[Service]
+		ExecStart=
+		ExecStart=-/sbin/agetty --noissue --autologin ${SUDO_USER:-"tangarora"} %I $TERM
+		Type=idle
+		OEM_TTY_LOGIN_OPTION
+	else
+		write_status "TTY auto login is enabled: toggling off..."
+		rm "$tty_conf"
+	fi
+}
+
+
+
+
+
 
 
 
@@ -2315,6 +2467,61 @@ set_oem_elevated_privilege_gui ()
 
 
 
+system::set_oem_elevated_privilege_gui () 
+{
+# Description
+
+# This function configures the local X environment to allow root to display GUI applications. 
+# It is particularly useful for Debian and other Linux distributions where GUI apps cannot 
+# be run under sudo or in a root environment by default. This function modifies the .bashrc 
+# files for the specified user and root to enable GUI applications to be launched with elevated 
+# privileges. It is compatible with distributions like Slackware and Debian.
+#
+# Globals:
+#
+#     $_OEM_USER: The username for whom the X environment will be configured. 
+#
+# Arguments:
+#
+# None. The function does not take any arguments.
+#
+# Outputs:
+#
+# The function modifies the .bashrc file in the home directory of $_OEM_USER and the root user 
+# to configure the X environment. It outputs information about the changes being made.
+#
+# Returns:
+#
+# None. The function does not return a value.
+#
+# Usage:
+#
+# To use this function, ensure that the $_OEM_USER global variable is set to the appropriate username, 
+# then call the function:
+#
+# _OEM_USER="username"
+# set_oem_elevated_privilege_gui
+#
+# This will append the necessary configurations to the .bashrc files of the specified user and the root user.
+# Function Behavior:
+#
+#     The function appends xhost local:root to the .bashrc file in the home directory of $_OEM_USER. 
+#     This command allows the root user to display GUI applications on the local X server.
+#     It also appends export XAUTHORITY=/home/${_OEM_USER}/.Xauthority to /root/.bashrc. This export 
+#     sets the XAUTHORITY environment variable for the root user, pointing to the .Xauthority file in 
+#     the home directory of $_OEM_USER.
+#
+# End of documentation
+
+	local user_bashrc="/home/${_OEM_USER:-"tangarora"}/.bashrc"
+	local root_bashrc="/root/.bashrc"
+
+	write_information "Editing bashrc: xhost local:root in ${user_bashrc}"
+	echo "xhost local:root" >> "${user_bashrc}"
+
+	write_information "Editing bashrc: XAUTHORITY=/home/${_OEM_USER:-"tangarora"}/.Xauthority in ${root_bashrc}"
+	echo "export XAUTHORITY=/home/${_OEM_USER:-"tangarora"}/.Xauthority" >> "${root_bashrc}"
+}
 
 
 
@@ -2339,6 +2546,49 @@ set_enable_oem_elevated_privelege()
 	sudo visudo -cf /etc/sudoers.d/99_sudo_include_file
 }
 
+
+
+
+
+system::toggle_oem_auto_elevated_privilege () 
+{
+# Description: Toggles passwordless sudo privileges for a specified user.
+# WARNING: This function modifies sudoers and can pose a security risk.
+# Ensure to disable this with 'rtd_oem_reset_default_environment_config' after use.
+# Globals:
+#   _OEM_USER - The user for whom to toggle passwordless sudo. Defaults to SUDO_USER.
+# Arguments: None
+# Usage:
+#   system::toggle_oem_auto_elevated_privilege
+
+	: ${_OEM_USER:="${SUDO_USER}"}
+
+	if [[ -z "${_OEM_USER}" ]]; then
+		write_error "Error: User not specified for elevated privileges."
+		return 1
+	fi
+
+	local sudoers_file="/etc/sudoers.d/99_sudo_include_file"
+
+	# Check if passwordless sudo is already set for the user
+	if sudo grep -q "^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" "${sudoers_file}" 2>/dev/null; then
+		# Remove passwordless sudo entry
+		write_information "Removing passwordless sudo for user: ${_OEM_USER}"
+		sudo sed -i "/^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL/d" "${sudoers_file}"
+	else
+		# Add passwordless sudo entry
+		write_information "Adding passwordless sudo for user: ${_OEM_USER}"
+		echo "${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" | sudo EDITOR='tee -a' visudo -f "${sudoers_file}"
+	fi
+
+	# Validate sudoers file syntax
+	if ! sudo visudo -cf "${sudoers_file}" &>/dev/null; then
+		write_error "Error: Syntax error in sudoers file."
+		return 1
+	fi
+
+	write_information "Passwordless sudo configuration updated for ${_OEM_USER}."
+}
 
 
 
@@ -5963,19 +6213,19 @@ software::add_native_package ()
 
         if [[ $(echo $OSTYPE | grep "linux") ]]; then
 		if hash zypper 2>/dev/null; then
-			write_status  "Installing ${1} using ZYPPER"
+			write_status "📦 Installing ${1} using ZYPPER"
 			sudo zypper install -y ${1}
 			return $?
 		elif hash apt 2>/dev/null; then
-			write_status  "Installing ${1} using DEB"
+			write_status "📦 Installing ${1} using DEB"
 			sudo apt-get -y install ${1}
 			return $?
 		elif hash dnf 2>/dev/null; then
-			write_status "Installing ${1} using DNF"
+			write_status "📦 Installing ${1} using DNF"
 			sudo dnf -y install ${1}
 			return $?
 		elif hash pkcon 2>/dev/null; then
-			write_status  "Installing ${1} using Package Kit..."
+			write_status "📦 Installing ${1} using Package Kit..."
 			pkcon install -y ${1}
 			return $?
 		else
@@ -6107,17 +6357,17 @@ check_dependencies ()
 # End of documentation
 	ensure_admin
 	#---------------------------------------------------------------
-	write_status "Checking for script dependencies and install if not there..."
+	write_status "📦 Checking for script dependencies and install if not there..."
 	#---------------------------------------------------------------
 	if is_software_package_installed "${1}" ; then
-		write_information "I found that the dependency ${1} is present on this system... "
+		write_information "📦 I found that the dependency ${1} is present on this system... "
 	else
-		write_warning "You seem to have no ${1}... I will try to get it... "
+		write_warning "📦 You seem to have no ${1}... I will try to get it... "
 		if InstallSoftwareFromRepo "${1}" ; then
-			write_status "OK Done! Continuing..."
+			write_status "📦 OK Done! Continuing..."
 		else
-			write_error "That install didn't work out so well."
-			write_error "Please manually try to add the software since I couldn't do it."
+			write_error "📦 That install didn't work out so well."
+			write_error "📦 Please manually try to add the software since I couldn't do it."
 			return 1
 		fi
 	fi
@@ -6259,64 +6509,115 @@ rtd_oem_release_upgrade ()
 
 
 	ensure_admin
-	local set interactive=$1
-	unset result
-	tmp_disc_dir=$(mktemp -d )
-		if hostnamectl |grep "Ubuntu" 2>/dev/null ; then
-			write_warning "this may take some time, please be patient!"
-			apt clean && apt update -m ; dpkg --configure -a ; apt install -f ; apt dist-upgrade ; apt autoremove --purge
-			do-release-upgrade 1> >(tee "$tmp_disc_dir"/stdout ) 2> >(tee "$tmp_disc_dir"/stderr >&2 )
-			result="$( cat "$tmp_disc_dir"/stdout; cat "$tmp_disc_dir"/stderr)"
-			display_result "Release Upgrade Attempt Result: "
-			rm -r "$tmp_disc_dir" ; unset tmp_disc_dir
-		elif hostnamectl |grep "Pop!_OS" 2>/dev/null ; then
-			write_warning "this may take some time, please be patient!"
-			apt clean && apt update -m ; dpkg --configure -a ; apt install -f ; apt dist-upgrade ; apt autoremove --purge
-			do-release-upgrade 1> >(tee "$tmp_disc_dir"/stdout ) 2> >(tee "$tmp_disc_dir"/stderr >&2 )
-			result="$( cat "$tmp_disc_dir"/stdout; cat "$tmp_disc_dir"/stderr)"
-			display_result "Release Upgrade Attempt Result: "
-			rm -r "$tmp_disc_dir" ; unset tmp_disc_dir
-		elif hostnamectl |grep "Debian" 2>/dev/null ; then
-			write_error "Debian does not provide an upgrade tool between major releases... Please use the manual upgrade method."
-			result="Debian does not have an in place upgrade tool. Please edit the /etc/apt/sources.list and use the disd-upgrade option"
-			display_result "Release Upgrade Attempt Result: "
-		elif hostnamectl |grep "SUSE" 2>/dev/null ; then
-			write_warning "This REALLY may take some time, please be patient!"
-			cat /etc/os-release
-			write_information "these are the current repositories..."
-			zypper modifyrepo --enable repo-update
-			zypper repos --uri
+	local interactive=$1
+	local distro=$(hostnamectl | grep -Eo 'Ubuntu|Pop!_OS|Debian|SUSE|fedora')
 
-			SUSE_VER=$($RTD_GUI --title "SUSE Distribution Upgrade Confirmation" --inputbox "Please pick an available Suse version by entering it below. For example type: 15.3  \n You are currently using: \n $(hosnamectl)  "  25 110 "15.3" 3>&1 1>&2 2>&3) ;clear
-			[ "${SUSE_VER}" ] || write_error "No verson selected for distribution upgrade -- Only running a regular update then... "
-
-			write_status "Checking if it is possible to upgrade to ${SUSE_VER}"
-			if zypper --releasever="${SUSE_VER}" lr -u ; then
-				zypper --releasever="${SUSE_VER}" ref
-				write_status "Attempting upgrade of system now..."
-				zypper --releasever="${SUSE_VER}" dup --force-resolution
-				read -p "$ERRMSG: Press  [ ENTER ] to REBOOT:"
-				reboot
-			else
-				write_error "It is not possible to upgrade to Open Suse ${SUSE_VER} since there does not appear to be a release server available for ${SUSE_VER}"
-				read -p "$ERRMSG: Press  [ ENTER ] to continue:"
-			fi
-		elif hostnamectl |grep "fedora" 2>/dev/null ; then
-			releasever=$($RTD_GUI --title "Fedora Distribution Upgrade Confirmation" --inputbox "Please enter the Fedora version you want to upgrade to. Please make sure that it has been published. You are currently using: $(hosnamectl)  only numbers are valid" 8 78  3>&1 1>&2 2>&3)
-			dnf upgrade --refresh
-			dnf install dnf-plugin-system-upgrade
-			dnf system-upgrade download --refresh --releasever="${releasever}"
-			read -p "$ERRMSG: Press  [ ENTER ] to REBOOT and install the upgrade:"
+	case $distro in
+		"Ubuntu"|"Pop!_OS"|"TUXEDO")
+			# Common update steps for Ubuntu and Pop!_OS
+			write_warning "This may take some time, please be patient!"
+			apt clean && apt update -m ; dpkg --configure -a ; apt install -f ; apt dist-upgrade ; apt autoremove --purge
+			if [[ "$interactive" == "interactive" ]]; then
+				$RTD_GUI --title "$distro Distribution Upgrade Confirmation" --yesno "Please confirm that you want to upgrade to the next version of $distro. This may take some time, please be patient!" 8 78
 				case $? in
-					0 ) dnf system-upgrade reboot || return 1;;
-					1 ) return 1 ;;
-					255) return 1 ;;
+				0 ) do-release-upgrade | tee -a ${_LOGFILE} ;;
+				1|255 ) return 1 ;;
 				esac
+			else
+				do-release-upgrade --quiet | tee -a ${_LOGFILE}
+			fi
+		;;
+		"Debian")
+			write_error "Debian does not provide an upgrade tool between major releases. Please use the manual upgrade method."
+			return 1
+		;;
+		"SUSE")
+			# SUSE upgrade steps
+			if current_version=$(cat /etc/os-release | grep VERSION_ID | cut -d '"' -f2) ; then
+				write_status "Current SUSE version: $current_version"
+			else
+				write_error "unable to query /etc/os-release for current version of SUSE! "
+				return 1
+			fi
 
-		else
-			[[ "$interactive" == "interactive" ]] && read -p "This option requires the program (do-release-upgrade) (Ubuntu) or OpenSUSE (zypper) on your system. Press [Enter] key to return to menu."
-		fi
-		return
+			if latest_version=$(curl -s https://download.opensuse.org/distribution/openSUSE-current/iso/ | grep -Eo '1[5-9]\.[0-9]|20\.[0-9]+' | sort -V | tail -n1) ; then
+				write_status "Latest SUSE version: $latest_version"
+			else
+				write_error "unable to query opensuse.org for latest version of SUSE! Check access to internet and try again."
+				return 1
+			fi
+
+			if [ "$(printf '%s\n' "$current_version" "$latest_version" | sort -V | head -n1)" != "$current_version" ]; then
+				write_status "A newer version of SUSE is available: $latest_version"
+				write_warning "This REALLY may take some time, please be patient!"
+				write_information "These are the current repositories:"
+				{
+					zypper repos --uri
+					zypper modifyrepo --enable repo-update
+					zypper repos --uri
+					zypper refresh
+				} | tee -a ${_LOGFILE}
+
+				write_status "Checking if it is possible to upgrade to ${SUSE_VER}"
+				if zypper --releasever="${SUSE_VER}" lr -u ; then
+					zypper --releasever="${SUSE_VER}" ref
+					write_status "Attempting upgrade of system now..."
+					zypper --releasever="${SUSE_VER}" dup --force-resolution
+					wait
+					[[ "$interactive" == "interactive" ]] && read -p "$ERRMSG: Press  [ ENTER ] to REBOOT:"
+					reboot
+				else
+					write_error "It is not possible to upgrade to Open Suse ${SUSE_VER} since there does not appear to be a release server available for ${SUSE_VER}"
+					[[ "$interactive" == "interactive" ]] && read -p "$ERRMSG: Press  [ ENTER ] to continue:"
+				fi
+			else
+				write_information "You are using the latest version of SUSE: $current_version"
+			fi
+		;;
+		"fedora")
+			# Fedora upgrade steps
+			if [[ "$interactive" == "interactive" ]]; then
+				latest_version=$(curl -s https://dl.fedoraproject.org/pub/fedora/linux/releases/ | cut -d' ' -f5 |grep -Eo '[0-9][5-9]' | sort -V | tail -n1)
+				releasever=$($RTD_GUI --title "Fedora Distribution Upgrade Confirmation" \
+					--inputbox "Please enter the Fedora version you want to upgrade to. Latest version is . Current version: $latest_version $(hostnamectl | grep -oP '(?<=Operating System: Fedora\s)\d+')\nOnly numbers are valid." 10 78 3>&1 1>&2 2>&3)
+			else
+				releasever=$(curl -s https://dl.fedoraproject.org/pub/fedora/linux/releases/ | cut -d' ' -f5 |grep -Eo '[0-9][5-9]' | sort -V | tail -n1)
+			fi
+
+			# Validate input
+			if [[ ! $releasever =~ ^[0-9]+$ ]]; then
+				write_error "Invalid version number. Upgrade aborted."
+				return 1
+			fi
+
+			# Upgrade process
+			write_status "Starting upgrade process for Fedora. This may take some time."
+			{
+				dnf clean all
+				dnf upgrade --refresh -y
+				dnf install dnf-plugin-system-upgrade -y
+				if ! dnf system-upgrade download --refresh --releasever="${releasever}"; then
+					write_error "Failed to download system upgrade packages."
+					return 1
+				fi
+			} | tee -a ${_LOGFILE}
+
+			# Confirmation for reboot
+			if [[ "$interactive" == "interactive" ]]; then
+				read -p "$ERRMSG: Press [ ENTER ] to REBOOT and install the upgrade:"
+			fi
+
+			# Rebooting to apply upgrade
+			dnf system-upgrade reboot
+			return $?
+		;;
+		*)
+		[[ "$interactive" == "interactive" ]] && read -p "This distribution is not supported. Press [Enter] key to return to menu."
+		return 1
+		;;
+	esac
+	return
+
 }
 
 
@@ -8737,7 +9038,7 @@ kvm::make_vm_template_now_from_ubuntu_com ()
 
 
 
-make_kvm_virtual_machine_now_from_microsoft ()
+kvm::make_vm_template_now_from_microsoft ()
 {
 # Description:
 # Function to create a KVM virtual michine disk and define a VM. This function should be
@@ -8749,7 +9050,7 @@ make_kvm_virtual_machine_now_from_microsoft ()
 # Arguments: [ win11 | win10 | win8 | win7 ]
 # Outputs: One VM running windows
 # Returns:
-# Usage: make_kvm_virtual_machine_now_from_microsoft target_winver
+# Usage: "kvm::make_vm_template_now_from_microsoft --winver target_winver"
 #
 #
 # NOTE: QCOW2 is a storage format for virtual .
@@ -8769,60 +9070,78 @@ make_kvm_virtual_machine_now_from_microsoft ()
 	dependency::virtualization
 
 	# Check for optional default T-Shirts size overrides... 
-	local OPTIND o a
-	while getopts ':c:m:d:' OPTION; do
-		case "$OPTION" in
-		c )
-			local _cpu="${OPTARG}"
-			write_information "Custom CPU set to: ${OPTARG}"
-		;;
-		m )
-			local _mem="${OPTARG}"
-			write_information "Custom memory set to: ${OPTARG}"
-		;;
-		d )
-			local _dsk="${OPTARG}"
-			write_information "Custom disk sizee set to: ${OPTARG}"
-		;;
-		? )
-			write_host --cyan  "Usage: ${FUNCNAME[0]} or ${FUNCNAME[0]} [-c <#CPU>, -m <MB RAM>, -d <GB Disk>]"
-			return 0
-		;;
+	local _cpu _mem _dsk _saveto AutoUnattend PostTasks WindowsMedia _uefi_option _virt_net
+
+	while  [[ $# -gt 0 ]] ; do
+		case "$1" in
+			--cpu)
+				_cpu="$2"
+				write_information "Custom CPU requested andset to: ${_cpu}"
+				shift 2
+			;;
+			--mem)
+				_mem="$2"
+				write_information "Custom memory requested andset to: ${_mem}"
+				shift 2
+			;;
+			--disk)
+				_dsk="$2"
+				write_information "Custom disk size requested andset to: ${_dsk}"
+				shift 2
+			;;
+			--winver )
+				target_winver="$2"
+				write_information "Custom Windows version requested and set to: ${target_winver}"
+				shift 2
+			;;
+			*)
+				write_host --cyan "Usage: ${FUNCNAME[0]} [--cpu <#CPU>] [--mem <MB RAM>] [--disk <GB Disk>] [--winver <win11 | win10 | win8 | win7>]"
+				return 0
+			;;
 		esac
 	done
-	unset OPTIND
+
 
 	# Set default values for VM T-Shirts sizes...
 	: ${_cpu="${_cpu:-2}"}
 	: ${_mem="${_mem:-4098}"}
 	: ${_dsk="${_dsk:-100}"}
+	: ${target_winver="${target_winver:-"win10"}"}
+	: ${BIN_VIRT_INSTALL:="$(type -p virt-install)"}
+	: ${CONFIG:="Workstation"}
+	: ${WindowsInstructions:="/var/lib/libvirt/boot/win$(date +%Y-%m-%d-%H-%M-%S-%s).img"}
+	: ${virt_net="$(system::find_vm_bridge)"}
+	: ${_saveto:="$( mktemp -d /tmp/WinConfig.XXXXXX )"}
+	: ${AutoUnattend="${_saveto}/autounattend.xml"}
+	: ${PostTasks="${_saveto}/rtd-me-sh.cmd"}
+	: ${preferred_video="${5:-"qxl"}"}
+	: ${RTD_GUI:="dialog"}
+	: ${_TLA:="$(basename "$0" | cut -c1-3)"}
 
-	: ${target_winver="${1:-win10}"} || read -p "💥 - Failure to set variable target_winver"
-	case $target_winver in
+	# Select the appropriate Windows ISO and UEFI boot option based on requested Windows version...
+	case ${target_winver} in
 		win12 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win11_English_x64.iso"} 
 			: ${uefi_option="--boot uefi"} 
 			;;
 		win11 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win11_English_x64.iso"} 
 			: ${uefi_option="--boot uefi"} 
 			;;
-		win10 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win10_English_x64.iso"} ;;
-		win8 )  : ${WindowsMedia="/var/lib/libvirt/boot/Win8_English_x64.iso"}  ;;
-		win7 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win7_English_x64v1.iso"} ;;
+		win10 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win10_English_x64.iso"} 
+			;;
+		win8 )  : ${WindowsMedia="/var/lib/libvirt/boot/Win8_English_x64.iso"}  
+			;;
+		win7 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win7_English_x64v1.iso"} 
+			;;
 	esac
 
-	: ${BIN_VIRT_INSTALL:="$(type -p virt-install)"}
-	: ${CONFIG:="Workstation"}
-	: ${WindowsInstructions:="/var/lib/libvirt/boot/win$(date +%Y-%m-%d-%H-%M-%S-%s).img"}
-	: ${virt_net="$(system::find_vm_bridge)"}
-	: ${AutoUnattend="/tmp/autounattend.xml"}
-	: ${PostTasks="/tmp/rtd-me-sh.cmd"}
-	: ${preferred_video="${5:-"qxl"}"}
 
+
+	# Check for the needed ISO file and request it if not found...
 	if [[ ! -e "${WindowsMedia}" ]]; then
 		if ( $RTD_GUI --backtitle "..$BRANDING" --title "Windows Install Media Needed" \
 			--no-button "NO: Just Cancel" \
 			--yes-button "OK: I am done upploading" \
-			--yesno "Windows install media was not found where expected ${WindowsMedia} \n Please place a copy of it in /home/$SUDO_USER/ and press [ OK ] \n Please name it Win**something**.iso NOTE: you can download Windows from Microsoft for free" 20 90 );
+			--yesno "Windows install media was not found where expected ${WindowsMedia} \n It is not possible to automatically download the media due to restrictions from Microsoft. Please place a copy of it in /home/$SUDO_USER/ and press [ OK ] \n Please name it Win**something**.iso NOTE: you can download Windows from Microsoft for free" 20 90 );
 		then
 			if ls /home/$SUDO_USER/Win*.iso ; then
 				mv -v /home/$SUDO_USER/Win*.iso ${WindowsMedia} || rtd_oem_pause 1S
@@ -8836,24 +9155,62 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		fi
 	fi
 
-	if [[ ! -e "${WindowsInstructions}" ]]; then
-		write_information "Generate Windows Instruction media..."
-			if ! hash mkfs.msdos ; then check_dependencies dosfstools ; fi
-			mkfs.msdos -C ${WindowsInstructions} 1440 || rtd_oem_pause 1
+	if [[ ! -f "${WindowsInstructions}" ]]; then
+		write_information "Generate Windows Instruction media requested..."
 
-		write_information "Generate installations instructions for Windows..."
-			generate_autounattend_xml "${AutoUnattend}" || rtd_oem_pause 1
+		# Ensure mkfs.msdos is available
+		if ! hash mkfs.msdos && ! check_dependencies dosfstools; then
+			write_error "Failed to install or find dosfstools. mkfs.msdos required to create the floppy disk."
+			rtd_oem_pause 1 "Install will not be fully automatic: Please press [ENTER] to continue..."
+		fi
 
-		write_information "Generate post install bootstrap script..."
-			generate_rtd_me_sh_cmd ${PostTasks}
-			if ! hash mcopy ; then check_dependencies mtools ; fi
-			mcopy -i ${WindowsInstructions} ${PostTasks} ::/ || rtd_oem_pause 1
-			mcopy -i ${WindowsInstructions} ${AutoUnattend} ::/ || rtd_oem_pause 1
+		command -v mkfs.msdos > /dev/null  && \
+		{
+		# Create virtual floppy disk, skipp if some optional tasks above failed...
+		if ! mkfs.msdos -C "${WindowsInstructions}" 1440; then
+			write_error "Failed to create the virtual floppy disk..."
+			rtd_oem_pause 1 "Install will not be fully automatic: Please press [ENTER] to continue..."
+		fi
+		}
 
-		for i in ${_OEM_DIR}/modules/windows.mod/_* ; do
-			mcopy -i ${WindowsInstructions} ${i} ::/ || rtd_oem_pause 1
+		# Generate autounattend.xml
+		write_information "Generate installations instructions for Windows ${AutoUnattend}..."
+		if ! generate_autounattend_xml "${AutoUnattend}"; then
+			write_error "Failed to create the autounattend.xml file..."
+			rtd_oem_pause 1 "Install will not be fully automatic: Please press [ENTER] to continue..."
+		fi
+
+		# Generate rtd-me-sh.cmd
+		write_information "Generate post install bootstrap script ${PostTasks}..."
+		if ! oem::generate_rtd_me_sh_cmd "${PostTasks}"; then
+			write_error "Failed to create the rtd-me-sh.cmd file..."
+			rtd_oem_pause 1 "Install will not be fully automatic: Please press [ENTER] to continue..."
+		fi
+
+		# Ensure mcopy is available
+		if ! hash mcopy && ! check_dependencies mtools; then
+			write_warning "No mcopy found in mtools (unable to install?) to copy the post-install script to the floppy disk..."
+			rtd_oem_pause 1 "Install will not be fully automatic: Please press [ENTER] to continue..."
+		fi
+
+		# Copy files to the floppy disk but skipp if some optional tasks above failed...
+		command -v mcopy > /dev/null  && \
+		{
+		mcopy -i "${WindowsInstructions}" "${PostTasks}" ::/ || rtd_oem_pause 1 
+		mcopy -i "${WindowsInstructions}" "${AutoUnattend}" ::/ || rtd_oem_pause 1 
+
+		write_information "Copy the Windows.mod files files to the floppy disk..."
+		for i in "$(find /opt/${_TLA,,} -type d -name "windows.mod")/_*"; do
+			if [[ -e "${i}" ]]; then
+				command -v mcopy > /dev/null  && { mcopy -i "${WindowsInstructions}" "${i}" ::/ || rtd_oem_pause 1 ; }
+				write_status "Copied ${i} to the floppy disk..."
+			else
+				write_warning "No files found in ${i} to copy to the floppy disk..."
+			fi
 		done
+		}
 	fi
+
 
 	local vm_name="Windows${target_winver:(-2)}_${CONFIG}_${RANDOM}"
 
@@ -8884,6 +9241,7 @@ make_kvm_virtual_machine_now_from_microsoft ()
 		--noautoconsole && dialog::display_summary_message "NOTICE!"  \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
+	rm -f "${PostTasks}" || system::log_item "Failed to remove ${PostTasks}..."
 	for i in WindowsInstructions CONFIG WindowsMedia AutoUnattend PostTasks target_winver mem_size uefi_option cpu_count disk_size preferred_video ; do unset $i ; done
 }
 
@@ -9159,7 +9517,7 @@ backup_running_vm ()
 
 
 
-generate_rtd_me_sh_cmd ()
+oem::generate_rtd_me_sh_cmd ()
 {
 # Description:
 # Generates an unattended install instruction file for Windows systems.
@@ -9179,144 +9537,49 @@ generate_rtd_me_sh_cmd ()
 # NOTE: This file is generated from this library to limit the dependecies on external downloads.
 # End of documentation
 
-	cat > $1 <<-'EOF'
-	#!/bin/bash
+	cat > $1 <<'rtd_me_sh_cmd'
 	cls
-	:<<"::CMDLITERAL"
 	@ECHO OFF
-	GOTO :CMDSCRIPT
-	::CMDLITERAL
 
 	echo	[internal]	-	RTD System System Managment Bootstrap Script      -	[internal]
-	#::
-	#::
-	#:: 						Shell Script Section
-	#::
-	#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-	#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-	#:: Author(s):   	SLS, KLS, NB.  Buffalo Center, IA & Avarua, Cook Islands
-	#:: Version:	1.06
-	#::
-	#::
-	#:: Purpose: 	The purpose of the script is to decide what scripts to download based
-	#::          	on the host OS found; works with both Windows, MAC and Linux systems.
-	#::		The focus of this script is to be compatible enough that it could be run on any
-	#::		system and compete it's job. In this case it is simply to identify the OS
-	#::		and get the appropriate script files to run on the system in question;
-	#::		In its original configuration this bootstrap script was used to install and
-	#::		configure software appropriate for the system in question. It accomplishes this
-	#::		by using the idiosyncrasies of the default scripting languages found in
-	#::		the most popular operating systems around *NIX (MAC, Linux, BSD etc.) and
-	#::		CMD (Windows NT, 2000, 2003, XP, Vista, 8, and 10).
-	#::
-	#::
-	#::
-	#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-	#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-	#
-
-	#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-	#::::::::::::::                                          ::::::::::::::::::::::
-	#::::::::::::::          Script Settings                 ::::::::::::::::::::::
-	#::::::::::::::                                          ::::::::::::::::::::::
-	#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-	# Variables that govern the behavior or the script and location of files are
-	# set here. There should be no reason to change any of this.
-
-	# Ensure administrative privileges.
-	[ "$UID" -eq 0 ] || echo -e $YELLOW "This script needs administrative access..." $ENDCOLOR
-	[ "$UID" -eq 0 ] || exec sudo DISPLAY=$DISPLAY bash "$0" "$@"
-
-	# Put a convenient link to the logs where logs are normally found...
-	# capture the 3 first letters as org TLA (Three Letter Acronym)
-	export _SCRIPTNAME=$(basename $0)
-	export _TLA=${_SCRIPTNAME:0:3}
-	export _LOG_DIR=/var/log/${_TLA}
-	mkdir -p ${_LOG_DIR}
-
-	# Set the GIT profile name to be used if not set elsewhere:
-	export _GIT_PROFILE="${_GIT_PROFILE:-vonschutter}"
-
-	# Location of base administrative scripts and command-lets to get.
-	_src_url=https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git
-
-	# Determine log file names for this session
-	export _ERRLOGFILE=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-error.log
-	export _LOGFILE${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup.log
-	export _STATUSLOG=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-oem-setup-status.log
-
-
-	#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-	#::::::::::::::                                          ::::::::::::::::::::::
-	#::::::::::::::          Execute tasks                   ::::::::::::::::::::::
-	#::::::::::::::                                          ::::::::::::::::::::::
-	#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-	#:: Given that Bash or other Shell environment has been detected and the POSIX chell portion of this script is executed,
-	#:: the second stage script must be downloaded from an online location. Depending on the distribution of OS
-	#:: there are different methods available to get and run remote files.
-	#::
-	#:: Table of evaluating family of OS and executing the appropriate action fiven the OS found.
-	#:: In this case it is easier to manage a straight table than a for loop or array:
-
-	if echo "$OSTYPE" |grep "linux" ; then
-		echo "Linux OS Found: Attempting to get instructions for Linux..."
-		echo executing $0 >> ${_LOGFILE}
-		for d in git zip ; do 
-			if ! hash ${d} &>> ${_LOGFILE} ; then
-				for pkgmgr in apt yum dnf zypper ; do hash ${pkgmgr} && ${pkgmgr} -y install ${d} | tee ${_LOGFILE} ; done
-			fi
-		done
-		git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp | tee ${_LOGFILE}
-			if [ $? -eq 0 ]
-			then
-				echo "Instructions successfully retrieved..."
-				if [[ -d /opt/${_TLA,,}  ]] ; then
-					mv /opt/${_TLA,,} ${_BackupFolderName:="/opt/${_TLA,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"}
-					zip -m -r -5 ${_BackupFolderName}.zip  ${_BackupFolderName}
-					rm -r ${_BackupFolderName}
-				fi
-				mv /opt/${_TLA,,}.tmp /opt/${_TLA,,} ; rm -rf /opt/${_TLA,,}/.git
-				source /opt/${_TLA,,}/core/_rtd_library
-				oem::register_all_tools
-				ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
-				bash ${_OEM_DIR}/core/rtd-oem-linux-config.sh ${@}
-			else
-				echo "Failed to retrieve instructions correctly! "
-				echo "Suggestion: check write permission in "/opt" or internet connectivity."
-				exit 1
-			fi
-		exit $?
-	elif [[ "$OSTYPE" == "darwin"* ]]; then
-		echo "Mac OSX is currently not supported..."
-	elif [[ "$OSTYPE" == "cygwin" ]]; then
-		echo "CYGWIN is currently unsupported..."
-	elif [[ "$OSTYPE" == "msys" ]]; then
-		echo "Lightweight shell is currently unsupported... "
-	elif [[ "$OSTYPE" == "freebsd"* ]]; then
-		echo "Free BSD is currently unsupported... "
-	else
-	echo "This system is Unknown to this script"
-	fi
-	exit $?
-
-
-	# -----------------------------------------------------------------------------------------------------------------------
-	# Anything after this exit statment below will be dangerous and meaningless
-	# command syntax to POSIX based systems...
-	# Make sure to exit no matter what...
-	exit $?
-	:CMDSCRIPT
+	::
+	::
+	:: 						Shell Script Section
+	::
 	::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 	::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-	@echo off
-	echo			-	RTD System System Managment Bootstrap Script      -
+	:: Author(s):   	SLS, KLS, NB.  Buffalo Center, IA & Avarua, Cook Islands
+	:: Version:	1.06
+	::
+	::
+	:: Purpose: 	The purpose of the script is to decide what scripts to download based
+	::          	on the host OS found; works with both Windows, MAC and Linux systems.
+	::		The focus of this script is to be compatible enough that it could be run on any
+	::		system and compete it's job. In this case it is simply to identify the OS
+	::		and get the appropriate script files to run on the system in question;
+	::		In its original configuration this bootstrap script was used to install and
+	::		configure software appropriate for the system in question. It accomplishes this
+	::		by using the idiosyncrasies of the default scripting languages found in
+	::		the most popular operating systems around *NIX (MAC, Linux, BSD etc.) and
+	::		CMD (Windows NT, 2000, 2003, XP, Vista, 8, and 10).
+	::
+	::
+	::
+	::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+	::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+	
+
+	echo "
+	::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+	::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+	::
+	@title			-	RTD System System Managment Bootstrap Script      -
 	::
 	::
 	::					Windows CMD Shell Script Section
 	::
 	::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-	::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+	::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::"
 
 
 	:INIT
@@ -9385,8 +9648,14 @@ generate_rtd_me_sh_cmd ()
 		echo Found %*
 		echo Fetching %_STAGE2FILE%...
 		echo Please wait...
-		powershell -Command "(New-Object Net.WebClient).DownloadFile('%_STAGE2LOC%\%_STAGE2FILE%', '%_STAGE2FILE%')"
-		powershell -ExecutionPolicy UnRestricted -File .\%_STAGE2FILE%
+		if exist A:\%_STAGE2FILE% (
+			echo File found locally...  
+			powershell -ExecutionPolicy UnRestricted -File A:\%_STAGE2FILE%
+			) else (
+			echo Fetching %_STAGE2FILE% from the internet...
+			powershell -Command "(New-Object Net.WebClient).DownloadFile('%_STAGE2LOC%\%_STAGE2FILE%', '%_STAGE2FILE%')"
+			powershell -ExecutionPolicy UnRestricted -File .\%_STAGE2FILE%
+		)
 		goto end
 
 
@@ -9397,8 +9666,21 @@ generate_rtd_me_sh_cmd ()
 		echo Found %*
 		echo Fetching %_STAGE2FILE%...
 		echo Please wait...
-		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %_STAGE2LOC%\%_STAGE2FILE% -OutFile %_STAGE2FILE%"
-		powershell -ExecutionPolicy UnRestricted -File .\%_STAGE2FILE%
+		if exist A:\%_STAGE2FILE% (
+			echo File found locally...  
+			powershell -ExecutionPolicy UnRestricted -File A:\%_STAGE2FILE%
+			) else (
+			echo Fetching %_STAGE2FILE% from the internet...
+			powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %_STAGE2LOC%\%_STAGE2FILE% -OutFile %_STAGE2FILE%"
+			powershell -ExecutionPolicy UnRestricted -File .\%_STAGE2FILE%
+		)
+		if exist A:\_Chris-Titus-Post-Windows-Install-App.ps1 (
+			echo File found locally...  
+			powershell -ExecutionPolicy UnRestricted -File A:\_Chris-Titus-Post-Windows-Install-App.ps1
+			) else (
+			echo Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet...
+			powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
+		)
 		goto end
 
 
@@ -9447,7 +9729,7 @@ generate_rtd_me_sh_cmd ()
 	:end
 	:eof
 
-	EOF
+rtd_me_sh_cmd
 }
 
 
