@@ -104,7 +104,7 @@ Script_Documentation
 # You may comment out or edit items as you deem necessary.
 # Some formatting options for cli graphic display.
 : ${_SCRIPTNAME=$(basename "${BASH_SOURCE[0]}")}
-: ${_TLA=${_SCRIPTNAME:0:3}}
+: ${_TLA:=${_SCRIPTNAME:0:3}}
 : ${BRANDING_ORG:="RTD"}
 : ${BRANDING:="Simple Support Tool"}
 : ${DIALOG_CANCEL:="1"}
@@ -181,66 +181,37 @@ fi
 
 
 
-dependency::file () 
-{
-# Function: dependency::file
-# Description: This function is used to search for and load a dependency file. It first searches for the 
-# file locally in various paths, and if not found, it attempts to download it from a specified URL. 
-# If both local and online search fails, it logs an error and exits.
-# Parameters:
-#   - $1: The name of the dependency file to search for and load.
-# Returns:
-#   - 0: If the dependency file is found and successfully loaded.
-#   - 1: If the dependency file is not found or fails to load.
-# End of documentation
+dependency::file() {
+    # Function: dependency::file
+    # Description: Searches for and loads a dependency file locally, or downloads it if not found.
+    # Parameters:
+    #   - $1: The name of the dependency file.
+    # Returns:
+    #   - 0: If the file is found and loaded.
+    #   - 1: If the file is not found or fails to load.
 
 	local _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
-	local _tgt="${1}"
-	
-	dependency::search_local () {
-		system::log_item "Requested dependency file: ${1} ..."
+	local script_dir
 
-		local paths=(
-			"./${1}"
-			"../core/${1}"
-			"../../core/${1}"
-			"${0%/*}/../core/${1}"
-			"${0%/*}/../../core/${1}"
-			"$(dirname "$(find /opt -name ${1} 2>/dev/null | head -n 1 )")/${1}"
-			"$(dirname "$(find ${HOME}/GIT -name ${1} 2>/dev/null | head -n 1 )")/${1}"
-			"$(dirname "$(find ${HOME}/bin -name ${1} 2>/dev/null | head -n 1 )")/${1}"
-			)
+	script_dir=$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )
 
-		for path in "${paths[@]}"; do 
-			system::log_item "Searching for ${path} ..."
-			if [[ -e "${path}" ]]; then
-				system::log_item "Found ${path}"
-				source "${path}" "" || return 1
-				return 0
-			fi
-		done
-
-		return 1
-	}
-
-	if dependency::search_local "${1}" ; then
-		return 0
+	if source "${script_dir}/../core/${1}" ; then
+		system::log_item "${FUNCNAME[0]}: Using: ${script_dir}/../core/${1}"
+	elif source "${script_dir}/../../core/${1}" ; then
+		system::log_item "${FUNCNAME[0]}: Using: ${script_dir}/../../core/${1}"
+	elif source $(find /opt -name ${1} | grep -v backup) ; then
+		system::log_item "${FUNCNAME[0]}: Using: $(find /opt -name ${1} | grep -v backup)"
+	elif curl -sL "${_src_url}" -o "./${1}" && source "./${1}" ; then
+		system::log_item "${FUNCNAME[0]}: Using: ${_src_url}"
 	else
-		system::log_item "$(date) failure to find $1 on the local computer, now searching online..."
-		local tmpdir=$(mktemp -d)
-		if curl -sL "$_src_url" -o "${tmpdir}/${1}" ; then 
-			system::log_item "Using: ${_src_url} directly from URL..."
-			source "${tmpdir}/${1}"
-		elif wget "${_src_url}" -O "${tmpdir}/${1}" &>/dev/null ; then
-			source "${tmpdir}/${1}"
-			system::log_item "Using: ${_src_url} downloaded..."
-		else 
-			system::log_item "Failed to find  ${1} "
-			exit 1
-		fi
-		rm -rf "${tmpdir}"
-	fi 
+		system::log_item "${1} NOT found!"
+		return 1
+	fi
+	return 0
 }
+
+
+
 
 
 
@@ -794,10 +765,10 @@ show_deploy_VDI_VM_now_menu ()
 			cleanup_and_finish nomessage
 		;;
 		9 )
-			make_kvm_virtual_machine_now_from_microsoft win10
+			kvm::make_vm_template_now_from_microsoft --winver win10
 		;;
 		10 )
-			make_kvm_virtual_machine_now_from_microsoft win11
+			kvm::make_vm_template_now_from_microsoft --winver win11
 		;;
 		esac
 
@@ -1048,7 +1019,7 @@ show_manage_software_gui () {
 			fi
 		;;
 		4 )
-			rtd_oem_release_upgrade
+			rtd_oem_release_upgrade interactive
 		;;
 		5 )
 			rtd_setup_choices_cli_workstation
