@@ -642,42 +642,42 @@ recipe_Bundle:_Top_Curated_Games () {
 
 	# 0 A.D. is a real-time strategy (RTS) game of ancient warfare.
 	#software::from_snapcraft.io 0ad $1
-	software::from_flathub.org com.play0ad.zeroad $1
+	software::from_flathub.org "com.play0ad.zeroad" $1
 
 	# A 3D arcade racer with a variety of characters, tracks, and modes to play
 	#software::from_snapcraft.io supertuxkart $1
-	software::from_flathub.org net.supertuxkart.SuperTuxKart $1
+	software::from_flathub.org "net.supertuxkart.SuperTuxKart" $1
 
 	# A 2D space shooter with awesome visual effects and attractive physics.
 	#software::from_snapcraft.io marsshooter $1
-	software::from_flathub.org com.github.fabiocolacio.marsshooter $1
+	software::from_flathub.org "com.github.fabiocolacio.marsshooter" $1
 
 	# dm-tools is a collection of tools for Dungeons and Dragons 5e	
 	#software::from_snapcraft.io dm-tools $1
 	
 	# Join people all over the world playing Minecraft, one of the most popular videogames around!
-	software::from_flathub.org com.mojang.Minecraft $1
+	software::from_flathub.org "com.mojang.Minecraft" $1
 
 	# Survival horror set on a remote island known as Fort Oasis
-	software::from_flathub.org com.moddb.TotalChaos $1
+	software::from_flathub.org "com.moddb.TotalChaos" $1
 
 	# Hardcore 3D space scroll-shooter with spaceship upgrade possibilities	
-	software::from_flathub.org com.viewizard.AstroMenace $1
+	software::from_flathub.org "com.viewizard.AstroMenace" $1
 
 	# Space exploration and combat game		
-	software::from_flathub.org io.github.EndlessSky.endless-sky $1
+	software::from_flathub.org "io.github.EndlessSky.endless-sky" $1
 
 	# Albion Online is a sandbox MMORPG set in an open medieval fantasy world	
-	software::from_flathub.org com.albiononline.AlbionOnline $1
+	software::from_flathub.org "com.albiononline.AlbionOnline" $1
 
 	# An immersive puzzle adventure game where you hack your way to saving the day!	
-	software::from_flathub.org com.endlessnetwork.aqueducts $1
+	software::from_flathub.org "com.endlessnetwork.aqueducts" $1
 
 	# Do you love playing billiards, or have you ever wanted to learn how to play	
-	software::from_flathub.org de.billardgl.Billardgl $1
+	software::from_flathub.org "de.billardgl.Billardgl" $1
 
 	# OpenArena is a free and open source first-person shooter game based heavily on the Quake III Arena-style deathmatch		
-	software::from_flathub.org ws.openarena.OpenArena $1
+	software::from_flathub.org "ws.openarena.OpenArena" $1
 
 
 	# Install Valves Steam Client for gaming: gives access to thousands of commercial games.
@@ -692,7 +692,6 @@ recipe_Bundle:_Top_Curated_Games () {
 			 "I am not sure how to find the Steam download for $(lsb_release -sd) "
 			 "Please try to download it manually and insttall it from the website:"
 			 "https://store.steampowered.com/about/"
-			"
 		fi
 	fi
 }
@@ -893,21 +892,19 @@ recipe_Bundle:_1_RTD_CONFIG (){
 
 		# [Task 5.1] Configure Wallpapers for OEM look and feel.
 		# -------------------------------------------------------------------------------------------------------
-		write_information "${FUNCNAME[0]} : Fonud the gnome UI on this system! Adding OEM customizations..."
+		write_information "Fonud the gnome UI on this system! Adding OEM customizations..."
 
 		tempfile=$( mktemp )
 		chmod 777 ${tempfile}
 		cat > ${tempfile} <<-EOF
-		#!/bin/bash
-		source ${_OEM_DIR}/core/_rtd_library
-		set_gnome_ui_common_tweaks_for_user
+			#!/bin/bash
+			source ${_OEM_DIR}/core/_rtd_library
+			set_gnome_ui_common_tweaks_for_user
 		EOF
 		system::run_command_in_gnome_user_session /bin/bash ${tempfile}
 
-		# Register Wallpapers in Gnome
-		oem::register_wallpapers_for_gnome ${_WALLPAPER_DIR}
-
 		# Set the default wallpaper...
+		oem::register_wallpapers_for_gnome ${_WALLPAPER_DIR}
 		system::run_command_in_gnome_user_session gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/Wayland.jpg
 		# -------------------------------------------------------------------------------------------------------
 
@@ -945,20 +942,13 @@ recipe_Bundle:_1_RTD_CONFIG (){
 		# 	8: 	Places Status Indicator
 
 		# For critical extensions try to install from package manager first
-		for i in dash-to-dock dash-to-panel gnome-shell-extension-manager ; do software::add_native_package gnome-shell-extension-${i} ; done
+		software::add_native_package "dash-to-dock"
+		software::add_native_package "dash-to-panel"
+		software::add_native_package "gnome-shell-extension-manager"
 
-		for i in 6 7 8 19 97 307 517 615 906 1160 1319 1852 3628 ; do
-			local extension_installer="$(find /opt -name rtd-gnome-shell-extension-installer )"
-			local gnome_shell_ver=
-			if [[ -n "${extension_installer}" ]] ; then
-				bash ${extension_installer} --yes ${i} --restart-shell || \
-				bash ${extension_installer} --yes ${i} "$(gnome-shell --version |cut -d' '  -f3)" ||\
-				bash ${extension_installer} --yes ${i} $(sudo -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c  "gnome-shell --version |cut -d' '  -f3")
-			else
-				write_error "I could not find the gnome extension installer anywhere! "
-			fi
-		done
-		
+		# For the rest, use the gnome extension installer...
+		software::add_gnome_extensions "615 307 517 1160 1319 6 19 7 906 1852 97 3628 8"
+
 		# -------------------------------------------------------------------------------------------------------
 
 
@@ -970,11 +960,11 @@ recipe_Bundle:_1_RTD_CONFIG (){
 		# distro package managemnt is installed. This is easier and likely accurate in most cases.
 		# Pop, Ubuntu, Kubuntu, and Debian all use deb packages and name the packages consistently for ex.
 		# This will ensure that the sofware is installed so the themes look good...
-
 		# Install hemes (Light and Dark) and more...
 		bash ${_THEME_DIR}/plus-themes.sh
 
 		software::add_native_package arc-theme
+
 		# -------------------------------------------------------------------------------------------------------
 
 		# [Task 5.5] copy configuration elements so that NEW users also get the tweaks:
@@ -984,11 +974,11 @@ recipe_Bundle:_1_RTD_CONFIG (){
 		# the OEM tweaks to the UI. If this task sequence is run on a system by a user on a system not
 		# built by the unattended OEM process, then these changes sould only be implemented for the user
 		# running this task.
-		if [[ -e /opt/rtd ]] ; then
-			write_information "THis system was built by an OEM process: copying tweaks for all new users..."
+		if [[ -e /opt/${_TLA,,} ]] ; then
+			write_information "This system was built by an OEM process: copying tweaks for all new users..."
 			mkdir -p /etc/skel/.config
 			cp -r /home/${SUDO_USER}/.config/dconf /etc/skel/.config/dconf
-			write_information "THis system was built by an OEM process: done..."
+			write_information "This system was built by an OEM process: done..."
 		else
 			write_information "Only implementing tweaks for the current user..."
 		fi

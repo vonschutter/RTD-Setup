@@ -576,16 +576,16 @@ yad::display_cmd_output ()
 {
 # Description: Function to display a command output in a yad box. 
 # 
-# Globals: dialog 
+# Globals: yad 
 # Arguments: ["String to execute"]
 # Outputs: Message in dialog box
 # Returns: 0 or ESC
 # Usage:
 #
-# This function takes a command as an argument and executes it. The output of the command is displayed in a yad dialog box.
-# Any error messages are also displayed in the dialog box.
-# The function returns 0 if the command execution is successful or if the dialog box is closed with the "Close" button.
-# If the dialog box is closed with the "ESC" key, the function returns "ESC".
+# This function takes a command as an argument and executes it. The output of the command is displayed in a yad yad box.
+# Any error messages are also displayed in the yad box.
+# The function returns 0 if the command execution is successful or if the yad box is closed with the "Close" button.
+# If the yad box is closed with the "ESC" key, the function returns "ESC".
 #
 # Example usage:
 # yad::display_cmd_output "apt -y upgrade"
@@ -594,7 +594,7 @@ yad::display_cmd_output ()
 	# Command to execute
 	local cmd=$@
 
-	system::log_item "checking for dialog..."
+	system::log_item "checking for diayadog..."
 	if ! hash "yad" &>/dev/null ; then
 		system::log_item "yad not found..."
 		check_dependencies "yad" &>/dev/null || return 1
@@ -624,7 +624,7 @@ yad::display_progressbar_pulsating ()
 # 
 # Globals: yad 
 # Arguments: ["String to execute"]
-# Outputs: Message in dialog box
+# Outputs: Message in yad box
 # Returns: 0 or ESC
 # Usage:
 #
@@ -637,7 +637,7 @@ yad::display_progressbar_pulsating ()
 # End of Documentation
 	_cmd="$*"
 
-	system::log_item "checking for dialog..."
+	system::log_item "checking for yad..."
 	if ! hash "yad" &>/dev/null ; then
 		system::log_item "yad not found..."
 		check_dependencies "yad" &>/dev/null || return 1
@@ -902,6 +902,108 @@ dependency::os_linux ()
 	else
 		echo "I have no Idea what this OS is" ; return 1
 	fi
+}
+
+
+
+
+
+system::distribution_type ()
+{
+# Description:
+#
+# This function determines the Linux distribution type of the system on which it is run. It identifies the 
+# distribution by checking for the presence of specific files and functions unique to each distribution's 
+# initialization system. The function aims to support a variety of Linux distributions, including Fedora,
+#  RHEL, CentOS, SUSE, Debian, Ubuntu, Gentoo, Mandriva, and Slackware.
+#
+# Parameters: none
+#
+# Returns:
+#
+# Prints the type of the Linux distribution to standard output. The possible return values are:
+#
+#     "redhat": For Fedora, RHEL, CentOS, and other Red Hat derivatives.
+#     "suse": For SUSE Linux distributions.
+#     "debian": For Debian, Ubuntu, and derivatives.
+#     "gentoo": For Gentoo Linux.
+#     "mandriva": For Mandriva Linux.
+#     "slackware": For Slackware Linux.
+#     "unknown": If the distribution cannot be determined.
+#
+# Usage:
+#
+# To use this function, simply call it within a bash script or from the command line in a script 
+# environment where the function has been defined. Example usage:
+#
+# distribution=$(system::distribution_type)
+# echo "Detected distribution: $distribution"
+#
+#
+# Notes:
+#
+#     The order of checks matters, as some distributions may share certain files or functions. The function 
+#     is structured to minimize false positives. For Mandriva and Slackware, the function currently 
+#     checks for the presence of /etc/mandriva-release and /etc/slackware-version, 
+#     respectively, but acknowledges that a better method of identification might be needed.
+#     This function does not have external dependencies beyond the bash shell and standard Linux filesystem 
+#     and command-line tools.
+#
+# Example:
+#
+# Here's how you might call this function within a script to execute different commands based on the detected distribution:
+#
+# bash
+#
+# case $(system::distribution_type) in
+#     redhat)
+#         echo "This is a Red Hat derivative."
+#         ;;
+#     debian)
+#         echo "This is a Debian derivative."
+#         ;;
+#     *)
+#         echo "Distribution not specifically handled."
+#         ;;
+# esac
+#
+# End of documentation
+
+	local dtype
+	# Assume unknown
+	dtype="unknown"
+	
+	# First test against Fedora / RHEL / CentOS / generic Redhat derivative
+	if [ -r /etc/rc.d/init.d/functions ]; then
+		source /etc/rc.d/init.d/functions
+		[ zz`type -t passed 2>/dev/null` == "zzfunction" ] && dtype="redhat"
+	
+	# Then test against SUSE (must be after Redhat,
+	elif [ -r /etc/rc.status ]; then
+		source /etc/rc.status
+		[ zz`type -t rc_reset 2>/dev/null` == "zzfunction" ] && dtype="suse"
+	
+	# Then test against Debian, Ubuntu and friends
+	elif [ -r /lib/lsb/init-functions ]; then
+		source /lib/lsb/init-functions
+		[ zz`type -t log_begin_msg 2>/dev/null` == "zzfunction" ] && dtype="debian"
+	
+	# Then test against Gentoo
+	elif [ -r /etc/init.d/functions.sh ]; then
+		source /etc/init.d/functions.sh
+		[ zz`type -t ebegin 2>/dev/null` == "zzfunction" ] && dtype="gentoo"
+	
+	# For Mandriva we currently just test if /etc/mandriva-release exists
+	# and isn't empty (TODO: Find a better way :)
+	elif [ -s /etc/mandriva-release ]; then
+		dtype="mandriva"
+
+	# For Slackware we currently just test if /etc/slackware-version exists
+	elif [ -s /etc/slackware-version ]; then
+		dtype="slackware"
+
+	fi
+	echo $dtype
 }
 
 
@@ -6051,12 +6153,13 @@ is_software_package_installed ()
 	if hash dnf &> /dev/null; then
 		rpm -q "$1" &> /dev/null && return 0 || return 1
 	elif hash zypper &> /dev/null; then
-		zypper se -i "$1" &> /dev/null || return 1 && return 0 
+		zypper se -i "$1" &> /dev/null && return 0 || return 1
 	elif hash apt &> /dev/null; then
-		dpkg -l "$1" |tail -1 |grep "ii  $1" &> /dev/null && return 0 || return 1
+		dpkg -l "$1" | grep -E "^ii\s+$1\s" &> /dev/null && return 0 || return 1
 	else
 		return 3
 	fi
+
 }
 
 
@@ -6158,31 +6261,65 @@ InstallSoftwareFromRepo ()
 # be an RPM or deb string, or even snap or flatpak. A preference order between package system and
 # snap or flatpak use.
 # End of documentation
-	ensure_admin
-	: ${_LOGFILE:="/var/log/rtd/$( basename "$0".log )"}
-	# Ask function how to install software...
+	# ensure_admin
+	# : ${_LOGFILE:="/var/log/rtd/$( basename "$0".log )"}
+	# # Ask function how to install software...
+	# set_install_command &>>"${_LOGFILE}"
+
+	# # make some decent display terminal Graphics...
+	# PAD="------------------------------------------------"
+	# LINE=$(printf "%s %s" "$@" "$PAD" | cut -c 1-${#PAD})
+	# PRE=" - Installing $LINE :"
+	# # Test if package name is installed, if not then...
+	# if ! is_software_package_installed "${1}"; then
+	# 	_return="$?"  
+	# 	if is_software_package_available "${1}"; then
+	# 		if printf "${PRE}" & software::add_native_package "${1}" &>>${_LOGFILE} ; then
+	# 			printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR \n"
+	# 			return 0
+	# 		else	
+	# 			printf "%b%-6s%b [ ! ] ${RED} FAILED ${ENDCOLOR} \n"
+	# 			return 1
+	# 		fi
+	# 		#term::animate_while_command "$_INSTCMD ${1}" 
+	# 	else
+	# 		echo -ne "$PRE"\ && printf "%b%-6s%b [ \xE2\x9C\x94 ] $YELLOW Not available... $ENDCOLOR \n" && return 1
+	# 	fi
+	# else
+	# 	[ $? = 3 ] && { printf "%b%-6s%b [ ! ] ${RED} No package manager found... ${ENDCOLOR} \n" ; return 1 ; }
+	# 	[ $? = 1 ] && { echo -ne "$PRE"\ && printf "%b%-6s%b [ \xE2\x9C\x94 ] $YELLOW Allready installed... $ENDCOLOR \n" ; return 1 ; }
+	# fi
+
+	local PAD LINE PRE _return
+
 	set_install_command &>>"${_LOGFILE}"
 
-	# make some decent display terminal Graphics...
 	PAD="------------------------------------------------"
 	LINE=$(printf "%s %s" "$@" "$PAD" | cut -c 1-${#PAD})
 	PRE=" - Installing $LINE :"
-	# Test if package name is installed, if not then...
-	if ! is_software_package_installed "${1}"; then
-		if is_software_package_available "${1}"; then
-			printf "${PRE}" & software::add_native_package "${1}" &>>${_LOGFILE} && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR " ||   printf "%b%-6s%b [ ! ] ${RED} FAILED ${ENDCOLOR}"
-			#term::animate_while_command "$_INSTCMD ${1}" 
-			if [ $? != 0 ];
-			then
-				return 1
-			fi
+
+	display_message() {
+		local message="$1" color="$2" symbol="$3"
+		printf "%b%-6s%b [ $symbol ] $color $message $ENDCOLOR \n"
+	}
+
+	if is_software_package_installed "${1}"; then
+		display_message "Already installed..." "$YELLOW" "\xE2\x9C\x94"
+		return 1
+	elif is_software_package_available "${1}"; then
+		if printf "${PRE}" & software::add_native_package "${1}" &>>"${_LOGFILE}"; then
+			display_message "OK!" "$GREEN" "\xE2\x9C\x94"
+			return 0
 		else
-			echo -ne "$PRE"\ && printf "%b%-6s%b [ \xE2\x9C\x94 ] $YELLOW Not available... $ENDCOLOR \n" && return 1
+			display_message "FAILED" "$RED" "!"
+			return 1
 		fi
 	else
-		echo -ne "$PRE"\ && printf "%b%-6s%b [ \xE2\x9C\x94 ] $YELLOW Allready installed... $ENDCOLOR \n"
+		display_message "Not available..." "$YELLOW" "\xE2\x9C\x94"
+		return 1
 	fi
 }
+
 
 
 
@@ -6213,21 +6350,22 @@ software::add_native_package ()
 
         if [[ $(echo $OSTYPE | grep "linux") ]]; then
 		if hash zypper 2>/dev/null; then
-			write_status "📦 Installing ${1} using ZYPPER"
-			sudo zypper install -y ${1}
-			return $?
+			write_status "📦 Installing ${1} using ZYPPER:"
+			sudo zypper install -y ${1} || { write_error "Failed to install ${1} using ZYPPER" ; return 1 ; }
+			{ write_information "The software package ${1} has been installed sucessfully..." ; return 0 ; }
+
 		elif hash apt 2>/dev/null; then
-			write_status "📦 Installing ${1} using DEB"
-			sudo apt-get -y install ${1}
-			return $?
+			write_status "📦 Installing ${1} using DEB:"
+			sudo apt-get -y install ${1} || { write_error "Failed to install ${1} using DEB" ; return 1 ; }
+			{ write_information "The software package ${1} has been installed sucessfully..." ; return 0 ; }
 		elif hash dnf 2>/dev/null; then
-			write_status "📦 Installing ${1} using DNF"
-			sudo dnf -y install ${1}
-			return $?
+			write_status "📦 Installing ${1} using DNF:"
+			sudo dnf -y install ${1} || { write_error "Failed to install ${1} using DNF" ; return 1 ; }
+			{ write_information "The software package ${1} has been installed sucessfully..." ; return 0 ; }
 		elif hash pkcon 2>/dev/null; then
-			write_status "📦 Installing ${1} using Package Kit..."
-			pkcon install -y ${1}
-			return $?
+			write_status "📦 Installing ${1} using Package Kit:"
+			pkcon install -y ${1} || { write_error "Failed to install ${1} using Package Kit" ; return 1 ; }
+			{ write_information "The software package ${1} has been installed sucessfully..." ; return 0 ; }
 		else
 			write_error "This system does not seem to have a software managment system"
 			return 1
@@ -6326,6 +6464,54 @@ set_install_command ()
 
 
 
+software::add_gnome_extensions ()
+{
+# Description:
+# Function to add gnome extensions to the system. This function will take a parameter
+# that is expected to match the name of the extension. The function will then check if
+# the extension is installed and if not install it.
+#
+# Globals:
+# Arguments: None
+# Outputs:
+# Returns: 1/0
+# Usage: software::add_gnome_extensions [extension name]
+#
+# EXAMPLE: software::add_gnome_extensions "dash-to-dock"
+#
+# End of documentation
+
+	local gnome_extensions_to_get=${@}
+	[ -z "${gnome_extensions_to_get}" ] && { write_error "No gnome extensions were provided..."; return 1; }
+
+	local extension_installer=$(find /opt/${_TLA_lower} -name rtd-gnome-shell-extension-installer)
+	local gnome_shell_ver=$(gnome-shell --version | cut -d' ' -f3)
+	local gnome_shell_sudo_user_ver=$(sudo -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c "gnome-shell --version | cut -d' ' -f3")
+
+	for i in ${gnome_extensions_to_get}; do
+		if [[ -n "${extension_installer}" ]]; then
+			extension_success=false
+			if bash "${extension_installer}" --yes "${i}" --restart-shell ||
+				bash "${extension_installer}" --yes "${i}" "${gnome_shell_ver}" --restart-shell ||
+					bash "${extension_installer}" --yes "${i}" "${gnome_shell_sudo_user_ver}" --restart-shell; then
+			extension_success=true
+			fi
+
+			if [[ "${extension_success}" == true ]]; then
+				write_status "Successfully installed gnome extension: ${i}."
+			else
+				write_error "Failure to install gnome extension: ${i}..."
+			fi
+		else
+			write_error "I could not find the gnome extension installer anywhere! Check that the rtd-gnome-shell-extension-installer is in the right place..."
+		fi
+	done
+}
+
+
+
+
+
 
 
 
@@ -6356,9 +6542,9 @@ check_dependencies ()
 # 
 # End of documentation
 	ensure_admin
-	#---------------------------------------------------------------
+
 	write_status "📦 Checking for script dependencies and install if not there..."
-	#---------------------------------------------------------------
+
 	if is_software_package_installed "${1}" ; then
 		write_information "📦 I found that the dependency ${1} is present on this system... "
 	else
@@ -6510,11 +6696,11 @@ rtd_oem_release_upgrade ()
 
 	ensure_admin
 	local interactive=$1
-	local distro=$(hostnamectl | grep -Eo 'Ubuntu|Pop!_OS|Debian|SUSE|fedora')
+	local distro=$(hostnamectl | grep -Eo 'Ubuntu|Pop!_OS|Debian|SUSE|fedora|TUXEDO|Zorin')
 
 	case $distro in
-		"Ubuntu"|"Pop!_OS"|"TUXEDO")
-			# Common update steps for Ubuntu and Pop!_OS
+		"Ubuntu"|"Pop!_OS"|"TUXEDO|Zorin")
+			# Common update steps for Ubuntu and derivativres
 			write_warning "This may take some time, please be patient!"
 			apt clean && apt update -m ; dpkg --configure -a ; apt install -f ; apt dist-upgrade ; apt autoremove --purge
 			if [[ "$interactive" == "interactive" ]]; then
@@ -6612,6 +6798,7 @@ rtd_oem_release_upgrade ()
 			return $?
 		;;
 		*)
+		system::log_item "This distribution is not supported for release upgrade."
 		[[ "$interactive" == "interactive" ]] && read -p "This distribution is not supported. Press [Enter] key to return to menu."
 		return 1
 		;;
@@ -6789,83 +6976,6 @@ software::remove_native_software_package ()
 
 
 
-
-
-
-
-# system::log_item ()
-# {
-# # Description:
-# # The purpose of this function is to consistently write script output to the right log file. 
-# # By default, the log file will be /var/log/$(basename $0).log. If the log file is not set
-# # the function will set it to the default. If the log file is set, it will use the set log file.
-# # 
-# # This function will log items by prepending the time and date, as well as the calling function. 
-# # If the calling function is write_warning, write_error, write_information, or write_status, 
-# # the function will prepend the log item with the preceding calling function name. Otherwise, 
-# # it will simply prepend the calling function name.
-# # 
-# # Globals: _LOGFILE
-# # Arguments: "Text to log"
-# # Outputs: Writes to log file
-# #
-# # Example:
-# # 2024/01/17 11:43  --- : 🧩 source: 🧩 _LOG_DIR=/home/tangaroa/.config/rtd/logs
-# # 2024/01/17 11:43  --- : 🧩 source: 🧩 _LOGFILE=/home/tangaroa/.config/rtd/logs/_rtd_library.log
-# # 2024/01/17 11:43  --- : 🧩 ⚠ source: Library is sourced from a script or terminal! 
-# # 2024/01/17 11:43  --- : 🧩 🛈 source: Script is sourced from bash in a terminal: /bin/bash 
-# # 2024/01/17 11:43  --- : 🧩 dependency::search_local: Requested dependency file: _branding ...
-# #
-# # Returns: None
-# # Usage:
-# #
-# # Call this function by: 
-# # system::log_item "Text to log"
-# #
-# # End of documentation
-
-# 	if [[ -z $_LOGFILE ]] ; then
-# 		# If log file not set globally, set it to defaults for this function a.k.a. script name
-# 		local _scriptname=$(basename "${BASH_SOURCE[0]}")
-# 		local _tla=${_scriptname:0:3}
-
-# 		if [[ $EUID -ne 0 ]]; then
-# 			_log_dir="${HOME}/.config/rtd/logs"
-# 		else
-# 			local _log_dir=${_LOG_DIR:-"/var/log/${_tla,,}"}
-# 		fi
-
-# 		mkdir -p ${_log_dir}
-# 		local _logfile=${_log_dir}/${_scriptname}.log
-# 	else 
-# 		local _logfile="${_LOGFILE}"
-# 	fi
-
-# 	touch "${_logfile}"
-# 	local _date="$(date '+%Y/%m/%d %H:%M')"
-
-# 	# Format the log item based on the calling function for clear reading
-# 	case "${FUNCNAME[1]}" in
-# 		"write_error")
-# 			echo "${_date}  --- ERROR: $*" >> "${_logfile}"
-# 		;;
-# 		"write_warning") 
-# 			echo "${_date}  --- WARN : $*" >> "${_logfile}"
-# 		;;
-# 		"write_information")
-# 			echo "${_date}  --- INFO : $*" >> "${_logfile}"
-# 		;;
-# 		"write_host")
-# 			echo "${_date}  --- HOST : $*" >> "${_logfile}"
-# 		;;
-# 		"write_status")
-# 			echo "${_date}  --- STAT : $*" >> "${_logfile}"
-# 		;;
-# 		*)
-# 			echo "${_date}  --- LOGD : 🧩 ${FUNCNAME[1]}: $*" >> "${_logfile}"
-# 		;;
-# 	esac
-# }
 
 
 
