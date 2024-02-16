@@ -681,19 +681,25 @@ recipe_Bundle:_Top_Curated_Games () {
 
 
 	# Install Valves Steam Client for gaming: gives access to thousands of commercial games.
-	InstallSoftwareFromRepo steam
-	if [ $? != 0 ]; then
-		if hash rpm &>/dev/null; then
-			software::vendor_download_and_install https://steamcdn-a.akamaihd.net/client/installer/steam.rpm
-		elif hash apt &>/dev/null; then
-			software::vendor_download_and_install https://steamcdn-a.akamaihd.net/client/installer/steam.deb
-		else
-			write_error "
-			 "I am not sure how to find the Steam download for $(lsb_release -sd) "
-			 "Please try to download it manually and insttall it from the website:"
-			 "https://store.steampowered.com/about/"
+	
+	if InstallSoftwareFromRepo steam; then
+	package_url=""
+		if command -v rpm &> /dev/null; then
+			package_url="https://steamcdn-a.akamaihd.net/client/installer/steam.rpm"
+		elif command -v apt &> /dev/null; then
+			package_url="https://steamcdn-a.akamaihd.net/client/installer/steam.deb"
 		fi
-	fi
+    
+		if [ -n "$package_url" ]; then
+			software::vendor_download_and_install "$package_url"
+		else
+			distribution=$(lsb_release -sd)
+			write_error "I am not sure how to find the Steam download for $distribution." \
+			"Please try to download it manually and install it from the website:" \
+			"https://store.steampowered.com/about/"
+		fi
+    	fi
+    
 }
 
 
@@ -905,7 +911,7 @@ recipe_Bundle:_1_RTD_CONFIG (){
 
 		# Set the default wallpaper...
 		oem::register_wallpapers_for_gnome ${_WALLPAPER_DIR}
-		system::run_command_in_gnome_user_session gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/Wayland.jpg
+		system::run_command_in_gnome_user_session "gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/Wayland.jpg"
 		# -------------------------------------------------------------------------------------------------------
 
 
@@ -1217,6 +1223,10 @@ Single_Install_Citrix_App (){
 	if hash apt &>/dev/nul; then
 		write_warning "Please NOTE that Citrix only supports Ubuntu"
 		software::vendor_download_and_install "https://downloads.citrix.com/22439/icaclient_23.11.0.82_amd64.deb?__gda__=exp=1705538522~acl=/*~hmac=6a7fae42307cba95d027460b757da754de67be03b83e91475a1004be65bfbecd"
+		# Special requirement for Citrix Workspace on Ubuntu 20.04
+		if [[ "$(lsb_release -si)" == "Ubuntu" && "$(lsb_release -sr)" == "20.04" ]]; then
+			apt-get install libunwind-12 libc++-12-dev libc++1-12 libc++abi-12-dev libc++abi1-12 -y
+		fi
 	elif hash dnf &>/dev/nul; then
 		write_warning "Please NOTE that Citrix only supports Ubuntu"
 		software::vendor_download_and_install "https://downloads.citrix.com/22439/ICAClient-rhel-23.11.0.82-0.x86_64.rpm?__gda__=exp=1705538522~acl=/*~hmac=6a7fae42307cba95d027460b757da754de67be03b83e91475a1004be65bfbecd"
@@ -1226,8 +1236,6 @@ Single_Install_Citrix_App (){
 	else
 		write_error "No supported packaging system detected for special case of installing Citrix Workspace! "
 	fi
-
-	[[ hash apt ]] && apt-get install libunwind-12 libc++-12-dev
 }
 
 

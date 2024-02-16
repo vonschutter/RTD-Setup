@@ -2318,7 +2318,7 @@ system::update_config ()
 
 	local config_file=$1
 	shift  # Shift past the first argument (the config file path)
-	system::log_item "Updating configuration file with key-value pairs: $@"
+	system::log_item "Updating configuration file with key-value pairs: $*"
 	mkdir -p ${config_file%/*}  ; touch $config_file || system::log_item "Failed to create config file: $config_file"
 	
 	while (( "$#" )); do
@@ -9417,7 +9417,7 @@ kvm::make_vm_template_now_from_microsoft ()
 		mcopy -i "${WindowsInstructions}" "${AutoUnattend}" ::/ || rtd_oem_pause 1 
 
 		write_information "Copy the Windows.mod files files to the floppy disk..."
-		for i in "$(find /opt/${_TLA,,} -type d -name "windows.mod")/_*"; do
+		for i in $(find /opt/${_TLA,,} -type d -name "windows.mod")/_* ; do
 			if [[ -e "${i}" ]]; then
 				command -v mcopy > /dev/null  && { mcopy -i "${WindowsInstructions}" "${i}" ::/ || rtd_oem_pause 1 ; }
 				write_status "Copied ${i} to the floppy disk..."
@@ -11888,7 +11888,7 @@ system::make_preseed_cfg ()
 			# --------------------------------------------------- #
 			${_d_i_post_statment_ubunto_or_deb} \
 			in-target apt-get -y install git ; \
-			in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
+			in-target git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
 			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
 			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
 			in-target mkdir -p /root/.ssh ; \
@@ -11928,7 +11928,7 @@ system::make_preseed_cfg ()
 			${_d_i_post_statment_ubunto_or_deb} \
 			in-target apt-get -y install qemu-system libvirt-daemon-system ; \
 			in-target apt-get -y install git ; \
-			in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
+			in-target git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
 			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
 			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
 			in-target mkdir -p /root/.ssh ; \
@@ -11961,7 +11961,7 @@ system::make_preseed_cfg ()
 			# for Debian to work (ignored by Ubuntu)...
 			${_d_i_post_statment_ubunto_or_deb} \
 			in-target apt-get -y install git ; \
-			in-target git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
+			in-target git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
 			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
 			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
 			in-target mkdir -p /root/.ssh ; \
@@ -12749,13 +12749,13 @@ if (return 0 2>/dev/null) ; then
 	write_warning "Library is sourced from a script or terminal! "
 
 	if [[ "$(basename $0)" == "bash" ]] ; then
-		write_information "Script is sourced from bash in a terminal: $0 $@"
+		write_information "Script is sourced from bash in a terminal: $0 $*"
 	else
-		write_information "Script is being sourced from a script: $(basename $0) $@"
+		write_information "Script is being sourced from a script: $(basename $0) $*"
 	fi
 else 
 	sourced=1
-	write_warning "Library is run directly! $(basename $0) $@"
+	write_warning "Library is run directly! $(basename $0) $*"
 fi
 
 
