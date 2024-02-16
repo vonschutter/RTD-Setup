@@ -153,6 +153,7 @@ export RTD_VERSION=2.02
 	system::check_required_variables                ; Check that all required variables are set
 	system::create_physical_media_from_ubuntu_iso   ; Create physical media thumb drive from an Ubuntu ISO file
 	system::display_spinner                         ; Display a spinner in the terminal
+	system::check_file_limits		        ; check and display the current usage of file descriptors against the set limits
         system::download_and_manipulate_iso_debian      ; Download and modify a debian iso to automatically install OEM addons
 	system::find_download_ubuntu_iso                ; Find and download an Ubuntu ISO file
 	system::find_vm_bridge                          ; Echo back the name of the bridge device and if one is not found then echo default (nat)
@@ -166,6 +167,7 @@ export RTD_VERSION=2.02
 	system::process_vm_opt_args                     ; Process optional arguments for virtual machine creation
         system::prepare_environment_for_iso_creation    ; Prepare the environment for ISO creation
         system::read_config                             ; Read the configuration for a virtual machine
+	system::distribution_type		        ; Determines the Linux distribution type of the system on which it is run
         system::update_config                           ; Update the configuration for a virtual machine
 	system::remove_old_kernel                       ; Removes all old linux kernels
 	system::restart_sound                           ; Restart sound service in user session on system...
@@ -908,6 +910,112 @@ dependency::os_linux ()
 
 
 
+system::check_file_limits ()
+{
+# Description:
+#
+# This function is designed to check and display the current usage of file
+# descriptors against the set limits in a Linux system. It provides a clear
+# overview of open files and system limits, aiding in resource monitoring and
+# troubleshooting.
+#
+# The function performs the following actions:
+# - Retrieves the count of currently open files using `lsof`.
+# - Fetches the user-specific soft and hard limits for open files (`nofile`).
+# - Obtains the system-wide file handle limit.
+# - Displays the collected information in a user-friendly format.
+#
+# Additionally, it includes a spinner animation to indicate progress while
+# gathering data, enhancing the user experience during potentially longer
+# operations.
+#
+# Usage:
+#   Call `system::check_file_limits` from the terminal or within a script to
+#   execute the function.
+#
+# Notes:
+# - The function uses a temporary file (`/tmp/open_files_count`) to store the
+#   count of open files, which is then read and displayed.
+# - The spinner is implemented as a nested function `system::check_file_limits::spinner`,
+#   which visually indicates ongoing processing.
+# - The `printf` command is used with formatting to align and present the data
+#   clearly, including the use of thousand separators for better readability.
+# - The function checks if current usage exceeds any of the defined limits and
+#   displays appropriate warnings or critical alerts.
+#
+# Dependencies:
+# - Requires `lsof`, `sysctl`, `awk`, and standard bash utilities.
+#
+# Limitations:
+# - The spinner animation relies on the terminal's ability to interpret control
+#   characters for cursor movement. May not work correctly in all terminal
+#   environments.
+# - Number formatting is locale-dependent and assumes `en_US.UTF-8` is available
+#   and correctly configured on the system.
+#
+# End of documentation
+
+    # Get the number of currently open files in the background
+	lsof | wc -l > /tmp/open_files_count &
+	local lsof_pid=$!
+
+	system::check_file_limits::spinner() {
+		local pid=$1
+		local delay=0.1
+		local spinstr='|/-\\'
+		echo -n " Working... "
+		while kill -0 "$pid" 2>/dev/null; do
+			local temp=${spinstr#?}
+			printf "[%c]" "$spinstr"
+			local spinstr=$temp${spinstr%"$temp"}
+			sleep $delay
+			printf "\b\b\b"
+		done
+		echo -ne "\r               \r"
+	}
+	# Start the spinner
+	system::check_file_limits::spinner "$lsof_pid"
+
+	# Read the open files count
+	local open_files=$(cat /tmp/open_files_count)
+
+	# Rest of your function...
+	local user_soft_limit=$(ulimit -Sn)
+	local user_hard_limit=$(ulimit -Hn)
+	local system_limit=$(sysctl -n fs.file-max)
+	local allocated_file_handles=$(awk '{print $1}' /proc/sys/fs/file-nr)
+
+	# Print the results
+	write_information "
+	💻 File Descriptors Usage and Limits:
+	$(tput bold; tput setaf 1)-------------------------------------------------------- $(tput sgr0)
+	$(printf "%-43s \e[36m%'10d\e[0m\n" "Open Files:" $open_files )
+	$(printf "%-43s \e[36m%'10d\e[0m\n" "User Soft Limit:" $user_soft_limit )
+	$(printf "%-43s \e[36m%'10d\e[0m\n" "User Hard Limit:" $user_hard_limit )
+	$(printf "%-43s \e[36m%'10d\e[0m\n" "System-Wide File Handles Limit:" $system_limit )
+	$(printf "%-43s \e[36m%'10d\e[0m\n" "Allocated File Handles (System-Wide):" $allocated_file_handles )
+
+	$(tput bold; tput setaf 1)-------------------------------------------------------- $(tput sgr0)
+	"
+	# Additional information based on limits...
+	if [ "$open_files" -gt "$user_soft_limit" ]; then
+		echo "Warning: You are exceeding your soft limit of open files."
+	fi
+
+	if [ "$open_files" -gt "$user_hard_limit" ]; then
+		echo "Critical: You are exceeding your hard limit of open files."
+	fi
+
+	if [ "$allocated_file_handles" -gt "$system_limit" ]; then
+		echo "Critical: The system is exceeding its overall file handles limit."
+	fi
+}
+
+
+
+
+
+
 system::distribution_type ()
 {
 # Description:
@@ -970,7 +1078,6 @@ system::distribution_type ()
 # End of documentation
 
 	local dtype
-	# Assume unknown
 	dtype="unknown"
 	
 	# First test against Fedora / RHEL / CentOS / generic Redhat derivative
@@ -7066,7 +7173,7 @@ system::log_item () {
 		;;
 	esac
 
-	echo "${log_prefix} ${log_type} : 🧩 ${log_message}" >> "$logfile"
+	echo "${log_prefix} ${log_type} : ${log_message}" >> "$logfile"
 }
 
 
