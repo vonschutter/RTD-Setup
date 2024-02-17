@@ -6426,9 +6426,9 @@ is_software_package_available ()
 	if hash yum 2>/dev/null; then
 		yum list available "$1" &> /dev/null && return 0 || return 1
 	elif hash zypper 2>/dev/null; then
-		if zypper se "${1}" |grep "${1}" &> /dev/null ; then return 0 ; else return 1 ; fi
+		if zypper se "${1}" |grep "${1}" &> /dev/null && return 0 || return 1
 	elif hash apt 2>/dev/null; then
-		apt -qq list "$1" | grep -q "$1" 2>/dev/null  && return 0 || return 1
+		apt -qq list "$1" | grep -q "$1" &> /dev/null  && return 0 || return 1
 	else
 		return 3
 	fi
@@ -6455,7 +6455,7 @@ software::is_native_package_available ()
 	elif hash zypper 2>/dev/null; then
 		if zypper se "${1}" |grep "${1}" &> /dev/null ; then return 0 ; else return 1 ; fi
 	elif hash apt 2>/dev/null; then
-		apt-get -qq list "$1" 2>/dev/null | grep -q "$1" && return 0 || return 1
+		apt -qq list "$1" 2>/dev/null | grep -q "$1" && return 0 || return 1
 	else
 		return 3
 	fi
@@ -6473,34 +6473,6 @@ InstallSoftwareFromRepo ()
 # be an RPM or deb string, or even snap or flatpak. A preference order between package system and
 # snap or flatpak use.
 # End of documentation
-	# ensure_admin
-	# : ${_LOGFILE:="/var/log/rtd/$( basename "$0".log )"}
-	# # Ask function how to install software...
-	# set_install_command &>>"${_LOGFILE}"
-
-	# # make some decent display terminal Graphics...
-	# PAD="------------------------------------------------"
-	# LINE=$(printf "%s %s" "$@" "$PAD" | cut -c 1-${#PAD})
-	# PRE=" - Installing $LINE :"
-	# # Test if package name is installed, if not then...
-	# if ! is_software_package_installed "${1}"; then
-	# 	_return="$?"  
-	# 	if is_software_package_available "${1}"; then
-	# 		if printf "${PRE}" & software::add_native_package "${1}" &>>${_LOGFILE} ; then
-	# 			printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR \n"
-	# 			return 0
-	# 		else	
-	# 			printf "%b%-6s%b [ ! ] ${RED} FAILED ${ENDCOLOR} \n"
-	# 			return 1
-	# 		fi
-	# 		#term::animate_while_command "$_INSTCMD ${1}" 
-	# 	else
-	# 		echo -ne "$PRE"\ && printf "%b%-6s%b [ \xE2\x9C\x94 ] $YELLOW Not available... $ENDCOLOR \n" && return 1
-	# 	fi
-	# else
-	# 	[ $? = 3 ] && { printf "%b%-6s%b [ ! ] ${RED} No package manager found... ${ENDCOLOR} \n" ; return 1 ; }
-	# 	[ $? = 1 ] && { echo -ne "$PRE"\ && printf "%b%-6s%b [ \xE2\x9C\x94 ] $YELLOW Allready installed... $ENDCOLOR \n" ; return 1 ; }
-	# fi
 
 	local PAD LINE PRE _return
 
@@ -6561,6 +6533,7 @@ software::add_native_package ()
 # End of documentation
 
         if [[ $(echo $OSTYPE | grep "linux") ]]; then
+
 		if hash zypper 2>/dev/null; then
 			write_status "📦 Installing ${1} using ZYPPER:"
 			sudo zypper install -y ${1} || { write_error "Failed to install ${1} using ZYPPER" ; return 1 ; }
