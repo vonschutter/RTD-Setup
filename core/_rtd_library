@@ -809,6 +809,110 @@ term::animate_while_command ()
 
 
 
+
+
+dependency::command_exists ()
+{
+
+# Description: Function to check if a command exists.
+# The purpose of this function is to check if a command exists in the system.
+# To use this function, simply call it passing the command name as an argument.
+
+# Globals: None
+# Arguments: ["Command name"]
+# Outputs: None
+# Returns: 0 if the command exists, 1 if it does not
+# Usage:	
+# dependency::command_exists "command"
+#	
+# End of Documentation
+
+	# List of required command(s) from input:
+	required_commands=($@)
+
+	# Function to check if a command is available
+	command_exists() {
+		command -v "$1" >/dev/null 2>&1
+	}
+
+	# Check each command and collect the missing ones
+	missing_commands=()
+	for cmd in "${required_commands[@]}"; do
+		if ! command_exists "$cmd"; then
+			missing_commands+=("$cmd")
+		fi
+	done
+
+	install_missing_commands() {
+		local distro
+		distro=$(system::distribution_type)
+
+		for cmd in "${missing_commands[@]}"; do
+			case "$distro" in
+			debian)
+				# Debian and Ubuntu
+				local cmd=$1
+				# Check if the command exists
+				if ! command -v "$cmd" &> /dev/null; then
+					# Attempt to execute the command to trigger 'command-not-found'
+					# and capture its output
+					local install_info
+					install_info=$( $cmd 2>&1 )
+
+					# Extract the package suggestion
+					local pkg
+					pkg=$(echo "$install_info" | grep -oP 'sudo apt install \K[^ ]+')
+
+					if [ -n "$pkg" ]; then
+						write_status "Installing '$cmd' using package '$pkg'..."
+						apt install -y "$pkg"
+					else
+						write_error "Package for command '$cmd' not found."
+					fi
+				fi
+				;;
+			redhat)
+				# Fedora and RHEL
+				local pkg
+				pkg=$(dnf provides */$cmd | grep ' : ' | head -n1 | cut -d' ' -f1)
+				if [[ -n "$pkg" ]]; then
+					dnf install -y "$pkg"
+				fi
+				;;
+			suse)
+				# openSUSE / SUSE
+				for cmd in "${missing_commands[@]}"; do
+					cnf_output=$(cnf "$cmd" 2>&1)
+					if [[ $cnf_output == *"can be found in following package"* ]]; then
+						# Extracting package name
+						pkg=$(echo "$cnf_output" | grep "^\s*\*" | awk '{print $2}')
+						if [[ -n "$pkg" ]]; then
+							zypper install -y "$pkg"
+						else
+							write_error "Package for command '$cmd' not found."
+						fi
+					else
+						write_error "Command '$cmd' not found in cnf database."
+					fi
+				done
+			;;
+			*)
+				write_error "Unsupported distribution: $distro"
+				exit 1
+				;;
+			esac
+		done
+	}
+
+
+}
+
+
+
+
+
+
+
 dependency::desktop ()
 {
 # Description: This function simplifies identifying the currently running desktop.
@@ -1080,6 +1184,7 @@ system::distribution_type ()
 	local dtype
 	dtype="unknown"
 	
+	{
 	# First test against Fedora / RHEL / CentOS / generic Redhat derivative
 	if [ -r /etc/rc.d/init.d/functions ]; then
 		source /etc/rc.d/init.d/functions
@@ -1110,6 +1215,7 @@ system::distribution_type ()
 		dtype="slackware"
 
 	fi
+	} &>/dev/null
 	echo $dtype
 }
 
@@ -5399,7 +5505,7 @@ compress_all_items_here ()
 		IFS=$(echo -en "\n\b")
 		for line in $(ls -I "*.7z")
 		do
-			7z a -t7z -m0=lzma2 -mx=5 -mfb=64 -md=64m -ms=on -mhe=on $line.7z $line
+			7z a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=64m -ms=on -mhe=on $line.7z $line
 		done
 		IFS=$SAVEIFS
 		result="
@@ -11778,7 +11884,7 @@ system::make_preseed_cfg ()
 		# The "OEM" line below ist to make it simple to replace the 
 		# line with a relevant chice of debian role using "sed" or similar.
 		tasksel tasksel/first multiselect ${_task}
-		d-i pkgsel/include string openssh-server dialog virt-what curl wget spice-vdagent git
+		d-i pkgsel/include string dialog p7zip-full virt-what curl wget spice-vdagent git
 
 		# Valid choices for pkgsel/upgrade are: safe-upgrade full-upgrade none
 		d-i pkgsel/upgrade select safe-upgrade
@@ -11960,6 +12066,7 @@ system::make_preseed_cfg ()
 			# for Debian to work (ignored by Ubuntu)...
 			${_d_i_post_statment_ubunto_or_deb} \
 			in-target apt-get -y install git ; \
+			in-target apt-get -y install dialog p7zip-full virt-what curl wget spice-vdagent ; \
 			in-target git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
 			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
 			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
