@@ -2069,24 +2069,32 @@ err_no_menu_system_found ()
 enable_firewall ()
 {
 # Description:
-# Function to enable system firewall and add a given rule. This simple function
-# enables Uncomplicated Fire Wall (UFW) and adds a rule to allow SSH to
-# pass. This function expects no arguments. However nothing will be done if
-# no ufw firewall is present on the system. The cunction will not attempt to add
-# the ufw since this may conflict with any firewall present. To use this funciton
-# to enable ufw, first any other firewall software must be disabled and ufw added.
+# Function to enable the system firewall and add a rule to allow SSH.
+# This function attempts to detect and configure UFW or firewalld,
+# common in Ubuntu/Debian, Fedora, and SUSE systems. If neither is
+# detected, it will display a message and prompt the user to enable
+# the firewall and configure SSH access manually.
+#
 # Globals:
 # Arguments: None
 # Outputs:
 # Returns:
 # Usage:
 # End of documentation
+
+	write_warning "Configuring Firewall..."
+
 	if hash ufw 2>/dev/null; then
-			echo -e $YELLOW "Configure Firewall:" $ENDCOLOR
-			ufw enable && ufw allow ssh
+		write_status "Using UFW to enable firewall and allow SSH..."
+		ufw enable && ufw allow ssh
+	elif hash firewall-cmd 2>/dev/null; then
+		write_status "Using firewalld to enable firewall and allow SSH..."
+		firewall-cmd --zone=public --add-service=ssh --permanent
+		firewall-cmd --reload
 	else
-			echo -e $faded_orange "UFW not present on this system: please turn on the firewall and configure it manually!" $ENDCOLOR
-	fi
+		write_error "Firewall tool not recognized. Please enable the firewall and configure SSH access manually."
+    fi
+
 }
 
 
@@ -4091,15 +4099,90 @@ ensure_admin ()
 			fi
 		fi
 	else
-		if [[ ! -e /etc/pam.d/sudo ]] ; then
-			#touch /etc/pam.d/sudo
-			#echo 'session  optional       pam_xauth.so' > /etc/pam.d/sudo
-			system::log_item "${FUNCNAME[0]} sudo:Administrative access granted to ${SUDO_USER:-"unknon user"} as requested by ${FUNCNAME[1]} ..."
-		else
-			#sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
-			system::log_item "${FUNCNAME[0]} sudo:Administrative access granted to ${SUDO_USER:-"unknon user"} as requested by ${FUNCNAME[1]} ..."
-		fi
+		system::log_item "Administrative access granted to ${SUDO_USER:-"unknon user"} as requested by ${FUNCNAME[1]} ..."
 	fi
+
+}
+
+
+
+
+
+
+system::ensure_admin ()
+{
+# Description:
+# Ensures the script runs with administrative privileges, attempting to use
+# graphical methods in GUI environments and falling back to terminal-based
+# sudo in non-GUI environments or when graphical methods fail.
+#
+# Globals:
+#   UID - User ID of the current user. Root user has UID 0.
+#   DISPLAY - Environment variable specifying the X display.
+#   SUDO_USER - The user who invoked sudo or pkexec.
+#
+# Arguments: None
+#
+# Outputs:
+#   Informational messages about the authentication process.
+#
+# Returns:
+#   Exits the current script and restarts it with administrative privileges
+#   if necessary.
+#
+# Usage:
+#   Call `ensure_admin` at the beginning of a script that requires administrative privileges.
+
+
+	if [[ "$UID" -eq 0 ]]; then
+		system::log_item "Administrative access granted to ${SUDO_USER:-"unknon user"} as requested by ${FUNCNAME[1]} ..."
+		return
+	fi
+
+	# Attempt to use PolicyKit's pkexec for graphical privilege escalation
+	if command -v pkexec &>/dev/null && xset q &>/dev/null; then
+		system::log_item "Attempting to gain privileges using pkexec..."
+		pkexec env DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" SUDO_USER="$USER" "$0" "$@"
+		exit $?
+	fi
+
+	# Attempt to use dialog for a nicer terminal interface, if available
+	if command -v dialog &>/dev/null; then
+		echo "Attempting to gain privileges using dialog for sudo..."
+		token=$(dialog --title "${Title:-"sudo"}" --backtitle "${BackTitle:-"$( basename $0 )"}" --insecure --stdout --passwordbox "\n This functionality requires elevated priviledges. \n Please provide your (sudo) password" 10 90)
+		ret=$? ; clear
+		case $ret in
+			0)
+				export HISTIGNORE='*sudo -S*'
+				echo ${token} | sudo -S -v || ensure_admin
+				sudo -E SUDO_USER=$USER /bin/bash "${0}" "$@" || rtd_oem_pause 1
+			;;
+			1) 
+				system::log_item "Request cancelled"
+				exit $?
+			;;
+			255)
+				system::log_item "[esc] Request aborted"
+				exit $?
+			;;
+			* )  
+				system::log_item "Failed to gain administrative privileges."
+				exit 1
+			;;
+		esac
+	fi
+
+	# Fallback to using sudo directly in the terminal
+	system::log_item "Attempting to gain privileges using sudo..."
+	if ! sudo -v; then
+		system::log_item "Unable to gain administrative privileges."
+		exit 1
+	fi
+
+	# Relaunch the script with sudo
+	sudo SUDO_USER="$USER" "$0" "$@"
+	exit $?
+
 }
 
 
@@ -6703,45 +6786,13 @@ software::add_gnome_extensions ()
 check_dependencies ()
 {
 # Description:
-# Function to check that a piece of software is installed and if not install it.
-# Works for apt, zypper, dnf or yum based systems currently. The function will take a parameter 
-# that is expected to match the software name or rather the name of the package. 
-# 
-# 
-# This is done to comply wiht the philosophy to do what it takes to reach the objective, and 
-# just work. Rather than just fail, we want to try and solve the problem and make the software
-# available. 
-# 
-# Globals:
-# Arguments: None
-# Dependencies: [package manager]
-# Function Dependencies: (other functions)
-# ensure_admin, write_status, write_information, write_warning, write_error, is_software_package_installed,
-# InstallSoftwareFromRepo
-# 
-# Outputs:
-# Returns: 1/0
-# Usage: check_dependencies [packagename]
-# 
-# EXAMPLE: check_dependencies snapd
+# Function to maintain backward compatibility with the check_dependencies function.
+# This function will take a parameter that is expected to match the name of the package.
+# The function will then pass it to the software::check_native_package_dependency function.
 # 
 # End of documentation
-	ensure_admin
+software::check_native_package_dependency ${*} && return 0 || return 1 
 
-	write_status "📦 Checking for script dependencies and install if not there..."
-
-	if is_software_package_installed "${1}" ; then
-		write_information "📦 I found that the dependency ${1} is present on this system... "
-	else
-		write_warning "📦 You seem to have no ${1}... I will try to get it... "
-		if InstallSoftwareFromRepo "${1}" ; then
-			write_status "📦 OK Done! Continuing..."
-		else
-			write_error "📦 That install didn't work out so well."
-			write_error "📦 Please manually try to add the software since I couldn't do it."
-			return 1
-		fi
-	fi
 }
 
 
@@ -6774,19 +6825,19 @@ software::check_native_package_dependency ()
 # EXAMPLE: software::check_native_package_dependency snapd
 # 
 # End of documentation
-	ensure_admin
-	#---------------------------------------------------------------
-	write_status "Checking for script dependencies and install if not there..."
-	#---------------------------------------------------------------
+	[[ "${EUID}" -eq 0 ]] || ensure_admin
+	
+
+	write_status "📦 Checking for script dependency ${1} and install if not there..."
+
 	if is_software_package_installed "${1}" ; then
-		write_information "I found that the dependency ${1} is present on this system... "
+		write_information "📦 I found that the dependency ${1} is present on this system... "
 	else
-		write_warning "You seem to have no ${1}... I will try to get it... "
-		if software::add_native_package "${1}" ; then
-			write_status "OK Done! Continuing..."
+		write_warning "📦 You seem to have no ${1}... I will try to get it... "
+		if InstallSoftwareFromRepo "${1}" ; then
+			write_status "📦 OK Done! Continuing..."
 		else
-			write_error "That install didn't work out so well."
-			write_error "Please manually try to add the software since I couldn't do it."
+			write_error "📦 That install didn't work out so well. Please manually try to add the software since I couldn't do it."
 			return 1
 		fi
 	fi
@@ -7024,76 +7075,13 @@ rtd_oem_remove_non_western_latin_fonts ()
 	font_list="fonts-kacst fonts-kacst-one fonts-khmeros-core fonts-lklug-sinhala fonts-lohit-guru fonts-guru fonts-nanum fonts-noto-cjk fonts-takao-pgothic fonts-tibetan-machine fonts-guru-extra \
 		fonts-lao fonts-sil-padauk fonts-sil-abyssinica fonts-tlwg-* fonts-beng fonts-beng-extra fonts-deva fonts-deva-extra fonts-gubbi fonts-gujr fonts-gujr-extra fonts-kalapi fonts-knda \
 		fonts-lohit-* fonts-orya* fonts-pagul fonts-sahadeva fonts-samyak-* fonts-sarai fonts-smc fonts-smc-* fonts-taml fonts-telu fonts-telu-extra"
-	echo "Attempting to remove non-western fonts..."
+	write_status "Attempting to remove non-western fonts..."
 	count=0
 	for i in $font_list ; do
-		rtd_oem_remove_software $i && (( count++))
+		software::remove_native_software_package $i && (( count++))
 	done
-	echo "Removed [ $count ] non-western Fonts"
+	write_information "Removed [ $count ] non-western Fonts"
 }
-
-
-
-
-
-
-
-
-
-rtd_oem_remove_software ()
-{
-# Description:
-# The OEM remove software function will attempt to remove whatever package name given
-# as an argument using whatever package system found on the system. This is provided
-# for portability and convenience. Currently, this functions will attempt to use
-# pkcon (prefferred as it run on many distributions), apt, yum, dnf, and zypper.
-# Additional package manager may be added as time allows.
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-# 	call this function using one argument only for reliability reasons;
-#	as per the below example. If thre is a need to remove a large number of
-#	packages it is reccommended to use a for loop and call this function,
-#	still realizing the benefit of mylti-distribution support.
-#
-#	rtd_oem_remove_software packagename
-#
-# If a failure occurs this function will return a non "0" exit code. (1)
-# End of documentation
-
-	ensure_admin
-	if [[ $(echo $OSTYPE |grep "linux") ]]; then
-		echo "Trying to remove package $*"
-		if hash dnf 2>/dev/null; then
-			dnf -y remove $*
-			return $?
-		elif hash yum 2>/dev/null; then
-			yum -y remove $*
-			return $?
-		elif hash zypper 2>/dev/null; then
-			zypper remove -y $*
-			return $?
-		elif hash apt 2>/dev/null; then
-			apt-get -y remove $* && apt-get -y autoremove
-			return $?
-		elif hash pkcon 2>/dev/null; then
-			pkcon remove $* -y --autoremove
-			return $?
-		else
-			echo -e $YELLOW "This system does not seem to have a software managment system" $ENDCOLOR
-			return 1
-		fi
-	elif [[ "$OSTYPE" == "freebsd"* ]]; then
-		echo "Free BSD is currently unsupported... "
-		return 1
-	else
-		echo "Though you can run bash, I have no Idea how to remove software here!"
-		return 1
-	fi
-}
-
 
 
 
@@ -7102,59 +7090,94 @@ rtd_oem_remove_software ()
 software::remove_native_software_package ()
 {
 # Description:
-# The OEM remove software function will attempt to remove whatever package name given
-# as an argument using whatever package system found on the system. This is provided
-# for portability and convenience. Currently, this functions will attempt to use
-# pkcon (prefferred as it run on many distributions), apt, yum, dnf, and zypper.
-# Additional package manager may be added as time allows.
+#   Removes a specified software package using the native package management
+#   system found on the system. This function is designed for portability and
+#   convenience, supporting various Linux distributions by utilizing their
+#   default package managers (dnf, yum, zypper, apt, pkcon). It's intended to
+#   simplify the process of removing software packages across different
+#   environments without needing to manually identify the package manager.
+#
 # Globals:
-# Arguments: None
+#   None
+#
+# Arguments:
+#   $1 - The name of the package to be removed. This argument is required.
+#
 # Outputs:
+#   Outputs various log messages to indicate the status of operations, including
+#   detection of the package manager, attempts to remove the package, and
+#   error messages if the package manager is not found or if no package name
+#   is provided.
+#
 # Returns:
+#   0 - If the package removal operation is successful.
+#   1 - If the package removal operation fails, if no package name is provided,
+#       if no known package manager is found on the system, or if the function
+#       encounters any other errors during execution.
+#
 # Usage:
-# 	call this function using one argument only for reliability reasons;
-#	as per the below example. If there is a need to remove a large number of
-#	packages it is reccommended to use a for loop and call this function,
-#	still realizing the benefit of mylti-distribution support.
+#   To remove a package named "example-package", you would call the function as follows:
+#       software::remove_native_software_package example-package
 #
-#	software::remove_native_software_package packagename
-#
-# If a failure occurs this function will return a non "0" exit code. (1)
+#   It is recommended to use this function with a single package name for reliability.
+#   If there is a need to remove multiple packages, consider calling this function
+#   in a loop, passing one package name at a time. This approach retains the benefit
+#   of multi-distribution support while ensuring that each package is correctly handled.
 #
 # End of documentation
-	system::log_item "Requested to remove package $*"
-	ensure_admin
-	if [[ $(echo $OSTYPE |grep "linux") ]]; then
-		system::log_item "Linux system deetected; Trying to remove package $* using native package manager..."
-		if hash dnf 2>/dev/null; then
-			system::log_item "dnf package manager detected; attempting to remove package $*"
-			dnf -y remove $*
-			return $?
-		elif hash yum 2>/dev/null; then
-			system::log_item "yum package manager detected; attempting to remove package $*"
-			yum -y remove $*
-			return $?
-		elif hash zypper 2>/dev/null; then
-			system::log_item "zypper package manager detected; attempting to remove package $*"
-			zypper remove -y $*
-			return $?
-		elif hash apt 2>/dev/null; then
-			system::log_item "apt package manager detected; attempting to remove package $*"
-			apt-get -y remove $* && apt-get -y autoremove
-			return $?
-		elif hash pkcon 2>/dev/null; then
-			system::log_item "pkcon package manager detected; attempting to remove package $*"
-			pkcon remove $* -y --autoremove
-			return $?
-		else
-			write_error "This system does not seem to have a software managment system" 
-			return 1
-		fi
-	elif [[ "$OSTYPE" == "freebsd"* ]]; then
-		write_error "Free BSD is currently unsupported... "
+	
+	if [[ -z "$1" ]]; then
+		system::log_item "No package name provided for removal."
 		return 1
+	fi
+
+	local package_manager
+	local package_name="$1" # Assuming a single package for safety and clarity
+
+	system::log_item "Requested to remove package $package_name"
+	ensure_admin
+
+	# Detect package manager
+	if hash dnf 2>/dev/null; then
+		package_manager="dnf"
+	elif hash yum 2>/dev/null; then
+		package_manager="yum"
+	elif hash zypper 2>/dev/null; then
+		package_manager="zypper"
+	elif hash apt 2>/dev/null; then
+		package_manager="apt"
+	elif hash pkcon 2>/dev/null; then
+		package_manager="pkcon"
 	else
-		write_error "Though you can run bash, I have no Idea how to remove software here!"
+		system::log_item "No known package manager found on this system."
+		return 1
+	fi
+
+	# Remove package
+	case $package_manager in
+		dnf|yum)
+			system::log_item "$package_manager package manager detected; attempting to remove package $package_name"
+			$package_manager -y remove "$package_name"
+		;;
+		zypper)
+			system::log_item "$package_manager package manager detected; attempting to remove package $package_name"
+			$package_manager remove -y "$package_name"
+		;;
+		apt)
+			system::log_item "$package_manager package manager detected; attempting to remove package $package_name"
+			$package_manager -y remove "$package_name" && $package_manager -y autoremove
+		;;
+		pkcon)
+			system::log_item "$package_manager package manager detected; attempting to remove package $package_name"
+			$package_manager remove "$package_name" -y --autoremove
+		;;
+	esac
+
+	if [[ $? -eq 0 ]]; then
+		system::log_item "Package $package_name has been removed successfully."
+		return 0
+	else
+		system::log_item "Failed to remove package $package_name."
 		return 1
 	fi
 }
@@ -7226,7 +7249,7 @@ system::log_item () {
 
 	case "${FUNCNAME[1]}" in
 		write_error)
-			log_type="ERROR"
+			log_type="ERR!"
 			log_message="$*"
 		;;
 		write_warning)
