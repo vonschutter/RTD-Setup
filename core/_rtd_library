@@ -6423,11 +6423,11 @@ is_software_package_available ()
 # Supported base distributions: Fedora . SuSE . Debian
 # End of documentation
 
-	if hash yum 2>/dev/null; then
+	if hash yum &> /dev/null ; then
 		yum list available "$1" &> /dev/null && return 0 || return 1
-	elif hash zypper 2>/dev/null; then
-		if zypper se "${1}" |grep "${1}" &> /dev/null && return 0 || return 1
-	elif hash apt 2>/dev/null; then
+	elif hash zypper &> /dev/null ; then
+		zypper se "${1}" |grep "${1}" &> /dev/null && return 0 || return 1
+	elif hash apt &> /dev/null ; then
 		apt -qq list "$1" | grep -q "$1" &> /dev/null  && return 0 || return 1
 	else
 		return 3
