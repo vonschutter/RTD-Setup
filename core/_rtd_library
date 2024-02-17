@@ -1552,53 +1552,52 @@ system::oem_autounlock_disk ()
 # Usage: oem_autounlock_disk
 #
 # End of Documentation
+
 	local _pass="$1"
-	cp  /boot/initrd.img-$(uname -r)  /boot/initrd.img-$(uname -r).bak
+	local kernel_version=$(uname -r)
+	local encrypted_dev
+	local uuid
 
-	cat > /boot/grub/grub.cfg <<- OEM_CRYPTLOCK_OPTION
+	# 1. Backup initramfs disk
+	cp /boot/initrd.img-${kernel_version} /boot/initrd.img-${kernel_version}.bak
+
+	# 2. Update GRUB configuration
+	cat > /boot/grub/grub.cfg <<-EOF
 	### BEGIN /etc/grub.d/10_linux ###
-
-	menuentry 'Debian GNU/Linux, with Linux $(uname -r) (crypto safe)' --class debian --class gnu-linux --class gnu --class os {
+	menuentry 'Debian GNU/Linux, with Linux ${kernel_version} (crypto safe)' {
 		load_video
 		insmod gzio
 		insmod part_msdos
 		insmod ext2
 		set root='hd0,msdos1'
 		search --no-floppy --fs-uuid --set=root 2a5e9b7f-2128-4a50-83b6-d1c285410145
-		echo    'Loading Linux $(uname -r) ...'
-		linux   /vmlinuz-$(uname -r) root=/dev/mapper/dradispro-root ro  quiet
+		echo    'Loading Linux ${kernel_version} ...'
+		linux   /vmlinuz-${kernel_version} root=/dev/mapper/dradispro-root ro quiet
 		echo    'Loading initial ramdisk ...'
-		initrd  /initrd.img-$(uname -r).safe
+		initrd  /initrd.img-${kernel_version}.safe
 	}
-	...
-	## END /etc/grub.d/10_linux ###
-	OEM_CRYPTLOCK_OPTION
+	### END /etc/grub.d/10_linux ###
+	EOF
 
-	# 2. Create the key file in the unencrypted /boot partition
+	# 3. Create the key file in the unencrypted /boot partition
 	dd if=/dev/urandom of=/boot/keyfile bs=1024 count=4
-
-	# 3. Set permissions
 	chmod 0400 /boot/keyfile
 
 	# 4. Add the new file as unlock key to the encrypted volume
-	echo ${_pass} | cryptsetup -v luksAddKey "$(blkid | grep crypto_LUKS|  cut -d : -f 1)" /boot/keyfile -
+	encrypted_dev=$(blkid | grep crypto_LUKS | cut -d : -f 1)
+	echo $_pass | cryptsetup -v luksAddKey "$encrypted_dev" /boot/keyfile -
 
-	# 6. Edit /etc/crypttab
-	chmod 0777 /etc/crypttab
-	cp /etc/crypttab /etc/crypttab.temporary
-	sed -i /"$(cat /etc/crypttab | cut -d " " -f 1 )"/d /etc/crypttab.temporary
-	echo "$(cat /etc/crypttab | cut -d " " -f 1-2)"  /"$(udevadm info "$(blkid | grep crypto_LUKS|  cut -d : -f 1)" |grep by-uuid | cut -d : -f 2 | head -1)":/keyfile luks,keyscript=/lib/cryptsetup/scripts/pa$  >> /etc/crypttab.temporary
-	mv /etc/crypttab /etc/crypttab.back
-	mv /etc/crypttab.temporary /etc/crypttab
-
-	# Restore permissions to crypttab
+	# 5. Edit /etc/crypttab
+	cp /etc/crypttab /etc/crypttab.bak
+	chmod 0600 /etc/crypttab
+	uuid=$(udevadm info "$encrypted_dev" | grep by-uuid | cut -d : -f 2 | head -1)
+	sed -i /"$(cat /etc/crypttab | cut -d " " -f 1)"/d /etc/crypttab
+	echo "$(cat /etc/crypttab | cut -d " " -f 1-2)" /"${uuid}":/keyfile luks,keyscript=/lib/cryptsetup/scripts/pa$  >> /etc/crypttab
 	chmod 0440 /etc/crypttab
 
-	# Generate new initramfs
-	mkinitramfs -o /boot/initrd.img-"$(uname -r)"  "$(uname -r)"
-
+	# 6. Generate new initramfs
+	mkinitramfs -o /boot/initrd.img-${kernel_version} ${kernel_version}
 }
-
 
 
 
@@ -12246,7 +12245,7 @@ set_colors ()
 	"    ${blue}•${green}•${red}•${magenta}•"
 	)
 
-	echo -e "$yellow * $darkyellow * $red * $darkred * $green * $darkgreen * $blue * $darkblue * $cyan * $darkcyan * $gray * $darkgray * $purple * $darkpurple * $endcolor"
+	echo -e "🧩 $yellow * $darkyellow * $red * $darkred * $green * $darkgreen * $blue * $darkblue * $cyan * $darkcyan * $gray * $darkgray * $purple * $darkpurple * $endcolor"
 }
 
 
@@ -12737,12 +12736,12 @@ fi
 # initialize loging and provide process details...
 export _LOGFILE
 touch ${_LOGFILE}
-system::log_item "💻 ********** : $(basename ${BASH_SOURCE[0]}) loaded by $(basename "${0}") on $HOSTNAME  : ************************************"
+system::log_item " ********** : $(basename ${BASH_SOURCE[0]}) loaded by $(basename "${0}") on $HOSTNAME  : ************************************"
 system::log_item "💻 Basic System Information: 
 $(hostnamectl)"
 
 
-# check if library is loaded from a terminal or another script (behavior may differ)...
+# Check if library is loaded from a terminal or another script (behavior may differ)...
 # This may be useful to log for support reasons.
 if (return 0 2>/dev/null) ; then 
 	sourced=0
@@ -12778,7 +12777,7 @@ _SCRIPTNAME=${_SCRIPTNAME}
 
 # Check if this library is asked to do anything or just load...
 if [ -z $1 ]; then
-	echo "RTD Power Library $RTD_VERSION OK"
+	echo -e "RTD Power Library $RTD_VERSION OK"
 	export RTDFUNCTIONS=1
 else
 	case $1 in
@@ -12882,7 +12881,4 @@ else
 fi
 
 
-# Cleanup on exit: 
-# for var in $(compgen -v | grep '^_'); do
-#     unset $var
-# done
+
