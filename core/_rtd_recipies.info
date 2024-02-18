@@ -906,25 +906,6 @@ recipe_Bundle:_1_Install_OEM_Themes_and_Tweaks (){
 	# Apply tweaks to the UI based on desktop active
 	if  ps -e |grep "gnome-shell"; then
 
-		# [Task 5.1] Configure Wallpapers for OEM look and feel.
-		# -------------------------------------------------------------------------------------------------------
-		write_information "Fonud the gnome UI on this system! Adding OEM customizations..."
-
-		tempfile=$( mktemp )
-		chmod 777 ${tempfile}
-		cat > ${tempfile} <<-EOF
-			#!/bin/bash
-			source ${_OEM_DIR}/core/_rtd_library
-			set_gnome_ui_common_tweaks_for_user
-		EOF
-		system::run_command_in_gnome_user_session /bin/bash ${tempfile}
-
-		# Set the default wallpaper...
-		oem::register_wallpapers_for_gnome ${_WALLPAPER_DIR}
-		system::run_command_in_gnome_user_session "gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/Wayland.jpg"
-		# -------------------------------------------------------------------------------------------------------
-
-
 		# [Task 5.2] Add extensions:
 		# -------------------------------------------------------------------------------------------------------
 		# To fully support themes and customixzations the Gnome environment requires extensions and
@@ -984,6 +965,26 @@ recipe_Bundle:_1_Install_OEM_Themes_and_Tweaks (){
 
 		# -------------------------------------------------------------------------------------------------------
 
+
+		# -------------------------------------------------------------------------------------------------------
+		# [Task 5.1] Configure Wallpapers for OEM look and feel.
+		# -------------------------------------------------------------------------------------------------------
+		write_information "Fonud the gnome UI on this system! Adding OEM customizations..."
+
+		tempfile=$( mktemp )
+		chmod 777 ${tempfile}
+		cat > ${tempfile} <<-EOF
+			#!/bin/bash
+			source ${_OEM_DIR}/core/_rtd_library
+			set_gnome_ui_common_tweaks_for_user
+		EOF
+		system::run_command_in_gnome_user_session /bin/bash ${tempfile}
+
+		# Set the default wallpaper...
+		oem::register_wallpapers_for_gnome ${_WALLPAPER_DIR}
+		system::run_command_in_gnome_user_session "gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/Wayland.jpg"
+
+		# -------------------------------------------------------------------------------------------------------
 		# [Task 5.5] copy configuration elements so that NEW users also get the tweaks:
 		# -------------------------------------------------------------------------------------------------------
 		# If the system that this is run on was built using an unattended build it is reasonable to
