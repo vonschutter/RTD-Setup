@@ -3281,7 +3281,6 @@ set_gnome_ui_common_tweaks_for_user ()
 	write_status "Seting common OEM tweaks..."
 	# Terminal and Tilix Dark Theme
 		GNOME_TERMINAL_PROFILE=$(gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}')
-		gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ theme-variant 'dark'
 		gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-transparent-background true
 		gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ background-transparency-percent 20
 		gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ default-size-columns 100
@@ -3870,48 +3869,97 @@ set_gnome_ui_moca_tweaks_for_user ()
 
 
 
-oem::register_wallpapers_for_gnome ()
-{
-# Description: Function to simplify registering wallpapers for Gnome.
-#
-# Globals:
-# Arguments: /path/to/folder/with/wallpapers
-# Outputs:
-# Returns:
-# Usage:
-# oem::register_wallpapers_for_gnome  /path/to/folder/with/wallpapers
-#
-# End of documentation
+# oem::register_wallpapers_for_gnome ()
+# {
+# # Description: Function to simplify registering wallpapers for Gnome.
+# #
+# # Globals:
+# # Arguments: /path/to/folder/with/wallpapers
+# # Outputs:
+# # Returns:
+# # Usage:
+# # oem::register_wallpapers_for_gnome  /path/to/folder/with/wallpapers
+# #
+# # End of documentation
 
+# 	local _wallpaper_dir="${1:-"${_WALLPAPER_DIR}"}"
+
+# 	# Make a header:
+# 	echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+# 	<!DOCTYPE wallpapers SYSTEM \"gnome-wp-list.dtd\">
+# 	<wallpapers>" > oem-backgrounds.xml
+
+# 	# Registering all pictures in $_wallpaper_dir:
+# 	for i in ${_wallpaper_dir}/*.jpg ${_wallpaper_dir}/*.png; do
+# 	echo "<wallpaper>
+# 	<name>$i</name>
+# 	<filename>$i</filename>
+# 	<options>stretched</options>
+# 	<pcolor>#8f4a1c</pcolor>
+# 	<scolor>#8f4a1c</scolor>
+# 	<shade_type>solid</shade_type>
+# 	</wallpaper>" >> oem-backgrounds.xml
+# 	done
+
+# 	# creating the footer:
+# 	echo "</wallpapers>" >> oem-backgrounds.xml
+
+# 	# Register all files:
+# 	mkdir -p /usr/local/share/gnome-background-properties
+# 	sed 's/<name>\/usr\/share\/backgrounds\//<name>/g' oem-backgrounds.xml > /usr/local/share/gnome-background-properties/oem-backgrounds.xml
+# 	rm oem-backgrounds.xml
+# }
+
+
+
+oem::register_wallpapers_for_gnome() {
+	# Validate the input directory
 	local _wallpaper_dir="${1:-"${_WALLPAPER_DIR}"}"
+	if [[ ! -d "$_wallpaper_dir" ]]; then
+		echo "Error: Directory '$_wallpaper_dir' does not exist."
+		return 1
+	fi
 
-	# Make a header:
-	echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-	<!DOCTYPE wallpapers SYSTEM \"gnome-wp-list.dtd\">
-	<wallpapers>" > oem-backgrounds.xml
+	local xml_file="oem-backgrounds.xml"
+	local dest_dir="/usr/local/share/gnome-background-properties"
+	local dest_file="${dest_dir}/${xml_file}"
 
-	# Registering all pictures in $_wallpaper_dir:
-	for i in ${_wallpaper_dir}/*.jpg ${_wallpaper_dir}/*.png; do
-	echo "<wallpaper>
-	<name>$i</name>
-	<filename>$i</filename>
-	<options>stretched</options>
-	<pcolor>#8f4a1c</pcolor>
-	<scolor>#8f4a1c</scolor>
-	<shade_type>solid</shade_type>
-	</wallpaper>" >> oem-backgrounds.xml
+	# Start with the XML header
+	cat > "$xml_file" <<-EOF
+	<?xml version="1.0" encoding="UTF-8"?>
+	<!DOCTYPE wallpapers SYSTEM "gnome-wp-list.dtd">
+	<wallpapers>
+	EOF
+
+	# Safely iterate over .jpg and .png files
+	shopt -s nullglob
+	for i in "$_wallpaper_dir"/*.jpg "$_wallpaper_dir"/*.png; do
+		cat >> "$xml_file" <<-EOF
+	<wallpaper>
+	    <name>$(basename "$i")</name>
+	    <filename>$i</filename>
+	    <options>stretched</options>
+	    <pcolor>#8f4a1c</pcolor>
+	    <scolor>#8f4a1c</scolor>
+	    <shade_type>solid</shade_type>
+	</wallpaper>
+	EOF
 	done
+	shopt -u nullglob
 
-	# creating the footer:
-	echo "</wallpapers>" >> oem-backgrounds.xml
+	# Finish with the XML footer
+	echo "</wallpapers>" >> "$xml_file"
 
-	# Register all files:
-	mkdir -p /usr/local/share/gnome-background-properties
-	sed 's/<name>\/usr\/share\/backgrounds\//<name>/g' oem-backgrounds.xml > /usr/local/share/gnome-background-properties/oem-backgrounds.xml
-	rm oem-backgrounds.xml
+	# Ensure the destination directory exists
+	mkdir -p "$dest_dir"
+
+	# Use 'mv' instead of 'sed' to place the file to avoid unnecessary complexity
+	# and potential issues with file paths. If further processing is needed,
+	# it should be handled more explicitly.
+	mv "$xml_file" "$dest_file"
+
+	echo "Wallpapers registered successfully at $dest_file"
 }
-
-
 
 
 
@@ -12565,7 +12613,7 @@ write_host ()
 		--red ) color="$(tput bold; tput setaf 1)" ;;
 		--darkred ) color="$(tput setaf 3)" ;;
 		--endcolor ) color="$(tput sgr0)" ;;
-		--green ) color="$"$(tput bold; tput setaf 2)"" ;;
+		--green ) color="$(tput bold; tput setaf 2)" ;;
 		--darkgreen ) color="$(tput dim; tput setaf 2)" ;;
 		--blue ) color="$(tput bold; tput setaf 4)" ;;
 		--darkblue ) color="$(tput dim; tput setaf 4)" ;;
