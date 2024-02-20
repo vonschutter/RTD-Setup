@@ -6770,6 +6770,7 @@ software::add_gnome_extensions ()
 		return 1
 	fi
 
+	# "Dont run if gnome is not running..."
 	if [[ -z "$gnome_shell_ver" ]]; then
 		write_error "Error: Unable to determine GNOME Shell version." >&2
 		return 1
@@ -6779,7 +6780,7 @@ software::add_gnome_extensions ()
 	write_status "Status: Installing GNOME extension(s): $@."
 	for extension in $@; do
 		write_status "Status: Installing GNOME extension: $extension."
-		if ! bash "$extension_installer" "$extension" "$gnome_shell_ver" --yes |& tee -a "${_logfile}" ; then
+		if ! bash "$extension_installer" "$extension" --yes |& tee -a "${_logfile}" ; then
 			write_error "Error: Failure to install GNOME extension: $extension." >&2
 			install_status=1
 		else
