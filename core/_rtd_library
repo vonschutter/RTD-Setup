@@ -6722,31 +6722,71 @@ software::add_gnome_extensions ()
 #
 # End of documentation
 
-	local gnome_extensions_to_get=${@}
-	[ -z "${gnome_extensions_to_get}" ] && { write_error "No gnome extensions were provided..."; return 1; }
+	# local gnome_extensions_to_get=${@}
+	# [ -z "${gnome_extensions_to_get}" ] && { write_error "No gnome extensions were provided..."; return 1; }
+	# local _TLA=${_TLA:=RTD}
+	# local _tla=${_TLA,,}
+	# local extension_installer=$(find "/opt/${_tla}" -name rtd-gnome-shell-extension-installer)
+	# local gnome_shell_ver=$(gnome-shell --version | cut -d' ' -f3)
+	# local gnome_shell_sudo_user_ver=$(sudo -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c "gnome-shell --version | cut -d' ' -f3")
 
-	local extension_installer=$(find /opt/${_TLA_lower} -name rtd-gnome-shell-extension-installer)
-	local gnome_shell_ver=$(gnome-shell --version | cut -d' ' -f3)
-	local gnome_shell_sudo_user_ver=$(sudo -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c "gnome-shell --version | cut -d' ' -f3")
+	# if [[ -n "${extension_installer}" ]]; then
+	# 	write_status "I found the gnome extension installer at: ${extension_installer}"
+	# else
+	# 	write_error "I could not find the gnome extension installer anywhere! Check that the rtd-gnome-shell-extension-installer is in the right place..."
+	# 	return 1
+	# fi
 
-	for i in ${gnome_extensions_to_get}; do
-		if [[ -n "${extension_installer}" ]]; then
-			extension_success=false
-			if bash "${extension_installer}" --yes "${i}" --restart-shell ||
-				bash "${extension_installer}" --yes "${i}" "${gnome_shell_ver}" --restart-shell ||
-					bash "${extension_installer}" --yes "${i}" "${gnome_shell_sudo_user_ver}" --restart-shell; then
-			extension_success=true
-			fi
+	# for i in ${gnome_extensions_to_get}; do
+	# 	extension_success=false
+	# 	if bash "${extension_installer}" --yes "${i}" ||
+	# 		bash "${extension_installer}" --yes "${i}" "${gnome_shell_ver}" ||
+	# 			bash "${extension_installer}" --yes "${i}" "${gnome_shell_sudo_user_ver}" ; then
+	# 	extension_success=true
+	# 	fi
 
-			if [[ "${extension_success}" == true ]]; then
-				write_status "Successfully installed gnome extension: ${i}."
-			else
-				write_error "Failure to install gnome extension: ${i}..."
-			fi
+	# 	if [[ "${extension_success}" == true ]]; then
+	# 		write_status "Successfully installed gnome extension: ${i}."
+	# 	else
+	# 		write_error "Failure to install gnome extension: ${i}..."
+	# 	fi
+	# done
+	if [ $# -eq 0 ]; then
+		write_warning "Error: No GNOME extensions were provided for me to install."
+		return 1
+	fi
+
+	local extension_installer_path="/opt/${_TLA,,}"
+	local extension_installer="$(find "$extension_installer_path" -name 'rtd-gnome-shell-extension-installer')"
+	local gnome_shell_ver="$(gnome-shell --version | awk '{print $3}')"
+	local _logfile="${_LOGFILE:-"/var/log/${_TLA,,}/$(basename ${0})"}"
+
+	if [[ -z "$gnome_shell_ver" && -n "$SUDO_USER" ]]; then
+		gnome_shell_ver=$(sudo -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/$(id -u $SUDO_USER)" gnome-shell --version | awk '{print $3}')
+	fi
+
+	if [[ -z "$extension_installer" ]]; then
+		write_error "Error: GNOME extension installer not found in $extension_installer_path." >&2
+		return 1
+	fi
+
+	if [[ -z "$gnome_shell_ver" ]]; then
+		write_error "Error: Unable to determine GNOME Shell version." >&2
+		return 1
+	fi
+
+	local install_status=0
+	write_status "Status: Installing GNOME extension(s): $@."
+	for extension in "$@"; do
+		if ! bash "$extension_installer" --yes "$extension" "$gnome_shell_ver" |& tee -a "${_logfile}" ; then
+			write_error "Error: Failure to install GNOME extension: $extension." >&2
+			install_status=1
 		else
-			write_error "I could not find the gnome extension installer anywhere! Check that the rtd-gnome-shell-extension-installer is in the right place..."
+			write_status "Status: Successfully installed GNOME extension: $extension."
 		fi
 	done
+
+	return $install_status
 }
 
 
