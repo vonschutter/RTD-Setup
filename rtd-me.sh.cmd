@@ -152,7 +152,7 @@ _git_src_url=https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git
 
 if [[ "$OSTYPE" == *"linux"* ]]; then
 	{
-	printf "Linux OS Found: Attempting to get instructions for Linux: \n executing $0"
+	printf "🌎 Linux OS Found: Attempting to get instructions for Linux: \n executing $0"
 
 	for d in git zip; do 
 		if ! command -v "$d" &>/dev/null; then
@@ -165,7 +165,7 @@ if [[ "$OSTYPE" == *"linux"* ]]; then
 	done
 	
 	if git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp ; then
-		printf "Instructions successfully retrieved..."
+		printf "✅ Instructions successfully retrieved..."
 		if [[ -d /opt/${_TLA,,}  ]] ; then
 			mv /opt/${_TLA,,} ${_BackupFolderName:="/opt/${_TLA,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"}
 			zip -m -r -5 ${_BackupFolderName}.zip  ${_BackupFolderName}
@@ -177,7 +177,7 @@ if [[ "$OSTYPE" == *"linux"* ]]; then
 		ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
 		bash ${_OEM_DIR}/core/rtd-oem-linux-config.sh ${*}
 	else
-		printf "Failed to retrieve instructions correctly! "
+		printf "💥 Failed to retrieve instructions correctly! "
 		exit 1
 	fi
 	} |& tee -a ${_LOGFILE}
