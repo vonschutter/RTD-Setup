@@ -213,7 +213,7 @@ oem_linux_config ()
 	fi
 }
 
-oem_linux_config |& tee -a ${_LOGFILE} 2>/dev/null
+oem_linux_config $zstatus
 
 exit
 EOF
