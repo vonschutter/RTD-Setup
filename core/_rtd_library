@@ -6860,49 +6860,33 @@ set_install_command ()
 software::add_gnome_extensions ()
 {
 # Description:
-# Function to add gnome extensions to the system. This function will take a parameter
-# that is expected to match the name of the extension. The function will then check if
-# the extension is installed and if not install it.
+# Description:
+# Function to add GNOME extensions to the system. This function takes one or more extension names
+# as parameters, checks if each extension is installed, and if not, installs them.
 #
 # Globals:
-# Arguments: None
-# Outputs:
-# Returns: 1/0
-# Usage: software::add_gnome_extensions [extension name]
+#   _TLA - Expected to be set to a unique identifier for the script or application.
+#   _LOGFILE - Optional global variable to specify a custom log file path.
 #
-# EXAMPLE: software::add_gnome_extensions "dash-to-dock"
+# Arguments:
+#   Extension names (one or more).
+#
+# Outputs:
+#   Writes status messages and errors to stdout or stderr, and logs installation details.
+#
+# Returns:
+#   0 if all specified extensions were installed successfully, 1 otherwise.
+#
+# Usage:
+#   software::add_gnome_extensions "dash-to-dock" "some-other-extension"
+#
+# Example:
+#   software::add_gnome_extensions "dash-to-dock"
+
 #
 # End of documentation
 
-	# local gnome_extensions_to_get=${@}
-	# [ -z "${gnome_extensions_to_get}" ] && { write_error "No gnome extensions were provided..."; return 1; }
-	# local _TLA=${_TLA:=RTD}
-	# local _tla=${_TLA,,}
-	# local extension_installer=$(find "/opt/${_tla}" -name rtd-gnome-shell-extension-installer)
-	# local gnome_shell_ver=$(gnome-shell --version | cut -d' ' -f3)
-	# local gnome_shell_sudo_user_ver=$(sudo -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c "gnome-shell --version | cut -d' ' -f3")
 
-	# if [[ -n "${extension_installer}" ]]; then
-	# 	write_status "I found the gnome extension installer at: ${extension_installer}"
-	# else
-	# 	write_error "I could not find the gnome extension installer anywhere! Check that the rtd-gnome-shell-extension-installer is in the right place..."
-	# 	return 1
-	# fi
-
-	# for i in ${gnome_extensions_to_get}; do
-	# 	extension_success=false
-	# 	if bash "${extension_installer}" --yes "${i}" ||
-	# 		bash "${extension_installer}" --yes "${i}" "${gnome_shell_ver}" ||
-	# 			bash "${extension_installer}" --yes "${i}" "${gnome_shell_sudo_user_ver}" ; then
-	# 	extension_success=true
-	# 	fi
-
-	# 	if [[ "${extension_success}" == true ]]; then
-	# 		write_status "Successfully installed gnome extension: ${i}."
-	# 	else
-	# 		write_error "Failure to install gnome extension: ${i}..."
-	# 	fi
-	# done
 	if [ $# -eq 0 ]; then
 		write_warning "Error: No GNOME extensions were provided for me to install."
 		return 1
@@ -6918,22 +6902,23 @@ software::add_gnome_extensions ()
 	fi
 
 	if [[ -z "$extension_installer" ]]; then
-		write_error "Error: GNOME extension installer not found in $extension_installer_path." >&2
+		write_error "Error: GNOME extension installer not found in $extension_installer_path."
 		return 1
 	fi
 
 	# "Dont run if gnome is not running..."
 	if [[ -z "$gnome_shell_ver" ]]; then
-		write_error "Error: Unable to determine GNOME Shell version." >&2
+		write_error "Error: Unable to determine GNOME Shell version."
 		return 1
 	fi
 
 	local install_status=0
+	local extensions=("$@") # Capture all arguments as an array
 	write_status "Status: Installing GNOME extension(s): $* ..."
-	for extension in $* ; do
+	for extension in "${extensions[@]}"; do
 		write_status "Status: Installing GNOME extension: $extension."
 		if ! bash "$extension_installer" "$extension" --yes |& tee -a "${_logfile}" ; then
-			write_error "Error: Failure to install GNOME extension: $extension." >&2
+			write_error "Error: Failure to install GNOME extension: $extension." 
 			install_status=1
 		else
 			write_status "Status: Successfully installed GNOME extension: $extension."
