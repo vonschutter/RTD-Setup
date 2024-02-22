@@ -2948,71 +2948,61 @@ make_system_recovery_partition ()
 
 # End of documentation
 
-	devlist="$(lsblk -ndo name,rm |grep -v loop |grep -v sr |grep 1 | cut -f1 -d' ')"
 
-	if [[ -z ${devlist} ]]; then
+
+	# Find removable devices that are not loops or CD/DVD drives
+	readarray -t devlist < <(lsblk -dnlo name,rm | awk '$2 == "1" {print $1}')
+
+	if [[ ${#devlist[@]} -eq 0 ]]; then
+		# No removable media found
 		DIALOGRC="/root/.dialogrc"
-		if -e ${DIALOGRC} ; then
-			mv ${DIALOGRC} ${DIALOGRC}.bak
-		fi
-		echo 'screen_color = (CYAN,RED,ON)' >${DIALOGRC}
-		dialog --title "Physical Installation Media Creator Error!" --backtitle "OS Media Manger" --msgbox "No removable media could be found!"  14 90
-		rm ${DIALOGRC}
-		if -e ${DIALOGRC}.bak ; then
-			mv ${DIALOGRC}.bak ${DIALOGRC}
-		fi
+		[[ -e $DIALOGRC ]] && mv "$DIALOGRC" "${DIALOGRC}.bak"
+		echo 'screen_color = (CYAN,RED,ON)' > "$DIALOGRC"
+		dialog --title "Error!" --backtitle "OS Media Manager" --msgbox "No removable media found!" 14 90
+		rm -f "$DIALOGRC"
+		[[ -e ${DIALOGRC}.bak ]] && mv "${DIALOGRC}.bak" "$DIALOGRC"
 		return 1
-	else
-		declare -A RemovableMediaList
-		key=0
-		for i in $(lsblk -ndo name,rm |grep -v loop |grep -v sr |grep 1 | cut -f1 -d' ');
-		do
-			SuggestedRemovableDevice="${i}"
-			element="$(fdisk -l /dev/$i |head -1)"
-			RemovableMediaList[$key]=$(echo -e \'"$element"\')
-			(( key++ ))
-		done
-
-		if [[ 1 -eq ${#RemovableMediaList[@]} ]]; then
-			mkdir /boot/iso
-			dd if=/dev/${SuggestedRemovableDevice} of=/boot/iso/recovery.iso
-			cat >> /etc/grub.d/40_custom <<-'EOF'
-			menuentry "Reset to Factory Defaults" {
-				set isofile="/boot/iso/recovery.iso"
-				loopback loop (hd0,8)$isofile
-				linux (loop)/casper/vmlinuz boot=casper iso-scan/filename=$isofile noprompt noeject
-				initrd (loop)/casper/initrd.lz
-			}
-			EOF
-		else
-
-			ChosenMediaItem="
-			Removable media found: \n
-			------------------------------------------------------------------------------- \n
-			\n
-			$(until [ $i -gt ${#RemovableMediaList[@]} ]
-			do
-				echo -e "Removable Disk $i:   ${RemovableMediaList[$i]}" \n
-				((i=i+1))
-			done
-			)"
-
-			USBTargetDevice=$( dialog --stdout --title "Physical Installation Media Creator" \
-			--backtitle "OS Media Manger" \
-			--inputbox "\n ${DiscoveredItems}" 0 0 /dev/${SuggestedRemovableDevice} )
-
-			mkdir /boot/iso
-			dd if=/dev/${ChosenMediaItem} of=/boot/iso/recovery.iso
-			cat >> /etc/grub.d/40_custom <<-'EOF'
-			menuentry "Reset to Factory Defaults" {
-				set isofile="/boot/iso/recovery.iso"
-				loopback loop (hd0,8)$isofile
-				linux (loop)/casper/vmlinuz boot=casper iso-scan/filename=$isofile noprompt noeject
-				initrd (loop)/casper/initrd.lz
-			}
-			EOF
-		fi
 	fi
+
+	# If only one removable device is found, use it directly
+	if [[ ${#devlist[@]} -eq 1 ]]; then
+		local targetDevice="/dev/${devlist[0]}"
+	else
+		# If multiple devices are found, let the user choose
+		local menuOptions=()
+		for dev in "${devlist[@]}"; do
+		menuOptions+=("$dev" "$(fdisk -l /dev/$dev | head -1)")
+		done
+		targetDevice=$(dialog --stdout --title "Choose a device" --menu "Select target device:" 0 0 0 "${menuOptions[@]}")
+		targetDevice="/dev/$targetDevice"
+	fi
+
+	if [[ -z $targetDevice ]]; then
+		echo "No device selected or dialog cancelled."
+		return 1
+	fi
+
+	echo "Using device: $targetDevice for recovery partition."
+
+	mkdir -p /boot/iso
+	if dd if="$targetDevice" of=/boot/iso/recovery.iso status=progress; then
+		echo "Recovery image created successfully."
+	else
+		echo "Failed to create recovery image."
+		return 1
+	fi
+
+	# Append custom GRUB entry
+	cat >> /etc/grub.d/40_custom <<-EOF
+	menuentry "Reset to Factory Defaults" {
+	set isofile="/boot/iso/recovery.iso"
+	loopback loop (hd0,1)\$isofile
+	linux (loop)/casper/vmlinuz boot=casper iso-scan/filename=\$isofile noprompt noeject
+	initrd (loop)/casper/initrd.lz
+	}
+	EOF
+
+    	echo "GRUB menu entry added. Please update GRUB configuration with 'update-grub'."
 }
 
 
