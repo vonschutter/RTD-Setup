@@ -3044,7 +3044,7 @@ rtd_oem_reseal ()
 
 # End of documentation
 	if cat /etc/os-release |grep ubuntu ; then
-		InstallSoftwareFromRepo oem-config-gtk
+		software::add_native_package "oem-config-gtk"
 		oem-config-prepare
 		if hash virt-what 2>/dev/null ; then
 			system::log_item "💻 This is a virtual machine. Shutting down..."
@@ -3056,7 +3056,7 @@ rtd_oem_reseal ()
 			shutdown -h now
 		fi
 	elif cat /etc/os-release |grep kubuntu ; then
-		InstallSoftwareFromRepo oem-config-kde
+		software::add_native_package "oem-config-gtk"
 		oem-config-prepare
 		if hash virt-what 2>/dev/null ; then
 			system::log_item "💻 This is a virtual machine. Shutting down..."
@@ -12849,13 +12849,13 @@ write_information ()
 	local text=$1
 
 	if [[ "${TERMUITXT}" == "nocolor" ]] ; then
-		[ -n "${text}" ] && echo -e "🧩 🛈 ${FUNCNAME[1]}: ${text}"
+		[ -n "${text}" ] && echo -e "🧩 ℹ ${FUNCNAME[1]}: ${text}"
 	else
-		[ -n "${text}" ] && echo -e "${blue}🧩 🛈 ${FUNCNAME[1]}: ${text}${endcolor}"
+		[ -n "${text}" ] && echo -e "${blue}🧩 ℹ ${FUNCNAME[1]}: ${text}${endcolor}"
 	fi
 
 	# Tell the loging function to log the message requested...
-	system::log_item "🧩 🛈 ${FUNCNAME[1]}: ${text}"
+	system::log_item "🧩 ℹ ${FUNCNAME[1]}: ${text}"
 	
 }
 
