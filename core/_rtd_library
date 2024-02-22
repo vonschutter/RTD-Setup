@@ -2167,12 +2167,32 @@ oem::rtd_reset_default_environment_config ()
 		write_error  "🚫 Error: SUDO_USER not set or .bashrc not found."
 	fi
 
-	# Assuming system::toggle_oem_auto_login is available, disable auto login
-	if type system::toggle_oem_auto_login &>/dev/null; then
+	if type system::add_or_remove_login_script &>/dev/null ; then
+		system::add_or_remove_login_script --remove
+		write_status "👨‍🦱 Login script has been removed."
+	else
+		write_error  "👺 system::add_or_remove_login_script function not found. Cannot remove login script."
+	fi
+
+	if type system::toggle_oem_auto_login &>/dev/null ; then
 		system::toggle_oem_auto_login --disable
 		write_status "👨‍🦱 Auto login has been disabled."
 	else
 		write_error  "👺 system::toggle_oem_auto_login function not found. Cannot disable auto login."
+	fi
+
+	if type system::toggle_oem_auto_elevated_privilege &>/dev/null ; then
+		system::toggle_oem_auto_elevated_privilege --disable
+		write_status "👑 Auto elevated privilege has been disabled."
+	else
+		write_error  "👺 system::toggle_oem_auto_elevated_privilege function not found. Cannot disable auto elevated privilege."
+	fi
+
+	if type system::set_oem_elevated_privilege_gui &>/dev/null ; then
+		system::set_oem_elevated_privilege_gui --disable
+		write_status "👑 Elevated privilege GUI has been disabled."
+	else
+		write_error  "👺 system::set_oem_elevated_privilege_gui function not found. Cannot disable elevated privilege GUI."
 	fi
 }
 
@@ -2206,17 +2226,28 @@ rtd_wait_for_internet_availability ()
 
 	write_status "🌐 Checking for internet connectivity..."
 
+	# Do ping test... 
 	for ip in "${test_ips[@]}"; do
 		attempt=1
 		while (( attempt <= max_attempts )); do
-		if ping -c 1 -W 1 "$ip" &>/dev/null; then
-			write_status "🌐 Internet access confirmed through IP: $ip"
-			return 0
-		else
-			write_status "Attempt $attempt of $max_attempts failed to reach $ip"
-			((attempt++))
-			sleep 10
-		fi
+			if ping -c 1 -W 1 "$ip" &>/dev/null; then
+				# Lookup external IP...
+				write_status "🌐 Internet ping access confirmed to IP: $ip"
+				local response 
+				response=$(curl -s https://httpbin.org/ip)
+				RTD_INTERNET_IP=$(echo "$response" | jq -r '.origin')
+				if [[ -n "$RTD_INTERNET_IP" ]] ; then
+					write_status "🌐 Internet access confirmed through IP: $RTD_INTERNET_IP"
+					export RTD_INTERNET_IP
+				else
+					write_status "❗📶 Could not determine external egress IP."
+				fi
+				return 0
+			else
+				write_status "📶 Attempt $attempt of $max_attempts failed to reach $ip"
+				((attempt++))
+				sleep 10
+			fi
 		done
 	done
 
@@ -2407,7 +2438,7 @@ system::add_or_remove_login_script ()
 	local file_path="${3:-"/etc/xdg/autostart/oem-run.desktop"}"
 
 	if [[ ! -f "${script_path}" ]]; then
-			write_error "Script not found: ${script_path}"
+			write_error "🚫 Script not found: ${script_path}"
 		return 1
 	fi
 
@@ -2448,7 +2479,7 @@ system::add_or_remove_login_script ()
 						return 1
 					fi
 				else
-					write_error "🚫 Script not found: ${script_path}"
+					write_error "🚫 Login script not found: ${script_path}"
 					return 1
 				fi
 			fi

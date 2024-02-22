@@ -172,38 +172,35 @@ oem_linux_config ()
 {
 	
 	if [[ ! $UID -eq 0 ]]; then
-		echo -e "This script needs administrative access..."
+		echo -e "🛡️ This script needs administrative access..."
 		# Relaunch script in priviledged mode...
 		sudo -E bash $0 $*
 	else
-		dependency::_rtd_library || exit 1
-		system::log_item "**********************************************************************"
-		system::log_item "$(basename $0) was started on $(date +%Y-%m-%d-%H)"
-		system::log_item "$(basename $0): Logfile is set to: ${_LOGFILE}"
+		dependency::_rtd_library || { echo "💥 Unable to load library!" ;  exit 1 ; }
 
 		for i in $_requirements ; do 
-			check_dependencies $i 
+			software::check_native_package_dependency $i 
 		done
 		
 		rtd_wait_for_internet_availability
-		#rtd_oem_reset_default_environment_config
-		system::add_or_remove_login_script --remove
-		system::toggle_oem_auto_login --disable
-		system::toggle_oem_auto_elevated_privilege --disable
-		system::set_oem_elevated_privilege_gui --disable
+		oem::rtd_reset_default_environment_config
+		# system::add_or_remove_login_script --remove
+		# system::toggle_oem_auto_login --disable
+		# system::toggle_oem_auto_elevated_privilege --disable
+		# system::set_oem_elevated_privilege_gui --disable
 
 		if [[ -z "$(ps aux |grep X |grep -v grep)" ]]; then
 			echo "No X server at \$DISPLAY [$DISPLAY]"
-			if ! hash dialog &>/dev/null ; then check_dependencies dialog || exit 1 ; fi
+			if ! hash dialog &>/dev/null ; then software::check_native_package_dependency dialog || exit 1 ; fi
 			rtd_setup_choices_server
 		else
-			if ! hash zenity &>/dev/null ; then  check_dependencies zenity || exit 1 ; fi
-			if ! hash yad &>/dev/null  ; then check_dependencies yad || write_warning "YAD is not installed. Some features will not be available." ; fi
+			if ! hash zenity &>/dev/null ; then  software::check_native_package_dependency zenity || exit 1 ; fi
+			if ! hash yad &>/dev/null  ; then software::check_native_package_dependency yad || write_warning "YAD is not installed. Some features will not be available." ; fi
 
 			if [[ -e ${_THEME_DIR}/plus-themes.sh ]] ; then
-				write_information "Found plus-themes.sh in ${_THEME_DIR}"
+				write_information "🔮 Found plus-themes.sh in ${_THEME_DIR}"
 			else
-				write_information "Downloading plus-themes.sh to ${_THEME_DIR}"
+				write_information "🔮 Downloading plus-themes.sh to ${_THEME_DIR}"
 				oem::deploy_themes
 			fi
 			

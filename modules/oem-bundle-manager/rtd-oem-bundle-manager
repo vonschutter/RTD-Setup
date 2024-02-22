@@ -136,11 +136,12 @@ dependency::file ()
 	fi 
 
 }
-
+ 
 
 system::ExecStart () {
-	ensure_admin
-	rtd_wait_for_internet_availability
+	[ "$UID" -eq 0 ] || ensure_admin
+	[ -z "$RTD_INTERNET_IP" ] || rtd_wait_for_internet_availability
+
 	# Allow super user to display gui menu on users screen.
 	if [[ -f /etc/pam.d/sudo ]] ; then
 		sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
