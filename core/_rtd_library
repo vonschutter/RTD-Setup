@@ -2410,8 +2410,6 @@ system::add_or_remove_login_script ()
 # The function returns 0 on success and 1 on failure.
 #
 # Example:
-#   system::add_or_remove_login_script /path/to/script.sh
-#   system::add_or_remove_login_script /path/to/script.sh /etc/xdg/autostart/oem-run.desktop
 #   system::add_or_remove_login_script --remove /etc/xdg/autostart/oem-run.desktop
 #   system::add_or_remove_login_script --remove 
 #   system::add_or_remove_login_script --add /path/to/script.sh
@@ -2439,8 +2437,8 @@ system::add_or_remove_login_script ()
 			fi
 		;;
 		--add)
-			if [[ -e "$file_path" ]]; then
-				write_information "📜 Adding execution on login of (${file_path})"
+			if [[ -e "$script_path" ]]; then
+				write_information "📜 Adding execution on login of (${script_path})"
 				if ! printf '[Desktop Entry]\nType=Application\nExec=sudo -E %s\nTerminal=true\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
 					write_error "🚫 Failed to create file: ${file_path}"
 					return 1
@@ -2452,13 +2450,18 @@ system::add_or_remove_login_script ()
 				write_information "🗑️ Removing execution on login of (${file_path})"
 				if ! sudo rm "${file_path}"; then
 					write_error "Failed to remove file: ${file_path}"
-				return 1
+					return 1
 				fi
 			else
-				write_information "📜 Adding execution on login of (${file_path})"
-				if ! printf '[Desktop Entry]\nType=Application\nExec=sudo -E %s\nTerminal=true\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
-					write_error "🚫 Failed to create file: ${file_path}"
-				return 1
+				if [[ -e "$script_path" ]]; then
+					write_information "📜 Adding execution on login of (${script_path})"
+					if ! printf '[Desktop Entry]\nType=Application\nExec=sudo -E %s\nTerminal=true\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
+						write_error "🚫 Failed to create file: ${file_path}"
+						return 1
+					fi
+				else
+					write_error "🚫 Script not found: ${script_path}"
+					return 1
 				fi
 			fi
 		;;
