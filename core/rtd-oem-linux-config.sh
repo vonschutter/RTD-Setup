@@ -187,10 +187,10 @@ oem_linux_config ()
 		
 		rtd_wait_for_internet_availability
 		#rtd_oem_reset_default_environment_config
-		system::setup_or_remove_login_script "/opt/rtd/core/rtd-oem-linux-config.sh"
-		system::toggle_oem_auto_login 
-		system::toggle_oem_auto_elevated_privilege
-		system::set_oem_elevated_privilege_gui
+		system::add_or_remove_login_script --remove
+		system::toggle_oem_auto_login --disable
+		system::toggle_oem_auto_elevated_privilege --disable
+		system::set_oem_elevated_privilege_gui --disable
 
 		if [[ -z "$(ps aux |grep X |grep -v grep)" ]]; then
 			echo "No X server at \$DISPLAY [$DISPLAY]"

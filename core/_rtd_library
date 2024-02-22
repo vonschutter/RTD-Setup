@@ -2390,36 +2390,79 @@ toggle_oem_run_once () {
 
 
 
-system::setup_or_remove_login_script () 
+system::add_or_remove_login_script () 
 {
 # Description: Sets up or removes a .desktop launcher to run a script at login.
 # Arguments:
 #   1. Path to the script to be executed.
 #   2. Optional: Path to the .desktop launcher (default: /etc/xdg/autostart/oem-run.desktop).
+#
 # Usage:
-#   setup_or_remove_oem_login_script /path/to/script.sh
-
-	local script_path="$1"
-	local file_path="${2:-"/etc/xdg/autostart/oem-run.desktop"}"
+#   system::add_or_remove_login_script <path>
+#
+# This function is responsible for adding or removing the execution of a script on login.
+# It takes two parameters: the path to the script and an optional file path for the autostart desktop entry.
+# If the script is not found, an error message is displayed and the function returns 1.
+# If the "--remove" option is specified, the function removes the autostart desktop entry file if it exists.
+# If the "--add" option is specified, the function creates or updates the autostart desktop entry file with the script path.
+# If no option is specified, the function checks if the autostart desktop entry file exists.
+# If it exists, the function removes it. If it doesn't exist, the function creates it with the script path.
+# The function returns 0 on success and 1 on failure.
+#
+# Example:
+#   system::add_or_remove_login_script /path/to/script.sh
+#   system::add_or_remove_login_script /path/to/script.sh /etc/xdg/autostart/oem-run.desktop
+#   system::add_or_remove_login_script --remove /etc/xdg/autostart/oem-run.desktop
+#   system::add_or_remove_login_script --remove 
+#   system::add_or_remove_login_script --add /path/to/script.sh
+#
+# End of documentation
+	local script_path="$2"
+	local file_path="${3:-"/etc/xdg/autostart/oem-run.desktop"}"
 
 	if [[ ! -f "${script_path}" ]]; then
 			write_error "Script not found: ${script_path}"
 		return 1
 	fi
 
-	if [[ -e "$file_path" ]]; then
-		write_information "Removing execution on login of (${file_path})"
-		if ! sudo rm "${file_path}"; then
-			write_error "Failed to remove file: ${file_path}"
-		return 1
-		fi
-	else
-		write_information "Adding execution on login of (${file_path})"
-		if ! printf '[Desktop Entry]\nType=Application\nExec=sudo -E %s\nTerminal=true\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
-			write_error "Failed to create file: ${file_path}"
-		return 1
-		fi
-	fi
+	case "$1" in
+		--remove)
+			if [[ -e "$file_path" ]]; then
+				write_information "🗑️ Removing execution on login of (${file_path})"
+				if ! sudo rm "${file_path}"; then
+					write_error "🚫 Failed to remove file: ${file_path}"
+					return 1
+				fi
+			else
+				write_error "🗑️ File already removed: ${file_path}"
+				return 0
+			fi
+		;;
+		--add)
+			if [[ -e "$file_path" ]]; then
+				write_information "📜 Adding execution on login of (${file_path})"
+				if ! printf '[Desktop Entry]\nType=Application\nExec=sudo -E %s\nTerminal=true\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
+					write_error "🚫 Failed to create file: ${file_path}"
+					return 1
+				fi
+			fi
+		;;
+		*)
+			if [[ -e "$file_path" ]]; then
+				write_information "🗑️ Removing execution on login of (${file_path})"
+				if ! sudo rm "${file_path}"; then
+					write_error "Failed to remove file: ${file_path}"
+				return 1
+				fi
+			else
+				write_information "📜 Adding execution on login of (${file_path})"
+				if ! printf '[Desktop Entry]\nType=Application\nExec=sudo -E %s\nTerminal=true\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
+					write_error "🚫 Failed to create file: ${file_path}"
+				return 1
+				fi
+			fi
+		;;
+	esac
 }
 
 
@@ -2453,7 +2496,7 @@ system::update_config ()
 
 	local config_file=$1
 	shift  # Shift past the first argument (the config file path)
-	system::log_item "Updating configuration file with key-value pairs: $*"
+	system::log_item "📔 Updating configuration file with key-value pairs: $*"
 	mkdir -p ${config_file%/*}  ; touch $config_file || system::log_item "Failed to create config file: $config_file"
 	
 	while (( "$#" )); do
@@ -2462,10 +2505,10 @@ system::update_config ()
 		shift 2  # Shift past the processed key-value pair
 
 		if grep -q "^$key=" "$config_file"; then
-			system::log_item "Update existing entry $key=$value in $config_file"
+			system::log_item "📔 Update existing entry $key=$value in $config_file"
 			sed -i "s|^$key=.*|$key=$value|" "$config_file"
 		else
-			system::log_item "Add new entry $key=$value to $config_file"
+			system::log_item "📔 Add new entry $key=$value to $config_file"
 			echo "$key=$value" >> "$config_file"
 		fi
 	done
@@ -2497,13 +2540,13 @@ system::read_config ()
         # Specify the path to your configuration file
         local config_file=$1
 
-        system::log_item "Reading configuration file: $config_file"
+        system::log_item "📖 Reading configuration file: $config_file"
         # Read each line in the configuration file
         while IFS='=' read -r key value; do
                 if [[ $key && $value ]]; then
                         # Use declare to safely assign value to the variable named by 'key'
                         declare -g "$key=$value"
-                        system::log_item "Read key-value pair: $key=$value"
+                        system::log_item "📖 Read key-value pair: $key=$value"
                 fi
         done < "$config_file"
 }
@@ -2575,15 +2618,15 @@ system::toggle_oem_auto_login ()
 			return
 			;;
 		--enable|-e)
-			write_status "Enabling auto login..."
+			write_status "🚧 Enabling auto login..."
 			local _flip=on
 			;;
 		--disable|-d)
-			write_status "Disabling auto login..."
+			write_status "🚧 Disabling auto login..."
 			local _flip=off
 			;;
 		*)	
-			write_status "Toggling auto login..."
+			write_status "🚧 Toggling auto login..."
 			;;
 	esac
 
@@ -2737,39 +2780,6 @@ system::toggle_oem_auto_login ()
 
 
 
-
-
-
-
-
-
-
-set_oem_elevated_privilege_gui ()
-{
-# Description: Some Debian and other Linux distribution do not allow gui apps to
-# be run when invoked by "sudo" or in a root (system elevated authority)
-# environment. To mitigate this some stemp may need to taken.
-# Will work on Slackware as well as Debian to give root permission to open X programs.
-#
-# Globals: $_OEM_USER
-# Arguments: None
-# Outputs: configures local X environment to allow root to show GUI apps
-# Returns:
-# Usage: set_oem_elevated_privilege_gui
-# End of documentation
-
-	write_information "Editing bashrc: xhost local:root IN /home/${_OEM_USER}/.bashrc"
-	touch /home/${_OEM_USER}/.bashrc
-	echo "xhost local:root" >> /home/${_OEM_USER:-"tangarora"}/.bashrc
-
-	# Allows runing an X program as root
-	write_information "Editing bashrc: XAUTHORITY=/home/${_OEM_USER}/.Xauthority IN /root/.bashrc"
-	touch /root/.bashrc
-	echo "export XAUTHORITY=/home/${_OEM_USER:-"tangarora"}/.Xauthority" >>/root/.bashrc
-}
-
-
-
 system::set_oem_elevated_privilege_gui () 
 {
 # Description
@@ -2853,108 +2863,6 @@ system::set_oem_elevated_privilege_gui ()
 
 
 
-set_enable_oem_elevated_privelege()
-{
-# Description: Set no password elevated priviledges.
-# This will allow apps to be run when invoked by "sudo" without being prompted
-# for a password. This emulates the "UAC" from Microsoft. Please remember to
-# turn this off using the function "rtd_oem_reset_default_environment_config"
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-# End of documentation
-	: ${_OEM_USER:="${SUDO_USER}"}
-	write_information "Adding instruction to a sudoers include file: ${_OEM_USER} ALL=(ALL) NOPASSWD:ALL"
-	# This should be removed when OEM setup is complete as it would represent a back door...
-	echo "${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/99_sudo_include_file
-
-	# Check that your sudoers include file passed the visudo syntax checks:
-	sudo visudo -cf /etc/sudoers.d/99_sudo_include_file
-}
-
-
-
-
-
-# system::toggle_oem_auto_elevated_privilege () 
-# {
-# # Description: Toggles passwordless sudo privileges for a specified user.
-# # WARNING: This function modifies sudoers and can pose a security risk.
-# # Ensure to disable this with 'rtd_oem_reset_default_environment_config' after use.
-# # Globals:
-# #   _OEM_USER - The user for whom to toggle passwordless sudo. Defaults to SUDO_USER.
-# # Arguments: None
-# # Usage:
-# #   system::toggle_oem_auto_elevated_privilege
-
-# 	: ${_OEM_USER:="${SUDO_USER}"}
-# 	local sudoers_file="/etc/sudoers.d/99_sudo_include_file"
-
-# 	if [[ -z "${_OEM_USER}" ]]; then
-# 		write_error "⛔ Error: User not specified for elevated privileges."
-# 		return 1
-# 	fi
-
-
-# 	case $1 in
-# 	--help|-h)
-# 		write_information "usage : system::toggle_oem_auto_elevated_privilege [--enable|--disable]"
-# 		return
-# 		;;
-# 	--enable|-e)
-# 		write_status "🚧 Enabling passwordless sudo for user: ${_OEM_USER}"
-
-# 		# Check if passwordless sudo is already set for the user
-# 		if sudo grep -q "^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" "${sudoers_file}" 2>/dev/null; then
-# 			# Remove passwordless sudo entry
-# 			write_information "🚧 Removing passwordless sudo for user: ${_OEM_USER}"
-# 			sudo sed -i "/^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL/d" "${sudoers_file}"
-# 		else
-# 			# Add passwordless sudo entry
-# 			write_information "🚧 Adding passwordless sudo for user: ${_OEM_USER}"
-# 			echo "${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" | sudo EDITOR='tee -a' visudo -f "${sudoers_file}"
-# 		fi
-
-# 		# Validate sudoers file syntax
-# 		if ! sudo visudo -cf "${sudoers_file}" &>/dev/null; then
-# 			write_error "⛔ Error: Syntax error in sudoers file."
-# 			return 1
-# 		fi
-
-# 		write_information "🚧 Passwordless sudo configuration updated for ${_OEM_USER}."
-# 		;;
-# 	--disable|-d)
-# 		write_status "🚧 Disabling passwordless sudo for user: ${_OEM_USER}"
-# 		# Check if passwordless sudo is already set for the user
-# 		if sudo grep -q "^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" "${sudoers_file}" 2>/dev/null; then
-# 			# Remove passwordless sudo entry
-# 			write_information "🚧 Removing passwordless sudo for user: ${_OEM_USER}"
-# 			sudo sed -i "/^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL/d" "${sudoers_file}"
-# 		else
-# 			# Add passwordless sudo entry
-# 			write_information "🚧 Adding passwordless sudo for user: ${_OEM_USER}"
-# 			echo "${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" | sudo EDITOR='tee -a' visudo -f "${sudoers_file}"
-# 		fi
-
-# 		# Validate sudoers file syntax
-# 		if ! sudo visudo -cf "${sudoers_file}" &>/dev/null; then
-# 			write_error "⛔ Error: Syntax error in sudoers file."
-# 			return 1
-# 		fi
-
-# 		write_information "🚧 Passwordless sudo configuration updated for ${_OEM_USER}."
-# 		;;
-# 	*)
-# 		write_status "👽 Un-known option. Use --enable to enable or --disable to disable passwordless sudo."
-# 		return 1
-# 		;;
-# 	esac
-# }
-
-
-
 
 
 
@@ -2969,56 +2877,56 @@ system::toggle_oem_auto_elevated_privilege ()
     # Usage:
     #   system::toggle_oem_auto_elevated_privilege [--enable|--disable]
 
-    : ${_OEM_USER:="${SUDO_USER}"}
-    local sudoers_file="/etc/sudoers.d/99_sudo_include_file"
+	: ${_OEM_USER:="${SUDO_USER}"}
+	local sudoers_file="/etc/sudoers.d/99_sudo_include_file"
 
-    if [[ -z "${_OEM_USER}" ]]; then
-        write_error "⛔ Error: User not specified for elevated privileges."
-        return 1
-    fi
+	if [[ -z "${_OEM_USER}" ]]; then
+		write_error "⛔ Error: User not specified for elevated privileges."
+		return 1
+	fi
 
-    case $1 in
-    --help|-h)
-        write_information "usage : system::toggle_oem_auto_elevated_privilege [--enable|--disable]"
-        return
-        ;;
-    --enable|-e)
-        write_status "🚧 Enabling passwordless sudo for user: ${_OEM_USER}"
-        # Ensure passwordless sudo is not already set for the user
-        if ! sudo grep -q "^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" "${sudoers_file}" 2>/dev/null; then
-            # Add passwordless sudo entry
-            write_information "🚧 Adding passwordless sudo for user: ${_OEM_USER}"
-            echo "${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" | sudo EDITOR='tee -a' visudo -f "${sudoers_file}"
-        else
-            write_information "✅ Passwordless sudo already enabled for user: ${_OEM_USER}"
-        fi
-        ;;
-    --disable|-d)
-        write_status "🚧 Disabling passwordless sudo for user: ${_OEM_USER}"
-        # Check if passwordless sudo is set for the user and remove it
-        if sudo grep -q "^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" "${sudoers_file}" 2>/dev/null; then
-            # Remove passwordless sudo entry
-            write_information "🚧 Removing passwordless sudo for user: ${_OEM_USER}"
-            sudo sed -i "/^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL/d" "${sudoers_file}"
-        else
-            write_information "✅ Passwordless sudo already disabled for user: ${_OEM_USER}"
-        fi
-        ;;
-    *)
-        write_status "👽 Unknown option. Use --enable to enable or --disable to disable passwordless sudo."
-        return 1
-        ;;
-    esac
+	case ${1} in
+	--help|-h)
+		write_information "usage : system::toggle_oem_auto_elevated_privilege [--enable|--disable]"
+		return
+		;;
+	--enable|-e)
+		write_status "🚧 Enabling passwordless sudo for user: ${_OEM_USER}"
+		# Ensure passwordless sudo is not already set for the user
+		if ! sudo grep -q "^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" "${sudoers_file}" 2>/dev/null; then
+			# Add passwordless sudo entry
+			write_information "🚧 Adding passwordless sudo for user: ${_OEM_USER}"
+			echo "${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" | sudo EDITOR='tee -a' visudo -f "${sudoers_file}"
+		else
+			write_information "✅ Passwordless sudo already enabled for user: ${_OEM_USER}"
+		fi
+		;;
+	--disable|-d)
+		write_status "🚧 Disabling passwordless sudo for user: ${_OEM_USER}"
+		# Check if passwordless sudo is set for the user and remove it
+		if sudo grep -q "^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" "${sudoers_file}" 2>/dev/null; then
+			# Remove passwordless sudo entry
+			write_information "🚧 Removing passwordless sudo for user: ${_OEM_USER}"
+			sudo sed -i "/^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL/d" "${sudoers_file}"
+		else
+			write_information "✅ Passwordless sudo already disabled for user: ${_OEM_USER}"
+		fi
+		;;
+	*)
+		write_status "👽 Unknown option. Use --enable to enable or --disable to disable passwordless sudo."
+		return 1
+		;;
+	esac
 
-    # Validate sudoers file syntax
-    if ! sudo visudo -cf "${sudoers_file}" &>/dev/null; then
-        write_error "⛔ Error: Syntax error in sudoers file."
-        return 1
-    else
-        write_information "🚧 Sudoers file syntax is valid."
-    fi
+	# Validate sudoers file syntax
+	if ! sudo visudo -cf "${sudoers_file}" &>/dev/null; then
+		write_error "⛔ Error: Syntax error in sudoers file."
+		return 1
+	else
+		write_information "🚧 Sudoers file syntax is valid."
+	fi
 
-    write_information "🚧 Passwordless sudo configuration updated for ${_OEM_USER}."
+	write_information "🚧 Passwordless sudo configuration updated for ${_OEM_USER}."
 }
 
 
@@ -8542,7 +8450,7 @@ rtd_server_setup_choices_services ()
 						write_information "Service auto login already setup..."
 					else
 						write_warning "Minecraft server startup is not enabled: seting up now..."
-						toggle_oem_auto_login
+						toggle_oem_auto_login --enable
 					fi
 
 					if cat /home/$SUDO_USER/.bashrc |grep minecraft-server ; then

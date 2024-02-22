@@ -74,15 +74,17 @@ echo '
 
 
 #toggle_oem_run_once "/opt/rtd/core/rtd-oem-linux-config.sh"	&>> $_LOGFILE
-system::setup_or_remove_login_script "/opt/rtd/core/rtd-oem-linux-config.sh"	&>> $_LOGFILE
-#set_enable_oem_elevated_privelege	                 &>> $_LOGFILE
-system::toggle_oem_auto_elevated_privilege --enable  &>> $_LOGFILE
-#toggle_oem_auto_login						         &>> $_LOGFILE
-system::toggle_oem_auto_login --enable               &>> $_LOGFILE
-#set_oem_elevated_privilege_gui			             &>> $_LOGFILE
-system::set_oem_elevated_privilege_gui --enable      &>> $_LOGFILE
-oem::rtd_tools_make_launchers				         &>> $_LOGFILE
-oem::register_all_tools						         &>> $_LOGFILE
+{
+system::add_or_remove_login_script --add "/opt/rtd/core/rtd-oem-linux-config.sh"	
+#set_enable_oem_elevated_privelege	                 
+system::toggle_oem_auto_elevated_privilege --enable
+#toggle_oem_auto_login
+system::toggle_oem_auto_login --enable
+#set_oem_elevated_privilege_gui
+system::set_oem_elevated_privilege_gui --enable
+oem::rtd_tools_make_launchers
+oem::register_all_tools
 
 # Create a link to the log directory in the OEM directory
-ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log		         &>> $_LOGFILE
+ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
+} &>> $_LOGFILE
