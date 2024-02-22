@@ -110,7 +110,7 @@ complete_setup () {
 	completion=$(printf "Restart system and start using it now\nExit now and do no more\n${ConditionalResealOption}\n" | zenity \
 				--list \
 				--title "System Setup Complete" \
-				--text "Please select if you witsh to reseal the system (not available for some distributtions), restart and use the system, or just exit" \
+				--text "<span font="16" foreground="red"> 🚧 System Setup Complete 🚧</span> \n Please select if you witsh to reseal the system (not available for some distributtions), restart and use the system, or just exit" \
 				--column "Options" --width=1024 --height=768  2>/dev/null )
 	case "$completion" in
 		"Restart system and start using it now" )

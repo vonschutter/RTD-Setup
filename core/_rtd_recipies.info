@@ -1000,7 +1000,7 @@ recipe_Bundle:_1_Install_OEM_Themes_and_Tweaks (){
 			write_information "This system was built by an OEM process: copying tweaks for all new users..."
 			mkdir -p /etc/skel/.config
 			cp -r /home/${SUDO_USER}/.config/dconf /etc/skel/.config/dconf
-			write_information "This system was built by an OEM process: done..."
+			write_information "Done copying tweaks for all new users..."
 		else
 			write_information "Only implementing tweaks for the current user..."
 		fi
@@ -1018,9 +1018,19 @@ recipe_Bundle:_1_Install_OEM_Themes_and_Tweaks (){
 			bash ${_THEME_DIR}/plus-themes.sh || write_error "There was a problem installing themes... "
 		fi
 
+		if [[ -e /opt/${_TLA,,} ]] ; then
+			write_information "This system was built by an OEM process: copying tweaks for all new users..."
+			cp -r /home/${SUDO_USER}/.config /etc/skel/
+			cp -r /home/${SUDO_USER}/.local /etc/skel/
+			write_information "Done copying tweaks for all new users..."
+		else
+			write_information "Only implementing tweaks for the current user..."
+		fi
 		# sudo -H -u $SUDO_USER  bash -c source ${_CORE_DIR}/_rtd_library ; rtd_oem_kde_set_wallpaper "${_WALLPAPER_DIR}/Wayland.jpg"
 		# for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
 		sudo -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c '/usr/bin/lookandfeeltool -a RTD-Win11-Dark --resetLayout'
+		sudo -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c '/usr/bin/lookandfeeltool -a RTD-Win11-Dark --apply'
+
 	fi
 }
 

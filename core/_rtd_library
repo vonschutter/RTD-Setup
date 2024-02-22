@@ -2131,7 +2131,7 @@ rtd_oem_reset_default_environment_config ()
 		sed -i '/xhost\ local:root/d' "$file_path"
 	fi
 
-	system::toggle_oem_auto_login
+	system::toggle_oem_auto_login --disable
 }
 
 
@@ -2152,14 +2152,36 @@ rtd_wait_for_internet_availability ()
 # Usage: rtd_wait_for_internet_availability
 # End of documentation
 
+	# Array of IPs for testing internet connectivity (may be set globally)
+	local -a test_ips
+	if [[ -n "$_OEM_TEST_IPS" ]]; then
+		IFS=' ' read -r -a test_ips <<< "$_OEM_TEST_IPS"
+	else
+		test_ips=("8.8.8.8" "1.1.1.1")
+	fi
 
+	local -i max_attempts=10
+	local -i attempt=1
+	local ip
 
-	write_status "Waiting for internet access..."
-	write_information "NOTE: Free access to the internet is required to continue."
-	while ! ping -c 1 -W 1 8.8.8.8 &>/dev/null ; do
-		write_status "Waiting..."
-		sleep 10
+	write_status "Checking for internet connectivity..."
+
+	for ip in "${test_ips[@]}"; do
+		attempt=1
+		while (( attempt <= max_attempts )); do
+		if ping -c 1 -W 1 "$ip" &>/dev/null; then
+			write_status "Internet access confirmed through IP: $ip"
+			return 0
+		else
+			write_status "Attempt $attempt of $max_attempts failed to reach $ip"
+			((attempt++))
+			sleep 10
+		fi
+		done
 	done
+
+	write_error "Unable to confirm internet access after $max_attempts attempts on each tested IP."
+	return 1
 }
 
 
@@ -2547,13 +2569,33 @@ system::toggle_oem_auto_login ()
 #
 # End of documentation
 
+	case $1 in
+		--help|-h)
+			write_information "usage : sysetm::toggle_oem_auto_login [--enable|--disable]"
+			return
+			;;
+		--enable|-e)
+			write_status "Enabling auto login..."
+			local _flip=on
+			;;
+		--disable|-d)
+			write_status "Disabling auto login..."
+			local _flip=off
+			;;
+		*)	
+			write_status "Toggling auto login..."
+			;;
+	esac
+
 	# Toggle auto login for Light DM if present (Old Ubuntu, Mint?, Budgie? etc.)
 	if [[ -f /etc/lightdm/lightdm.conf ]]; then
-		if [[ -f /etc/lightdm/lightdm.conf.rtd-bak ]]; then
-			write_status "***** LightDM auto login is enabled: toggeling off... ******"
+		case $_flip in ;
+		off )
+			write_status "⛔ LightDM: toggeling auto login off... *******"
 			rm /etc/lightdm/lightdm.conf && mv /etc/lightdm/lightdm.conf.rtd-bak /etc/lightdm/lightdm.conf
-		else
-			write_status "***** LightDM auto login is disabled: toggeling on... ******"
+			;;
+		on )
+			write_status "✅ LightDM: toggeling auto login on... *******"
 			cp /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.rtd-bak
 			cat > /etc/lightdm/lightdm.conf <<-OEM_LXDM_LOGIN_OPTION
 			# This configuration file was created by RTD Setup.
@@ -2562,19 +2604,22 @@ system::toggle_oem_auto_login ()
 			# If this file is not there, then it was not there to begin with
 			# and you can delete this file.
 			[SeatDefaults]
-			autologin-user=${SUDO_USER:-"tangarora"}
+			autologin-user=${_OEM_USER:-"tangarora"}
 			autologin-user-timeout=0
 			OEM_LXDM_LOGIN_OPTION
-		fi
+			;;
+		esac
 	fi
 
 	# Toggle auto login for SDDM if present (Kubuntu, SUSE, KDE Based DE's)
 	if [[ -f /etc/sddm.conf ]]; then
-		if [[ -f /etc/sddm.conf.rtd-bak ]]; then
-			write_status "******* SDDM auto login is enabled: toggeling off... *******"
+		case $_flip in ;
+		off )
+			write_status "⛔ SDDM: toggeling auto login off... *******"
 			rm /etc/sddm.conf && mv /etc/sddm.conf.rtd-bak /etc/sddm.conf
-		else
-			write_status "******* SDDM auto login is disabled: toggeling on... *******"
+			;;
+		on )
+			write_status "✅ SDDM: toggeling auto login on... *******"
 			cp /etc/sddm.conf /etc/sddm.conf.rtd-bak
 			cat > /etc/sddm.conf <<-OEM_SDDM_LOGIN_OPTION
 			# This configuration file was created by RTD Setup.
@@ -2583,19 +2628,22 @@ system::toggle_oem_auto_login ()
 			# If this file is not there, then it was not there to begin with
 			# and you can delete this file.
 			[Autologin]
-			User=${SUDO_USER:-"tangarora"}
+			User=${_OEM_USER:-"tangarora"}
 			Session=plasma.desktop
 			OEM_SDDM_LOGIN_OPTION
-		fi
+			;;
+		esac
 	fi
 
 	# Toggle auto login for GDM3 if present (Ubuntu, Debian default etc.)
 	if [[ -f /etc/gdm3/daemon.conf ]]; then
-		if [[ -f /etc/gdm3/daemon.conf.rtd-bak ]]; then
-			write_status "******* GDM3 auto login is enabled: toggeling off... *******"
+		case $_flip in ;
+		off )
+			write_status "⛔ GDM3: toggeling auto login off... *******"
 			rm /etc/gdm3/daemon.conf && mv /etc/gdm3/daemon.conf.rtd-bak /etc/gdm3/daemon.conf
-		else
-			write_status "******* GDM3 auto login is disabled: toggeling on... *******"
+			;;
+		on )
+			write_status "✅ GDM3: toggeling auto login on... *******"
 			cp /etc/gdm3/daemon.conf /etc/gdm3/daemon.conf.rtd-bak
 			cat >  /etc/gdm3/daemon.conf <<-OEM_GDM3_LOGIN_OPTION
 			# This configuration file was created by RTD Setup.
@@ -2605,19 +2653,22 @@ system::toggle_oem_auto_login ()
 			# and you can delete this file.
 			[daemon]
 			AutomaticLoginEnable=True
-			AutomaticLogin=${SUDO_USER:-"tangarora"}
+			AutomaticLogin=${_OEM_USER:-"tangarora"}
 			WaylandEnable=false
 			OEM_GDM3_LOGIN_OPTION
-		fi
+			;;
+		esac
 	fi
 
 	# Toggle auto login for GDM per gnome standard (Fedora et. al.)
 	if [[ -f /etc/gdm/custom.conf ]]; then
-		if [[ -f /etc/gdm/custom.conf.rtd-bak ]]; then
-			write_status "******* GDM auto login is enabled: toggeling off... ********"
+		case $_flip in ;
+		off )
+			write_status "⛔ GDM: toggeling auto login off... *******"
 			rm /etc/gdm/custom.conf && mv /etc/gdm/custom.conf.rtd-bak /etc/gdm/custom.conf
-		else
-			write_status "******* GDM auto login is disabled: toggeling on... ********"
+			;;
+		on )
+			write_status "✅ GDM: toggeling auto login on... *******"
 			cp /etc/gdm/custom.conf /etc/gdm/custom.conf.rtd-bak
 			cat >  /etc/gdm/custom.conf <<-OEM_GDM_LOGIN_OPTION
 			# This configuration file was created by RTD Setup.
@@ -2630,7 +2681,7 @@ system::toggle_oem_auto_login ()
 			[daemon]
 			WaylandEnable=false
 			AutomaticLoginEnable=True
-			AutomaticLogin=${SUDO_USER:-"tangarora"}
+			AutomaticLogin=${_OEM_USER:-"tangarora"}
 
 			[security]
 
@@ -2640,35 +2691,45 @@ system::toggle_oem_auto_login ()
 
 			[debug]
 			OEM_GDM_LOGIN_OPTION
-		fi
+			;;
+		esac
 	fi
 
 	# Special case for SUSE...
 	if [[ -e /etc/sysconfig/displaymanager ]] ; then
-		if [[ -e /etc/sysconfig/displaymanager.rtd-bak ]]; then
-			write_status "****** SUSE auto login is enabled: toggeling off... ********"
+		case $_flip in ;
+		off )
+			write_status "⛔ SUSE: toggeling auto login off... *******"
 			rm /etc/sysconfig/displaymanager && mv /etc/sysconfig/displaymanager.rtd-bak /etc/sysconfig/displaymanager
-		else
-			write_status "****** SUSE auto login is disabled: toggeling on... ********"
+			;;
+		on )
+			write_status "✅ SUSE: toggeling auto login on... *******"
 			cp /etc/sysconfig/displaymanager /etc/sysconfig/displaymanager.rtd-bak || write_error "Could not backup: /etc/sysconfig/displaymanager! "
 			sed -i 's/DISPLAYMANAGER_AUTOLOGIN=""/DISPLAYMANAGER_AUTOLOGIN="tangarora"/' /etc/sysconfig/displaymanager || write_error "Could not write to file: /etc/sysconfig/displaymanager!"
-			#sed -i 's/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="no"/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"/' /etc/sysconfig/displaymanager || write_error "Could not write to file: /etc/sysconfig/displaymanager!"
-		fi
+			sed -i 's/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="no"/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"/' /etc/sysconfig/displaymanager || write_error "Could not write to file: /etc/sysconfig/displaymanager!"
+			;;
+		esac
 	fi
+
 
 	# Toggle auto login for Terminal target env. (no GUI).
 	if [ ! -f /etc/systemd/system/getty@tty1.service.d/override.conf ]; then
-		write_status "******* TTY auto login is disabled: toggeling on... ********"
-		mkdir -p /etc/systemd/system/getty@tty1.service.d
-		cat >  /etc/systemd/system/getty@tty1.service.d/override.conf <<-OEM_TTY_LOGIN_OPTION
-		"[Service]"
-		"ExecStart="
-		"ExecStart=-/sbin/agetty --noissue --autologin ${SUDO_USER:-"tangarora"} %I $TERM"
-		"Type=idle"
-		OEM_TTY_LOGIN_OPTION
-	else
-		write_status "******* TTY auto login is enabled: toggeling off... ********"
-		rm /etc/systemd/system/getty@tty1.service.d/override.conf
+		case $_flip in ;
+		off )
+			write_status "⛔ TTY: toggeling auto login off... ********"
+			rm /etc/systemd/system/getty@tty1.service.d/override.conf
+			;;
+		on )
+			write_status "✅ TTY: toggeling auto login on... ********"
+			mkdir -p /etc/systemd/system/getty@tty1.service.d
+			cat >  /etc/systemd/system/getty@tty1.service.d/override.conf <<-OEM_TTY_LOGIN_OPTION
+			"[Service]"
+			"ExecStart="
+			"ExecStart=-/sbin/agetty --noissue --autologin ${_OEM_USER:-"tangarora"} %I $TERM"
+			"Type=idle"
+			OEM_TTY_LOGIN_OPTION
+			;;
+		esac
 	fi
 }
 
@@ -2755,14 +2816,39 @@ system::set_oem_elevated_privilege_gui ()
 #
 # End of documentation
 
+
 	local user_bashrc="/home/${_OEM_USER:-"tangarora"}/.bashrc"
 	local root_bashrc="/root/.bashrc"
 
-	write_information "Editing bashrc: xhost local:root in ${user_bashrc}"
-	echo "xhost local:root" >> "${user_bashrc}"
+	case $1 in
+	--help|-h)
+		write_information "usage : system::set_oem_elevated_privilege_gui [--enable|--disable]"
+		return
+		;;
+	--enable|-e)
+		write_status "🚧 Enabling GUI elevated privileges..."
 
-	write_information "Editing bashrc: XAUTHORITY=/home/${_OEM_USER:-"tangarora"}/.Xauthority in ${root_bashrc}"
-	echo "export XAUTHORITY=/home/${_OEM_USER:-"tangarora"}/.Xauthority" >> "${root_bashrc}"
+		# Ensure the commands are idempotent: don't add lines if they already exist
+		grep -qxF 'xhost local:root' "${user_bashrc}" || echo "xhost local:root" >> "${user_bashrc}"
+		grep -qxF "export XAUTHORITY=/home/${_OEM_USER:-"tangarora"}/.Xauthority" "${root_bashrc}" || echo "export XAUTHORITY=/home/${_OEM_USER:-"tangarora"}/.Xauthority" >> "${root_bashrc}"
+
+		write_information "🚧 Editing bashrc: xhost local:root in ${user_bashrc}"
+		write_information "🚧 Editing bashrc: export XAUTHORITY=/home/${_OEM_USER:-"tangarora"}/.Xauthority in ${root_bashrc}"
+		;;
+	--disable|-d)
+		write_status "🚧 Disabling GUI elevated privileges..."
+
+		# Use sed to remove the specific lines added during the enable step
+		sed -i '/xhost local:root/d' "${user_bashrc}"
+		sed -i "/export XAUTHORITY=\/home\/${_OEM_USER:-"tangarora"}\/.Xauthority/d" "${root_bashrc}"
+
+		write_information "🚧 Removed xhost command from ${user_bashrc}"
+		write_information "🚧 Removed XAUTHORITY export from ${root_bashrc}"
+		;;
+	*)
+		write_status "👽 Un-known option. Use --enable to enable or --disable to disable GUI elevated privileges."
+		;;
+	esac
 }
 
 
@@ -2792,45 +2878,151 @@ set_enable_oem_elevated_privelege()
 
 
 
+# system::toggle_oem_auto_elevated_privilege () 
+# {
+# # Description: Toggles passwordless sudo privileges for a specified user.
+# # WARNING: This function modifies sudoers and can pose a security risk.
+# # Ensure to disable this with 'rtd_oem_reset_default_environment_config' after use.
+# # Globals:
+# #   _OEM_USER - The user for whom to toggle passwordless sudo. Defaults to SUDO_USER.
+# # Arguments: None
+# # Usage:
+# #   system::toggle_oem_auto_elevated_privilege
+
+# 	: ${_OEM_USER:="${SUDO_USER}"}
+# 	local sudoers_file="/etc/sudoers.d/99_sudo_include_file"
+
+# 	if [[ -z "${_OEM_USER}" ]]; then
+# 		write_error "⛔ Error: User not specified for elevated privileges."
+# 		return 1
+# 	fi
+
+
+# 	case $1 in
+# 	--help|-h)
+# 		write_information "usage : system::toggle_oem_auto_elevated_privilege [--enable|--disable]"
+# 		return
+# 		;;
+# 	--enable|-e)
+# 		write_status "🚧 Enabling passwordless sudo for user: ${_OEM_USER}"
+
+# 		# Check if passwordless sudo is already set for the user
+# 		if sudo grep -q "^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" "${sudoers_file}" 2>/dev/null; then
+# 			# Remove passwordless sudo entry
+# 			write_information "🚧 Removing passwordless sudo for user: ${_OEM_USER}"
+# 			sudo sed -i "/^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL/d" "${sudoers_file}"
+# 		else
+# 			# Add passwordless sudo entry
+# 			write_information "🚧 Adding passwordless sudo for user: ${_OEM_USER}"
+# 			echo "${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" | sudo EDITOR='tee -a' visudo -f "${sudoers_file}"
+# 		fi
+
+# 		# Validate sudoers file syntax
+# 		if ! sudo visudo -cf "${sudoers_file}" &>/dev/null; then
+# 			write_error "⛔ Error: Syntax error in sudoers file."
+# 			return 1
+# 		fi
+
+# 		write_information "🚧 Passwordless sudo configuration updated for ${_OEM_USER}."
+# 		;;
+# 	--disable|-d)
+# 		write_status "🚧 Disabling passwordless sudo for user: ${_OEM_USER}"
+# 		# Check if passwordless sudo is already set for the user
+# 		if sudo grep -q "^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" "${sudoers_file}" 2>/dev/null; then
+# 			# Remove passwordless sudo entry
+# 			write_information "🚧 Removing passwordless sudo for user: ${_OEM_USER}"
+# 			sudo sed -i "/^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL/d" "${sudoers_file}"
+# 		else
+# 			# Add passwordless sudo entry
+# 			write_information "🚧 Adding passwordless sudo for user: ${_OEM_USER}"
+# 			echo "${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" | sudo EDITOR='tee -a' visudo -f "${sudoers_file}"
+# 		fi
+
+# 		# Validate sudoers file syntax
+# 		if ! sudo visudo -cf "${sudoers_file}" &>/dev/null; then
+# 			write_error "⛔ Error: Syntax error in sudoers file."
+# 			return 1
+# 		fi
+
+# 		write_information "🚧 Passwordless sudo configuration updated for ${_OEM_USER}."
+# 		;;
+# 	*)
+# 		write_status "👽 Un-known option. Use --enable to enable or --disable to disable passwordless sudo."
+# 		return 1
+# 		;;
+# 	esac
+# }
+
+
+
+
+
+
 system::toggle_oem_auto_elevated_privilege () 
 {
-# Description: Toggles passwordless sudo privileges for a specified user.
-# WARNING: This function modifies sudoers and can pose a security risk.
-# Ensure to disable this with 'rtd_oem_reset_default_environment_config' after use.
-# Globals:
-#   _OEM_USER - The user for whom to toggle passwordless sudo. Defaults to SUDO_USER.
-# Arguments: None
-# Usage:
-#   system::toggle_oem_auto_elevated_privilege
+    # Description: Toggles passwordless sudo privileges for a specified user.
+    # WARNING: This function modifies sudoers and can pose a security risk.
+    # Ensure to disable this with 'rtd_oem_reset_default_environment_config' after use.
+    # Globals:
+    #   _OEM_USER - The user for whom to toggle passwordless sudo. Defaults to SUDO_USER.
+    # Arguments: None
+    # Usage:
+    #   system::toggle_oem_auto_elevated_privilege [--enable|--disable]
 
-	: ${_OEM_USER:="${SUDO_USER}"}
+    : ${_OEM_USER:="${SUDO_USER}"}
+    local sudoers_file="/etc/sudoers.d/99_sudo_include_file"
 
-	if [[ -z "${_OEM_USER}" ]]; then
-		write_error "Error: User not specified for elevated privileges."
-		return 1
-	fi
+    if [[ -z "${_OEM_USER}" ]]; then
+        write_error "⛔ Error: User not specified for elevated privileges."
+        return 1
+    fi
 
-	local sudoers_file="/etc/sudoers.d/99_sudo_include_file"
+    case $1 in
+    --help|-h)
+        write_information "usage : system::toggle_oem_auto_elevated_privilege [--enable|--disable]"
+        return
+        ;;
+    --enable|-e)
+        write_status "🚧 Enabling passwordless sudo for user: ${_OEM_USER}"
+        # Ensure passwordless sudo is not already set for the user
+        if ! sudo grep -q "^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" "${sudoers_file}" 2>/dev/null; then
+            # Add passwordless sudo entry
+            write_information "🚧 Adding passwordless sudo for user: ${_OEM_USER}"
+            echo "${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" | sudo EDITOR='tee -a' visudo -f "${sudoers_file}"
+        else
+            write_information "✅ Passwordless sudo already enabled for user: ${_OEM_USER}"
+        fi
+        ;;
+    --disable|-d)
+        write_status "🚧 Disabling passwordless sudo for user: ${_OEM_USER}"
+        # Check if passwordless sudo is set for the user and remove it
+        if sudo grep -q "^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" "${sudoers_file}" 2>/dev/null; then
+            # Remove passwordless sudo entry
+            write_information "🚧 Removing passwordless sudo for user: ${_OEM_USER}"
+            sudo sed -i "/^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL/d" "${sudoers_file}"
+        else
+            write_information "✅ Passwordless sudo already disabled for user: ${_OEM_USER}"
+        fi
+        ;;
+    *)
+        write_status "👽 Unknown option. Use --enable to enable or --disable to disable passwordless sudo."
+        return 1
+        ;;
+    esac
 
-	# Check if passwordless sudo is already set for the user
-	if sudo grep -q "^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" "${sudoers_file}" 2>/dev/null; then
-		# Remove passwordless sudo entry
-		write_information "Removing passwordless sudo for user: ${_OEM_USER}"
-		sudo sed -i "/^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL/d" "${sudoers_file}"
-	else
-		# Add passwordless sudo entry
-		write_information "Adding passwordless sudo for user: ${_OEM_USER}"
-		echo "${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" | sudo EDITOR='tee -a' visudo -f "${sudoers_file}"
-	fi
+    # Validate sudoers file syntax
+    if ! sudo visudo -cf "${sudoers_file}" &>/dev/null; then
+        write_error "⛔ Error: Syntax error in sudoers file."
+        return 1
+    else
+        write_information "🚧 Sudoers file syntax is valid."
+    fi
 
-	# Validate sudoers file syntax
-	if ! sudo visudo -cf "${sudoers_file}" &>/dev/null; then
-		write_error "Error: Syntax error in sudoers file."
-		return 1
-	fi
-
-	write_information "Passwordless sudo configuration updated for ${_OEM_USER}."
+    write_information "🚧 Passwordless sudo configuration updated for ${_OEM_USER}."
 }
+
+
+
 
 
 
@@ -2935,15 +3127,60 @@ rtd_oem_reseal ()
 	if cat /etc/os-release |grep ubuntu ; then
 		InstallSoftwareFromRepo oem-config-gtk
 		oem-config-prepare
-		shutdown -h now
+		if hash virt-what 2>/dev/null ; then
+			system::log_item "This is a virtual machine. Shutting down..."
+			apt-get -y install qemu-guest-agent
+			apt-get -y install spice-vdagent
+			shutdown -h now
+		else
+			system::log_item "This is a physical machine. Shutting down..."
+			shutdown -h now
+		fi
 	elif cat /etc/os-release |grep kubuntu ; then
 		InstallSoftwareFromRepo oem-config-kde
 		oem-config-prepare
-		shutdown -h now
+		if hash virt-what 2>/dev/null ; then
+			system::log_item "This is a virtual machine. Shutting down..."
+			apt-get -y install qemu-guest-agent
+			apt-get -y install spice-vdagent
+			shutdown -h now
+		else
+			system::log_item "This is a physical machine. Shutting down..."
+			shutdown -h now
+		fi
 	elif cat /etc/os-release |grep suse ; then
 		system::log_item "I dont know of any OEM configuration for SuSE"
 	elif cat /etc/os-release |grep fedora ; then
-		system::log_item "I dont know of any OEM configuration for Fedora"
+		system::log_item "BETA: I dont know of any OEM configuration for Fedora... trying anyhow... "
+		tee /usr/local/bin/custom-oem-setup.sh <<-'EOF'
+		#!/bin/bash
+
+		# Example task: prompt for creating a new user account
+		echo "Creating a new user account..."
+		read -p "Enter username: " username
+		useradd -m "$username"
+		passwd "$username"
+
+		# Disable this service so it doesn't run again
+		systemctl disable custom-oem-setup.service
+		EOF
+		chmod +x /usr/local/bin/custom-oem-setup.sh
+
+		tee /etc/systemd/system/custom-oem-setup.service <<-'EOF'
+		[Unit]
+		Description=Custom OEM Setup
+		After=multi-user.target
+
+		[Service]
+		Type=oneshot
+		ExecStart=/usr/local/bin/custom-oem-setup.sh
+
+		[Install]
+		WantedBy=multi-user.target
+		EOF
+
+		sudo systemctl enable custom-oem-setup.service
+		shutdown -h now
 	else
 		system::log_item "I dont know of any OEM configuration for this distribution"
 	fi
@@ -3168,11 +3405,6 @@ generate_report_disk_space_used_by_directory ()
 
 
 
-
-
-
-
-
 set_gnome_ui_common_tweaks_for_user ()
 {
 # Description:
@@ -3208,8 +3440,10 @@ set_gnome_ui_common_tweaks_for_user ()
 		gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ scrollback-lines 10000
 		if fc-list | grep -i SauceCodePro ; then 
 			gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ font 'SauceCodePro Nerd Font 12'
+			gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-system-font false
 		else 
 			gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ font 'Monospace 12'
+			gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-system-font false
 		fi
 
 	# Better Font Smoothing
