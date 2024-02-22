@@ -2618,11 +2618,11 @@ system::toggle_oem_auto_login ()
 			return
 			;;
 		--enable|-e)
-			write_status "🚧 Enabling auto login..."
+			write_status "🚧 Enabling auto login as requested by - ${FUNCNAME[1]}"
 			local _flip=on
 			;;
 		--disable|-d)
-			write_status "🚧 Disabling auto login..."
+			write_status "🚧 Disabling auto login as requested by ${FUNCNAME[1]}"
 			local _flip=off
 			;;
 		*)	
@@ -2679,25 +2679,24 @@ system::toggle_oem_auto_login ()
 	fi
 
 	# Toggle auto login for GDM3 if present (Ubuntu, Debian default etc.)
-	if [[ -f /etc/gdm3/daemon.conf ]]; then
+	if [[ -f /etc/gdm3/custom.conf ]]; then
 		case $_flip in
 		off )
 			write_status "⛔ GDM3: toggeling auto login off... *******"
-			rm /etc/gdm3/daemon.conf && mv /etc/gdm3/daemon.conf.rtd-bak /etc/gdm3/daemon.conf
+			rm /etc/gdm3/custom.conf && mv /etc/gdm3/custom.conf.rtd-bak /etc/gdm3/custom.conf
 			;;
 		on )
 			write_status "✅ GDM3: toggeling auto login on... *******"
-			cp /etc/gdm3/daemon.conf /etc/gdm3/daemon.conf.rtd-bak
-			cat >  /etc/gdm3/daemon.conf <<-OEM_GDM3_LOGIN_OPTION
+			cp /etc/gdm3/custom.conf /etc/gdm3/custom.conf.rtd-bak
+			cat >  /etc/gdm3/custom.conf <<-OEM_GDM3_LOGIN_OPTION
 			# This configuration file was created by RTD Setup.
 			# You may safely replace this file with the original backed up:
-			# /etc/gdm3/daemon.conf.rtd-bak
+			# /etc/gdm3/custom.conf.rtd-bak
 			# If this file is not there, then it was not there to begin with
 			# and you can delete this file.
 			[daemon]
 			AutomaticLoginEnable=True
 			AutomaticLogin=${_OEM_USER:-"tangarora"}
-			WaylandEnable=false
 			OEM_GDM3_LOGIN_OPTION
 			;;
 		esac
