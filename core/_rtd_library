@@ -2589,7 +2589,7 @@ system::toggle_oem_auto_login ()
 
 	# Toggle auto login for Light DM if present (Old Ubuntu, Mint?, Budgie? etc.)
 	if [[ -f /etc/lightdm/lightdm.conf ]]; then
-		case $_flip in ;
+		case $_flip in 
 		off )
 			write_status "⛔ LightDM: toggeling auto login off... *******"
 			rm /etc/lightdm/lightdm.conf && mv /etc/lightdm/lightdm.conf.rtd-bak /etc/lightdm/lightdm.conf
@@ -2613,7 +2613,7 @@ system::toggle_oem_auto_login ()
 
 	# Toggle auto login for SDDM if present (Kubuntu, SUSE, KDE Based DE's)
 	if [[ -f /etc/sddm.conf ]]; then
-		case $_flip in ;
+		case $_flip in 
 		off )
 			write_status "⛔ SDDM: toggeling auto login off... *******"
 			rm /etc/sddm.conf && mv /etc/sddm.conf.rtd-bak /etc/sddm.conf
@@ -2637,7 +2637,7 @@ system::toggle_oem_auto_login ()
 
 	# Toggle auto login for GDM3 if present (Ubuntu, Debian default etc.)
 	if [[ -f /etc/gdm3/daemon.conf ]]; then
-		case $_flip in ;
+		case $_flip in
 		off )
 			write_status "⛔ GDM3: toggeling auto login off... *******"
 			rm /etc/gdm3/daemon.conf && mv /etc/gdm3/daemon.conf.rtd-bak /etc/gdm3/daemon.conf
@@ -2662,7 +2662,7 @@ system::toggle_oem_auto_login ()
 
 	# Toggle auto login for GDM per gnome standard (Fedora et. al.)
 	if [[ -f /etc/gdm/custom.conf ]]; then
-		case $_flip in ;
+		case $_flip in
 		off )
 			write_status "⛔ GDM: toggeling auto login off... *******"
 			rm /etc/gdm/custom.conf && mv /etc/gdm/custom.conf.rtd-bak /etc/gdm/custom.conf
@@ -2697,7 +2697,7 @@ system::toggle_oem_auto_login ()
 
 	# Special case for SUSE...
 	if [[ -e /etc/sysconfig/displaymanager ]] ; then
-		case $_flip in ;
+		case $_flip in
 		off )
 			write_status "⛔ SUSE: toggeling auto login off... *******"
 			rm /etc/sysconfig/displaymanager && mv /etc/sysconfig/displaymanager.rtd-bak /etc/sysconfig/displaymanager
@@ -2714,7 +2714,7 @@ system::toggle_oem_auto_login ()
 
 	# Toggle auto login for Terminal target env. (no GUI).
 	if [ ! -f /etc/systemd/system/getty@tty1.service.d/override.conf ]; then
-		case $_flip in ;
+		case $_flip in
 		off )
 			write_status "⛔ TTY: toggeling auto login off... ********"
 			rm /etc/systemd/system/getty@tty1.service.d/override.conf
@@ -7011,8 +7011,8 @@ software::add_gnome_extensions ()
 	fi
 
 	local install_status=0
-	write_status "Status: Installing GNOME extension(s): $@."
-	for extension in $@; do
+	write_status "Status: Installing GNOME extension(s): $* ..."
+	for extension in $* ; do
 		write_status "Status: Installing GNOME extension: $extension."
 		if ! bash "$extension_installer" "$extension" --yes |& tee -a "${_logfile}" ; then
 			write_error "Error: Failure to install GNOME extension: $extension." >&2
