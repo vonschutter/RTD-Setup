@@ -8943,7 +8943,7 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 	: ${_config="${1:-"workstation"}"}
 	system::generate_ks_cfg_file -u "${_source_url}" -c "${_config}" -p "${_preseed_file}" -e "@workstation-product-environment"
 
-	local vm_name="#Template_VDI_Fedora_"${_config}"_"${RANDOM}""
+	local vm_name="#Template_Fedora_VDI_$(date +%Y-%m-%d-%H-%M)"
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in PRESEED: ${_preseed_file} \n
@@ -9049,7 +9049,7 @@ kvm::make_vm_template_now_from_redhat_com ()
 	: ${_config="${1:-"workstation"}"}
 	system::generate_ks_cfg_file -u "${_source_url}" -c "${_config}" -p "${_preseed_file}" -e "@workstation-product-environment"
 
-	local vm_name="RedHat_${_config}_${RANDOM}"
+	local vm_name="RedHat_${_config}_$(date +%Y-%m-%d-%H-%M)"
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in PRESEED: ${_preseed_file} \n
@@ -9135,7 +9135,7 @@ make_kvm_virtual_machine_now_from_opensuse_org ()
 	: ${_cpu="${_cpu:-2}"}
 	: ${_mem="${_mem:-2048}"}
 	: ${_dsk="${_dsk:-100}"}
-	: ${CONFIG:="desktop"}
+	: ${CONFIG:="VDI"}
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
@@ -9144,7 +9144,7 @@ make_kvm_virtual_machine_now_from_opensuse_org ()
 	: ${virt_net="$(system::find_vm_bridge)"}
 	: ${source_url:="${_SUSE_LEAP_SOURCE}"}
 
-	local vm_name="#Template_SUSE_${CONFIG}_${RANDOM}"
+	local vm_name="#Template_SUSE_${CONFIG}_$(date +%Y-%m-%d-%H-%M)"
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in Autoyast: ${PRESEED_FILE} \n
@@ -11231,7 +11231,7 @@ system::generate_autoyast_file ()
 		;;
 		--desktop_environment | --DE )
 			if [[ $2 == "kde" || $2 == "gnome" || $2 == "xfce" || $2 == "lxde" || $2 == "mate" || $2 == "cinnamon" || $2 == "enlightenment" || $2 == "lxqt" ]] ; then
-				_UserDesktopEnvironemtSelection="$2"
+				_UserDesktopEnvironemtSelection="${2:-"kde"}"
 			else
 				write_error "⛔ Unknown Desktop Environment: $2"
 				return 1
@@ -11273,7 +11273,7 @@ system::generate_autoyast_file ()
 		esac
 		shift # Remove argument value from processing
 	done
-	suse_product="Leap"
+
 	system::log_item "Called by: ${FUNCNAME[1]}"
 	write_host --cyan "Creating AUTOYAST Instructions (XML): ${FILE}"
 
