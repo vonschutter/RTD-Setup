@@ -62,18 +62,9 @@ _LOGFILE=${_LOG_DIR}/$( basename $0 ).log
 
 # Set login banner:
 ISSUE_FILE="/etc/issue"
-echo '
-██████   ██████ █████       TTY: \l
-██   ██    ██   ██   ██     Host: \n
-██████     ██   ██    ██    IP Address: \4
-██   ██    ██   ██   ██     Kernel: \r
-██   ██    ██   █████       Build: \v
- 
+echo $_OEM_TTY_LOGIN_BANNER > $ISSUE_FILE
 
-    \d \t
-' > $ISSUE_FILE
-
-# Set the motd banner:
+# Create Ken's MOTD file with some wisdom:
 cat > /etc/motd_quotes.txt << "EOF"
 - Do not argue with an idiot. He will drag you down to his level and beat you with experience.
 - Going to church doesn't make you a Christian any more than standing in a garage makes you a car.
@@ -152,16 +143,27 @@ EOF
 
 chmod +x /etc/update-motd.d/05-wisdom
 
+# Set the MOTD to display a random quote from the file:
+if [[ -d /etc/update-motd.d ]]; then
+	motd_wisdom_file="/etc/update-motd.d/55-wisdom"
+elif [[ -d /etc/motd.d ]]; then
+	motd_wisdom_file="/etc/motd.d/55-wisdom"
+else
+	system::log_item "No MOTD directory found, NOT installing wisdom."
+fi
 
-cat > /etc/update-motd.d/05-wisdom << "EOF"
-#!/bin/sh
-QuoteFile="/etc/motd_quotes.txt"
-num_lines=$(wc -l < $QuoteFile)
-random_line=$((RANDOM % num_lines + 1))
-sed -n "${random_line}p" $QuoteFile
-EOF
+if [[ -n "${motd_wisdom_file}" ]]; then
+	cat > "${motd_wisdom_file}" <<-"EOF"
+	#!/bin/sh
+	QuoteFile="/etc/motd_quotes.txt"
+	num_lines=$(wc -l < $QuoteFile)
+	random_line=$((RANDOM % num_lines + 1))
+	sed -n "${random_line}p" $QuoteFile
+	EOF
 
-chmod +x /etc/update-motd.d/05-wisdom
+	chmod +x /etc/update-motd.d/05-wisdom
+fi
+
 
 # Prepare the system for auto task sequnce post build
 system::add_or_remove_login_script --add "/opt/rtd/core/rtd-oem-linux-config.sh"

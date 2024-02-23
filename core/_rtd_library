@@ -2168,7 +2168,7 @@ oem::rtd_reset_default_environment_config ()
 	fi
 
 	if type system::add_or_remove_login_script &>/dev/null ; then
-		system::add_or_remove_login_script --remove
+		system::add_or_remove_login_script --remove /etc/xdg/autostart/oem-run.desktop
 		write_status "👨‍🦱 Login script has been removed."
 	else
 		write_error  "👺 system::add_or_remove_login_script function not found. Cannot remove login script."
@@ -2654,18 +2654,23 @@ system::toggle_oem_auto_login ()
 
 	# Toggle auto login for Light DM if present (Old Ubuntu, Mint?, Budgie? etc.)
 	if [[ -f /etc/lightdm/lightdm.conf ]]; then
+		local _config_file="/etc/lightdm/lightdm.conf"
 		case $_flip in 
 		off )
 			write_status "⛔ LightDM: toggeling auto login off... *******"
-			rm /etc/lightdm/lightdm.conf && mv /etc/lightdm/lightdm.conf.rtd-bak /etc/lightdm/lightdm.conf
+			if rm ${_config_file} && mv ${_config_file}.rtd-bak ${_config_file} ; then
+				write_status "💾 Restored previous configuration..."
+			else
+				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
+			fi
 			;;
 		on )
 			write_status "✅ LightDM: toggeling auto login on... *******"
-			cp /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.rtd-bak
-			cat > /etc/lightdm/lightdm.conf <<-OEM_LXDM_LOGIN_OPTION
+			cp ${_config_file} ${_config_file}.rtd-bak
+			cat > ${_config_file} <<-OEM_LXDM_LOGIN_OPTION
 			# This configuration file was created by RTD Setup.
 			# You may safely replace this file with the original backed up:
-			# /etc/lightdm/lightdm.conf.rtd-bak
+			# ${_config_file}.rtd-bak
 			# If this file is not there, then it was not there to begin with
 			# and you can delete this file.
 			[SeatDefaults]
@@ -2678,18 +2683,23 @@ system::toggle_oem_auto_login ()
 
 	# Toggle auto login for SDDM if present (Kubuntu, SUSE, KDE Based DE's)
 	if [[ -f /etc/sddm.conf ]]; then
+		local _config_file="/etc/sddm.conf"
 		case $_flip in 
 		off )
 			write_status "⛔ SDDM: toggeling auto login off... *******"
-			rm /etc/sddm.conf && mv /etc/sddm.conf.rtd-bak /etc/sddm.conf
+			if rm ${_config_file} && mv ${_config_file}.rtd-bak ${_config_file} ; then
+				write_status "💾 Restored previous configuration..."
+			else
+				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
+			fi
 			;;
 		on )
 			write_status "✅ SDDM: toggeling auto login on... *******"
-			cp /etc/sddm.conf /etc/sddm.conf.rtd-bak
-			cat > /etc/sddm.conf <<-OEM_SDDM_LOGIN_OPTION
+			cp ${_config_file} ${_config_file}.rtd-bak
+			cat > ${_config_file} <<-OEM_SDDM_LOGIN_OPTION
 			# This configuration file was created by RTD Setup.
 			# You may safely replace this file with the original backed up:
-			# /etc/sddm.conf.rtd-bak
+			# ${_config_file}.rtd-bak
 			# If this file is not there, then it was not there to begin with
 			# and you can delete this file.
 			[Autologin]
@@ -2700,20 +2710,54 @@ system::toggle_oem_auto_login ()
 		esac
 	fi
 
-	# Toggle auto login for GDM3 if present (Ubuntu, Debian default etc.)
+	# Toggle auto login for GDM3 if present (Ubuntu, default etc.)
 	if [[ -f /etc/gdm3/custom.conf ]]; then
+		local _config_file="/etc/gdm3/custom.conf"
 		case $_flip in
 		off )
 			write_status "⛔ GDM3: toggeling auto login off... *******"
-			rm /etc/gdm3/custom.conf && mv /etc/gdm3/custom.conf.rtd-bak /etc/gdm3/custom.conf
+			if rm ${_config_file} && mv ${_config_file}.rtd-bak ${_config_file} ; then
+				write_status "💾 Restored previous configuration..."
+			else
+				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
+			fi
 			;;
 		on )
 			write_status "✅ GDM3: toggeling auto login on... *******"
-			cp /etc/gdm3/custom.conf /etc/gdm3/custom.conf.rtd-bak
-			cat >  /etc/gdm3/custom.conf <<-OEM_GDM3_LOGIN_OPTION
+			cp ${_config_file} ${_config_file}.rtd-bak
+			cat >  ${_config_file} <<-OEM_GDM3_LOGIN_OPTION
 			# This configuration file was created by RTD Setup.
 			# You may safely replace this file with the original backed up:
-			# /etc/gdm3/custom.conf.rtd-bak
+			# ${_config_file}.rtd-bak
+			# If this file is not there, then it was not there to begin with
+			# and you can delete this file.
+			[daemon]
+			AutomaticLoginEnable=True
+			AutomaticLogin=${_OEM_USER:-"tangarora"}
+			OEM_GDM3_LOGIN_OPTION
+			;;
+		esac
+	fi
+
+	# Toggle auto login for GDM3 if present (Debian and others...)
+	if [[ -f /etc/gdm3/daemon.conf ]]; then
+		local _config_file="/etc/gdm3/daemon.conf"
+		case $_flip in
+		off )
+			write_status "⛔ GDM3: toggeling auto login off... *******"
+			if rm ${_config_file} && mv ${_config_file}.rtd-bak ${_config_file} ; then
+				write_status "💾 Restored previous configuration..."
+			else
+				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
+			fi
+			;;
+		on )
+			write_status "✅ GDM3: toggeling auto login on... *******"
+			cp ${_config_file} ${_config_file}.rtd-bak
+			cat >  ${_config_file} <<-OEM_GDM3_LOGIN_OPTION
+			# This configuration file was created by RTD Setup.
+			# You may safely replace this file with the original backed up:
+			# ${_config_file}.rtd-bak
 			# If this file is not there, then it was not there to begin with
 			# and you can delete this file.
 			[daemon]
@@ -2726,18 +2770,23 @@ system::toggle_oem_auto_login ()
 
 	# Toggle auto login for GDM per gnome standard (Fedora et. al.)
 	if [[ -f /etc/gdm/custom.conf ]]; then
+		local _config_file="/etc/gdm/custom.conf"
 		case $_flip in
 		off )
 			write_status "⛔ GDM: toggeling auto login off... *******"
-			rm /etc/gdm/custom.conf && mv /etc/gdm/custom.conf.rtd-bak /etc/gdm/custom.conf
+			if rm ${_config_file} && mv ${_config_file}.rtd-bak ${_config_file} ; then
+				write_status "💾 Restored previous configuration..."
+			else
+				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
+			fi
 			;;
 		on )
 			write_status "✅ GDM: toggeling auto login on... *******"
-			cp /etc/gdm/custom.conf /etc/gdm/custom.conf.rtd-bak
-			cat >  /etc/gdm/custom.conf <<-OEM_GDM_LOGIN_OPTION
+			cp ${_config_file} ${_config_file}.rtd-bak
+			cat >  ${_config_file} <<-OEM_GDM_LOGIN_OPTION
 			# This configuration file was created by RTD Setup.
 			# You may safely replace this file with the original backed up:
-			# /etc/gdm/custom.conf.rtd-bak
+			# ${_config_file}.rtd-bak
 			# If this file is not there, then it was not there to begin with
 			# and you can delete this file.
 			# GDM configuration storage
@@ -2761,32 +2810,42 @@ system::toggle_oem_auto_login ()
 
 	# Special case for SUSE...
 	if [[ -e /etc/sysconfig/displaymanager ]] ; then
+		local _config_file="/etc/sysconfig/displaymanager"
 		case $_flip in
 		off )
 			write_status "⛔ SUSE: toggeling auto login off... *******"
-			rm /etc/sysconfig/displaymanager && mv /etc/sysconfig/displaymanager.rtd-bak /etc/sysconfig/displaymanager
+			if rm ${_config_file} && mv ${_config_file}.rtd-bak ${_config_file} ; then
+				write_status "💾 Restored previous configuration..."
+			else
+				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
+			fi
 			;;
 		on )
 			write_status "✅ SUSE: toggeling auto login on... *******"
-			cp /etc/sysconfig/displaymanager /etc/sysconfig/displaymanager.rtd-bak || write_error "Could not backup: /etc/sysconfig/displaymanager! "
-			sed -i 's/DISPLAYMANAGER_AUTOLOGIN=""/DISPLAYMANAGER_AUTOLOGIN="tangarora"/' /etc/sysconfig/displaymanager || write_error "Could not write to file: /etc/sysconfig/displaymanager!"
-			sed -i 's/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="no"/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"/' /etc/sysconfig/displaymanager || write_error "Could not write to file: /etc/sysconfig/displaymanager!"
+			cp ${_config_file} ${_config_file}.rtd-bak || write_error "❗💾 Could not backup: ${_config_file}! "
+			sed -i 's/DISPLAYMANAGER_AUTOLOGIN=""/DISPLAYMANAGER_AUTOLOGIN="tangarora"/' ${_config_file} || write_error "❗📄 Could not write to file: ${_config_file}!"
+			sed -i 's/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="no"/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"/' ${_config_file} || write_error "❗📄 Could not write to file: ${_config_file}!"
 			;;
 		esac
 	fi
 
 
 	# Toggle auto login for Terminal target env. (no GUI).
-	if [ ! -f /etc/systemd/system/getty@tty1.service.d/override.conf ]; then
+	if [[ ! -f /etc/systemd/system/getty@tty1.service.d/override.conf ]]; then
+		local _config_file="/etc/systemd/system/getty@tty1.service.d/override.conf"
 		case $_flip in
 		off )
 			write_status "⛔ TTY: toggeling auto login off... ********"
-			rm /etc/systemd/system/getty@tty1.service.d/override.conf
+			if rm ${_config_file} && mv ${_config_file}.rtd-bak ${_config_file} ; then
+				write_status "💾 Restored previous configuration..."
+			else
+				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
+			fi
 			;;
 		on )
 			write_status "✅ TTY: toggeling auto login on... ********"
-			mkdir -p /etc/systemd/system/getty@tty1.service.d
-			cat >  /etc/systemd/system/getty@tty1.service.d/override.conf <<-OEM_TTY_LOGIN_OPTION
+			mkdir -p ${_config_file%/*}
+			cat >  ${_config_file} <<-OEM_TTY_LOGIN_OPTION
 			"[Service]"
 			"ExecStart="
 			"ExecStart=-/sbin/agetty --noissue --autologin ${_OEM_USER:-"tangarora"} %I $TERM"
@@ -11087,6 +11146,309 @@ system::generate_ks_cfg_file ()
 
 
 
+system::generate_autoyast_file ()
+{
+# Description:
+# Function to dynamically generate an AutoYaST XML file for automated SUSE Linux installations.
+# This function allows customization of the installation process, including desktop environment,
+# server role, disk encryption, initial user setup, and more based on provided arguments.
+#
+# Globals:
+#   None explicitly declared within the function, but it expects certain environment variables
+#   to be set (e.g., _autoyast_filename, _UserDesktopEnvironmentSelection, etc.) based on the arguments passed.
+#
+# Arguments:
+#   --filename <file path>                : Specifies the path and filename where the AutoYaST XML file will be saved.
+#   --desktop_environment <DE name>       : Selects the desktop environment to install (kde, gnome, xfce, lxde, mate, cinnamon, enlightenment, lxqt).
+#   --server_role <role name>             : Specifies the server role (lamp, dns, dhcp_dns_server, file_server, print_server, mail_server, monitoring, desktop).
+#   --disk_encryption <YES|NO>            : Enables or disables disk encryption.
+#   --disk_password <password>            : Sets the disk encryption password (ignored if disk encryption is NO).
+#   --initial_user <username>             : Sets the username for the initial user account.
+#   --initial_user_password <password>    : Sets the password for the initial user account.
+#   --help | -h                           : Displays usage information for the function.
+#
+# Outputs:
+#   The function generates an AutoYaST XML file at the specified location. It also outputs status messages,
+#   error messages, and usage information to the console based on the operations performed and arguments provided.
+#
+# Returns:
+#   0 : Successfully generated the AutoYaST XML file.
+#   1 : Encountered an error due to incorrect or missing arguments.
+#
+# Usage:
+#   To generate an AutoYaST file with specific configurations, call the function with the desired options. For example:
+#   system::generate_autoyast_file --filename "/path/to/autoyast.xml" --desktop_environment "kde" --server_role "lamp" \
+#   --disk_encryption "YES" --disk_password "securepassword" --initial_user "admin" --initial_user_password "adminpassword"
+#
+#   Providing the --help or -h argument displays usage information:
+#   system::generate_autoyast_file --help
+#
+# Supported desktop Configurations:
+#    | basic_desktop        | A very basic desktop (previously part of x11 pattern) | pattern
+#    | budgie               | Budgie Desktop Environment                            | pattern
+#    | budgie_applets       | Applets for Budgie Desktop Environment                | pattern
+#    | cinnamon             | Cinnamon Desktop Environment                          | pattern
+#    | deepin               | Deepin Desktop Environment                            | pattern
+#    | gnome                | GNOME Desktop Environment (Wayland)                   | pattern
+#    | gnome_basic          | GNOME Desktop Environment (Basic)                     | pattern
+#    | gnome_x11            | GNOME Desktop Environment (X11)                       | pattern
+#    | kde                  | KDE Applications and Plasma 5 Desktop                 | pattern
+#    | kde_plasma           | KDE Plasma 5 Desktop Base                             | pattern
+#    | lxde                 | LXDE Desktop Environment                              | pattern
+#    | lxqt                 | LXQt Desktop Environment                              | pattern
+#    | mate                 | MATE Desktop Environment                              | pattern
+#    | xfce                 | XFCE Desktop Environment                              | pattern
+#    | yast2_desktop        | YaST Desktop Utilities                                | pattern
+#
+# Supported Server Configurations:
+#    | dhcp_dns_server      | DHCP and DNS Server                                   | pattern
+#    | directory_server     | Directory Server (LDAP)                               | pattern
+#    | file_server          | File Server                                           | pattern
+#    | gateway_server       | Internet Gateway                                      | pattern
+#    | kvm_server           | KVM Host Server                                       | pattern
+#    | lamp_server          | Web and LAMP Server                                   | pattern
+#    | mail_server          | Mail and News Server                                  | pattern
+#    | oracle_server        | Oracle Server Base                                    | pattern
+#    | print_server         | Print Server                                          | pattern
+#    | sap-bone             | SAP BusinessOne Server Base                           | pattern
+#    | sap-hana             | SAP HANA Server Base                                  | pattern
+#    | sap-nw               | SAP NetWeaver Server Base                             | pattern
+#    | sap_server           | SAP Application Server Base                           | pattern
+#    | xen_server           | Xen Virtual Machine Host Server                       | pattern
+#    | yast2_server         | YaST Server Utilities                                 | pattern
+#
+# End of documentation
+
+	# Get vm config standard options
+	system::get_vm_config
+
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--filename | --file )
+			_autoyast_filename="$2"
+			shift # Remove argument name from processing
+		;;
+		--desktop_environment | --DE )
+			if [[ $2 == "kde" || $2 == "gnome" || $2 == "xfce" || $2 == "lxde" || $2 == "mate" || $2 == "cinnamon" || $2 == "enlightenment" || $2 == "lxqt" ]] ; then
+				_UserDesktopEnvironemtSelection="$2"
+			else
+				write_error "⛔ Unknown Desktop Environment: $2"
+				return 1
+			fi
+			shift # Remove argument name from processing
+		;;
+		--server_role | --ServerRole )
+			if [[ $2 == "lamp" || $2 == "dns" || $2 == "dhcp_dns_server" || $2 == "file_server" || $2 == "print_server" || $2 == "mail_server" || $2 == "monitoring" || $2 == "desktop" ]] ; then
+				_UserServerEnvironemtSelection="$2"
+			else
+				write_error "⛔ Unknown Server Selection: $2"
+				return 1
+			fi
+			shift # Remove argument name from processing
+		;;
+		--disk_encryption | --DE )
+			Preference_DiskEncryption="$2"
+			shift # Remove argument name from processing
+		;;
+		--disk_password | --DP )
+			Preference_Disk_Password="$2"
+			shift # Remove argument name from processing
+		;;
+		--initial_user | --IU )
+			Preference_InitialUser="$2"
+			shift # Remove argument name from processing
+		;;
+		--initial_user_password | --IUP )
+			Preference_InitialUserPassword="$2"
+			shift # Remove argument name from processing
+		;;
+		--help | -h )
+			echo "Usage: generate_autoyast_file --filename <file path> --desktop_environment <kde|gnome|xfce|lxde|mate|cinnamon|enlightenment|lxqt> --server_role <lamp|dns|dhcp_dns_server|file_server|print_server|mail_server|monitoring|desktop> --disk_encryption <YES|NO> --disk_password <password> --initial_user <username> --initial_user_password <password>"
+			return 0
+		;;
+		*)
+			write_error "Unknown parameter: $1"
+		;;
+		esac
+		shift # Remove argument value from processing
+	done
+	suse_product="Leap"
+	system::log_item "Called by: ${FUNCNAME[1]}"
+	write_host --cyan "Creating AUTOYAST Instructions (XML): ${FILE}"
+
+	# Localized variables based on User preferences, but with suse speciffic defaults:
+	# We cannot have empty tags in XML or validation will fail: so echo stored values with relevant tags.
+	if [[ ${Preference_DiskEncryption} == "YES" ]]; then
+		Preference_DiskEncryption_SUSE="<encryption_password>${Preference_Disk_Password:-"letmein1234"}</encryption_password>"
+	fi
+
+	if [[ -n ${Preference_InitialUser}  ]] ; then
+		Preference_InitialUser_SUSE="<username>${Preference_InitialUser:-"tangarora"}</username>"
+	fi
+
+	if [[ -n ${Preference_InitialUserPassword} ]] ; then
+		Preference_Password_SUSE="<password>${Preference_InitialUserPassword:-"letmein1234"}</password>"
+	fi
+
+	if [[ -n ${_UserDesktopEnvironemtSelection}  ]] ; then
+		Preference_Desktop_DE_SUSE="<pattern>${_UserDesktopEnvironemtSelection:-"kde"}</pattern>"
+	fi
+
+	if [[ -n ${_UserServerEnvironemtSelection}  ]] ; then
+		Preference_Server_Role_SUSE="<pattern>${_UserServerEnvironemtSelection:-"lamp"}</pattern>"
+	fi
+
+
+
+	# Populate AutoYaST Template and write the autoyast file
+cat >> ${_autoyast_filename} <<-AUTOYAST_EOF
+<?xml version="1.0"?>
+<!DOCTYPE profile>
+<profile
+    xmlns="http://www.suse.com/1.0/yast2ns"
+    xmlns:config="http://www.suse.com/1.0/configns" >
+    <general>
+        <mode>
+            <confirm config:type="boolean">false</confirm>
+            <final_reboot config:type="boolean">true</final_reboot>
+            <final_halt config:type="boolean">false</final_halt>
+            <halt config:type="boolean">false</halt>
+            <second_stage config:type="boolean">false</second_stage>
+            <forceboot config:type="boolean">true</forceboot>
+        </mode>
+    </general>
+
+    <storage>
+        <proposal>
+        <confirm config:type="boolean">false</confirm>
+        <lvm config:type="boolean">true</lvm>
+        <windows_delete_mode config:type="symbol">all</windows_delete_mode>
+        <linux_delete_mode config:type="symbol">all</linux_delete_mode>
+        <other_delete_mode config:type="symbol">all</other_delete_mode>
+        ${Preference_DiskEncryption_SUSE}
+        </proposal>
+    </storage>
+
+    <networking>
+    <keep_install_network config:type="boolean">true</keep_install_network>
+    </networking>
+
+    <deploy_image>
+    <image_installation config:type="boolean">true</image_installation>
+    </deploy_image>
+
+    <software>
+        <install_recommended config:type="boolean">true</install_recommended>
+        <patterns config:type="list">
+            <pattern>base</pattern>
+            ${Preference_Desktop_DE_SUSE}
+	    ${Preference_Server_Role_SUSE}
+        </patterns>
+
+        <packages config:type="list">
+            <package>wget</package>
+            <package>curl</package>
+            <package>dialog</package>
+            <package>vim</package>
+            <package>spice-vdagent</package>
+            <package>git</package>
+            <package>pkexec</package>
+            <package>zip</package>
+            <package>zenity</package>
+            <package>acpi</package>
+            <package>pciutils</package>
+        </packages>
+
+        <products t="list">
+            <% if os_release[:id] == 'opensuse-tumbleweed' %>
+            <product>Tumbleweed</product>
+            <% else %>
+            <product>openSUSE</product>
+            <% end %>
+        </products>
+
+    </software>
+
+    <firstboot>
+        <firstboot_enabled config:type="boolean">false</firstboot_enabled>
+    </firstboot>
+
+    <users config:type="list">
+        <user>
+            <encrypted config:type="boolean">true</encrypted>
+            <fullname>root</fullname>
+            <gid>0</gid>
+            <home>/root</home>
+            <shell>/bin/bash</shell>
+            <uid>0</uid>
+            ${Preference_Password_SUSE}
+            <username>root</username>
+        </user>
+        <user>
+            <encrypted config:type="boolean">true</encrypted>
+            <fullname>RTD User</fullname>
+            <shell>/bin/bash</shell>
+            ${Preference_Password_SUSE}
+            ${Preference_InitialUser_SUSE}
+        </user>
+    </users>
+
+    <login_settings>
+        <autologin_user>tangarora</autologin_user>
+        <password_less_login config:type="boolean">true</password_less_login>
+    </login_settings>
+
+    <services-manager>
+        <default_target>graphical</default_target>
+        <services>
+            <enable config:type="list">
+                <service>sshd</service>
+                <service>spice-vdagent</service>
+            </enable>
+        </services>
+    </services-manager>
+
+    <scripts>
+        <init-scripts config:type="list">
+        <script>
+        <source><![CDATA[
+#!/bin/bash
+git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd
+chmod 755 /opt/rtd/core/rtd-oem-enable-config.sh
+/opt/rtd/core/rtd-oem-enable-config.sh
+cp *.xml /opt/rtd/
+sudo zypper ar -cfp 90 ${_SUSE_PACKMAN_LEAP} packman
+zypper --gpg-auto-import-keys refresh
+zypper dup --from packman -y --force-resolution
+]]>
+        </source>
+        </script>
+        </init-scripts>
+    </scripts>
+
+    <security>
+        <displaymanager_remote_access>no</displaymanager_remote_access>
+        <fail_delay>3</fail_delay>
+        <faillog_enab>yes</faillog_enab>
+        <gid_max>60000</gid_max>
+        <gid_min>101</gid_min>
+        <lastlog_enab>yes</lastlog_enab>
+        <obscure_checks_enab>no</obscure_checks_enab>
+        <permission_security>secure</permission_security>
+        <run_updatedb_as>nobody</run_updatedb_as>
+        <uid_max>60000</uid_max>
+        <uid_min>500</uid_min>
+        <selinux_mode>permissive</selinux_mode>
+        <lsm_select>selinux</lsm_select>
+    </security>
+</profile>
+AUTOYAST_EOF
+}
+
+
+
+
 generate_autoyast_file ()
 {
 # Description: Function to generate an installation configuration file for SUSE builds.
@@ -11103,7 +11465,7 @@ generate_autoyast_file ()
 
 
 	# Localized variables based on User preferences, but with suse speciffic defaults:
-	Preference_DiskEncryption_SUSE="$( [[ "$_EncryptDisk" == "YES" ]] && echo "<encryption_password>${PreferredDiskPassword:-"letmein1234"}</encryption_password>" )"
+	Preference_DiskEncryption_SUSE="$( [[ "$_EncryptDisk" == "NO" ]] && echo "<encryption_password>${PreferredDiskPassword:-"letmein1234"}</encryption_password>" )"
 	Preference_Password_SUSE=$( [[ -n "${PrefferredUserPassword}" ]] && echo "<user_password>${PrefferredUserPassword}</user_password>" || echo '<user_password>$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1</user_password>' )
 	Preference_Desktop_DE_SUSE=${_UserDesktopEnvironemtSelection:-"<pattern>kde</pattern>"}
 	Preference_InitialUser_SUSE="<username>${_OEM_USER:-"tangarora"}</username>"
@@ -11248,9 +11610,6 @@ zypper dup --from packman -y --force-resolution
 
 AUTOYAST_EOF
 }
-
-
-
 
 
 
