@@ -4220,26 +4220,37 @@ ensure_admin ()
 #
 # End of documentation
 
+	if [ -n "$DISPLAY" ] ; then 
+		system::log_item "👌 An X session is running."
+		# Because of course it is not installed by default in SUSE!
+		if ! command xhost ; then software::command_exists xhost ; fi 
+	elif [ -n "$WAYLAND_DISPLAY" ]; then
+		system::log_item "👌 A Wayland session is running."
+	else
+		system::log_item "👌 No graphical session detected."
+	fi
+
 	if [ ! "$UID" -eq 0 ]; then
 		if xset q &>/dev/null; then
 			# If X is running in this session then...
 			if echo $(systemctl get-default ) |grep graphical &>/dev/null ; then
-				# If we are a normal GUI w. systemd: elevate privs with normal GUI policy kit...
-				write_information "Allowing root to display menus..."
-				xhost local:root
-				write_information "Authenticating..."
-				pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY SUDO_USER=$USER "$(readlink -m ${0})"
+				system::log_item "🔐 We are in a normal GUI w. systemd: elevating privs with normal GUI policy kit..."
+				system::log_item "🔐 Allowing root to display menus..."
+				if [ -n "$DISPLAY" ] ; then xhost local:root ; fi
+				system::log_item "🔐 Authenticating..."
+				pkexec env DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" SUDO_USER="$USER" DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" "$(readlink -m "${0}")"
 				exit
 			else
-				# If we are some other kind of archane GUI then...
-				write_information "Allowing root to display menus..."
-				xhost local:root
-				write_information "Checking for dialog..."
+				system::log_item "🔐 We are some other kind of older GUI: authenticating using lowest common denominatior..."
+				system::log_item "🔐 Allowing root to display menus..."
+				if [ -n "$DISPLAY" ] ; then xhost local:root ; fi
+				write_information "🔍 Checking for dialog..."
 				if hash dialog 2>/dev/null ; then
 					token=$(dialog --title "${Title:-"sudo"}" --backtitle "${BackTitle:-"$( basename $0 )"}" --insecure --stdout --passwordbox "\n This functionality requires elevated priviledges. \n Please provide your (sudo) password" 10 90)
 					ret=$? ; clear
 					case $ret in
 						0)
+							system::log_item "🔐 Authenticating using dialog..."
 							export HISTIGNORE='*sudo -S*'
 							echo ${token} | sudo -S -v || ensure_admin
 							sudo -E SUDO_USER=$USER /bin/bash "${0}" "$*" || rtd_oem_pause 1
@@ -4250,23 +4261,22 @@ ensure_admin ()
 					esac
 					exit
 				else
-					# If we have some kind of X but not even "dialog" then...
-					write_information "Dialog not found..."
-					write_warning "This script needs administrative access..."
+					system::log_item "🔐 We have some kind of X but no dialog installed: authenticating using plain sudo..."
+					write_warning "🔐 This script needs administrative access..."
 					xhost local:root
 					sudo -E SUDO_USER=$USER bash "${0}" "$@" || rtd_oem_pause 1
 					exit
 				fi
 			fi
 		else
-			# If there is no X in this session...
-			write_information "No X server at \$DISPLAY [$DISPLAY]"
+			write_information "🖥️ No X server at \$DISPLAY [$DISPLAY] : we are running in a TTY..."
 			# Use dialog if possible, otherwise just terminal...
 			if hash dialog 2>/dev/null ; then
 				token=$(dialog --title "${Title:-"sudo"}" --backtitle "${BackTitle:-"$( basename $0 )"}" --insecure --stdout --passwordbox "\n This functionality requires elevated priviledges. \n Please provide your (sudo) password" 10 90)
 				ret=$? ; clear
 				case $ret in
 					0)
+						system::log_item "🔐 Authenticating using dialog..."
 						export HISTIGNORE='*sudo -S*'
 						echo ${token} | sudo -S -v || ensure_admin
 						sudo -E SUDO_USER=$USER /bin/bash "${0}" "$@" || rtd_oem_pause 1
@@ -4277,13 +4287,14 @@ ensure_admin ()
 				esac
 				exit
 			else
-				write_warning "This script needs administrative access..."
+				system::log_item "🔐 we are in a TTY and no dialog installed: authenticating using plain sudo..."
+				write_warning "🔐 This script needs administrative access..."
 				sudo -E SUDO_USER=$USER bash "${0}" "$@" || rtd_oem_pause 1
 				exit
 			fi
 		fi
 	else
-		system::log_item "Administrative access granted to ${SUDO_USER:-"unknon user"} as requested by ${FUNCNAME[1]} ..."
+		system::log_item "✅ Administrative access confirmed for: 👩‍🦰 ${SUDO_USER:-"❓ unknon user"} as requested by ${FUNCNAME[1]} ..."
 	fi
 
 }
@@ -11242,7 +11253,16 @@ system::generate_autoyast_file ()
 			if [[ $2 == "lamp" || $2 == "dns" || $2 == "dhcp_dns_server" || $2 == "file_server" || $2 == "print_server" || $2 == "mail_server" || $2 == "monitoring" || $2 == "desktop" ]] ; then
 				_UserServerEnvironemtSelection="$2"
 			else
-				write_error "⛔ Unknown Server Selection: $2"
+				write_error "⛔ Unknown Server selection: $2"
+				return 1
+			fi
+			shift # Remove argument name from processing
+		;;
+		--product | --product )
+			if [[ $2 == "Leap" || $2 == "SLES" || $2 == "Tumbleweed" ]] ; then
+				_UserProductSelection="$2"
+			else
+				write_error "⛔ Unknown product selection: $2"
 				return 1
 			fi
 			shift # Remove argument name from processing
@@ -11275,34 +11295,56 @@ system::generate_autoyast_file ()
 	done
 
 	system::log_item "Called by: ${FUNCNAME[1]}"
-	write_host --cyan "Creating AUTOYAST Instructions (XML): ${FILE}"
+
+	escape_xml_special_chars() {
+	local password="$1"
+	
+	# Replace & first to avoid double escaping of & in other entities
+	password="${password//&/&amp;}"
+	password="${password//</&lt;}"
+	password="${password//>/&gt;}"
+	password="${password//\"/&quot;}"
+	password="${password//\'/&apos;}"
+	
+	echo "$password"
+	}
 
 	# Localized variables based on User preferences, but with suse speciffic defaults:
 	# We cannot have empty tags in XML or validation will fail: so echo stored values with relevant tags.
 	if [[ ${Preference_DiskEncryption} == "YES" ]]; then
-		Preference_DiskEncryption_SUSE="<encryption_password>${Preference_Disk_Password:-"letmein1234"}</encryption_password>"
+		Preference_DiskEncryption_SUSE="<encryption_password>${Preference_Disk_Password}</encryption_password>"
+	else
+		#Preference_DiskEncryption_SUSE="<encryption_password></encryption_password>"
+		system::log_item "Disk encryption is not enabled."
 	fi
 
 	if [[ -n ${Preference_InitialUser}  ]] ; then
-		Preference_InitialUser_SUSE="<username>${Preference_InitialUser:-"tangarora"}</username>"
+		Preference_InitialUser_SUSE="<username>${Preference_InitialUser}</username>"
+	else
+		Preference_InitialUser_SUSE="<username>tangarora</username>"
 	fi
 
 	if [[ -n ${Preference_InitialUserPassword} ]] ; then
-		Preference_Password_SUSE="<password>${Preference_InitialUserPassword:-"letmein1234"}</password>"
+		Preference_Password_SUSE="<user_password>${Preference_InitialUserPassword}</user_password>"
+	else
+		Preference_Password_SUSE="<user_password>$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1</user_password>"
 	fi
 
 	if [[ -n ${_UserDesktopEnvironemtSelection}  ]] ; then
-		Preference_Desktop_DE_SUSE="<pattern>${_UserDesktopEnvironemtSelection:-"kde"}</pattern>"
+		Preference_Desktop_DE_SUSE="<pattern>${_UserDesktopEnvironemtSelection}</pattern>"
+	else
+		Preference_Desktop_DE_SUSE="<pattern>kde</pattern>"
 	fi
 
 	if [[ -n ${_UserServerEnvironemtSelection}  ]] ; then
-		Preference_Server_Role_SUSE="<pattern>${_UserServerEnvironemtSelection:-"lamp"}</pattern>"
+		Preference_Server_Role_SUSE="<pattern>${_UserServerEnvironemtSelection}</pattern>"
+	else
+		Preference_Server_Role_SUSE="<pattern>basic_desktop</pattern>"
 	fi
 
-
-
+	write_host --cyan "Creating AUTOYAST Instructions (XML): ${_autoyast_filename}"
 	# Populate AutoYaST Template and write the autoyast file
-cat >> ${_autoyast_filename} <<-AUTOYAST_EOF
+cat > ${_autoyast_filename} <<-AUTOYAST_EOF
 <?xml version="1.0"?>
 <!DOCTYPE profile>
 <profile
@@ -11343,7 +11385,6 @@ cat >> ${_autoyast_filename} <<-AUTOYAST_EOF
         <patterns config:type="list">
             <pattern>base</pattern>
             ${Preference_Desktop_DE_SUSE}
-	    ${Preference_Server_Role_SUSE}
         </patterns>
 
         <packages config:type="list">
@@ -11360,12 +11401,8 @@ cat >> ${_autoyast_filename} <<-AUTOYAST_EOF
             <package>pciutils</package>
         </packages>
 
-        <products t="list">
-            <% if os_release[:id] == 'opensuse-tumbleweed' %>
-            <product>Tumbleweed</product>
-            <% else %>
-            <product>openSUSE</product>
-            <% end %>
+        <products config:type="list">
+            <product>${_UserProductSelection:-"Leap"}</product>
         </products>
 
     </software>
@@ -11382,14 +11419,14 @@ cat >> ${_autoyast_filename} <<-AUTOYAST_EOF
             <home>/root</home>
             <shell>/bin/bash</shell>
             <uid>0</uid>
-            ${Preference_Password_SUSE}
+            <user_password>${Preference_InitialUserPassword}</user_password>
             <username>root</username>
         </user>
         <user>
             <encrypted config:type="boolean">true</encrypted>
             <fullname>RTD User</fullname>
             <shell>/bin/bash</shell>
-            ${Preference_Password_SUSE}
+            <user_password>${Preference_InitialUserPassword}</user_password>
             ${Preference_InitialUser_SUSE}
         </user>
     </users>
@@ -11443,7 +11480,15 @@ zypper dup --from packman -y --force-resolution
         <lsm_select>selinux</lsm_select>
     </security>
 </profile>
+
 AUTOYAST_EOF
+
+	system::log_item "AutoYaST file created: ${_autoyast_filename}
+	With the contents:
+	
+	$(cat ${_autoyast_filename})
+	"
+	return 0
 }
 
 
@@ -11471,7 +11516,7 @@ generate_autoyast_file ()
 	Preference_InitialUser_SUSE="<username>${_OEM_USER:-"tangarora"}</username>"
 	Preference_Product_SUSE="<product>${suse_product:="openSUSE"}</product>"
 
-	cat >> ${FILE} <<-AUTOYAST_EOF
+	cat > ${FILE} <<-AUTOYAST_EOF
 <?xml version="1.0"?>
 <!DOCTYPE profile>
 <profile
