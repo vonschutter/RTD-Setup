@@ -9026,6 +9026,7 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: ${virt_net="$(system::find_vm_bridge)"}
 	: ${BIN_VIRT_INSTALL:=$(type -p virt-install)}
+	: ${_DEFAULT_FEDORA_VER:="$(curl -s https://dl.fedoraproject.org/pub/fedora/linux/releases/ | grep -oP 'href="\K[0-9]+(?=/")' | sort -n | tail -1)"}
 	: ${_os_version=$( $RTD_GUI --title "Select Release Version of Fedora" --inputbox "Please pick an available OS version by entering it below. \
 	If you are not sure just let me choose for you... \n ${fedoralogo} "  25 110 "${_DEFAULT_FEDORA_VER}" 3>&1 1>&2 2>&3)}
 	case $? in
@@ -11107,7 +11108,7 @@ system::generate_ks_cfg_file ()
 # Usage: system::generate_ks_cfg_file [-p <filename> ] [-u URL ] [-c workstation|ssh-server|ansible-server ]
 # End of documentation
 
-	system::log_item "Called by: ${FUNCNAME[-1]}"
+	system::log_item "Called by: ${FUNCNAME[1]}"
 	# Get vm config standard options
 	system::get_vm_config
 

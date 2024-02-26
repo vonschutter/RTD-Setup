@@ -46,15 +46,36 @@ if [[ $EUID -ne 0 ]]; then { echo "This script must be run as root" ; exit 1; } 
 # Base folder structure for optional administrative commandlets and scripts:
 # Put a convenient link to the logs where logs are normally found...
 # capture the 3 first letters as org TLA (Three Letter Acronym)
+
+# Figure the base TLA for the organization
 export _SCRIPTNAME=$(basename $0)
 export _TLA=${_SCRIPTNAME:0:3}
-source /opt/${_TLA,,}/core/_rtd_library
+_lib_path="/opt/${_TLA,,}/core/_rtd_library"
+_faillog="/opt/${_TLA,,}/faillog.log"
+
+# Load the RTD library (onve loaded, all functions are available)
+if [ -f ${_lib_path} ]; then
+    source ${_lib_path} || { echo "💥 CRITICAL ERROR: Required library ( ${_lib_path} ) not found." >> ${_faillog} ; exit 1; }
+else
+    echo "💥 CRITICAL ERROR: Required library not found." >> ${_faillog}
+    exit 1
+fi
+
+
+
+# Esure used directories exist
 mkdir -p ${_LOG_DIR}
-ISSUE_FILE="/etc/issue"
-RTD_WISDOM_QUOTES="/etc/${_TLA,,}/kens_quotes.txt"
+mkdir -p ${_CONFIG_DIR}
 
 # Determine log file directory
 _LOGFILE=${_LOG_DIR}/$( basename $0 ).log
+
+# Set the key locations for the system
+ISSUE_FILE="/etc/issue"
+
+system::log_item "🦉 Creating wisdom quotes file: ${RTD_WISDOM_QUOTES}"
+RTD_WISDOM_QUOTES="${_CONFIG_DIR}/kens_quotes.txt"
+touch ${RTD_WISDOM_QUOTES} && system::log_item "✅ Wisdom quotes file created: ${RTD_WISDOM_QUOTES}" || system::log_item "⛔ Failed to create wisdom quotes file: ${RTD_WISDOM_QUOTES}"
 
 
 
@@ -79,7 +100,10 @@ test -L "${ISSUE_FILE}" && rm "${ISSUE_FILE}"
 echo "${_OEM_TTY_LOGIN_BANNER}" > ${ISSUE_FILE}
 
 # Create Ken's MOTD file with some wisdom:
-cat > ${RTD_WISDOM_QUOTES} << "EOF"
+system::log_item "Creating Ken's MOTD file with some wisdom: ${RTD_WISDOM_QUOTES}"
+touch ${RTD_WISDOM_QUOTES} && system::log_item "✅ Wisdom quotes file created: ${RTD_WISDOM_QUOTES}" || system::log_item "⛔ Failed to create wisdom quotes file: ${RTD_WISDOM_QUOTES}" 
+
+cat >> ${RTD_WISDOM_QUOTES} << 'WEOF'
 - Do not argue with an idiot. He will drag you down to his level and beat you with experience.
 - Going to church doesn't make you a Christian any more than standing in a garage makes you a car.
 - The last thing I want to do is hurt you. But it's still on the list.
@@ -153,7 +177,7 @@ cat > ${RTD_WISDOM_QUOTES} << "EOF"
 - Life is ten percent what you make it and ninety percent how you take it!
 - I have kleptomania, but when it gets bad, I take something for it.
 - I may be schizophrenic, but at least I have each other.
-EOF
+WEOF
 
 # Set the MOTD to display a random quote from the file:
 if [[ -n "${motd_wisdom_file}" && -n "${RTD_WISDOM_QUOTES}" ]]; then
