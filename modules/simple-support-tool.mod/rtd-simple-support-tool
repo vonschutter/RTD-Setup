@@ -1379,9 +1379,14 @@ case $1 in
 		if [[ "$TERM" == screen* ]]; then
 			echo "$_SIMPLE_SUPPORT_TOOL_DOC" >> ${_LOGFILE}
 			rtd_oem_check_inet_access  "$@"
-			dependency::file ${_dependency_lib} &>/dev/null || ( read -p "There was a problem loading ${_dependency_lib}" exit 1 )
-			if [[ $EUID -ne 0 ]]; then ensure_admin ; fi
-			if [ "$UID" -eq 0 ]; then
+			if [ -z "${RTDFUNCTIONS}" ]; then
+				dependency::file "${_dependency_lib}" || { echo "📚 Failed to find _rtd_library"; exit 1; }
+			else
+				echo "📚 _rtd_library is already loaded..."
+			fi
+			if [[ $EUID -ne 0 ]]; then 
+				ensure_admin
+			else
 				check_menu_availability
 				show_notice_on_fist_run
 				show_main_menu
@@ -1392,9 +1397,14 @@ case $1 in
 				byobu new-session -s "RTD Simple Server Support Tools" $0
 			else
 				rtd_oem_check_inet_access "$@"
-				dependency::file ${_dependency_lib} &>/dev/null || ( read -p "There was a problem loading ${_dependency_lib}" exit 1 )
-				if [[ $EUID -ne 0 ]]; then ensure_admin ; fi
-				if [ "$UID" -eq 0 ]; then
+				if [ -z "${RTDFUNCTIONS}" ]; then
+					dependency::file "${_dependency_lib}" || { echo "📚 Failed to find _rtd_library"; exit 1; }
+				else
+					echo "📚 _rtd_library is already loaded..."
+				fi
+				if [[ $EUID -ne 0 ]]; then 
+					ensure_admin
+				else
 					check_dependencies byobu && echo -e "$RED" "A critical component needed for this script to work properly was attempted to be added... Attempting to run the script again"
 					su -c "$0 $*" "$SUDO_USER"
 					clear

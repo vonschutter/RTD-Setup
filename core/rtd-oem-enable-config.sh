@@ -34,6 +34,8 @@
 # 1 - To see options to use the rtd library type: "bash _rtd_library --help"
 # 2 - To see usefull documentation on each function in this library: "bash _rtd_library --devhelp or --devhelp-gtk"
 
+if [[ $EUID -ne 0 ]]; then { echo "This script must be run as root" ; exit 1; } ; fi
+
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::          Script Settings                 ::::::::::::::::::::::

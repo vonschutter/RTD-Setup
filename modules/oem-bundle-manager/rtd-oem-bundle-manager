@@ -233,7 +233,12 @@ system::ExecStart::help ()
 
 
 
-[ -z "${RTDFUNCTIONS}" ] && dependency::file "_rtd_library" || { echo "Failed to find _rtd_library" ; exit 1 ; }
+if [ -z "${RTDFUNCTIONS}" ]; then
+	dependency::file "_rtd_library" || { echo "📚 Failed to find _rtd_library"; exit 1; }
+else
+	echo "📚 _rtd_library is already loaded..."
+fi
+
 
 case ${1} in
 	--help )

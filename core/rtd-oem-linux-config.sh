@@ -177,7 +177,11 @@ oem_linux_config ()
 		# Relaunch script in priviledged mode...
 		sudo -E bash $0 $*
 	else
-		dependency::_rtd_library || { echo "💥 Unable to load library!" ;  exit 1 ; }
+		if [ -z "${RTDFUNCTIONS}" ]; then
+			dependency::file "_rtd_library" || { echo "📚 Failed to find _rtd_library"; exit 1; }
+		else
+			echo "📚 _rtd_library is already loaded..."
+		fi
 
 		for i in $_requirements ; do 
 			software::check_native_package_dependency $i 
