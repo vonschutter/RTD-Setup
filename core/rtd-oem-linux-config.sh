@@ -178,7 +178,7 @@ oem_linux_config ()
 		sudo -E bash $0 $*
 	else
 		if [ -z "${RTDFUNCTIONS}" ]; then
-			dependency::file "_rtd_library" || { echo "📚 Failed to find _rtd_library"; exit 1; }
+			dependency::_rtd_library || { echo "📚 Failed to find _rtd_library"; exit 1; }
 		else
 			echo "📚 _rtd_library is already loaded..."
 		fi

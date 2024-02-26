@@ -50,6 +50,8 @@ export _SCRIPTNAME=$(basename $0)
 export _TLA=${_SCRIPTNAME:0:3}
 source /opt/${_TLA,,}/core/_rtd_library
 mkdir -p ${_LOG_DIR}
+ISSUE_FILE="/etc/issue"
+RTD_WISDOM_QUOTES="/etc/${_TLA,,}/kens_quotes.txt"
 
 # Determine log file directory
 _LOGFILE=${_LOG_DIR}/$( basename $0 ).log
@@ -63,8 +65,7 @@ _LOGFILE=${_LOG_DIR}/$( basename $0 ).log
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 # Set login banner:
-ISSUE_FILE="/etc/issue"
-RTD_WISDOM_QUOTES="/etc/${_TLA,,}/kens_quotes.txt"
+
 if [[ -d /etc/update-motd.d ]]; then
 	motd_wisdom_file="/etc/update-motd.d/55-wisdom"
 elif [[ -d /etc/motd.d ]]; then
