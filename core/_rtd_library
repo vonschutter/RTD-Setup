@@ -2655,13 +2655,17 @@ system::toggle_oem_auto_login ()
 			;;
 	esac
 
+	# Create a backup directory if it does not exist
+	mkdir -p /etc/${_TLA,,}/backup
+	local _backup_dir="/etc/${_TLA,,}/backup"
+	
 	# Toggle auto login for Light DM if present (Old Ubuntu, Mint?, Budgie? etc.)
 	if [[ -f /etc/lightdm/lightdm.conf ]]; then
 		local _config_file="/etc/lightdm/lightdm.conf"
 		case $_flip in 
 		off )
 			write_status "⛔ LightDM: toggeling auto login off... *******"
-			if rm ${_config_file} && mv ${_config_file}.rtd-bak ${_config_file} ; then
+			if rm ${_config_file} && mv ${_backup_dir}/${_config_file##*/}.rtd-bak ${_config_file} ; then
 				write_status "💾 Restored previous configuration..."
 			else
 				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
@@ -2669,11 +2673,11 @@ system::toggle_oem_auto_login ()
 			;;
 		on )
 			write_status "✅ LightDM: toggeling auto login on... *******"
-			cp ${_config_file} ${_config_file}.rtd-bak
+			cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak
 			cat > ${_config_file} <<-OEM_LXDM_LOGIN_OPTION
 			# This configuration file was created by RTD Setup.
 			# You may safely replace this file with the original backed up:
-			# ${_config_file}.rtd-bak
+			# ${_backup_dir}/${_config_file##*/}.rtd-bak
 			# If this file is not there, then it was not there to begin with
 			# and you can delete this file.
 			[SeatDefaults]
@@ -2690,7 +2694,7 @@ system::toggle_oem_auto_login ()
 		case $_flip in 
 		off )
 			write_status "⛔ SDDM: toggeling auto login off... *******"
-			if rm ${_config_file} && mv ${_config_file}.rtd-bak ${_config_file} ; then
+			if rm ${_config_file} && mv ${_backup_dir}/${_config_file##*/}.rtd-bak ${_config_file} ; then
 				write_status "💾 Restored previous configuration..."
 			else
 				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
@@ -2698,11 +2702,11 @@ system::toggle_oem_auto_login ()
 			;;
 		on )
 			write_status "✅ SDDM: toggeling auto login on... *******"
-			cp ${_config_file} ${_config_file}.rtd-bak
+			cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak
 			cat > ${_config_file} <<-OEM_SDDM_LOGIN_OPTION
 			# This configuration file was created by RTD Setup.
 			# You may safely replace this file with the original backed up:
-			# ${_config_file}.rtd-bak
+			# ${_backup_dir}/${_config_file##*/}.rtd-bak
 			# If this file is not there, then it was not there to begin with
 			# and you can delete this file.
 			[Autologin]
@@ -2719,7 +2723,7 @@ system::toggle_oem_auto_login ()
 		case $_flip in
 		off )
 			write_status "⛔ GDM3: toggeling auto login off... *******"
-			if rm ${_config_file} && mv ${_config_file}.rtd-bak ${_config_file} ; then
+			if rm ${_config_file} && mv ${_backup_dir}/${_config_file##*/}.rtd-bak ${_config_file} ; then
 				write_status "💾 Restored previous configuration..."
 			else
 				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
@@ -2727,11 +2731,11 @@ system::toggle_oem_auto_login ()
 			;;
 		on )
 			write_status "✅ GDM3: toggeling auto login on... *******"
-			cp ${_config_file} ${_config_file}.rtd-bak
+			cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak
 			cat >  ${_config_file} <<-OEM_GDM3_LOGIN_OPTION
 			# This configuration file was created by RTD Setup.
 			# You may safely replace this file with the original backed up:
-			# ${_config_file}.rtd-bak
+			# ${_backup_dir}/${_config_file##*/}.rtd-bak
 			# If this file is not there, then it was not there to begin with
 			# and you can delete this file.
 			[daemon]
@@ -2748,7 +2752,7 @@ system::toggle_oem_auto_login ()
 		case $_flip in
 		off )
 			write_status "⛔ GDM3: toggeling auto login off... *******"
-			if rm ${_config_file} && mv ${_config_file}.rtd-bak ${_config_file} ; then
+			if rm ${_config_file} && mv ${_backup_dir}/${_config_file##*/}.rtd-bak ${_config_file} ; then
 				write_status "💾 Restored previous configuration..."
 			else
 				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
@@ -2756,11 +2760,11 @@ system::toggle_oem_auto_login ()
 			;;
 		on )
 			write_status "✅ GDM3: toggeling auto login on... *******"
-			cp ${_config_file} ${_config_file}.rtd-bak
+			cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak
 			cat >  ${_config_file} <<-OEM_GDM3_LOGIN_OPTION
 			# This configuration file was created by RTD Setup.
 			# You may safely replace this file with the original backed up:
-			# ${_config_file}.rtd-bak
+			# ${_backup_dir}/${_config_file##*/}.rtd-bak
 			# If this file is not there, then it was not there to begin with
 			# and you can delete this file.
 			[daemon]
@@ -2777,7 +2781,7 @@ system::toggle_oem_auto_login ()
 		case $_flip in
 		off )
 			write_status "⛔ GDM: toggeling auto login off... *******"
-			if rm ${_config_file} && mv ${_config_file}.rtd-bak ${_config_file} ; then
+			if rm ${_config_file} && mv ${_backup_dir}/${_config_file##*/}.rtd-bak ${_config_file} ; then
 				write_status "💾 Restored previous configuration..."
 			else
 				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
@@ -2785,11 +2789,11 @@ system::toggle_oem_auto_login ()
 			;;
 		on )
 			write_status "✅ GDM: toggeling auto login on... *******"
-			cp ${_config_file} ${_config_file}.rtd-bak
+			cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak
 			cat >  ${_config_file} <<-OEM_GDM_LOGIN_OPTION
 			# This configuration file was created by RTD Setup.
 			# You may safely replace this file with the original backed up:
-			# ${_config_file}.rtd-bak
+			# ${_backup_dir}/${_config_file##*/}.rtd-bak
 			# If this file is not there, then it was not there to begin with
 			# and you can delete this file.
 			# GDM configuration storage
@@ -2817,7 +2821,7 @@ system::toggle_oem_auto_login ()
 		case $_flip in
 		off )
 			write_status "⛔ SUSE: toggeling auto login off... *******"
-			if rm ${_config_file} && mv ${_config_file}.rtd-bak ${_config_file} ; then
+			if rm ${_config_file} && mv ${_backup_dir}/${_config_file##*/}.rtd-bak ${_config_file} ; then
 				write_status "💾 Restored previous configuration..."
 			else
 				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
@@ -2825,7 +2829,7 @@ system::toggle_oem_auto_login ()
 			;;
 		on )
 			write_status "✅ SUSE: toggeling auto login on... *******"
-			cp ${_config_file} ${_config_file}.rtd-bak || write_error "❗💾 Could not backup: ${_config_file}! "
+			cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak || write_error "❗💾 Could not backup: ${_config_file}! "
 			sed -i 's/DISPLAYMANAGER_AUTOLOGIN=""/DISPLAYMANAGER_AUTOLOGIN="tangarora"/' ${_config_file} || write_error "❗📄 Could not write to file: ${_config_file}!"
 			sed -i 's/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="no"/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"/' ${_config_file} || write_error "❗📄 Could not write to file: ${_config_file}!"
 			;;
@@ -2839,7 +2843,7 @@ system::toggle_oem_auto_login ()
 		case $_flip in
 		off )
 			write_status "⛔ TTY: toggeling auto login off... ********"
-			if rm ${_config_file} && mv ${_config_file}.rtd-bak ${_config_file} ; then
+			if rm ${_config_file} && mv ${_backup_dir}/${_config_file##*/}.rtd-bak ${_config_file} ; then
 				write_status "💾 Restored previous configuration..."
 			else
 				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
@@ -2848,7 +2852,8 @@ system::toggle_oem_auto_login ()
 		on )
 			write_status "✅ TTY: toggeling auto login on... ********"
 			mkdir -p ${_config_file%/*}
-			cat >  ${_config_file} <<-OEM_TTY_LOGIN_OPTION
+			mv ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak 
+			cat >  ${_config_file} ${_config_file} <<-OEM_TTY_LOGIN_OPTION
 			"[Service]"
 			"ExecStart="
 			"ExecStart=-/sbin/agetty --noissue --autologin ${_OEM_USER:-"tangarora"} %I $TERM"
