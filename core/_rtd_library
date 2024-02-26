@@ -2156,7 +2156,7 @@ oem::rtd_reset_default_environment_config ()
 	# Backup the current .bashrc for SUDO_USER
 	if [[ -n "${SUDO_USER}" && -f "/home/${SUDO_USER}/.bashrc" ]]; then
 		cp "/home/${SUDO_USER}/.bashrc" "${_OEM_DIR}/cache/bashrc"
-		write_status "👨‍🦱 User .bashrc has been backed up."
+		write_status "👩‍🦰 User .bashrc has been backed up."
 
 		# Remove 'xhost local:root' if it exists in the real .bashrc or its symlink target
 		file_path="/home/${SUDO_USER}/.bashrc"
@@ -2169,14 +2169,14 @@ oem::rtd_reset_default_environment_config ()
 
 	if type system::add_or_remove_login_script &>/dev/null ; then
 		system::add_or_remove_login_script --remove /etc/xdg/autostart/oem-run.desktop
-		write_status "👨‍🦱 Login script has been removed."
+		write_status "👩‍🦰 Login script has been removed."
 	else
 		write_error  "👺 system::add_or_remove_login_script function not found. Cannot remove login script."
 	fi
 
 	if type system::toggle_oem_auto_login &>/dev/null ; then
 		system::toggle_oem_auto_login --disable
-		write_status "👨‍🦱 Auto login has been disabled."
+		write_status "👩‍🦰 Auto login has been disabled."
 	else
 		write_error  "👺 system::toggle_oem_auto_login function not found. Cannot disable auto login."
 	fi
@@ -2228,6 +2228,9 @@ rtd_wait_for_internet_availability ()
 
 	# Do ping test... 
 	for ip in "${test_ips[@]}"; do
+		# Will partially work only with ping, but try to enusre cmd is available...
+		dependency::command_exists curl || _missingcmd="curl"
+		dependency::command_exists jq || _missingcmd="jq"
 		attempt=1
 		while (( attempt <= max_attempts )); do
 			if ping -c 1 -W 1 "$ip" &>/dev/null; then
@@ -2240,7 +2243,7 @@ rtd_wait_for_internet_availability ()
 					write_status "🌐 Internet access confirmed through IP: $RTD_INTERNET_IP"
 					export RTD_INTERNET_IP
 				else
-					write_status "❗📶 Could not determine external egress IP."
+					write_status "❗📶 Could not determine external egress IP. Missing: $_missingcmd ?"
 				fi
 				return 0
 			else
@@ -2999,11 +3002,15 @@ system::toggle_oem_auto_elevated_privilege ()
 	esac
 
 	# Validate sudoers file syntax
-	if ! sudo visudo -cf "${sudoers_file}" &>/dev/null; then
-		write_error "⛔ Error: Syntax error in sudoers file."
-		return 1
+	if [[ -f "${sudoers_file}" ]]; then
+		write_information "🚧 Validating sudoers file syntax..."
+		if ! sudo visudo -cf "${sudoers_file}" &>/dev/null; then
+			write_error "⛔ Error: Syntax error in sudoers file."
+		else
+			write_information "🏆 Sudoers file syntax is valid."
+		fi
 	else
-		write_information "🚧 Sudoers file syntax is valid."
+		write_status "🔍 ${sudoers_file} not present."
 	fi
 
 	write_information "🚧 Passwordless sudo configuration updated for ${_OEM_USER}."
@@ -4436,7 +4443,7 @@ rtd_oem_kde_set_wallpaper ()
 # Outputs:
 # Returns:
 # Usage:
-# End of documentation
+# End of documentationsystem::toggle_oem_auto_elevated_privilege
 
 	echo "Setting wallpaper $1"
 	full_image_path=$(realpath "$1")
@@ -8908,28 +8915,103 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 	dependency::virtualization
 
 	# Check for optional default T-Shirts size overrides... 
-	local OPTIND o a
-	while getopts ':c:m:d:' OPTION; do
-		case "$OPTION" in
-		c )
-			local _cpu="${OPTARG}"
-			write_information "Custom CPU set to: ${OPTARG}"
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--desktop_environment | --DE )
+			if [[ $2 == "@deepin-desktop-environment" || $2 == "@sway-desktop-environment" || $2 == "@basic-desktop-environment" || $2 == "@(i3-desktop-environment" || $2 == "@developer-workstation-environment" || $2 == "@budgie-desktop-environment" || $2 == "@sugar-desktop-environment" || $2 == "@mate-desktop-environment" || $2 == "@kde-desktop-environment" || $2 == "@xfce-desktop-environment" || $2 == "@lxde-desktop-environment" || $2 == "@lxqt-desktop-environment" || $2 == "@cinnamon-desktop-environment" || $2 == "@mate-desktop-environment" || $2 == "@workstation-product-environment" ]] ; then
+				local _UserDesktopEnvironemtSelection="${2}"
+				write_host --cyan  "🖥️ Selecting desktop environment: ${_UserDesktopEnvironemtSelection}"
+			else
+				write_error "⛔ Unknown Desktop Environment: $2 ==> Use deepin-desktop-environment, sway-desktop-environment, basic-desktop-environment, i3-desktop-environment, developer-workstation-environment, budgie-desktop-environment, sugar-desktop-environment, mate-desktop-environment, kde-desktop-environment, xfce-desktop-environment, lxde-desktop-environment, lxqt-desktop-environment, cinnamon-desktop-environment, mate-desktop-environment, workstation-product-environment"
+				return 1
+			fi
+			shift
 		;;
-		m )
-			local _mem="${OPTARG}"
-			write_information "Custom memory set to: ${OPTARG}"
+		--server_role | --ServerRole | --SR )
+			if [[ $2 == "@minimal-environment" || $2 == "@web-server-environment" || $2 == "@freeipa-server" || $2 == "@network-server" || $2 == "@cloud-server-environment" || $2 == "@infrastructure-server-environment" ]] ; then
+				local _UserServerEnvironemtSelection="${2}"
+				write_status "🎭 Selecting server role: ${2}"
+			else
+				write_error "⛔ Unknown server role selection: ${2} ==> Use web-server-environment, freeipa-server, network-server, cloud-server-environment, infrastructure-server-environment"
+				return 1
+			fi
+			shift
 		;;
-		d )
-			local _dsk="${OPTARG}"
-			write_information "Custom disk sizee set to: ${OPTARG}"
+		--role | --Role )
+			if [[ $2 == "workstation" || $2 == "server" ]] ; then
+				local _role="${2}"
+				write_status "🎭 Selecting role: ${2}"
+			else
+				write_error "⛔ Unknown role selection: ${2} ==> Use workstation or server"
+				return 1
+			fi
+			shift
 		;;
-		? )
-			write_host --cyan  "Usage: ${FUNCNAME[0]} or ${FUNCNAME[0]} [-c <#CPU>, -m <MB RAM>, -d <GB Disk>]"
+		--source | --URL | --url )
+			local _repo_url="${2}"
+			write_status "🌐 Using URL: ${_repo_url}"
+			shift
+		;;
+		--ram | --memory | -m )
+			_mem="${2}"
+			write_status "🖥️ Memory: ${_mem}"
+			shift
+		;;
+		--cpu | -c )
+			_cpu="${2}"
+			write_status "🖥️ CPU's: ${_cpu}"
+			shift
+		;;
+		--disk | -d )
+			_dsk="${2}"
+			write_status "🖥️ Disk Size: ${_dsk}"
+			shift
+		;;
+		--tshirt-size | -t )
+			case "${2}" in
+			"small" | "S" | "s" )
+				_cpu=2
+				_mem=2048
+				_dsk=100
+				write_status "👕 T-Shirt Size Small: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
+			;;
+			"medium" | "M" | "m" )
+				_cpu=4
+				_mem=4096
+				_dsk=100
+				write_status "👕 T-Shirt Size Medium: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
+			;;
+			"large" | "L" | "l" )
+				_cpu=8
+				_mem=8192
+				_dsk=100
+				write_status "👕 T-Shirt Size Large: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
+			;;
+			"extra-large" | "XL" | "xl" )
+				_cpu=16
+				_mem=16384
+				_dsk=100
+				write_status "👕 T-Shirt Size Extra Large: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
+			;;
+			"extra-extra-large" | "XXL" | "xxl" )
+				_cpu=32
+				_mem=32768
+				_dsk=100
+				write_status "👕 T-Shirt Size Extra Extra Large: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
+			;;
+			esac
+			shift
+		;;
+		--help | -h )
+			write_information "Usage: system::generate_ks_cfg_file [-p <filename> ] [-u URL ] [-c workstation|ssh-server|ansible-server ]"
 			return 0
 		;;
+		*)
+			write_error "Unknown parameter: $1"
+		;;
 		esac
+		shift 
 	done
-	unset OPTIND
 
 	# Set default values for VM T-Shirts sizes...
 	: ${_cpu="${_cpu:-2}"}
@@ -8950,21 +9032,30 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 	: ${_os_version:="${_DEFAULT_FEDORA_VER}"}
 	: ${_mirrorlist_url="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-${_os_version}&arch=x86_64"}
 	: ${_source_url:="https://dl.fedoraproject.org/pub/fedora/linux/releases/${_os_version}/Everything/x86_64/os/"}
-	: ${_preseed_file="$( mktemp ).cfg"}
-	: ${_config="${1:-"workstation"}"}
-	system::generate_ks_cfg_file -u "${_source_url}" -c "${_config}" -p "${_preseed_file}" -e "@workstation-product-environment"
+	: ${_preseed_file="$( mktemp -d )/ks.cfg"}
 
-	local vm_name="#Template_Fedora_VDI_$(date +%Y-%m-%d-%H-%M)"
+	if [[ ${_role} == "workstation" ]] ; then
+		local _service="VDI"
+		system::generate_ks_cfg_file --source "${_source_url}" --role "${_role}" --file "${_preseed_file}" --DE "${_UserDesktopEnvironemtSelection:="@basic-desktop-environment"}"
+	elif [[ ${_role} == "server" ]] ; then
+		local _service="SRV"
+		system::generate_ks_cfg_file --source "${_source_url}" --role "${_role}" --file "${_preseed_file}" --SR "${_UserServerEnvironemtSelection:="@network-server"}"
+	else
+		write_error "Unknown role selection: ${_role} ==> Use workstation or server"
+		return 1
+	fi
+
+
+	local vm_name="#Template_Fedora_${_service}_$(date +%Y-%m-%d-%H-%M)"
 
 	_summary_message="The virtual machine (${vm_name}) \n
-	📋 - Using the instructions in PRESEED: ${_preseed_file} \n
-	🔧 - And Using this source for the packages and files to download: \n
+	📋 - Using the instructions in Kickstart: ${_preseed_file} \n
+	🔧 - Using this source for the packages and files to download: \n
 	🌎 - ${_source_url} \n
-	🌎 - ${_mirrorlist_url} \n
-	✅ - Using the network: ${virt_net:=default} \n
-	✅ - Memory: ${_mem} \n
-	✅ - CPU's: ${_cpu} \n
-	✅ - Disk Size: ${_dsk} \n You may attach to this server and see the progress at IP: $(hostname -I)"
+	🖥️ - Using the network: ${virt_net:=default} \n
+	🖥️ - Memory: ${_mem} \n
+	🖥️ - CPU's: ${_cpu} \n
+	🖥️ - Disk Size: ${_dsk} \n You may attach to this server and see the progress at IP: $(hostname -I)"
 
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
 		--vcpus "${_cpu}" \
@@ -11011,100 +11102,145 @@ system::generate_ks_cfg_file ()
 # Usage: system::generate_ks_cfg_file [-p <filename> ] [-u URL ] [-c workstation|ssh-server|ansible-server ]
 # End of documentation
 
-	system::log_item "Function : ${FUNCNAME[0]}"
 	system::log_item "Called by: ${FUNCNAME[-1]}"
+	# Get vm config standard options
+	system::get_vm_config
 
-	local OPTIND o a
-	while getopts ':u:c:p:e:' OPTION; do
-		case "$OPTION" in
-		u )
-			local _repo_url="${OPTARG}"
-			write_host --cyan "${FUNCNAME[0]}: Using URL: ${OPTARG}"
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--filename | --file )
+			local _ks_file="$2"
+			write_host --cyan  "📜 Directed to create kickstart instructions file: ${_ks_file}"
+			shift
 		;;
-		c )
-			local _config="${OPTARG}"
-			write_host --cyan  "${FUNCNAME[0]}: Using Config for: ${OPTARG}"
+		--desktop_environment | --DE )
+			if [[ $2 == "@deepin-desktop-environment" || $2 == "@sway-desktop-environment" || $2 == "@basic-desktop-environment" || $2 == "@(i3-desktop-environment" || $2 == "@developer-workstation-environment" || $2 == "@budgie-desktop-environment" || $2 == "@sugar-desktop-environment" || $2 == "@mate-desktop-environment" || $2 == "@kde-desktop-environment" || $2 == "@xfce-desktop-environment" || $2 == "@lxde-desktop-environment" || $2 == "@lxqt-desktop-environment" || $2 == "@cinnamon-desktop-environment" || $2 == "@mate-desktop-environment" || $2 == "@workstation-product-environment" ]] ; then
+				local _UserDesktopEnvironemtSelection="${2}"
+				write_host --cyan  "🖥️ Selecting desktop environment: ${_UserDesktopEnvironemtSelection}"
+			else
+				write_error "⛔ Unknown Desktop Environment: $2 ==> Use deepin-desktop-environment, sway-desktop-environment, basic-desktop-environment, i3-desktop-environment, developer-workstation-environment, budgie-desktop-environment, sugar-desktop-environment, mate-desktop-environment, kde-desktop-environment, xfce-desktop-environment, lxde-desktop-environment, lxqt-desktop-environment, cinnamon-desktop-environment, mate-desktop-environment, workstation-product-environment"
+				return 1
+			fi
+			shift
 		;;
-		p )
-			local _ks_file="${OPTARG}"
-			write_host --cyan  "${FUNCNAME[0]}: Creating KS.CFG Instructions: ${_ks_file}"
+		--server_role | --ServerRole | --SR )
+			if [[ $2 == "@minimal-environment" || $2 == "@web-server-environment" || $2 == "@freeipa-server" || $2 == "@network-server" || $2 == "@cloud-server-environment" || $2 == "@infrastructure-server-environment" ]] ; then
+				local _UserServerEnvironemtSelection="${2}"
+				write_status "🎭 Selecting server role: ${2}"
+			else
+				write_error "⛔ Unknown server role selection: ${2} ==> Use web-server-environment, freeipa-server, network-server, cloud-server-environment, infrastructure-server-environment"
+				return 1
+			fi
+			shift
 		;;
-		e )
-			local _wks_env="${OPTARG}"
-			write_host --cyan  "${FUNCNAME[0]}: Received optioinal option: ${_wks_env}"
+		--role | --Role )
+			if [[ $2 == "workstation" || $2 == "server" ]] ; then
+				local _role="${2}"
+				write_status "🎭 Selecting role: ${2}"
+			else
+				write_error "⛔ Unknown role selection: ${2} ==> Use workstation or server"
+				return 1
+			fi
+			shift
 		;;
-		? )
-			write_host --cyan  "${FUNCNAME[0]}: Usage: $(FUNCNAME[0]) [-p <filename> ] [-u URL ] [-c workstation|ssh-server|ansible-server ]"
-			return 1
+		--source | --URL | --url )
+			local _repo_url="${2}"
+			write_status "🌐 Using URL: ${_repo_url}"
+			shift
+		;;
+		--timezone | --TZ )
+			local Preference_InitialTimeZone="${2}"
+			write_status "🕰️ Using Timezone: ${Preference_InitialTimeZone}"
+			shift
+		;;
+		--disk_encryption | --DC )
+			Preference_DiskEncryption="$2"
+			write_status "🔐 Disk encryption is requested and enabled."
+			shift
+		;;
+		--disk_password | --DP )
+			Preference_Disk_Password="$2"
+			write_status "🔐 Disk encryption password is set."
+			shift
+		;;
+		--initial_user | --IU )
+			Preference_InitialUser="$2"
+			write_status "👤 Initial user is set to: ${Preference_InitialUser}"
+			shift
+		;;
+		--initial_user_password | --IUP )
+			Preference_InitialUserPassword="$2"
+			write_status "🔐 Initial user password is set."
+			shift
+		;;
+		--help | -h )
+			write_information "Usage: system::generate_ks_cfg_file [-p <filename> ] [-u URL ] [-c workstation|ssh-server|ansible-server ]"
+			return 0
+		;;
+		*)
+			write_error "Unknown parameter: $1"
 		;;
 		esac
+		shift 
 	done
-	unset OPTIND
 
-	[[ -v _repo_url && -v _config && -v _ks_file   ]] || ( echo missing mandatory parameters! ; return 1 )
+	if [[ ${Preference_DiskEncryption} == "YES" || ${Preference_DiskEncryption} == "yes" || ${Preference_DiskEncryption} == "Yes" ]]; then
+		# set disk encryption password string, if password not set and Preference_DiskEncryption not set use default
+		system::log_item "🔐 Disk encryption is requested and enabled."
+		Preference_DiskEncryption_RH="--encrypted --passphrase ${Preference_Disk_Password:-"letmein1234"}"
+	else
+		system::log_item "🔐 Disk encryption is not requested and not enabled."
+	fi
 
-	case ${_config} in
-	ssh-server )
-		write_information "${FUNCNAME[0]}: Selected configuration is ssh-server..."
+	[[ -v _repo_url && -v _role && -v _ks_file   ]] || ( echo missing mandatory parameters! ; return 1 )
+
+	case ${_role} in
+	server )
+		write_information "Selected configuration is ${_role}:${_UserServerEnvironemtSelection}"
 		cat >> "${_ks_file}" <<-KS_EOF
 		# Generated by: system::generate_ks_cfg_file by RTD Power Tools
 		# Choosing mode (graphical|text|cmdline [--non-interactive])
-		text
-		url --mirrorlist="${_repo_url}"
+		# text
+		# url --mirrorlist="${_repo_url}"
+		url --url "${_repo_url}"
 		firstboot --enable
-		keyboard --vckeymap=us --xlayouts='us'
+		keyboard --vckeymap=${Preference_InitialKeyboardLayout:-"us"} --xlayouts="${Preference_InitialKeyboardLayout:-"us"}"
 		lang en_US.UTF-8
-		timezone Europe/London --isUtc --ntpservers=0.pool.ntp.org
+		timezone ${Preference_InitialTimeZone:-"Etc/UTC"} --utc 
 		network --onboot=yes --bootproto=dhcp
-		rootpw \$6\$Rn5/UTzjIs68MX\$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted
-		user --groups=wheel --name=tangarora --password=\$6\$Rn5/UTzjIs68MX\$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted
+		rootpw ${Preference_InitialUserPassword} --iscrypted
+		user --groups=wheel --name=tangarora --password=${Preference_InitialUserPassword} --iscrypted
 		zerombr
 		clearpart --all
-		autopart --nohome
+		autopart --nohome ${Preference_DiskEncryption_RH}
 		reboot
 
 		%packages --retries 5 --timeout 20
+		@server-product-environment
+		@guest-agents
 		openssh-server
 		spice-vdagent
 		git
 		curl
 		dialog
-		%end
-		KS_EOF
-		return
-	;;
-	ansible-server )
-		write_information "${FUNCNAME[0]}: Selected configuration is ansible-server..."
-		cat >> "${_ks_file}" <<-KS_EOF
-		# Generated by: system::generate_ks_cfg_file by RTD Power Tools
-		# Choosing mode (graphical|text|cmdline [--non-interactive])
-		text
-		url --mirrorlist="${_repo_url}"
-		firstboot --enable
-		keyboard --vckeymap=us --xlayouts='us'
-		lang en_US.UTF-8
-		timezone Europe/London --isUtc --ntpservers=0.pool.ntp.org
-		network --onboot=yes --bootproto=dhcp --hostname=ansible.localdomain
-		rootpw \$6\$Rn5/UTzjIs68MX\$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted
-		user --groups=wheel --name=tangarora --password=\$6\$Rn5/UTzjIs68MX\$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted
-		zerombr
-		clearpart --all
-		autopart --nohome
-		reboot
-
-		%packages --retries 5 --timeout 20
-		openssh-server
-		spice-vdagent
-		git
-		curl
-		dialog
+		yad
 		ansible
+		vim-ansible
+		vim-syntastic-ansible
+		${_UserServerEnvironemtSelection}
+		%end
+
+		# Post-installation Script
+		%post --interpreter=/bin/bash
+		git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd
+		chmod 755 /opt/rtd/core/rtd-oem-enable-config.sh
+		bash /opt/rtd/core/rtd-oem-enable-config.sh
 		%end
 		KS_EOF
 		return
 	;;
 	workstation )
-		write_information "${FUNCNAME[0]}: Selected configuration is workstation..."
+		write_information "Selected configuration is ${_role}:${_UserDesktopEnvironemtSelection}"
 		cat >> "${_ks_file}" <<-KS_EOF
 		# Generated by: system::generate_ks_cfg_file by RTD Power Tools
 		# Choosing mode (graphical|text|cmdline [--non-interactive])
@@ -11112,19 +11248,20 @@ system::generate_ks_cfg_file ()
 		# url --mirrorlist="${_repo_url}"
 		url --url "${_repo_url}"
 		firstboot --disable
-		keyboard --xlayouts='se'
+		keyboard --vckeymap=${Preference_InitialKeyboardLayout} --xlayouts="${Preference_InitialKeyboardLayout}"
 		lang en_US.UTF-8
-		timezone Europe/London --isUtc --ntpservers=0.pool.ntp.org
+		timezone ${Preference_InitialTimeZone:-"Etc/UTC"} --utc 
 		network --onboot=yes --bootproto=dhcp
-		rootpw \$6\$Rn5/UTzjIs68MX\$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted
-		user --groups=wheel --name=tangarora --password=\$6\$Rn5/UTzjIs68MX\$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1 --iscrypted
+		rootpw ${Preference_InitialUserPassword} --iscrypted
+		user --groups=wheel --name=tangarora --password=${Preference_InitialUserPassword} --iscrypted
 		zerombr
 		clearpart --all
-		autopart --nohome --encrypted --passphrase letmein1234
+		autopart --nohome ${Preference_DiskEncryption_RH}
 		reboot
 
 		%packages --retries 5 --timeout 20
-		${_wks_env}
+		${_UserDesktopEnvironemtSelection}
+		@system-tools
 		openssh-server
 		spice-vdagent
 		git
@@ -11238,25 +11375,25 @@ system::generate_autoyast_file ()
 		case "$1" in
 		--filename | --file )
 			_autoyast_filename="$2"
-			shift # Remove argument name from processing
+			shift
 		;;
 		--desktop_environment | --DE )
 			if [[ $2 == "kde" || $2 == "gnome" || $2 == "xfce" || $2 == "lxde" || $2 == "mate" || $2 == "cinnamon" || $2 == "enlightenment" || $2 == "lxqt" ]] ; then
-				_UserDesktopEnvironemtSelection="${2:-"kde"}"
+				_UserDesktopEnvironemtSelection="${2}"
 			else
 				write_error "⛔ Unknown Desktop Environment: $2"
 				return 1
 			fi
-			shift # Remove argument name from processing
+			shift
 		;;
-		--server_role | --ServerRole )
+		--server_role | --ServerRole | --SR )
 			if [[ $2 == "lamp" || $2 == "dns" || $2 == "dhcp_dns_server" || $2 == "file_server" || $2 == "print_server" || $2 == "mail_server" || $2 == "monitoring" || $2 == "desktop" ]] ; then
-				_UserServerEnvironemtSelection="$2"
+				_UserServerEnvironemtSelection="${2}"
 			else
 				write_error "⛔ Unknown Server selection: $2"
 				return 1
 			fi
-			shift # Remove argument name from processing
+			shift
 		;;
 		--product | --product )
 			if [[ $2 == "Leap" || $2 == "SLES" || $2 == "Tumbleweed" ]] ; then
@@ -11265,23 +11402,23 @@ system::generate_autoyast_file ()
 				write_error "⛔ Unknown product selection: $2"
 				return 1
 			fi
-			shift # Remove argument name from processing
+			shift
 		;;
-		--disk_encryption | --DE )
+		--disk_encryption | --DC )
 			Preference_DiskEncryption="$2"
-			shift # Remove argument name from processing
+			shift
 		;;
 		--disk_password | --DP )
 			Preference_Disk_Password="$2"
-			shift # Remove argument name from processing
+			shift
 		;;
 		--initial_user | --IU )
 			Preference_InitialUser="$2"
-			shift # Remove argument name from processing
+			shift
 		;;
 		--initial_user_password | --IUP )
 			Preference_InitialUserPassword="$2"
-			shift # Remove argument name from processing
+			shift
 		;;
 		--help | -h )
 			echo "Usage: generate_autoyast_file --filename <file path> --desktop_environment <kde|gnome|xfce|lxde|mate|cinnamon|enlightenment|lxqt> --server_role <lamp|dns|dhcp_dns_server|file_server|print_server|mail_server|monitoring|desktop> --disk_encryption <YES|NO> --disk_password <password> --initial_user <username> --initial_user_password <password>"
@@ -11291,58 +11428,22 @@ system::generate_autoyast_file ()
 			write_error "Unknown parameter: $1"
 		;;
 		esac
-		shift # Remove argument value from processing
+		shift 
 	done
 
 	system::log_item "Called by: ${FUNCNAME[1]}"
 
-	escape_xml_special_chars() {
-	local password="$1"
-	
-	# Replace & first to avoid double escaping of & in other entities
-	password="${password//&/&amp;}"
-	password="${password//</&lt;}"
-	password="${password//>/&gt;}"
-	password="${password//\"/&quot;}"
-	password="${password//\'/&apos;}"
-	
-	echo "$password"
-	}
-
 	# Localized variables based on User preferences, but with suse speciffic defaults:
 	# We cannot have empty tags in XML or validation will fail: so echo stored values with relevant tags.
-	if [[ ${Preference_DiskEncryption} == "YES" ]]; then
+	if [[ ${Preference_DiskEncryption} == "YES" || ${Preference_DiskEncryption} == "yes" || ${Preference_DiskEncryption} == "Yes" ]]; then
 		Preference_DiskEncryption_SUSE="<encryption_password>${Preference_Disk_Password}</encryption_password>"
 	else
 		#Preference_DiskEncryption_SUSE="<encryption_password></encryption_password>"
 		system::log_item "Disk encryption is not enabled."
 	fi
 
-	if [[ -n ${Preference_InitialUser}  ]] ; then
-		Preference_InitialUser_SUSE="<username>${Preference_InitialUser}</username>"
-	else
-		Preference_InitialUser_SUSE="<username>tangarora</username>"
-	fi
-
-	if [[ -n ${Preference_InitialUserPassword} ]] ; then
-		Preference_Password_SUSE="<user_password>${Preference_InitialUserPassword}</user_password>"
-	else
-		Preference_Password_SUSE="<user_password>$6$Rn5/UTzjIs68MX$9gz8vmshGlPqse3VoX8dzSfhWxRVoYv1MB6aGRD8xdvztOf.gD.SxxVWkxYrwwbShB9Q14flquK/apbdQJ65t1</user_password>"
-	fi
-
-	if [[ -n ${_UserDesktopEnvironemtSelection}  ]] ; then
-		Preference_Desktop_DE_SUSE="<pattern>${_UserDesktopEnvironemtSelection}</pattern>"
-	else
-		Preference_Desktop_DE_SUSE="<pattern>kde</pattern>"
-	fi
-
-	if [[ -n ${_UserServerEnvironemtSelection}  ]] ; then
-		Preference_Server_Role_SUSE="<pattern>${_UserServerEnvironemtSelection}</pattern>"
-	else
-		Preference_Server_Role_SUSE="<pattern>basic_desktop</pattern>"
-	fi
-
 	write_host --cyan "Creating AUTOYAST Instructions (XML): ${_autoyast_filename}"
+
 	# Populate AutoYaST Template and write the autoyast file
 cat > ${_autoyast_filename} <<-AUTOYAST_EOF
 <?xml version="1.0"?>
@@ -11373,18 +11474,19 @@ cat > ${_autoyast_filename} <<-AUTOYAST_EOF
     </storage>
 
     <networking>
-    <keep_install_network config:type="boolean">true</keep_install_network>
+        <keep_install_network config:type="boolean">true</keep_install_network>
     </networking>
 
     <deploy_image>
-    <image_installation config:type="boolean">true</image_installation>
+        <image_installation config:type="boolean">true</image_installation>
     </deploy_image>
 
     <software>
         <install_recommended config:type="boolean">true</install_recommended>
         <patterns config:type="list">
             <pattern>base</pattern>
-            ${Preference_Desktop_DE_SUSE}
+            <pattern>${_UserDesktopEnvironemtSelection:-"kde"}</pattern>
+            <pattern>${_UserServerEnvironemtSelection:-"file_server"}</pattern>
         </patterns>
 
         <packages config:type="list">
@@ -11399,6 +11501,9 @@ cat > ${_autoyast_filename} <<-AUTOYAST_EOF
             <package>zenity</package>
             <package>acpi</package>
             <package>pciutils</package>
+            <package>jq</package>
+            <package>p7zip-full</package>
+            <package>xhost</package>
         </packages>
 
         <products config:type="list">
@@ -11427,7 +11532,7 @@ cat > ${_autoyast_filename} <<-AUTOYAST_EOF
             <fullname>RTD User</fullname>
             <shell>/bin/bash</shell>
             <user_password>${Preference_InitialUserPassword}</user_password>
-            ${Preference_InitialUser_SUSE}
+            <username>${Preference_InitialUser:-"tangarora"}</username>
         </user>
     </users>
 
@@ -11441,7 +11546,6 @@ cat > ${_autoyast_filename} <<-AUTOYAST_EOF
         <services>
             <enable config:type="list">
                 <service>sshd</service>
-                <service>spice-vdagent</service>
             </enable>
         </services>
     </services-manager>

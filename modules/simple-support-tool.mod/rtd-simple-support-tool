@@ -684,15 +684,11 @@ show_deploy_server_VM_now_menu ()
 			cleanup_and_finish nomessage
 		;;
 		6 )
-			PRESEED_FILE="$(mktemp)"
-			generate_fedora_ks_cfg_file "${PRESEED_FILE}" ssh-server
-			make_kvm_virtual_machine_now_from_fedora_org fedora30
+			make_kvm_virtual_machine_now_from_fedora_org --role server --server_role @minimal-environment --tshirt-size small
 			cleanup_and_finish nomessage
 		;;
 		7 )
-			PRESEED_FILE="$(mktemp)"
-			generate_fedora_ks_cfg_file "${PRESEED_FILE}" ansible-server
-			make_kvm_virtual_machine_now_from_fedora_org fedora30
+			make_kvm_virtual_machine_now_from_fedora_org --role server --server_role @infrastructure-server-environment
 			cleanup_and_finish nomessage
 		;;
 		esac
@@ -755,12 +751,12 @@ show_deploy_VDI_VM_now_menu ()
 			cleanup_and_finish nomessage
 		;;
 		7 )
-			make_kvm_virtual_machine_now_from_fedora_org
+			make_kvm_virtual_machine_now_from_fedora_org --role workstation --DE @workstation-product-environment 
 			cleanup_and_finish nomessage
 		;;
 		8 )
-			PRESEED_FILE="$(mktemp).xml"
-			system::generate_autoyast_file --file "${PRESEED_FILE}" 
+			PRESEED_FILE="$(mktemp -d)/AutoYaST.xml"
+			system::generate_autoyast_file --file "${PRESEED_FILE}" --desktop_environment kde --disk_encryption YES
 			#generate_autoyast_file "${PRESEED_FILE}"
 			make_kvm_virtual_machine_now_from_opensuse_org
 			cleanup_and_finish nomessage

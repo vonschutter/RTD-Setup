@@ -62,10 +62,21 @@ _LOGFILE=${_LOG_DIR}/$( basename $0 ).log
 
 # Set login banner:
 ISSUE_FILE="/etc/issue"
-echo $_OEM_TTY_LOGIN_BANNER > $ISSUE_FILE
+RTD_WISDOM_QUOTES="/etc/${_TLA,,}/kens_quotes.txt"
+if [[ -d /etc/update-motd.d ]]; then
+	motd_wisdom_file="/etc/update-motd.d/55-wisdom"
+elif [[ -d /etc/motd.d ]]; then
+	motd_wisdom_file="/etc/motd.d/55-wisdom"
+else
+	system::log_item "No MOTD directory found, NOT installing wisdom."
+fi
+
+# Enable the login banner:
+test -L "${ISSUE_FILE}" && rm "${ISSUE_FILE}"
+echo "${_OEM_TTY_LOGIN_BANNER}" > ${ISSUE_FILE}
 
 # Create Ken's MOTD file with some wisdom:
-cat > /etc/motd_quotes.txt << "EOF"
+cat > ${RTD_WISDOM_QUOTES} << "EOF"
 - Do not argue with an idiot. He will drag you down to his level and beat you with experience.
 - Going to church doesn't make you a Christian any more than standing in a garage makes you a car.
 - The last thing I want to do is hurt you. But it's still on the list.
@@ -141,28 +152,22 @@ cat > /etc/motd_quotes.txt << "EOF"
 - I may be schizophrenic, but at least I have each other.
 EOF
 
-chmod +x /etc/update-motd.d/05-wisdom
-
 # Set the MOTD to display a random quote from the file:
-if [[ -d /etc/update-motd.d ]]; then
-	motd_wisdom_file="/etc/update-motd.d/55-wisdom"
-elif [[ -d /etc/motd.d ]]; then
-	motd_wisdom_file="/etc/motd.d/55-wisdom"
-else
-	system::log_item "No MOTD directory found, NOT installing wisdom."
-fi
-
-if [[ -n "${motd_wisdom_file}" ]]; then
-	cat > "${motd_wisdom_file}" <<-"EOF"
+if [[ -n "${motd_wisdom_file}" && -n "${RTD_WISDOM_QUOTES}" ]]; then
+    cat > "${motd_wisdom_file}" <<-"EOF"
 	#!/bin/sh
-	QuoteFile="/etc/motd_quotes.txt"
-	num_lines=$(wc -l < $QuoteFile)
+	QuoteFile=RTD_WISDOM_QUOTES
+	num_lines=$(wc -l < "$QuoteFile")
 	random_line=$((RANDOM % num_lines + 1))
-	sed -n "${random_line}p" $QuoteFile
+	sed -n "${random_line}p" "$QuoteFile"
 	EOF
 
-	chmod +x /etc/update-motd.d/05-wisdom
+	chmod +x "${motd_wisdom_file}"
+	# Correctly escape the path to handle spaces and special characters
+	sed -i "s|QuoteFile=RTD_WISDOM_QUOTES|QuoteFile=\"${RTD_WISDOM_QUOTES}\"|" "${motd_wisdom_file}"
 fi
+
+
 
 
 # Prepare the system for auto task sequnce post build

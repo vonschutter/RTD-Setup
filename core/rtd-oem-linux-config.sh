@@ -90,6 +90,7 @@ export zstatus="$1"
 # List of bare minimum managmement software that shuold be on a system
 _requirements="dialog wget curl rsync git"
 
+[ "$UID" -eq 0 ] || exec sudo -E -H /bin/bash "$0" "$@" 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::          Script Functions                ::::::::::::::::::::::
