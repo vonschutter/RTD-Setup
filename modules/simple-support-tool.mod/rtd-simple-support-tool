@@ -159,11 +159,11 @@ Script_Documentation
 # in the system log directory in a file named the same as this script.
 if [[ $EUID -ne 0 ]]; then
 	_LOG_DIR="${_LOG_DIR:="${HOME}/.config/rtd/logs"}" ; mkdir -p ${_LOG_DIR}
-	_LOGFILE="${_LOGFILE:="${_LOG_DIR}/${_SCRIPTNAME}.log"}" ; touch ${_LOGFILE}
+	_LOGFILE="${_LOGFILE:="${_LOG_DIR}/${_SCRIPTNAME}.log"}" 
 
 else
 	_LOG_DIR="${_LOG_DIR:="/var/log/${_TLA,,}"}" ; mkdir -p ${_LOG_DIR}
-	_LOGFILE="${_LOGFILE:="${_LOG_DIR}/${_SCRIPTNAME}.log"}" ; touch ${_LOGFILE}
+	_LOGFILE="${_LOGFILE:="${_LOG_DIR}/${_SCRIPTNAME}.log"}" 
 
 fi
 
@@ -196,13 +196,13 @@ dependency::file() {
 	script_dir=$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )
 
 	if source "${script_dir}/../core/${1}" ; then
-		system::log_item "${FUNCNAME[0]}: Using: ${script_dir}/../core/${1}"
+		system::log_item "Using: ${script_dir}/../core/${1}"
 	elif source "${script_dir}/../../core/${1}" ; then
-		system::log_item "${FUNCNAME[0]}: Using: ${script_dir}/../../core/${1}"
+		system::log_item "Using: ${script_dir}/../../core/${1}"
 	elif source $(find /opt -name ${1} | grep -v backup) ; then
-		system::log_item "${FUNCNAME[0]}: Using: $(find /opt -name ${1} | grep -v backup)"
+		system::log_item "Using: $(find /opt -name ${1} | grep -v backup)"
 	elif curl -sL "${_src_url}" -o "./${1}" && source "./${1}" ; then
-		system::log_item "${FUNCNAME[0]}: Using: ${_src_url}"
+		system::log_item "Using: ${_src_url}"
 	else
 		system::log_item "${1} NOT found!"
 		return 1
@@ -1382,7 +1382,7 @@ case $1 in
 			if [ -z "${RTDFUNCTIONS}" ]; then
 				dependency::file "${_dependency_lib}" || { echo "📚 Failed to find _rtd_library"; exit 1; }
 			else
-				echo "📚 _rtd_library is already loaded..."
+				write_status "📚 _rtd_library is already loaded..."
 			fi
 			if [[ $EUID -ne 0 ]]; then 
 				ensure_admin
@@ -1400,7 +1400,7 @@ case $1 in
 				if [ -z "${RTDFUNCTIONS}" ]; then
 					dependency::file "${_dependency_lib}" || { echo "📚 Failed to find _rtd_library"; exit 1; }
 				else
-					echo "📚 _rtd_library is already loaded..."
+					write_status "📚 _rtd_library is already loaded..."
 				fi
 				if [[ $EUID -ne 0 ]]; then 
 					ensure_admin
@@ -1415,7 +1415,4 @@ case $1 in
 	;;
 esac
 
-# Clean up the environment just in case...
-for var in $(compgen -v | grep '^_'); do
-    unset "$var"
-done
+
