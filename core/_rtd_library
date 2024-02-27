@@ -1135,6 +1135,7 @@ system::distribution_type ()
 #
 # Prints the type of the Linux distribution to standard output. The possible return values are:
 #
+#     "fedora": For Fedora Linux.
 #     "redhat": For Fedora, RHEL, CentOS, and other Red Hat derivatives.
 #     "suse": For SUSE Linux distributions.
 #     "debian": For Debian, Ubuntu, and derivatives.
@@ -1183,40 +1184,45 @@ system::distribution_type ()
 
 	local dtype
 	dtype="unknown"
-	
+
 	{
-	# First test against Fedora / RHEL / CentOS / generic Redhat derivative
-	if [ -r /etc/rc.d/init.d/functions ]; then
-		source /etc/rc.d/init.d/functions
-		[ zz`type -t passed 2>/dev/null` == "zzfunction" ] && dtype="redhat"
-	
+	# First test specifically for Fedora
+	if [ -r /etc/fedora-release ]; then
+	dtype="fedora"
+
+	# Then test against Fedora / RHEL / CentOS / generic Redhat derivative
+	elif [ -r /etc/rc.d/init.d/functions ]; then
+	source /etc/rc.d/init.d/functions
+	[ "zz$(type -t passed 2>/dev/null)" == "zzfunction" ] && dtype="redhat"
+
 	# Then test against SUSE (must be after Redhat,
 	elif [ -r /etc/rc.status ]; then
-		source /etc/rc.status
-		[ zz`type -t rc_reset 2>/dev/null` == "zzfunction" ] && dtype="suse"
-	
+	source /etc/rc.status
+	[ "zz$(type -t rc_reset 2>/dev/null)" == "zzfunction" ] && dtype="suse"
+
 	# Then test against Debian, Ubuntu and friends
 	elif [ -r /lib/lsb/init-functions ]; then
-		source /lib/lsb/init-functions
-		[ zz`type -t log_begin_msg 2>/dev/null` == "zzfunction" ] && dtype="debian"
-	
+	source /lib/lsb/init-functions
+	[ "zz$(type -t log_begin_msg 2>/dev/null)" == "zzfunction" ] && dtype="debian"
+
 	# Then test against Gentoo
 	elif [ -r /etc/init.d/functions.sh ]; then
-		source /etc/init.d/functions.sh
-		[ zz`type -t ebegin 2>/dev/null` == "zzfunction" ] && dtype="gentoo"
-	
+	source /etc/init.d/functions.sh
+	[ "zz$(type -t ebegin 2>/dev/null)" == "zzfunction" ] && dtype="gentoo"
+
 	# For Mandriva we currently just test if /etc/mandriva-release exists
 	# and isn't empty (TODO: Find a better way :)
 	elif [ -s /etc/mandriva-release ]; then
-		dtype="mandriva"
+	dtype="mandriva"
 
 	# For Slackware we currently just test if /etc/slackware-version exists
 	elif [ -s /etc/slackware-version ]; then
-		dtype="slackware"
+	dtype="slackware"
 
 	fi
 	} &>/dev/null
 	echo $dtype
+
 }
 
 
@@ -1263,16 +1269,14 @@ dependency::file ()
 		# End of Documentation
 
 		system::log_item "Requested dependency file: ${1} ..."
-
+		local script_path="$(readlink -f "$0")"
+		local script_dir="$(dirname "$script_path")"
 		local paths=(
+			"$(dirname "$(find /home/${SUDO_USER}/GIT -name ${1} 2>/dev/null | head -n 1 )")/${1}"
+			"$(dirname "$(find /home/${SUDO_USER}/bin -name ${1} 2>/dev/null | head -n 1 )")/${1}"
+			"$(dirname "$(find /opt/rtd -name ${1} 2>/dev/null | head -n 1 )")/${1}"
+			"${script_dir}/${1}"
 			"./${1}"
-			"../core/${1}"
-			"../../core/${1}"
-			"${0%/*}/../core/${1}"
-			"${0%/*}/../../core/${1}"
-			"$(dirname "$(find /opt -name ${1} 2>/dev/null | head -n 1 )")/${1}"
-			"$(dirname "$(find ${HOME}/GIT -name ${1} 2>/dev/null | head -n 1 )")/${1}"
-			"$(dirname "$(find ${HOME}/bin -name ${1} 2>/dev/null | head -n 1 )")/${1}"
 			)
 
 		for path in "${paths[@]}"; do 
@@ -3430,9 +3434,13 @@ set_gnome_ui_common_tweaks_for_user ()
 		if fc-list | grep -i SauceCodePro ; then 
 			gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ font 'SauceCodePro Nerd Font 12'
 			gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-system-font false
+			gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ bold-is-bright true
+
 		else 
 			gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ font 'Monospace 12'
 			gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-system-font false
+			gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ bold-is-bright true
+
 		fi
 
 	# Better Font Smoothing
@@ -3747,6 +3755,7 @@ set_gnome_ui_mac_tweaks_for_user ()
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ default-size-columns 100
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-theme-transparency true
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ scrollback-lines 10000
+	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ bold-is-bright true
 
 	# Restore Keyboard Layout (reset by gnome)
 	# gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
@@ -3829,6 +3838,7 @@ set_gnome_ui_win10_tweaks_for_user ()
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ background-color '#000000'
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ foreground-color '#AFAFAF'
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-transparent-background 'false'
+	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ bold-is-bright true
 
 	# Set wallpaper
 	gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR} -name Redmond.png)
@@ -3922,6 +3932,7 @@ set_gnome_ui_corprate_crisp_tweaks_for_user ()
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ foreground-color '#AFAFAF'
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-transparent-background true
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ background-transparency-percent 20
+	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ bold-is-bright true
 
 	# Restore Keyboard Layout (reset by gnome)
 	# gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
@@ -3997,6 +4008,7 @@ set_gnome_ui_moca_tweaks_for_user ()
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ foreground-color '#AFAFAF'
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-transparent-background true
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ background-transparency-percent 20
+	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ bold-is-bright true
 
 	# Restore Keyboard Layout (reset by gnome)
 	# gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
@@ -9024,21 +9036,21 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 	: ${_dsk="${_dsk:-100}"}
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
-	: ${virt_net="$(system::find_vm_bridge)"}
-	: ${BIN_VIRT_INSTALL:=$(type -p virt-install)}
-	: ${_DEFAULT_FEDORA_VER:="$(curl -s https://dl.fedoraproject.org/pub/fedora/linux/releases/ | grep -oP 'href="\K[0-9]+(?=/")' | sort -n | tail -1)"}
-	: ${_os_version=$( $RTD_GUI --title "Select Release Version of Fedora" --inputbox "Please pick an available OS version by entering it below. \
-	If you are not sure just let me choose for you... \n ${fedoralogo} "  25 110 "${_DEFAULT_FEDORA_VER}" 3>&1 1>&2 2>&3)}
-	case $? in
-		"$DIALOG_CANCEL") return ;;
-		"$DIALOG_ESC") return ;;
-	esac
+	: "${virt_net="$(system::find_vm_bridge)"}"
+	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
+	: "${_DEFAULT_FEDORA_VER:="$(curl -s https://dl.fedoraproject.org/pub/fedora/linux/releases/ | grep -oP 'href="\K[0-9]+(?=/")' | sort -n | tail -1)"}"
+	: "${_os_version=$( $RTD_GUI --title "Select Release Version of Fedora" --inputbox "Please pick an available OS version by entering it below. \
+	If you are not sure just let me choose for you... \n ${fedoralogo} "  25 110 "${_DEFAULT_FEDORA_VER:-"39"}" 3>&1 1>&2 2>&3)}"
+		case $? in
+			"$DIALOG_CANCEL") return ;;
+			"$DIALOG_ESC") return ;;
+		esac
 	clear
 
-	: ${_os_version:="${_DEFAULT_FEDORA_VER}"}
-	: ${_mirrorlist_url="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-${_os_version}&arch=x86_64"}
-	: ${_source_url:="https://dl.fedoraproject.org/pub/fedora/linux/releases/${_os_version}/Everything/x86_64/os/"}
-	: ${_preseed_file="$( mktemp -d )/ks.cfg"}
+	: "${_os_version:="${_DEFAULT_FEDORA_VER}"}"
+	: "${_mirrorlist_url="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-${_os_version}&arch=x86_64"}"
+	: "${_source_url:="https://dl.fedoraproject.org/pub/fedora/linux/releases/${_os_version}/Everything/x86_64/os/"}"
+	: "${_preseed_file="$( mktemp -d )/ks.cfg"}"
 
 	if [[ ${_role} == "workstation" ]] ; then
 		local _service="VDI"
@@ -9057,7 +9069,7 @@ make_kvm_virtual_machine_now_from_fedora_org ()
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in Kickstart: ${_preseed_file} \n
 	🔧 - Using this source for the packages and files to download: \n
-	🌎 - ${_source_url} \n
+	🌎 - ${_source_url%%/*pub*} \n
 	🖥️ - Using the network: ${virt_net:=default} \n
 	🖥️ - Memory: ${_mem} \n
 	🖥️ - CPU's: ${_cpu} \n
@@ -11230,6 +11242,7 @@ system::generate_ks_cfg_file ()
 		curl
 		dialog
 		yad
+		neofetch
 		ansible
 		vim-ansible
 		vim-syntastic-ansible
@@ -11273,6 +11286,7 @@ system::generate_ks_cfg_file ()
 		git
 		curl
 		dialog
+		neofetch
 		%end
 
 		# Post-installation Script
@@ -11418,14 +11432,6 @@ system::generate_autoyast_file ()
 			Preference_Disk_Password="$2"
 			shift
 		;;
-		--initial_user | --IU )
-			Preference_InitialUser="$2"
-			shift
-		;;
-		--initial_user_password | --IUP )
-			Preference_InitialUserPassword="$2"
-			shift
-		;;
 		--help | -h )
 			echo "Usage: generate_autoyast_file --filename <file path> --desktop_environment <kde|gnome|xfce|lxde|mate|cinnamon|enlightenment|lxqt> --server_role <lamp|dns|dhcp_dns_server|file_server|print_server|mail_server|monitoring|desktop> --disk_encryption <YES|NO> --disk_password <password> --initial_user <username> --initial_user_password <password>"
 			return 0
@@ -11541,6 +11547,15 @@ cat > ${_autoyast_filename} <<-AUTOYAST_EOF
             <username>${Preference_InitialUser:-"tangarora"}</username>
         </user>
     </users>
+
+    <keyboard>
+        <keymap>${Preference_InitialKeyboardLayout}</keymap>
+    </keyboard>
+
+    <timezone>
+        <hwclock>UTC</hwclock>
+        <timezone>Europe/Berlin</timezone>
+    </timezone>
 
     <login_settings>
         <autologin_user>tangarora</autologin_user>
@@ -11686,7 +11701,6 @@ generate_autoyast_file ()
         <products config:type="list">
             ${Preference_Product_SUSE}
         </products>
-
     </software>
 
     <firstboot>
@@ -12154,6 +12168,8 @@ system::get_vm_config()
 	Preference_InitialUserGroup="${_OEM_USER_GROUP:-"sudo"}"
 	Preference_InitialUserPassword="${_OEM_USER_PASSWORD:-"letmein1234"}"
 	Preference_InitialKeyboardLayout="${_OEM_USER_KEYBOARD_LAYOUT:-"us"}"
+	Preference_InitialLanguage="${_OEM_USER_LANGUAGE:-"en_US"}"
+	Preference_InitialLanguageEncoding="${_OEM_USER_LANGUAGE:-"UTF8"}"
 	Preference_InitialTimeZone="${_OEM_USER_TIMEZONE:-"Etc/UTC"}"
 	Preference_Wireless_ID="${_OEM_WIRELESS_ID:-"loader"}"
 	Preference_Wireless_Password="${_OEM_WIRELESS_PASSWORD:-"letmein1234"}"
@@ -12177,12 +12193,14 @@ system::get_vm_config()
 		"Admin User Full Name:"                 4 1 "${Preference_InitialUserFullName}" 4 40 40 0 0 \
 		"Admin User Initial UserGroup:"         5 1 "${Preference_InitialUserGroup}" 5 40 40 0 0 \
 		"Admin User Password (8 30 char):"      6 1 "${Preference_InitialUserPassword}" 6 40 128 0 0 \
-		"Initial Keyboard Layout:"              7 1 "${Preference_InitialKeyboardLayout}" 7 40 40 0 0 \
-		"Initial Time Zone:"                    8 1 "${Preference_InitialTimeZone}" 8 40 40 0 0 \
-		"Wireless Network SSID:"                9 1 "${Preference_Wireless_ID}" 9 40 40 0 0 \
-		"Wireless Network Password:"           10 1 "${Preference_Wireless_Password}" 10 40 40 0 0 \
-		"Role (Default, KVM, Minecraft):"      11 1 "${Preference_Role}" 11 40 40 0 0 \
-		"Copy you ssh public key to host?"     12 1 "${Preference_CopySSHKey}" 12 40 40 0 0 \
+		"Preferred Keyboard Layout:"            7 1 "${Preference_InitialKeyboardLayout}" 7 40 40 0 0 \
+		"Preferred Language"                    8 1 "${Preference_InitialLanguage}" 8 40 40 0 0 \
+		"Preferred Encoding"                    9 1 "${Preference_InitialLanguageEncoding}" 9 40 40 0 0 \
+		"Initial Time Zone:"                   10 1 "${Preference_InitialTimeZone}" 10 40 40 0 0 \
+		"Wireless Network SSID:"               11 1 "${Preference_Wireless_ID}" 11 40 40 0 0 \
+		"Wireless Network Password:"           12 1 "${Preference_Wireless_Password}" 12 40 40 0 0 \
+		"Role (Default, KVM, Minecraft):"      13 1 "${Preference_Role}" 13 40 40 0 0 \
+		"Copy you ssh public key to host?"     14 1 "${Preference_CopySSHKey}" 14 40 40 0 0 \
 		3>&1 1>&2 2>&3)
 		exit_status=$?
 
@@ -12215,11 +12233,13 @@ system::get_vm_config()
 		Preference_InitialUserGroup=${input_array[4]}
 		Preference_InitialUserPassword=${input_array[5]}
 		Preference_InitialKeyboardLayout=${input_array[6]}
-		Preference_InitialTimeZone=${input_array[7]}
-		Preference_Wireless_ID=${input_array[8]}
-		Preference_Wireless_Password=${input_array[9]}
-		Preference_Role=${input_array[10]}
-		Preference_CopySSHKey=${input_array[11]}
+		Preference_InitialLanguage=${input_array[7]}
+		Preference_InitialLanguageEncoding=${input_array[8]}
+		Preference_InitialTimeZone=${input_array[9]}
+		Preference_Wireless_ID=${input_array[10]}
+		Preference_Wireless_Password=${input_array[11]}
+		Preference_Role=${input_array[12]}
+		Preference_CopySSHKey=${input_array[13]}
 
 		# Encrypt the user/admin password before saving & for use in the preseed file
 		# If the password is already encrypted, then skip this step:
@@ -12245,6 +12265,8 @@ system::get_vm_config()
 		"Preference_InitialUserFullName" "${Preference_InitialUserFullName}" \
 		"Preference_InitialUserGroup" "${Preference_InitialUserGroup}" \
 		"Preference_InitialKeyboardLayout" "${Preference_InitialKeyboardLayout}" \
+		"Preference_InitialLanguage" "${Preference_InitialLanguage}" \
+		"Preference_InitialLanguageEncoding" "${Preference_InitialLanguageEncoding}" \
 		"Preference_InitialTimeZone" "${Preference_InitialTimeZone}" \
 		"Preference_Wireless_ID" "${Preference_Wireless_ID}" \
 		"Preference_Wireless_Password" "${Preference_Wireless_Password}" \
@@ -13012,7 +13034,7 @@ set_colors ()
 	"    ${blue}•${green}•${red}•${magenta}•"
 	)
 
-	echo -e "🧩 $yellow * $darkyellow * $red * $darkred * $green * $darkgreen * $blue * $darkblue * $cyan * $darkcyan * $gray * $darkgray * $purple * $darkpurple * $endcolor"
+	echo -e " 🎨 $yellow * $darkyellow * $red * $darkred * $green * $darkgreen * $blue * $darkblue * $cyan * $darkcyan * $gray * $darkgray * $purple * $darkpurple * $endcolor"
 }
 
 
@@ -13483,7 +13505,7 @@ list_loaded_software_functions ()
 # library will simply be loaded in to memory.
 
 # Load base color sheme for use in the library...
-set_colors
+#set_colors
 
 
 # Set log location and name...
@@ -13503,53 +13525,54 @@ fi
 # initialize loging and provide process details...
 export _LOGFILE
 touch ${_LOGFILE}
-system::log_item " ********** : $(basename ${BASH_SOURCE[0]}) loaded by $(basename "${0}") on $HOSTNAME  : ************************************"
+system::log_item " ***  : $(basename ${BASH_SOURCE[0]}) loaded by $(basename "${0}") on $HOSTNAME  :  ***"
 system::log_item "💻 Basic System Information: 
 $(hostnamectl)"
 
 
-# Check if library is loaded from a terminal or another script (behavior may differ)...
-# This may be useful to log for support reasons.
-if (return 0 2>/dev/null) ; then 
-	sourced=0
-	write_host --cyan "Library is sourced from a script or terminal! "
 
-	if [[ "$(basename $0)" == "bash" ]] ; then
-		write_host --cyan "Script is sourced from bash in a terminal: $0 $*"
-	else
-		write_host --cyan "Script is being sourced from a script: $(basename $0) $*"
-	fi
-else 
-	sourced=1
-	write_warning "Library is run directly! $(basename $0) $*"
-fi
-
-
-
-
-
-# Find and load all dependant files for this library... 
-for i in ${_OEM_dependencies} ; do dependency::file ${i} &>/dev/null ; done 
-
-# log variables for support reasons...
-system::log_item "Library Loaded Variables: 
-.........................................
-$(env | grep '^_')
-
-_LOG_DIR=${_LOG_DIR}
-_LOGFILE=${_LOGFILE}
-_SCRIPTNAME=${_SCRIPTNAME}
-.........................................
-"
 
 # Check if this library is asked to do anything or just load...
 if [ -z $1 ]; then
-	echo -e "📚 RTD Power Library $RTD_VERSION loaded OK"
+	# Check if library is loaded from a terminal or another script (behavior may differ)...
+	# This may be useful to log for support reasons.
+	if (return 0 2>/dev/null) ; then 
+		sourced=0
+		# write_host --cyan "Library is sourced from a script or terminal! "
+		if [[ "$(basename $0)" == "bash" ]] ; then
+			write_host --cyan "Script is sourced from bash in a terminal: $0 $*"
+		else
+			write_host --cyan "Script is being sourced from a script: $(basename $0) $*"
+		fi
+	else 
+		sourced=1
+		write_host --yellow "Library is run directly as an executable! $(basename $0) $*"
+	fi
+
+
+	# Find and load all dependant files for this library... 
+	for i in ${_OEM_dependencies} ; do dependency::file ${i} &>/dev/null || _lderr=1 ; done
+	if [[ -n $_lderr ]] ; then
+		write_host --red "👾 Failed to load *.info files for this library! some functionality may be limited..."
+	else
+		write_host --cyan "(${_OEM_dependencies}) loaded OK!"
+	fi 
+
+	# log variables for support reasons...
+	system::log_item "Library Loaded Variables: 
+	RTD Functions Version: ${RTDFUNCTIONS}
+	.........................................
+	_LOG_DIR=${_LOG_DIR}
+	_LOGFILE=${_LOGFILE}
+	_SCRIPTNAME=${_SCRIPTNAME}
+	.........................................
+	"
+	write_host --green " 📚 RTD Power Library $RTD_VERSION loaded OK"
 	export RTDFUNCTIONS="${RTD_VERSION}"
 else
 	case $1 in
 		--help | -? )
-			echo -e "${0##*/} :: RunTime Data Library HELP ::
+			write_host --cyan "${0##*/} :: RunTime Data Library HELP ::
 
 			Usage: ${0##*/} [OPTIONS]
 			valid option are :
@@ -13559,13 +13582,30 @@ else
 				internal : (list) internal functions loaded
 				all	 : (list) all library functions including software
 			--devhelp	 : diplay script developer's help
-			EXAMPLE:
-			${0##*/} --list --internal"
+			--devhelp-gtk	 : diplay script developer's help in a GTK window
+			--clean		 : clean up the environment
+			--version	 : display version information
+
+			EXAMPLES:
+			${0##*/} --list internal
+			${0##*/} --devhelp
+			${0##*/} --devhelp-gtk"
 		;;
 		--list )
+
 			case $2 in
-				software ) list_loaded_software_functions ;;
-				internal ) list_loaded_internal_functions ;;
+				software )
+					for i in ${_OEM_dependencies} ; do dependency::file ${i} &>/dev/null || _lderr=1 ; done
+					if [[ -n $_lderr ]] ; then
+						write_host --red "👾 Failed to load *.info files for this library! some functionality may be limited..."
+					else
+						system::log_item "(${_OEM_dependencies}) loaded OK!"
+					fi 
+					list_loaded_software_functions 
+				;;
+				internal ) 
+					list_loaded_internal_functions
+				;;
 				all ) ( echo -e $YELLOW "Software Recipies: $ENDCOLOR" && list_loaded_software_functions && echo -e $YELLOW "INTERNAL Functions: $ENDCOLOR" && list_loaded_internal_functions ) ;;
 				* ) echo "USAGE: The --list option requires a (what option). Valid option are: software, internal, all." ;;
 			esac
@@ -13638,6 +13678,19 @@ else
 					;;
 				esac
 			done
+		;;
+		--clean )
+			# Clean up the environment just in case...
+			for var in $(compgen -v | grep '^_'); do
+				unset "$var"
+			done
+			write_host --cyan "Environment cleaned up!"
+		;;
+		--version )
+			write_host --cyan "RTD Library Version: $RTD_VERSION"
+		;;
+		--V )
+			echo "$RTD_VERSION"
 		;;
 		* )
 			echo "No RECOGNIZED arguments provided: loading ${0:BASENAME}" ; echo "Use ${0:BASENAME} --help to see supported arguments"

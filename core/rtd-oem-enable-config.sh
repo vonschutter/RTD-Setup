@@ -53,57 +53,15 @@ export _TLA=${_SCRIPTNAME:0:3}
 _lib_path="/opt/${_TLA,,}/core/_rtd_library"
 _faillog="/opt/${_TLA,,}/faillog.log"
 
-# Load the RTD library (onve loaded, all functions are available)
+# Load the RTD library (once loaded, all functions are available)
 if [ -f ${_lib_path} ]; then
-    source ${_lib_path} || { echo "💥 CRITICAL ERROR: Required library ( ${_lib_path} ) not found." >> ${_faillog} ; exit 1; }
+	source ${_lib_path} || { echo "💥 CRITICAL ERROR: Required library ( ${_lib_path} ) not found." >> ${_faillog} ; exit 1; }
 else
-    echo "💥 CRITICAL ERROR: Required library not found." >> ${_faillog}
-    exit 1
+	echo "💥 CRITICAL ERROR: Required library not found." >> ${_faillog}
+	exit 1
 fi
 
-
-
-# Esure used directories exist
-mkdir -p ${_LOG_DIR}
-mkdir -p ${_CONFIG_DIR}
-
-# Determine log file directory
-_LOGFILE=${_LOG_DIR}/$( basename $0 ).log
-
-# Set the key locations for the system
-ISSUE_FILE="/etc/issue"
-
-system::log_item "🦉 Creating wisdom quotes file: ${RTD_WISDOM_QUOTES}"
-RTD_WISDOM_QUOTES="${_CONFIG_DIR}/kens_quotes.txt"
-touch ${RTD_WISDOM_QUOTES} && system::log_item "✅ Wisdom quotes file created: ${RTD_WISDOM_QUOTES}" || system::log_item "⛔ Failed to create wisdom quotes file: ${RTD_WISDOM_QUOTES}"
-
-
-
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Execute tasks                   ::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-# Set login banner:
-
-if [[ -d /etc/update-motd.d ]]; then
-	motd_wisdom_file="/etc/update-motd.d/55-wisdom"
-elif [[ -d /etc/motd.d ]]; then
-	motd_wisdom_file="/etc/motd.d/55-wisdom"
-else
-	system::log_item "No MOTD directory found, NOT installing wisdom."
-fi
-
-# Enable the login banner:
-test -L "${ISSUE_FILE}" && rm "${ISSUE_FILE}"
-echo "${_OEM_TTY_LOGIN_BANNER}" > ${ISSUE_FILE}
-
-# Create Ken's MOTD file with some wisdom:
-system::log_item "Creating Ken's MOTD file with some wisdom: ${RTD_WISDOM_QUOTES}"
-touch ${RTD_WISDOM_QUOTES} && system::log_item "✅ Wisdom quotes file created: ${RTD_WISDOM_QUOTES}" || system::log_item "⛔ Failed to create wisdom quotes file: ${RTD_WISDOM_QUOTES}" 
-
-cat >> ${RTD_WISDOM_QUOTES} << 'WEOF'
+kens_quotes="
 - Do not argue with an idiot. He will drag you down to his level and beat you with experience.
 - Going to church doesn't make you a Christian any more than standing in a garage makes you a car.
 - The last thing I want to do is hurt you. But it's still on the list.
@@ -177,12 +135,109 @@ cat >> ${RTD_WISDOM_QUOTES} << 'WEOF'
 - Life is ten percent what you make it and ninety percent how you take it!
 - I have kleptomania, but when it gets bad, I take something for it.
 - I may be schizophrenic, but at least I have each other.
+"
+
+# Esure used directories exist
+mkdir -p ${_LOG_DIR}
+mkdir -p ${_CONFIG_DIR}
+
+# Determine log file directory
+_LOGFILE=${_LOG_DIR}/$( basename $0 ).log
+
+if [[ -d /etc/update-motd.d ]]; then
+	motd_wisdom_file="/etc/update-motd.d/55-wisdom"
+	neofetch_file="/etc/update-motd.d/50-neofetch"
+elif [[ -d /etc/motd.d ]]; then
+	motd_wisdom_file="/etc/motd.d/55-wisdom"
+	neofetch_file="/etc/motd.d/50-neofetch"
+else
+	system::log_item "No MOTD directory found, NOT installing wisdom."
+fi
+
+# Set the key locations for the system
+ISSUE_FILE="/etc/issue"
+
+write_status "🦉 Creating wisdom quotes file: ${RTD_WISDOM_QUOTES}"
+RTD_WISDOM_QUOTES="${_CONFIG_DIR}/kens_quotes.txt"
+touch ${RTD_WISDOM_QUOTES} && system::log_item "✅ Wisdom quotes file created: ${RTD_WISDOM_QUOTES}" || system::log_item "⛔ Failed to create wisdom quotes file: ${RTD_WISDOM_QUOTES}"
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Execute tasks                   ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# Set login banner:
+system::distribution_type
+if [[ $dtype == "redhat" ]]; then
+write_status "setup MOTD manually for redhat"
+
+# Step 1: Create the MOTD update script
+MOTD_SCRIPT_PATH="/usr/local/sbin/update-motd.sh"
+cat << EOF > "$MOTD_SCRIPT_PATH"
+#!/bin/bash
+MOTD_FILE="/etc/motd"
+{
+    ${motd_wisdom_file}
+} > "$MOTD_FILE"
+EOF
+
+chmod +x "$MOTD_SCRIPT_PATH"
+
+# Step 2: Create a systemd service file
+SERVICE_PATH="/etc/systemd/system/update-motd.service"
+cat << EOF > "$SERVICE_PATH"
+[Unit]
+Description=Update MOTD
+
+[Service]
+Type=oneshot
+ExecStart=$MOTD_SCRIPT_PATH
+EOF
+
+# Step 3: Create a systemd timer file
+TIMER_PATH="/etc/systemd/system/update-motd.timer"
+cat << EOF > "$TIMER_PATH"
+[Unit]
+Description=Runs update-motd every day
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=24h
+Unit=update-motd.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
+# Step 4: Enable and start the timer
+systemctl enable update-motd.timer
+systemctl start update-motd.timer
+
+system::log_item "Dynamic MOTD setup completed."
+
+fi
+
+
+
+
+# Enable the login banner:
+test -L "${ISSUE_FILE}" && rm "${ISSUE_FILE}"
+echo "${_OEM_TTY_LOGIN_BANNER}" > ${ISSUE_FILE}
+
+# Create Ken's MOTD file with some wisdom:
+system::log_item "Populating Ken's ${RTD_WISDOM_QUOTES} file with some wisdom... "
+
+cat >> ${RTD_WISDOM_QUOTES} << WEOF
+${kens_quotes}
 WEOF
 
 # Set the MOTD to display a random quote from the file:
 if [[ -n "${motd_wisdom_file}" && -n "${RTD_WISDOM_QUOTES}" ]]; then
     cat > "${motd_wisdom_file}" <<-"EOF"
-	#!/bin/sh
+	#!/bin/bash
 	QuoteFile=RTD_WISDOM_QUOTES
 	num_lines=$(wc -l < "$QuoteFile")
 	random_line=$((RANDOM % num_lines + 1))
@@ -194,7 +249,13 @@ if [[ -n "${motd_wisdom_file}" && -n "${RTD_WISDOM_QUOTES}" ]]; then
 	sed -i "s|QuoteFile=RTD_WISDOM_QUOTES|QuoteFile=\"${RTD_WISDOM_QUOTES}\"|" "${motd_wisdom_file}"
 fi
 
-
+if [[ -n "${neofetch_file}" ]]; then
+    cat > "${neofetch_file}" <<-"EOF"
+	#!/bin/bash
+	neofetch
+	EOF
+	chmod +x "${neofetch_file}"
+fi
 
 
 # Prepare the system for auto task sequnce post build
