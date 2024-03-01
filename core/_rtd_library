@@ -10960,42 +10960,17 @@ template::rtd_me_sh_cmd() {
 	# case ${todo} in 
 	# 	--write )
 cat >> ${outfile} <<-'EOF'
-cls
 @ECHO OFF
-
 echo	[internal]	-	RTD System System Management Bootstrap Script      -	[internal]
+@title              -	RTD System System Management Bootstrap Script      -
 ::
-::
-:: 						Shell Script Section
-::
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:::::::::::::::::::::::::::::// CMD Bootstrap Script //::::::::::::::::::::::::::::::::::::::::// Windows //::::::::::::
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Author(s):   	SLS, KLS, NB.  Buffalo Center, IA & Avarua, Cook Islands
 :: Version:	1.06
 ::
 ::
-:: Purpose: 	The purpose of the script is to decide what scripts to download based
-::          	on the host OS found; works with both Windows, MAC and Linux systems.
-::		The focus of this script is to be compatible enough that it could be run on any
-::		system and compete it's job. In this case it is simply to identify the OS
-::		and get the appropriate script files to run on the system in question;
-::		In its original configuration this bootstrap script was used to install and
-::		configure software appropriate for the system in question. It accomplishes this
-::		by using the idiosyncrasies of the default scripting languages found in
-::		the most popular operating systems around *NIX (MAC, Linux, BSD etc.) and
-::		CMD (Windows NT, 2000, 2003, XP, Vista, 8, and 10).
-::
-::
-::
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-
-echo "
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-::
-@title			-	RTD System System Managment Bootstrap Script      -
+:: for the full script see https://github.com/vonschutter/RTD-Setup
 ::
 ::
 ::					Windows CMD Shell Script Section
@@ -11021,13 +10996,13 @@ echo "
 	::
 	set temp=c:\rtd\temp
 	set _LOGDIR=c:\rtd\log
-	set wallpaperloc=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/wallpaper/Wayland.jpg
 	set wallpaperdir=c:\rtd\wallpaper
 
-	if not exit %temp% md %temp%
-	if not exist %_LOGDIR% md %_LOGDIR%
-	if not exist %wallpaperdir% md %wallpaperdir%
+	md %temp%
+	md %_LOGDIR%
+	md %wallpaperdir%
 
+    set wallpaper_url=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/wallpaper/Wayland.jpg
 	set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
 	set _STAGE2FILE=rtd-oem-win10-config.ps1
 	echo Stage 2 file is located at:
@@ -11035,12 +11010,12 @@ echo "
 
 
 :GetInterestingThigsToDoOnThisSystem
-	:: Given that Microsoft Windows has been detected and the CMD chell portion of this script is executed,
+	:: Given that Microsoft Windows has been detected and the CMD shell portion of this script is executed,
 	:: the second stage script must be downloaded from an online location. Depending on the version of windows
-	:: there are different methods available to get and run remote files. All versions of windows do not neccesarily
-	:: support powershell scripting. Therefore the base of this activity is coded in simple command CMD.EXE shell scripting
+	:: there are different methods available to get and run remote files. All versions of windows do not necessarily
+	:: support power-shell scripting. Therefore the base of this activity is coded in simple command CMD.EXE shell scripting
 	::
-	:: Table of evaluating verson of windos and calling the appropriate action fiven the version of windows found.
+	:: Table of evaluating verson of windows and calling the appropriate action given the version of windows found.
 	:: In this case it is easier to manage a straight table than a for loop or array:
 
 	:: DOS Based versions of Windows:
@@ -11075,6 +11050,7 @@ echo "
 	echo Found %*
 	echo Fetching %_STAGE2FILE%...
 	echo Please wait...
+
 	if exist A:\%_STAGE2FILE% (
 		echo File found locally...  
 		powershell -ExecutionPolicy UnRestricted -File A:\%_STAGE2FILE%
@@ -11093,16 +11069,19 @@ echo "
 	echo Found %*
 	echo Fetching %_STAGE2FILE%...
 	echo Please wait...
-	copy /y A:\*.* c:\rtd
+	copy /y A:\*.* c:\rtd\
+	powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %wallpaperloc% -OutFile c:\rtd\wallpaper\Wayland.jpg"
+
 	if exist A:\%_STAGE2FILE% (
 		echo File found locally...  
 		powershell -ExecutionPolicy UnRestricted -File A:\%_STAGE2FILE%
 		) else (
 		echo Fetching %_STAGE2FILE% from the internet...
 		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %_STAGE2LOC%\%_STAGE2FILE% -OutFile c:\rtd\%_STAGE2FILE%"
-		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %wallpaperloc% -OutFile c:\rtd\Wayland.jpg"
+
 		powershell -ExecutionPolicy UnRestricted -File c:\rtd\%_STAGE2FILE%
 	)
+
 	if exist A:\_Chris-Titus-Post-Windows-Install-App.ps1 (
 		echo File found locally...  
 		powershell -ExecutionPolicy UnRestricted -File A:\_Chris-Titus-Post-Windows-Install-App.ps1
@@ -11149,6 +11128,7 @@ echo "
 	echo ::                                                                             ::
 	echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 	echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+	pause
 goto eof
 
 
