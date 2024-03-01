@@ -121,7 +121,7 @@ complete_setup () {
 		;;
 		"${ConditionalResealOption:-"Ignore"}" )
 			write_information "Resealing system..." 
-			rtd_oem_reseal
+			system::rtd_oem_reseal
 			exit 0
 		;;
 		"Exit now and do no more" )
@@ -137,7 +137,7 @@ complete_setup () {
 
 
 
-dependency::_rtd_library ()
+dependency_rtd_library ()
 {
 	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
 
@@ -178,7 +178,7 @@ oem_linux_config ()
 		sudo -E bash $0 $*
 	else
 		if [ -z "${RTDFUNCTIONS}" ]; then
-			dependency::_rtd_library || { echo "📚 Failed to find _rtd_library"; exit 1; }
+			dependency_rtd_library || { echo "📚 Failed to find _rtd_library"; exit 1; }
 		else
 			echo "📚 _rtd_library is already loaded..."
 		fi
@@ -187,12 +187,8 @@ oem_linux_config ()
 			software::check_native_package_dependency $i 
 		done
 		
-		rtd_wait_for_internet_availability
+		system::wait_for_internet_availability
 		oem::rtd_reset_default_environment_config
-		# system::add_or_remove_login_script --remove
-		# system::toggle_oem_auto_login --disable
-		# system::toggle_oem_auto_elevated_privilege --disable
-		# system::set_oem_elevated_privilege_gui --disable
 
 		if [[ -z "$(ps aux |grep X |grep -v grep)" ]]; then
 			echo "No X server at \$DISPLAY [$DISPLAY]"
