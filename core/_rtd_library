@@ -1907,7 +1907,7 @@ dependency::virtualization() {
 			if ! command -v qemu-system-x86_64 >/dev/null 2>&1; then
 				write_status "KVM or QEMU not found. Installing virtualization software for $OS_NAME..."
 				local count=1
-				for dependency in qemu-kvm libvirt-daemon  bridge-utils virtinst libvirt-daemon-system ; do
+				for dependency in qemu-kvm libvirt-daemon  bridge-utils virtinst libvirt-daemon-system libosinfo-bin ; do
 					write_status "${count} - Verifying dependency (${dependency})..."
 					software::add_native_package "$dependency" 
 					count=$((count + 1))
@@ -10136,7 +10136,6 @@ kvm::make_vm_template_now_from_microsoft() {
 	✅ - Memory: ${_mem} \n
 	✅ - CPU's: ${_cpu} \n
 	✅ - Disk Size: ${_dsk} \n You may attach to this server and see the progress at IP: $(hostname -I))"
-
 	write_status "Creating and starting Virtual machine... "
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
 		--vcpus "${_cpu}" \
