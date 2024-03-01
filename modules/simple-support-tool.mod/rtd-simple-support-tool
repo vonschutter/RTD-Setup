@@ -1,7 +1,7 @@
 #!/bin/bash
-RTD_Version=2.1.2
-: <<'Script_Documentation'
-										  -    RTD Power Toy Script      -
+RTD_Version="2.1.3"
+: <<'DOC'
+					  -    RTD Power Toy Script      -
 
 :::::::::::::::::::::::::::::::::::::::::: PREVENT RUNING IN WINDOWS	 ::::::::::::::::::::::::::::::::::::::::::::::::
 
@@ -90,10 +90,7 @@ Our scripts are also structured in to three major sections: "settings", "functio
 Settings, contain configurable options for the script. Functions, contain all functions. Execute,
 contains all the actual logic and control of the script.
 
-
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-Script_Documentation
+DOC
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -113,9 +110,6 @@ Script_Documentation
 : ${WIDTH:="90"}
 : ${LIST_HEIGHT:="12"}
 : ${_GIT_PROFILE:=vonschutter}
-
-# load documentation for this script in a variable for later use.
-: ${_SIMPLE_SUPPORT_TOOL_DOC="$(tail -n +6 "$0" | head -n 25)"}
 
 
 # Terminal Color Setup definitions. These settings allow the simlified use of
@@ -153,7 +147,7 @@ Script_Documentation
 # the primary functions for this script. If the file is not found, the script will exit.
 # The file is searched for in the same directory as the script, and if not found, it
 # will be searched for in the /opt/$_TLA/scripts directory.
-: ${_dependency_lib:="_rtd_library"}
+_dependency_lib=_rtd_library
 
 # Set location to where to log information:
 # in the system log directory in a file named the same as this script.
@@ -182,39 +176,50 @@ fi
 
 
 dependency_file() {
-    local _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
-    local script_dir found_file
 
-    script_dir=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
+	local _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
+	local script_dir found_file
 
-    # Try to source from the first location
-    if source "${script_dir}/../core/${1}" &>>"${_LOGFILE}"; then
-        theme_log_item "Using: ${script_dir}/../core/${1}"
-        return 0
-    fi
+	script_dir=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
+	# Try to source from the third location using find
+	found_file=$(find /opt/${_TLA,,} -name "${1}" -print | head -n 1)
+	if [[ -f $found_file ]] ; then
+		source "$found_file" &>>"${_LOGFILE}"
+		theme_log_item "Using: $found_file"
+		return 0
+	fi
 
-    # Try to source from the second location
-    if source "${script_dir}/../../core/${1}" &>>"${_LOGFILE}"; then
-        theme_log_item "Using: ${script_dir}/../../core/${1}"
-        return 0
-    fi
+	found_file=$(find /home/${SUDO_USER}/GIT -name "${1}" -print | head -n 1)
+	if [[ -n $found_file ]] && source "$found_file" &>>"${_LOGFILE}"; then
+		theme_log_item "Using: $found_file"
+		return 0
+	fi
 
-    # Try to source from the third location using find
-    found_file=$(find /opt -name "${1}" -print | grep -v 'backup' | head -n 1)
-    if [[ -n $found_file ]] && source "$found_file" &>>"${_LOGFILE}"; then
-        theme_log_item "Using: $found_file"
-        return 0
-    fi
+	found_file=$(find /home/${SUDO_USER}/bin -name "${1}" -print | head -n 1)
+	if [[ -n $found_file ]] && source "$found_file" &>>"${_LOGFILE}"; then
+		theme_log_item "Using: $found_file"
+		return 0
+	fi
 
-    # Try to download and source the file
-    if curl -sL "${_src_url}" -o "./${1}" && [[ -f "./${1}" ]] && source "./${1}" &>>"${_LOGFILE}"; then
-        theme_log_item "Using: ${_src_url}"
-        return 0
-    fi
+	# Try to download and source the file
+	read -p "Do you want to download the file: ${1} from the internet? [Y/n] " -n 1 -r
+	if [[ $REPLY =~ ^[Yy]$ ]]; then
+		theme_log_item "Downloading: ${_src_url}"
+		if curl -sL "${_src_url}" -o "./${1}" && [[ -f "./${1}" ]] && source "./${1}" &>>"${_LOGFILE}"; then
+			theme_log_item "Using: ${_src_url}"
+			return 0
+		else
+			theme_log_item "Failed to download: ${_src_url}"
+			return 1
+		fi
+	else 
+		theme_log_item "${SUDO_USER} Declined to attempt dowmload of: ${1}"
+		exit 1
+	fi
 
-    # If all the above fail, log and return an error
-    theme_log_item "${1} NOT found!"
-    return 1
+	# If all the above fail, log and return an error
+	theme_log_item "${1} NOT found!"
+	return 1
 }
 
 
@@ -351,7 +356,7 @@ BRANDING="$BRAND"
 
 
 
-display_notice () {
+display_help() {
 	# Function to display a notice that the ISO creation is complete.
 	# And describe what to de next.
 	$RTD_GUI --backtitle "$BRANDING" \
@@ -390,7 +395,7 @@ remotely connecting through SSH. This can be done by:
 - then running command "byobu" if a session is already running on the server"
 
 		$RTD_GUI --backtitle "$BRANDING" --title "DONE" --msgbox "$show_notice_on_fist_run_TEXT" 15 80
-		mkdir -p ~/.config/rtd ; touch ~/.config/rtd/rtd-first-run-$RTD_Version
+		mkdir -p "/HOME/${SUDO_USER}/.config/${_TLA,,}" ; touch "/HOME/${SUDO_USER}/.config/${_TLA,,}/rtd-first-run-$RTD_Version"
 		clear
 	fi
 }
@@ -1115,7 +1120,7 @@ show_main_menu () {
 				show_menu_quick_fixes
 			;;
 			9 )
-			display_notice
+			display_help
 			;;
 		esac
 	done
@@ -1286,75 +1291,6 @@ show_menu_quick_fixes () {
 }
 
 
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Script templates                ::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-# Useful code sniplet templates. Copy and paste these and the edit them
-# as necessary to extend the functionality of this tool.
-#
-
-
-
-
-menu_template () {
-	while true; do
-		exec 3>&1
-		# Dialog Display Menu Items...
-			selection=$($RTD_GUI \
-				--backtitle "$BRANDING" \
-				--title "Menu Title" \
-				--menu "Please tell me what I can do for you:" $HEIGHT $WIDTH $LIST_HEIGHT \
-				"1" "Description" \
-				"2" "Description" \
-				"3" "Description" \
-				2>&1 1>&3)
-			exit_status=$?
-			exec 3>&-
-			clear
-
-		# Cases for how program exited...
-		case $exit_status in
-			"$DIALOG_CANCEL")
-				clear
-				echo "Program terminated."
-				exit
-			;;
-			"$DIALOG_ESC")
-				clear
-				echo "Program aborted." >&2
-				exit 1
-			;;
-		esac
-
-		# What to do depending on selection...
-		case $selection in
-			0 )
-				clear
-				echo "Program terminated."
-			;;
-			1 )
-				# code
-			;;
-			2 )
-				# code
-			;;
-			3 )
-				# code
-			;;
-		esac
-	done
-}
-
-
-
-
-
-
-
-
-
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -1378,49 +1314,50 @@ if [[ -z "$BASH_VERSINFO" ]]; then
 	exit 255
 fi
 
-case $1 in
-	about | --about | --help | -h )
-		display_notice
-		exit
-	;;
-	* )
-		if [[ "$TERM" == screen* ]]; then
-			echo "$_SIMPLE_SUPPORT_TOOL_DOC" >> ${_LOGFILE}
-			rtd_oem_check_inet_access  "$@"
-			if [ -z "${RTDFUNCTIONS}" ]; then
-				dependency_file ${_dependency_lib} #|| { echo "📚 Failed to find ${_dependency_lib}"; read -p "Press any key to continure"; }
-			else
-				write_status "📚 ${_dependency_lib} is already loaded..."
-			fi
-			if [[ $EUID -ne 0 ]]; then 
-				ensure_admin
-			else
-				check_menu_availability
-				show_notice_on_fist_run
-				show_main_menu
-			fi
+main() {
+	case $1 in
+		about | --about | --help | -h )
+			display_help
 			exit
-		else
-			if hash byobu 2>/dev/null; then
-				byobu new-session -s "RTD Simple Server Support Tools" $0
-			else
-				rtd_oem_check_inet_access "$@"
+		;;
+		* )
+			if [[ "$TERM" == screen* ]]; then
+				rtd_oem_check_inet_access  "$@"
 				if [ -z "${RTDFUNCTIONS}" ]; then
-					dependency_file ${_dependency_lib} #|| { echo "📚 Failed to find ${_dependency_lib}"; read -p "Press any key to continure"; }
+					dependency_file ${_dependency_lib} 
 				else
 					write_status "📚 ${_dependency_lib} is already loaded..."
 				fi
 				if [[ $EUID -ne 0 ]]; then 
 					ensure_admin
 				else
-					check_dependencies byobu && echo -e "$RED" "A critical component needed for this script to work properly was attempted to be added... Attempting to run the script again"
-					su -c "$0 $*" "$SUDO_USER"
-					clear
+					check_menu_availability
+					show_notice_on_fist_run
+					show_main_menu
 				fi
 				exit
+			else
+				if hash byobu 2>/dev/null; then
+					byobu new-session -s "RTD Simple Server Support Tools" $0
+				else
+					rtd_oem_check_inet_access $*
+					if [ -z "${RTDFUNCTIONS}" ]; then
+						dependency_file ${_dependency_lib} 
+					else
+						write_status "📚 ${_dependency_lib} is already loaded..."
+					fi
+					if [[ $EUID -ne 0 ]]; then 
+						ensure_admin
+					else
+						check_dependencies byobu && echo -e "$RED" "A critical component needed for this script to work properly was attempted to be added... Attempting to run the script again"
+						su -c "$0 $*" "$SUDO_USER"
+						clear
+					fi
+					exit
+				fi
 			fi
-		fi
-	;;
-esac
-
+		;;
+	esac
+}
+main $*
 

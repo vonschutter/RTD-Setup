@@ -3,7 +3,7 @@ if [[ -z "$BASH_VERSINFO" ]]; then
 	echo "SHELL ENV ERROR: You must use a BASH Shell to load this library. Exiting..."
 	exit 255
 fi
-export RTD_VERSION=2.02
+export RTD_VERSION="2.03"
 : << 'Library_Documentation'
 ::              R T D   F u n c t i o n   L i b r a r y
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -47,7 +47,7 @@ export RTD_VERSION=2.02
         backup_running_vm                               ; Backs up all running virtual machines on the local computer
         check_dependencies                              ; Checks that software requirements are met so scripts do not fail
         security::check_if_password_pOwned              ; Allows user to check if an intended password is already in well known dictionaries
-        check_menu_availability                         ; Checks if it is possible to display graphical menus in a terminal
+        dialog::check_menu_availability                         ; Checks if it is possible to display graphical menus in a terminal
         system::cleanup_and_finish                      ; Cleans and clears variables and temp files used by the media creations functions
         compress_all_items_here                         ; Compress all folders and files in pwd using 7z (optionally encrypt)
         compress_provided_items                         ; Compress and optionally encrypt discrete contents
@@ -101,10 +101,10 @@ export RTD_VERSION=2.02
 	oem::register_all_tools                         ; Register all OEM scripts so that they are accessible by terminal
 	oem::register_wallpapers_for_gnome              ; Register wallpapers for Gnome (so they show up in the appearance tool)
 	oem::rtd_tools_make_launchers                   ; Creates a default set of pre-defined launchers
-	oem::generate_rtd_me_sh_cmd                     ; Creates a rtd bootstrap script for system/software install for Windows, Linux, MAC OS, BSD etc.
+	template::_rtd_me_sh_cmd                     ; Creates a rtd bootstrap script for system/software install for Windows, Linux, MAC OS, BSD etc.
 	pause_a_given_time                              ; Pause while showing a count down in seconds
 	rtd_oem_cfg_Account_Setup                       ; Generates a preseed section [Account setup] (d-i passwd string)
-	rtd_oem_check_inet_access                       ; Verifies that the internet is accessible
+	system::rtd_oem_check_inet_access                       ; Verifies that the internet is accessible
 	rtd_oem_cloud-config_ubuntu_cfg_KS_CFG_Options  ; TO DO (incomplete)
 	system::rtd_oem_find_live_release               ; locate and download live media for debian and ubuntu
 	rtd_oem_kde_set_wallpaper                       ; Sets wallpaper in the plasma workspace
@@ -2309,7 +2309,7 @@ oem::register_all_tools() {
 
 
 
-check_menu_availability() {
+dialog::check_menu_availability() {
 	# Description: First discover what menu system is installed. Some systems use "dialog" and
 	# other systems use whiptail for the terminal to show menus and dialogs.
 	# If nothing is found, then make sure it is available before continuing.
@@ -2321,7 +2321,7 @@ check_menu_availability() {
 	# Arguments: 	None accepted
 	# Outputs: 	Interactive
 	# Returns: 	Default exit status of the last command run.
-	# Usage: 	check_menu_availability
+	# Usage: 	dialog::check_menu_availability
 	#
 	# End of documentation
 	if hash dialog 2>/dev/null ; then
@@ -4639,7 +4639,7 @@ system::ensure_admin() {
 
 
 
-rtd_oem_check_inet_access() {
+system::rtd_oem_check_inet_access() {
 	# Description: Function to verrify internet availabiltiy.
 	# The funciton will pause for 10 seconds by default, and will accept
 	# an integer to indicate a non-decault time to pause.
@@ -4648,12 +4648,12 @@ rtd_oem_check_inet_access() {
 	# Outputs:
 	# Returns:
 	# Usage:
-	# rtd_oem_check_inet_access [ integer ]
+	# system::rtd_oem_check_inet_access [ integer ]
 	#
 	# Example:
-	# rtd_oem_check_inet_access 60
+	# system::rtd_oem_check_inet_access 60
 	#
-	# If an argument is omitted rtd_oem_check_inet_access will wait indefinitley
+	# If an argument is omitted system::rtd_oem_check_inet_access will wait indefinitley
 	# for input.
 	#
 	# End of documentation
@@ -10023,7 +10023,7 @@ kvm::make_vm_template_now_from_microsoft() {
 	: ${CONFIG:="Workstation"}
 	: ${WindowsInstructions:="/var/lib/libvirt/boot/win$(date +%Y-%m-%d-%H-%M-%S-%s).img"}
 	: ${virt_net="$(system::find_vm_bridge)"}
-	: ${_saveto:="$( mktemp -d /tmp/WinConfig.XXXXXX )"}
+	: ${_saveto="$( mktemp -d /tmp/WinConfig.XXXXXX )"}
 	: ${AutoUnattend="${_saveto}/autounattend.xml"}
 	: ${PostTasks="${_saveto}/rtd-me-sh.cmd"}
 	: ${preferred_video="${5:-"qxl"}"}
@@ -10087,7 +10087,7 @@ kvm::make_vm_template_now_from_microsoft() {
 
 		# Generate autounattend.xml
 		write_information "Generate installations instructions for Windows ${AutoUnattend}..."
-		if ! template::autounattend_xml --write "${AutoUnattend}"; then
+		if ! template::autounattend_xml --write "${AutoUnattend}" --winver ${target_winver} ; then
 			write_error "Failed to create the autounattend.xml file..."
 			rtd_oem_pause 1 "Install will not be fully automatic: Please press [ENTER] to continue..."
 		fi
@@ -10952,226 +10952,246 @@ template::kickstart_cfg() {
 
 
 template::rtd_me_sh_cmd() {
+	# Template for the rtd_me.sh.cmd script
 
-	case ${1} in 
-		--write )
-		if [[ ! -d ${2%$base} ]] ; then { write_error "Folder does not exist! Cannot create file... " ; return 1 ; } ; fi
-		cat >> ${2} <<-'EOF'
-		cls
-		@ECHO OFF
+	local todo=${1}
+	local outfile=${2}
+	write_information "Writing out the rtd_me.sh.cmd script to ${outfile}"
+	
+	# case ${todo} in 
+	# 	--write )
+			cat >> ${outfile} <<-'EOF'
+			cls
+			@ECHO OFF
 
-		echo	[internal]	-	RTD System System Managment Bootstrap Script      -	[internal]
-		::
-		::
-		:: 						Shell Script Section
-		::
-		::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-		::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-		:: Author(s):   	SLS, KLS, NB.  Buffalo Center, IA & Avarua, Cook Islands
-		:: Version:	1.06
-		::
-		::
-		:: Purpose: 	The purpose of the script is to decide what scripts to download based
-		::          	on the host OS found; works with both Windows, MAC and Linux systems.
-		::		The focus of this script is to be compatible enough that it could be run on any
-		::		system and compete it's job. In this case it is simply to identify the OS
-		::		and get the appropriate script files to run on the system in question;
-		::		In its original configuration this bootstrap script was used to install and
-		::		configure software appropriate for the system in question. It accomplishes this
-		::		by using the idiosyncrasies of the default scripting languages found in
-		::		the most popular operating systems around *NIX (MAC, Linux, BSD etc.) and
-		::		CMD (Windows NT, 2000, 2003, XP, Vista, 8, and 10).
-		::
-		::
-		::
-		::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-		::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-		
-
-		echo "
-		::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-		::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-		::
-		@title			-	RTD System System Managment Bootstrap Script      -
-		::
-		::
-		::					Windows CMD Shell Script Section
-		::
-		::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-		::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::"
-
-
-		:INIT
-			:::::::::::::::::::::::::::::::::::::::::::::::::::
-			::	Script startup components; tasks that always
-			::	need to be done when the initializes.
+			echo	[internal]	-	RTD System System Management Bootstrap Script      -	[internal]
 			::
-			ECHO Welcome to %COMSPEC%
-			ECHO This is a windows script!
-			:: setlocal &  pushd %~dp0
-			:: %debug%
-
-		:SETINGS
-			::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			::  ***             Settings               ***      ::
-			::::::::::::::::::::::::::::::::::::::::::::::::::::::
 			::
-			set temp=c:\rtd\temp
-			::if not exit %temp% md %temp%
-			::set _LOGDIR=c:\rtd\log
-			::if not exist %_LOGDIR% md %_OGDIR%
-			set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
-			set _STAGE2FILE=rtd-oem-win10-config.ps1
-			echo Stage 2 file is located at:
-			echo %_STAGE2LOC%\%_STAGE2FILE%
-
-
-		:GetInterestingThigsToDoOnThisSystem
-			:: Given that Microsoft Windows has been detected and the CMD chell portion of this script is executed,
-			:: the second stage script must be downloaded from an online location. Depending on the version of windows
-			:: there are different methods available to get and run remote files. All versions of windows do not neccesarily
-			:: support powershell scripting. Therefore the base of this activity is coded in simple command CMD.EXE shell scripting
+			:: 						Shell Script Section
 			::
-			:: Table of evaluating verson of windos and calling the appropriate action fiven the version of windows found.
-			:: In this case it is easier to manage a straight table than a for loop or array:
+			::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+			::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+			:: Author(s):   	SLS, KLS, NB.  Buffalo Center, IA & Avarua, Cook Islands
+			:: Version:	1.06
+			::
+			::
+			:: Purpose: 	The purpose of the script is to decide what scripts to download based
+			::          	on the host OS found; works with both Windows, MAC and Linux systems.
+			::		The focus of this script is to be compatible enough that it could be run on any
+			::		system and compete it's job. In this case it is simply to identify the OS
+			::		and get the appropriate script files to run on the system in question;
+			::		In its original configuration this bootstrap script was used to install and
+			::		configure software appropriate for the system in question. It accomplishes this
+			::		by using the idiosyncrasies of the default scripting languages found in
+			::		the most popular operating systems around *NIX (MAC, Linux, BSD etc.) and
+			::		CMD (Windows NT, 2000, 2003, XP, Vista, 8, and 10).
+			::
+			::
+			::
+			::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+			::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+			
 
-			:: DOS Based versions of Windows:
-			:: ver | find "4.0" > nul && goto CMD1 	rem Windows 95
-			:: ver | find "4.10" > nul && goto CMD1 rem Windows 98
-			:: ver | find "4.90" > nul && goto CMD1	rem Windows ME
-
-			:: Windows 32 and 64 Bit versions:
-			ver | find "NT 4.0" > nul && call :CMD1 Windows NT 4.0
-			ver | find "5.0" > nul && call :CMD1 Windows 2000
-			ver | find "5.1" > nul && call :CMD1 Windows XP
-			ver | find "5.2" > nul && call :CMD1 Windows XP 64 Bit
-			ver | find "6.0" > nul && call :DispErr Vista is not supported!!!
-			ver | find "6.1" > nul && call :PS1 Windows 7
-			ver | find "6.2" > nul && call :PS2 Windows 8
-			ver | find "6.3" > nul && call :PS2 Windows 8
-			ver | find "6.3" > nul && call :PS2 Windows 8
-			ver | find "10.0" > nul && call :PS2 Windows 10
-
-			:: Windows Server OS Versions:
-			ver | find "NT 6.2" > nul && call :PS2 Windows Server 2012
-			ver | find "NT 6.3" > nul && call :PS2 Windows Server 2012 R2
-			ver | find "NT 10.0" > nul && call :PS2 Windows Server 2016 and up...
-
-			goto end
-
-
-		:PS1
-			:: Procedure to get the second stage in Windows 7. Windows 7, by default has a different version of
-			:: PowerShell installed. Therefore a slightly different syntax must be used.
-			:: get stage 2 and run it...
-			echo Found %*
-			echo Fetching %_STAGE2FILE%...
-			echo Please wait...
-			if exist A:\%_STAGE2FILE% (
-				echo File found locally...  
-				powershell -ExecutionPolicy UnRestricted -File A:\%_STAGE2FILE%
-				) else (
-				echo Fetching %_STAGE2FILE% from the internet...
-				powershell -Command "(New-Object Net.WebClient).DownloadFile('%_STAGE2LOC%\%_STAGE2FILE%', '%_STAGE2FILE%')"
-				powershell -ExecutionPolicy UnRestricted -File .\%_STAGE2FILE%
-			)
-			goto end
+			echo "
+			::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+			::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+			::
+			@title			-	RTD System System Managment Bootstrap Script      -
+			::
+			::
+			::					Windows CMD Shell Script Section
+			::
+			::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+			::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::"
 
 
-		:PS2
-			:: Procedure to get the second stage configuration script in all version of windows after 7.
-			:: These version of windows have a more modern version of PowerShell.
-			:: get stage 2 and run it...
-			echo Found %*
-			echo Fetching %_STAGE2FILE%...
-			echo Please wait...
-			if exist A:\%_STAGE2FILE% (
-				echo File found locally...  
-				powershell -ExecutionPolicy UnRestricted -File A:\%_STAGE2FILE%
-				) else (
-				echo Fetching %_STAGE2FILE% from the internet...
-				powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %_STAGE2LOC%\%_STAGE2FILE% -OutFile %_STAGE2FILE%"
-				powershell -ExecutionPolicy UnRestricted -File .\%_STAGE2FILE%
-			)
-			if exist A:\_Chris-Titus-Post-Windows-Install-App.ps1 (
-				echo File found locally...  
-				powershell -ExecutionPolicy UnRestricted -File A:\_Chris-Titus-Post-Windows-Install-App.ps1
-				) else (
-				echo Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet...
-				powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
-			)
-			goto end
+			:INIT
+				:::::::::::::::::::::::::::::::::::::::::::::::::::
+				::	Script startup components; tasks that always
+				::	need to be done when the initializes.
+				::
+				ECHO Welcome to %COMSPEC%
+				ECHO This is a windows script!
+				:: setlocal &  pushd %~dp0
+				:: %debug%
+
+			:SETINGS
+				::::::::::::::::::::::::::::::::::::::::::::::::::::::
+				::  ***             Settings               ***      ::
+				::::::::::::::::::::::::::::::::::::::::::::::::::::::
+				::
+				set temp=c:\rtd\temp
+				::if not exit %temp% md %temp%
+				::set _LOGDIR=c:\rtd\log
+				::if not exist %_LOGDIR% md %_OGDIR%
+				set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
+				set _STAGE2FILE=rtd-oem-win10-config.ps1
+				echo Stage 2 file is located at:
+				echo %_STAGE2LOC%\%_STAGE2FILE%
+
+
+			:GetInterestingThigsToDoOnThisSystem
+				:: Given that Microsoft Windows has been detected and the CMD chell portion of this script is executed,
+				:: the second stage script must be downloaded from an online location. Depending on the version of windows
+				:: there are different methods available to get and run remote files. All versions of windows do not neccesarily
+				:: support powershell scripting. Therefore the base of this activity is coded in simple command CMD.EXE shell scripting
+				::
+				:: Table of evaluating verson of windos and calling the appropriate action fiven the version of windows found.
+				:: In this case it is easier to manage a straight table than a for loop or array:
+
+				:: DOS Based versions of Windows:
+				:: ver | find "4.0" > nul && goto CMD1 	rem Windows 95
+				:: ver | find "4.10" > nul && goto CMD1 rem Windows 98
+				:: ver | find "4.90" > nul && goto CMD1	rem Windows ME
+
+				:: Windows 32 and 64 Bit versions:
+				ver | find "NT 4.0" > nul && call :CMD1 Windows NT 4.0
+				ver | find "5.0" > nul && call :CMD1 Windows 2000
+				ver | find "5.1" > nul && call :CMD1 Windows XP
+				ver | find "5.2" > nul && call :CMD1 Windows XP 64 Bit
+				ver | find "6.0" > nul && call :DispErr Vista is not supported!!!
+				ver | find "6.1" > nul && call :PS1 Windows 7
+				ver | find "6.2" > nul && call :PS2 Windows 8
+				ver | find "6.3" > nul && call :PS2 Windows 8
+				ver | find "6.3" > nul && call :PS2 Windows 8
+				ver | find "10.0" > nul && call :PS2 Windows 10
+
+				:: Windows Server OS Versions:
+				ver | find "NT 6.2" > nul && call :PS2 Windows Server 2012
+				ver | find "NT 6.3" > nul && call :PS2 Windows Server 2012 R2
+				ver | find "NT 10.0" > nul && call :PS2 Windows Server 2016 and up...
+
+				goto end
+
+
+			:PS1
+				:: Procedure to get the second stage in Windows 7. Windows 7, by default has a different version of
+				:: PowerShell installed. Therefore a slightly different syntax must be used.
+				:: get stage 2 and run it...
+				echo Found %*
+				echo Fetching %_STAGE2FILE%...
+				echo Please wait...
+				if exist A:\%_STAGE2FILE% (
+					echo File found locally...  
+					powershell -ExecutionPolicy UnRestricted -File A:\%_STAGE2FILE%
+					) else (
+					echo Fetching %_STAGE2FILE% from the internet...
+					powershell -Command "(New-Object Net.WebClient).DownloadFile('%_STAGE2LOC%\%_STAGE2FILE%', '%_STAGE2FILE%')"
+					powershell -ExecutionPolicy UnRestricted -File .\%_STAGE2FILE%
+				)
+				goto end
+
+
+			:PS2
+				:: Procedure to get the second stage configuration script in all version of windows after 7.
+				:: These version of windows have a more modern version of PowerShell.
+				:: get stage 2 and run it...
+				echo Found %*
+				echo Fetching %_STAGE2FILE%...
+				echo Please wait...
+				if exist A:\%_STAGE2FILE% (
+					echo File found locally...  
+					powershell -ExecutionPolicy UnRestricted -File A:\%_STAGE2FILE%
+					) else (
+					echo Fetching %_STAGE2FILE% from the internet...
+					powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %_STAGE2LOC%\%_STAGE2FILE% -OutFile %_STAGE2FILE%"
+					powershell -ExecutionPolicy UnRestricted -File .\%_STAGE2FILE%
+				)
+				if exist A:\_Chris-Titus-Post-Windows-Install-App.ps1 (
+					echo File found locally...  
+					powershell -ExecutionPolicy UnRestricted -File A:\_Chris-Titus-Post-Windows-Install-App.ps1
+					) else (
+					echo Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet...
+					powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
+				)
+				goto end
 
 
 
 
-		:CMD1
-			:: Pre windows 7 instruction go here (except vista)...
-			:: Windows NT, XP, and 2000 etc. do not have powershell and must find a different way to
-			:: fetch a script over the internet and execute it.
+			:CMD1
+				:: Pre windows 7 instruction go here (except vista)...
+				:: Windows NT, XP, and 2000 etc. do not have powershell and must find a different way to
+				:: fetch a script over the internet and execute it.
 
-			echo Detected %* ...
-			echo executing PRE Windows 7 instructions...
+				echo Detected %* ...
+				echo executing PRE Windows 7 instructions...
 
-			goto end
-
-
-
-
-		::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-		::::::::::::::                                          ::::::::::::::::::::::
-		::::::::::::::            ERROR handling Below          ::::::::::::::::::::::
-		::::::::::::::                                          ::::::::::::::::::::::
-		::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+				goto end
 
 
 
-		:DispErr
-			set _ERRMSG=%*
-			@title %0 -- !!%_ERRMSG%!!
-			echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			echo ::                            Message                                          ::
-			echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			echo.
-			echo.
-			echo        %_ERRMSG%
-			echo        Presently I know what to do for Linux, and Windows 7 and beyond...
-			echo.
-			echo ::                                                                             ::
-			echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-		goto eof
+
+			::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+			::::::::::::::                                          ::::::::::::::::::::::
+			::::::::::::::            ERROR handling Below          ::::::::::::::::::::::
+			::::::::::::::                                          ::::::::::::::::::::::
+			::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 
 
-		:end
-		:eof
+			:DispErr
+				set _ERRMSG=%*
+				@title %0 -- !!%_ERRMSG%!!
+				echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+				echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+				echo ::                            Message                                          ::
+				echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+				echo.
+				echo.
+				echo        %_ERRMSG%
+				echo        Presently I know what to do for Linux, and Windows 7 and beyond...
+				echo.
+				echo ::                                                                             ::
+				echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+				echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+			goto eof
+
+
+
+			:end
+			:eof
 		EOF
-	;;
-	--help )
-		echo "Usage: ${FUNCNAME[0]} --write </path/to/filename>"
-	;;
-	* )
-		write_error "No output file provided, use: ${FUNCNAME[0]} --write </path/to/filename>"
-	;;
-	esac
+	# ;;
+	# --help )
+	# 	echo "Usage: ${FUNCNAME[0]} --write </path/to/filename>"
+	# ;;
+	# * )
+	# 	write_error "No output file provided, use: ${FUNCNAME[0]} --write </path/to/filename>"
+	# ;;
+	# esac
 
 }
 
 
 
 template::autounattend_xml() {
-
-	# make sure the output file is provided
-	# if [[ -z ${1} ]] ; then { write_error "No output file provided, use: ${FUNCNAME[0]} <win10 | win11>" ; return 1 ; } ; fi
-	if [[ -z ${1} ]] ; then { write_error "No output file provided, use: ${FUNCNAME[0]} </path/to/filename>" ; return 1 ; } ; fi
-	check_required_variables "target_winver"
-
 	# Generate the autounattend file
-	case $target_winver in
+	local target_file target_winver
+	while  [[ $# -gt 0 ]] ; do
+		case "$1" in
+			--write)
+				target_file="$2"
+				write_information "Requested to write out instructions to: ${target_file}"
+				shift 2
+			;;
+			--winver )
+				target_winver="$2"
+				write_information "Requested to write out instructions for ${target_winver}"
+				shift 2
+			;;
+			*)
+				write_error "Incorrect sytax provided, use: ${FUNCNAME[0]} --write </path/to/filename> --winver <win10|win11|win7>"
+				return 1
+			;;
+		esac
+	done
+	system::check_required_variables target_winver target_file 
+
+	# Write out the autounattend file
+	case ${target_winver} in
 		win11 )
-		cat >> $1 <<-'EOF'
+		cat >> ${target_file} <<-'EOF'
 		<?xml version="1.0" encoding="utf-8"?>
 	<unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
 	<settings pass="offlineServicing" />
@@ -11307,8 +11327,8 @@ template::autounattend_xml() {
 		</unattend>
 		EOF
 		;;
-		* )
-		cat > $1 <<-'EOF'
+		win10 | Win10 | win7 | Win7 )
+		cat > ${target_file} <<-'EOF'
 		<?xml version="1.0" encoding="utf-8"?>
 		<unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
 		<settings pass="offlineServicing" />
@@ -11434,6 +11454,9 @@ template::autounattend_xml() {
 		</settings>
 		</unattend>
 		EOF
+		;;
+		* )
+			write_error "No valid Windows version provided, use: win7, win10, win11"
 		;;
 	esac
 }
@@ -13017,228 +13040,223 @@ if (return 0 2>/dev/null) ; then
 	sourced=0
 else
 	sourced=1
+	echo clear > /dev/null
 fi
 
 loader() {
-# Check if this library is asked to do anything or just load...
-if [ -z $1 ]; then
-	system::log_item " ***  : $(basename ${BASH_SOURCE[0]}) loaded by $(basename "${0}") on $HOSTNAME  :  ***"
-	system::log_item "💻 Basic System Information: 
-	$(hostnamectl)"
-	# Check if library is loaded from a terminal or another script (behavior may differ)...
-	# This may be useful to log for support reasons.
-	if [[ $sourced -eq 0  ]] ; then 
-		if [[ "$(basename $0)" == "bash" ]] ; then
-			write_host --cyan "Script is sourced from bash in a terminal: $0 $*"
-		else
-			write_host --cyan "Script is being sourced from a script: $(basename $0) $*"
-		fi
-	else 
-		write_host --yellow "Library is run directly as an executable! This does nothing by itself."
-		loader --help
-	fi
 
-
-	# Find and load all dependant files for this library... 
-	for i in ${_OEM_dependencies} ; do dependency::file ${i} &>/dev/null || _lderr=1 ; done
-	if [[ -n $_lderr ]] ; then
-		write_host --red "👾 Failed to load *.info files for this library! some functionality may be limited..."
-	else
-		write_host --cyan "(${_OEM_dependencies}) loaded OK!"
-	fi 
-
-	# log variables for support reasons...
-	system::log_item "Library Loaded Variables: 
-	RTD Functions Version: ${RTDFUNCTIONS}
-	.........................................
-	_LOG_DIR=${_LOG_DIR}
-	_LOGFILE=${_LOGFILE}
-	_SCRIPTNAME=${_SCRIPTNAME}
-	.........................................
-	"
-	write_host --green " 📚 RTD Power Library $RTD_VERSION loaded OK"
-	export RTDFUNCTIONS="${RTD_VERSION}"
-
-else
-	case $1 in
-		--help | -? )
-			clear
-			set_colors
-			echo -e " 📚 ${UWhite}${0##*/} ${red}::${BICyan} RunTime Data Library HELP ${endcolor}${red}${UWhite}::${endcolor}
-
-			${blue}Usage${red}:${endcolor}
-			${IYellow}source ${IGreen}${0##*/} ${endcolor}(to load the library into memory and use its functions.)
-			
-			${blue}Alternate usage${red}:${endcolor}
-			${green}"${0##*/}" ${red} [OPTIONS]${endcolor}
-
-			${blue}valid option are${red}: ${endcolor}
-			--help		       ${red}: ${endcolor}Show this help text
-			--list [option]        ${red}: ${endcolor}List library functions (requires options: software, or internal, or all)
-			       software        ${red}: ${endcolor}(list) software install bundles available
-			       internal        ${red}: ${endcolor}(list) internal functions loaded
-			           package     ${red}: ${endcolor}(list) filter by package name (requires combination with --list internal|--list all)
-			       all             ${red}: ${endcolor}(list) all library functions including software
-			--devhelp	       ${red}: ${endcolor}diplay script developer's help
-			--devhelp-gtk	       ${red}: ${endcolor}diplay script developer's help in a GTK window
-			--clean		       ${red}: ${endcolor}clean up the environment
-			--version	       ${red}: ${endcolor}display version information
-			--V		       ${red}: ${endcolor}display version information number only (short version)
-			--envcheck	       ${red}: ${endcolor}check the environment and how library was launched
-			--selfcheck	       ${red}: ${endcolor}check the library for syntax errors
-
-			${blue}EXAMPLES${red}:${endcolor}
-			${0##*/} --list internal
-			${0##*/} --list internal kvm::
-			${0##*/} --list all
-			${0##*/} --devhelp
-			${0##*/} --devhelp-gtk"
-			return
-		;;
-		--list )
-			case $2 in
-				software )
-					for i in ${_OEM_dependencies} ; do dependency::file ${i} &>/dev/null || _lderr=1 ; done
-					if [[ -n $_lderr ]] ; then
-						write_host --red "👾 Failed to load *.info files for this library! some functionality may be limited..."
-					else
-						system::log_item "(${_OEM_dependencies}) loaded OK!"
-					fi 
-					list_loaded_software_functions 
-				;;
-				internal )
-					echo -e $YELLOW "INTERNAL Functions: $ENDCOLOR"
-					echo ".........................................."
-					echo "Number	Function"
-					echo ".........................................."
-					list_loaded_internal_functions --hformat |grep "${3:-""}"
-				;;
-				all ) ( echo -e $YELLOW "Software Recipies: $ENDCOLOR" && list_loaded_software_functions && echo -e $YELLOW "INTERNAL Functions: $ENDCOLOR" && list_loaded_internal_functions ) ;;
-				* ) echo "USAGE: The --list option requires a (what option). Valid option are: software, internal, all." ;;
-			esac
-			return
-		;;
-		--devhelp )
-			while true; do
-				exec 3>&1
-				selection=$(dialog --clear --no-collapse --backtitle "${BRANDING:-" RunTime Data : Function library : Script Development Support"}" --title "RTD Library Loaded Functions:" --menu "\n Chose a function below to see more details about the function." "${HEIGHT:-0}" "${WIDTH:-90}" "${LIST_HEIGHT:-0}" $(list_loaded_internal_functions) 2>&1 1>&3)
-				exit_status=$?
-				exec 3>&-
-
-				case $exit_status in
-					1) clear && echo [Cancel] && exit ;;
-					255) clear && echo [ESC] && exit ;;
-				esac
-
-				case $selection in
-					$selection )
-						result=$(while IFS= read -r 'line'; do
-							[[ "$line" == "$selection() {" ]]		&& printline="yes"
-							[[ "$line" == "$selection() { " ]]		&& printline="no"
-							[[ "$line" == "# End of documentation"* ]]	&& printline="no"
-							[[ "$line" == *"# End of documentation"* ]]	&& printline="no"
-							[[ "$line" == *End*of*Documentation* ]]		&& printline="no"
-							[[ "$printline" == "yes" ]]			&& echo "$line" | grep -E '(^|\s*)#\s*' | sed 's/#//'
-						done < $0 )
-						dialog --clear --no-collapse --backtitle "${0##*/} :: RunTime Data Library HELP ::" --title "RTD Functon: $selection" --msgbox "$result" "${HEIGHT:-25}" "${WIDTH:-110}"
-					;;
-					* ) exit ;;
-				esac
-			done
-			return
-		;;
-		--devhelp-gtk )
-			while true; do
-				exec 3>&1
-				DisplayList=$(list_loaded_internal_functions --zformat)
-				IFS_SAV=$IFS
-				IFS=$(echo -en "\n\b")
-				selection=$(zenity --list --modal --text="Select a function below, to see the function's documentation \n and usage:" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1000}" --print-column=2 --column="Number" --column="Function" --column="Description" ${DisplayList} 2>/dev/null )
-				exit_status=$?
-				IFS=$IFS_SAV
-				exec 3>&-
-				case $exit_status in
-					1) clear && echo [Cancel] && exit ;;
-					255) clear && echo [ESC] && exit ;;
-				esac
-
-				case "$selection" in
-					"$selection" )
-						result=$(while IFS= read -r 'line'; do
-							# if echo "$line" |grep "$selection ()" ; then printline="yes" ; fi
-							[[ "$line" == "${selection/ /}()" ]]		&& printline="yes"
-							[[ "$line" =~ ?"$selection ()" ]]		&& printline="yes"
-							[[ "$line" == *"$selection ()"* ]]		&& printline="yes"
-							[[ "$line" == "# End of documentation"* ]]	&& printline="no"
-							[[ "$line" == *"# End of documentation"* ]]	&& printline="no"
-							[[ "$line" == *End*of*Documentation* ]]		&& printline="no"
-							[[ "$line" == "# End of Documentation" ]]	&& printline="no"
-							[[ "$printline" == "yes" ]]			&& echo "$line" | grep -E '(^|\s*)#\s*'
-						done < $0 )
-						zenity --info --modal --ok-label=BACK --title "RTD Functon: $selection" --text="$result" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1000}"
-					;;
-					* )
-					# Trap unknown exit code...
-					exit
-					;;
-				esac
-			done
-			return
-		;;
-		--clean )
-			# Clean up the environment just in case...
-			for var in $(compgen -v | grep '^_'); do
-				unset "$var"
-			done
-			write_host --cyan "Environment cleaned up!"
-			return
-		;;
-		--version )
-			write_host --cyan "RTD Library Version: $RTD_VERSION"
-			return
-		;;
-		--envcheck )
-			# Check if the library is loaded from a terminal or another script (behavior may differ)...
-			# This may be useful to log for support reasons.
-			if [[ $sourced -eq 0  ]] ; then 
-				if [[ "$(basename $0)" == "bash" ]] ; then
-					write_host --cyan "Script is sourced from bash in a terminal: $0 $*"
-				else
-					write_host --cyan "Script is being sourced from a script: $(basename $0) $*"
-				fi
-			else 
-				write_host --yellow "Library is run directly as an executable! This does nothing by itself."
-			fi
-			return
-		;;
-		--selfcheck )
-			write_host --cyan "Checking library syntax..."
-			if dependency::command_exists "shellcheck" ; then
-				if shellcheck -S error $0 ; then 
-					write_host --cyan "Library sytax OK!"
-				 else
-					write_host --red "Library has a syntax error!"
-				 fi
+	if [[ -z $1 ]]; then
+		# Check if this library is asked to do anything or just load...
+		system::log_item " ***  : $(basename ${BASH_SOURCE[0]}) loaded by $(basename "${0}") on $HOSTNAME  :  ***"
+		system::log_item "💻 Basic System Information: 
+		$(hostnamectl)"
+		# Check if library is loaded from a terminal or another script (behavior may differ)...
+		# This may be useful to log for support reasons.
+		if [[ $sourced -eq 0  ]] ; then 
+			if [[ "$(basename $0)" == "bash" ]] ; then
+				write_host --cyan "Script is sourced from bash in a terminal: $0 $*"
 			else
-				write_host --red "shellcheck command not found! Please install it to use this function."
-			fi 
-		;;
-		--V )
-			echo "$RTD_VERSION"
-			return
-		;;
-		* )
-			# write_error "No RECOGNIZED arguments provided: 
-			# function: ${FUNCNAME[0]} 
-			# called by: ${FUNCNAME[1]}
-			# called by 2: ${FUNCNAME[2]}
-			# Use ${0:BASENAME} --help to see supported arguments
-			# Parameter provided: $1
-			# $0 launched with unknown parameters ($*)" 
-			return
-		;;
-	esac
-fi
+				write_host --cyan "Script is being sourced from a script: $(basename $0) $*"
+			fi
+		else 
+			write_host --yellow "Library is run directly as an executable! This does nothing by itself."
+			loader --help
+		fi
+
+		# Find and load all dependant files for this library... 
+		for i in ${_OEM_dependencies} ; do dependency::file ${i} &>/dev/null || _lderr=1 ; done
+		if [[ -n $_lderr ]] ; then
+			write_host --red "👾 Failed to load *.info files for this library! some functionality may be limited..."
+		else
+			write_host --cyan "(${_OEM_dependencies}) loaded OK!"
+		fi 
+
+		# log variables for support reasons...
+		system::log_item "Library Loaded Variables: 
+		RTD Functions Version: ${RTDFUNCTIONS}
+		.........................................
+		_LOG_DIR=${_LOG_DIR}
+		_LOGFILE=${_LOGFILE}
+		_SCRIPTNAME=${_SCRIPTNAME}
+		.........................................
+		"
+		write_host --green " 📚 RTD Power Library $RTD_VERSION loaded OK"
+		export RTDFUNCTIONS="${RTD_VERSION}"
+
+	else
+		# If the library is asked to do something, evaluate the parameters...
+		case $1 in
+			--help | -? )
+				clear
+				set_colors
+				echo -e " 📚 ${UWhite}${0##*/} ${red}::${BICyan} RunTime Data Library HELP ${endcolor}${red}${UWhite}::${endcolor}
+
+				${blue}Usage${red}:${endcolor}
+				${IYellow}source ${IGreen}${0##*/} ${endcolor}(to load the library into memory and use its functions.)
+				
+				${blue}Alternate usage${red}:${endcolor}
+				${green}"${0##*/}" ${red} [OPTIONS]${endcolor}
+
+				${blue}valid option are${red}: ${endcolor}
+				--help		       ${red}: ${endcolor}Show this help text
+				--list [option]        ${red}: ${endcolor}List library functions (requires options: software, or internal, or all)
+				software        ${red}: ${endcolor}(list) software install bundles available
+				internal        ${red}: ${endcolor}(list) internal functions loaded
+					package     ${red}: ${endcolor}(list) filter by package name (requires combination with --list internal|--list all)
+				all             ${red}: ${endcolor}(list) all library functions including software
+				--devhelp	       ${red}: ${endcolor}diplay script developer's help
+				--devhelp-gtk	       ${red}: ${endcolor}diplay script developer's help in a GTK window
+				--clean		       ${red}: ${endcolor}clean up the environment
+				--version	       ${red}: ${endcolor}display version information
+				--V		       ${red}: ${endcolor}display version information number only (short version)
+				--envcheck	       ${red}: ${endcolor}check the environment and how library was launched
+				--selfcheck	       ${red}: ${endcolor}check the library for syntax errors
+
+				${blue}EXAMPLES${red}:${endcolor}
+				${0##*/} --list internal
+				${0##*/} --list internal kvm::
+				${0##*/} --list all
+				${0##*/} --devhelp
+				${0##*/} --devhelp-gtk"
+				return
+			;;
+			--list )
+				case $2 in
+					software )
+						for i in ${_OEM_dependencies} ; do dependency::file ${i} &>/dev/null || _lderr=1 ; done
+						if [[ -n $_lderr ]] ; then
+							write_host --red "👾 Failed to load *.info files for this library! some functionality may be limited..."
+						else
+							system::log_item "(${_OEM_dependencies}) loaded OK!"
+						fi 
+						list_loaded_software_functions 
+					;;
+					internal )
+						echo -e $YELLOW "INTERNAL Functions: $ENDCOLOR"
+						echo ".........................................."
+						echo "Number	Function"
+						echo ".........................................."
+						list_loaded_internal_functions --hformat |grep "${3:-""}"
+					;;
+					all ) ( echo -e $YELLOW "Software Recipies: $ENDCOLOR" && list_loaded_software_functions && echo -e $YELLOW "INTERNAL Functions: $ENDCOLOR" && list_loaded_internal_functions ) ;;
+					* ) echo "USAGE: The --list option requires a (what option). Valid option are: software, internal, all." ;;
+				esac
+				return
+			;;
+			--devhelp )
+				while true; do
+					exec 3>&1
+					selection=$(dialog --clear --no-collapse --backtitle "${BRANDING:-" RunTime Data : Function library : Script Development Support"}" --title "RTD Library Loaded Functions:" --menu "\n Chose a function below to see more details about the function." "${HEIGHT:-0}" "${WIDTH:-90}" "${LIST_HEIGHT:-0}" $(list_loaded_internal_functions) 2>&1 1>&3)
+					exit_status=$?
+					exec 3>&-
+
+					case $exit_status in
+						1) clear && echo [Cancel] && exit ;;
+						255) clear && echo [ESC] && exit ;;
+					esac
+
+					case $selection in
+						$selection )
+							result=$(while IFS= read -r 'line'; do
+								[[ "$line" == "$selection() {" ]]		&& printline="yes"
+								[[ "$line" == "$selection() { " ]]		&& printline="no"
+								[[ "$line" == "# End of documentation"* ]]	&& printline="no"
+								[[ "$line" == *"# End of documentation"* ]]	&& printline="no"
+								[[ "$line" == *End*of*Documentation* ]]		&& printline="no"
+								[[ "$printline" == "yes" ]]			&& echo "$line" | grep -E '(^|\s*)#\s*' | sed 's/#//'
+							done < $0 )
+							dialog --clear --no-collapse --backtitle "${0##*/} :: RunTime Data Library HELP ::" --title "RTD Functon: $selection" --msgbox "$result" "${HEIGHT:-25}" "${WIDTH:-110}"
+						;;
+						* ) exit ;;
+					esac
+				done
+				return
+			;;
+			--devhelp-gtk )
+				while true; do
+					exec 3>&1
+					DisplayList=$(list_loaded_internal_functions --zformat)
+					IFS_SAV=$IFS
+					IFS=$(echo -en "\n\b")
+					selection=$(zenity --list --modal --text="Select a function below, to see the function's documentation \n and usage:" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1000}" --print-column=2 --column="Number" --column="Function" --column="Description" ${DisplayList} 2>/dev/null )
+					exit_status=$?
+					IFS=$IFS_SAV
+					exec 3>&-
+					case $exit_status in
+						1) clear && echo [Cancel] && exit ;;
+						255) clear && echo [ESC] && exit ;;
+					esac
+
+					case "$selection" in
+						"$selection" )
+							result=$(while IFS= read -r 'line'; do
+								# if echo "$line" |grep "$selection ()" ; then printline="yes" ; fi
+								[[ "$line" == "${selection/ /}()" ]]		&& printline="yes"
+								[[ "$line" =~ ?"$selection ()" ]]		&& printline="yes"
+								[[ "$line" == *"$selection ()"* ]]		&& printline="yes"
+								[[ "$line" == "# End of documentation"* ]]	&& printline="no"
+								[[ "$line" == *"# End of documentation"* ]]	&& printline="no"
+								[[ "$line" == *End*of*Documentation* ]]		&& printline="no"
+								[[ "$line" == "# End of Documentation" ]]	&& printline="no"
+								[[ "$printline" == "yes" ]]			&& echo "$line" | grep -E '(^|\s*)#\s*'
+							done < $0 )
+							zenity --info --modal --ok-label=BACK --title "RTD Functon: $selection" --text="$result" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1000}"
+						;;
+						* )
+						# Trap unknown exit code...
+						exit
+						;;
+					esac
+				done
+				return
+			;;
+			--clean )
+				# Clean up the environment just in case...
+				for var in $(compgen -v | grep '^_'); do
+					unset "$var"
+				done
+				write_host --cyan "Environment cleaned up!"
+				return 0
+			;;
+			--version )
+				write_host --cyan "RTD Library Version: $RTD_VERSION"
+				return 0
+			;;
+			--envcheck )
+				# Check if the library is loaded from a terminal or another script (behavior may differ)...
+				# This may be useful to log for support reasons.
+				if [[ $sourced -eq 0  ]] ; then 
+					if [[ "$(basename $0)" == "bash" ]] ; then
+						write_host --cyan "Script is sourced from bash in a terminal: $0 $*"
+					else
+						write_host --cyan "Script is being sourced from a script: $(basename $0) $*"
+					fi
+				else 
+					write_host --yellow "Library is run directly as an executable! This does nothing by itself."
+				fi
+				return
+			;;
+			--selfcheck )
+				write_host --cyan "Checking library syntax..."
+				if dependency::command_exists "shellcheck" ; then
+					if shellcheck -S error $0 ; then 
+						write_host --cyan "Library sytax OK!"
+					else
+						write_host --red "Library has a syntax error!"
+					fi
+				else
+					write_host --red "shellcheck command not found! Please install it to use this function."
+				fi 
+			;;
+			--V )
+				echo "$RTD_VERSION"
+				return 0
+			;;
+			* )
+				return 0
+			;;
+		esac
+	fi
 
 }
 loader $*
