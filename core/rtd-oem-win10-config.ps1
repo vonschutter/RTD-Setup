@@ -375,9 +375,13 @@ function InstallVMSDriverTools {
 		"QEMU" {
 			# To disable Driver Signature Enforcement
 			Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows NT\Driver Signing" -Name "BehaviorOnFailedVerify" -Value 0
+			# Apply the policy update without rebooting
+			gpupdate /target:computer /force
+
 			OnlineInstallTask -Title "Installing Spice Virtualization Client Tools" -ChocoInstall "spice-agent"
 			OnlineInstallTask -Title "Installing Spice Virtualization Client Tools" -ChocoInstall "qemu-guest-agent --install-arguments 'ALLUSERS'"
 			OnlineInstallTask -Title "Installing VirtIO Drivers for KVM Hypervisor" -ChocoInstall "virtio-drivers"
+			
 			# To enable Driver Signature Enforcement
 			Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows NT\Driver Signing" -Name "BehaviorOnFailedVerify" -Value 1
 			}
