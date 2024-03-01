@@ -10959,198 +10959,203 @@ template::rtd_me_sh_cmd() {
 	
 	# case ${todo} in 
 	# 	--write )
-			cat >> ${outfile} <<-'EOF'
-			cls
-			@ECHO OFF
+cat >> ${outfile} <<-'EOF'
+cls
+@ECHO OFF
 
-			echo	[internal]	-	RTD System System Management Bootstrap Script      -	[internal]
-			::
-			::
-			:: 						Shell Script Section
-			::
-			::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			:: Author(s):   	SLS, KLS, NB.  Buffalo Center, IA & Avarua, Cook Islands
-			:: Version:	1.06
-			::
-			::
-			:: Purpose: 	The purpose of the script is to decide what scripts to download based
-			::          	on the host OS found; works with both Windows, MAC and Linux systems.
-			::		The focus of this script is to be compatible enough that it could be run on any
-			::		system and compete it's job. In this case it is simply to identify the OS
-			::		and get the appropriate script files to run on the system in question;
-			::		In its original configuration this bootstrap script was used to install and
-			::		configure software appropriate for the system in question. It accomplishes this
-			::		by using the idiosyncrasies of the default scripting languages found in
-			::		the most popular operating systems around *NIX (MAC, Linux, BSD etc.) and
-			::		CMD (Windows NT, 2000, 2003, XP, Vista, 8, and 10).
-			::
-			::
-			::
-			::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			
-
-			echo "
-			::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			::
-			@title			-	RTD System System Managment Bootstrap Script      -
-			::
-			::
-			::					Windows CMD Shell Script Section
-			::
-			::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::"
+echo	[internal]	-	RTD System System Management Bootstrap Script      -	[internal]
+::
+::
+:: 						Shell Script Section
+::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:: Author(s):   	SLS, KLS, NB.  Buffalo Center, IA & Avarua, Cook Islands
+:: Version:	1.06
+::
+::
+:: Purpose: 	The purpose of the script is to decide what scripts to download based
+::          	on the host OS found; works with both Windows, MAC and Linux systems.
+::		The focus of this script is to be compatible enough that it could be run on any
+::		system and compete it's job. In this case it is simply to identify the OS
+::		and get the appropriate script files to run on the system in question;
+::		In its original configuration this bootstrap script was used to install and
+::		configure software appropriate for the system in question. It accomplishes this
+::		by using the idiosyncrasies of the default scripting languages found in
+::		the most popular operating systems around *NIX (MAC, Linux, BSD etc.) and
+::		CMD (Windows NT, 2000, 2003, XP, Vista, 8, and 10).
+::
+::
+::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 
-			:INIT
-				:::::::::::::::::::::::::::::::::::::::::::::::::::
-				::	Script startup components; tasks that always
-				::	need to be done when the initializes.
-				::
-				ECHO Welcome to %COMSPEC%
-				ECHO This is a windows script!
-				:: setlocal &  pushd %~dp0
-				:: %debug%
-
-			:SETINGS
-				::::::::::::::::::::::::::::::::::::::::::::::::::::::
-				::  ***             Settings               ***      ::
-				::::::::::::::::::::::::::::::::::::::::::::::::::::::
-				::
-				set temp=c:\rtd\temp
-				::if not exit %temp% md %temp%
-				::set _LOGDIR=c:\rtd\log
-				::if not exist %_LOGDIR% md %_OGDIR%
-				set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
-				set _STAGE2FILE=rtd-oem-win10-config.ps1
-				echo Stage 2 file is located at:
-				echo %_STAGE2LOC%\%_STAGE2FILE%
+echo "
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::
+@title			-	RTD System System Managment Bootstrap Script      -
+::
+::
+::					Windows CMD Shell Script Section
+::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::"
 
 
-			:GetInterestingThigsToDoOnThisSystem
-				:: Given that Microsoft Windows has been detected and the CMD chell portion of this script is executed,
-				:: the second stage script must be downloaded from an online location. Depending on the version of windows
-				:: there are different methods available to get and run remote files. All versions of windows do not neccesarily
-				:: support powershell scripting. Therefore the base of this activity is coded in simple command CMD.EXE shell scripting
-				::
-				:: Table of evaluating verson of windos and calling the appropriate action fiven the version of windows found.
-				:: In this case it is easier to manage a straight table than a for loop or array:
+:INIT
+	:::::::::::::::::::::::::::::::::::::::::::::::::::
+	::	Script startup components; tasks that always
+	::	need to be done when the initializes.
+	::
+	ECHO Welcome to %COMSPEC%
+	ECHO This is a windows script!
+	:: setlocal &  pushd %~dp0
+	:: %debug%
 
-				:: DOS Based versions of Windows:
-				:: ver | find "4.0" > nul && goto CMD1 	rem Windows 95
-				:: ver | find "4.10" > nul && goto CMD1 rem Windows 98
-				:: ver | find "4.90" > nul && goto CMD1	rem Windows ME
+:SETINGS
+	::::::::::::::::::::::::::::::::::::::::::::::::::::::
+	::  ***             Settings               ***      ::
+	::::::::::::::::::::::::::::::::::::::::::::::::::::::
+	::
+	set temp=c:\rtd\temp
+	set _LOGDIR=c:\rtd\log
+	set wallpaperloc=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/wallpaper/Wayland.jpg
+	set wallpaperdir=c:\rtd\wallpaper
 
-				:: Windows 32 and 64 Bit versions:
-				ver | find "NT 4.0" > nul && call :CMD1 Windows NT 4.0
-				ver | find "5.0" > nul && call :CMD1 Windows 2000
-				ver | find "5.1" > nul && call :CMD1 Windows XP
-				ver | find "5.2" > nul && call :CMD1 Windows XP 64 Bit
-				ver | find "6.0" > nul && call :DispErr Vista is not supported!!!
-				ver | find "6.1" > nul && call :PS1 Windows 7
-				ver | find "6.2" > nul && call :PS2 Windows 8
-				ver | find "6.3" > nul && call :PS2 Windows 8
-				ver | find "6.3" > nul && call :PS2 Windows 8
-				ver | find "10.0" > nul && call :PS2 Windows 10
+	if not exit %temp% md %temp%
+	if not exist %_LOGDIR% md %_LOGDIR%
+	if not exist %wallpaperdir% md %wallpaperdir%
 
-				:: Windows Server OS Versions:
-				ver | find "NT 6.2" > nul && call :PS2 Windows Server 2012
-				ver | find "NT 6.3" > nul && call :PS2 Windows Server 2012 R2
-				ver | find "NT 10.0" > nul && call :PS2 Windows Server 2016 and up...
-
-				goto end
+	set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
+	set _STAGE2FILE=rtd-oem-win10-config.ps1
+	echo Stage 2 file is located at:
+	echo %_STAGE2LOC%\%_STAGE2FILE%
 
 
-			:PS1
-				:: Procedure to get the second stage in Windows 7. Windows 7, by default has a different version of
-				:: PowerShell installed. Therefore a slightly different syntax must be used.
-				:: get stage 2 and run it...
-				echo Found %*
-				echo Fetching %_STAGE2FILE%...
-				echo Please wait...
-				if exist A:\%_STAGE2FILE% (
-					echo File found locally...  
-					powershell -ExecutionPolicy UnRestricted -File A:\%_STAGE2FILE%
-					) else (
-					echo Fetching %_STAGE2FILE% from the internet...
-					powershell -Command "(New-Object Net.WebClient).DownloadFile('%_STAGE2LOC%\%_STAGE2FILE%', '%_STAGE2FILE%')"
-					powershell -ExecutionPolicy UnRestricted -File .\%_STAGE2FILE%
-				)
-				goto end
+:GetInterestingThigsToDoOnThisSystem
+	:: Given that Microsoft Windows has been detected and the CMD chell portion of this script is executed,
+	:: the second stage script must be downloaded from an online location. Depending on the version of windows
+	:: there are different methods available to get and run remote files. All versions of windows do not neccesarily
+	:: support powershell scripting. Therefore the base of this activity is coded in simple command CMD.EXE shell scripting
+	::
+	:: Table of evaluating verson of windos and calling the appropriate action fiven the version of windows found.
+	:: In this case it is easier to manage a straight table than a for loop or array:
+
+	:: DOS Based versions of Windows:
+	:: ver | find "4.0" > nul && goto CMD1 	rem Windows 95
+	:: ver | find "4.10" > nul && goto CMD1 rem Windows 98
+	:: ver | find "4.90" > nul && goto CMD1	rem Windows ME
+
+	:: Windows 32 and 64 Bit versions:
+	ver | find "NT 4.0" > nul && call :CMD1 Windows NT 4.0
+	ver | find "5.0" > nul && call :CMD1 Windows 2000
+	ver | find "5.1" > nul && call :CMD1 Windows XP
+	ver | find "5.2" > nul && call :CMD1 Windows XP 64 Bit
+	ver | find "6.0" > nul && call :DispErr Vista is not supported!!!
+	ver | find "6.1" > nul && call :PS1 Windows 7
+	ver | find "6.2" > nul && call :PS2 Windows 8
+	ver | find "6.3" > nul && call :PS2 Windows 8
+	ver | find "6.3" > nul && call :PS2 Windows 8
+	ver | find "10.0" > nul && call :PS2 Windows 10
+
+	:: Windows Server OS Versions:
+	ver | find "NT 6.2" > nul && call :PS2 Windows Server 2012
+	ver | find "NT 6.3" > nul && call :PS2 Windows Server 2012 R2
+	ver | find "NT 10.0" > nul && call :PS2 Windows Server 2016 and up...
+
+	goto end
 
 
-			:PS2
-				:: Procedure to get the second stage configuration script in all version of windows after 7.
-				:: These version of windows have a more modern version of PowerShell.
-				:: get stage 2 and run it...
-				echo Found %*
-				echo Fetching %_STAGE2FILE%...
-				echo Please wait...
-				if exist A:\%_STAGE2FILE% (
-					echo File found locally...  
-					powershell -ExecutionPolicy UnRestricted -File A:\%_STAGE2FILE%
-					) else (
-					echo Fetching %_STAGE2FILE% from the internet...
-					powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %_STAGE2LOC%\%_STAGE2FILE% -OutFile %_STAGE2FILE%"
-					powershell -ExecutionPolicy UnRestricted -File .\%_STAGE2FILE%
-				)
-				if exist A:\_Chris-Titus-Post-Windows-Install-App.ps1 (
-					echo File found locally...  
-					powershell -ExecutionPolicy UnRestricted -File A:\_Chris-Titus-Post-Windows-Install-App.ps1
-					) else (
-					echo Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet...
-					powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
-				)
-				goto end
+:PS1
+	:: Procedure to get the second stage in Windows 7. Windows 7, by default has a different version of
+	:: PowerShell installed. Therefore a slightly different syntax must be used.
+	:: get stage 2 and run it...
+	echo Found %*
+	echo Fetching %_STAGE2FILE%...
+	echo Please wait...
+	if exist A:\%_STAGE2FILE% (
+		echo File found locally...  
+		powershell -ExecutionPolicy UnRestricted -File A:\%_STAGE2FILE%
+		) else (
+		echo Fetching %_STAGE2FILE% from the internet...
+		powershell -Command "(New-Object Net.WebClient).DownloadFile('%_STAGE2LOC%\%_STAGE2FILE%', '%_STAGE2FILE%')"
+		powershell -ExecutionPolicy UnRestricted -File .\%_STAGE2FILE%
+	)
+	goto end
 
 
+:PS2
+	:: Procedure to get the second stage configuration script in all version of windows after 7.
+	:: These version of windows have a more modern version of PowerShell.
+	:: get stage 2 and run it...
+	echo Found %*
+	echo Fetching %_STAGE2FILE%...
+	echo Please wait...
+	copy /y A:\*.* c:\rtd
+	if exist A:\%_STAGE2FILE% (
+		echo File found locally...  
+		powershell -ExecutionPolicy UnRestricted -File A:\%_STAGE2FILE%
+		) else (
+		echo Fetching %_STAGE2FILE% from the internet...
+		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %_STAGE2LOC%\%_STAGE2FILE% -OutFile c:\rtd\%_STAGE2FILE%"
+		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %wallpaperloc% -OutFile c:\rtd\Wayland.jpg"
+		powershell -ExecutionPolicy UnRestricted -File c:\rtd\%_STAGE2FILE%
+	)
+	if exist A:\_Chris-Titus-Post-Windows-Install-App.ps1 (
+		echo File found locally...  
+		powershell -ExecutionPolicy UnRestricted -File A:\_Chris-Titus-Post-Windows-Install-App.ps1
+		) else (
+		echo Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet...
+		powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
+	)
+	goto end
 
 
-			:CMD1
-				:: Pre windows 7 instruction go here (except vista)...
-				:: Windows NT, XP, and 2000 etc. do not have powershell and must find a different way to
-				:: fetch a script over the internet and execute it.
+:CMD1
+	:: Pre windows 7 instruction go here (except vista)...
+	:: Windows NT, XP, and 2000 etc. do not have powershell and must find a different way to
+	:: fetch a script over the internet and execute it.
 
-				echo Detected %* ...
-				echo executing PRE Windows 7 instructions...
+	echo Detected %* ...
+	echo executing PRE Windows 7 instructions...
 
-				goto end
-
-
-
-
-			::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			::::::::::::::                                          ::::::::::::::::::::::
-			::::::::::::::            ERROR handling Below          ::::::::::::::::::::::
-			::::::::::::::                                          ::::::::::::::::::::::
-			::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+	goto end
 
 
 
-			:DispErr
-				set _ERRMSG=%*
-				@title %0 -- !!%_ERRMSG%!!
-				echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-				echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-				echo ::                            Message                                          ::
-				echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-				echo.
-				echo.
-				echo        %_ERRMSG%
-				echo        Presently I know what to do for Linux, and Windows 7 and beyond...
-				echo.
-				echo ::                                                                             ::
-				echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-				echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			goto eof
+
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::::::::::::::                                          ::::::::::::::::::::::
+::::::::::::::            ERROR handling Below          ::::::::::::::::::::::
+::::::::::::::                                          ::::::::::::::::::::::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 
 
-			:end
-			:eof
-		EOF
+:DispErr
+	set _ERRMSG=%*
+	@title %0 -- !!%_ERRMSG%!!
+	echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+	echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+	echo ::                            Message                                          ::
+	echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+	echo.
+	echo.
+	echo        %_ERRMSG%
+	echo        Presently I know what to do for Linux, and Windows 7 and beyond...
+	echo.
+	echo ::                                                                             ::
+	echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+	echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+goto eof
+
+
+
+:end
+:eof
+EOF
 	# ;;
 	# --help )
 	# 	echo "Usage: ${FUNCNAME[0]} --write </path/to/filename>"
