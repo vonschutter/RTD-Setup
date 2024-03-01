@@ -182,32 +182,39 @@ fi
 
 
 dependency_file() {
-    # Function: dependency_file
-    # Description: Searches for and loads a dependency file locally, or downloads it if not found.
-    # Parameters:
-    #   - $1: The name of the dependency file.
-    # Returns:
-    #   - 0: If the file is found and loaded.
-    #   - 1: If the file is not found or fails to load.
+    local _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
+    local script_dir found_file
 
-	local _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
-	local script_dir
+    script_dir=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
 
-	script_dir=$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )
+    # Try to source from the first location
+    if source "${script_dir}/../core/${1}" &>>"${_LOGFILE}"; then
+        theme_log_item "Using: ${script_dir}/../core/${1}"
+        return 0
+    fi
 
-	if source "${script_dir}/../core/${1}" &>>${_LOGFILE} ; then
-		system::log_item "Using: ${script_dir}/../core/${1}"
-	elif source "${script_dir}/../../core/${1}" &>>${_LOGFILE} ; then
-		system::log_item "Using: ${script_dir}/../../core/${1}"
-	elif source $(find /opt -name ${1} | grep -v backup) &>>${_LOGFILE} ; then
-		system::log_item "Using: $(find /opt -name ${1} | grep -v backup)"
-	elif curl -sL "${_src_url}" -o "./${1}" && source "./${1}" &>>${_LOGFILE} ; then
-		system::log_item "Using: ${_src_url}"
-	else
-		system::log_item "${1} NOT found!"
-		return 1
-	fi
-	return 0
+    # Try to source from the second location
+    if source "${script_dir}/../../core/${1}" &>>"${_LOGFILE}"; then
+        theme_log_item "Using: ${script_dir}/../../core/${1}"
+        return 0
+    fi
+
+    # Try to source from the third location using find
+    found_file=$(find /opt -name "${1}" -print | grep -v 'backup' | head -n 1)
+    if [[ -n $found_file ]] && source "$found_file" &>>"${_LOGFILE}"; then
+        theme_log_item "Using: $found_file"
+        return 0
+    fi
+
+    # Try to download and source the file
+    if curl -sL "${_src_url}" -o "./${1}" && [[ -f "./${1}" ]] && source "./${1}" &>>"${_LOGFILE}"; then
+        theme_log_item "Using: ${_src_url}"
+        return 0
+    fi
+
+    # If all the above fail, log and return an error
+    theme_log_item "${1} NOT found!"
+    return 1
 }
 
 
@@ -219,7 +226,8 @@ dependency_file() {
 
 
 
-system::log_item ()
+
+theme_log_item ()
 {
 # Description:
 # The purpose of this function is to consistently write script output to the right log file. 
@@ -1380,9 +1388,9 @@ case $1 in
 			echo "$_SIMPLE_SUPPORT_TOOL_DOC" >> ${_LOGFILE}
 			rtd_oem_check_inet_access  "$@"
 			if [ -z "${RTDFUNCTIONS}" ]; then
-				dependency_file "${_dependency_lib}" || { echo "📚 Failed to find _rtd_library"; exit 1; }
+				dependency_file ${_dependency_lib} #|| { echo "📚 Failed to find ${_dependency_lib}"; read -p "Press any key to continure"; }
 			else
-				write_status "📚 _rtd_library is already loaded..."
+				write_status "📚 ${_dependency_lib} is already loaded..."
 			fi
 			if [[ $EUID -ne 0 ]]; then 
 				ensure_admin
@@ -1398,9 +1406,9 @@ case $1 in
 			else
 				rtd_oem_check_inet_access "$@"
 				if [ -z "${RTDFUNCTIONS}" ]; then
-					dependency_file "${_dependency_lib}" || { echo "📚 Failed to find _rtd_library"; exit 1; }
+					dependency_file ${_dependency_lib} #|| { echo "📚 Failed to find ${_dependency_lib}"; read -p "Press any key to continure"; }
 				else
-					write_status "📚 _rtd_library is already loaded..."
+					write_status "📚 ${_dependency_lib} is already loaded..."
 				fi
 				if [[ $EUID -ne 0 ]]; then 
 					ensure_admin

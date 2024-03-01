@@ -10094,7 +10094,7 @@ kvm::make_vm_template_now_from_microsoft() {
 
 		# Generate rtd-me-sh.cmd
 		write_information "Generate post install bootstrap script ${PostTasks}..."
-		if ! template::rtd_me_sh_cmd "${PostTasks}"; then
+		if ! template::rtd_me_sh_cmd --write "${PostTasks}"; then
 			write_error "Failed to create the rtd-me-sh.cmd file..."
 			rtd_oem_pause 1 "Install will not be fully automatic: Please press [ENTER] to continue..."
 		fi
@@ -10953,8 +10953,9 @@ template::kickstart_cfg() {
 
 template::rtd_me_sh_cmd() {
 
-	case $1 in 
+	case ${1} in 
 		--write )
+		if [[ ! -d ${2%$base} ]] ; then { write_error "Folder does not exist! Cannot create file... " ; return 1 ; } ; fi
 		cat >> ${2} <<-'EOF'
 		cls
 		@ECHO OFF
@@ -11152,7 +11153,7 @@ template::rtd_me_sh_cmd() {
 		echo "Usage: ${FUNCNAME[0]} --write </path/to/filename>"
 	;;
 	* )
-		write_error "No output file provided, use: ${FUNCNAME[0]} </path/to/filename>"
+		write_error "No output file provided, use: ${FUNCNAME[0]} --write </path/to/filename>"
 	;;
 	esac
 
