@@ -1650,65 +1650,65 @@ system::check_file_limits() {
 
 
 system::distribution_type() {
-# Description:
-#
-# This function determines the Linux distribution type of the system on which it is run. It identifies the 
-# distribution by checking for the presence of specific files and functions unique to each distribution's 
-# initialization system. The function aims to support a variety of Linux distributions, including Fedora,
-#  RHEL, CentOS, SUSE, Debian, Ubuntu, Gentoo, Mandriva, and Slackware.
-#
-# Parameters: none
-#
-# Returns:
-#
-# Prints the type of the Linux distribution to standard output. The possible return values are:
-#
-#     "fedora": For Fedora Linux.
-#     "redhat": For Fedora, RHEL, CentOS, and other Red Hat derivatives.
-#     "suse": For SUSE Linux distributions.
-#     "debian": For Debian, Ubuntu, and derivatives.
-#     "gentoo": For Gentoo Linux.
-#     "mandriva": For Mandriva Linux.
-#     "slackware": For Slackware Linux.
-#     "unknown": If the distribution cannot be determined.
-#
-# Usage:
-#
-# To use this function, simply call it within a bash script or from the command line in a script 
-# environment where the function has been defined. Example usage:
-#
-# distribution=$(system::distribution_type)
-# echo "Detected distribution: $distribution"
-#
-#
-# Notes:
-#
-#     The order of checks matters, as some distributions may share certain files or functions. The function 
-#     is structured to minimize false positives. For Mandriva and Slackware, the function currently 
-#     checks for the presence of /etc/mandriva-release and /etc/slackware-version, 
-#     respectively, but acknowledges that a better method of identification might be needed.
-#     This function does not have external dependencies beyond the bash shell and standard Linux filesystem 
-#     and command-line tools.
-#
-# Example:
-#
-# Here's how you might call this function within a script to execute different commands based on the detected distribution:
-#
-# bash
-#
-# case $(system::distribution_type) in
-#     redhat)
-#         echo "This is a Red Hat derivative."
-#         ;;
-#     debian)
-#         echo "This is a Debian derivative."
-#         ;;
-#     *)
-#         echo "Distribution not specifically handled."
-#         ;;
-# esac
-#
-# End of documentation
+	# Description:
+	#
+	# This function determines the Linux distribution type of the system on which it is run. It identifies the 
+	# distribution by checking for the presence of specific files and functions unique to each distribution's 
+	# initialization system. The function aims to support a variety of Linux distributions, including Fedora,
+	#  RHEL, CentOS, SUSE, Debian, Ubuntu, Gentoo, Mandriva, and Slackware.
+	#
+	# Parameters: none
+	#
+	# Returns:
+	#
+	# Prints the type of the Linux distribution to standard output. The possible return values are:
+	#
+	#     "fedora": For Fedora Linux.
+	#     "redhat": For Fedora, RHEL, CentOS, and other Red Hat derivatives.
+	#     "suse": For SUSE Linux distributions.
+	#     "debian": For Debian, Ubuntu, and derivatives.
+	#     "gentoo": For Gentoo Linux.
+	#     "mandriva": For Mandriva Linux.
+	#     "slackware": For Slackware Linux.
+	#     "unknown": If the distribution cannot be determined.
+	#
+	# Usage:
+	#
+	# To use this function, simply call it within a bash script or from the command line in a script 
+	# environment where the function has been defined. Example usage:
+	#
+	# distribution=$(system::distribution_type)
+	# echo "Detected distribution: $distribution"
+	#
+	#
+	# Notes:
+	#
+	#     The order of checks matters, as some distributions may share certain files or functions. The function 
+	#     is structured to minimize false positives. For Mandriva and Slackware, the function currently 
+	#     checks for the presence of /etc/mandriva-release and /etc/slackware-version, 
+	#     respectively, but acknowledges that a better method of identification might be needed.
+	#     This function does not have external dependencies beyond the bash shell and standard Linux filesystem 
+	#     and command-line tools.
+	#
+	# Example:
+	#
+	# Here's how you might call this function within a script to execute different commands based on the detected distribution:
+	#
+	# bash
+	#
+	# case $(system::distribution_type) in
+	#     redhat)
+	#         echo "This is a Red Hat derivative."
+	#         ;;
+	#     debian)
+	#         echo "This is a Debian derivative."
+	#         ;;
+	#     *)
+	#         echo "Distribution not specifically handled."
+	#         ;;
+	# esac
+	#
+	# End of documentation
 
 	local dtype
 	dtype="unknown"
@@ -1754,34 +1754,31 @@ system::distribution_type() {
 
 
 
-
-
-
 dependency::file () {
-# Description: Function to check for a bash library or script file and source it.
-#
-# This function searches a predetermined set of paths for a given file and sources it if found.
-# It first searches for the file locally in a set of predefined paths. If the file is found, it is sourced.
-# If the file is not found locally, the function attempts to download it from a specified URL and source it.
-# If the download is successful, the file is sourced. If the download fails, the function logs an error and exits.
-#
-# Globals:
-#   _GIT_PROFILE: The GitHub profile to use for downloading the file (default: vonschutter)
-# Arguments:
-#   Filename: The name of the file to search for and source
-# Outputs:
-#   None
-# Returns:
-#   Standard error level
-# Usage:
-#   dependency::file <filename>
-#   Example: dependency::file _config.ini
-#
-# Dependencies:
-#   This function depends on the following functions:
-#   - system::log_item: A function to log messages
-#
-# End of documentation
+	# Description: Function to check for a bash library or script file and source it.
+	#
+	# This function searches a predetermined set of paths for a given file and sources it if found.
+	# It first searches for the file locally in a set of predefined paths. If the file is found, it is sourced.
+	# If the file is not found locally, the function attempts to download it from a specified URL and source it.
+	# If the download is successful, the file is sourced. If the download fails, the function logs an error and exits.
+	#
+	# Globals:
+	#   _GIT_PROFILE: The GitHub profile to use for downloading the file (default: vonschutter)
+	# Arguments:
+	#   Filename: The name of the file to search for and source
+	# Outputs:
+	#   None
+	# Returns:
+	#   Standard error level
+	# Usage:
+	#   dependency::file <filename>
+	#   Example: dependency::file _config.ini
+	#
+	# Dependencies:
+	#   This function depends on the following functions:
+	#   - system::log_item: A function to log messages
+	#
+	# End of documentation
 
 
 	local _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
@@ -1838,19 +1835,17 @@ dependency::file () {
 
 
 
-
-
 oem::deploy_themes() {
-# Description: Function to download and deploy themes from Github.
-#              The github location is defined in the _locations file for consistency.
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns: Standard error level.
-# Usage: simply call function in a script, or override the default location in _locations:
-#        oem::deploy_themes https://www.github.com/myuser/myrepo.git
-# End of documentation
+	# Description: Function to download and deploy themes from Github.
+	#              The github location is defined in the _locations file for consistency.
+	#
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns: Standard error level.
+	# Usage: simply call function in a script, or override the default location in _locations:
+	#        oem::deploy_themes https://www.github.com/myuser/myrepo.git
+	# End of documentation
 
 	local GIT_Theme_URL="${1:-"$GIT_Theme_URL"}"
 	local _THEME_DIR="${_THEME_DIR:-"/opt/${_TLA:-rtd}/themes"}"
@@ -1875,16 +1870,15 @@ oem::deploy_themes() {
 
 
 
-
 dependency::virtualization() {
-# Description: Common function to check on the required components for making virtual machines. 
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns: nothing
-# Usage: simply call function in a script
-# End of documentation
+	# Description: Common function to check on the required components for making virtual machines. 
+	#
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns: nothing
+	# Usage: simply call function in a script
+	# End of documentation
 
 	OS_NAME=$(hostnamectl | awk '/Operating System/ {print $3}')
 	write_status "${FUNCNAME[0]}: Checking for virtualization software..."
@@ -1930,50 +1924,47 @@ dependency::virtualization() {
 
 
 
-
-
-
 system::check_required_variables() {
-# Description: Function to check for the presence and non-emptiness of a list of variables.
-# This function checks for the presence and non-emptiness of a list of variables. 
-# It is designed to validate that certain required variables are both defined (set) 
-# and have a non-empty value. This is particularly useful in scripts where specific 
-# variables are essential for correct execution.
-#
-# Arguments:
-#     $@: A list of variable names (as strings) to be checked. Each argument should 
-#     be the name of a variable to check.
-#
-# Outputs:
-#     If any variables are found to be unset, it prints a message listing these variables.
-#     If any variables are found to be set but empty, it prints a message listing these variables.
-#
-# Return Values:
-#     Returns 0 (success) if all variables are set and non-empty.
-#     Returns 1 (failure) if any variable is either unset or set but empty.
-#
-# Usage:
-# To use this function, pass the names of the variables you want to check as arguments. For example:
-#
-# system::check_required_variables "VAR1" "VAR2" "VAR3"
-#
-# Example:
-# VAR1="data"
-# VAR2=""
-# VAR3=
-#
-# if system::check_required_variables "VAR1" "VAR2" "VAR3"; then
-#     echo "All required variables are set and non-empty."
-# else
-#     echo "Some required variables are either unset or empty."
-# fi
-#
-# Notes:
-#     This function is useful in scenarios where the correct configuration of the environment or 
-#     script depends on certain variables. It helps in early detection of misconfigurations 
-#     or missing data, allowing for more robust and error-resistant scripts. The function 
-#     does not modify any of the variables it checks; it only reports on their status.
-# End of documentation
+	# Description: Function to check for the presence and non-emptiness of a list of variables.
+	# This function checks for the presence and non-emptiness of a list of variables. 
+	# It is designed to validate that certain required variables are both defined (set) 
+	# and have a non-empty value. This is particularly useful in scripts where specific 
+	# variables are essential for correct execution.
+	#
+	# Arguments:
+	#     $@: A list of variable names (as strings) to be checked. Each argument should 
+	#     be the name of a variable to check.
+	#
+	# Outputs:
+	#     If any variables are found to be unset, it prints a message listing these variables.
+	#     If any variables are found to be set but empty, it prints a message listing these variables.
+	#
+	# Return Values:
+	#     Returns 0 (success) if all variables are set and non-empty.
+	#     Returns 1 (failure) if any variable is either unset or set but empty.
+	#
+	# Usage:
+	# To use this function, pass the names of the variables you want to check as arguments. For example:
+	#
+	# system::check_required_variables "VAR1" "VAR2" "VAR3"
+	#
+	# Example:
+	# VAR1="data"
+	# VAR2=""
+	# VAR3=
+	#
+	# if system::check_required_variables "VAR1" "VAR2" "VAR3"; then
+	#     echo "All required variables are set and non-empty."
+	# else
+	#     echo "Some required variables are either unset or empty."
+	# fi
+	#
+	# Notes:
+	#     This function is useful in scenarios where the correct configuration of the environment or 
+	#     script depends on certain variables. It helps in early detection of misconfigurations 
+	#     or missing data, allowing for more robust and error-resistant scripts. The function 
+	#     does not modify any of the variables it checks; it only reports on their status.
+	# End of documentation
 
 	local unset_vars=()
 	local empty_vars=()
@@ -2002,47 +1993,45 @@ system::check_required_variables() {
 
 
 
-
-
 system::find_vm_bridge() {
-# Description:
-# This function searches for the default bridge network device on the system. It is designed to 
-# work in environments where virtual machines (VMs) are managed, typically using bridge networks for 
-# VM connectivity. If no bridge network device is found (prefixed with br or named bridge), the 
-# function defaults to a NAT device named "default".
-#
-# Globals:
-# None. This function does not depend on or modify any global variables.
-#
-# Arguments:
-# None. The function does not take any arguments.
-#
-# Outputs:
-# The function outputs one of the following, depending on the system's network configuration:
-#
-#     The name of the first bridge network device found (e.g., br0, bridge0).
-#     default if no bridge network device is found.
-#
-# Returns:
-#     The name of a bridge network device (e.g., br0, bridge0) if one is found.
-#     default if no bridge network device is found.
-#
-# Usage:
-# To use this function, simply call it within a script. For example:
-#
-# bridge_device=$(system::find_vm_bridge)
-# echo "The default bridge device is: $bridge_device"
-#
-# This will store the name of the default bridge network device (or default if none is found) 
-# in the variable bridge_device and then print it.
-#
-# Additional Notes:
-#
-#     This function is particularly useful in virtualized environments where network bridging is 
-#     a common requirement.It assumes a standard naming convention for bridge devices (starting with br or named bridge).
-#     The function uses grep to filter the network devices and ls to list them from /sys/class/net, 
-#     which is a standard location for network interface information in Linux.
-# End of documentation
+	# Description:
+	# This function searches for the default bridge network device on the system. It is designed to 
+	# work in environments where virtual machines (VMs) are managed, typically using bridge networks for 
+	# VM connectivity. If no bridge network device is found (prefixed with br or named bridge), the 
+	# function defaults to a NAT device named "default".
+	#
+	# Globals:
+	# None. This function does not depend on or modify any global variables.
+	#
+	# Arguments:
+	# None. The function does not take any arguments.
+	#
+	# Outputs:
+	# The function outputs one of the following, depending on the system's network configuration:
+	#
+	#     The name of the first bridge network device found (e.g., br0, bridge0).
+	#     default if no bridge network device is found.
+	#
+	# Returns:
+	#     The name of a bridge network device (e.g., br0, bridge0) if one is found.
+	#     default if no bridge network device is found.
+	#
+	# Usage:
+	# To use this function, simply call it within a script. For example:
+	#
+	# bridge_device=$(system::find_vm_bridge)
+	# echo "The default bridge device is: $bridge_device"
+	#
+	# This will store the name of the default bridge network device (or default if none is found) 
+	# in the variable bridge_device and then print it.
+	#
+	# Additional Notes:
+	#
+	#     This function is particularly useful in virtualized environments where network bridging is 
+	#     a common requirement.It assumes a standard naming convention for bridge devices (starting with br or named bridge).
+	#     The function uses grep to filter the network devices and ls to list them from /sys/class/net, 
+	#     which is a standard location for network interface information in Linux.
+	# End of documentation
 
 	if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi
 }
@@ -2051,19 +2040,19 @@ system::find_vm_bridge() {
 
 
 system::restart_sound() {
-# Description: Function to check for PipeWire or Pulse Audio and attempt to restart sound.
-#
-# This function checks if the system has PipeWire or Pulse Audio installed. If PipeWire is 
-# installed, it restarts the pipewire.service. If Pulse Audio is installed, it kills the pulseaudio 
-# process and reloads the ALSA sound driver. If neither PipeWire nor Pulse Audio is found, 
-# it displays an error message.
-#
-# Globals: None
-# Arguments: None
-# Outputs: None
-# Returns: Standard error level.
-# Usage: Simply call this function in a script.
-# End of documentation
+	# Description: Function to check for PipeWire or Pulse Audio and attempt to restart sound.
+	#
+	# This function checks if the system has PipeWire or Pulse Audio installed. If PipeWire is 
+	# installed, it restarts the pipewire.service. If Pulse Audio is installed, it kills the pulseaudio 
+	# process and reloads the ALSA sound driver. If neither PipeWire nor Pulse Audio is found, 
+	# it displays an error message.
+	#
+	# Globals: None
+	# Arguments: None
+	# Outputs: None
+	# Returns: Standard error level.
+	# Usage: Simply call this function in a script.
+	# End of documentation
 
 	if hash pw-cli ; then 
 		systemctl --user restart pipewire.service
@@ -2076,19 +2065,16 @@ system::restart_sound() {
 
 
 
-
-
-
 system::remove_old_kernel() {
-# Description: Function to remove all old linux kernels.
-#
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns: Standard error level.
-# Usage: simply call function in a script
-# End of documentation
+	# Description: Function to remove all old linux kernels.
+	#
+	#
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns: Standard error level.
+	# Usage: simply call function in a script
+	# End of documentation
 
         if echo "$OSTYPE" |grep -q "linux" &>/dev/null ; then
                 # these tests focus on the latest versions of the distros evaluated...
@@ -2140,19 +2126,19 @@ system::remove_old_kernel() {
 
 
 system::change_disk_pass() {
-# Description: Function to change the passphrase fo an encrypted storage device.
-# It will offer to change the first encrypted volume found by blockid.
-# It is unclear how this will work if there are multiple encrypted volumes found.
-# The function does not expect an argument. It will prompt for a password.
-#
-# Globals:
-# Arguments: None accepted
-# Outputs: Interactive
-# Returns: default exit status of the last command run.
-# Usage: change_disk_pass
-#
-#
-# End of Documentation
+	# Description: Function to change the passphrase fo an encrypted storage device.
+	# It will offer to change the first encrypted volume found by blockid.
+	# It is unclear how this will work if there are multiple encrypted volumes found.
+	# The function does not expect an argument. It will prompt for a password.
+	#
+	# Globals:
+	# Arguments: None accepted
+	# Outputs: Interactive
+	# Returns: default exit status of the last command run.
+	# Usage: change_disk_pass
+	#
+	#
+	# End of Documentation
 
 	clear
 	write_host --red "Changing the disk encryption password for your hard drive:"
@@ -2162,25 +2148,24 @@ system::change_disk_pass() {
 
 
 
-
 system::oem_autounlock_disk() {
-# Setup automatic unlocking of the encrypted system disk.
-# NOTE: This will render the encryption useless since the key to unlock the encrypted
-# volume will be located on an unencrypted location on the same system as the encrypted volume.
-# This is the same as locking your door and leaving the key by the door outside.
-#
-# The intention behind this is to be able to complete all build activites without manual intervention
-# of any kind. The intention is to remove the key file after all administrative tasks are complete.
-#
-# 1. Back up your initramfs disk
-#
-# Globals:
-# Arguments: None accepted
-# Outputs:
-# Returns: default exit status of the last command run.
-# Usage: oem_autounlock_disk
-#
-# End of Documentation
+	# Setup automatic unlocking of the encrypted system disk.
+	# NOTE: This will render the encryption useless since the key to unlock the encrypted
+	# volume will be located on an unencrypted location on the same system as the encrypted volume.
+	# This is the same as locking your door and leaving the key by the door outside.
+	#
+	# The intention behind this is to be able to complete all build activites without manual intervention
+	# of any kind. The intention is to remove the key file after all administrative tasks are complete.
+	#
+	# 1. Back up your initramfs disk
+	#
+	# Globals:
+	# Arguments: None accepted
+	# Outputs:
+	# Returns: default exit status of the last command run.
+	# Usage: oem_autounlock_disk
+	#
+	# End of Documentation
 
 	local _pass="$1"
 	local kernel_version=$(uname -r)
@@ -2230,20 +2215,18 @@ system::oem_autounlock_disk() {
 
 
 
-
-
 github::clone_repo_user() {
-# Description:
-# Function to CLONE all github.com repositories for a specified user.
-# simply call the function and pass the username as parameter to clone
-# all github repositories in to the current folder.
-#
-# Globals: None
-# Arguments: User-name
-# Outputs:
-# Returns: a download of all repositories for the given user.
-# Usage: ${FUNCNAME[0]} user-name
-# End of documentation
+	# Description:
+	# Function to CLONE all github.com repositories for a specified user.
+	# simply call the function and pass the username as parameter to clone
+	# all github repositories in to the current folder.
+	#
+	# Globals: None
+	# Arguments: User-name
+	# Outputs:
+	# Returns: a download of all repositories for the given user.
+	# Usage: ${FUNCNAME[0]} user-name
+	# End of documentation
 
 	if [ $# -eq 0 ]; then
 	    echo "Usage: ${FUNCNAME[0]} <user_name> "
@@ -2257,18 +2240,19 @@ github::clone_repo_user() {
 }
 
 
+
 github::list_all_user_repositories() {
-# Description:
-# Function to LIST all github.com repositories for a specified user.
-# simply call the function and pass the username as parameter to show
-# all github repositories the indicated user.
-#
-# Globals: None
-# Arguments: User-name
-# Outputs:
-# Returns: a LIST of all repositories for the given user.
-# Usage: ${FUNCNAME[0]} user-name
-# End of documentation
+	# Description:
+	# Function to LIST all github.com repositories for a specified user.
+	# simply call the function and pass the username as parameter to show
+	# all github repositories the indicated user.
+	#
+	# Globals: None
+	# Arguments: User-name
+	# Outputs:
+	# Returns: a LIST of all repositories for the given user.
+	# Usage: ${FUNCNAME[0]} user-name
+	# End of documentation
 
 	if [ $# -eq 0 ]
 	  then
@@ -2284,23 +2268,20 @@ github::list_all_user_repositories() {
 
 
 
-
-
-
 oem::register_all_tools() {
-# Description: Function to register all OEM scripts on the current device.
-# It will find all the ${_TLA} powertools locations and make a link for each script to
-# the system /bin directory. This assures that all tools can be easily accessed from any terminal.
-#
-#
-# Globals: ${_MODS_DIR}
-# Arguments: None accepted
-# Outputs:
-# Returns: default exit status of the last command run.
-# Usage: oem::register_all_tools
-# Dependencies: _locations
-#
-# End of Documentation
+	# Description: Function to register all OEM scripts on the current device.
+	# It will find all the ${_TLA} powertools locations and make a link for each script to
+	# the system /bin directory. This assures that all tools can be easily accessed from any terminal.
+	#
+	#
+	# Globals: ${_MODS_DIR}
+	# Arguments: None accepted
+	# Outputs:
+	# Returns: default exit status of the last command run.
+	# Usage: oem::register_all_tools
+	# Dependencies: _locations
+	#
+	# End of Documentation
 	_bashrc="/home/${_OEM_USER:-"tangarora"}/.bashrc"
 
 	sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
@@ -2328,30 +2309,21 @@ oem::register_all_tools() {
 
 
 
-
-
-
-
-
-
-
-
-
 check_menu_availability() {
-# Description: First discover what menu system is installed. Some systems use "dialog" and
-# other systems use whiptail for the terminal to show menus and dialogs.
-# If nothing is found, then make sure it is available before continuing.
-#
-# Globals:
-# RTD_GUI respected as default value. If unset it will be set to "dialog" or "whiptail"
-# depending on which is present. IF both are present, the dialog is prefferred.
-#
-# Arguments: 	None accepted
-# Outputs: 	Interactive
-# Returns: 	Default exit status of the last command run.
-# Usage: 	check_menu_availability
-#
-# End of documentation
+	# Description: First discover what menu system is installed. Some systems use "dialog" and
+	# other systems use whiptail for the terminal to show menus and dialogs.
+	# If nothing is found, then make sure it is available before continuing.
+	#
+	# Globals:
+	# RTD_GUI respected as default value. If unset it will be set to "dialog" or "whiptail"
+	# depending on which is present. IF both are present, the dialog is prefferred.
+	#
+	# Arguments: 	None accepted
+	# Outputs: 	Interactive
+	# Returns: 	Default exit status of the last command run.
+	# Usage: 	check_menu_availability
+	#
+	# End of documentation
 	if hash dialog 2>/dev/null ; then
 		: "${RTD_GUI:=dialog --clear}"
 		export RTD_GUI
@@ -2375,27 +2347,19 @@ check_menu_availability() {
 }
 
 
-
-
-
-
-
-
-
-
 oem::rtd_tools_make_launchers() {
-# Description: Function that creates a default set of launchers for the Linux GUI menu system.
-#
-# Globals:
-# The tools (scripts) located in {_OEM_DIR}/*/ are expected as launchers are created for these.
-# ${_MODS_DIR}
-#
-# Arguments: None accepted
-# Outputs: Launcherc created in /usr/share/applications/
-# Returns: Default exit status of the last command run.
-# Usage: oem::rtd_tool_make_launchers
-#
-# End of documentation
+	# Description: Function that creates a default set of launchers for the Linux GUI menu system.
+	#
+	# Globals:
+	# The tools (scripts) located in {_OEM_DIR}/*/ are expected as launchers are created for these.
+	# ${_MODS_DIR}
+	#
+	# Arguments: None accepted
+	# Outputs: Launcherc created in /usr/share/applications/
+	# Returns: Default exit status of the last command run.
+	# Usage: oem::rtd_tool_make_launchers
+	#
+	# End of documentation
 
 	if [[ ! $UID -eq 0 ]]; then
 		write_error "This function requires elevated privileges. Please elevate privileges prior to calling this function."
@@ -2507,50 +2471,42 @@ oem::rtd_tools_make_launchers() {
 		Categories=OEM;
 		EOF
 	fi
- }
-
-
-
+}
 
 
 
 system::get_Windows_Product_Key() {
-# Description: Function to retrieve a Windows product key from the BIOS. This assumes that the OEM
-# has indeed stored the windows key in the BIOS... Doing so is a common practice. It is useful to
-# retrieve the key if it is desired to run Windows in a Virtual Machine and Presumably would prefer to
-# not run the evaluation version of Windows. This function could also be used to take advantage of the
-# ${WinKey} variable and echo it in to the autoinattend.xml file for unattended builds.
-#
-# Globals: RTD_GUI
-# Arguments: None
-# Outputs: A variable named: "${WinKey}" and echoing its contents to standard out.
-# Returns: default exit status of the last command run.
-# Usage: get_Windows_Product_Key
-# End of documentation
+	# Description: Function to retrieve a Windows product key from the BIOS. This assumes that the OEM
+	# has indeed stored the windows key in the BIOS... Doing so is a common practice. It is useful to
+	# retrieve the key if it is desired to run Windows in a Virtual Machine and Presumably would prefer to
+	# not run the evaluation version of Windows. This function could also be used to take advantage of the
+	# ${WinKey} variable and echo it in to the autoinattend.xml file for unattended builds.
+	#
+	# Globals: RTD_GUI
+	# Arguments: None
+	# Outputs: A variable named: "${WinKey}" and echoing its contents to standard out.
+	# Returns: default exit status of the last command run.
+	# Usage: get_Windows_Product_Key
+	# End of documentation
 	WinKey=$(sudo strings /sys/firmware/acpi/tables/MSDM | tail -1)
 	echo "${WinKey}"
 }
 
 
-
-
-
-
-
 err_no_menu_system_found() {
-# Description: Function to handle the error condition if a manu system is not found on the system.
-# On occasion it may be neede to display dialog boxes and selection menus even in a terminal.
-# for these cases; dialog, whiptail (newt), or zenity may be needed.
-# This function will attempt to install the desired menu system and if it cannot or the user
-# opts out it will error and exit the script.
-#
-# Globals: RTD_GUI
-# Arguments: None
-# Outputs: Interactive
-# Returns: default exit status of the last command run.
-# Usage:
-# err_no_menu_system_found
-# End of documentation
+	# Description: Function to handle the error condition if a manu system is not found on the system.
+	# On occasion it may be neede to display dialog boxes and selection menus even in a terminal.
+	# for these cases; dialog, whiptail (newt), or zenity may be needed.
+	# This function will attempt to install the desired menu system and if it cannot or the user
+	# opts out it will error and exit the script.
+	#
+	# Globals: RTD_GUI
+	# Arguments: None
+	# Outputs: Interactive
+	# Returns: default exit status of the last command run.
+	# Usage:
+	# err_no_menu_system_found
+	# End of documentation
 
 	write_error " ______________________________________________________________________ \n There is eiter no way to display menus on this system or you have told me \n to install the default  menu system! \n This is required to display the administrative menus... \n \n     ¯\_( ͡👁️ ͜ʖ ͡👁️)_/¯ \n ______________________________________________________________________ \n"
 	write_warning "May I attepmpt to install this ability to your system? \a "
@@ -2577,42 +2533,37 @@ err_no_menu_system_found() {
 
 
 
-
-
-
-
-
 oem::rtd_reset_default_environment_config() {
-# Description:
-# Function to reset temporary configurations to their original settings as provided by the distributor. 
-# This is critical for systems initially configured under the RTD OEM load process, which might involve
-# setting less secure or operationally disruptive configurations such as "auto login", "auto sudo", and
-# "auto running scripts". This function reverses these changes to ensure the system adheres to good security
-# practices and is ready for normal operations.
-#
-# Globals:
-#   _OEM_DIR: Specifies the directory used to store backup configurations and caches during the OEM load process.
-#   SUDO_USER: The username of the user who initiated the sudo command. This is used to identify the user's home directory for .bashrc modifications.
-#
-# Arguments: None
-#
-# Outputs:
-#   Prints messages to stdout indicating the actions being taken, including backing up and removing specific
-#   configuration files, and any errors or information relevant to the operation of the function.
-#
-# Returns:
-#   0: If all operations were successful.
-#   1: If an error occurred that prevented the function from completing its task.
-#
-# Usage:
-#   This function should be run with root privileges to ensure it has the necessary permissions to modify system
-#   files and configurations. It does not take any arguments. Before running, ensure that the _OEM_DIR global
-#   variable is set to a valid directory path where backup files can be stored. Here is an example of how to
-#   call this function:
-#
-#   sudo rtd_oem_reset_default_environment_config
-#
-# End of documentation
+	# Description:
+	# Function to reset temporary configurations to their original settings as provided by the distributor. 
+	# This is critical for systems initially configured under the RTD OEM load process, which might involve
+	# setting less secure or operationally disruptive configurations such as "auto login", "auto sudo", and
+	# "auto running scripts". This function reverses these changes to ensure the system adheres to good security
+	# practices and is ready for normal operations.
+	#
+	# Globals:
+	#   _OEM_DIR: Specifies the directory used to store backup configurations and caches during the OEM load process.
+	#   SUDO_USER: The username of the user who initiated the sudo command. This is used to identify the user's home directory for .bashrc modifications.
+	#
+	# Arguments: None
+	#
+	# Outputs:
+	#   Prints messages to stdout indicating the actions being taken, including backing up and removing specific
+	#   configuration files, and any errors or information relevant to the operation of the function.
+	#
+	# Returns:
+	#   0: If all operations were successful.
+	#   1: If an error occurred that prevented the function from completing its task.
+	#
+	# Usage:
+	#   This function should be run with root privileges to ensure it has the necessary permissions to modify system
+	#   files and configurations. It does not take any arguments. Before running, ensure that the _OEM_DIR global
+	#   variable is set to a valid directory path where backup files can be stored. Here is an example of how to
+	#   call this function:
+	#
+	#   sudo rtd_oem_reset_default_environment_config
+	#
+	# End of documentation
 
 
 	# Ensure _OEM_DIR is defined
@@ -2677,17 +2628,17 @@ oem::rtd_reset_default_environment_config() {
 
 
 system::wait_for_internet_availability() {
-# Description: Function that, when called, will wait for an active internet connection
-# to be available before before continuing. Most softwrare install activities
-# need an active internet connection to be able to install and update software.
-# Naturally, some in house loads use local mirrors, but if you can see the
-# internet, you would have access to your own ropositories as well...
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage: system::wait_for_internet_availability
-# End of documentation
+	# Description: Function that, when called, will wait for an active internet connection
+	# to be available before before continuing. Most softwrare install activities
+	# need an active internet connection to be able to install and update software.
+	# Naturally, some in house loads use local mirrors, but if you can see the
+	# internet, you would have access to your own ropositories as well...
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage: system::wait_for_internet_availability
+	# End of documentation
 
 	# Array of IPs for testing internet connectivity (may be set globally)
 	local -a test_ips
@@ -2737,22 +2688,18 @@ system::wait_for_internet_availability() {
 
 
 
-
-
-
-
 system::io_on_notify_wait() {
-# Description: Function that, when called, will wait for a disk change
-# and then execute the command passed as an argument. This is useful when
-# wanting to keep two location in sync with minimal delay, or to scan
-# for malware as soon as a change has occurred.
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage: system::io_on_notify_wait rsync -avt . host:/remote/dir ...
-# End of documentation
+	# Description: Function that, when called, will wait for a disk change
+	# and then execute the command passed as an argument. This is useful when
+	# wanting to keep two location in sync with minimal delay, or to scan
+	# for malware as soon as a change has occurred.
+	#
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage: system::io_on_notify_wait rsync -avt . host:/remote/dir ...
+	# End of documentation
 
 	check_dependencies inotify-tools
 	EVENTS="CREATE,CLOSE_WRITE,DELETE,MODIFY,MOVED_FROM,MOVED_TO"
@@ -2786,23 +2733,17 @@ system::io_on_notify_wait() {
 
 
 
-
-
-
-
-
-
 system::display_spinner() {
-# Description: Simple function to display a spinner in the terminal.
-# Globals:
-# Arguments: start/stop
-# Outputs:
-# Returns:
-# Usage:
-#
-#
-#
-# End of documentation
+	# Description: Simple function to display a spinner in the terminal.
+	# Globals:
+	# Arguments: start/stop
+	# Outputs:
+	# Returns:
+	# Usage:
+	#
+	#
+	#
+	# End of documentation
 
 	function _spinner() {
 	# $1 start/stop
@@ -2884,33 +2825,30 @@ system::display_spinner() {
 
 
 
-
-
-
 system::add_or_remove_login_script() {
-# Description: Sets up or removes a .desktop launcher to run a script at login.
-# Arguments:
-#   1. Path to the script to be executed.
-#   2. Optional: Path to the .desktop launcher (default: /etc/xdg/autostart/oem-run.desktop).
-#
-# Usage:
-#   system::add_or_remove_login_script <path>
-#
-# This function is responsible for adding or removing the execution of a script on login.
-# It takes two parameters: the path to the script and an optional file path for the autostart desktop entry.
-# If the script is not found, an error message is displayed and the function returns 1.
-# If the "--remove" option is specified, the function removes the autostart desktop entry file if it exists.
-# If the "--add" option is specified, the function creates or updates the autostart desktop entry file with the script path.
-# If no option is specified, the function checks if the autostart desktop entry file exists.
-# If it exists, the function removes it. If it doesn't exist, the function creates it with the script path.
-# The function returns 0 on success and 1 on failure.
-#
-# Example:
-#   system::add_or_remove_login_script --remove /etc/xdg/autostart/oem-run.desktop
-#   system::add_or_remove_login_script --remove 
-#   system::add_or_remove_login_script --add /path/to/script.sh
-#
-# End of documentation
+	# Description: Sets up or removes a .desktop launcher to run a script at login.
+	# Arguments:
+	#   1. Path to the script to be executed.
+	#   2. Optional: Path to the .desktop launcher (default: /etc/xdg/autostart/oem-run.desktop).
+	#
+	# Usage:
+	#   system::add_or_remove_login_script <path>
+	#
+	# This function is responsible for adding or removing the execution of a script on login.
+	# It takes two parameters: the path to the script and an optional file path for the autostart desktop entry.
+	# If the script is not found, an error message is displayed and the function returns 1.
+	# If the "--remove" option is specified, the function removes the autostart desktop entry file if it exists.
+	# If the "--add" option is specified, the function creates or updates the autostart desktop entry file with the script path.
+	# If no option is specified, the function checks if the autostart desktop entry file exists.
+	# If it exists, the function removes it. If it doesn't exist, the function creates it with the script path.
+	# The function returns 0 on success and 1 on failure.
+	#
+	# Example:
+	#   system::add_or_remove_login_script --remove /etc/xdg/autostart/oem-run.desktop
+	#   system::add_or_remove_login_script --remove 
+	#   system::add_or_remove_login_script --add /path/to/script.sh
+	#
+	# End of documentation
 	local script_path="$2"
 	local file_path="${3:-"/etc/xdg/autostart/oem-run.desktop"}"
 
@@ -2966,31 +2904,29 @@ system::add_or_remove_login_script() {
 
 
 
-
-
 system::update_config() {
-# Description: This function updates a configuration file with key-value pairs.
-# The `system::update_config` function is designed to update a configuration file 
-# with key-value pairs. It takes as parameters the path to the configuration
-# file and the key-value pairs to be updated or added to the configuration file. 
-# If the key already exists in the configuration file, the value is updated.
-# If the key does not exist in the configuration file, the key-value pair is added.
-# Globals:
-# Arguments: config_file key-value pairs
-# Outputs: The configuration file with the updated key-value pairs.
-# Returns: None
-# Usage: system::update_config /home/user/.config/myapp/config.conf key1 value1 key2 value2
-#
-# Parameters:
-#   - config_file: The path to the configuration file.
-#   - key-value pairs: The key-value pairs to be updated or added to the configuration file.
-# Returns: None
-# 
-# Example: 
-# 
-# system::update_config /home/user/.config/myapp/config.conf key1 value1 key2 value2
-#
-# End of documentation
+	# Description: This function updates a configuration file with key-value pairs.
+	# The `system::update_config` function is designed to update a configuration file 
+	# with key-value pairs. It takes as parameters the path to the configuration
+	# file and the key-value pairs to be updated or added to the configuration file. 
+	# If the key already exists in the configuration file, the value is updated.
+	# If the key does not exist in the configuration file, the key-value pair is added.
+	# Globals:
+	# Arguments: config_file key-value pairs
+	# Outputs: The configuration file with the updated key-value pairs.
+	# Returns: None
+	# Usage: system::update_config /home/user/.config/myapp/config.conf key1 value1 key2 value2
+	#
+	# Parameters:
+	#   - config_file: The path to the configuration file.
+	#   - key-value pairs: The key-value pairs to be updated or added to the configuration file.
+	# Returns: None
+	# 
+	# Example: 
+	# 
+	# system::update_config /home/user/.config/myapp/config.conf key1 value1 key2 value2
+	#
+	# End of documentation
 
 	local config_file=$1
 	shift  # Shift past the first argument (the config file path)
@@ -3016,24 +2952,24 @@ system::update_config() {
 
 
 system::read_config() {
-# Description: This function reads a configuration file with key-value pairs.
-# The configuration file should contain one key-value pair per line, with the
-# key and value separated by an equals sign.
-# Globals:
-# Arguments: config_file (path to configuration file)
-# Outputs:
-# Returns: standard exit code
-# Usage: system::read_config /home/user/.config/myapp/config.conf
-#
-# Parameters:
-#   - config_file: The path to the configuration file.
-#   
-# Returns: None
-# 
-# Example:
-#   system::read_config "/home/user/.config/myapp/config.conf" 
-#
-# End of documentation
+	# Description: This function reads a configuration file with key-value pairs.
+	# The configuration file should contain one key-value pair per line, with the
+	# key and value separated by an equals sign.
+	# Globals:
+	# Arguments: config_file (path to configuration file)
+	# Outputs:
+	# Returns: standard exit code
+	# Usage: system::read_config /home/user/.config/myapp/config.conf
+	#
+	# Parameters:
+	#   - config_file: The path to the configuration file.
+	#   
+	# Returns: None
+	# 
+	# Example:
+	#   system::read_config "/home/user/.config/myapp/config.conf" 
+	#
+	# End of documentation
         # Specify the path to your configuration file
         local config_file=$1
 
@@ -3050,63 +2986,57 @@ system::read_config() {
 
 
 
-
-
-
-
-
-
 system::toggle_oem_auto_login() {
-# Description: Function to toggle auto login for admin purposes.
-#
-# This function toggles automatic login for various display managers. It is designed to enable or disable 
-# auto-login for administrative purposes, such as performing interactive administrative logins and 
-# running configuration scripts. This function supports a range of popular display managers and 
-# applies SUSE-specific configurations when necessary.
-#
-# Globals:
-# None. The function does not depend on or modify any global variables.
-#
-# Arguments:
-# None. The function does not take any arguments.
-#
-# Outputs:
-# The function outputs status messages, warnings, and error information using the write_status, 
-# write_warning, write_information, and write_error functions. These messages indicate the actions 
-# being taken (e.g., enabling or disabling auto-login) and any issues encountered.
-#
-# Returns:
-# None. The function does not return a value.
-#
-# Usage:
-#
-# Call toggle_oem_auto_login without any arguments to toggle the auto-login feature. For example:
-#
-# toggle_oem_auto_login
-#
-# This will enable auto-login if it is currently disabled, or disable it if it is currently enabled.
-#
-# Function Behavior:
-#
-#     It proceeds to check for the 
-#     presence of configuration files for LightDM, SDDM, GDM3, and GDM. For each display manager found, 
-#     the function toggles the auto-login setting. If auto-login is enabled, it will disable it, and vice versa.
-#     In the case of SUSE, the function modifies the SUSE-specific display manager file in /etc/sysconfig/ 
-#     instead of the individual display manager configuration files.
-#     The function also handles toggling auto-login for terminal environments (TTY) without a graphical user interface.
-#
-# Special Notes:
-#
-#     This function should be used with caution as enabling auto-login can have security implications.
-#     It is particularly useful for scenarios like OEM setup or automatic template generation for KVM.
-#     The function assumes that the current user has the necessary permissions to modify system configuration files.
-#
-# Implementation Details:
-#
-#     The function uses conditional checks to determine the presence of various display manager configuration files.
-#     Backup files with the suffix .rtd-bak are used to preserve the original configuration before making changes.
-#
-# End of documentation
+	# Description: Function to toggle auto login for admin purposes.
+	#
+	# This function toggles automatic login for various display managers. It is designed to enable or disable 
+	# auto-login for administrative purposes, such as performing interactive administrative logins and 
+	# running configuration scripts. This function supports a range of popular display managers and 
+	# applies SUSE-specific configurations when necessary.
+	#
+	# Globals:
+	# None. The function does not depend on or modify any global variables.
+	#
+	# Arguments:
+	# None. The function does not take any arguments.
+	#
+	# Outputs:
+	# The function outputs status messages, warnings, and error information using the write_status, 
+	# write_warning, write_information, and write_error functions. These messages indicate the actions 
+	# being taken (e.g., enabling or disabling auto-login) and any issues encountered.
+	#
+	# Returns:
+	# None. The function does not return a value.
+	#
+	# Usage:
+	#
+	# Call toggle_oem_auto_login without any arguments to toggle the auto-login feature. For example:
+	#
+	# toggle_oem_auto_login
+	#
+	# This will enable auto-login if it is currently disabled, or disable it if it is currently enabled.
+	#
+	# Function Behavior:
+	#
+	#     It proceeds to check for the 
+	#     presence of configuration files for LightDM, SDDM, GDM3, and GDM. For each display manager found, 
+	#     the function toggles the auto-login setting. If auto-login is enabled, it will disable it, and vice versa.
+	#     In the case of SUSE, the function modifies the SUSE-specific display manager file in /etc/sysconfig/ 
+	#     instead of the individual display manager configuration files.
+	#     The function also handles toggling auto-login for terminal environments (TTY) without a graphical user interface.
+	#
+	# Special Notes:
+	#
+	#     This function should be used with caution as enabling auto-login can have security implications.
+	#     It is particularly useful for scenarios like OEM setup or automatic template generation for KVM.
+	#     The function assumes that the current user has the necessary permissions to modify system configuration files.
+	#
+	# Implementation Details:
+	#
+	#     The function uses conditional checks to determine the presence of various display manager configuration files.
+	#     Backup files with the suffix .rtd-bak are used to preserve the original configuration before making changes.
+	#
+	# End of documentation
 
 	case $1 in
 		--help|-h)
@@ -3337,52 +3267,49 @@ system::toggle_oem_auto_login() {
 
 
 
-
-
 system::set_oem_elevated_privilege_gui() {
-# Description
-
-# This function configures the local X environment to allow root to display GUI applications. 
-# It is particularly useful for Debian and other Linux distributions where GUI apps cannot 
-# be run under sudo or in a root environment by default. This function modifies the .bashrc 
-# files for the specified user and root to enable GUI applications to be launched with elevated 
-# privileges. It is compatible with distributions like Slackware and Debian.
-#
-# Globals:
-#
-#     $_OEM_USER: The username for whom the X environment will be configured. 
-#
-# Arguments:
-#
-# None. The function does not take any arguments.
-#
-# Outputs:
-#
-# The function modifies the .bashrc file in the home directory of $_OEM_USER and the root user 
-# to configure the X environment. It outputs information about the changes being made.
-#
-# Returns:
-#
-# None. The function does not return a value.
-#
-# Usage:
-#
-# To use this function, ensure that the $_OEM_USER global variable is set to the appropriate username, 
-# then call the function:
-#
-# _OEM_USER="username"
-# set_oem_elevated_privilege_gui
-#
-# This will append the necessary configurations to the .bashrc files of the specified user and the root user.
-# Function Behavior:
-#
-#     The function appends xhost local:root to the .bashrc file in the home directory of $_OEM_USER. 
-#     This command allows the root user to display GUI applications on the local X server.
-#     It also appends export XAUTHORITY=/home/${_OEM_USER}/.Xauthority to /root/.bashrc. This export 
-#     sets the XAUTHORITY environment variable for the root user, pointing to the .Xauthority file in 
-#     the home directory of $_OEM_USER.
-#
-# End of documentation
+	# Description
+	# This function configures the local X environment to allow root to display GUI applications. 
+	# It is particularly useful for Debian and other Linux distributions where GUI apps cannot 
+	# be run under sudo or in a root environment by default. This function modifies the .bashrc 
+	# files for the specified user and root to enable GUI applications to be launched with elevated 
+	# privileges. It is compatible with distributions like Slackware and Debian.
+	#
+	# Globals:
+	#
+	#     $_OEM_USER: The username for whom the X environment will be configured. 
+	#
+	# Arguments:
+	#
+	# None. The function does not take any arguments.
+	#
+	# Outputs:
+	#
+	# The function modifies the .bashrc file in the home directory of $_OEM_USER and the root user 
+	# to configure the X environment. It outputs information about the changes being made.
+	#
+	# Returns:
+	#
+	# None. The function does not return a value.
+	#
+	# Usage:
+	#
+	# To use this function, ensure that the $_OEM_USER global variable is set to the appropriate username, 
+	# then call the function:
+	#
+	# _OEM_USER="username"
+	# set_oem_elevated_privilege_gui
+	#
+	# This will append the necessary configurations to the .bashrc files of the specified user and the root user.
+	# Function Behavior:
+	#
+	#     The function appends xhost local:root to the .bashrc file in the home directory of $_OEM_USER. 
+	#     This command allows the root user to display GUI applications on the local X server.
+	#     It also appends export XAUTHORITY=/home/${_OEM_USER}/.Xauthority to /root/.bashrc. This export 
+	#     sets the XAUTHORITY environment variable for the root user, pointing to the .Xauthority file in 
+	#     the home directory of $_OEM_USER.
+	#
+	# End of documentation
 
 
 	local user_bashrc="/home/${_OEM_USER:-"tangarora"}/.bashrc"
@@ -3421,18 +3348,15 @@ system::set_oem_elevated_privilege_gui() {
 
 
 
-
-
-
 system::toggle_oem_auto_elevated_privilege() {
-    # Description: Toggles passwordless sudo privileges for a specified user.
-    # WARNING: This function modifies sudoers and can pose a security risk.
-    # Ensure to disable this with 'rtd_oem_reset_default_environment_config' after use.
-    # Globals:
-    #   _OEM_USER - The user for whom to toggle passwordless sudo. Defaults to SUDO_USER.
-    # Arguments: None
-    # Usage:
-    #   system::toggle_oem_auto_elevated_privilege [--enable|--disable]
+	# Description: Toggles passwordless sudo privileges for a specified user.
+	# WARNING: This function modifies sudoers and can pose a security risk.
+	# Ensure to disable this with 'rtd_oem_reset_default_environment_config' after use.
+	# Globals:
+	#   _OEM_USER - The user for whom to toggle passwordless sudo. Defaults to SUDO_USER.
+	# Arguments: None
+	# Usage:
+	#   system::toggle_oem_auto_elevated_privilege [--enable|--disable]
 
 	: ${_OEM_USER:="${SUDO_USER}"}
 	local sudoers_file="/etc/sudoers.d/99_sudo_include_file"
@@ -3491,22 +3415,16 @@ system::toggle_oem_auto_elevated_privilege() {
 }
 
 
-
-
-
-
-
-
 system::make_system_recovery_partition() {
-# Description: Incomplete function to build an OEM rescue partition...
-# Function to enable system OEM Recovery
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage: NOTE: I have yet to figura out how to do this!
+	# Description: Incomplete function to build an OEM rescue partition...
+	# Function to enable system OEM Recovery
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage: NOTE: I have yet to figura out how to do this!
 
-# End of documentation
+	# End of documentation
 
 
 
@@ -3567,20 +3485,16 @@ system::make_system_recovery_partition() {
 
 
 
-
-
-
-
 system::rtd_oem_reseal() {
-# Description: 
-# Function to reseal a newly installed system for delivery to end user.
-# Globals: The distribution must have an OEM reseal function or software available.
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
+	# Description: 
+	# Function to reseal a newly installed system for delivery to end user.
+	# Globals: The distribution must have an OEM reseal function or software available.
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
 
-# End of documentation
+	# End of documentation
 	if cat /etc/os-release |grep ubuntu ; then
 		software::add_native_package "oem-config-gtk"
 		oem-config-prepare
@@ -3645,24 +3559,22 @@ system::rtd_oem_reseal() {
 
 
 
-
-
 system::rtd_oem_find_live_release() {
-# Description: This function will return the URL for the version of Debian, Ubuntu server or Destktop requested.
-# 3 parameters are required for this function to know what to do: distro_version/distro_flavor/live_or_not
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns: Return a URL to the desired release ISO of Ubuntu or Debian.
-# Usage:
-# Example:
-# Function name 		: distro_version : distro_flavor : live_or_not : desktop_env (only Debian)
-# system::rtd_oem_find_live_release 	      10              debian         live           kde
-# system::rtd_oem_find_live_release 	      10              debian         live           cinnamon
-# system::rtd_oem_find_live_release 	      10              debian         net            ssh-server
-# system::rtd_oem_find_live_release 	      19.04.2         ubuntu         live
-# End of documentation
+	# Description: This function will return the URL for the version of Debian, Ubuntu server or Destktop requested.
+	# 3 parameters are required for this function to know what to do: distro_version/distro_flavor/live_or_not
+	#
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns: Return a URL to the desired release ISO of Ubuntu or Debian.
+	# Usage:
+	# Example:
+	# Function name 		: distro_version : distro_flavor : live_or_not : desktop_env (only Debian)
+	# system::rtd_oem_find_live_release 	      10              debian         live           kde
+	# system::rtd_oem_find_live_release 	      10              debian         live           cinnamon
+	# system::rtd_oem_find_live_release 	      10              debian         net            ssh-server
+	# system::rtd_oem_find_live_release 	      19.04.2         ubuntu         live
+	# End of documentation
 	local distro_version="${1:-12}"
 	local distro_flavor="${2:-debian}"
 	local live_or_not="${3:-live}"
@@ -3722,19 +3634,16 @@ system::rtd_oem_find_live_release() {
 
 
 
-
-
-
 system::cleanup_and_finish() {
-# Description: Function to remove all temporary file locations left over from building
-# the new netinstall ISO etc. and clean  up some variables...
-# go back to initial directory
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-# End of documentation
+	# Description: Function to remove all temporary file locations left over from building
+	# the new netinstall ISO etc. and clean  up some variables...
+	# go back to initial directory
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	# End of documentation
 
 	cd "$current_dir" && echo "returned to $current_dir" || echo "No directory to return to... never mind."
 	# Cleanup folder structure...
@@ -3777,22 +3686,21 @@ system::cleanup_and_finish() {
 
 
 
-
 generate_report_disk_space_used_by_directory() {
-# Description: Function to generate a report for folders' disk space use.
-# This function requres one argument; what root folder to analyse the directories in.
-# This functio will return a report contained in the variable $return that may then be used.
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-# Example:
-# generate_report_disk_space_used_by_directory /home
-#
-# This will generate a report on the disk space per directory in the /home folder.
-#
-# End of documentation
+	# Description: Function to generate a report for folders' disk space use.
+	# This function requres one argument; what root folder to analyse the directories in.
+	# This functio will return a report contained in the variable $return that may then be used.
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	# Example:
+	# generate_report_disk_space_used_by_directory /home
+	#
+	# This will generate a report on the disk space per directory in the /home folder.
+	#
+	# End of documentation
 
 	DIRS=$( ls $1 )
 	store=/$tmp/out.ct
@@ -3820,36 +3728,29 @@ generate_report_disk_space_used_by_directory() {
 
 
 
-
-
-
-
-
-
-
 set_gnome_ui_common_tweaks_for_user() {
-# Description:
-# Configure Gnome for OEM look and feel. This is completely as desired.
-# This function takes no arguments. Simply call it to make the changes.
-# Howerver, this function must be called as the user it should apply to.
-# if it is called in a script with "sudo" priviledges, it will make chages to
-# the look and feel for the "root" user.
-#
-# To run this function as the user who started a script with sudo script content
-# could be echoed out ot a temporary file and executed as follows
-# sudo -H -u $SUDO_USER DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u "$SUDO_USER")/bus temporary_script.sh > /dev/null 2>&1
-# or alternatively by calling the function "system::run_command_in_gnome_user_session /path/to/temorary_script.sh".
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-#
-# USAGE:
-#
-# set_gnome_ui_common_tweaks_for_user
-#
-# End of documentation
+	# Description:
+	# Configure Gnome for OEM look and feel. This is completely as desired.
+	# This function takes no arguments. Simply call it to make the changes.
+	# Howerver, this function must be called as the user it should apply to.
+	# if it is called in a script with "sudo" priviledges, it will make chages to
+	# the look and feel for the "root" user.
+	#
+	# To run this function as the user who started a script with sudo script content
+	# could be echoed out ot a temporary file and executed as follows
+	# sudo -H -u $SUDO_USER DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u "$SUDO_USER")/bus temporary_script.sh > /dev/null 2>&1
+	# or alternatively by calling the function "system::run_command_in_gnome_user_session /path/to/temorary_script.sh".
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	#
+	# USAGE:
+	#
+	# set_gnome_ui_common_tweaks_for_user
+	#
+	# End of documentation
 
 	write_status "📐 Seting common OEM tweaks..."
 	# Terminal and Tilix Dark Theme
@@ -4075,24 +3976,19 @@ set_gnome_ui_common_tweaks_for_user() {
 
 
 
-
-
-
-
-
 set_gnome_ui_tweak_no_media_error() {
-# Description:  Function to handle missing media when attempting to set UI look to
-# 		resemble MAC/Windows/etc. for users accustomed to that.
-#
-# Usage:
-# set_gnome_ui_tweak_no_media_error
-# OEM_Hint="My custom mesage" ; set_gnome_ui_tweak_no_media_error
-#
-# Globals: ${OEM_Hint}
-# Arguments: none
-# Outputs:
-# Returns: Standard err for last task
-# End of documentation
+	# Description:  Function to handle missing media when attempting to set UI look to
+	# 		resemble MAC/Windows/etc. for users accustomed to that.
+	#
+	# Usage:
+	# set_gnome_ui_tweak_no_media_error
+	# OEM_Hint="My custom mesage" ; set_gnome_ui_tweak_no_media_error
+	#
+	# Globals: ${OEM_Hint}
+	# Arguments: none
+	# Outputs:
+	# Returns: Standard err for last task
+	# End of documentation
 	: ${OEM_Hint:="I cannot find the actual theme files needed. Should I attempt to get these?"}
 
 	zenity --question --text "${OEM_Hint}" --width=600
@@ -4105,22 +4001,18 @@ set_gnome_ui_tweak_no_media_error() {
 
 
 
-
-
-
-
 set_gnome_ui_mac_tweaks_for_user() {
-# Description: Function to set UI look to resemble MAC for users accustomed to that.
-#
-# Usage:
-# set_gnome_ui_mac_tweaks_for_user Dark
-# set_gnome_ui_mac_tweaks_for_user Light
-#
-# Globals:
-# Arguments: Dark/Light
-# Outputs:
-# Returns: Standard err for last task
-# End of documentation
+	# Description: Function to set UI look to resemble MAC for users accustomed to that.
+	#
+	# Usage:
+	# set_gnome_ui_mac_tweaks_for_user Dark
+	# set_gnome_ui_mac_tweaks_for_user Light
+	#
+	# Globals:
+	# Arguments: Dark/Light
+	# Outputs:
+	# Returns: Standard err for last task
+	# End of documentation
 
 	# Save users keyboard preferences:
 	# KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
@@ -4190,21 +4082,18 @@ set_gnome_ui_mac_tweaks_for_user() {
 
 
 
-
-
-
 set_gnome_ui_win10_tweaks_for_user() {
-# Description: Function to set UI look to resemble Windows 10 for users accustomed to that.
-#
-# Globals:
-# Arguments: Dark/Light
-# Outputs:
-# Returns: Standard err for last task
-# Usage:
-# set_gnome_ui_win10_tweaks_for_user Dark
-# set_gnome_ui_win10_tweaks_for_user Light
-#
-# End of documentation
+	# Description: Function to set UI look to resemble Windows 10 for users accustomed to that.
+	#
+	# Globals:
+	# Arguments: Dark/Light
+	# Outputs:
+	# Returns: Standard err for last task
+	# Usage:
+	# set_gnome_ui_win10_tweaks_for_user Dark
+	# set_gnome_ui_win10_tweaks_for_user Light
+	#
+	# End of documentation
 	GIT_Profile=${GIT_Profile:-vonschutter}
 	# Save users keyboard preferences:
 	# KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
@@ -4276,20 +4165,18 @@ set_gnome_ui_win10_tweaks_for_user() {
 
 
 
-
-
 set_gnome_ui_corprate_crisp_tweaks_for_user() {
-# Description: Function to set UI look to appeal to teh corporate or business user.
-#
-# Globals:
-# Arguments: Dark/Light
-# Outputs:
-# Returns: Standard err for last task
-# Usage:
-# set_gnome_ui_corprate_crisp_tweaks_for_user Dark
-# set_gnome_ui_corprate_crisp_tweaks_for_user Light
-#
-# End of documentation
+	# Description: Function to set UI look to appeal to teh corporate or business user.
+	#
+	# Globals:
+	# Arguments: Dark/Light
+	# Outputs:
+	# Returns: Standard err for last task
+	# Usage:
+	# set_gnome_ui_corprate_crisp_tweaks_for_user Dark
+	# set_gnome_ui_corprate_crisp_tweaks_for_user Light
+	#
+	# End of documentation
 	GIT_Profile=${GIT_Profile:-vonschutter}
 	# Save users keyboard preferences:
 	# KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
@@ -4364,24 +4251,17 @@ set_gnome_ui_corprate_crisp_tweaks_for_user() {
 }
 
 
-
-
-
-
-
-
-
 set_gnome_ui_moca_tweaks_for_user() {
-# Description: Function to set UI look to be friendly on the eyes, limiting eye strain.
-#
-# Globals:
-# Arguments: none
-# Outputs:
-# Returns: Standard err for last task
-# Usage:
-# set_gnome_ui_moca_tweaks_for_user
-#
-# End of documentation
+	# Description: Function to set UI look to be friendly on the eyes, limiting eye strain.
+	#
+	# Globals:
+	# Arguments: none
+	# Outputs:
+	# Returns: Standard err for last task
+	# Usage:
+	# set_gnome_ui_moca_tweaks_for_user
+	#
+	# End of documentation
 	GIT_Profile=${GIT_Profile:-vonschutter}
 	# Save users keyboard preferences:
 	# KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
@@ -4440,9 +4320,6 @@ set_gnome_ui_moca_tweaks_for_user() {
 
 
 
-
-
-
 oem::register_wallpapers_for_gnome() {
 	# Validate the input directory
 	local _wallpaper_dir="${1:-"${_WALLPAPER_DIR}"}"
@@ -4493,23 +4370,19 @@ oem::register_wallpapers_for_gnome() {
 }
 
 
-
-
-
-
 rtd_oem_turn_on_gui_network_management() {
-# Description: Function to set NetworkManager by default to manage networking.
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-# The function expects no arguments.
-# Usage:
-# rtd_oem_turn_on_gui_network_management
-#
-# End of documentation
+	# Description: Function to set NetworkManager by default to manage networking.
+	#
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	# The function expects no arguments.
+	# Usage:
+	# rtd_oem_turn_on_gui_network_management
+	#
+	# End of documentation
 
 	if ls /usr/bin/*session ; then
 		# backup any existing network yaml definitions:
@@ -4537,22 +4410,19 @@ rtd_oem_turn_on_gui_network_management() {
 }
 
 
-
-
-
-
 add_gnome3_favorite_app() {
-# Description: Function to add a new favorite app to the gnome favorites bar.
-# Globals: none
-# Arguments: name of the shortcut to create (appname.desktop)
-# Outputs:
-# Returns: 0/1
-# Usage: add_gnome3_favorite_app [appname.desktop]
-#
-# NOTE: This function must be run in the user context.
-# End of documentation
-# A potentioal simplification if the escapes cn be figured out:
-# sudo -iu $SUDO_USER /bin/bash -c \" "gsettings set org.gnome.shell favorite-apps \\\"\$(gsettings get org.gnome.shell favorite-apps | sed s/.\\$//), '${Newapp}']\\\"" \"
+	# Description: Function to add a new favorite app to the gnome favorites bar.
+	# Globals: none
+	# Arguments: name of the shortcut to create (appname.desktop)
+	# Outputs:
+	# Returns: 0/1
+	# Usage: add_gnome3_favorite_app [appname.desktop]
+	#
+	# NOTE: This function must be run in the user context.
+	# End of documentation
+	# A potentioal simplification if the escapes cn be figured out:
+	# sudo -iu $SUDO_USER /bin/bash -c \" "gsettings set org.gnome.shell favorite-apps \\\"\$(gsettings get org.gnome.shell favorite-apps | sed s/.\\$//), '${Newapp}']\\\"" \"
+
 	NewApp="$1"
 	if TMP_FIL=$(mktemp -p "$(mktemp -d )") ; then
 		chown -R $SUDO_USER ${TMP_FIL%/*}
@@ -4566,23 +4436,19 @@ add_gnome3_favorite_app() {
 
 
 
-
-
-
-
 system::run_command_in_gnome_user_session() {
-# Description: Function to do a reverse sudo back to teh original Gnome user who called upon sudo.
-# This functon expects any number of parameters that would make up the command or commands
-# to be run in the users session. For example:
-# 	system::run_command_in_gnome_user_session script_name.sh parameter one two etc
-#
-# Globals:
-# Arguments: [path/script.sh] [bash command]
-# Outputs:
-# Returns:
-# Usage: system::run_command_in_gnome_user_session script_name.sh
-#
-# End of documentation
+	# Description: Function to do a reverse sudo back to teh original Gnome user who called upon sudo.
+	# This functon expects any number of parameters that would make up the command or commands
+	# to be run in the users session. For example:
+	# 	system::run_command_in_gnome_user_session script_name.sh parameter one two etc
+	#
+	# Globals:
+	# Arguments: [path/script.sh] [bash command]
+	# Outputs:
+	# Returns:
+	# Usage: system::run_command_in_gnome_user_session script_name.sh
+	#
+	# End of documentation
 	echo -------------------------- Begin as user: $SUDO_USER ---------------------
 	echo "$*"
 	sudo -H -u "$SUDO_USER" DISPLAY=$DISPLAY DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u "$SUDO_USER")/bus $*
@@ -4592,30 +4458,28 @@ system::run_command_in_gnome_user_session() {
 
 
 
-
-
 ensure_admin() {
-# Description: Function to elevate priviledges of script execution and to ensure administrative privileges
-# such that system wide settings or configuration may be done.
-#
-# This function evaluates and uses multiple ways to elevate priviledges based on the environment. In an
-# X session; and normal GUI w. systemd: elevate privs with normal GUI policy kit, otherwise try dialog
-# menu system and cached sudo, and finally fall back on good old sudo. Since scripts may be launched with
-# a GUI front (for user interaction) end and NO terminal; it is really preferable to display a proper
-# priviledge escalation propt in a GUI format and only use sudo in cases where there is a terminal or
-# no other option is present.
-#
-# Should the function not discover an X session, then dialog will be preferred over regular sudo.
-#
-# Globals: $UID
-# Arguments: None
-# Outputs: GUI
-# Dependencies: soft dependency on "dialog", will fall back on CLI if dialog is absent.
-# Returns: relaunches script under sudo.
-# Usage: The function expects no arguments, but will prompt for system password if required.
-# Usage: ensure_admin
-#
-# End of documentation
+	# Description: Function to elevate priviledges of script execution and to ensure administrative privileges
+	# such that system wide settings or configuration may be done.
+	#
+	# This function evaluates and uses multiple ways to elevate priviledges based on the environment. In an
+	# X session; and normal GUI w. systemd: elevate privs with normal GUI policy kit, otherwise try dialog
+	# menu system and cached sudo, and finally fall back on good old sudo. Since scripts may be launched with
+	# a GUI front (for user interaction) end and NO terminal; it is really preferable to display a proper
+	# priviledge escalation propt in a GUI format and only use sudo in cases where there is a terminal or
+	# no other option is present.
+	#
+	# Should the function not discover an X session, then dialog will be preferred over regular sudo.
+	#
+	# Globals: $UID
+	# Arguments: None
+	# Outputs: GUI
+	# Dependencies: soft dependency on "dialog", will fall back on CLI if dialog is absent.
+	# Returns: relaunches script under sudo.
+	# Usage: The function expects no arguments, but will prompt for system password if required.
+	# Usage: ensure_admin
+	#
+	# End of documentation
 
 	if [ -n "$DISPLAY" ] ; then 
 		system::log_item "👌 An X session is running."
@@ -4698,31 +4562,28 @@ ensure_admin() {
 
 
 
-
-
-
 system::ensure_admin() {
-# Description:
-# Ensures the script runs with administrative privileges, attempting to use
-# graphical methods in GUI environments and falling back to terminal-based
-# sudo in non-GUI environments or when graphical methods fail.
-#
-# Globals:
-#   UID - User ID of the current user. Root user has UID 0.
-#   DISPLAY - Environment variable specifying the X display.
-#   SUDO_USER - The user who invoked sudo or pkexec.
-#
-# Arguments: None
-#
-# Outputs:
-#   Informational messages about the authentication process.
-#
-# Returns:
-#   Exits the current script and restarts it with administrative privileges
-#   if necessary.
-#
-# Usage:
-#   Call `ensure_admin` at the beginning of a script that requires administrative privileges.
+	# Description:
+	# Ensures the script runs with administrative privileges, attempting to use
+	# graphical methods in GUI environments and falling back to terminal-based
+	# sudo in non-GUI environments or when graphical methods fail.
+	#
+	# Globals:
+	#   UID - User ID of the current user. Root user has UID 0.
+	#   DISPLAY - Environment variable specifying the X display.
+	#   SUDO_USER - The user who invoked sudo or pkexec.
+	#
+	# Arguments: None
+	#
+	# Outputs:
+	#   Informational messages about the authentication process.
+	#
+	# Returns:
+	#   Exits the current script and restarts it with administrative privileges
+	#   if necessary.
+	#
+	# Usage:
+	#   Call `ensure_admin` at the beginning of a script that requires administrative privileges.
 
 
 	if [[ "$UID" -eq 0 ]]; then
@@ -4778,27 +4639,24 @@ system::ensure_admin() {
 
 
 
-
-
-
 rtd_oem_check_inet_access() {
-# Description: Function to verrify internet availabiltiy.
-# The funciton will pause for 10 seconds by default, and will accept
-# an integer to indicate a non-decault time to pause.
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-# rtd_oem_check_inet_access [ integer ]
-#
-# Example:
-# rtd_oem_check_inet_access 60
-#
-# If an argument is omitted rtd_oem_check_inet_access will wait indefinitley
-# for input.
-#
-# End of documentation
+	# Description: Function to verrify internet availabiltiy.
+	# The funciton will pause for 10 seconds by default, and will accept
+	# an integer to indicate a non-decault time to pause.
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	# rtd_oem_check_inet_access [ integer ]
+	#
+	# Example:
+	# rtd_oem_check_inet_access 60
+	#
+	# If an argument is omitted rtd_oem_check_inet_access will wait indefinitley
+	# for input.
+	#
+	# End of documentation
 	_ARG=$1
 	if ! hash curl &>/dev/null; then
 		read -t 10 -p "N O T I C E ! --
@@ -4815,22 +4673,18 @@ rtd_oem_check_inet_access() {
 }
 
 
-
-
-
-
 rtd_oem_kde_set_wallpaper() {
-# Description:
-# Function to set KDE Plasma wallpaper from a script. this function expects one variable
-# indication what file to set as background. You must provide the full path to the file.
-# rtd_oem_kde_set_wallpaper /opt/oem/wallpaper.png Supported fule types are:
-# webm, mp4, png, jpeg, gif, webp.
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-# End of documentationsystem::toggle_oem_auto_elevated_privilege
+	# Description:
+	# Function to set KDE Plasma wallpaper from a script. this function expects one variable
+	# indication what file to set as background. You must provide the full path to the file.
+	# rtd_oem_kde_set_wallpaper /opt/oem/wallpaper.png Supported fule types are:
+	# webm, mp4, png, jpeg, gif, webp.
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	# End of documentationsystem::toggle_oem_auto_elevated_privilege
 
 	echo "Setting wallpaper $1"
 	full_image_path=$(realpath "$1")
@@ -4868,29 +4722,24 @@ rtd_oem_kde_set_wallpaper() {
 
 
 
-
-
-
-
-
 rtd_oem_setup_brand_splash_screen() {
-# Description: Function to brand the installer splash screen for the customized installer
-# downloaded from a ginve vendor. This function expects a few simple peices of information:
-# parameter 1: full path to image file to be branded.
-# parameter 2: quoted text to be incerted.
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-# rtd_oem_setup_brand_splash_screen [string] [string]
-#
-# [string]: /path/to/imagefile.png, "text to brand image with"
-#
-# rtd_oem_setup_brand_splash_screen /tmp/splash.png "Hi! I am a lable!"
-#
-# End of Documentation
+	# Description: Function to brand the installer splash screen for the customized installer
+	# downloaded from a ginve vendor. This function expects a few simple peices of information:
+	# parameter 1: full path to image file to be branded.
+	# parameter 2: quoted text to be incerted.
+	#
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	# rtd_oem_setup_brand_splash_screen [string] [string]
+	#
+	# [string]: /path/to/imagefile.png, "text to brand image with"
+	#
+	# rtd_oem_setup_brand_splash_screen /tmp/splash.png "Hi! I am a lable!"
+	#
+	# End of Documentation
 
 	image_file_to_brand=$1
 	text_to_brand_with=$2
@@ -4923,48 +4772,46 @@ rtd_oem_setup_brand_splash_screen() {
 
 
 
-
-
 system::prepare_environment_for_iso_creation() {
-# Description: Function to check that all dependencies are available for manipulating the
-# net install ISO from Ubuntu. Subsequently, the temporary file locations
-# are setup and templates are downloaded.
-#
-# Several key software components are required to create ISO files (virtual DVD/CD/BlueRay)
-# as well as a few others needed to download files from the internet, etc.
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-# DEPENDENCIES: dos2unix, cpio, gzip, genisoimage, whois, pwgen, wget, fakeroot, xorriso.
-#
-# This function will find full paths for the binaries needed since if they are recently
-# added, they may not be found in the current $PATH.
-#
-#	Software PATH insurance:
-#	: "${bin_7z:=$(type -P 7z)}"
-#	: "${bin_xorriso:=$(type -P xorriso)}"
-#	: "${bin_cpio:=$(type -P gnucpio || type -P cpio)}"
-#	: "${bin_qemu_img:=$(type -P qemu-img)}"
-#	: "${bin_kvm:=$(type -P kvm)}"
-#	: "${bin_qemu_system_x86_64:=$(type -P qemu-system-x86_64 )}"
-#	: "${put_iso_file_here_when_done:="/home/$SUDO_USER/Virtual-DVDs"}"
-#	: "${put_qcow_file_here_when_done:="/home/$SUDO_USER/Virtual-HDs"}"
-#	: "${VOLUME_TITLE:="RTD Auto Installer"}"
-#	: "${ssh_public_key_file:="/home/$SUDO_USER/.ssh/id_rsa.pub"}"
-#	: "${permanent_download_dir:="/home/$SUDO_USER/Virtual-DVDs/Downloaded"}"
-#
-# The main tool to create ISO files system is "xorriso".
-# [xorriso] copies file objects from POSIX compliant filesystems into Rock Ridge
-# enhanced ISO 9660 filesystems and allows session-wise manipulation of such filesystems.
-# It can load the management information of existing ISO images and it writes the session results
-# to optical media or to filesystem objects.
-#
-# At this time this function expects no arguments.
-#
-# End of Documentation
+	# Description: Function to check that all dependencies are available for manipulating the
+	# net install ISO from Ubuntu. Subsequently, the temporary file locations
+	# are setup and templates are downloaded.
+	#
+	# Several key software components are required to create ISO files (virtual DVD/CD/BlueRay)
+	# as well as a few others needed to download files from the internet, etc.
+	#
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	# DEPENDENCIES: dos2unix, cpio, gzip, genisoimage, whois, pwgen, wget, fakeroot, xorriso.
+	#
+	# This function will find full paths for the binaries needed since if they are recently
+	# added, they may not be found in the current $PATH.
+	#
+	#	Software PATH insurance:
+	#	: "${bin_7z:=$(type -P 7z)}"
+	#	: "${bin_xorriso:=$(type -P xorriso)}"
+	#	: "${bin_cpio:=$(type -P gnucpio || type -P cpio)}"
+	#	: "${bin_qemu_img:=$(type -P qemu-img)}"
+	#	: "${bin_kvm:=$(type -P kvm)}"
+	#	: "${bin_qemu_system_x86_64:=$(type -P qemu-system-x86_64 )}"
+	#	: "${put_iso_file_here_when_done:="/home/$SUDO_USER/Virtual-DVDs"}"
+	#	: "${put_qcow_file_here_when_done:="/home/$SUDO_USER/Virtual-HDs"}"
+	#	: "${VOLUME_TITLE:="RTD Auto Installer"}"
+	#	: "${ssh_public_key_file:="/home/$SUDO_USER/.ssh/id_rsa.pub"}"
+	#	: "${permanent_download_dir:="/home/$SUDO_USER/Virtual-DVDs/Downloaded"}"
+	#
+	# The main tool to create ISO files system is "xorriso".
+	# [xorriso] copies file objects from POSIX compliant filesystems into Rock Ridge
+	# enhanced ISO 9660 filesystems and allows session-wise manipulation of such filesystems.
+	# It can load the management information of existing ISO images and it writes the session results
+	# to optical media or to filesystem objects.
+	#
+	# At this time this function expects no arguments.
+	#
+	# End of Documentation
 
         if [[ "$1" == "--cleanup" ]]; then
                 for dir in "$tmp_download_dir" "$tmp_disc_dir" "$tmp_initrd_dir"; do
@@ -5065,34 +4912,31 @@ system::prepare_environment_for_iso_creation() {
 
 
 
-
-
-
 system::download_and_manipulate_iso_debian() {
-# Description:
-# system::download_and_manipulate_iso_debian "debian" "openssh-server" "MinecraftTasks"
-# This is a simple command sequence to read the preference of distribution to install
-# and what release to get... then download the network install file from debian
-# and manipulate the iso file to complete the edited instruction in the preseed.cfg...
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-#
-# system::download_and_manipulate_iso_debian [ISO Name] [Environment] [Addon Task]
-#
-# where [ISO Name] may be: any string to starte the file name with
-# where [Environment] may be: any debian supported desktop environment
-# where [Addon Task] may be: additional pre determined configuration
-#
-# EXAMPLE:
-# system::download_and_manipulate_iso_debian openssh-server MinecraftTasks
-# system::download_and_manipulate_iso_debian gnome-desktop
-# system::download_and_manipulate_iso_debian xfce-desktop
-#
-# End of Documentation
+	# Description:
+	# system::download_and_manipulate_iso_debian "debian" "openssh-server" "MinecraftTasks"
+	# This is a simple command sequence to read the preference of distribution to install
+	# and what release to get... then download the network install file from debian
+	# and manipulate the iso file to complete the edited instruction in the preseed.cfg...
+	#
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	#
+	# system::download_and_manipulate_iso_debian [ISO Name] [Environment] [Addon Task]
+	#
+	# where [ISO Name] may be: any string to starte the file name with
+	# where [Environment] may be: any debian supported desktop environment
+	# where [Addon Task] may be: additional pre determined configuration
+	#
+	# EXAMPLE:
+	# system::download_and_manipulate_iso_debian openssh-server MinecraftTasks
+	# system::download_and_manipulate_iso_debian gnome-desktop
+	# system::download_and_manipulate_iso_debian xfce-desktop
+	#
+	# End of Documentation
         local _role=$1
 	system::prepare_environment_for_iso_creation
 
@@ -5172,24 +5016,17 @@ system::download_and_manipulate_iso_debian() {
 
 
 
-
-
-
-
-
-
-
 create_iso_image_debian() {
-# Description: Function to generate the new ISO file from the extracted and
-# altered original ISO.
-# Delete old iso file if there...
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-# End of Documentation
+	# Description: Function to generate the new ISO file from the extracted and
+	# altered original ISO.
+	# Delete old iso file if there...
+	#
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	# End of Documentation
 
 	# Check for other input and create them if not defined...
 	# : "${target_iso}"
@@ -5237,34 +5074,22 @@ create_iso_image_debian() {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 create_iso_image() {
-# Description: Function to generate a bootable ISO file from source folder or an extracted and
-# altered original ISO. The function takes 3 arguments: target file name, folder to use as source
-# and volume title. The first argument is mandatory since it makes not sense unless it is known
-# what source to use for makeing the ISO file.
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-# create_iso_image  ~/mybootablecdfolder ~/mybootable.iso "My cool bootable iso title"
-#
-# This function will over write the old iso file if there...
-#
-# End of Documentation
+	# Description: Function to generate a bootable ISO file from source folder or an extracted and
+	# altered original ISO. The function takes 3 arguments: target file name, folder to use as source
+	# and volume title. The first argument is mandatory since it makes not sense unless it is known
+	# what source to use for makeing the ISO file.
+	#
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	# create_iso_image  ~/mybootablecdfolder ~/mybootable.iso "My cool bootable iso title"
+	#
+	# This function will over write the old iso file if there...
+	#
+	# End of Documentation
 
 	# Check for required input...
 
@@ -5295,44 +5120,40 @@ create_iso_image() {
 
 
 
-
-
-
-
 create_physical_media_from_iso() {
-# Description:
-# Function to automatically write ISO (virtual DVD/CD/BlueRay) to a thumb drive. No argumenst are
-# required, but a source ISO file location can may be provided when calling the function.
-# If information is required, but not provided, the end user will be interactively prompted.
-# This function requires elevated priviledges to be able to write media to a thumb drive
-# (boot sector) and other system restrictied activities. If the function is NOT called in a
-# script with elevated priviledges, it will attempt to elevate priviledges and prompt for a password.
-# Since writing a new bootable thumb drive is inherrently an interactive activity; a prompt will
-# be displayed asking what media to write to. If no media is present, a warning error
-# message will be displayed.
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-#
-# "create_physical_media_from_iso" or "create_physical_media_from_iso path/to/file.iso"
-#
-# NOTE:
-# [Note 1] An ISO file, often called an ISO image, is a single file that's a perfect representation of an
-# entire CD, DVD, or BD. The entire contents of a disc can be precisely duplicated in a single ISO file.
-# An optical disc image (or ISO image, from the ISO 9660 file system used with CD-ROM media) is a disk image
-# that contains everything that would be written to an optical disc, disk sector by disc sector, including the
-# optical disc file system. ISO images are expected to contain the binary image of an optical media file system
-# (usually ISO 9660 and its extensions or UDF), including the data in its files in binary format, copied exactly
-# as they were stored on the disc. The data inside the ISO image will be structured according to the file system
-# that was used on the optical disc from which it was created.
-#
-# [Note 2] A USB flash drive is a data storage device that includes flash memory with an integrated USB interface.
-# It is typically removable, rewritable and much smaller than an optical disc. Most weigh less than 30 g (1 oz).
-# Since first appearing on the market in late 2000
-# End of documentation
+	# Description:
+	# Function to automatically write ISO (virtual DVD/CD/BlueRay) to a thumb drive. No argumenst are
+	# required, but a source ISO file location can may be provided when calling the function.
+	# If information is required, but not provided, the end user will be interactively prompted.
+	# This function requires elevated priviledges to be able to write media to a thumb drive
+	# (boot sector) and other system restrictied activities. If the function is NOT called in a
+	# script with elevated priviledges, it will attempt to elevate priviledges and prompt for a password.
+	# Since writing a new bootable thumb drive is inherrently an interactive activity; a prompt will
+	# be displayed asking what media to write to. If no media is present, a warning error
+	# message will be displayed.
+	#
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	#
+	# "create_physical_media_from_iso" or "create_physical_media_from_iso path/to/file.iso"
+	#
+	# NOTE:
+	# [Note 1] An ISO file, often called an ISO image, is a single file that's a perfect representation of an
+	# entire CD, DVD, or BD. The entire contents of a disc can be precisely duplicated in a single ISO file.
+	# An optical disc image (or ISO image, from the ISO 9660 file system used with CD-ROM media) is a disk image
+	# that contains everything that would be written to an optical disc, disk sector by disc sector, including the
+	# optical disc file system. ISO images are expected to contain the binary image of an optical media file system
+	# (usually ISO 9660 and its extensions or UDF), including the data in its files in binary format, copied exactly
+	# as they were stored on the disc. The data inside the ISO image will be structured according to the file system
+	# that was used on the optical disc from which it was created.
+	#
+	# [Note 2] A USB flash drive is a data storage device that includes flash memory with an integrated USB interface.
+	# It is typically removable, rewritable and much smaller than an optical disc. Most weigh less than 30 g (1 oz).
+	# Since first appearing on the market in late 2000
+	# End of documentation
 
 
 	: ${BackTitle="Physical Installation Media Creator"}
@@ -5438,30 +5259,24 @@ create_physical_media_from_iso() {
 
 
 
-
-
-
-
-
-
 rtd_oem_setup_brand_splash_screen() {
-# Description: Function to brand the installer splash screen for the customized installer
-# downloaded from a ginve vendor. This function expects a few simple peices of information:
-# parameter 1: full path to image file to be branded.
-# parameter 2: quoted text to be incerted.
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-# rtd_oem_setup_brand_splash_screen [string] [string]
-#
-# [string]: /path/to/imagefile.png, "text to brand image with"
-#
-# rtd_oem_setup_brand_splash_screen /tmp/splash.png "Hi! I am a lable!"
-#
-# End of Documentation
+	# Description: Function to brand the installer splash screen for the customized installer
+	# downloaded from a ginve vendor. This function expects a few simple peices of information:
+	# parameter 1: full path to image file to be branded.
+	# parameter 2: quoted text to be incerted.
+	#
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	# rtd_oem_setup_brand_splash_screen [string] [string]
+	#
+	# [string]: /path/to/imagefile.png, "text to brand image with"
+	#
+	# rtd_oem_setup_brand_splash_screen /tmp/splash.png "Hi! I am a lable!"
+	#
+	# End of Documentation
 
 	image_file_to_brand=$1
 	text_to_brand_with=$2
@@ -5496,26 +5311,23 @@ rtd_oem_setup_brand_splash_screen() {
 
 
 
-
-
-
 rtd_oem_ubuntu_auto_install_iso_builder() {
-# Description: Function to generate an edited ISO file from a folder.
-# this function expects a minimum of one parameter: ssh-server, ubuntu-desktop, kubuntu-desktop, xubuntu-desktop, lubuntu-desktop etc.
-# By default the server ISO image will be downloaded and manipulated. Optionally this function can be told to use the
-# Ubuntu Desktop ISO instead of the server iso by passing a second parameter:
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-# :: function name				:: target		:: iso version to download
-# rtd_oem_ubuntu_auto_install_iso_builder 	ubuntu-desktop       	desktop ⏭ creates auoinstall iso using the Ubuntu live dvd
-# rtd_oem_ubuntu_auto_install_iso_builder 	ubuntu-desktop       	live	⏭ creates auoinstall iso using the Ubuntu live dvd
-# rtd_oem_ubuntu_auto_install_iso_builder 	ubuntu-desktop       	server	⏭ creates auoinstall iso using the Ubuntu server dvd
-#
-# End of Documentation
+	# Description: Function to generate an edited ISO file from a folder.
+	# this function expects a minimum of one parameter: ssh-server, ubuntu-desktop, kubuntu-desktop, xubuntu-desktop, lubuntu-desktop etc.
+	# By default the server ISO image will be downloaded and manipulated. Optionally this function can be told to use the
+	# Ubuntu Desktop ISO instead of the server iso by passing a second parameter:
+	#
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	# :: function name				:: target		:: iso version to download
+	# rtd_oem_ubuntu_auto_install_iso_builder 	ubuntu-desktop       	desktop ⏭ creates auoinstall iso using the Ubuntu live dvd
+	# rtd_oem_ubuntu_auto_install_iso_builder 	ubuntu-desktop       	live	⏭ creates auoinstall iso using the Ubuntu live dvd
+	# rtd_oem_ubuntu_auto_install_iso_builder 	ubuntu-desktop       	server	⏭ creates auoinstall iso using the Ubuntu server dvd
+	#
+	# End of Documentation
 
 
 	CONFIG=$1
@@ -5639,43 +5451,33 @@ rtd_oem_ubuntu_auto_install_iso_builder() {
 
 
 
-
-
-
-
-
-
-
-
-
-
 system::process_vm_opt_args() {
-# Description:
-# Function to evaluate input fiven to a VM build finction and set configuration override variables. 
-#
-# Globals:
-# Arguments: No[-c <#CPU>, -m <MB RAM>, -d <GB Disk>, -r <server|desktop>, -t <task>]ne
-# Outputs:
-# Returns: variables; _cpu _mem _dsk _task _role 
-# Usage:
-#
-# system::process_vm_opt_args [-c <#CPU>, -m <MB RAM>, -d <GB Disk>, -r <server|desktop>, -t <task>]
-#
-#	Supported overrides:
-#	Role:   -r ${role}
-#	Task:   -t ${CONFIG}
-#	CPU:    -c ${_cpu} VCPU
-#	Memory: -m ${_mem} GB
-#	Disk:   -d ${_dsk} GB
-#
-#
-# call from another function or script:
-# 	system::process_vm_opt_args $@
-#
-# This will call this function and pass all parameters received here. Any parameters that match the expected
-# format will set the variable accordingly. 
-#
-# End of documentation
+	# Description:
+	# Function to evaluate input fiven to a VM build finction and set configuration override variables. 
+	#
+	# Globals:
+	# Arguments: No[-c <#CPU>, -m <MB RAM>, -d <GB Disk>, -r <server|desktop>, -t <task>]ne
+	# Outputs:
+	# Returns: variables; _cpu _mem _dsk _task _role 
+	# Usage:
+	#
+	# system::process_vm_opt_args [-c <#CPU>, -m <MB RAM>, -d <GB Disk>, -r <server|desktop>, -t <task>]
+	#
+	#	Supported overrides:
+	#	Role:   -r ${role}
+	#	Task:   -t ${CONFIG}
+	#	CPU:    -c ${_cpu} VCPU
+	#	Memory: -m ${_mem} GB
+	#	Disk:   -d ${_dsk} GB
+	#
+	#
+	# call from another function or script:
+	# 	system::process_vm_opt_args $@
+	#
+	# This will call this function and pass all parameters received here. Any parameters that match the expected
+	# format will set the variable accordingly. 
+	#
+	# End of documentation
 
 	# Check for optional default T-Shirts size overrides... 
 	write_information "Set custom values for VM T-Shirts sizes, tasks and roles..."
@@ -5714,10 +5516,6 @@ system::process_vm_opt_args() {
 	done
 	unset OPTIND
 }
-
-
-
-
 
 
 
@@ -5768,32 +5566,28 @@ system::find_download_ubuntu_iso() {
 
 
 
-
-
-
-
 system::create_physical_media_from_ubuntu_iso() {
-# Description:
-# Courtesy of 'covertsh':  ubuntu-autoinstall-generator
-# Function to automatically write ISO (virtual DVD/CD/BlueRay) to a thumb drive. No argumenst are
-# required, but a source ISO file location can may be provided when calling the function.
-# If information is required, but not provided, the end user will be interactively prompted.
-# This function requires elevated priviledges to be able to write media to a thumb drive
-# (boot sector) and other system restrictied activities. If the function is NOT called in a
-# script with elevated priviledges, it will attempt to elevate priviledges and prompt for a password.
-# Since writing a new bootable thumb drive is inherrently an interactive activity; a prompt will
-# be displayed asking what media to write to. If no media is present, a warning error
-# message will be displayed.
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-#
-# "system::create_physical_media_from_ubuntu_iso" or "create_physical_media_from_iso path/to/file.iso"
-#
-# End of documentation
+	# Description:
+	# Courtesy of 'covertsh':  ubuntu-autoinstall-generator
+	# Function to automatically write ISO (virtual DVD/CD/BlueRay) to a thumb drive. No argumenst are
+	# required, but a source ISO file location can may be provided when calling the function.
+	# If information is required, but not provided, the end user will be interactively prompted.
+	# This function requires elevated priviledges to be able to write media to a thumb drive
+	# (boot sector) and other system restrictied activities. If the function is NOT called in a
+	# script with elevated priviledges, it will attempt to elevate priviledges and prompt for a password.
+	# Since writing a new bootable thumb drive is inherrently an interactive activity; a prompt will
+	# be displayed asking what media to write to. If no media is present, a warning error
+	# message will be displayed.
+	#
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	#
+	# "system::create_physical_media_from_ubuntu_iso" or "create_physical_media_from_iso path/to/file.iso"
+	#
+	# End of documentation
 
 	cleanup() {
 		trap - SIGINT SIGTERM ERR EXIT
@@ -6079,26 +5873,23 @@ system::create_physical_media_from_ubuntu_iso() {
 
 
 
-
-
-
 tool::compress_all_items_here() {
-# Description: Function to compress the contents of the present working directory.
-#
-# Purpose:	To compress all files and folders individually found in the current folder.
-#		The current folder refers to the present working directory "PWD". Compression method
-#		is 7z. This privides a high level of compression.
-#
-# Globals:
-# Arguments: --noprompt, --encrypt (mutually exclusive)
-# Outputs:
-# Returns:
-# Usage:	compress_all_items_here [--compress] [--noprompt]
-# Usage:	Simply call this function to accomplish this task.
-#
-# Arguments:	No parameters required for basic function (user will be prompted).
-#
-# End of documentation
+	# Description: Function to compress the contents of the present working directory.
+	#
+	# Purpose:	To compress all files and folders individually found in the current folder.
+	#		The current folder refers to the present working directory "PWD". Compression method
+	#		is 7z. This privides a high level of compression.
+	#
+	# Globals:
+	# Arguments: --noprompt, --encrypt (mutually exclusive)
+	# Outputs:
+	# Returns:
+	# Usage:	compress_all_items_here [--compress] [--noprompt]
+	# Usage:	Simply call this function to accomplish this task.
+	#
+	# Arguments:	No parameters required for basic function (user will be prompted).
+	#
+	# End of documentation
 
 	if hash 7z ; then
 		write_information "7z is present, good..."
@@ -6173,26 +5964,24 @@ tool::compress_all_items_here() {
 }
 
 
-
-
 tool::compress_provided_items() {
-# Description: Function to compress the contents of the present working directory.
-#
-# Purpose:	To compress all files and folders individually found in the current folder.
-#		The current folder refers to the present working directory "PWD". Compression method
-#		is 7z. This privides a high level of compression.
-#
-# Globals:
-# Arguments: --noprompt, --encrypt (mutually exclusive)
-# Outputs:
-# Returns:
-# Usage:	compress_provided_items [--encrypt] [--noprompt]
-# Usage:	Simply call this function to accomplish this task.
-#
-# Arguments:	No parameters required for basic function (user will be prompted).
-#
-# End of documentation
-list="$*"
+	# Description: Function to compress the contents of the present working directory.
+	#
+	# Purpose:	To compress all files and folders individually found in the current folder.
+	#		The current folder refers to the present working directory "PWD". Compression method
+	#		is 7z. This privides a high level of compression.
+	#
+	# Globals:
+	# Arguments: --noprompt, --encrypt (mutually exclusive)
+	# Outputs:
+	# Returns:
+	# Usage:	compress_provided_items [--encrypt] [--noprompt]
+	# Usage:	Simply call this function to accomplish this task.
+	#
+	# Arguments:	No parameters required for basic function (user will be prompted).
+	#
+	# End of documentation
+	list="$*"
 	if echo "${@}" |grep "--encrypt" ; then
 		passtoken=$(dialog --title "${Title:="$( basename $0 )"}" \
                   --backtitle "${BRANDING:-"${FUNCNAME[0]}"}" \
@@ -6264,8 +6053,6 @@ list="$*"
 		fi
 	fi
 }
-
-
 
 
 
@@ -6414,22 +6201,20 @@ tool::recompress_provided_items() {
 
 
 
-
-
 tool::up_2_date() {
-# Description: Function to simplify updating system completely. At present this function sets the
-# highest preference to use "pkcon", the command line interface of "Package Kit" since
-# this is the most consistent across different distrbutions. It may even work on BSD.
-# Only if "pkcon" is not available, will the function use the identified distro native
-# software manager: apt, yum, zypper etc. This is to maintain stability since a distro may
-# alias another distributions command (like SuSE does with apt) to be helpfull.
-# This is one of the first update functions written and is kept for compatibility.
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns: 0/1/3 where 1/0 = sucess/fail and 3 = package manager NOT found
-# Usage: tool::up_2_date
-# End of documentation
+	# Description: Function to simplify updating system completely. At present this function sets the
+	# highest preference to use "pkcon", the command line interface of "Package Kit" since
+	# this is the most consistent across different distrbutions. It may even work on BSD.
+	# Only if "pkcon" is not available, will the function use the identified distro native
+	# software manager: apt, yum, zypper etc. This is to maintain stability since a distro may
+	# alias another distributions command (like SuSE does with apt) to be helpfull.
+	# This is one of the first update functions written and is kept for compatibility.
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns: 0/1/3 where 1/0 = sucess/fail and 3 = package manager NOT found
+	# Usage: tool::up_2_date
+	# End of documentation
 	ensure_admin
 	write_status "Running up2date function:"
 
@@ -6451,34 +6236,30 @@ tool::up_2_date() {
 
 
 
-
-
-
-
 system::create_swapfile() {
-# Description: Function to create a swapfile and enable it automatically.
-#
-# Globals:
-# Arguments: None
-# Outputs:
-# Returns:
-# Usage:
-# Usage: [function_name] [options]
-# Arguments:
-# 	[size] : size in MB or GB
-# 	[path] : path to file (Default path: /swapfile)
-#
-# NOTE:
-# The Linux Kernel divides RAM into chunks of memories and the swapping process is
-# when the Linux Kernel uses a hard disk space (swap space) to store information from RAM
-# and thus releases some RAM space. That is why when you install a Linux distribution, the
-# installation wizard usually asks you to assign some space for the system and another for the swap.
-#
-# Using swap is a very useful way to extend the RAM because it provides the necessary additional
-# memory when the RAM space has been exhausted and a process has to be continued. It is especially
-# recommended when you have less than 1Gb of RAM. Although in the end, everything depends on you.
-# 
-# End of documentation
+	# Description: Function to create a swapfile and enable it automatically.
+	#
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	# Usage: [function_name] [options]
+	# Arguments:
+	# 	[size] : size in MB or GB
+	# 	[path] : path to file (Default path: /swapfile)
+	#
+	# NOTE:
+	# The Linux Kernel divides RAM into chunks of memories and the swapping process is
+	# when the Linux Kernel uses a hard disk space (swap space) to store information from RAM
+	# and thus releases some RAM space. That is why when you install a Linux distribution, the
+	# installation wizard usually asks you to assign some space for the system and another for the swap.
+	#
+	# Using swap is a very useful way to extend the RAM because it provides the necessary additional
+	# memory when the RAM space has been exhausted and a process has to be continued. It is especially
+	# recommended when you have less than 1Gb of RAM. Although in the end, everything depends on you.
+	# 
+	# End of documentation
 
 
 	SWAP_SIZE=$1

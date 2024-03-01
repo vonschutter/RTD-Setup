@@ -181,8 +181,8 @@ fi
 
 
 
-dependency::file() {
-    # Function: dependency::file
+dependency_file() {
+    # Function: dependency_file
     # Description: Searches for and loads a dependency file locally, or downloads it if not found.
     # Parameters:
     #   - $1: The name of the dependency file.
@@ -195,13 +195,13 @@ dependency::file() {
 
 	script_dir=$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )
 
-	if source "${script_dir}/../core/${1}" &>/dev/null ; then
+	if source "${script_dir}/../core/${1}" &>>${_LOGFILE} ; then
 		system::log_item "Using: ${script_dir}/../core/${1}"
-	elif source "${script_dir}/../../core/${1}" &>/dev/null ; then
+	elif source "${script_dir}/../../core/${1}" &>>${_LOGFILE} ; then
 		system::log_item "Using: ${script_dir}/../../core/${1}"
-	elif source $(find /opt -name ${1} | grep -v backup) &>/dev/null ; then
+	elif source $(find /opt -name ${1} | grep -v backup) &>>${_LOGFILE} ; then
 		system::log_item "Using: $(find /opt -name ${1} | grep -v backup)"
-	elif curl -sL "${_src_url}" -o "./${1}" && source "./${1}" &>/dev/null ; then
+	elif curl -sL "${_src_url}" -o "./${1}" && source "./${1}" &>>${_LOGFILE} ; then
 		system::log_item "Using: ${_src_url}"
 	else
 		system::log_item "${1} NOT found!"
@@ -1380,7 +1380,7 @@ case $1 in
 			echo "$_SIMPLE_SUPPORT_TOOL_DOC" >> ${_LOGFILE}
 			rtd_oem_check_inet_access  "$@"
 			if [ -z "${RTDFUNCTIONS}" ]; then
-				dependency::file "${_dependency_lib}" || { echo "📚 Failed to find _rtd_library"; exit 1; }
+				dependency_file "${_dependency_lib}" || { echo "📚 Failed to find _rtd_library"; exit 1; }
 			else
 				write_status "📚 _rtd_library is already loaded..."
 			fi
@@ -1398,7 +1398,7 @@ case $1 in
 			else
 				rtd_oem_check_inet_access "$@"
 				if [ -z "${RTDFUNCTIONS}" ]; then
-					dependency::file "${_dependency_lib}" || { echo "📚 Failed to find _rtd_library"; exit 1; }
+					dependency_file "${_dependency_lib}" || { echo "📚 Failed to find _rtd_library"; exit 1; }
 				else
 					write_status "📚 _rtd_library is already loaded..."
 				fi

@@ -373,8 +373,9 @@ function InstallVMSDriverTools {
 			}
 		# KVM/QEMU
 		"QEMU" {
-			OnlineInstallTask -Title "Installing VirtIO Drivers for KVM Hypervisor" -ChocoInstall "virtio-drivers"
+			#OnlineInstallTask -Title "Installing VirtIO Drivers for KVM Hypervisor" -ChocoInstall "virtio-drivers"
 			OnlineInstallTask -Title "Installing Spice Virtualization Client Tools" -ChocoInstall "spice-agent"
+			OnlineInstallTask -Title "Installing Spice Virtualization Client Tools" -ChocoInstall "qemu-guest-agent --install-arguments 'ALLUSERS'"
 			}
 		}
 	} catch {
