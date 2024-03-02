@@ -197,12 +197,12 @@ exit $?
 
 
 # -----------------------------------------------------------------------------------------------------------------------
-# Anything after this exit statment below will be dangerous and meaningless
+# Anything after this exit statement below will be dangerous and meaningless
 # command syntax to POSIX based systems...
 # Make sure to exit no matter what...
 # -----------------------------------------------------------------------------------------------------------------------
 :CMDSCRIPT
-@title			-	RTD System System Managment Bootstrap Script      -
+@title			-	RTD System System Management Bootstrap Script      -
 ::
 ::
 ::					Windows CMD Shell Script Section
@@ -220,15 +220,15 @@ exit $?
 :: 	Please list command files to be run here in the following format:
 ::
 :: 	:TITLE
-:: 	Description of the pupose of called command file.
+:: 	Description of the purpose of called command file.
 :: 	call <path>\command.cmd or command...
 ::
 ::
 :: The preferred method of coding NT Shell well is per the Tim Hill Windows NT Shell Scripting book, ISBN: 1-57878-047-7
 :: This is to ensure a secure and controlled way to execute components in the script. This may be an old way
-:: but it is relible and it works in all versions of Windows starting with Windows NT. However, newer more powerfull
+:: but it is reliable and it works in all versions of Windows starting with Windows NT. However, newer more powerful
 :: scripting languages are available. These should be used where appropriate in the stage 2 of this process.
-:: This bootstrap sctipt is intended for compatibility and this section therefore focuses on Windows CMD as this
+:: This bootstrap script is intended for compatibility and this section therefore focuses on Windows CMD as this
 :: works in all earlier 32 and 64 bit versions of Windows.
 ::
 :: Example 1
@@ -242,6 +242,7 @@ exit $?
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
+
 :INIT
 	:::::::::::::::::::::::::::::::::::::::::::::::::::
 	::	Script startup components; tasks that always
@@ -249,21 +250,23 @@ exit $?
 	::
 	ECHO Welcome to %COMSPEC%
 	ECHO This is a windows script!
-	setlocal &  pushd %~dp0
+	:: setlocal &  pushd %~dp0
 	:: %debug%
-	color 17
-	title RTD OEM Launcher
 
 :SETINGS
 	::::::::::::::::::::::::::::::::::::::::::::::::::::::
 	::  ***             Settings               ***      ::
 	::::::::::::::::::::::::::::::::::::::::::::::::::::::
 	::
-	mkdir c:\rtd\temp
 	set temp=c:\rtd\temp
-	mkdir c:\rtd\log
 	set _LOGDIR=c:\rtd\log
+	set wallpaperdir=c:\rtd\wallpaper
+
+	md %temp%
 	md %_LOGDIR%
+	md %wallpaperdir%
+
+    set wallpaper_url=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/wallpaper/Wayland.jpg
 	set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
 	set _STAGE2FILE=rtd-oem-win10-config.ps1
 	echo Stage 2 file is located at:
@@ -271,37 +274,35 @@ exit $?
 
 
 :GetInterestingThigsToDoOnThisSystem
-	:: Given that Microsoft Windows has been detected and the CMD chell portion of this script is executed,
-	:: the second stage script must be downloaded from an online location. Depending on the version of Windows
-	:: there are different methods available to get and run remote files. All versions of Windows do not neccesarily
-	:: support powershell scripting. Therefore the base of this activity is coded in simple command CMD.EXE shell scripting
+	:: Given that Microsoft Windows has been detected and the CMD shell portion of this script is executed,
+	:: the second stage script must be downloaded from an online location. Depending on the version of windows
+	:: there are different methods available to get and run remote files. All versions of windows do not necessarily
+	:: support power-shell scripting. Therefore the base of this activity is coded in simple command CMD.EXE shell scripting
 	::
-	:: Table of evaluating verson of Windows and calling the appropriate action given the version of Windows found.
+	:: Table of evaluating verson of windows and calling the appropriate action given the version of windows found.
 	:: In this case it is easier to manage a straight table than a for loop or array:
 
 	:: DOS Based versions of Windows:
-	ver | find "4.0" > %_LOGDIR%\%0.log && goto BAT1 	rem Windows 95
-	ver | find "4.10" > %_LOGDIR%\%0.log && goto BAT1	rem Windows 98
-	ver | find "4.90" > %_LOGDIR%\%0.log && goto BAT1	rem Windows ME
+	:: ver | find "4.0" > nul && goto CMD1 	rem Windows 95
+	:: ver | find "4.10" > nul && goto CMD1 rem Windows 98
+	:: ver | find "4.90" > nul && goto CMD1	rem Windows ME
 
 	:: Windows 32 and 64 Bit versions:
-	ver | find "NT 4.0" > %_LOGDIR%\%0.log && call :CMD1 Windows NT 4.0
-	ver | find "5.0" > %_LOGDIR%\%0.log && call :CMD1 Windows 2000
-	ver | find "5.1" > %_LOGDIR%\%0.log && call :CMD1 Windows XP
-	ver | find "5.2" > %_LOGDIR%\%0.log && call :CMD1 Windows XP 64 Bit
-	ver | find "6.0" > %_LOGDIR%\%0.log && call :DispErr Vista is not supported!!!
-	ver | find "6.1" > %_LOGDIR%\%0.log && call :PS1 Windows 7
-	ver | find "6.2" > %_LOGDIR%\%0.log && call :PS2 Windows 8
-	ver | find "6.3" > %_LOGDIR%\%0.log && call :PS2 Windows 8
-	ver | find "6.3" > %_LOGDIR%\%0.log && call :PS2 Windows 8
-	ver | find "10.0" > %_LOGDIR%\%0.log && call :PS2 Windows 10
-	ver | find "11.0" > %_LOGDIR%\%0.log && call :PS2 Windows 11
-	ver | find "12.0" > %_LOGDIR%\%0.log && call :PS2 Windows 12
+	ver | find "NT 4.0" > nul && call :CMD1 Windows NT 4.0
+	ver | find "5.0" > nul && call :CMD1 Windows 2000
+	ver | find "5.1" > nul && call :CMD1 Windows XP
+	ver | find "5.2" > nul && call :CMD1 Windows XP 64 Bit
+	ver | find "6.0" > nul && call :DispErr Vista is not supported!!!
+	ver | find "6.1" > nul && call :PS1 Windows 7
+	ver | find "6.2" > nul && call :PS2 Windows 8
+	ver | find "6.3" > nul && call :PS2 Windows 8
+	ver | find "6.3" > nul && call :PS2 Windows 8
+	ver | find "10.0" > nul && call :PS2 Windows 10
 
 	:: Windows Server OS Versions:
-	ver | find "NT 6.2" > %_LOGDIR%\%0.log && call :PS2 Windows Server 2012
-	ver | find "NT 6.3" > %_LOGDIR%\%0.log && call :PS2 Windows Server 2012 R2
-	ver | find "NT 10.0" > %_LOGDIR%\%0.log && call :PS2 Windows Server 2016 and up...
+	ver | find "NT 6.2" > nul && call :PS2 Windows Server 2012
+	ver | find "NT 6.3" > nul && call :PS2 Windows Server 2012 R2
+	ver | find "NT 10.0" > nul && call :PS2 Windows Server 2016 and up...
 
 	goto end
 
@@ -313,44 +314,63 @@ exit $?
 	echo Found %*
 	echo Fetching %_STAGE2FILE%...
 	echo Please wait...
-	powershell -Command "(New-Object Net.WebClient).DownloadFile('%_STAGE2LOC%\%_STAGE2FILE%', '%_STAGE2FILE%')"
-	powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
-	powershell -ExecutionPolicy UnRestricted -File .\%_STAGE2FILE%
+	copy /y A:\*.* c:\rtd\
+
+	powershell -Command "(New-Object Net.WebClient).DownloadFile('%wallpaper_url%', 'c:\rtd\wallpaper\Wayland.jpg')"
+
+	if exist C:\rtd\%_STAGE2FILE% (
+		echo File found locally...
+		powershell -ExecutionPolicy UnRestricted -File C:\rtd\%_STAGE2FILE%
+		) else (
+		echo Fetching %_STAGE2FILE% from the internet...
+		powershell -Command "(New-Object Net.WebClient).DownloadFile('%_STAGE2LOC%\%_STAGE2FILE%', '%_STAGE2FILE%')"
+		powershell -ExecutionPolicy UnRestricted -File .\%_STAGE2FILE%
+	)
 	goto end
 
 
 :PS2
-	:: Procedure to get the second stage configuration script in all versions of Windows after 7.
-	:: These versions of Windows have a more modern version of PowerShell.
+	:: Procedure to get the second stage configuration script in all version of windows after 7.
+	:: These version of windows have a more modern version of PowerShell.
 	:: get stage 2 and run it...
 	echo Found %*
 	echo Fetching %_STAGE2FILE%...
 	echo Please wait...
-	powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %_STAGE2LOC%\%_STAGE2FILE% -OutFile %_STAGE2FILE%"
-	powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
-	powershell -ExecutionPolicy UnRestricted -File .\%_STAGE2FILE%
-	goto end
+	if exist A:\autounattend.xml copy /y A:\*.* c:\rtd\
 
+	powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %wallpaper_url% -OutFile c:\rtd\wallpaper\Wayland.jpg"
+
+	if exist C:\rtd\%_STAGE2FILE% (
+		echo File found locally...
+		powershell -ExecutionPolicy UnRestricted -File C:\rtd\%_STAGE2FILE%
+		) else (
+		echo Fetching %_STAGE2FILE% from the internet...
+		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %_STAGE2LOC%\%_STAGE2FILE% -OutFile c:\rtd\%_STAGE2FILE%"
+
+		powershell -ExecutionPolicy UnRestricted -File c:\rtd\%_STAGE2FILE%
+	)
+
+	if exist C:\rtd\_Chris-Titus-Post-Windows-Install-App.ps1 (
+		echo File found locally...
+		powershell -ExecutionPolicy UnRestricted -File C:\rtd\_Chris-Titus-Post-Windows-Install-App.ps1
+		) else (
+		echo Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet...
+		powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
+	)
+	goto end
 
 
 :CMD1
-	:: Pre windows 7 instructions go here...
+	:: Pre windows 7 instruction go here (except vista)...
 	:: Windows NT, XP, and 2000 etc. do not have powershell and must find a different way to
 	:: fetch a script over the internet and execute it.
+
 	echo Detected %* ...
 	echo executing PRE Windows 7 instructions...
-	echo However, no instructions for Windows NT or 2000 are avaliable.
+
 	goto end
 
 
-:BAT1
-	:: DOS Based instructions go here ...
-	:: Windows 3.11 - ME etc. do not have powershell and must find a different way to
-	:: fetch a script over the internet and execute it.
-	echo Detected an ancient Microsoft OS...
-	echo Executing DOS Based instructions...
-	echo However, nothing for this has been created as DOS, Windows 3.11, 95, 98, ME are too ancient!
-	goto END
 
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -376,9 +396,9 @@ exit $?
 	echo ::                                                                             ::
 	echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 	echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-goto eof
+	pause
+goto end
 
 
 
 :end
-:EOF

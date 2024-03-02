@@ -283,6 +283,19 @@ Function Set-WallPaper($Value){
 }
 
 
+Function InstallWinGet {
+	Write-Progress -Activity "-- Prerequisite Configuration" -CurrentOperation "Enabeling Software Management..." -Status "Running with Recommended Settings"
+	$progressPreference = 'silentlyContinue'
+	Write-Information "Downloading WinGet and its dependencies..."
+	Invoke-WebRequest -Uri https://aka.ms/getwinget -OutFile Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle
+	Invoke-WebRequest -Uri https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx -OutFile Microsoft.VCLibs.x64.14.00.Desktop.appx
+	Invoke-WebRequest -Uri https://github.com/microsoft/microsoft-ui-xaml/releases/download/v2.8.6/Microsoft.UI.Xaml.2.8.x64.appx -OutFile Microsoft.UI.Xaml.2.8.x64.appx
+	Add-AppxPackage Microsoft.VCLibs.x64.14.00.Desktop.appx
+	Add-AppxPackage Microsoft.UI.Xaml.2.8.x64.appx
+	Add-AppxPackage Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle
+}
+
+
 Function RTDRegistryTweaks {
 	Write-Progress -Activity "Improving Windows Update to delay Feature updates and only install Security Updates" -Status "Processing"
 	### Fix Windows Update to delay feature updates and only update at certain times
@@ -326,7 +339,7 @@ Function InstallPDFToolsBundle {
 }
 
 Function InstallFirefox {
-	OnlineInstallTask -Title "Installing Mozilla Firefox" -ChocoInstall "firefox"
+	OnlineInstallTask -Title "Installing Mozilla Firefox" -ChocoInstall "firefox '--params /NoDesktopShortcut'"
 	# set Firefox as default...
 	$regKey      = "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\{0}\UserChoice"
 	$regKeyFtp   = $regKey -f 'ftp'
@@ -381,7 +394,8 @@ function InstallVMSDriverTools {
 
 			OnlineInstallTask -Title "Installing Spice Virtualization Client Tools" -ChocoInstall "spice-agent"
 			OnlineInstallTask -Title "Installing Spice Virtualization Client Tools" -ChocoInstall "qemu-guest-agent --install-arguments 'ALLUSERS'"
-			OnlineInstallTask -Title "Installing VirtIO Drivers for KVM Hypervisor" -ChocoInstall "virtio-drivers"
+			# drivers installed by msiexec prior, no need to install again
+			#OnlineInstallTask -Title "Installing VirtIO Drivers for KVM Hypervisor" -ChocoInstall "virtio-drivers"
 			
 			# To enable Driver Signature Enforcement
 			Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows NT\Driver Signing" -Name "BehaviorOnFailedVerify" -Value 1

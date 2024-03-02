@@ -10959,26 +10959,7 @@ template::rtd_me_sh_cmd() {
 	
 	# case ${todo} in 
 	# 	--write )
-cat >> ${outfile} <<-'EOF'
-@ECHO OFF
-echo	[internal]	-	RTD System System Management Bootstrap Script      -	[internal]
-@title              -	RTD System System Management Bootstrap Script      -
-::
-:::::::::::::::::::::::::::::// CMD Bootstrap Script //::::::::::::::::::::::::::::::::::::::::// Windows //::::::::::::
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-:: Author(s):   	SLS, KLS, NB.  Buffalo Center, IA & Avarua, Cook Islands
-:: Version:	1.06
-::
-::
-:: for the full script see https://github.com/vonschutter/RTD-Setup
-::
-::
-::					Windows CMD Shell Script Section
-::
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::"
-
-
+cat >> ${outfile} <<'EOF'
 :INIT
 	:::::::::::::::::::::::::::::::::::::::::::::::::::
 	::	Script startup components; tasks that always
@@ -10994,28 +10975,32 @@ echo	[internal]	-	RTD System System Management Bootstrap Script      -	[internal
 	::  ***             Settings               ***      ::
 	::::::::::::::::::::::::::::::::::::::::::::::::::::::
 	::
-	set temp=c:\rtd\temp
-	set _LOGDIR=c:\rtd\log
-	set wallpaperdir=c:\rtd\wallpaper
-
-	md %temp%
-	md %_LOGDIR%
-	md %wallpaperdir%
-
-    set wallpaper_url=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/wallpaper/Wayland.jpg
+	set TEMP=C:\rtd\temp
+	set LOG_DIR=C:\rtd\log
+	set WALLPAPER_DIR=C:\rtd\wallpaper
+	set CACHE_DIR=C:\rtd\cache
+    set WALLPAPER_URL=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/wallpaper/Wayland.jpg
+    set VIRTIO_URL=https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.248-1/virtio-win-gt-x64.msi
 	set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
 	set _STAGE2FILE=rtd-oem-win10-config.ps1
-	echo Stage 2 file is located at:
-	echo %_STAGE2LOC%\%_STAGE2FILE%
+	
+	md %TEMP%
+	md %LOG_DIR%
+	md %WALLPAPER_DIR%
+    md %CACHE_DIR%
+    
+	@title "Stage 2 file is located at: %_STAGE2LOC%\%_STAGE2FILE%"
 
-
+    set >>%LOG_DIR%\rtd.log
+    ver >>%LOG_DIR%\rtd.log
+    
 :GetInterestingThigsToDoOnThisSystem
 	:: Given that Microsoft Windows has been detected and the CMD shell portion of this script is executed,
 	:: the second stage script must be downloaded from an online location. Depending on the version of windows
 	:: there are different methods available to get and run remote files. All versions of windows do not necessarily
 	:: support power-shell scripting. Therefore the base of this activity is coded in simple command CMD.EXE shell scripting
 	::
-	:: Table of evaluating verson of windows and calling the appropriate action given the version of windows found.
+	:: Table of evaluating version of windows and calling the appropriate action given the version of windows found.
 	:: In this case it is easier to manage a straight table than a for loop or array:
 
 	:: DOS Based versions of Windows:
@@ -11047,17 +11032,24 @@ echo	[internal]	-	RTD System System Management Bootstrap Script      -	[internal
 	:: Procedure to get the second stage in Windows 7. Windows 7, by default has a different version of
 	:: PowerShell installed. Therefore a slightly different syntax must be used.
 	:: get stage 2 and run it...
-	echo Found %*
-	echo Fetching %_STAGE2FILE%...
+	echo Found %* >>%LOG_DIR%\rtd.log
 	echo Please wait...
+	:: if exist A:\autounattend.xml copy /y A:\*.* c:\rtd\
+    @title "Fetch Wallpaper for default background"
+	powershell -Command "(New-Object Net.WebClient).DownloadFile('%WALLPAPER_URL%', '%CACHE_DIR%\virtio-win-gt-x64.msi')"
+    @title: "Download and install virtio-drivers"
+    powershell -Command "(New-Object Net.WebClient).DownloadFile('%VIRTIO_URL%', '%WALLPAPER_DIR%\Wayland.jpg')"
+    powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %VIRTIO_URL% -OutFile %CACHE_DIR%\virtio-win-gt-x64.msi"
+    msiexec /i virtio-win-gt-x64.msi /passive /norestart /l*v %LOG_DIR%\virtio_log.txt
+	
 
-	if exist A:\%_STAGE2FILE% (
-		echo File found locally...  
-		powershell -ExecutionPolicy UnRestricted -File A:\%_STAGE2FILE%
+	if exist C:\rtd\%_STAGE2FILE% (
+		echo File found locally...
+		powershell -ExecutionPolicy UnRestricted -File C:\rtd\%_STAGE2FILE%
 		) else (
 		echo Fetching %_STAGE2FILE% from the internet...
-		powershell -Command "(New-Object Net.WebClient).DownloadFile('%_STAGE2LOC%\%_STAGE2FILE%', '%_STAGE2FILE%')"
-		powershell -ExecutionPolicy UnRestricted -File .\%_STAGE2FILE%
+		powershell -Command "(New-Object Net.WebClient).DownloadFile('%_STAGE2LOC%/%_STAGE2FILE%', '%CACHE_DIR%\%_STAGE2FILE%')"
+		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
 	)
 	goto end
 
@@ -11069,24 +11061,29 @@ echo	[internal]	-	RTD System System Management Bootstrap Script      -	[internal
 	echo Found %*
 	echo Fetching %_STAGE2FILE%...
 	echo Please wait...
-	copy /y A:\*.* c:\rtd\
-	powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %wallpaperloc% -OutFile c:\rtd\wallpaper\Wayland.jpg"
+	:: if exist A:\autounattend.xml copy /y A:\*.* c:\rtd\
+    
+    @title "Fetch Wallpaper for default background"
+	powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %WALLPAPER_URL% -OutFile %WALLPAPER_DIR%\Wayland.jpg"
+    @title: "Download and install virtio-drivers"
+    powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %VIRTIO_URL% -OutFile %CACHE_DIR%\virtio-win-gt-x64.msi"
+    msiexec /i virtio-win-gt-x64.msi /passive /norestart /l*v %LOG_DIR%\virtio_log.txt
 
-	if exist A:\%_STAGE2FILE% (
-		echo File found locally...  
-		powershell -ExecutionPolicy UnRestricted -File A:\%_STAGE2FILE%
+    
+	if exist C:\rtd\%_STAGE2FILE% (
+		@title "File found locally..."
+		powershell -ExecutionPolicy UnRestricted -File C:\rtd\%_STAGE2FILE%
 		) else (
-		echo Fetching %_STAGE2FILE% from the internet...
-		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %_STAGE2LOC%\%_STAGE2FILE% -OutFile c:\rtd\%_STAGE2FILE%"
-
-		powershell -ExecutionPolicy UnRestricted -File c:\rtd\%_STAGE2FILE%
+		@title "Fetching %_STAGE2FILE% from the internet..."
+		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %_STAGE2LOC%/%_STAGE2FILE% -OutFile %CACHE_DIR%\%_STAGE2FILE%"
+		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
 	)
 
-	if exist A:\_Chris-Titus-Post-Windows-Install-App.ps1 (
-		echo File found locally...  
-		powershell -ExecutionPolicy UnRestricted -File A:\_Chris-Titus-Post-Windows-Install-App.ps1
+	if exist C:\rtd\_Chris-Titus-Post-Windows-Install-App.ps1 (
+		@title "File found locally..."
+		powershell -ExecutionPolicy UnRestricted -File C:\rtd\_Chris-Titus-Post-Windows-Install-App.ps1
 		) else (
-		echo Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet...
+		@title "Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet..."
 		powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
 	)
 	goto end
@@ -11129,12 +11126,9 @@ echo	[internal]	-	RTD System System Management Bootstrap Script      -	[internal
 	echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 	echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 	pause
-goto eof
-
-
+goto end
 
 :end
-:eof
 EOF
 	# ;;
 	# --help )
@@ -11313,131 +11307,149 @@ template::autounattend_xml() {
 		;;
 		win10 | Win10 | win7 | Win7 )
 		cat > ${target_file} <<-'EOF'
-		<?xml version="1.0" encoding="utf-8"?>
-		<unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
-		<settings pass="offlineServicing" />
-		<settings pass="windowsPE">
-		<component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-		<SetupUILanguage>
-			<UILanguage>en-US</UILanguage>
-		</SetupUILanguage>
-		<InputLocale>0409:00000409</InputLocale>
-		<SystemLocale>en-US</SystemLocale>
-		<UILanguage>en-US</UILanguage>
-		<UserLocale>en-US</UserLocale>
-		</component>
-		<component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-		<ImageInstall>
-			<OSImage>
-			<InstallTo>
-			<DiskID>0</DiskID>
-			<PartitionID>2</PartitionID>
-			</InstallTo>
-			</OSImage>
-		</ImageInstall>
-		<UserData>
-			<ProductKey>
-			<Key>VK7JG-NPHTM-C97JM-9MPGT-3V66T</Key>
-			</ProductKey>
-			<AcceptEula>true</AcceptEula>
-		</UserData>
-		<RunSynchronous>
-			<RunSynchronousCommand>
-			<Order>1</Order>
-			<Path>cmd.exe /c echo SELECT DISK=0 &gt;&gt; X:\diskpart.txt</Path>
-			</RunSynchronousCommand>
-			<RunSynchronousCommand>
-			<Order>2</Order>
-			<Path>cmd.exe /c echo CLEAN &gt;&gt; X:\diskpart.txt</Path>
-			</RunSynchronousCommand>
-			<RunSynchronousCommand>
-			<Order>3</Order>
-			<Path>cmd.exe /c echo CREATE PARTITION PRIMARY SIZE=100 &gt;&gt; X:\diskpart.txt</Path>
-			</RunSynchronousCommand>
-			<RunSynchronousCommand>
-			<Order>4</Order>
-			<Path>cmd.exe /c echo FORMAT QUICK FS=NTFS LABEL="System Reserved" &gt;&gt; X:\diskpart.txt</Path>
-			</RunSynchronousCommand>
-			<RunSynchronousCommand>
-			<Order>5</Order>
-			<Path>cmd.exe /c echo ACTIVE &gt;&gt; X:\diskpart.txt</Path>
-			</RunSynchronousCommand>
-			<RunSynchronousCommand>
-			<Order>6</Order>
-			<Path>cmd.exe /c echo CREATE PARTITION PRIMARY &gt;&gt; X:\diskpart.txt</Path>
-			</RunSynchronousCommand>
-			<RunSynchronousCommand>
-			<Order>7</Order>
-			<Path>cmd.exe /c echo FORMAT QUICK FS=NTFS LABEL="Windows" &gt;&gt; X:\diskpart.txt</Path>
-			</RunSynchronousCommand>
-			<RunSynchronousCommand>
-			<Order>8</Order>
-			<Path>cmd.exe /c diskpart /s X:\diskpart.txt &gt;&gt; X:\diskpart.log</Path>
-			</RunSynchronousCommand>
-		</RunSynchronous>
-		</component>
-		</settings>
-		<settings pass="generalize" />
-		<settings pass="specialize" />
-		<settings pass="auditSystem" />
-		<settings pass="auditUser" />
-		<settings pass="oobeSystem">
-		<component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-		<InputLocale>0409:00000409</InputLocale>
-		<SystemLocale>en-US</SystemLocale>
-		<UILanguage>en-US</UILanguage>
-		<UserLocale>en-US</UserLocale>
-		</component>
-		<component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-		<UserAccounts>
-			<AdministratorPassword>
-			<Value>letmein1234</Value>
-			<PlainText>true</PlainText>
-			</AdministratorPassword>
-			<LocalAccounts>
-			<LocalAccount wcm:action="add">
-			<Name>tangarora</Name>
-			<Group>Administrators</Group>
-			<Password>
-			<Value>letmein1234</Value>
-			<PlainText>true</PlainText>
-			</Password>
-			</LocalAccount>
-			<LocalAccount wcm:action="add">
-			<Name>RTDUser</Name>
-			<Group>Users</Group>
-			<Password>
-			<Value>letmein1234</Value>
-			<PlainText>true</PlainText>
-			</Password>
-			</LocalAccount>
-			</LocalAccounts>
-		</UserAccounts>
-		<AutoLogon>
-			<Username>Administrator</Username>
-			<Enabled>true</Enabled>
-			<LogonCount>1</LogonCount>
-			<Password>
-			<Value>letmein1234</Value>
-			<PlainText>true</PlainText>
-			</Password>
-		</AutoLogon>
-		<OOBE>
-			<ProtectYourPC>3</ProtectYourPC>
-			<HideEULAPage>true</HideEULAPage>
-			<HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
-		</OOBE>
-		<FirstLogonCommands>
-			<SynchronousCommand wcm:action="add">
-			<CommandLine>a:\rtd-me-sh.cmd</CommandLine>
-			<Description>Run Software install</Description>
-			<Order>1</Order>
-			</SynchronousCommand>
-		</FirstLogonCommands>
-		</component>
-		</settings>
-		</unattend>
-		EOF
+<?xml version="1.0" encoding="utf-8"?>
+<unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+    <settings pass="offlineServicing"></settings>
+    <settings pass="windowsPE">
+        <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+            <SetupUILanguage>
+                <UILanguage>en-US</UILanguage>
+            </SetupUILanguage>
+            <InputLocale>0409:00000409</InputLocale>
+            <SystemLocale>en-US</SystemLocale>
+            <UILanguage>en-US</UILanguage>
+            <UserLocale>en-US</UserLocale>
+        </component>
+        <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+            <ImageInstall>
+                <OSImage>
+                    <InstallTo>
+                        <DiskID>0</DiskID>
+                        <PartitionID>2</PartitionID>
+                    </InstallTo>
+                </OSImage>
+            </ImageInstall>
+            <UserData>
+                <ProductKey>
+                    <Key>DXG7C-N36C4-C4HTG-X4T3X-2YV77</Key>
+                </ProductKey>
+                <AcceptEula>true</AcceptEula>
+            </UserData>
+            <RunSynchronous>
+                <RunSynchronousCommand>
+                <Order>1</Order>
+                <Path>cmd.exe /c echo SELECT DISK=0 &gt;&gt; X:\diskpart.txt</Path>
+                </RunSynchronousCommand>
+                <RunSynchronousCommand>
+                <Order>2</Order>
+                <Path>cmd.exe /c echo CLEAN &gt;&gt; X:\diskpart.txt</Path>
+                </RunSynchronousCommand>
+                <RunSynchronousCommand>
+                <Order>3</Order>
+                <Path>cmd.exe /c echo CREATE PARTITION PRIMARY SIZE=100 &gt;&gt; X:\diskpart.txt</Path>
+                </RunSynchronousCommand>
+                <RunSynchronousCommand>
+                <Order>4</Order>
+                <Path>cmd.exe /c echo FORMAT QUICK FS=NTFS LABEL="System Reserved" &gt;&gt; X:\diskpart.txt</Path>
+                </RunSynchronousCommand>
+                <RunSynchronousCommand>
+                <Order>5</Order>
+                <Path>cmd.exe /c echo ACTIVE &gt;&gt; X:\diskpart.txt</Path>
+                </RunSynchronousCommand>
+                <RunSynchronousCommand>
+                <Order>6</Order>
+                <Path>cmd.exe /c echo CREATE PARTITION PRIMARY &gt;&gt; X:\diskpart.txt</Path>
+                </RunSynchronousCommand>
+                <RunSynchronousCommand>
+                <Order>7</Order>
+                <Path>cmd.exe /c echo FORMAT QUICK FS=NTFS LABEL="Windows" &gt;&gt; X:\diskpart.txt</Path>
+                </RunSynchronousCommand>
+                <RunSynchronousCommand>
+                <Order>8</Order>
+                <Path>cmd.exe /c diskpart /s X:\diskpart.txt &gt;&gt; X:\diskpart.log</Path>
+                </RunSynchronousCommand>
+            </RunSynchronous>
+        </component>
+    </settings>
+    <settings pass="generalize"></settings>
+    <settings pass="specialize"></settings>
+    <settings pass="auditSystem"></settings>
+    <settings pass="auditUser"></settings>
+    <settings pass="oobeSystem">
+        <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+            <InputLocale>0409:00000409</InputLocale>
+            <SystemLocale>en-US</SystemLocale>
+            <UILanguage>en-US</UILanguage>
+            <UserLocale>en-US</UserLocale>
+        </component>
+        <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+            <UserAccounts>
+                <LocalAccounts>
+                    <LocalAccount wcm:action="add">
+                        <Name>tangarora</Name>
+                        <Group>Administrators</Group>
+                        <Password>
+                            <Value>letmein1234</Value>
+                            <PlainText>true</PlainText>
+                        </Password>
+                    </LocalAccount>
+                    <LocalAccount wcm:action="add">
+                        <Name>RTD-User</Name>
+                        <Group>Users</Group>
+                        <Password>
+                            <Value>letmein1234</Value>
+                            <PlainText>true</PlainText>
+                        </Password>
+                    </LocalAccount>
+                </LocalAccounts>
+            </UserAccounts>
+            <AutoLogon>
+                <Username>tangarora</Username>
+                <Enabled>true</Enabled>
+                <LogonCount>1</LogonCount>
+                <Password>
+                    <Value>letmein1234</Value>
+                    <PlainText>true</PlainText>
+                </Password>
+            </AutoLogon>
+            <OOBE>
+                <ProtectYourPC>3</ProtectYourPC>
+                <HideEULAPage>true</HideEULAPage>
+            </OOBE>
+            <FirstLogonCommands>
+                <SynchronousCommand wcm:action="add">
+                    <Order>1</Order>
+                    <CommandLine>reg.exe add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoLogonCount /t REG_DWORD /d 0 /f</CommandLine>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <Order>2</Order>
+                    <CommandLine>powershell.exe -NoProfile -Command "Disable-ComputerRestore -Drive 'C:';"</CommandLine>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <Order>3</Order>
+		    <CommandLine>powershell.exe -NoProfile -Command "Set-ItemProperty -Path 'HKLM:\Software\Policies\Microsoft\Windows NT\Driver Signing' -Name 'BehaviorOnFailedVerify' -Value 0"</CommandLine>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <Order>4</Order>
+                    <CommandLine>cmd.exe /c "gpupdate /target:computer /force"</CommandLine>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <Order>5</Order>
+                    <CommandLine>cmd.exe /c "md C:\rtd"</CommandLine>
+		</SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <Order>6</Order>
+                    <CommandLine>cmd.exe /c "copy A:\*.* C:\rtd"</CommandLine>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <Order>7</Order>
+                    <CommandLine>cmd.exe /c C:\rtd\rtd-me-sh.cmd</CommandLine>
+                </SynchronousCommand>
+            </FirstLogonCommands>
+        </component>
+    </settings>
+</unattend>
+	EOF
 		;;
 		* )
 			write_error "No valid Windows version provided, use: win7, win10, win11"
