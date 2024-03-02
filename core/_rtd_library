@@ -10967,7 +10967,7 @@ cat >> ${outfile} <<'EOF'
 	::
 	ECHO Welcome to %COMSPEC%
 	ECHO This is a windows script!
-	:: setlocal &  pushd %~dp0
+	setlocal &  pushd %~dp0
 	:: %debug%
 
 :SETINGS
@@ -11035,12 +11035,12 @@ cat >> ${outfile} <<'EOF'
 	echo Found %* >>%LOG_DIR%\rtd.log
 	echo Please wait...
 	:: if exist A:\autounattend.xml copy /y A:\*.* c:\rtd\
-    @title "Fetch Wallpaper for default background"
+	@title "Fetch Wallpaper for default background"
 	powershell -Command "(New-Object Net.WebClient).DownloadFile('%WALLPAPER_URL%', '%CACHE_DIR%\virtio-win-gt-x64.msi')"
-    @title: "Download and install virtio-drivers"
-    powershell -Command "(New-Object Net.WebClient).DownloadFile('%VIRTIO_URL%', '%WALLPAPER_DIR%\Wayland.jpg')"
-    powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %VIRTIO_URL% -OutFile %CACHE_DIR%\virtio-win-gt-x64.msi"
-    msiexec /i virtio-win-gt-x64.msi /passive /norestart /l*v %LOG_DIR%\virtio_log.txt
+	@title: "Download and install virtio-drivers"
+	powershell -Command "(New-Object Net.WebClient).DownloadFile('%VIRTIO_URL%', '%WALLPAPER_DIR%\Wayland.jpg')"
+	powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %VIRTIO_URL% -OutFile %CACHE_DIR%\virtio-win-gt-x64.msi"
+	msiexec /i %CACHE_DIR%\virtio-win-gt-x64.msii /passive /norestart /l*v %LOG_DIR%\virtio_log.txt
 	
 
 	if exist C:\rtd\%_STAGE2FILE% (
@@ -11063,11 +11063,11 @@ cat >> ${outfile} <<'EOF'
 	echo Please wait...
 	:: if exist A:\autounattend.xml copy /y A:\*.* c:\rtd\
     
-    @title "Fetch Wallpaper for default background"
+	@title "Fetch Wallpaper for default background"
 	powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %WALLPAPER_URL% -OutFile %WALLPAPER_DIR%\Wayland.jpg"
-    @title: "Download and install virtio-drivers"
-    powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %VIRTIO_URL% -OutFile %CACHE_DIR%\virtio-win-gt-x64.msi"
-    msiexec /i virtio-win-gt-x64.msi /passive /norestart /l*v %LOG_DIR%\virtio_log.txt
+	@title: "Download and install virtio-drivers"
+	powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %VIRTIO_URL% -OutFile %CACHE_DIR%\virtio-win-gt-x64.msi"
+	msiexec /i %CACHE_DIR%\virtio-win-gt-x64.msi /passive /norestart /l*v %LOG_DIR%\virtio_log.txt
 
     
 	if exist C:\rtd\%_STAGE2FILE% (
