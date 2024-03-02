@@ -94,7 +94,7 @@ $tweaks = @(
 
 	###	Unpinning software titles
 	"UnpinStartMenuTiles",
-	"UnpinTaskbarIcons",
+	#"UnpinTaskbarIcons",
 
 	###	Install Software Managment
 	"InstallRTDProgs",
@@ -104,7 +104,7 @@ $tweaks = @(
 	"InstallVMSDriverTools",         # Install VM Guest tools if a VM is detected 
 	"Install7Zip",
 	#"InstallGameBundle",
-	#"InstallDeveloperToolsBundle",
+	"InstallDeveloperToolsBundle",
 	"InstallVLC",
 	# "InstallPDFToolsBundle",
 	"InstallBrave",
@@ -169,7 +169,8 @@ $tweaks = @(
 	"EnableIndexing",
 	"SetBIOSTimeUTC",               # "SetBIOSTimeLocal",
 	#"DisableHibernation",		# "EnableHibernation",
-	"EnableSleepButton",		# "DisableSleepButton",
+	#"EnableSleepButton",		# 
+	"DisableSleepButton",
 	"DisableSleepTimeout",          # "EnableSleepTimeout",
 	# "DisableFastStartup",         # "EnableFastStartup",
 
@@ -184,7 +185,7 @@ $tweaks = @(
 	"ShowFileOperationsDetails",    # "HideFileOperationsDetails",
 	"DisableFileDeleteConfirm",	# "EnableFileDeleteConfirm",
 	"HideTaskbarSearch",
-	#"ShowTaskbarSearchIcon",       # "ShowTaskbarSearchBox",
+	"ShowTaskbarSearchIcon",       # "ShowTaskbarSearchBox",
 	"HideTaskView",                 # "ShowTaskView",
 	#"ShowSmallTaskbarIcons",       # "ShowLargeTaskbarIcons",
 	"SetTaskbarCombineWhenFull",    # "SetTaskbarCombineNever",     # "SetTaskbarCombineAlways",
@@ -1382,6 +1383,10 @@ Function EnableDarkMode {
 	New-Item -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes" -Name "Personalize" –Force
 	New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "AppsUseLightTheme" -Value "0" -PropertyType "Dword"
 	New-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "AppsUseLightTheme" -Value "0" -PropertyType "Dword"
+	# For Apps
+	New-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "AppsUseLightTheme" -Value 0 -PropertyType DWord -Force
+	# For System UI
+	New-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "SystemUsesLightTheme" -Value 0 -PropertyType DWord -Force
 }
 
 Function DisableDarkMode {

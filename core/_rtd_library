@@ -9329,7 +9329,7 @@ make_kvm_virtual_machine_now_from_fedora_org() {
 	fi
 
 
-	local vm_name="#Template_Fedora_${_service}_$(date +%Y-%m-%d-%H-%M)"
+	local vm_name="Template_Fedora_${_service}_$(date +%Y-%m-%d-%H-%M)"
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in Kickstart: ${_preseed_file} \n
@@ -9433,7 +9433,7 @@ kvm::make_vm_template_now_from_redhat_com() {
 	: ${_config="${1:-"workstation"}"}
 	system::generate_ks_cfg_file -u "${_source_url}" -c "${_config}" -p "${_preseed_file}" -e "@workstation-product-environment"
 
-	local vm_name="RedHat_${_config}_$(date +%Y-%m-%d-%H-%M)"
+	local vm_name="Template_RedHat_${_config}_$(date +%Y-%m-%d-%H-%M)"
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in PRESEED: ${_preseed_file} \n
@@ -9528,7 +9528,7 @@ make_kvm_virtual_machine_now_from_opensuse_org() {
 	: ${virt_net="$(system::find_vm_bridge)"}
 	: ${source_url:="${_SUSE_LEAP_SOURCE:-"https://download.opensuse.org/distribution/openSUSE-current/repo/oss/"}"}
 
-	local vm_name="#Template_SUSE_${CONFIG}_$(date +%Y-%m-%d-%H-%M)"
+	local vm_name="Template_SUSE_${CONFIG}_$(date +%Y-%m-%d-%H-%M)"
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in Autoyast: ${PRESEED_FILE} \n
@@ -9628,7 +9628,7 @@ kvm::make_vm_template_now_from_debian_org() {
 	write_status "🔎 	- Discovering what the appropriate VM net interface is (default or br'0 - n')"
 	: ${virt_net="$(system::find_vm_bridge)"}
 	: ${source_url:="${_DEBIAN_SOURCE_URL}"}
-	local vm_name="#Template_Debian_${_task}_${vm_usecase}_$(date +%Y-%m-%d-%H-%M)"
+	local vm_name="Template_Debian_${_task}_${vm_usecase}_$(date +%Y-%m-%d-%H-%M)"
 
 	system::check_required_variables "vm_name" "vm_kernel" "vm_initrd" "source_url" "virt_net" "_mem" "_cpu" "_dsk" "bin_virt_install" "PRESEED_FILE" \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
@@ -9808,7 +9808,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	[ "$tgt_ubuntu_ver" ] || tgt_ubuntu_ver=${all_lts_versions[-1]}
 
 	# Format the name of the VM to be created...
-	local vm_name="#Template_Ubuntu_${tgt_ubuntu_ver}_${_role}_$(date +%Y-%m-%d-%s)"
+	local vm_name="Template_Ubuntu_${tgt_ubuntu_ver}_${_role}_$(date +%Y-%m-%d-%s)"
 
 	_summary_message="
 	The virtual machine (${vm_name}) \n
@@ -10124,7 +10124,7 @@ kvm::make_vm_template_now_from_microsoft() {
 	fi
 
 
-	local vm_name="#Template_Windows${target_winver:(-2)}_${CONFIG}_${RANDOM}"
+	local vm_name="Template_Windows${target_winver:(-2)}_${CONFIG}_${RANDOM}"
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in: ${AutoUnattend} \n
@@ -10147,7 +10147,7 @@ kvm::make_vm_template_now_from_microsoft() {
 		--cdrom "${WindowsMedia}" \
 		--disk "${WindowsInstructions}",device=floppy \
 		--livecd \
-		--tpm default \
+		--tpm backend.type=emulator,backend.version=2.0,model=tpm-crb  \
 		${uefi_option} \
 		--noautoconsole && dialog::display_summary_message "NOTICE!"  \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
@@ -10965,8 +10965,9 @@ cat >> ${outfile} <<'EOF'
 	::	Script startup components; tasks that always
 	::	need to be done when the initializes.
 	::
-	ECHO Welcome to %COMSPEC%
-	ECHO This is a windows script!
+        @echo off
+	echo Welcome to %COMSPEC%
+	echo This is a windows script!
 	setlocal &  pushd %~dp0
 	:: %debug%
 
@@ -11299,18 +11300,41 @@ template::autounattend_xml() {
 			</Password>
 		</AutoLogon>
 
-		<FirstLogonCommands>
-			<SynchronousCommand wcm:action="add">
-			<CommandLine>a:\rtd-me-sh.cmd</CommandLine>
-			<Description>Run Software install</Description>
-			<Order>1</Order>
-			</SynchronousCommand>
-		</FirstLogonCommands>
+            <FirstLogonCommands>
+                <SynchronousCommand wcm:action="add">
+                    <Order>1</Order>
+                    <CommandLine>reg.exe add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoLogonCount /t REG_DWORD /d 0 /f</CommandLine>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <Order>2</Order>
+                    <CommandLine>powershell.exe -NoProfile -Command "Disable-ComputerRestore -Drive 'C:';"</CommandLine>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <Order>3</Order>
+		    <CommandLine>powershell.exe -NoProfile -Command "Set-ItemProperty -Path 'HKLM:\Software\Policies\Microsoft\Windows NT\Driver Signing' -Name 'BehaviorOnFailedVerify' -Value 0"</CommandLine>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <Order>4</Order>
+                    <CommandLine>cmd.exe /c "gpupdate /target:computer /force"</CommandLine>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <Order>5</Order>
+                    <CommandLine>cmd.exe /c "md C:\rtd"</CommandLine>
+		</SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <Order>6</Order>
+                    <CommandLine>cmd.exe /c "copy A:\*.* C:\rtd"</CommandLine>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <Order>7</Order>
+                    <CommandLine>cmd.exe /c C:\rtd\rtd-me-sh.cmd</CommandLine>
+                </SynchronousCommand>
+            </FirstLogonCommands>
 
 		</component>
 		</settings>
 		</unattend>
-		EOF
+EOF
 		;;
 		win10 | Win10 | win7 | Win7 )
 		cat > ${target_file} <<-'EOF'
