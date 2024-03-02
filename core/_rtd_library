@@ -10124,7 +10124,7 @@ kvm::make_vm_template_now_from_microsoft() {
 	fi
 
 
-	local vm_name="Windows${target_winver:(-2)}_${CONFIG}_${RANDOM}"
+	local vm_name="#Template_Windows${target_winver:(-2)}_${CONFIG}_${RANDOM}"
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in: ${AutoUnattend} \n
@@ -10979,20 +10979,20 @@ cat >> ${outfile} <<'EOF'
 	set LOG_DIR=C:\rtd\log
 	set WALLPAPER_DIR=C:\rtd\wallpaper
 	set CACHE_DIR=C:\rtd\cache
-    set WALLPAPER_URL=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/wallpaper/Wayland.jpg
-    set VIRTIO_URL=https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.248-1/virtio-win-gt-x64.msi
+        set WALLPAPER_URL=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/wallpaper/Wayland.jpg
+        set VIRTIO_URL=https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-guest-tools.exe
 	set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
 	set _STAGE2FILE=rtd-oem-win10-config.ps1
 	
 	md %TEMP%
 	md %LOG_DIR%
 	md %WALLPAPER_DIR%
-    md %CACHE_DIR%
+        md %CACHE_DIR%
     
 	@title "Stage 2 file is located at: %_STAGE2LOC%\%_STAGE2FILE%"
 
-    set >>%LOG_DIR%\rtd.log
-    ver >>%LOG_DIR%\rtd.log
+        set >>%LOG_DIR%\rtd.log
+        ver >>%LOG_DIR%\rtd.log
     
 :GetInterestingThigsToDoOnThisSystem
 	:: Given that Microsoft Windows has been detected and the CMD shell portion of this script is executed,
@@ -11032,16 +11032,22 @@ cat >> ${outfile} <<'EOF'
 	:: Procedure to get the second stage in Windows 7. Windows 7, by default has a different version of
 	:: PowerShell installed. Therefore a slightly different syntax must be used.
 	:: get stage 2 and run it...
-	echo Found %* >>%LOG_DIR%\rtd.log
+	@title Found %* >>%LOG_DIR%\rtd.log
 	echo Please wait...
 	:: if exist A:\autounattend.xml copy /y A:\*.* c:\rtd\
-	@title "Fetch Wallpaper for default background"
+        @title "Fetch Wallpaper for default background"
 	powershell -Command "(New-Object Net.WebClient).DownloadFile('%WALLPAPER_URL%', '%CACHE_DIR%\virtio-win-gt-x64.msi')"
-	@title: "Download and install virtio-drivers"
-	powershell -Command "(New-Object Net.WebClient).DownloadFile('%VIRTIO_URL%', '%WALLPAPER_DIR%\Wayland.jpg')"
-	powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %VIRTIO_URL% -OutFile %CACHE_DIR%\virtio-win-gt-x64.msi"
-	msiexec /i %CACHE_DIR%\virtio-win-gt-x64.msii /passive /norestart /l*v %LOG_DIR%\virtio_log.txt
+        @title: "Download and install virtio-drivers"
+        powershell -Command "(New-Object Net.WebClient).DownloadFile('%VIRTIO_URL%', '%WALLPAPER_DIR%\Wayland.jpg')"
+        powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %VIRTIO_URL% -OutFile %CACHE_DIR%\virtio-win-gt-x64.msi"
+        msiexec /i %CACHE_DIR%\virtio-win-gt-x64.msii /passive /norestart /l*v %LOG_DIR%\virtio_log.txt
 	
+        SetLocal EnableDelayedExpansion
+
+        REM Run PowerShell commands to set network profiles to Private
+        powershell -Command "& { $profiles = Get-ChildItem -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles'; foreach ($profile in $profiles) { Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles\' + $profile.PSChildName -Name 'Category' -Value 1 } }"
+
+        EndLocal
 
 	if exist C:\rtd\%_STAGE2FILE% (
 		echo File found locally...
@@ -11059,31 +11065,32 @@ cat >> ${outfile} <<'EOF'
 	:: These version of windows have a more modern version of PowerShell.
 	:: get stage 2 and run it...
 	echo Found %*
-	echo Fetching %_STAGE2FILE%...
-	echo Please wait...
 	:: if exist A:\autounattend.xml copy /y A:\*.* c:\rtd\
-    
-	@title "Fetch Wallpaper for default background"
-	powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %WALLPAPER_URL% -OutFile %WALLPAPER_DIR%\Wayland.jpg"
-	@title: "Download and install virtio-drivers"
-	powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %VIRTIO_URL% -OutFile %CACHE_DIR%\virtio-win-gt-x64.msi"
-	msiexec /i %CACHE_DIR%\virtio-win-gt-x64.msi /passive /norestart /l*v %LOG_DIR%\virtio_log.txt
+	@title "POWERSHELL: seting NETWORK Config"
+        powershell -Command "& {Get-ChildItem -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles' | ForEach-Object {Set-ItemProperty -Path $_.PSParentPath -Name 'Category' -Value 1}}"
+
+
+        @title "POWERSHELL: Fetch Wallpaper for default background"
+        powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %WALLPAPER_URL% -OutFile %WALLPAPER_DIR%\Wayland.jpg"
+        @title: "POWERSHELL: Download and install virtio-drivers"
+        powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %VIRTIO_URL% -OutFile %CACHE_DIR%\virtio-win-guest-tools.exe"
+        %CACHE_DIR%\virtio-win-guest-tools.exe /passive /norestart /log %LOG_DIR%\virtio_log.txt
 
     
 	if exist C:\rtd\%_STAGE2FILE% (
-		@title "File found locally..."
+		@title "CMD: %_STAGE2FILE%File found locally..."
 		powershell -ExecutionPolicy UnRestricted -File C:\rtd\%_STAGE2FILE%
 		) else (
-		@title "Fetching %_STAGE2FILE% from the internet..."
+		@title "CMD: Fetching %_STAGE2FILE% from the internet..."
 		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %_STAGE2LOC%/%_STAGE2FILE% -OutFile %CACHE_DIR%\%_STAGE2FILE%"
 		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
 	)
 
 	if exist C:\rtd\_Chris-Titus-Post-Windows-Install-App.ps1 (
-		@title "File found locally..."
+		@title "CMD: _Chris-Titus-Post-Windows-Install-App.ps1 File found locally..."
 		powershell -ExecutionPolicy UnRestricted -File C:\rtd\_Chris-Titus-Post-Windows-Install-App.ps1
 		) else (
-		@title "Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet..."
+		@title "CMD: Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet..."
 		powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
 	)
 	goto end
@@ -11413,8 +11420,12 @@ template::autounattend_xml() {
                 </Password>
             </AutoLogon>
             <OOBE>
-                <ProtectYourPC>3</ProtectYourPC>
                 <HideEULAPage>true</HideEULAPage>
+                <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+                <NetworkLocation>Work</NetworkLocation>
+                <ProtectYourPC>1</ProtectYourPC>
+                <SkipMachineOOBE>true</SkipMachineOOBE>
+                <SkipUserOOBE>true</SkipUserOOBE>
             </OOBE>
             <FirstLogonCommands>
                 <SynchronousCommand wcm:action="add">

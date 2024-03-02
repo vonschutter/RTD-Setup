@@ -1,5 +1,5 @@
 # :: --    --
-# :: 					Windows PowerShell Script
+# :: 					Windows Power-shell Script
 # ::
 # ::             			A D M I N   S C R I P T
 # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -12,17 +12,17 @@
 # :: 	Primary Author Source: 	https://github.com/Disassembler0/Win10-Initial-Setup-Script
 # :: 	Tweaked Source: 	https://gist.github.com/alirobe/7f3b34ad89a159e6daa1/
 # ::
-# :: 	This Script Souce:	https://github.com/vonschutter/RTD-Setup
+# :: 	This Script Source:	https://github.com/vonschutter/RTD-Setup
 # ::
 # :: Purpose: 	The purpose of the script is to:
-# ::		- Remove unnessesary software from Windows 10
-# ::		- Turn off unnessesary services and telemetry (may be turned on again)
+# ::		- Remove unnecessary software from Windows 10
+# ::		- Turn off unnecessary services and telemetry (may be turned on again)
 # ::		- Add some useful software (OSS and freeware)
 # ::		- Make some UI Tweaks for better usability
 # ::
 # ::		NOTE: Individual items may be turned on or off in the settings section of this script.
 # ::
-# :: Background: This script is shared in the hopes that someone will find it usefull. To encourage sharing changes
+# :: Background: This script is shared in the hopes that someone will find it useful. To encourage sharing changes
 # :: 		 back to the source this script is released under the GPL v3. (see source location for details)
 # ::		 https://github.com/vonschutter/RTD-Setup/raw/master/LICENSE.md
 # ::
@@ -30,7 +30,7 @@
 # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #
 #	NOTE:	These terminal program(s) are written and documented to a very high degree. The reason for doing this is that
-#		these apps are seldom changed and when they are, it is usefull to be able to understand why and how
+#		these apps are seldom changed and when they are, it is useful to be able to understand why and how
 #		things were built. Obviously, this becomes a useful learning tool as well; for all people that want to
 #		learn how to write admin scripts. It is a good and necessary practice to document extensively and follow
 #		patterns when building your own apps and config scripts. Failing to do so will result in a costly mess
