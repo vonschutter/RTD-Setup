@@ -1,5 +1,5 @@
 #!/bin/bash
-RTD_Version="2.1.3"
+SST_Version="2.1.3"
 : <<'DOC'
 					  -    RTD Power Toy Script      -
 
@@ -185,40 +185,40 @@ dependency_file() {
 	found_file=$(find /opt/${_TLA,,} -name "${1}" -print | head -n 1)
 	if [[ -f $found_file ]] ; then
 		source "$found_file" &>>"${_LOGFILE}"
-		theme_log_item "Using: $found_file"
+		log_item "Using: $found_file"
 		return 0
 	fi
 
 	found_file=$(find /home/${SUDO_USER}/GIT -name "${1}" -print | head -n 1)
 	if [[ -n $found_file ]] && source "$found_file" &>>"${_LOGFILE}"; then
-		theme_log_item "Using: $found_file"
+		log_item "Using: $found_file"
 		return 0
 	fi
 
 	found_file=$(find /home/${SUDO_USER}/bin -name "${1}" -print | head -n 1)
 	if [[ -n $found_file ]] && source "$found_file" &>>"${_LOGFILE}"; then
-		theme_log_item "Using: $found_file"
+		log_item "Using: $found_file"
 		return 0
 	fi
 
 	# Try to download and source the file
 	read -p "Do you want to download the file: ${1} from the internet? [Y/n] " -n 1 -r
 	if [[ $REPLY =~ ^[Yy]$ ]]; then
-		theme_log_item "Downloading: ${_src_url}"
+		log_item "Downloading: ${_src_url}"
 		if curl -sL "${_src_url}" -o "./${1}" && [[ -f "./${1}" ]] && source "./${1}" &>>"${_LOGFILE}"; then
-			theme_log_item "Using: ${_src_url}"
+			log_item "Using: ${_src_url}"
 			return 0
 		else
-			theme_log_item "Failed to download: ${_src_url}"
+			log_item "Failed to download: ${_src_url}"
 			return 1
 		fi
 	else 
-		theme_log_item "${SUDO_USER} Declined to attempt dowmload of: ${1}"
-		exit 1
+		log_item "${SUDO_USER} Declined to attempt dowmload of: ${1}"
+		return 1
 	fi
 
 	# If all the above fail, log and return an error
-	theme_log_item "${1} NOT found!"
+	log_item "${1} NOT found!"
 	return 1
 }
 
@@ -232,7 +232,7 @@ dependency_file() {
 
 
 
-theme_log_item ()
+log_item ()
 {
 # Description:
 # The purpose of this function is to consistently write script output to the right log file. 
@@ -273,7 +273,7 @@ theme_log_item ()
 
 
 
-rtd_oem_check_inet_access ()
+check_inet_access ()
 {
 # Function to verrify internet availabiltiy.
 # The funciton will pause for 10 seconds by default, and will accept
@@ -350,8 +350,8 @@ check_menu_availability ()
 # in some logical order.
 
 # Show Branding and version in UI
-BRAND="💻 $BRANDING                        Managing:  $HOSTNAME                        Verson: $RTD_Version"
-BRANDING="$BRAND"
+BRAND="💻 ${BRANDING}                        Managing:  ${HOSTNAME}                        Verson: ${SST_Version}"
+BRANDING="${BRAND}"
 
 
 
@@ -383,8 +383,8 @@ display_help() {
 
 
 show_notice_on_fist_run () {
-	if [ -f ~/.config/rtd/rtd-first-run-$RTD_Version ]; then
-		echo $RTD_Version has been used already and terms reviewed...
+	if [ -f ~/.config/rtd/rtd-first-run-$SST_Version ]; then
+		echo $SST_Version has been used already and terms reviewed...
 	else
 		show_notice_on_fist_run_TEXT="
 This looks like the first time you run this vesion of the RTD tools. Please note that these tools are provided as-is and for modification.
@@ -1314,7 +1314,19 @@ if [[ -z "$BASH_VERSINFO" ]]; then
 	exit 255
 fi
 
+
 main() {
+	# Load library and ensure we are runnig in a screen (or byobu) session and wih the proper privileges...
+	if [ -z "${RTDFUNCTIONS}" ]; then
+		log_item "📚 ${_dependency_lib} NOT loaded..."
+		dependency_file ${_dependency_lib} || read -p "📚 Failed to load ${_dependency_lib}, Press [Enter] to Exit: " 
+		[[ -z "${RTDFUNCTIONS}" ]] && read -p "📚 Tried, no error, but failed to load ${_dependency_lib}, Press [Enter] to Exit: "
+		BRANDING+="	Library: ${RTDFUNCTIONS}"
+	else
+		write_status "📚 ${_dependency_lib} is already loaded..."
+		BRANDING+="	Library: ${RTDFUNCTIONS}"
+	fi
+
 	case $1 in
 		about | --about | --help | -h )
 			display_help
@@ -1322,15 +1334,11 @@ main() {
 		;;
 		* )
 			if [[ "$TERM" == screen* ]]; then
-				rtd_oem_check_inet_access  "$@"
-				if [ -z "${RTDFUNCTIONS}" ]; then
-					dependency_file ${_dependency_lib} 
-				else
-					write_status "📚 ${_dependency_lib} is already loaded..."
-				fi
+				
 				if [[ $EUID -ne 0 ]]; then 
 					ensure_admin
 				else
+					check_inet_access
 					check_menu_availability
 					show_notice_on_fist_run
 					show_main_menu
@@ -1338,17 +1346,13 @@ main() {
 				exit
 			else
 				if hash byobu 2>/dev/null; then
-					byobu new-session -s "RTD Simple Server Support Tools" $0
+					byobu new-session -s "RTD Simple Server Support Tools" ${0}
 				else
-					rtd_oem_check_inet_access $*
-					if [ -z "${RTDFUNCTIONS}" ]; then
-						dependency_file ${_dependency_lib} 
-					else
-						write_status "📚 ${_dependency_lib} is already loaded..."
-					fi
+					
 					if [[ $EUID -ne 0 ]]; then 
 						ensure_admin
 					else
+						check_inet_access
 						check_dependencies byobu && echo -e "$RED" "A critical component needed for this script to work properly was attempted to be added... Attempting to run the script again"
 						su -c "$0 $*" "$SUDO_USER"
 						clear
@@ -1358,6 +1362,7 @@ main() {
 			fi
 		;;
 	esac
-}
-main $*
+ }
+ main $*
+
 

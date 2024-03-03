@@ -47,7 +47,7 @@ export RTD_VERSION="2.03"
         backup_running_vm                               ; Backs up all running virtual machines on the local computer
         check_dependencies                              ; Checks that software requirements are met so scripts do not fail
         security::check_if_password_pOwned              ; Allows user to check if an intended password is already in well known dictionaries
-        dialog::check_menu_availability                         ; Checks if it is possible to display graphical menus in a terminal
+        dialog::check_menu_availability                 ; Checks if it is possible to display graphical menus in a terminal
         system::cleanup_and_finish                      ; Cleans and clears variables and temp files used by the media creations functions
         compress_all_items_here                         ; Compress all folders and files in pwd using 7z (optionally encrypt)
         compress_provided_items                         ; Compress and optionally encrypt discrete contents
@@ -76,7 +76,7 @@ export RTD_VERSION="2.03"
         err_no_menu_system_found                        ; Function to handle what to do if it is not possible to currently display menus in a terminal
         generate_autounattend_xml                       ; Creates an autounattend.xml for Windows setup
         generate_autoyast_file                          ; Generates an installation configuration file for SUSE builds.
-        system::generate_minecraft_server_launcher              ; Creates a minecraft server launcher, w. automatic dependeny resolutions
+        system::generate_minecraft_server_launcher      ; Creates a minecraft server launcher, w. automatic dependeny resolutions
 	generate_report_disk_space_used_by_directory    ; Generate a disk usage report
 	github::clone_repo_user                         ; Clone all repositories for a given user at github.com
 	github::list_all_user_repositories              ; List all repositories for a given user
@@ -101,11 +101,11 @@ export RTD_VERSION="2.03"
 	oem::register_all_tools                         ; Register all OEM scripts so that they are accessible by terminal
 	oem::register_wallpapers_for_gnome              ; Register wallpapers for Gnome (so they show up in the appearance tool)
 	oem::rtd_tools_make_launchers                   ; Creates a default set of pre-defined launchers
-	template::_rtd_me_sh_cmd                     ; Creates a rtd bootstrap script for system/software install for Windows, Linux, MAC OS, BSD etc.
+	template::_rtd_me_sh_cmd                        ; Creates a rtd bootstrap script for system/software install for Windows, Linux, MAC OS, BSD etc.
 	pause_a_given_time                              ; Pause while showing a count down in seconds
 	rtd_oem_cfg_Account_Setup                       ; Generates a preseed section [Account setup] (d-i passwd string)
-	system::rtd_oem_check_inet_access                       ; Verifies that the internet is accessible
-	rtd_oem_cloud-config_ubuntu_cfg_KS_CFG_Options  ; TO DO (incomplete)
+	system::rtd_oem_check_inet_access               ; Verifies that the internet is accessible
+	system::preseed_to_ubuntu_ks_cfg                ; TO DO (incomplete)
 	system::rtd_oem_find_live_release               ; locate and download live media for debian and ubuntu
 	rtd_oem_kde_set_wallpaper                       ; Sets wallpaper in the plasma workspace
 	rtd_oem_pause                                   ; Pause function; will only pause if a non zero integet is passed
@@ -189,7 +189,7 @@ export RTD_VERSION="2.03"
 	test_iso_boot_media                             ; Test bootable media using QEMU
 	toggle_oem_auto_login                           ; Toggle the auto login option for the user
 	toggle_oem_run_once                             ; Toggle the oem run once of a script at login
-	tool::up_2_date                                       ; Older universal software update function
+	tool::up_2_date                                 ; Older universal software update function
 	yad::display_cmd_output                         ; Display a command output in a progress box
 	write_error                                     ; Prints an error message to terminal in RED
 	write_host                                      ; Prints a message to the terminal w. a choice of color
@@ -288,7 +288,7 @@ Library_Documentation
 _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
 
 # load branding informaton:
-_OEM_dependencies="${_branding_info} ${_locations_info} ${_rtd_recipies_info}"
+_OEM_dependencies="_branding.info _locations.info _rtd_recipies.info"
 
 
 # All library functions are listed below in a few sections:
@@ -821,6 +821,137 @@ term::animate_while_command() {
 
 
 
+
+
+system::preseed_to_ubuntu_ks_cfg ()
+{
+# Description: generates a preseed section [Ubuntu only] (ks.cfg)
+# Globals: $PRESEED (filename)
+# Arguments: Where to place file (directory)
+# Outputs: one preseed file section
+# Returns: instruction for Ubuntu's convoluted support for both preseed and kickstart files.
+# Usage: rtd_oem_preseed_ubuntu_cfg_KS_CFG_Options "directory"
+# End of documentation
+	system::log_item "Saving preeseed file as $1/ks.cfg for legacy Ubuntu installs..."
+	cat $1/preseed.cfg >$1/ks.cfg
+}
+
+
+system::make_preseed_cfg ()
+{
+# Description: Function to write out a debina preeseed file to a location requested by the first parameter.
+# Other parameters accepted are CONFIG (multiselect de), SRVFUNC (task "Minecraft" "Tasks")
+# some parameters have defaults.
+# Globals:
+# Arguments: [-p <path> ] [-r server|desktop|minecraft ] [-t gnome-desktop|kde-desktop|xfce-desktop|mate-desktop|cinnamon-desktop ]
+# Outputs: /path/to/preseed.cfg
+# Returns:
+# Usage: system::make_preseed_cfg -r "${_role}" -p "$( mktemp -d)" -t ${_task}
+# Example:
+# 
+# system::make_preseed_cfg -r "${_role}" -p "$( mktemp -d)" -t ${_task}
+#
+# To install a basic server: 
+# system::make_preseed_cfg -r "default" -p "$( mktemp -d)" -t ssh-server
+#
+# To install a basic ansible server:
+# system::make_preseed_cfg -r "default" -p "$( mktemp -d)" -t ansible-server
+#
+# To autoinstall a basic minecraft server:
+# system::make_preseed_cfg -r "minecraft-server" -p "$( mktemp -d)" -t ssh-server
+# 
+# To autoinstall a basic desktop with gnome:
+# system::make_preseed_cfg -r "default" -p "$( mktemp -d)" -t gnome-desktop
+# 
+# End of documentation
+
+	system::log_item "Called by: ${FUNCNAME[1]}"
+
+	# Defaults:
+	local _saveto="$( mktemp -d )"	# Where to save the preseed file
+	local _role="default"		# selects d-i preseed/late_command actions based on role.
+	local _task="ssh-server"	# Package selection: What DE to install, or ssh-server
+	unset _ask			# If set to "YES" then ask for user input to generate preseed file.
+
+	local OPTIND o a
+	while getopts ':r:p:t:a:' OPTION; do
+		case "$OPTION" in
+		r )
+			_role="${OPTARG}"
+			system::log_item "Using Config for: ${_role}"
+		;;
+		p )
+			local _saveto="${OPTARG}"
+			write_information "Overriding default save location: ${_saveto} with user supplied: ${OPTARG}"
+			system::log_item  "Saving configuration instructions to: ${_saveto}"
+
+		;;
+		t )
+			local _task="${OPTARG}"
+			system::log_item "Received optioinal option: ${_task}"
+		;;
+		a )
+			local _ask="${OPTARG}"
+			system::log_item "Received optioinal option: ${_ask}"
+		;;
+		? )
+			write_error "Usage: $(FUNCNAME[0]) [-p <path> ] [-r server|desktop|minecraft ] [-t gnome-desktop | kde-desktop | ...-desktop | xfce-desktop | mate-desktop | cinnamon-desktop ]"
+			return 1
+		;;
+		esac
+	done
+	unset OPTIND
+
+	export PRESEED_FILE="${_saveto}/preseed.cfg"	# The name of the preseed file to be created
+	export TASK_FILE="${_saveto}/task.sh"		# The name of the task file to be created (if needed)
+
+	touch "${PRESEED_FILE}" 2>&1 | tee -a "${_LOGFILE}"
+	touch "${TASK_FILE}"    2>&1 | tee -a "${_LOGFILE}"
+
+        # system::get_vm_config will load the preferences from the config file if it exists
+        # otherwise it will use the defaults set in the function.
+        # it will return predefined variables that can be used in the preseed file.
+	if [[ "$_ask" == "YES" ]] ; then
+		system::log_item "Prompting for configuration options..."
+		system::get_vm_config || dialog::yesno "Cancelled or sommething went wrong... continue with defaults?"
+                exit_status=$?
+
+                case $exit_status in
+			0 )   
+				system::log_item "Save coices and continue..." 
+			;;
+			1 )   
+				system::log_item "[Cancel] pressed; not updating or changing any configuration items..." 
+			;;
+			255 )
+				 ystem::log_item "[ESC] pressed, exiting the dialog immediatley..." ; return 1 
+			;;
+			* )   
+				system::log_item "[ERROR] Dialog closed or unexpected error." ; rtd_oem_pause 1 "Dialog closed or unexpected error." 
+			;;
+                esac
+	else
+		system::log_item "Using default configuration options..."
+		system::get_vm_config || system::log_item "Failed to get configuration options from saved preferences..."
+	fi
+
+	# If the user has requested to copy their SSH key to the host, then do so:
+	if [[ "${Preference_CopySSHKey}" == "yes" || "${Preference_CopySSHKey}" == "YES" ]] ; then
+		Preference_ssh_pub_key="$(cat /home/$SUDO_USER/.ssh/*.pub | head -1)"
+	fi
+
+
+	touch "${PRESEED_FILE}"
+	template::preseed_cfg::early_command ${PRESEED_FILE}
+	template::preseed_cfg::main ${PRESEED_FILE}
+	template::preseed_cfg::auto_disk_layout ${PRESEED_FILE}
+	template::preseed_cfg::late_command ${PRESEED_FILE}
+
+	system::preseed_to_ubuntu_ks_cfg
+	system::log_item "Preseed file created: ${PRESEED_FILE}
+	Containging DATA:
+	$(cat ${PRESEED_FILE})"
+}
 
 
 
@@ -6651,7 +6782,7 @@ software::package_kit::remove_package() {
 	else
 		write_information "The software package ${1} is not installed, no need for action..." 
 	fi
-	) | tee ${_LOGFILE}
+	) | tee -a ${_LOGFILE}
 }
 
 
@@ -9329,7 +9460,7 @@ make_kvm_virtual_machine_now_from_fedora_org() {
 	fi
 
 
-	local vm_name="Template_Fedora_${_service}_$(date +%Y-%m-%d-%H-%M)"
+	local vm_name="Template_Fedora_VDI_${_service}_$(date +%Y-%m-%d-%H-%M)"
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in Kickstart: ${_preseed_file} \n
@@ -9433,7 +9564,7 @@ kvm::make_vm_template_now_from_redhat_com() {
 	: ${_config="${1:-"workstation"}"}
 	system::generate_ks_cfg_file -u "${_source_url}" -c "${_config}" -p "${_preseed_file}" -e "@workstation-product-environment"
 
-	local vm_name="Template_RedHat_${_config}_$(date +%Y-%m-%d-%H-%M)"
+	local vm_name="Template_RedHat_VDI_${_config}_$(date +%Y-%m-%d-%H-%M)"
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in PRESEED: ${_preseed_file} \n
@@ -9528,18 +9659,20 @@ make_kvm_virtual_machine_now_from_opensuse_org() {
 	: ${virt_net="$(system::find_vm_bridge)"}
 	: ${source_url:="${_SUSE_LEAP_SOURCE:-"https://download.opensuse.org/distribution/openSUSE-current/repo/oss/"}"}
 
-	local vm_name="Template_SUSE_${CONFIG}_$(date +%Y-%m-%d-%H-%M)"
+	local vm_name="Template_SUSE_VDI_${CONFIG}_$(date +%Y-%m-%d-%H-%M)"
 
-	_summary_message="The virtual machine (${vm_name}) \n
-	📋 - Using the instructions in Autoyast: ${PRESEED_FILE} \n
-	🔧 - And Using this source for the packages and files to download: \n
-	🌎 - ${source_url} \n
-	🌎 - ${vm_kernel:="DEFAULT"} \n
-	🌎 - ${vm_initrd:="DEFAULT"} \n
-	✅ - Using the network: ${virt_net} \n
-	✅ - Memory: ${_mem} \n
-	✅ - CPU's: ${_cpu} \n
-	✅ - Disk Size: ${_dsk} \n You may attach to this server and see the progress at IP: $(hostname -I))"
+	_summary_message="
+	The virtual machine (${vm_name}) \n
+	📋 - Using the instructions in: ${_preseed_file} \n
+	🔧 - Using this source for the packages and files to download: \n
+	🌎 - ${_source_url%%/*pub*} \n
+	🖥️ - Using the network: ${virt_net:=default} \n
+	🖥️ - Memory: ${_mem} \n
+	🖥️ - CPU's: ${_cpu} \n
+	🖥️ - Disk Size: ${_dsk} \n 
+	
+	NOTE: You may connecct to the VM and see the progress at IP: $(hostname -I) \n
+	      After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
 
 	# create image and run installer
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
@@ -9588,7 +9721,7 @@ kvm::make_vm_template_now_from_debian_org() {
 # End of Documentation
 
 	# Check for optional default T-Shirts size overrides... 
-	system::process_vm_opt_args "${@}"
+	system::process_vm_opt_args ${*}
 	dependency::virtualization
 
 	# Set default values for VM T-Shirts sizes (may vary by OS)...
@@ -9609,40 +9742,43 @@ kvm::make_vm_template_now_from_debian_org() {
 
 	case "${_role}" in
 		desktop | Desktop | gnome-desktop | kde-desktop | lxde-desktop | xfce-desktop | mate-desktop | cinnamon-desktop )
-				: "${vm_kernel="${_DEBIAN_FRONTEND_GTK_KERNEL}"}"
-				: "${vm_initrd="${_DEBIAN_FRONTEND_GTK_INITRD}"}"
-				: "${ui_diplay_style="theme=dark"}"
-				: "${vm_usecase="VDI"}"
-				;;
+			write_status "🖥️ 	- Using a desktop environment: ${_role}"
+			: "${vm_kernel="${_DEBIAN_FRONTEND_GTK_KERNEL}"}"
+			: "${vm_initrd="${_DEBIAN_FRONTEND_GTK_INITRD}"}"
+			: "${ui_diplay_style="theme=dark"}"
+			: "${vm_usecase="VDI"}"
+			write_status "🖥️ 	- Using Variables: \n ${vm_kernel}, \n ${vm_initrd}"
+			;;
 		* )
-				: "${vm_kernel="${_DEBIAN_FRONTEND_DEFAULT_KERNEL}"}"
-				: "${vm_initrd="${_DEBIAN_FRONTEND_DEFAULT_INITRD}"}"
-				: "${ui_diplay_style="theme=light"}"
-				: "${vm_usecase="Server"}"
-				;;
-		*)	;;
+			write_status "🖥️ 	- Using a desktop environment: ${_role}"
+			: "${vm_kernel="${_DEBIAN_FRONTEND_DEFAULT_KERNEL}"}"
+			: "${vm_initrd="${_DEBIAN_FRONTEND_DEFAULT_INITRD}"}"
+			: "${ui_diplay_style="theme=light"}"
+			: "${vm_usecase="Server"}"
+			write_status "🖥️ 	- Using Variables: \n ${vm_kernel}, \n ${vm_initrd}"
+			;;
 	esac
 	
-	
-
 	write_status "🔎 	- Discovering what the appropriate VM net interface is (default or br'0 - n')"
 	: ${virt_net="$(system::find_vm_bridge)"}
 	: ${source_url:="${_DEBIAN_SOURCE_URL}"}
-	local vm_name="Template_Debian_${_task}_${vm_usecase}_$(date +%Y-%m-%d-%H-%M)"
+	local vm_name="Template_Debian_VDI_${_task}_${vm_usecase}_$(date +%Y-%m-%d-%H-%M)"
 
 	system::check_required_variables "vm_name" "vm_kernel" "vm_initrd" "source_url" "virt_net" "_mem" "_cpu" "_dsk" "bin_virt_install" "PRESEED_FILE" \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
-	_summary_message="The virtual machine (${vm_name}) \n
-	📋 - Using the instructions in PRESEED: ${PRESEED_FILE} \n
-	🔧 - And Using this source for the packages and files to download: \n
-	🌎 - ${source_url} \n
-	🌎 - ${vm_kernel} \n
-	🌎 - ${vm_initrd} \n
-	✅ - Using the network: ${virt_net} \n
-	✅ - Memory: ${_mem} \n
-	✅ - CPU's: ${_cpu} \n
-	✅ - Disk Size: ${_dsk} \n You may attach to this server and see the progress at IP: $(hostname -I))"
+	_summary_message="
+	The virtual machine (${vm_name}) \n
+	📋 - Using the instructions in: ${_preseed_file} \n
+	🔧 - Using this source for the packages and files to download: \n
+	🌎 - ${_source_url%%/*pub*} \n
+	🖥️ - Using the network: ${virt_net:=default} \n
+	🖥️ - Memory: ${_mem} \n
+	🖥️ - CPU's: ${_cpu} \n
+	🖥️ - Disk Size: ${_dsk} \n 
+	
+	NOTE: You may connecct to the VM and see the progress at IP: $(hostname -I) \n
+	      After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
 
 
 	# create image and run installer
@@ -9812,16 +9948,16 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 
 	_summary_message="
 	The virtual machine (${vm_name}) \n
-	📋 - Using the instructions in PRESEED: ${CloudConfigDir}/${PRESEED_FILE} \n
-	📋 - Or the instructions in CloudConfig: ${CloudConfigDir}/cidata.iso,device=cdrom \n
-	🔧 - Configuring the following VM: \n
-			${vm_name} \n
-			cpus "${_cpu}" \n
-			memory "${_mem}" \n
-			network "${virt_net}" \n
-			disk size="${_dsk}" \n
-			os-variant="$tgt_ubuntu_ver" \n
-			Source="${iso}" \n"
+	📋 - Using the instructions in: ${_preseed_file} \n
+	🔧 - Using this source for the packages and files to download: \n
+	🌎 - ${_source_url%%/*pub*} \n
+	🖥️ - Using the network: ${virt_net:=default} \n
+	🖥️ - Memory: ${_mem} \n
+	🖥️ - CPU's: ${_cpu} \n
+	🖥️ - Disk Size: ${_dsk} \n 
+	
+	NOTE: You may connecct to the VM and see the progress at IP: $(hostname -I) \n
+	      After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
 
 	# Check the version of Ubuntu and use the appropriate installer...
 	# Ubuntu is migration installers and methods, so we need to check the version and use the appropriate installer...
@@ -10132,10 +10268,14 @@ kvm::make_vm_template_now_from_microsoft() {
 	🌎 - ${WindowsMedia} \n
 	🌎 - ${WindowsInstructions} \n
 	🌎 - ${PostTasks} \n
-	✅ - Using the network: ${virt_net} \n
-	✅ - Memory: ${_mem} \n
-	✅ - CPU's: ${_cpu} \n
-	✅ - Disk Size: ${_dsk} \n You may attach to this server and see the progress at IP: $(hostname -I))"
+	🖥️ - Using the network: ${virt_net:=default} \n
+	🖥️ - Memory: ${_mem} \n
+	🖥️ - CPU's: ${_cpu} \n
+	🖥️ - Disk Size: ${_dsk} \n 
+	
+	NOTE: You may connecct to the VM and see the progress at IP: $(hostname -I) \n
+	      After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
+
 	write_status "Creating and starting Virtual machine... "
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
 		--vcpus "${_cpu}" \
@@ -10228,15 +10368,17 @@ make_kvm_virtual_machine_now_from_iso() {
 	# Discover if the appropriate VM net interface is (default or br'0 - n')
 	: ${virt_net="$(system::find_vm_bridge)"}
 	_summary_message="
-	--vcpus ${2:-"2"}
-	--memory ${3:-"2048"}
-	--network ${virt_net}
-	--disk size=${4:-"30"}
-	--os-variant=${1:-"ubuntu20.04"}
-	--location=${target_iso}
-	--cdrom=${target_iso}
-	--initrd-inject=$PRESEED_FILE
-	--extra-args ks=file:/$(basename $PRESEED_FILE)"
+	The virtual machine (${vm_name}) \n
+	📋 - Using the instructions in: ${_preseed_file} \n
+	🔧 - Using this source for the packages and files to download: \n
+	🌎 - ${_source_url%%/*pub*} \n
+	🖥️ - Using the network: ${virt_net:=default} \n
+	🖥️ - Memory: ${_mem} \n
+	🖥️ - CPU's: ${_cpu} \n
+	🖥️ - Disk Size: ${_dsk} \n 
+	
+	NOTE: You may connecct to the VM and see the progress at IP: $(hostname -I) \n
+	      After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
 
 	# create image and run installer
 	"${BIN_VIRT_INSTALL}" --name VDI_Ubuntu_"$CONFIG"_"$RANDOM" \
@@ -11108,14 +11250,11 @@ cat >> ${outfile} <<'EOF'
 	goto end
 
 
-
-
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 ::::::::::::::                                          ::::::::::::::::::::::
 ::::::::::::::            ERROR handling Below          ::::::::::::::::::::::
 ::::::::::::::                                          ::::::::::::::::::::::
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
 
 
 :DispErr
@@ -12855,7 +12994,7 @@ write_warning() {
 	if [[ "${TERMUITXT}" == "nocolor" ]]; then
 		[ -n "${text}" ] && echo "🧩 ⚠ ${FUNCNAME[1]}: ${text}"
 	else
-		[ -n "${text}" ] && echo -e "${yellow}🧩 ⚠ ${FUNCNAME[1]}: ${text}${endcolor}"
+		[ -n "${text}" ] && echo -e "${yellow}🧩 ⚠ ${FUNCNAME[1]}: ${text}${Color_Off}"
 	fi
 
 	# Tell the loging function to log the message requested...
@@ -12882,7 +13021,7 @@ write_status() {
 	if [[ "${TERMUITXT}" == "nocolor" ]] ; then
 		[ -n "${text}" ] && echo "🧩 ✓ ${FUNCNAME[1]}: ${text}"
 	else
-		[ -n "${text}" ] && echo -e "${green}🧩 ✓ ${FUNCNAME[1]}: ${text}${endcolor}"
+		[ -n "${text}" ] && echo -e "${green}🧩 ✓ ${FUNCNAME[1]}: ${text}${Color_Off}"
 	fi
 
 	# Tell the loging function to log the message requested...
@@ -12909,7 +13048,7 @@ write_information() {
 	if [[ "${TERMUITXT}" == "nocolor" ]] ; then
 		[ -n "${text}" ] && echo -e "🧩 ℹ ${FUNCNAME[1]}: ${text}"
 	else
-		[ -n "${text}" ] && echo -e "${blue}🧩 ℹ ${FUNCNAME[1]}: ${text}${endcolor}"
+		[ -n "${text}" ] && echo -e "${blue}🧩 ℹ ${FUNCNAME[1]}: ${text}${Color_Off}"
 	fi
 
 	# Tell the loging function to log the message requested...
@@ -13062,11 +13201,11 @@ fi
 : ${_LOGFILE:="${_LOG_DIR}/${_SCRIPTNAME}.log"}
 
 
-# initialize loging and provide process details...
+# initialize logging and provide process details...
 export _LOGFILE
 touch ${_LOGFILE}
 
-
+# Check if library is loaded from a terminal or another script (behavior may differ)...
 if (return 0 2>/dev/null) ; then
 	sourced=0
 else
@@ -13074,14 +13213,181 @@ else
 	echo clear > /dev/null
 fi
 
-loader() {
+if [[ $sourced -eq 0  ]] ; then 
+	if [[ "$(basename $0)" == "bash" ]] ; then
+		write_host --cyan "Script is sourced from bash in a terminal: $0 $*"
+	else
+		write_host --cyan "Script is being sourced from a script: $(basename $0) $*"
+	fi
+else 
+	write_host --yellow "Library is run directly as an executable! This does nothing by itself."
+	loader --help
+fi
 
-	if [[ -z $1 ]]; then
-		# Check if this library is asked to do anything or just load...
-		system::log_item " ***  : $(basename ${BASH_SOURCE[0]}) loaded by $(basename "${0}") on $HOSTNAME  :  ***"
-		system::log_item "💻 Basic System Information: 
-		$(hostnamectl)"
-		# Check if library is loaded from a terminal or another script (behavior may differ)...
+# Find and load all dependant files for this library... 
+system::log_item "Loading dependant files for this library..."
+for i in ${_OEM_dependencies} ; do 
+	dependency::file ${i} &>>${_LOGFILE} && system::log_item "${i} Loaded without errors..." || _lderr=1 
+done
+
+if [[ -n $_lderr ]] ; then
+	write_host --red "👾 Failed to load *.info files for this library! some functionality may be limited..."
+else
+	write_host --cyan "(${_OEM_dependencies}) loaded OK!"
+fi 
+
+write_host --green " 📚 RTD Power Library $RTD_VERSION loaded OK"
+export RTDFUNCTIONS="${RTD_VERSION}"
+
+# log variables for support reasons...
+system::log_item "Library Loaded Variables: 
+RTD Functions Version: ${RTDFUNCTIONS}
+.........................................
+_LOG_DIR=${_LOG_DIR}
+_LOGFILE=${_LOGFILE}
+_SCRIPTNAME=${_SCRIPTNAME}
+.........................................
+"
+
+# Log the environment and how the library was launched...
+system::log_item " ***  : $(basename ${BASH_SOURCE[0]}) loaded by $(basename "${0}") on $HOSTNAME  :  ***"
+system::log_item "💻 Basic System Information: 
+$(hostnamectl)"
+
+# If the library is asked to do something, evaluate the parameters...
+case $1 in
+	--help | -? )
+		clear
+		set_colors
+		echo -e " 📚 ${UWhite}${0##*/} ${red}::${BICyan} RunTime Data Library HELP ${endcolor}${red}${UWhite}::${endcolor}
+
+		${blue}Usage${red}:${endcolor}
+		${IYellow}source ${IGreen}${0##*/} ${endcolor}(to load the library into memory and use its functions.)
+		
+		${blue}Alternate usage${red}:${endcolor}
+		${green}"${0##*/}" ${red} [OPTIONS]${endcolor}
+
+		${blue}valid option are${red}: ${endcolor}
+		--help		       ${red}: ${endcolor}Show this help text
+		--list [option]        ${red}: ${endcolor}List library functions (requires options: software, or internal, or all)
+		software        ${red}: ${endcolor}(list) software install bundles available
+		internal        ${red}: ${endcolor}(list) internal functions loaded
+			package     ${red}: ${endcolor}(list) filter by package name (requires combination with --list internal|--list all)
+		all             ${red}: ${endcolor}(list) all library functions including software
+		--devhelp	       ${red}: ${endcolor}diplay script developer's help
+		--devhelp-gtk	       ${red}: ${endcolor}diplay script developer's help in a GTK window
+		--clean		       ${red}: ${endcolor}clean up the environment
+		--version	       ${red}: ${endcolor}display version information
+		--V		       ${red}: ${endcolor}display version information number only (short version)
+		--envcheck	       ${red}: ${endcolor}check the environment and how library was launched
+		--selfcheck	       ${red}: ${endcolor}check the library for syntax errors
+
+		${blue}EXAMPLES${red}:${endcolor}
+		${0##*/} --list internal
+		${0##*/} --list internal kvm::
+		${0##*/} --list all
+		${0##*/} --devhelp
+		${0##*/} --devhelp-gtk"
+		return
+	;;
+	--list )
+		case $2 in
+			software )
+				list_loaded_software_functions 
+			;;
+			internal )
+				echo -e $YELLOW "INTERNAL Functions: $ENDCOLOR"
+				echo ".........................................."
+				echo "Number	Function"
+				echo ".........................................."
+				list_loaded_internal_functions --hformat |grep "${3:-""}"
+			;;
+			all ) ( echo -e $YELLOW "Software Recipies: $ENDCOLOR" && list_loaded_software_functions && echo -e $YELLOW "INTERNAL Functions: $ENDCOLOR" && list_loaded_internal_functions ) ;;
+			* ) echo "USAGE: The --list option requires a (what option). Valid option are: software, internal, all." ;;
+		esac
+		return
+	;;
+	--devhelp )
+		while true; do
+			exec 3>&1
+			selection=$(dialog --clear --no-collapse --backtitle "${BRANDING:-" RunTime Data : Function library : Script Development Support"}" --title "RTD Library Loaded Functions:" --menu "\n Chose a function below to see more details about the function." "${HEIGHT:-0}" "${WIDTH:-90}" "${LIST_HEIGHT:-0}" $(list_loaded_internal_functions) 2>&1 1>&3)
+			exit_status=$?
+			exec 3>&-
+
+			case $exit_status in
+				1) clear && echo [Cancel] && exit ;;
+				255) clear && echo [ESC] && exit ;;
+			esac
+
+			case $selection in
+				$selection )
+					result=$(while IFS= read -r 'line'; do
+						[[ "$line" == "$selection() {" ]]		&& printline="yes"
+						[[ "$line" == "$selection() { " ]]		&& printline="no"
+						[[ "$line" == "# End of documentation"* ]]	&& printline="no"
+						[[ "$line" == *"# End of documentation"* ]]	&& printline="no"
+						[[ "$line" == *End*of*Documentation* ]]		&& printline="no"
+						[[ "$printline" == "yes" ]]			&& echo "$line" | grep -E '(^|\s*)#\s*' | sed 's/#//'
+					done < $0 )
+					dialog --clear --no-collapse --backtitle "${0##*/} :: RunTime Data Library HELP ::" --title "RTD Functon: $selection" --msgbox "$result" "${HEIGHT:-25}" "${WIDTH:-110}"
+				;;
+				* ) exit ;;
+			esac
+		done
+		return
+	;;
+	--devhelp-gtk )
+		while true; do
+			exec 3>&1
+			DisplayList=$(list_loaded_internal_functions --zformat)
+			IFS_SAV=$IFS
+			IFS=$(echo -en "\n\b")
+			selection=$(zenity --list --modal --text="Select a function below, to see the function's documentation \n and usage:" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1000}" --print-column=2 --column="Number" --column="Function" --column="Description" ${DisplayList} 2>/dev/null )
+			exit_status=$?
+			IFS=$IFS_SAV
+			exec 3>&-
+			case $exit_status in
+				1) clear && echo [Cancel] && exit ;;
+				255) clear && echo [ESC] && exit ;;
+			esac
+
+			case "$selection" in
+				"$selection" )
+					result=$(while IFS= read -r 'line'; do
+						# if echo "$line" |grep "$selection ()" ; then printline="yes" ; fi
+						[[ "$line" == "${selection/ /}()" ]]		&& printline="yes"
+						[[ "$line" =~ ?"$selection ()" ]]		&& printline="yes"
+						[[ "$line" == *"$selection ()"* ]]		&& printline="yes"
+						[[ "$line" == "# End of documentation"* ]]	&& printline="no"
+						[[ "$line" == *"# End of documentation"* ]]	&& printline="no"
+						[[ "$line" == *End*of*Documentation* ]]		&& printline="no"
+						[[ "$line" == "# End of Documentation" ]]	&& printline="no"
+						[[ "$printline" == "yes" ]]			&& echo "$line" | grep -E '(^|\s*)#\s*'
+					done < $0 )
+					zenity --info --modal --ok-label=BACK --title "RTD Functon: $selection" --text="$result" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1000}"
+				;;
+				* )
+				# Trap unknown exit code...
+				exit
+				;;
+			esac
+		done
+		return
+	;;
+	--clean )
+		# Clean up the environment just in case...
+		for var in $(compgen -v | grep '^_'); do
+			unset "$var"
+		done
+		write_host --cyan "Environment cleaned up!"
+		return 0
+	;;
+	--version )
+		write_host --cyan "RTD Library Version: $RTD_VERSION"
+		return 0
+	;;
+	--envcheck )
+		# Check if the library is loaded from a terminal or another script (behavior may differ)...
 		# This may be useful to log for support reasons.
 		if [[ $sourced -eq 0  ]] ; then 
 			if [[ "$(basename $0)" == "bash" ]] ; then
@@ -13091,204 +13397,30 @@ loader() {
 			fi
 		else 
 			write_host --yellow "Library is run directly as an executable! This does nothing by itself."
-			loader --help
 		fi
-
-		# Find and load all dependant files for this library... 
-		for i in ${_OEM_dependencies} ; do dependency::file ${i} &>/dev/null || _lderr=1 ; done
-		if [[ -n $_lderr ]] ; then
-			write_host --red "👾 Failed to load *.info files for this library! some functionality may be limited..."
+		return
+	;;
+	--selfcheck )
+		write_host --cyan "Checking library syntax..."
+		if dependency::command_exists "shellcheck" ; then
+			if shellcheck -S error $0 ; then 
+				write_host --cyan "Library sytax OK!"
+			else
+				write_host --red "Library has a syntax error!"
+			fi
 		else
-			write_host --cyan "(${_OEM_dependencies}) loaded OK!"
+			write_host --red "shellcheck command not found! Please install it to use this function."
 		fi 
+	;;
+	--V )
+		echo "$RTD_VERSION"
+		return 0
+	;;
+	* )
+		# write_host --cyan "Unknown option! Please use --help for valid options."
+		# write_host --cyan "CALL: ${0##*/} $*"
+		return 0
+	;;
+esac
 
-		# log variables for support reasons...
-		system::log_item "Library Loaded Variables: 
-		RTD Functions Version: ${RTDFUNCTIONS}
-		.........................................
-		_LOG_DIR=${_LOG_DIR}
-		_LOGFILE=${_LOGFILE}
-		_SCRIPTNAME=${_SCRIPTNAME}
-		.........................................
-		"
-		write_host --green " 📚 RTD Power Library $RTD_VERSION loaded OK"
-		export RTDFUNCTIONS="${RTD_VERSION}"
-
-	else
-		# If the library is asked to do something, evaluate the parameters...
-		case $1 in
-			--help | -? )
-				clear
-				set_colors
-				echo -e " 📚 ${UWhite}${0##*/} ${red}::${BICyan} RunTime Data Library HELP ${endcolor}${red}${UWhite}::${endcolor}
-
-				${blue}Usage${red}:${endcolor}
-				${IYellow}source ${IGreen}${0##*/} ${endcolor}(to load the library into memory and use its functions.)
-				
-				${blue}Alternate usage${red}:${endcolor}
-				${green}"${0##*/}" ${red} [OPTIONS]${endcolor}
-
-				${blue}valid option are${red}: ${endcolor}
-				--help		       ${red}: ${endcolor}Show this help text
-				--list [option]        ${red}: ${endcolor}List library functions (requires options: software, or internal, or all)
-				software        ${red}: ${endcolor}(list) software install bundles available
-				internal        ${red}: ${endcolor}(list) internal functions loaded
-					package     ${red}: ${endcolor}(list) filter by package name (requires combination with --list internal|--list all)
-				all             ${red}: ${endcolor}(list) all library functions including software
-				--devhelp	       ${red}: ${endcolor}diplay script developer's help
-				--devhelp-gtk	       ${red}: ${endcolor}diplay script developer's help in a GTK window
-				--clean		       ${red}: ${endcolor}clean up the environment
-				--version	       ${red}: ${endcolor}display version information
-				--V		       ${red}: ${endcolor}display version information number only (short version)
-				--envcheck	       ${red}: ${endcolor}check the environment and how library was launched
-				--selfcheck	       ${red}: ${endcolor}check the library for syntax errors
-
-				${blue}EXAMPLES${red}:${endcolor}
-				${0##*/} --list internal
-				${0##*/} --list internal kvm::
-				${0##*/} --list all
-				${0##*/} --devhelp
-				${0##*/} --devhelp-gtk"
-				return
-			;;
-			--list )
-				case $2 in
-					software )
-						for i in ${_OEM_dependencies} ; do dependency::file ${i} &>/dev/null || _lderr=1 ; done
-						if [[ -n $_lderr ]] ; then
-							write_host --red "👾 Failed to load *.info files for this library! some functionality may be limited..."
-						else
-							system::log_item "(${_OEM_dependencies}) loaded OK!"
-						fi 
-						list_loaded_software_functions 
-					;;
-					internal )
-						echo -e $YELLOW "INTERNAL Functions: $ENDCOLOR"
-						echo ".........................................."
-						echo "Number	Function"
-						echo ".........................................."
-						list_loaded_internal_functions --hformat |grep "${3:-""}"
-					;;
-					all ) ( echo -e $YELLOW "Software Recipies: $ENDCOLOR" && list_loaded_software_functions && echo -e $YELLOW "INTERNAL Functions: $ENDCOLOR" && list_loaded_internal_functions ) ;;
-					* ) echo "USAGE: The --list option requires a (what option). Valid option are: software, internal, all." ;;
-				esac
-				return
-			;;
-			--devhelp )
-				while true; do
-					exec 3>&1
-					selection=$(dialog --clear --no-collapse --backtitle "${BRANDING:-" RunTime Data : Function library : Script Development Support"}" --title "RTD Library Loaded Functions:" --menu "\n Chose a function below to see more details about the function." "${HEIGHT:-0}" "${WIDTH:-90}" "${LIST_HEIGHT:-0}" $(list_loaded_internal_functions) 2>&1 1>&3)
-					exit_status=$?
-					exec 3>&-
-
-					case $exit_status in
-						1) clear && echo [Cancel] && exit ;;
-						255) clear && echo [ESC] && exit ;;
-					esac
-
-					case $selection in
-						$selection )
-							result=$(while IFS= read -r 'line'; do
-								[[ "$line" == "$selection() {" ]]		&& printline="yes"
-								[[ "$line" == "$selection() { " ]]		&& printline="no"
-								[[ "$line" == "# End of documentation"* ]]	&& printline="no"
-								[[ "$line" == *"# End of documentation"* ]]	&& printline="no"
-								[[ "$line" == *End*of*Documentation* ]]		&& printline="no"
-								[[ "$printline" == "yes" ]]			&& echo "$line" | grep -E '(^|\s*)#\s*' | sed 's/#//'
-							done < $0 )
-							dialog --clear --no-collapse --backtitle "${0##*/} :: RunTime Data Library HELP ::" --title "RTD Functon: $selection" --msgbox "$result" "${HEIGHT:-25}" "${WIDTH:-110}"
-						;;
-						* ) exit ;;
-					esac
-				done
-				return
-			;;
-			--devhelp-gtk )
-				while true; do
-					exec 3>&1
-					DisplayList=$(list_loaded_internal_functions --zformat)
-					IFS_SAV=$IFS
-					IFS=$(echo -en "\n\b")
-					selection=$(zenity --list --modal --text="Select a function below, to see the function's documentation \n and usage:" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1000}" --print-column=2 --column="Number" --column="Function" --column="Description" ${DisplayList} 2>/dev/null )
-					exit_status=$?
-					IFS=$IFS_SAV
-					exec 3>&-
-					case $exit_status in
-						1) clear && echo [Cancel] && exit ;;
-						255) clear && echo [ESC] && exit ;;
-					esac
-
-					case "$selection" in
-						"$selection" )
-							result=$(while IFS= read -r 'line'; do
-								# if echo "$line" |grep "$selection ()" ; then printline="yes" ; fi
-								[[ "$line" == "${selection/ /}()" ]]		&& printline="yes"
-								[[ "$line" =~ ?"$selection ()" ]]		&& printline="yes"
-								[[ "$line" == *"$selection ()"* ]]		&& printline="yes"
-								[[ "$line" == "# End of documentation"* ]]	&& printline="no"
-								[[ "$line" == *"# End of documentation"* ]]	&& printline="no"
-								[[ "$line" == *End*of*Documentation* ]]		&& printline="no"
-								[[ "$line" == "# End of Documentation" ]]	&& printline="no"
-								[[ "$printline" == "yes" ]]			&& echo "$line" | grep -E '(^|\s*)#\s*'
-							done < $0 )
-							zenity --info --modal --ok-label=BACK --title "RTD Functon: $selection" --text="$result" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1000}"
-						;;
-						* )
-						# Trap unknown exit code...
-						exit
-						;;
-					esac
-				done
-				return
-			;;
-			--clean )
-				# Clean up the environment just in case...
-				for var in $(compgen -v | grep '^_'); do
-					unset "$var"
-				done
-				write_host --cyan "Environment cleaned up!"
-				return 0
-			;;
-			--version )
-				write_host --cyan "RTD Library Version: $RTD_VERSION"
-				return 0
-			;;
-			--envcheck )
-				# Check if the library is loaded from a terminal or another script (behavior may differ)...
-				# This may be useful to log for support reasons.
-				if [[ $sourced -eq 0  ]] ; then 
-					if [[ "$(basename $0)" == "bash" ]] ; then
-						write_host --cyan "Script is sourced from bash in a terminal: $0 $*"
-					else
-						write_host --cyan "Script is being sourced from a script: $(basename $0) $*"
-					fi
-				else 
-					write_host --yellow "Library is run directly as an executable! This does nothing by itself."
-				fi
-				return
-			;;
-			--selfcheck )
-				write_host --cyan "Checking library syntax..."
-				if dependency::command_exists "shellcheck" ; then
-					if shellcheck -S error $0 ; then 
-						write_host --cyan "Library sytax OK!"
-					else
-						write_host --red "Library has a syntax error!"
-					fi
-				else
-					write_host --red "shellcheck command not found! Please install it to use this function."
-				fi 
-			;;
-			--V )
-				echo "$RTD_VERSION"
-				return 0
-			;;
-			* )
-				return 0
-			;;
-		esac
-	fi
-
-}
-loader $*
 

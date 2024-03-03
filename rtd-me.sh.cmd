@@ -248,9 +248,10 @@ exit $?
 	::	Script startup components; tasks that always
 	::	need to be done when the initializes.
 	::
-	ECHO Welcome to %COMSPEC%
-	ECHO This is a windows script!
-	:: setlocal &  pushd %~dp0
+        @echo off
+	echo Welcome to %COMSPEC%
+	echo This is a windows script!
+	setlocal &  pushd %~dp0
 	:: %debug%
 
 :SETINGS
@@ -258,28 +259,32 @@ exit $?
 	::  ***             Settings               ***      ::
 	::::::::::::::::::::::::::::::::::::::::::::::::::::::
 	::
-	set temp=c:\rtd\temp
-	set _LOGDIR=c:\rtd\log
-	set wallpaperdir=c:\rtd\wallpaper
-
-	md %temp%
-	md %_LOGDIR%
-	md %wallpaperdir%
-
-    set wallpaper_url=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/wallpaper/Wayland.jpg
+	set TEMP=C:\rtd\temp
+	set LOG_DIR=C:\rtd\log
+	set WALLPAPER_DIR=C:\rtd\wallpaper
+	set CACHE_DIR=C:\rtd\cache
+        set WALLPAPER_URL=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/wallpaper/Wayland.jpg
+        set VIRTIO_URL=https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-guest-tools.exe
 	set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
 	set _STAGE2FILE=rtd-oem-win10-config.ps1
-	echo Stage 2 file is located at:
-	echo %_STAGE2LOC%\%_STAGE2FILE%
+	
+	md %TEMP%
+	md %LOG_DIR%
+	md %WALLPAPER_DIR%
+        md %CACHE_DIR%
+    
+	@title "Stage 2 file is located at: %_STAGE2LOC%\%_STAGE2FILE%"
 
-
+        set >>%LOG_DIR%\rtd.log
+        ver >>%LOG_DIR%\rtd.log
+    
 :GetInterestingThigsToDoOnThisSystem
 	:: Given that Microsoft Windows has been detected and the CMD shell portion of this script is executed,
 	:: the second stage script must be downloaded from an online location. Depending on the version of windows
 	:: there are different methods available to get and run remote files. All versions of windows do not necessarily
 	:: support power-shell scripting. Therefore the base of this activity is coded in simple command CMD.EXE shell scripting
 	::
-	:: Table of evaluating verson of windows and calling the appropriate action given the version of windows found.
+	:: Table of evaluating version of windows and calling the appropriate action given the version of windows found.
 	:: In this case it is easier to manage a straight table than a for loop or array:
 
 	:: DOS Based versions of Windows:
@@ -311,20 +316,30 @@ exit $?
 	:: Procedure to get the second stage in Windows 7. Windows 7, by default has a different version of
 	:: PowerShell installed. Therefore a slightly different syntax must be used.
 	:: get stage 2 and run it...
-	echo Found %*
-	echo Fetching %_STAGE2FILE%...
+	@title Found %* >>%LOG_DIR%\rtd.log
 	echo Please wait...
-	copy /y A:\*.* c:\rtd\
+	:: if exist A:\autounattend.xml copy /y A:\*.* c:\rtd\
+        @title "Fetch Wallpaper for default background"
+	powershell -Command "(New-Object Net.WebClient).DownloadFile('%WALLPAPER_URL%', '%CACHE_DIR%\virtio-win-gt-x64.msi')"
+        @title: "Download and install virtio-drivers"
+        powershell -Command "(New-Object Net.WebClient).DownloadFile('%VIRTIO_URL%', '%WALLPAPER_DIR%\Wayland.jpg')"
+        powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %VIRTIO_URL% -OutFile %CACHE_DIR%\virtio-win-gt-x64.msi"
+        msiexec /i %CACHE_DIR%\virtio-win-gt-x64.msii /passive /norestart /l*v %LOG_DIR%\virtio_log.txt
+	
+        SetLocal EnableDelayedExpansion
 
-	powershell -Command "(New-Object Net.WebClient).DownloadFile('%wallpaper_url%', 'c:\rtd\wallpaper\Wayland.jpg')"
+        REM Run PowerShell commands to set network profiles to Private
+        powershell -Command "& { $profiles = Get-ChildItem -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles'; foreach ($profile in $profiles) { Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles\' + $profile.PSChildName -Name 'Category' -Value 1 } }"
+
+        EndLocal
 
 	if exist C:\rtd\%_STAGE2FILE% (
 		echo File found locally...
 		powershell -ExecutionPolicy UnRestricted -File C:\rtd\%_STAGE2FILE%
 		) else (
 		echo Fetching %_STAGE2FILE% from the internet...
-		powershell -Command "(New-Object Net.WebClient).DownloadFile('%_STAGE2LOC%\%_STAGE2FILE%', '%_STAGE2FILE%')"
-		powershell -ExecutionPolicy UnRestricted -File .\%_STAGE2FILE%
+		powershell -Command "(New-Object Net.WebClient).DownloadFile('%_STAGE2LOC%/%_STAGE2FILE%', '%CACHE_DIR%\%_STAGE2FILE%')"
+		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
 	)
 	goto end
 
@@ -334,27 +349,32 @@ exit $?
 	:: These version of windows have a more modern version of PowerShell.
 	:: get stage 2 and run it...
 	echo Found %*
-	echo Fetching %_STAGE2FILE%...
-	echo Please wait...
-	if exist A:\autounattend.xml copy /y A:\*.* c:\rtd\
+	:: if exist A:\autounattend.xml copy /y A:\*.* c:\rtd\
+	@title "POWERSHELL: seting NETWORK Config"
+        powershell -Command "& {Get-ChildItem -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles' | ForEach-Object {Set-ItemProperty -Path $_.PSParentPath -Name 'Category' -Value 1}}"
 
-	powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %wallpaper_url% -OutFile c:\rtd\wallpaper\Wayland.jpg"
 
+        @title "POWERSHELL: Fetch Wallpaper for default background"
+        powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %WALLPAPER_URL% -OutFile %WALLPAPER_DIR%\Wayland.jpg"
+        @title: "POWERSHELL: Download and install virtio-drivers"
+        powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %VIRTIO_URL% -OutFile %CACHE_DIR%\virtio-win-guest-tools.exe"
+        %CACHE_DIR%\virtio-win-guest-tools.exe /passive /norestart /log %LOG_DIR%\virtio_log.txt
+
+    
 	if exist C:\rtd\%_STAGE2FILE% (
-		echo File found locally...
+		@title "CMD: %_STAGE2FILE%File found locally..."
 		powershell -ExecutionPolicy UnRestricted -File C:\rtd\%_STAGE2FILE%
 		) else (
-		echo Fetching %_STAGE2FILE% from the internet...
-		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %_STAGE2LOC%\%_STAGE2FILE% -OutFile c:\rtd\%_STAGE2FILE%"
-
-		powershell -ExecutionPolicy UnRestricted -File c:\rtd\%_STAGE2FILE%
+		@title "CMD: Fetching %_STAGE2FILE% from the internet..."
+		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %_STAGE2LOC%/%_STAGE2FILE% -OutFile %CACHE_DIR%\%_STAGE2FILE%"
+		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
 	)
 
 	if exist C:\rtd\_Chris-Titus-Post-Windows-Install-App.ps1 (
-		echo File found locally...
+		@title "CMD: _Chris-Titus-Post-Windows-Install-App.ps1 File found locally..."
 		powershell -ExecutionPolicy UnRestricted -File C:\rtd\_Chris-Titus-Post-Windows-Install-App.ps1
 		) else (
-		echo Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet...
+		@title "CMD: Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet..."
 		powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
 	)
 	goto end
@@ -367,10 +387,11 @@ exit $?
 
 	echo Detected %* ...
 	echo executing PRE Windows 7 instructions...
+	:: Assuming wget is in teh path...
+	wget -O %TEMP%\%_STAGE2FILE% %_STAGE2LOC%/%_STAGE2FILE%
+	powershell -ExecutionPolicy UnRestricted -File %TEMP%\%_STAGE2FILE%
 
 	goto end
-
-
 
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -398,7 +419,5 @@ exit $?
 	echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 	pause
 goto end
-
-
 
 :end
