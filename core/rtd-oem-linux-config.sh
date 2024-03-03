@@ -205,7 +205,7 @@ oem_linux_config ()
 				oem::deploy_themes
 			fi
 			
-			bash ${_MODS_DIR}/oem-bundle-manager/rtd-oem-bundle-manager 
+			bash ${_MODS_DIR}/oem-bundle-manager.mod/rtd-oem-bundle-manager 
 			complete_setup
 		fi
 	fi
