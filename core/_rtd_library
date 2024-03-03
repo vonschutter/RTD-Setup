@@ -940,6 +940,14 @@ system::make_preseed_cfg ()
 		Preference_ssh_pub_key="$(cat /home/$SUDO_USER/.ssh/*.pub | head -1)"
 	fi
 
+	system::log_item "Adding late commands to the preseed file..."
+	if echo "${FUNCNAME[1]}" | grep -i ubuntu ; then
+		system::log_item "Ubuntu requested, using ubiquity/success_command"
+		_d_i_post_statment_ubunto_or_deb="ubiquity ubiquity/success_command string" 
+	else
+		system::log_item "Debian requested, using d-i preseed/late_command"
+		_d_i_post_statment_ubunto_or_deb="d-i preseed/late_command string" 
+	fi
 
 	touch "${PRESEED_FILE}"
 	template::preseed_cfg::early_command ${PRESEED_FILE}
@@ -1926,9 +1934,9 @@ dependency::file () {
 		local script_path="$(readlink -f "$0")"
 		local script_dir="$(dirname "$script_path")"
 		local paths=(
+			"$(dirname "$(find /opt/rtd -name ${1} 2>/dev/null | head -n 1 )")/${1}"
 			"$(dirname "$(find /home/${SUDO_USER}/GIT -name ${1} 2>/dev/null | head -n 1 )")/${1}"
 			"$(dirname "$(find /home/${SUDO_USER}/bin -name ${1} 2>/dev/null | head -n 1 )")/${1}"
-			"$(dirname "$(find /opt/rtd -name ${1} 2>/dev/null | head -n 1 )")/${1}"
 			"${script_dir}/${1}"
 			"./${1}"
 			)
@@ -1937,7 +1945,7 @@ dependency::file () {
 			system::log_item "Searching for ${path} ..."
 			if [[ -e "${path}" ]]; then
 				system::log_item "Found ${path}"
-				source "${path}" &>${_LOGFILE}
+				source "${path}"
 				return 0
 			fi
 		done
@@ -9963,7 +9971,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	# Ubuntu is migration installers and methods, so we need to check the version and use the appropriate installer...
 	if [[ ${tgt_ubuntu_ver::2} -lt 23 ]] ; then
 
-		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: is less than 23, so using debian installer (d-i) and desktop media..."
+		system::log_item "🐧 Ubuntu version ${tgt_ubuntu_ver}: is less than 23, so using debian installer (d-i) and desktop media..."
 		system::make_preseed_cfg -r "${_role}" -p "${_saveto}" -t ${_task}
 		system::log_item "🔎 Issuing search command: system::rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} ${_role}"
 
@@ -9981,7 +9989,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 			write_information "💿 - $iso_filename already in cache, using it for VM greenfield creation..."
 		fi
 
-		system::log_item "Ubuntu version ${tgt_ubuntu_version}: Running install options for debian installer (d-i)..."
+		system::log_item "🐧 Ubuntu version ${tgt_ubuntu_version}: Running install options for debian installer (d-i)..."
 		"${bin_virt_install}" --name ${vm_name} \
 			--vcpus "${_cpu}" \
 			--memory "${_mem}" \
@@ -9999,7 +10007,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 
 	elif [[ ${tgt_ubuntu_ver::2} -ge 23 || ${tgt_ubuntu_ver::2} -lt 24 ]] ; then
 
-		dialog::display_notice "Ubuntu version ${tgt_ubuntu_ver} no longer supports Debian preseed and not yet 
+		dialog::display_notice "🐧 Ubuntu version ${tgt_ubuntu_ver} no longer supports Debian preseed and not yet 
 		CloudCOnfig so using cloud config and server media to build desktop...
 		\n This is a temporary measure until the new installer is available and it is buggy and unreliable."
 		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: is greater than 23 but less than 24, so using cloud config and server media to build desktop..."
@@ -10019,7 +10027,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 			write_information "💿 - $iso_filename already in cache, using it for VM greenfield creation..."
 		fi
 		
-		system::log_item "Ubuntu version ${tgt_ubuntu_version}: Running install options for subiquity..."
+		system::log_item "🐧 Ubuntu version ${tgt_ubuntu_version}: Running install options for subiquity..."
 
 		"${bin_virt_install}" --name ${vm_name} \
 			--vcpus "${_cpu}" \
@@ -10036,7 +10044,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 
 	elif [[ ${tgt_ubuntu_ver::2} -ge 24 ]] ; then
 
-		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: Using MODERN installer..."
+		system::log_item "🐧 Ubuntu version ${tgt_ubuntu_ver}: Using MODERN installer..."
 		system::generate_cloudconfig
 
 		: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} live)}
@@ -10067,8 +10075,6 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 			--noautoconsole  || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 ) |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 
 	fi
-
-
 
 	system::log_item "${_summary_message}"
 
@@ -10953,38 +10959,38 @@ template::preseed_cfg::late_command() {
 			EOF
 		;;
 		* )
-			cat >> ${1} <<-EOF
+cat >> ${1} <<-EOF
 
-			# --------------------------------------------------- #
-			# C.4.12. Default preseed Addon Tasks
-			# --------------------------------------------------- #
-			# for Debian to work (ignored by Ubuntu)...
-			${_d_i_post_statment_ubunto_or_deb} \
-			in-target apt-get -y install git ; \
-			in-target apt-get -y install dialog p7zip-full virt-what curl wget spice-vdagent ; \
-			in-target git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
-			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
-			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
-			in-target mkdir -p /root/.ssh ; \
-			in-target mkdir -p /home/${Preference_InitialUser}/.ssh ; \
-			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /root/.ssh/authorized_keys" ; \
-			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /home/${Preference_InitialUser}/.ssh/authorized_keys" ; \
-			cp /*.cfg /target/opt/rtd/ ; \
-			umount -l /media || echo "Empty" ; \
-			eject || true; \
-			echo "------  initial Setup Complete!  ------"
+# --------------------------------------------------- #
+# C.4.12. Default preseed Addon Tasks
+# --------------------------------------------------- #
+# for Debian to work (ignored by Ubuntu)...
+${_d_i_post_statment_ubunto_or_deb} \
+in-target apt-get -y install git ; \
+in-target apt-get -y install dialog p7zip-full virt-what curl wget spice-vdagent ; \
+in-target /usr/bin/git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
+in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
+in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
+in-target mkdir -p /root/.ssh ; \
+in-target mkdir -p /home/${Preference_InitialUser}/.ssh ; \
+in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /root/.ssh/authorized_keys" ; \
+in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /home/${Preference_InitialUser}/.ssh/authorized_keys" ; \
+cp /*.cfg /target/opt/rtd/ ; \
+umount -l /media || echo "Empty" ; \
+eject || true; \
+echo "------  initial Setup Complete!  ------"
 
-			# Answer the last question
-			d-i debian-installer/splash boolean true
+# Answer the last question
+d-i debian-installer/splash boolean true
 
-			# Option to try to gracefully eject the installation media:
-			d-i cdrom-detect/eject boolean true
+# Option to try to gracefully eject the installation media:
+d-i cdrom-detect/eject boolean true
 
-			# Shutdown machine
-			d-i finish-install/reboot_in_progress note
+# Shutdown machine
+d-i finish-install/reboot_in_progress note
 
-			# --------------------------------------------------- #
-			EOF
+# --------------------------------------------------- #
+EOF
 		;;
 	esac
 }
@@ -13186,24 +13192,23 @@ list_loaded_software_functions() {
 # Load base color sheme for use in the library...
 #set_colors
 
+# If $LOGFILE is not set, then set it to a default location...
+if [[ -z $_LOGFILE ]] ; then
+	# Set log location and name...
+	if [[ $EUID -ne 0 ]]; then
+		: ${_LOG_DIR:="${HOME}/.config/${_RTD:-"rtd"}/logs"}
+		mkdir -p ${_LOG_DIR}
+	else
+		: ${_LOG_DIR:="/var/log/${_RTD:-"rtd"}"}
+		mkdir -p ${_LOG_DIR}
+	fi
 
-# Set log location and name...
-if [[ $EUID -ne 0 ]]; then
-	: ${_LOG_DIR:="${HOME}/.config/${_RTD:-"rtd"}/logs"}
-	mkdir -p ${_LOG_DIR}
-else
-	: ${_LOG_DIR:="/var/log/${_RTD:-"rtd"}"}
-	mkdir -p ${_LOG_DIR}
+	# Set the log file to be used by the library...
+	: ${_SCRIPTNAME:=$(basename "${BASH_SOURCE[0]}")}
+	: ${_LOGFILE:="${_LOG_DIR}/${_SCRIPTNAME}.log"}
+	# initialize logging and provide process details...
+	export _LOGFILE
 fi
-
-# Set the log file to be used by the library...
-: ${_SCRIPTNAME:=$(basename "${BASH_SOURCE[0]}")}
-: ${_LOGFILE:="${_LOG_DIR}/${_SCRIPTNAME}.log"}
-
-
-# initialize logging and provide process details...
-export _LOGFILE
-touch ${_LOGFILE}
 
 # Check if library is loaded from a terminal or another script (behavior may differ)...
 if (return 0 2>/dev/null) ; then
@@ -13217,7 +13222,7 @@ if [[ $sourced -eq 0  ]] ; then
 	if [[ "$(basename $0)" == "bash" ]] ; then
 		write_host --cyan "Script is sourced from bash in a terminal: $0 $*"
 	else
-		write_host --cyan "Script is being sourced from a script: $(basename $0) $*"
+		write_host --cyan "Script is being sourced from a script: $(basename $0) /2 ${FUNCNAME[2]} /1 ${FUNCNAME[1]} /0 ${FUNCNAME[0]} /-1 ${FUNCNAME[-1]} /$*"
 	fi
 else 
 	write_host --yellow "Library is run directly as an executable! This does nothing by itself."
@@ -13225,16 +13230,9 @@ else
 fi
 
 # Find and load all dependant files for this library... 
-system::log_item "Loading dependant files for this library..."
-for i in ${_OEM_dependencies} ; do 
-	dependency::file ${i} &>>${_LOGFILE} && system::log_item "${i} Loaded without errors..." || _lderr=1 
-done
-
-if [[ -n $_lderr ]] ; then
-	write_host --red "👾 Failed to load *.info files for this library! some functionality may be limited..."
-else
-	write_host --cyan "(${_OEM_dependencies}) loaded OK!"
-fi 
+dependency::file _branding.info && system::log_item "✅ _branding.info Loaded without errors..." || system::log_item "👾 _branding.info Loaded with errors..." 
+dependency::file _locations.info && system::log_item "✅ _locations.info Loaded without errors..." || system::log_item "👾 _locations.info Loaded with errors..."
+dependency::file _rtd_recipies.info && system::log_item "✅ _rtd_recipies.info Loaded without errors..." || system::log_item "👾 _rtd_recipies.info Loaded with errors..."
 
 write_host --green " 📚 RTD Power Library $RTD_VERSION loaded OK"
 export RTDFUNCTIONS="${RTD_VERSION}"
@@ -13254,7 +13252,9 @@ system::log_item " ***  : $(basename ${BASH_SOURCE[0]}) loaded by $(basename "${
 system::log_item "💻 Basic System Information: 
 $(hostnamectl)"
 
-# If the library is asked to do something, evaluate the parameters...
+
+
+eval_params() {
 case $1 in
 	--help | -? )
 		clear
@@ -13417,10 +13417,15 @@ case $1 in
 		return 0
 	;;
 	* )
-		# write_host --cyan "Unknown option! Please use --help for valid options."
-		# write_host --cyan "CALL: ${0##*/} $*"
+		write_host --cyan "Unknown option! Please use --help for valid options."
+		write_host --cyan "CALL: ${0##*/} $*"
 		return 0
 	;;
 esac
+}
 
+# If the library is asked to do something, evaluate the parameters...
+if [[ -n $1 ]] ; then
+	eval_params $1
+fi
 
