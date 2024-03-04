@@ -113,6 +113,7 @@ $tweaks = @(
 	"InstallFirefox",
 	#"InstallLibreOffice",
 	#"InstallRTDImageBundle",
+	"InstallMSOffice",
 
 	###	Privacy Tweaks: Improve the Privacy of Using Windows
 	###	Please unsderstand that this is no guarantee of privacy
@@ -346,9 +347,13 @@ Function InstallRTDImageBundle {
 
 Function InstallPDFToolsBundle {
 	OnlineInstallTask -Title "Installing PDF Tools: Adobe Reader" -ChocoInstall "adobereader"
-	#OnlineInstallTask -Title "Installing PDF Tools: Foxit Reader" -ChocoInstall "foxitreader"
 	OnlineInstallTask -Title "Installing PDF Tools: Cute PDF" -ChocoInstall "cutepdf"
 }
+
+Function InstallMSOffice {
+	OnlineInstallTask -Title "Installing Microsoft Office" -ChocoInstall "microsoft-office-deployment"
+}
+
 
 Function InstallFirefox {
 	OnlineInstallTask -Title "Installing Mozilla Firefox" -ChocoInstall "firefox '--params /NoDesktopShortcut'"
