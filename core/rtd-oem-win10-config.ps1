@@ -280,39 +280,11 @@ function OnlineInstallTask {
 }
 
 
-# Function Set-WallPaper($Value){
-# 	Set-ItemProperty -path 'HKCU:\Control Panel\Desktop\' -name wallpaper -value $value
-# 	rundll32.exe user32.dll, UpdatePerUserSystemParameters
-		 
-# 	    # Refresh the wallpaper
-# 	    $signature = @"
-# 	        [DllImport("user32.dll", CharSet = CharSet.Auto)]
-# 	        public static extern int SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);
-# "@
-# 	    $type = Add-Type -MemberDefinition $signature -Name Wallpaper -Namespace Win32Functions -PassThru
-# 	    $type::SystemParametersInfo(0x0014, 0, $wallpaperPath, 0x01 | 0x02)
-# 	    Write-Output "Wallpaper changed successfully."
-# }
-
-function Set-Wallpaper($MyWallpaper){
-$code = @' 
-using System.Runtime.InteropServices; 
-namespace Win32{ 
-	    
-	public class Wallpaper{ 
-	[DllImport("user32.dll", CharSet=CharSet.Auto)] 
-		static extern int SystemParametersInfo (int uAction , int uParam , string lpvParam , int fuWinIni) ; 
-		
-		public static void SetWallpaper(string thePath){ 
-		SystemParametersInfo(20,0,thePath,3); 
-		}
-	}
-	} 
-'@
-
-add-type $code 
-[Win32.Wallpaper]::SetWallpaper($MyWallpaper)
+Function Set-WallPaper($Value){
+	Set-ItemProperty -path 'HKCU:\Control Panel\Desktop\' -name wallpaper -value $value
+	RUNDLL32.EXE USER32.DLL,UpdatePerUserSystemParameters 1, True
 }
+
 
 Function InstallWinGet {
 	Write-Progress -Activity "-- Prerequisite Configuration" -CurrentOperation "Enabeling Software Management..." -Status "Running with Recommended Settings"
@@ -355,11 +327,12 @@ Function InstallRTDProgs {
 	./OOSU10.exe ooshutup10.cfg /quiet
 }
 
-Functon InstallRTDTweaks {
+Function InstallRTDTweaks {
 	Write-Progress -Activity "-- Prerequisite Configuration" -CurrentOperation "Enabeling Software Management..." -Status "Running with Recommended Settings"
-	Set-ItemProperty -Path HKCU:\software\microsoft\windows\currentversion\explorer\advanced -Name 'TaskbarAl' -Type 'DWord' -Value 0
-	Set-ItemProperty -Path HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Search -Name 'SearchboxTaskbarMode' -Type 'DWord' -Value 1
-	Set-Wallpaper("c:\rtd\wallpaper\Default.jpg") 
+	New-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAl" -Value 0 -Force
+	Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name 'TaskbarAl' -Type 'DWord' -Value 0 -Force
+	Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Search" -Name 'SearchboxTaskbarMode' -Type 'DWord' -Value 1 -Force
+
 }
 
 
@@ -2997,7 +2970,7 @@ If ($args) {
 # Call the desired tweak functions
 $tweaks | ForEach-Object { Invoke-Expression $_ } *>&1 | Out-File C:\setup.log
 
-
+Set-Wallpaper c:\rtd\wallpaper\Default.jpg 
 
 ### Restart Computer when all changes are made  ###
 If (([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator")) {
