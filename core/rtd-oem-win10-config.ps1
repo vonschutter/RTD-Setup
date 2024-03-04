@@ -81,13 +81,14 @@ If (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]:
 # want to add or remove from the script behavior. A pound sign in front of
 # a statement means that it is ignored.
 
-$BRANDING = "RTD"
+$BRANDING = "RTD Setup For Windows 10/11"
 
 $tweaks = @(
 	###	Require administrator privileges
 	"RequireAdmin",
+
 	### 	Create a recovery option in case of disaster
-	"CreateRestorePoint",
+	# "CreateRestorePoint",
 
 	### 	Remove Extra Windows Apps and Sponsored Content
 	"DebloatAll",
@@ -98,6 +99,7 @@ $tweaks = @(
 
 	###	Install Software Managment
 	"InstallRTDProgs",
+	"InstallRTDTweaks",
 
 	###	OEM Software Tasks
 	"RTDRegistryTweaks",
@@ -278,11 +280,39 @@ function OnlineInstallTask {
 }
 
 
-Function Set-WallPaper($Value){
- Set-ItemProperty -path 'HKCU:\Control Panel\Desktop\' -name wallpaper -value $value
- rundll32.exe user32.dll, UpdatePerUserSystemParameters
-}
+# Function Set-WallPaper($Value){
+# 	Set-ItemProperty -path 'HKCU:\Control Panel\Desktop\' -name wallpaper -value $value
+# 	rundll32.exe user32.dll, UpdatePerUserSystemParameters
+		 
+# 	    # Refresh the wallpaper
+# 	    $signature = @"
+# 	        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+# 	        public static extern int SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);
+# "@
+# 	    $type = Add-Type -MemberDefinition $signature -Name Wallpaper -Namespace Win32Functions -PassThru
+# 	    $type::SystemParametersInfo(0x0014, 0, $wallpaperPath, 0x01 | 0x02)
+# 	    Write-Output "Wallpaper changed successfully."
+# }
 
+function Set-Wallpaper($MyWallpaper){
+$code = @' 
+using System.Runtime.InteropServices; 
+namespace Win32{ 
+	    
+	public class Wallpaper{ 
+	[DllImport("user32.dll", CharSet=CharSet.Auto)] 
+		static extern int SystemParametersInfo (int uAction , int uParam , string lpvParam , int fuWinIni) ; 
+		
+		public static void SetWallpaper(string thePath){ 
+		SystemParametersInfo(20,0,thePath,3); 
+		}
+	}
+	} 
+'@
+
+add-type $code 
+[Win32.Wallpaper]::SetWallpaper($MyWallpaper)
+}
 
 Function InstallWinGet {
 	Write-Progress -Activity "-- Prerequisite Configuration" -CurrentOperation "Enabeling Software Management..." -Status "Running with Recommended Settings"
@@ -324,6 +354,14 @@ Function InstallRTDProgs {
 	Start-BitsTransfer -Source "https://dl5.oo-software.com/files/ooshutup10/OOSU10.exe" -Destination OOSU10.exe
 	./OOSU10.exe ooshutup10.cfg /quiet
 }
+
+Functon InstallRTDTweaks {
+	Write-Progress -Activity "-- Prerequisite Configuration" -CurrentOperation "Enabeling Software Management..." -Status "Running with Recommended Settings"
+	Set-ItemProperty -Path HKCU:\software\microsoft\windows\currentversion\explorer\advanced -Name 'TaskbarAl' -Type 'DWord' -Value 0
+	Set-ItemProperty -Path HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Search -Name 'SearchboxTaskbarMode' -Type 'DWord' -Value 1
+	Set-Wallpaper("c:\rtd\wallpaper\Default.jpg") 
+}
+
 
 Function InstallRTDImageBundle {
 	OnlineInstallTask -Title "Installing RTD Image Bundle: Krita" -ChocoInstall "krita"
@@ -2959,7 +2997,7 @@ If ($args) {
 # Call the desired tweak functions
 $tweaks | ForEach-Object { Invoke-Expression $_ } *>&1 | Out-File C:\setup.log
 
-Set-WallPaper c:\rtd\wallpaper\Wayland.jpg
+
 
 ### Restart Computer when all changes are made  ###
 If (([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator")) {

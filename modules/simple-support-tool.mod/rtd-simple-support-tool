@@ -633,17 +633,17 @@ show_deploy_VDI_VM_now_menu ()
 {
 	while true; do
 		exec 3>&1
-		selection=$($RTD_GUI --backtitle "$BRANDING" --title "Deploy Virtual Desktop (VDI)"  --menu "Please select which VDI to create on this server:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
-		"1"  "Ubuntu Standard Desktop (more MAC like)" \
-		"2"  "Ubuntu KDE Desktop (more Windows like)" \
-		"3"  "Debian Default Desktop" \
-		"4"  "Debian Cinnamon Desktop" \
-		"5"  "Debian Plasma Desktop" \
-		"6"  "Debian Light Weight Desktop (LXDE)" \
-		"7"  "Fedora Workstation VDI" \
-		"8"  "SUSE Workstation VDI" \
-		"9"  "Windows 10 VDI" \
-		"10" "Windows 11 VDI" \
+		selection=$($RTD_GUI --backtitle "$BRANDING" --title "Create a Virtual Desktop (VDI) Template"  --menu "Please select which VDI Template to create on this server:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
+		"1"  "Ubuntu Standard Desktop        (more MAC like)" \
+		"2"  "Ubuntu KDE Desktop             (more Windows like)" \
+		"3"  "Debian Default Desktop         (reseal manually)" \
+		"4"  "Debian Cinnamon Desktop        (reseal manually)" \
+		"5"  "Debian Plasma Desktop          (reseal manually)" \
+		"6"  "Debian Light Weight Desktop    (reseal manually)" \
+		"7"  "Fedora Workstation VDI         (reseal manually)" \
+		"8"  "SUSE Workstation VDI           (reseal manually)" \
+		"9"  "Windows 10 VDI                 (reseal manually)" \
+		"10" "Windows 11 VDI                 (reseal manually)" \
 		2>&1 1>&3)
 		exit_status=$?
 		exec 3>&-
@@ -693,10 +693,11 @@ show_deploy_VDI_VM_now_menu ()
 			cleanup_and_finish nomessage
 		;;
 		9 )
-			make_kvm_virtual_machine_now_from_microsoft --winver win10
+			kvm::make_vm_template_now_from_microsoft --winver win10
 		;;
 		10 )
-			make_kvm_virtual_machine_now_from_microsoft --winver win11
+			kvm::make_vm_template_now_from_microsoft
+			 --winver win11
 		;;
 		esac
 

@@ -319,20 +319,17 @@ exit $?
 	@title Found %* >>%LOG_DIR%\rtd.log
 	echo Please wait...
 	:: if exist A:\autounattend.xml copy /y A:\*.* c:\rtd\
-        @title "Fetch Wallpaper for default background"
-	powershell -Command "(New-Object Net.WebClient).DownloadFile('%WALLPAPER_URL%', '%CACHE_DIR%\virtio-win-gt-x64.msi')"
-        @title: "Download and install virtio-drivers"
-        powershell -Command "(New-Object Net.WebClient).DownloadFile('%VIRTIO_URL%', '%WALLPAPER_DIR%\Wayland.jpg')"
-        powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %VIRTIO_URL% -OutFile %CACHE_DIR%\virtio-win-gt-x64.msi"
+
+	@title: "Download and install virtio-drivers"
+	powershell -Command "(New-Object Net.WebClient).DownloadFile('%VIRTIO_URL%', '%CACHE_DIR%\virtio-win-gt-x64.msi')"
         msiexec /i %CACHE_DIR%\virtio-win-gt-x64.msii /passive /norestart /l*v %LOG_DIR%\virtio_log.txt
-	
-        SetLocal EnableDelayedExpansion
 
-        REM Run PowerShell commands to set network profiles to Private
-        powershell -Command "& { $profiles = Get-ChildItem -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles'; foreach ($profile in $profiles) { Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles\' + $profile.PSChildName -Name 'Category' -Value 1 } }"
+        @title "Fetch Wallpaper for default background"
+        powershell -Command "(New-Object Net.WebClient).DownloadFile('%WALLPAPER_URL%', '%WALLPAPER_DIR%\Default.jpg')"
 
-        EndLocal
-
+	@title "Set network profiles to Private"
+        powershell -Command "& {Get-ChildItem -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles' | ForEach-Object {Set-ItemProperty -Path $_.PSParentPath -Name 'Category' -Value 1}}"
+ 
 	if exist C:\rtd\%_STAGE2FILE% (
 		echo File found locally...
 		powershell -ExecutionPolicy UnRestricted -File C:\rtd\%_STAGE2FILE%
@@ -340,6 +337,14 @@ exit $?
 		echo Fetching %_STAGE2FILE% from the internet...
 		powershell -Command "(New-Object Net.WebClient).DownloadFile('%_STAGE2LOC%/%_STAGE2FILE%', '%CACHE_DIR%\%_STAGE2FILE%')"
 		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
+	)
+
+	if exist C:\rtd\_Chris-Titus-Post-Windows-Install-App.ps1 (
+		@title "CMD: _Chris-Titus-Post-Windows-Install-App.ps1 File found locally..."
+		powershell -ExecutionPolicy UnRestricted -File C:\rtd\_Chris-Titus-Post-Windows-Install-App.ps1
+		) else (
+		@title "CMD: Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet..."
+		powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
 	)
 	goto end
 
@@ -353,13 +358,12 @@ exit $?
 	@title "POWERSHELL: seting NETWORK Config"
         powershell -Command "& {Get-ChildItem -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles' | ForEach-Object {Set-ItemProperty -Path $_.PSParentPath -Name 'Category' -Value 1}}"
 
-
         @title "POWERSHELL: Fetch Wallpaper for default background"
-        powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %WALLPAPER_URL% -OutFile %WALLPAPER_DIR%\Wayland.jpg"
-        @title: "POWERSHELL: Download and install virtio-drivers"
+        powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %WALLPAPER_URL% -OutFile %WALLPAPER_DIR%\Default.jpg"
+
+        @title "POWERSHELL: Download and install virtio-drivers"
         powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %VIRTIO_URL% -OutFile %CACHE_DIR%\virtio-win-guest-tools.exe"
         %CACHE_DIR%\virtio-win-guest-tools.exe /passive /norestart /log %LOG_DIR%\virtio_log.txt
-
     
 	if exist C:\rtd\%_STAGE2FILE% (
 		@title "CMD: %_STAGE2FILE%File found locally..."
