@@ -259,24 +259,44 @@ exit $?
 	::  ***             Settings               ***      ::
 	::::::::::::::::::::::::::::::::::::::::::::::::::::::
 	::
-	set TEMP=C:\rtd\temp
-	set LOG_DIR=C:\rtd\log
-	set WALLPAPER_DIR=C:\rtd\wallpaper
-	set CACHE_DIR=C:\rtd\cache
+
+	:: gather some info... (BETA)
+	setlocal EnableDelayedExpansion
+		set "ScriptName=%~nx0"
+		set "ScriptPath=%~dp0"
+		set "_tla=%ScriptName:~0,3%"
+		set "lowercase=abcdefghijklmnopqrstuvwxyz"
+		set "uppercase=ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+		set "Result="
+		for /L %%i in (0,1,2) do (
+			set "char=!_tla:~%%i,1!"
+			for /L %%j in (0,1,25) do (
+				if "!char!"=="!lowercase:~%%j,1!" set "char=!uppercase:~%%j,1!"
+			)
+			set "Result=!Result!!char!"
+		)
+	set _TLA=%Result%
+	set _TLA=RTD
+	set TEMP=C:\%_TLA%\temp
+	set LOG_DIR=C:\%_TLA%\log
+	set WALLPAPER_DIR=C:\%_TLA%\wallpaper
+	set CACHE_DIR=C:\%_TLA%\cache
+	set CORE_DIR=C:\%_TLA%\core
         set WALLPAPER_URL=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/wallpaper/Wayland.jpg
         set VIRTIO_URL=https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-guest-tools.exe
 	set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
 	set _STAGE2FILE=rtd-oem-win10-config.ps1
-	
+
 	md %TEMP%
 	md %LOG_DIR%
 	md %WALLPAPER_DIR%
         md %CACHE_DIR%
-    
+	md %CORE_DIR%
+
 	@title "Stage 2 file is located at: %_STAGE2LOC%\%_STAGE2FILE%"
 
-        set >>%LOG_DIR%\rtd.log
-        ver >>%LOG_DIR%\rtd.log
+        set >>%LOG_DIR%\%_TLA%.log
+        ver >>%LOG_DIR%\%_TLA%.log
     
 :GetInterestingThigsToDoOnThisSystem
 	:: Given that Microsoft Windows has been detected and the CMD shell portion of this script is executed,
@@ -318,7 +338,7 @@ exit $?
 	:: get stage 2 and run it...
 	@title Found %* >>%LOG_DIR%\rtd.log
 	echo Please wait...
-	:: if exist A:\autounattend.xml copy /y A:\*.* c:\rtd\
+	if exist A:\autounattend.xml copy /y A:\*.* %CORE_DIR%\
 
 	@title: "Download and install virtio-drivers"
 	powershell -Command "(New-Object Net.WebClient).DownloadFile('%VIRTIO_URL%', '%CACHE_DIR%\virtio-win-gt-x64.msi')"
@@ -330,18 +350,18 @@ exit $?
 	@title "Set network profiles to Private"
         powershell -Command "& {Get-ChildItem -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles' | ForEach-Object {Set-ItemProperty -Path $_.PSParentPath -Name 'Category' -Value 1}}"
  
-	if exist C:\rtd\%_STAGE2FILE% (
+	if exist %CORE_DIR%\%_STAGE2FILE% (
 		echo File found locally...
-		powershell -ExecutionPolicy UnRestricted -File C:\rtd\%_STAGE2FILE%
+		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\%_STAGE2FILE%
 		) else (
 		echo Fetching %_STAGE2FILE% from the internet...
 		powershell -Command "(New-Object Net.WebClient).DownloadFile('%_STAGE2LOC%/%_STAGE2FILE%', '%CACHE_DIR%\%_STAGE2FILE%')"
 		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
 	)
 
-	if exist C:\rtd\_Chris-Titus-Post-Windows-Install-App.ps1 (
+	if exist %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1 (
 		@title "CMD: _Chris-Titus-Post-Windows-Install-App.ps1 File found locally..."
-		powershell -ExecutionPolicy UnRestricted -File C:\rtd\_Chris-Titus-Post-Windows-Install-App.ps1
+		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1
 		) else (
 		@title "CMD: Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet..."
 		powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
@@ -354,7 +374,7 @@ exit $?
 	:: These version of windows have a more modern version of PowerShell.
 	:: get stage 2 and run it...
 	echo Found %*
-	:: if exist A:\autounattend.xml copy /y A:\*.* c:\rtd\
+	if exist A:\autounattend.xml copy /y A:\*.* %CORE_DIR%\
 	@title "POWERSHELL: seting NETWORK Config"
         powershell -Command "& {Get-ChildItem -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles' | ForEach-Object {Set-ItemProperty -Path $_.PSParentPath -Name 'Category' -Value 1}}"
 
@@ -365,18 +385,18 @@ exit $?
         powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %VIRTIO_URL% -OutFile %CACHE_DIR%\virtio-win-guest-tools.exe"
         %CACHE_DIR%\virtio-win-guest-tools.exe /passive /norestart /log %LOG_DIR%\virtio_log.txt
     
-	if exist C:\rtd\%_STAGE2FILE% (
+	if exist %CORE_DIR%\%_STAGE2FILE% (
 		@title "CMD: %_STAGE2FILE%File found locally..."
-		powershell -ExecutionPolicy UnRestricted -File C:\rtd\%_STAGE2FILE%
+		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\%_STAGE2FILE%
 		) else (
 		@title "CMD: Fetching %_STAGE2FILE% from the internet..."
 		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %_STAGE2LOC%/%_STAGE2FILE% -OutFile %CACHE_DIR%\%_STAGE2FILE%"
 		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
 	)
 
-	if exist C:\rtd\_Chris-Titus-Post-Windows-Install-App.ps1 (
+	if exist %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1 (
 		@title "CMD: _Chris-Titus-Post-Windows-Install-App.ps1 File found locally..."
-		powershell -ExecutionPolicy UnRestricted -File C:\rtd\_Chris-Titus-Post-Windows-Install-App.ps1
+		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1
 		) else (
 		@title "CMD: Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet..."
 		powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
@@ -396,7 +416,7 @@ exit $?
 	powershell -ExecutionPolicy UnRestricted -File %TEMP%\%_STAGE2FILE%
 
 	goto end
-
+endlocal
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 ::::::::::::::                                          ::::::::::::::::::::::

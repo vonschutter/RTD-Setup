@@ -25,52 +25,51 @@
 @echo off
 @title "RTD Windows Configuration/Activation Menu"
 set MAS_ACTIVATION_SCRIPT=_config_menu.ps1
-set CTT_CONFIG_SCRIPT=_config_menu.ps1
+set CTT_CONFIG_SCRIPT=_Chris-Titus-Post-Windows-Install-App.ps1
 set CTT_URL=https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1
 set MAS_URL=https://massgrave.dev/get
 set RUN_DIR=%~dp0
 
-
+pushd %~dp0
 :MENU
-	cls
-	echo :::::::::::::::::::// Windows Configuration Options //::::::::::::::::::::::::::
-	echo :::::::::::::::::::::::::::::// Menu //:::::::::::::::::::::::::::::::::::::::::
-	echo .  
-	echo .
-	echo . 1. CTT Menu (Windows Configuration)
-	echo . 2. MAS Menu (Windows Activation)
-	echo . 3. Exit
-	echo .
-	echo . NOTE: Localexecution will be tired before fetching from the internet
-	echo .
-	echo ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-	set /p choice="                      Select an option (1-3): "
-	echo ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+color 1F
+cls
+echo :::::::::::::::::::// Windows Configuration Options //::::::::::::::::::::::::::
+echo :::::::::::::::::::::::::::::// Menu //:::::::::::::::::::::::::::::::::::::::::
+echo .  
+echo .
+echo . 1. CTT Menu (Windows Configuration)
+echo . 2. MAS Menu (Windows Activation)
+echo . 3. Exit
+echo .
+echo . NOTE: Local execution will be tried before fetching from the internet
+echo .
+echo ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+echo ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+set /p choice="                      Select an option (1-3): "
+cls
+if "%choice%"=="1" goto CTT
+if "%choice%"=="2" goto MAS
+if "%choice%"=="3" exit /b
 
-	if "%choice%"=="1" goto :CTT
-	if "%choice%"=="2" goto :MAS
-	if "%choice%"=="3" exit
-	goto :END
-
+goto MENU
 
 :CTT
-	if exist %RUN_DIR%\%CTT_CONFIG_SCRIPT% (
-		@title "POWERSHELL: run %RUN_DIR%\%CTT_CONFIG_SCRIPT% "
-		powershell -ExecutionPolicy UnRestricted -File %RUN_DIR%\%CTT_CONFIG_SCRIPT%
-		) else (
-		@title "POWERSHELL: run Fetching %CTT_URL% from the internet..."
-		powershell -Command "iwr -useb %CTT_URL% | iex"
-	)
-	goto :MENU
+if exist %CTT_CONFIG_SCRIPT% (
+    @title "CMD: Running %CTT_CONFIG_SCRIPT% locally"
+    powershell -ExecutionPolicy UnRestricted -File %RUN_DIR%\%CTT_CONFIG_SCRIPT%
+) else (
+    @title "POWERSHELL: Running %CTT_URL% from the internet..."
+    powershell -Command "iwr -useb %CTT_URL% | iex"
+)
+goto MENU
 
 :MAS
-	if exist %RUN_DIR%\%MAS_ACTIVATION_SCRIPT% (
-		@title "CMD: %RUN_DIR%\%MAS_ACTIVATION_SCRIPT% File found locally..."
-		powershell -ExecutionPolicy UnRestricted -File %RUN_DIR%\%MAS_ACTIVATION_SCRIPT%
-		) else (
-		@title "CMD: Fetching %MAS_URL% from the internet..."
-		powershell -Command "irm %MAS_URL% | iex"
-	)
-	goto :MENU
-
-:END
+if exist %RUN_DIR%\%MAS_ACTIVATION_SCRIPT% (
+    @title "CMD: %MAS_ACTIVATION_SCRIPT% File found locally..."
+    powershell -ExecutionPolicy UnRestricted -File %RUN_DIR%\%MAS_ACTIVATION_SCRIPT%
+) else (
+    @title "CMD: Running %MAS_URL% from the internet..."
+    powershell -Command "irm %MAS_URL% | iex"
+)
+goto MENU

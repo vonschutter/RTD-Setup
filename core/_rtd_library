@@ -11104,14 +11104,11 @@ template::kickstart_cfg() {
 
 template::rtd_me_sh_cmd() {
 	# Template for the rtd_me.sh.cmd script
-
-	local todo=${1}
 	local outfile=${2}
 	write_information "Writing out the rtd_me.sh.cmd script to ${outfile}"
 	
-	# case ${todo} in 
-	# 	--write )
 cat >> ${outfile} <<'EOF'
+
 :INIT
 	:::::::::::::::::::::::::::::::::::::::::::::::::::
 	::	Script startup components; tasks that always
@@ -11128,24 +11125,46 @@ cat >> ${outfile} <<'EOF'
 	::  ***             Settings               ***      ::
 	::::::::::::::::::::::::::::::::::::::::::::::::::::::
 	::
-	set TEMP=C:\rtd\temp
-	set LOG_DIR=C:\rtd\log
-	set WALLPAPER_DIR=C:\rtd\wallpaper
-	set CACHE_DIR=C:\rtd\cache
+
+	:: gather some info...
+	setlocal EnableDelayedExpansion
+		set "ScriptName=%~nx0"
+		set "ScriptPath=%~dp0"
+		set "_tla=%ScriptName:~0,3%"
+		set "lowercase=abcdefghijklmnopqrstuvwxyz"
+		set "uppercase=ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+		set "Result="
+		for /L %%i in (0,1,2) do (
+			set "char=!_tla:~%%i,1!"
+			for /L %%j in (0,1,25) do (
+				if "!char!"=="!lowercase:~%%j,1!" set "char=!uppercase:~%%j,1!"
+			)
+			set "Result=!Result!!char!"
+		)
+		set _TLA=%Result%
+	endlocal
+	::set _TLA=%Result%
+	set _TLA=RTD
+	set TEMP=C:\%_TLA%\temp
+	set LOG_DIR=C:\%_TLA%\log
+	set WALLPAPER_DIR=C:\%_TLA%\wallpaper
+	set CACHE_DIR=C:\%_TLA%\cache
+	set CORE_DIR=C:\%_TLA%\core
         set WALLPAPER_URL=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/wallpaper/Wayland.jpg
         set VIRTIO_URL=https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-guest-tools.exe
 	set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
 	set _STAGE2FILE=rtd-oem-win10-config.ps1
-	
+
 	md %TEMP%
 	md %LOG_DIR%
 	md %WALLPAPER_DIR%
         md %CACHE_DIR%
-    
+	md %CORE_DIR%
+
 	@title "Stage 2 file is located at: %_STAGE2LOC%\%_STAGE2FILE%"
 
-        set >>%LOG_DIR%\rtd.log
-        ver >>%LOG_DIR%\rtd.log
+        set >>%LOG_DIR%\%_TLA%.log
+        ver >>%LOG_DIR%\%_TLA%.log
     
 :GetInterestingThigsToDoOnThisSystem
 	:: Given that Microsoft Windows has been detected and the CMD shell portion of this script is executed,
@@ -11187,7 +11206,7 @@ cat >> ${outfile} <<'EOF'
 	:: get stage 2 and run it...
 	@title Found %* >>%LOG_DIR%\rtd.log
 	echo Please wait...
-	:: if exist A:\autounattend.xml copy /y A:\*.* c:\rtd\
+	if exist A:\autounattend.xml copy /y A:\*.* %CORE_DIR%\
 
 	@title: "Download and install virtio-drivers"
 	powershell -Command "(New-Object Net.WebClient).DownloadFile('%VIRTIO_URL%', '%CACHE_DIR%\virtio-win-gt-x64.msi')"
@@ -11199,18 +11218,18 @@ cat >> ${outfile} <<'EOF'
 	@title "Set network profiles to Private"
         powershell -Command "& {Get-ChildItem -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles' | ForEach-Object {Set-ItemProperty -Path $_.PSParentPath -Name 'Category' -Value 1}}"
  
-	if exist C:\rtd\%_STAGE2FILE% (
+	if exist %CORE_DIR%\%_STAGE2FILE% (
 		echo File found locally...
-		powershell -ExecutionPolicy UnRestricted -File C:\rtd\%_STAGE2FILE%
+		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\%_STAGE2FILE%
 		) else (
 		echo Fetching %_STAGE2FILE% from the internet...
 		powershell -Command "(New-Object Net.WebClient).DownloadFile('%_STAGE2LOC%/%_STAGE2FILE%', '%CACHE_DIR%\%_STAGE2FILE%')"
 		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
 	)
 
-	if exist C:\rtd\_Chris-Titus-Post-Windows-Install-App.ps1 (
+	if exist %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1 (
 		@title "CMD: _Chris-Titus-Post-Windows-Install-App.ps1 File found locally..."
-		powershell -ExecutionPolicy UnRestricted -File C:\rtd\_Chris-Titus-Post-Windows-Install-App.ps1
+		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1
 		) else (
 		@title "CMD: Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet..."
 		powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
@@ -11223,7 +11242,7 @@ cat >> ${outfile} <<'EOF'
 	:: These version of windows have a more modern version of PowerShell.
 	:: get stage 2 and run it...
 	echo Found %*
-	:: if exist A:\autounattend.xml copy /y A:\*.* c:\rtd\
+	if exist A:\autounattend.xml copy /y A:\*.* %CORE_DIR%\
 	@title "POWERSHELL: seting NETWORK Config"
         powershell -Command "& {Get-ChildItem -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles' | ForEach-Object {Set-ItemProperty -Path $_.PSParentPath -Name 'Category' -Value 1}}"
 
@@ -11234,23 +11253,24 @@ cat >> ${outfile} <<'EOF'
         powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %VIRTIO_URL% -OutFile %CACHE_DIR%\virtio-win-guest-tools.exe"
         %CACHE_DIR%\virtio-win-guest-tools.exe /passive /norestart /log %LOG_DIR%\virtio_log.txt
     
-	if exist C:\rtd\%_STAGE2FILE% (
+	if exist %CORE_DIR%\%_STAGE2FILE% (
 		@title "CMD: %_STAGE2FILE%File found locally..."
-		powershell -ExecutionPolicy UnRestricted -File C:\rtd\%_STAGE2FILE%
+		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\%_STAGE2FILE%
 		) else (
 		@title "CMD: Fetching %_STAGE2FILE% from the internet..."
 		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %_STAGE2LOC%/%_STAGE2FILE% -OutFile %CACHE_DIR%\%_STAGE2FILE%"
 		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
 	)
 
-	if exist C:\rtd\_Chris-Titus-Post-Windows-Install-App.ps1 (
+	if exist %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1 (
 		@title "CMD: _Chris-Titus-Post-Windows-Install-App.ps1 File found locally..."
-		powershell -ExecutionPolicy UnRestricted -File C:\rtd\_Chris-Titus-Post-Windows-Install-App.ps1
+		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1
 		) else (
 		@title "CMD: Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet..."
 		powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
 	)
 	goto end
+
 
 :CMD1
 	:: Pre windows 7 instruction go here (except vista)...
@@ -11259,6 +11279,9 @@ cat >> ${outfile} <<'EOF'
 
 	echo Detected %* ...
 	echo executing PRE Windows 7 instructions...
+	:: Assuming wget is in teh path...
+	wget -O %TEMP%\%_STAGE2FILE% %_STAGE2LOC%/%_STAGE2FILE%
+	powershell -ExecutionPolicy UnRestricted -File %TEMP%\%_STAGE2FILE%
 
 	goto end
 
@@ -11268,6 +11291,7 @@ cat >> ${outfile} <<'EOF'
 ::::::::::::::            ERROR handling Below          ::::::::::::::::::::::
 ::::::::::::::                                          ::::::::::::::::::::::
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 
 
 :DispErr
@@ -11290,21 +11314,15 @@ goto end
 
 :end
 EOF
-	# ;;
-	# --help )
-	# 	echo "Usage: ${FUNCNAME[0]} --write </path/to/filename>"
-	# ;;
-	# * )
-	# 	write_error "No output file provided, use: ${FUNCNAME[0]} --write </path/to/filename>"
-	# ;;
-	# esac
-
 }
 
 
 
 template::autounattend_xml() {
 	# Generate the autounattend file
+	system::get_vm_config
+	: ${_TLA:="RTD"}
+
 	local target_file target_winver
 	while  [[ $# -gt 0 ]] ; do
 		case "$1" in
@@ -11328,7 +11346,7 @@ template::autounattend_xml() {
 
 	# Write out the autounattend file
 	case ${target_winver} in
-		win11 )
+		win11 | Win11 )
 cat >> ${target_file} <<-EOF
 <?xml version="1.0" encoding="utf-8"?>
     <unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
@@ -11404,10 +11422,10 @@ cat >> ${target_file} <<-EOF
             <settings pass="auditUser" />
             <settings pass="oobeSystem">
             <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-                <InputLocale>en-US;fr-FR;sv-SE</InputLocale>
-                <SystemLocale>en-US</SystemLocale>
+                <InputLocale>${Preference_InitialKeyboardLayout//_/-}</InputLocale>
+                <SystemLocale>${Preference_InitialKeyboardLayout//_/-}</SystemLocale>
                 <UILanguage>en-US</UILanguage>
-                <UserLocale>en-US</UserLocale>
+                <UserLocale>${Preference_InitialKeyboardLayout//_/-}</UserLocale>
             </component>
 
             <component name="Microsoft-Windows-LUA-Settings" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -11471,18 +11489,10 @@ cat >> ${target_file} <<-EOF
                     </SynchronousCommand>
                     <SynchronousCommand wcm:action="add">
                         <Order>5</Order>
-                        <CommandLine>cmd.exe /c "md C:\rtd"</CommandLine>
+                        <CommandLine>cmd.exe /c A:\rtd-me-sh.cmd</CommandLine>
                     </SynchronousCommand>
                     <SynchronousCommand wcm:action="add">
                         <Order>6</Order>
-                        <CommandLine>cmd.exe /c "copy A:\*.* C:\rtd"</CommandLine>
-                    </SynchronousCommand>
-                    <SynchronousCommand wcm:action="add">
-                        <Order>7</Order>
-                        <CommandLine>cmd.exe /c C:\rtd\rtd-me-sh.cmd</CommandLine>
-                    </SynchronousCommand>
-                    <SynchronousCommand wcm:action="add">
-                        <Order>8</Order>
                         <Description>Set password age policy</Description>
                         <CommandLine>cmd.exe /c net accounts /maxpwage:1</CommandLine>
                     </SynchronousCommand>
@@ -11493,7 +11503,7 @@ cat >> ${target_file} <<-EOF
 EOF
 		;;
 		win10 | Win10 | win7 | Win7 )
-		cat > ${target_file} <<-'EOF'
+cat > ${target_file} <<EOF
 <?xml version="1.0" encoding="utf-8"?>
 <unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
     <settings pass="offlineServicing"></settings>
@@ -11564,10 +11574,10 @@ EOF
     <settings pass="auditUser"></settings>
     <settings pass="oobeSystem">
         <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-            <InputLocale>0409:00000409</InputLocale>
-            <SystemLocale>en-US</SystemLocale>
+            <InputLocale>${Preference_InitialKeyboardLayout//_/-}</InputLocale>
+            <SystemLocale>${Preference_InitialKeyboardLayout//_/-}</SystemLocale>
             <UILanguage>en-US</UILanguage>
-            <UserLocale>en-US</UserLocale>
+            <UserLocale>${Preference_InitialKeyboardLayout//_/-}</UserLocale>
         </component>
         <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
             <UserAccounts>
@@ -11576,7 +11586,7 @@ EOF
                         <Name>tangarora</Name>
                         <Group>Administrators</Group>
                         <Password>
-                            <Value>letmein1234</Value>
+                            <Value>${Preference_Wireless_Password}</Value>
                             <PlainText>true</PlainText>
                         </Password>
                     </LocalAccount>
@@ -11584,7 +11594,7 @@ EOF
                         <Name>RTD-User</Name>
                         <Group>Users</Group>
                         <Password>
-                            <Value>letmein1234</Value>
+                            <Value>${Preference_Wireless_Password}</Value>
                             <PlainText>true</PlainText>
                         </Password>
                     </LocalAccount>
@@ -11595,7 +11605,7 @@ EOF
                 <Enabled>true</Enabled>
                 <LogonCount>1</LogonCount>
                 <Password>
-                    <Value>letmein1234</Value>
+                    <Value>${Preference_Wireless_Password}</Value>
                     <PlainText>true</PlainText>
                 </Password>
             </AutoLogon>
@@ -11625,22 +11635,14 @@ EOF
                     <CommandLine>cmd.exe /c "gpupdate /target:computer /force"</CommandLine>
                 </SynchronousCommand>
                 <SynchronousCommand wcm:action="add">
-                    <Order>5</Order>
-                    <CommandLine>cmd.exe /c "md C:\rtd"</CommandLine>
-		</SynchronousCommand>
-                <SynchronousCommand wcm:action="add">
-                    <Order>6</Order>
-                    <CommandLine>cmd.exe /c "copy A:\*.* C:\rtd"</CommandLine>
-                </SynchronousCommand>
-                <SynchronousCommand wcm:action="add">
                     <Order>7</Order>
-                    <CommandLine>cmd.exe /c C:\rtd\rtd-me-sh.cmd</CommandLine>
+                    <CommandLine>cmd.exe /c "A:\rtd-me-sh.cmd" </CommandLine>
                 </SynchronousCommand>
             </FirstLogonCommands>
         </component>
     </settings>
 </unattend>
-	EOF
+EOF
 		;;
 		* )
 			write_error "No valid Windows version provided, use: win7, win10, win11"
