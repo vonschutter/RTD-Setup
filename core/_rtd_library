@@ -1032,15 +1032,17 @@ system::generate_cloudconfig() {
 				;;
 			* )
 				system::log_item "ERROR: Unknown ubuntu flavor: ${Preference_Role}"
-				dialog::display_error "ERROR: Unknown role: ${Preference_Role}
-				Usage: $(FUNCNAME[0]) [--CloudConfigDir <directory>] [--vmname <hostname> ] [--flavor <ubuntu-flavor>]
+				dialog::display_error "ERROR: Unknown role: ${Preference_Role}\n
+				Usage: $(FUNCNAME[0]) [--CloudConfigDir <directory>] [--vmname <hostname> ] [--flavor <ubuntu-flavor>]\n
 				Where <role> is the type of VM to create, e.g. :
 				ubuntu-desktop, 
 				ubuntu-server, 
 				kubuntu-desktop, 
 				ssh-server,
 				ansible-server,
-				minecraft-server"
+				minecraft-server
+				
+				GOT (${Preference_Role})"
 				return 1
 				;;
 			esac
@@ -3023,6 +3025,7 @@ system::add_or_remove_login_script() {
 			fi
 		;;
 		*)
+			write_information "📜 Toggeling execution on login of (${script_path})"
 			if [[ -e "$file_path" ]]; then
 				write_information "🗑️ Removing execution on login of (${file_path})"
 				if ! sudo rm "${file_path}"; then
@@ -9923,14 +9926,12 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 			local _role="$2"
 			shift # Remove argument name from processing
 		;;
-		*)
-			write_error "Unknown parameter: $1"
-		;;
 		esac
 		shift # Remove argument value from processing
 	done
 
 	# Evaluate override arguments to defaults...
+	# -t | -m | -d | -f | -r
 	system::process_vm_opt_args "${@}"
 
 	# Ensure everything for creating VMs is in place...
@@ -9953,7 +9954,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	clear
 
 	# Return the version number selected
-	[ "$tgt_ubuntu_ver" ] || tgt_ubuntu_ver=${all_lts_versions[-1]}
+	tgt_ubuntu_ver=${tgt_ubuntu_ver:-${all_lts_versions[-1]}}
 
 	# Format the name of the VM to be created...
 	local vm_name="Template_Ubuntu_${tgt_ubuntu_ver}_${_role}_$(date +%Y-%m-%d-%s)"
@@ -9976,7 +9977,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	if [[ ${tgt_ubuntu_ver::2} -lt 23 ]] ; then
 
 		system::log_item "🐧 Ubuntu version ${tgt_ubuntu_ver}: is less than 23, so using debian installer (d-i) and desktop media..."
-		system::make_preseed_cfg -r "${_role}" -p "${_saveto}" -t ${_task}
+		system::make_preseed_cfg -r ${_role} -p ${_saveto} -t ${_flavor}
 		system::log_item "🔎 Issuing search command: system::rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} ${_role}"
 
 		: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} live)}
@@ -10015,7 +10016,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 		CloudCOnfig so using cloud config and server media to build desktop...
 		\n This is a temporary measure until the new installer is available and it is buggy and unreliable."
 		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: is greater than 23 but less than 24, so using cloud config and server media to build desktop..."
-		system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor "${_flavor}"
+		system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor ${_flavor:-"ubuntu-desktop"} 
 
 		: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} server)}
 		: ${iso_filename:="$(basename $ubuntu_iso_url)"}
@@ -10903,9 +10904,6 @@ template::preseed_cfg::late_command() {
 			# C.4.12. Addon Tasks for Minecraft Server
 			# --------------------------------------------------- #
 			${_d_i_post_statment_ubunto_or_deb} \
-			in-target apt-get -y install git ; \
-			in-target git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
-			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
 			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
 			in-target mkdir -p /root/.ssh ; \
 			in-target mkdir -p /home/${Preference_InitialUser}/.ssh ; \
@@ -10963,38 +10961,37 @@ template::preseed_cfg::late_command() {
 			EOF
 		;;
 		* )
-cat >> ${1} <<-EOF
+			cat >> ${1} <<-EOF
 
-# --------------------------------------------------- #
-# C.4.12. Default preseed Addon Tasks
-# --------------------------------------------------- #
-# for Debian to work (ignored by Ubuntu)...
-${_d_i_post_statment_ubunto_or_deb} \
-in-target apt-get -y install git ; \
-in-target apt-get -y install dialog p7zip-full virt-what curl wget spice-vdagent ; \
-in-target /usr/bin/git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
-in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
-in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
-in-target mkdir -p /root/.ssh ; \
-in-target mkdir -p /home/${Preference_InitialUser}/.ssh ; \
-in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /root/.ssh/authorized_keys" ; \
-in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /home/${Preference_InitialUser}/.ssh/authorized_keys" ; \
-cp /*.cfg /target/opt/rtd/ ; \
-umount -l /media || echo "Empty" ; \
-eject || true; \
-echo "------  initial Setup Complete!  ------"
+			# --------------------------------------------------- #
+			# C.4.12. Default preseed Addon Tasks
+			# --------------------------------------------------- #
+			# for Debian to work (ignored by Ubuntu)...
+			${_d_i_post_statment_ubunto_or_deb} \
+			in-target apt-get -y install git ; \
+			in-target /usr/bin/git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
+			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
+			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
+			in-target mkdir -p /root/.ssh ; \
+			in-target mkdir -p /home/${Preference_InitialUser}/.ssh ; \
+			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /root/.ssh/authorized_keys" ; \
+			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /home/${Preference_InitialUser}/.ssh/authorized_keys" ; \
+			cp /*.cfg /target/opt/rtd/ ; \
+			umount -l /media || echo "Empty" ; \
+			eject || true; \
+			echo "------  initial Setup Complete!  ------"
 
-# Answer the last question
-d-i debian-installer/splash boolean true
+			# Answer the last question
+			d-i debian-installer/splash boolean true
 
-# Option to try to gracefully eject the installation media:
-d-i cdrom-detect/eject boolean true
+			# Option to try to gracefully eject the installation media:
+			d-i cdrom-detect/eject boolean true
 
-# Shutdown machine
-d-i finish-install/reboot_in_progress note
+			# Shutdown machine
+			d-i finish-install/reboot_in_progress note
 
-# --------------------------------------------------- #
-EOF
+			# --------------------------------------------------- #
+			EOF
 		;;
 	esac
 }

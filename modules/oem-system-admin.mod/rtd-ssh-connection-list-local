@@ -44,7 +44,7 @@ _LOCALSUB="$(ip -o -f inet addr show | awk '/scope global/ {print $4}' | head -1
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-dependency::_rtd_library ()
+dependency_library ()
 {
 	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
 
@@ -64,7 +64,7 @@ dependency::_rtd_library ()
 }
 
 
-system::scan_local_net_ssh ()
+scan_local_net_ssh ()
 {
         echo "scaning for hosts on the local subnet with SSH (port 22) open"
         local n=1
@@ -73,7 +73,7 @@ system::scan_local_net_ssh ()
 }
 
 
-system::show_local_ssh_list ()
+show_local_ssh_list ()
 {
 
 	while true; do
@@ -103,7 +103,7 @@ system::show_local_ssh_list ()
 }
 
 
-system::get_remote_user ()
+get_remote_user ()
 {
         if [[ -e $HOME/.config/"${_TLA,,}"/remote.pref ]] ; then
                 _remote_user="$(cat "${HOME}"/.config/"${_TLA,,}"/remote.pref)" 
@@ -111,12 +111,12 @@ system::get_remote_user ()
                         unset _remote_user
                 fi
         else
-                system::configure_remote_user
+                configure_remote_user
         fi
 }
 
 
-system::configure_remote_user ()
+configure_remote_user ()
 {
         local _param=$1
 
@@ -139,7 +139,7 @@ system::configure_remote_user ()
 }
 
 
-display::help ()
+display_help ()
 {
         clear
         write_host --cyan "
@@ -156,12 +156,12 @@ display::help ()
 }
 
 
-system::parameter_check ()
+parameter_check ()
 {
         _param=${1}
         case ${_param} in 
-                --config-user ) system::configure_remote_user --quit ;;
-                --help ) display::help ;;
+                --config-user ) configure_remote_user --quit ;;
+                --help ) display_help ;;
                 * ) return ;;
         esac
 }
@@ -174,11 +174,11 @@ system::parameter_check ()
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #
 # Elevate the privileges to root equivalent (if not already) to manage system...
-dependency::_rtd_library &>/dev/null || { echo "RTD functions not found!" ; exit 1 ; }
-system::parameter_check ${1}
-system::get_remote_user
-system::scan_local_net_ssh
-system::show_local_ssh_list
+dependency_library || { write_error "Llibrary not found!" ; exit 1 ; }
+parameter_check ${1}
+get_remote_user
+scan_local_net_ssh
+show_local_ssh_list
 
 
 

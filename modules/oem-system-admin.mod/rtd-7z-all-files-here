@@ -85,7 +85,7 @@ Script_Documentation
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-dependency::_library ()
+dependency_library ()
 {
 	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/${LIBFILE}
 
@@ -106,7 +106,7 @@ dependency::_library ()
 }
 
 
-local::_help ()
+local_help ()
 {
 	echo -e "
 	This script compresses all files and folders individually found in the current folder. 
@@ -128,12 +128,12 @@ local::_help ()
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 if [[ $1 == "--help" ]]; then
-	local::_help
+	local_help
 	exit 0
 fi
 
 # Ensure access to the rtd library functions:
-dependency::_library || { echo -e "RTD functions NOT found!"; exit 1; }
+dependency_library || { echo -e "RTD functions NOT found!"; exit 1; }
 
 # call compression function with its default behavior...
 tool::compress_all_items_here || { write_error -e "Compression failed!"; exit 1; }
