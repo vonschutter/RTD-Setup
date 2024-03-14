@@ -32,11 +32,11 @@ _SCRIPTNAME="$(basename "$0")"
 # Set the log dir depending on if this script is being run as root or a user.
 if [[ "$UID" -eq 0 ]] ; then _LOG_DIR=/var/log/${_TLA,,}; else _LOG_DIR=~/.config/${_TLA,,}/log ; fi
 mkdir -p "${_LOG_DIR}"
-_LOGFILE="${_LOG_DIR}/$(date +%Y-%m-%d)-${_SCRIPTNAME}.log"
+_LOGFILE="${_LOG_DIR}/${_SCRIPTNAME}.log"
+echo "*********    $_SCRIPTNAME     ********** " >> "${_LOGFILE}"
 
 # Discover apps dir and save it...
-_APPS_DIR="$(dirname "$(readlink -f "$0")")/apps"
-
+_APPS_DIR="$(dirname ${BASH_SOURCE[0]})/apps"
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -218,8 +218,7 @@ display::oem_program_list ()
 			local n=1
 			local _proglist
 			_proglist="$(
-				for i in $(for file in "${_APPS_DIR}"/*.7z ; do echo "${file##*/}" ; done );
-				do 
+				for i in $(for file in "${_APPS_DIR}"/*.7z ; do echo "${file##*/}" ; done ); do 
 					echo  "${i::-3}"
 					((n=n+1)) 
 				done
@@ -255,6 +254,8 @@ display::oem_program_list ()
 
 
 dependency::file _rtd_library &>/dev/null
+system::log_item "Starting OEM Application Launcher..."
+system::log_item "Application directory: ${_APPS_DIR}"
 hash 7z &>/dev/null || check_dependencies p7zip
 hash wine &>/dev/null || check_dependencies wine
 hash md5sum &>/dev/null || (echo "I cannot start OEM apps without security validation software!" ; exit 1)

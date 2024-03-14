@@ -1,12 +1,12 @@
 :: --    --
-::                        Windows PowerShell Script
+::                        Windows CMD Script
 ::
 ::                         A D M I N   S C R I P T
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-::::::::::::::::::::::::::::::::::::::// OEM System Configuration Script //:::::::::::::::::::::::::// Windows//::::::::
+::::::::::::::::::::::::::::::::::::::// OEM System Configuration Script //:::::::::::::::::::::::::// Windows //:::::::
 ::
 :: Author:			Vonschutter
-:: Version: 			1.0
+:: Version: 		1.0
 ::
 ::
 :: Purpose: 	The purpose of the script is to:
