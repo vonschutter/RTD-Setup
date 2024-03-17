@@ -258,7 +258,7 @@ if [[ -n "${neofetch_file}" ]]; then
 fi
 
 
-# Prepare the system for auto task sequnce post build
+# Prepare the system for auto task sequence post build
 system::add_or_remove_login_script --add "/opt/rtd/core/rtd-oem-linux-config.sh"
 system::toggle_oem_auto_elevated_privilege --enable
 system::toggle_oem_auto_login --enable

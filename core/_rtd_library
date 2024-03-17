@@ -875,36 +875,116 @@ system::make_preseed_cfg ()
 	local _saveto="$( mktemp -d )"	# Where to save the preseed file
 	local _role="default"		# selects d-i preseed/late_command actions based on role.
 	local _task="ssh-server"	# Package selection: What DE to install, or ssh-server
-	unset _ask			# If set to "YES" then ask for user input to generate preseed file.
+	unset _ask
 
-	local OPTIND o a
-	while getopts ':r:p:t:a:' OPTION; do
-		case "$OPTION" in
-		r )
-			_role="${OPTARG}"
-			system::log_item "Using Config for: ${_role}"
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--saveto | --location | --path | --dir | --directory | -p )
+			local _saveto="$2"
+			write_host --cyan  "📜 Directed to create preseed instructions file: ${_saveto}/preseed.cfg"
+			shift
 		;;
-		p )
-			local _saveto="${OPTARG}"
-			write_information "Overriding default save location: ${_saveto} with user supplied: ${OPTARG}"
-			system::log_item  "Saving configuration instructions to: ${_saveto}"
-
+		--file | --preseed | --preseed_file | --preseed_cfg | --preseed_cfg_file | --preseed_file )
+			local _preseed_file="$2"
+			write_host --cyan  "📜 Directed to create preseed instructions file: ${_preseed_file}"
+			shift
 		;;
-		t )
-			local _task="${OPTARG}"
-			system::log_item "Received optioinal option: ${_task}"
+		--desktop_environment | --DE )
+			if [[ $2 == "gnome-desktop" || $2 == "kde-desktop" || $2 == "xfce-desktop" || $2 == "lxde-desktop" || $2 == "cinnamon-desktop" || $2 == "mate-desktop" || $2 == "lxqt-desktop" || $2 == "ubuntu-desktop" || $2 == "kubuntu-desktop" || $2 == "xubuntu-desktop" || $2 == "lubuntu-desktop" || $2 == "ubuntu-mate-desktop" || $2 == "ubuntu-budgie-desktop" ]] ; then
+				local _UserDesktopEnvironemtSelection="${2}"
+				write_host --cyan  "🖥️ Selecting desktop environment: ${_UserDesktopEnvironemtSelection}"
+			else
+				write_error "⛔ Unknown Desktop Environment: $2 ==> Use deepin-desktop-environment, sway-desktop-environment, basic-desktop-environment, i3-desktop-environment, developer-workstation-environment, budgie-desktop-environment, sugar-desktop-environment, mate-desktop-environment, kde-desktop-environment, xfce-desktop-environment, lxde-desktop-environment, lxqt-desktop-environment, cinnamon-desktop-environment, mate-desktop-environment, workstation-product-environment"
+				return 1
+			fi
+			shift
 		;;
-		a )
-			local _ask="${OPTARG}"
-			system::log_item "Received optioinal option: ${_ask}"
+		--server_role | --ServerRole | --SR )
+			if [[ $2 == "openssh-server" || $2 == "lamp-server" || $2 == "postfix" || $2 == "bind9" || $2 == "dnsmasq" || $2 == "dhcp-server" || $2 == "print-server" ]]  ; then
+				local _UserServerEnvironemtSelection="${2}"
+				write_status "🎭 Selecting server role: ${2}"
+			else
+				write_error "⛔ Unknown server role selection: ${2} ==> Use web-server-environment, freeipa-server, network-server, cloud-server-environment, infrastructure-server-environment"
+				return 1
+			fi
+			shift
 		;;
-		? )
-			write_error "Usage: $(FUNCNAME[0]) [-p <path> ] [-r server|desktop|minecraft ] [-t gnome-desktop | kde-desktop | ...-desktop | xfce-desktop | mate-desktop | cinnamon-desktop ]"
-			return 1
+		--role | --Role )
+			if [[ $2 == "workstation" || $2 == "desktop" || $2 == "server" ]] ; then
+				local _role="${2}"
+				write_status "🎭 Selecting role: ${2}"
+			else
+				write_error "⛔ Unknown role selection: ${2} ==> Use workstation or server"
+				return 1
+			fi
+			shift
+		;;
+		--ask | --prompt | --interactive )
+			if [[ $2 == "YES" || $2 == "yes" || $2 == "Yes" || $2 == "NO" || $2 == "No" || $2 == "no" ]] ; then
+				local _ask="${2}"
+				write_status "🤔 Prompting for configuration options..."
+			else
+				write_error "⛔ incorretc option: ${2} ==> Use YES or NO"
+				return 1
+			fi
+		;;
+		--source | --URL | --url )
+			local _repo_url="${2}"
+			write_status "🌐 Using URL: ${_repo_url}"
+			shift
+		;;
+		--timezone | --TZ )
+			local Preference_InitialTimeZone="${2}"
+			write_status "🕰️ Using Timezone: ${Preference_InitialTimeZone}"
+			shift
+		;;
+		--disk_encryption | --DC )
+			Preference_DiskEncryption="$2"
+			write_status "🔐 Disk encryption is requested and enabled."
+			shift
+		;;
+		--disk_password | --DP )
+			Preference_Disk_Password="$2"
+			write_status "🔐 Disk encryption password is set."
+			shift
+		;;
+		--initial_user | --IU )
+			Preference_InitialUser="$2"
+			write_status "👤 Initial user is set to: ${Preference_InitialUser}"
+			shift
+		;;
+		--initial_user_password | --IUP )
+			Preference_InitialUserPassword="$2"
+			write_status "🔐 Initial user password is set."
+			shift
+		;;
+		--help | -h )
+			write_information "Usage: system::generate_ks_cfg_file [-p <filename> ] [-u URL ] [-c workstation|ssh-server|ansible-server ]"
+			return 0
+		;;
+		*)
+			write_error "Unknown parameter: $1"
 		;;
 		esac
+		shift 
 	done
-	unset OPTIND
+
+	system::log_item "Role: ${_role} | Desktop: ${_UserDesktopEnvironemtSelection} | Server: ${_UserServerEnvironemtSelection} | Ask: ${_ask} | Save to: ${_saveto}"
+	system::log_item "Transferring standard selections _role to the preseed file multiselect option..."
+	case "${_role}" in
+		workstation | desktop )
+			_task="${_UserDesktopEnvironemtSelection:="gnome-desktop"}"
+			system::log_item "Setting multiselect _task to: ${_task} because the primary purpose is to be a VDI or Desktop"
+		;;
+		server )
+			_task="${_UserServerEnvironemtSelection:="ssh-server"}"
+			system::log_item "Setting multiselect _task to: ${_task} because the primary purpose is to be a server"
+		;;
+		* )
+			write_error "Unable to set _task for PREESEED file: (${_task})"
+			return 1
+		;;
+	esac
 
 	export PRESEED_FILE="${_saveto}/preseed.cfg"	# The name of the preseed file to be created
 	export TASK_FILE="${_saveto}/task.sh"		# The name of the task file to be created (if needed)
@@ -3016,8 +3096,14 @@ system::add_or_remove_login_script() {
 			fi
 		;;
 		--add)
-			if [[ -e "$script_path" ]]; then
-				write_information "📜 Adding execution on login of (${script_path})"
+			if hash /usr/bin/xterm 2>/dev/null ; then
+				write_information "📜 Adding execution on login of (${script_path}) with xterm"
+				if ! printf '[Desktop Entry]\nType=Application\nExec=/usr/bin/xterm -e "sudo -E %s"\nTerminal=false\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
+					write_error "🚫 Failed to create file: ${file_path}"
+					return 1
+				fi
+			else
+				write_information "📜 Adding execution on login of (${script_path}) in default term"
 				if ! printf '[Desktop Entry]\nType=Application\nExec=sudo -E %s\nTerminal=true\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
 					write_error "🚫 Failed to create file: ${file_path}"
 					return 1
@@ -3033,15 +3119,18 @@ system::add_or_remove_login_script() {
 					return 1
 				fi
 			else
-				if [[ -e "$script_path" ]]; then
+				if hash xterm 2>/dev/null ; then
+					write_information "📜 Adding execution on login of (${script_path})"
+					if ! printf '[Desktop Entry]\nType=Application\nExec=xterm -e "sudo -E %s"\nTerminal=false\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
+						write_error "🚫 Failed to create file: ${file_path}"
+						return 1
+					fi
+				else
 					write_information "📜 Adding execution on login of (${script_path})"
 					if ! printf '[Desktop Entry]\nType=Application\nExec=sudo -E %s\nTerminal=true\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
 						write_error "🚫 Failed to create file: ${file_path}"
 						return 1
 					fi
-				else
-					write_error "🚫 Login script not found: ${script_path}"
-					return 1
 				fi
 			fi
 		;;
@@ -5114,7 +5203,7 @@ system::download_and_manipulate_iso_debian() {
 
 	# Load the installation answers template.
 	write_status "Getting intall instructions template... "
-	system::make_preseed_cfg -a ask -p "$tmp_initrd_dir/" -r $_role || ( write_error "Failed to create preseed.cfg template" ; dialog::display_error "Something went wrong, please chack the logfile $_LOGFILE" )
+	system::make_preseed_cfg -a ask -p "$tmp_initrd_dir" -r $_role || ( write_error "Failed to create preseed.cfg template" ; dialog::display_error "Something went wrong, please chack the logfile $_LOGFILE" )
 
 
 	# ----------------------- Modify Boot Media --------------------------- #
@@ -9977,7 +10066,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	if [[ ${tgt_ubuntu_ver::2} -lt 23 ]] ; then
 
 		system::log_item "🐧 Ubuntu version ${tgt_ubuntu_ver}: is less than 23, so using debian installer (d-i) and desktop media..."
-		system::make_preseed_cfg -r ${_role} -p ${_saveto} -t ${_flavor}
+		system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --desktop_environment ${_flavor}
 		system::log_item "🔎 Issuing search command: system::rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} ${_role}"
 
 		: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} live)}
@@ -10709,7 +10798,7 @@ template::preseed_cfg::main() {
 		# language is used for display and formats. Comparable to
 		# the MUI in Microsoft environments.
 		d-i debian-installer/locale string en_US.UTF-8
-		d-i localechooser/supported-locales multiselect en_US.UTF-8, sv_SE.UTF-8
+		d-i localechooser/supported-locales multiselect en_US.UTF-8
 		d-i console-setup/ask_detect boolean false
 
 		# --------------------------------------------------- #
@@ -10785,10 +10874,10 @@ template::preseed_cfg::main() {
 		# The "OEM" line below ist to make it simple to replace the 
 		# line with a relevant chice of debian role using "sed" or similar.
 		tasksel tasksel/first multiselect ${_task}
-		d-i pkgsel/include string dialog p7zip-full virt-what curl wget spice-vdagent git
+		d-i pkgsel/include string ${_task} dialog p7zip-full virt-what curl wget spice-vdagent git xterm
 
 		# Valid choices for pkgsel/upgrade are: safe-upgrade full-upgrade none
-		d-i pkgsel/upgrade select safe-upgrade
+		d-i pkgsel/upgrade select none
 		d-i pkgsel/update-policy select unattended-upgrades
 
 		# By default, the system’s locate database will be updated after the
@@ -10969,6 +11058,9 @@ template::preseed_cfg::late_command() {
 			# for Debian to work (ignored by Ubuntu)...
 			${_d_i_post_statment_ubunto_or_deb} \
 			in-target apt-get -y install git ; \
+			in-target apt-get -y install xterm ; \
+			in-target apt-get -y install ${_task} dialog p7zip-full virt-what curl wget spice-vdagent ; \
+			in-target sh -c 'gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'us') ]"' ; \
 			in-target /usr/bin/git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
 			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
 			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
@@ -10976,6 +11068,7 @@ template::preseed_cfg::late_command() {
 			in-target mkdir -p /home/${Preference_InitialUser}/.ssh ; \
 			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /root/.ssh/authorized_keys" ; \
 			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /home/${Preference_InitialUser}/.ssh/authorized_keys" ; \
+			in-target /bin/sh -c "chown -R ${Preference_InitialUser} /home/${Preference_InitialUser}/.ssh"  ; \
 			cp /*.cfg /target/opt/rtd/ ; \
 			umount -l /media || echo "Empty" ; \
 			eject || true; \
