@@ -10798,7 +10798,7 @@ template::preseed_cfg::main() {
 		# language is used for display and formats. Comparable to
 		# the MUI in Microsoft environments.
 		d-i debian-installer/locale string en_US.UTF-8
-		d-i localechooser/supported-locales multiselect en_US.UTF-8
+		d-i localechooser/supported-locales multiselect en_US.UTF-8, ${Preference_InitialLanguage}.UTF-8
 		d-i console-setup/ask_detect boolean false
 
 		# --------------------------------------------------- #
@@ -11060,7 +11060,7 @@ template::preseed_cfg::late_command() {
 			in-target apt-get -y install git ; \
 			in-target apt-get -y install xterm ; \
 			in-target apt-get -y install ${_task} dialog p7zip-full virt-what curl wget spice-vdagent ; \
-			in-target sh -c 'gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'us') ]"' ; \
+			in-target echo "LC_ALL=${Preference_InitialLanguage}.UTF-8" >> /etc/default/locale ; \
 			in-target /usr/bin/git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
 			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
 			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
