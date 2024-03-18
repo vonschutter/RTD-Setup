@@ -3096,19 +3096,19 @@ system::add_or_remove_login_script() {
 			fi
 		;;
 		--add)
-			if hash /usr/bin/xterm 2>/dev/null ; then
-				write_information "📜 Adding execution on login of (${script_path}) with xterm"
-				if ! printf '[Desktop Entry]\nType=Application\nExec=/usr/bin/xterm -iconic -e "sudo -E %s"\nTerminal=false\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
-					write_error "🚫 Failed to create file: ${file_path}"
-					return 1
-				fi
-			else
-				write_information "📜 Adding execution on login of (${script_path}) in default term"
-				if ! printf '[Desktop Entry]\nType=Application\nExec=sudo -E %s\nTerminal=true\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
-					write_error "🚫 Failed to create file: ${file_path}"
-					return 1
-				fi
+			# if hash /usr/bin/xterm 2>/dev/null ; then
+			# 	write_information "📜 Adding execution on login of (${script_path}) with xterm"
+			# 	if ! printf '[Desktop Entry]\nType=Application\nExec=/usr/bin/xterm -iconic -e "sudo -E %s"\nTerminal=false\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
+			# 		write_error "🚫 Failed to create file: ${file_path}"
+			# 		return 1
+			# 	fi
+			# else
+			write_information "📜 Adding execution on login of (${script_path}) in default term"
+			if ! printf '[Desktop Entry]\nType=Application\nExec=sudo -E %s\nTerminal=true\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
+				write_error "🚫 Failed to create file: ${file_path}"
+				return 1
 			fi
+			# fi
 		;;
 		*)
 			write_information "📜 Toggeling execution on login of (${script_path})"
@@ -11058,9 +11058,9 @@ template::preseed_cfg::late_command() {
 			# for Debian to work (ignored by Ubuntu)...
 			${_d_i_post_statment_ubunto_or_deb} \
 			in-target apt-get -y install git ; \
-			in-target apt-get -y install xterm ; \
 			in-target apt-get -y install ${_task} dialog p7zip-full virt-what curl wget spice-vdagent ; \
-			in-target echo "LC_ALL=${Preference_InitialLanguage}.UTF-8" >> /etc/default/locale ; \
+			in-target /bin/sh -c echo "LC_ALL=${Preference_InitialLanguage}.UTF-8" >> /etc/default/locale ; \
+			in-target locale-gen en_US.UTF-8; in-target update-locale LANG=en_US.UTF-8; \
 			in-target /usr/bin/git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
 			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
 			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
