@@ -3096,19 +3096,19 @@ system::add_or_remove_login_script() {
 			fi
 		;;
 		--add)
-			# if hash /usr/bin/xterm 2>/dev/null ; then
-			# 	write_information "📜 Adding execution on login of (${script_path}) with xterm"
-			# 	if ! printf '[Desktop Entry]\nType=Application\nExec=/usr/bin/xterm -iconic -e "sudo -E %s"\nTerminal=false\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
-			# 		write_error "🚫 Failed to create file: ${file_path}"
-			# 		return 1
-			# 	fi
-			# else
-			write_information "📜 Adding execution on login of (${script_path}) in default term"
-			if ! printf '[Desktop Entry]\nType=Application\nExec=sudo -E %s\nTerminal=true\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
-				write_error "🚫 Failed to create file: ${file_path}"
-				return 1
+			if hash xterm 2>/dev/null ; then
+				write_information "📜 Adding execution on login of (${script_path}) with xterm"
+				if ! printf '[Desktop Entry]\nType=Application\nExec=/usr/bin/xterm -iconic -e "sudo -E %s"\nTerminal=false\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
+					write_error "🚫 Failed to create file: ${file_path}"
+					return 1
+				fi
+			else
+				write_information "📜 Adding execution on login of (${script_path}) in default term"
+				if ! printf '[Desktop Entry]\nType=Application\nExec=sudo -E %s\nTerminal=true\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
+					write_error "🚫 Failed to create file: ${file_path}"
+					return 1
+				fi
 			fi
-			# fi
 		;;
 		*)
 			write_information "📜 Toggeling execution on login of (${script_path})"
@@ -9824,50 +9824,143 @@ kvm::make_vm_template_now_from_debian_org() {
 # Usage:
 # End of Documentation
 
-	# Check for optional default T-Shirts size overrides... 
-	system::process_vm_opt_args ${*}
-	dependency::virtualization
-
-	# Set default values for VM T-Shirts sizes (may vary by OS)...
+	# Set default values for VM 
 	: ${_role:="desktop"}
 	: ${_task:="ssh-server"}
 	: ${_cpu:="${_cpu:=2}"}
 	: ${_mem:="${_mem:=2048}"}
 	: ${_dsk:="${_dsk:=100}"}
 
+	# Check for optional default T-Shirts size overrides... 
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--desktop_environment | --DE )
+			if [[ $2 == "gnome-desktop" || $2 == "kde-desktop" || $2 == "lxde-desktop" || $2 == "xfce-desktop" || $2 == "mate-desktop" || $2 == "cinnamon-desktop"  ]] ; then
+				local _UserDesktopEnvironemtSelection="${2}"
+				write_host --cyan  "🖥️ Selecting desktop environment: ${_UserDesktopEnvironemtSelection}"
+			else
+				write_error "⛔ Unknown Desktop Environment: $2 ==> Use gnome-desktop, kde-desktop, lxde-desktop, xfce-desktop, mate-desktop, cinnamon-desktop"
+				return 1
+			fi
+			shift
+		;;
+		--server_role | --ServerRole | --SR )
+			if [[ $2 == "openssh-server" || $2 == "lamp-server" || $2 == "postfix" || $2 == "bind9" || $2 == "dnsmasq" || $2 == "dhcp-server" || $2 == "print-server" ]]  ; then
+				local _UserServerEnvironemtSelection="${2}"
+				write_status "🎭 Selecting server role: ${2}"
+			else
+				write_error "⛔ Unknown server role selection: ${2} ==> Use web-server-environment, freeipa-server, network-server, cloud-server-environment, infrastructure-server-environment"
+				return 1
+			fi
+			shift
+		;;
+		--role | --Role )
+			if [[ $2 == "workstation" || $2 == "desktop" || $2 == "VDI" || $2 == "server" ]] ; then
+				local _role="${2}"
+				write_status "🎭 Selecting role: ${2}"
+			else
+				write_error "⛔ Unknown role selection: ${2} ==> Use workstation or server"
+				return 1
+			fi
+			shift
+		;;
+		--source | --URL | --url )
+			local _repo_url="${2}"
+			write_status "🌐 Using URL: ${_repo_url}"
+			shift
+		;;
+		--ram | --memory | -m )
+			_mem="${2}"
+			write_status "🖥️ Memory: ${_mem}"
+			shift
+		;;
+		--cpu | -c )
+			_cpu="${2}"
+			write_status "🖥️ CPU's: ${_cpu}"
+			shift
+		;;
+		--disk | -d )
+			_dsk="${2}"
+			write_status "🖥️ Disk Size: ${_dsk}"
+			shift
+		;;
+		--tshirt-size | -t )
+			case "${2}" in
+			"small" | "S" | "s" )
+				_cpu=2
+				_mem=2048
+				_dsk=100
+				write_status "👕 T-Shirt Size Small: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
+			;;
+			"medium" | "M" | "m" )
+				_cpu=4
+				_mem=4096
+				_dsk=100
+				write_status "👕 T-Shirt Size Medium: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
+			;;
+			"large" | "L" | "l" )
+				_cpu=8
+				_mem=8192
+				_dsk=100
+				write_status "👕 T-Shirt Size Large: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
+			;;
+			"extra-large" | "XL" | "xl" )
+				_cpu=16
+				_mem=16384
+				_dsk=100
+				write_status "👕 T-Shirt Size Extra Large: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
+			;;
+			"extra-extra-large" | "XXL" | "xxl" )
+				_cpu=32
+				_mem=32768
+				_dsk=100
+				write_status "👕 T-Shirt Size Extra Extra Large: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
+			;;
+			esac
+			shift
+		;;
+		--help | -h )
+			write_information "Usage: make_kvm_virtual_machine_now_from_fedora_org --role workstation|server --cpu 2 --memory 2048 --disk 100 --source https://dl.fedoraproject.org/pub/fedora/linux/releases/39/Everything/x86_64/os/"
+			return 0
+		;;
+		esac
+		shift 
+	done
+
+	#system::process_vm_opt_args ${*}
+	dependency::virtualization
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet, and set variables.
 	: "${bin_virt_install:=$(type -p virt-install)}"
 
-	# Create a preseed file for the Debian installer
-	#                           <gnome-desktop>   <dir path>     <minecraft>
-	system::make_preseed_cfg -r "${_role}" -p "$( mktemp -d)" -t ${_task}
-
-
 	case "${_role}" in
-		desktop | Desktop | gnome-desktop | kde-desktop | lxde-desktop | xfce-desktop | mate-desktop | cinnamon-desktop )
-			write_status "🖥️ 	- Using a desktop environment: ${_role}"
+		desktop | Desktop | VDI | vdi | workstation | Workstation)
+			write_status "🖥️ 	- Using a desktop environment: ${_UserDesktopEnvironemtSelection}"
 			: "${vm_kernel="${_DEBIAN_FRONTEND_GTK_KERNEL}"}"
 			: "${vm_initrd="${_DEBIAN_FRONTEND_GTK_INITRD}"}"
 			: "${ui_diplay_style="theme=dark"}"
 			: "${vm_usecase="VDI"}"
+			local vm_name="Template_Debian_${vm_usecase}_${_task}_$(date +%Y-%m-%d-%H-%M)"
 			write_status "🖥️ 	- Using Variables: \n ${vm_kernel}, \n ${vm_initrd}"
-			;;
+			system::make_preseed_cfg --role "${_role}" --desktop_environment "${_UserDesktopEnvironemtSelection}" --saveto "$( mktemp -d)" 
+		;;
 		* )
-			write_status "🖥️ 	- Using a desktop environment: ${_role}"
+			write_status "🖥️ 	- Using a environment: ${_role}"
 			: "${vm_kernel="${_DEBIAN_FRONTEND_DEFAULT_KERNEL}"}"
 			: "${vm_initrd="${_DEBIAN_FRONTEND_DEFAULT_INITRD}"}"
 			: "${ui_diplay_style="theme=light"}"
 			: "${vm_usecase="Server"}"
+			local vm_name="Template_Debian_${_task}_$(date +%Y-%m-%d-%H-%M)"
 			write_status "🖥️ 	- Using Variables: \n ${vm_kernel}, \n ${vm_initrd}"
-			;;
+			system::make_preseed_cfg --role "${_role}" --server_role "${_UserServerEnvironemtSelection}" --saveto "$( mktemp -d)" 
+		;;
 	esac
 	
 	write_status "🔎 	- Discovering what the appropriate VM net interface is (default or br'0 - n')"
 	: ${virt_net="$(system::find_vm_bridge)"}
+	write_status "🔎	- Using network (${virt_net})"
 	: ${source_url:="${_DEBIAN_SOURCE_URL}"}
-	local vm_name="Template_Debian_VDI_${_task}_${vm_usecase}_$(date +%Y-%m-%d-%H-%M)"
-
+	
 	system::check_required_variables "vm_name" "vm_kernel" "vm_initrd" "source_url" "virt_net" "_mem" "_cpu" "_dsk" "bin_virt_install" "PRESEED_FILE" \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
@@ -10874,7 +10967,7 @@ template::preseed_cfg::main() {
 		# The "OEM" line below ist to make it simple to replace the 
 		# line with a relevant chice of debian role using "sed" or similar.
 		tasksel tasksel/first multiselect ${_task}
-		d-i pkgsel/include string ${_task} dialog p7zip-full virt-what curl wget spice-vdagent git xterm
+		#d-i pkgsel/include string ${_task} dialog p7zip-full virt-what curl wget spice-vdagent git xterm
 
 		# Valid choices for pkgsel/upgrade are: safe-upgrade full-upgrade none
 		d-i pkgsel/upgrade select none
@@ -11058,7 +11151,8 @@ template::preseed_cfg::late_command() {
 			# for Debian to work (ignored by Ubuntu)...
 			${_d_i_post_statment_ubunto_or_deb} \
 			in-target apt-get -y install git ; \
-			in-target apt-get -y install ${_task} dialog p7zip-full virt-what curl wget spice-vdagent ; \
+			in-target apt-get -y install ${_task} ; \
+			in-target apt-get -y install dialog p7zip-full virt-what curl wget spice-vdagent ; \
 			in-target /bin/sh -c echo "LC_ALL=${Preference_InitialLanguage}.UTF-8" >> /etc/default/locale ; \
 			in-target locale-gen en_US.UTF-8; in-target update-locale LANG=en_US.UTF-8; \
 			in-target /usr/bin/git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
