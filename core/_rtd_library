@@ -3498,6 +3498,18 @@ system::toggle_oem_auto_login() {
 			;;
 		esac
 	fi
+
+	if [[ -z $_config_file ]] ; then
+		write_error "❗🚫 No display manager found to toggle auto login!"
+		write_error "trying sddm, lightdm, gdm3, gdm, and suse..."
+		cat > ${_config_file} <<-OEM_SDDM_LOGIN_OPTION
+		# This configuration file was created by RTD Setup.
+		[Autologin]
+		User=${_OEM_USER:-"tangarora"}
+		Session=plasma.desktop
+		OEM_SDDM_LOGIN_OPTION
+		return 0
+	fi
 }
 
 
@@ -9940,7 +9952,7 @@ kvm::make_vm_template_now_from_debian_org() {
 			: "${vm_initrd="${_DEBIAN_FRONTEND_GTK_INITRD}"}"
 			: "${ui_diplay_style="theme=dark"}"
 			: "${vm_usecase="VDI"}"
-			local vm_name="Template_Debian_${vm_usecase}_${_task}_$(date +%Y-%m-%d-%H-%M)"
+			local vm_name="Template_Debian_${vm_usecase}_${_UserDesktopEnvironemtSelection}_$(date +%Y-%m-%d-%H-%M)"
 			write_status "🖥️ 	- Using Variables: \n ${vm_kernel}, \n ${vm_initrd}"
 			system::make_preseed_cfg --role "${_role}" --desktop_environment "${_UserDesktopEnvironemtSelection}" --saveto "$( mktemp -d)" 
 		;;
