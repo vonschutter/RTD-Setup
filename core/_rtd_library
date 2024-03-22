@@ -3098,7 +3098,7 @@ system::add_or_remove_login_script() {
 		--add)
 			if hash xterm 2>/dev/null ; then
 				write_information "📜 Adding execution on login of (${script_path}) with xterm"
-				if ! printf '[Desktop Entry]\nType=Application\nExec=/usr/bin/xterm -iconic -e "sudo -E %s"\nTerminal=false\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
+				if ! printf '[Desktop Entry]\nType=Application\nExec=/usr/bin/xterm -iconic -fa 'Monospace' -fs 12 -e "sudo -E %s"\nTerminal=false\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
 					write_error "🚫 Failed to create file: ${file_path}"
 					return 1
 				fi
@@ -13189,7 +13189,7 @@ write_error() {
 		fi
 	else
 		if [[ -n "${text}" ]]; then
-			echo -e "$(tput bold; tput setaf 1)🧩 💥 ${FUNCNAME[1]}: ${text}${Color_Off}"
+			echo -e "$(tput bold; tput setaf 1)🧩 💥 ${FUNCNAME[1]}: ${text}$(tput sgr0)"
 		fi
 	fi
 
@@ -13217,7 +13217,7 @@ write_warning() {
 	if [[ "${TERMUITXT}" == "nocolor" ]]; then
 		[ -n "${text}" ] && echo "🧩 ⚠ ${FUNCNAME[1]}: ${text}"
 	else
-		[ -n "${text}" ] && echo -e "${yellow}🧩 ⚠ ${FUNCNAME[1]}: ${text}${Color_Off}"
+		[ -n "${text}" ] && echo -e "$(tput bold; tput setaf 3)🧩 ⚠  ${FUNCNAME[1]}: ${text}$(tput sgr0)"
 	fi
 
 	# Tell the loging function to log the message requested...
@@ -13244,7 +13244,7 @@ write_status() {
 	if [[ "${TERMUITXT}" == "nocolor" ]] ; then
 		[ -n "${text}" ] && echo "🧩 ✓ ${FUNCNAME[1]}: ${text}"
 	else
-		[ -n "${text}" ] && echo -e "${green}🧩 ✓ ${FUNCNAME[1]}: ${text}${Color_Off}"
+		[ -n "${text}" ] && echo -e "$(tput bold; tput setaf 2)🧩 ✓ ${FUNCNAME[1]}: ${text}$(tput sgr0)"
 	fi
 
 	# Tell the loging function to log the message requested...
@@ -13271,7 +13271,7 @@ write_information() {
 	if [[ "${TERMUITXT}" == "nocolor" ]] ; then
 		[ -n "${text}" ] && echo -e "🧩 ℹ ${FUNCNAME[1]}: ${text}"
 	else
-		[ -n "${text}" ] && echo -e "${blue}🧩 ℹ ${FUNCNAME[1]}: ${text}${Color_Off}"
+		[ -n "${text}" ] && echo -e "$(tput bold; tput setaf 4)🧩 ℹ ${FUNCNAME[1]}: ${text}$(tput sgr0)"
 	fi
 
 	# Tell the loging function to log the message requested...
