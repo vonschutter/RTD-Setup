@@ -3322,6 +3322,7 @@ system::toggle_oem_auto_login() {
 			OEM_LXDM_LOGIN_OPTION
 			;;
 		esac
+		local toggle=done
 	fi
 
 	# Toggle auto login for SDDM if present (Kubuntu, SUSE, KDE Based DE's)
@@ -3351,6 +3352,7 @@ system::toggle_oem_auto_login() {
 			OEM_SDDM_LOGIN_OPTION
 			;;
 		esac
+		local toggle=done
 	fi
 
 	# Toggle auto login for GDM3 if present (Ubuntu, default etc.)
@@ -3380,6 +3382,7 @@ system::toggle_oem_auto_login() {
 			OEM_GDM3_LOGIN_OPTION
 			;;
 		esac
+		local toggle=done
 	fi
 
 	# Toggle auto login for GDM3 if present (Debian and others...)
@@ -3409,6 +3412,7 @@ system::toggle_oem_auto_login() {
 			OEM_GDM3_LOGIN_OPTION
 			;;
 		esac
+		local toggle=done
 	fi
 
 	# Toggle auto login for GDM per gnome standard (Fedora et. al.)
@@ -3449,6 +3453,7 @@ system::toggle_oem_auto_login() {
 			OEM_GDM_LOGIN_OPTION
 			;;
 		esac
+		local toggle=done
 	fi
 
 	# Special case for SUSE...
@@ -3470,6 +3475,7 @@ system::toggle_oem_auto_login() {
 			sed -i 's/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="no"/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"/' ${_config_file} || write_error "❗📄 Could not write to file: ${_config_file}!"
 			;;
 		esac
+		local toggle=done
 	fi
 
 
@@ -3499,7 +3505,7 @@ system::toggle_oem_auto_login() {
 		esac
 	fi
 
-	if [[ -z $_config_file ]] ; then
+	if [[ -z $toggle ]] ; then
 		write_error "❗🚫 No display manager found to toggle auto login!"
 		write_error "trying sddm, lightdm, gdm3, gdm, and suse..."
 		cat > ${_config_file} <<-OEM_SDDM_LOGIN_OPTION
@@ -3508,6 +3514,7 @@ system::toggle_oem_auto_login() {
 		User=${_OEM_USER:-"tangarora"}
 		Session=plasma.desktop
 		OEM_SDDM_LOGIN_OPTION
+		unset toggle
 		return 0
 	fi
 }
