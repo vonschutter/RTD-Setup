@@ -959,7 +959,7 @@ system::make_preseed_cfg ()
 			shift
 		;;
 		--help | -h )
-			write_information "Usage: system::generate_ks_cfg_file [-p <filename> ] [-u URL ] [-c workstation|ssh-server|ansible-server ]"
+			write_information "Usage: ${FUNCNAME[0]} [-p <filename> ] [-u URL ] [-c workstation|ssh-server|ansible-server ]"
 			return 0
 		;;
 		*)
@@ -3098,7 +3098,7 @@ system::add_or_remove_login_script() {
 		--add)
 			if hash xterm 2>/dev/null ; then
 				write_information "📜 Adding execution on login of (${script_path}) with xterm"
-				if ! printf '[Desktop Entry]\nType=Application\nExec=/usr/bin/xterm -iconic -fa 'Monospace' -fs 12 -e "sudo -E %s"\nTerminal=false\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
+				if ! printf '[Desktop Entry]\nType=Application\nExec=/usr/bin/xterm -fa 'Monospace' -fs 10 -e "sudo -E %s"\nTerminal=false\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" > /dev/null; then
 					write_error "🚫 Failed to create file: ${file_path}"
 					return 1
 				fi
@@ -9540,7 +9540,7 @@ make_kvm_virtual_machine_now_from_fedora_org() {
 			shift
 		;;
 		--help | -h )
-			write_information "Usage: make_kvm_virtual_machine_now_from_fedora_org --role workstation|server --cpu 2 --memory 2048 --disk 100 --source https://dl.fedoraproject.org/pub/fedora/linux/releases/39/Everything/x86_64/os/"
+			write_information "Usage: ${FUNCNAME[0]} --role workstation|server --cpu 2 --memory 2048 --disk 100 --source https://dl.fedoraproject.org/pub/fedora/linux/releases/39/Everything/x86_64/os/"
 			return 0
 		;;
 		*)
@@ -9940,7 +9940,7 @@ kvm::make_vm_template_now_from_debian_org() {
 			shift
 		;;
 		--help | -h )
-			write_information "Usage: make_kvm_virtual_machine_now_from_fedora_org --role workstation|server --cpu 2 --memory 2048 --disk 100 --source https://dl.fedoraproject.org/pub/fedora/linux/releases/39/Everything/x86_64/os/"
+			write_information "Usage: ${FUNCNAME[0]} --role workstation|server --cpu 2 --memory 2048 --disk 100 --source https://dl.fedoraproject.org/pub/fedora/linux/releases/39/Everything/x86_64/os/"
 			return 0
 		;;
 		esac
@@ -10987,7 +10987,7 @@ template::preseed_cfg::main() {
 		# The "OEM" line below ist to make it simple to replace the 
 		# line with a relevant chice of debian role using "sed" or similar.
 		tasksel tasksel/first multiselect ${_task}
-		#d-i pkgsel/include string ${_task} dialog p7zip-full virt-what curl wget spice-vdagent git xterm
+		#d-i pkgsel/include string ${_task} dialog p7zip-full 
 
 		# Valid choices for pkgsel/upgrade are: safe-upgrade full-upgrade none
 		d-i pkgsel/upgrade select none
@@ -11172,7 +11172,9 @@ template::preseed_cfg::late_command() {
 			${_d_i_post_statment_ubunto_or_deb} \
 			in-target apt-get -y install git ; \
 			in-target apt-get -y install ${_task} ; \
-			in-target apt-get -y install dialog p7zip-full virt-what curl wget spice-vdagent ; \
+			in-target apt-get -y install dialog p7zip-full virt-what curl wget ; \
+			in-target apt-get -y install spice-vdagent qemu-guest-agent ; \
+			in-target apt-get -y install neofetch ; \
 			in-target /bin/sh -c echo "LC_ALL=${Preference_InitialLanguage}.UTF-8" >> /etc/default/locale ; \
 			in-target locale-gen en_US.UTF-8; in-target update-locale LANG=en_US.UTF-8; \
 			in-target /usr/bin/git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
