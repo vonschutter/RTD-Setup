@@ -894,7 +894,7 @@ system::make_preseed_cfg ()
 				local _UserDesktopEnvironemtSelection="${2}"
 				write_host --cyan  "🖥️ Selecting desktop environment: ${_UserDesktopEnvironemtSelection}"
 			else
-				write_error "⛔ Unknown Desktop Environment: $2 ==> Use deepin-desktop-environment, sway-desktop-environment, basic-desktop-environment, i3-desktop-environment, developer-workstation-environment, budgie-desktop-environment, sugar-desktop-environment, mate-desktop-environment, kde-desktop-environment, xfce-desktop-environment, lxde-desktop-environment, lxqt-desktop-environment, cinnamon-desktop-environment, mate-desktop-environment, workstation-product-environment"
+				write_error "⛔ Unknown Desktop Environment: $2 ==> Use deepin-desktop-environment, sway-desktop-environment, basic-desktop-environment, i3-desktop-environment, developer-workstation-environment, budgie-desktop-environment, sugar-desktop-environment, mate-desktop-environment, kde-desktop-environment, xfce-desktop-environment, lxde-desktop-environment, lxqt-desktop-environment, cinnamon-desktop-environment, mate-desktop-environment, workstation-product-environment, ubuntu-desktop, kubuntu-desktop, xubuntu-desktop, lubuntu-desktop, ubuntu-mate-desktop, ubuntu-budgie-desktop" 
 				return 1
 			fi
 			shift
@@ -904,7 +904,7 @@ system::make_preseed_cfg ()
 				local _UserServerEnvironemtSelection="${2}"
 				write_status "🎭 Selecting server role: ${2}"
 			else
-				write_error "⛔ Unknown server role selection: ${2} ==> Use web-server-environment, freeipa-server, network-server, cloud-server-environment, infrastructure-server-environment"
+				write_error "⛔ Unknown server role selection: ${2} ==> Use web-server-environment, freeipa-server, network-server, cloud-server-environment, infrastructure-server-environment or print-server-environment"
 				return 1
 			fi
 			shift
@@ -3834,6 +3834,48 @@ system::rtd_oem_find_live_release() {
 	local distro_flavor="${2:-debian}"
 	local live_or_not="${3:-live}"
 	local desktop_env="${4:-standard}"
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--server|-s)
+			live_or_not="server"
+			system::log_item "🐧 Requested [server]..."
+			shift
+			;;
+		--netinst|-n)
+			live_or_not="netinst"
+			system::log_item "🐧 Requested [netinst]..."
+			shift
+			;;
+		--mini|-m)
+			live_or_not="mini"
+			system::log_item "🐧 Requested [mini]..."
+			shift
+			;;
+		--desktop|-d)
+			live_or_not="desktop"
+			system::log_item "🐧 Requested [desktop]..."
+			shift
+			;;
+		--distribution|-dist)
+			distro_flavor="$2"
+			system::log_item "🐧 Requested distribution [$2]..."
+			shift
+			;;
+		--version|-v)
+			distro_version="$2"
+			system::log_item "🐧 Requested version [$2]..."
+			shift
+			;;
+		--help|-h)
+			echo "Usage: system::rtd_oem_find_live_release --distribution <debian|ubuntu> --version <version number> --server --desktop "
+			return 0
+			;;
+		*)
+			shift
+		;;
+		esac
+	done
 
 	case "$distro_flavor" in
 	Ubuntu | ubuntu | ubuntu-desktop | Ubuntu-desktop)
@@ -10092,7 +10134,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 # End of Documentation
 
 	# Set default values for VM T-Shirts sizes (may vary by OS)...
-	: ${ubuntu_flavor="ubuntu"} 				# This is the default flavor of Ubuntu to use.
+	: ${ubuntu_flavor="ubuntu"} 				        # This is the default flavor of Ubuntu to use.
 	: ${_role:="server"} 					# This is the default role of the Ubuntu VM to create.
 	: ${_task:="ubuntu-desktop"} 				# This is the default task to perform on the Ubuntu VM.
 	: ${_cpu:="${_cpu:=2}"} 				# This is the default number of CPUs to use.
@@ -10107,34 +10149,109 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	# Check for optional parameters overrides...
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
-		--ram)
-			ram="$2"
-			shift # Remove argument name from processing
+		--saveto | --location | --path | --dir | --directory | -p )
+			local _saveto="$2"
+			write_host --cyan  "📜 Directed to create preseed instructions file: ${_saveto}/preseed.cfg"
+			shift
 		;;
-		--cpus | --cpu )
-			cpu="$2"
-			shift # Remove argument name from processing
-		;;
-		--disk | --dsk )
-			disk="$2"
-			shift # Remove argument name from processing
+		--file | --preseed | --preseed_file | --preseed_cfg | --preseed_cfg_file | --preseed_file )
+			local _preseed_file="$2"
+			write_host --cyan  "📜 Directed to create preseed instructions file: ${_preseed_file}"
+			shift
 		;;
 		--flavor | --Flavor )
 			# Ubuntu flavor to use (e.g. ubuntu, kubuntu, lubuntu, xubuntu, etc.)
 			local _flavor="$2"
 			shift # Remove argument name from processing
 		;;
+		--desktop_environment | --DE )
+			if [[ $2 == "ubuntu-desktop" || $2 == "kubuntu-desktop" || $2 == "xubuntu-desktop" || $2 == "lubuntu-desktop" || $2 == "ubuntu-mate-desktop" || $2 == "ubuntu-budgie-desktop" ]] ; then
+				local _UserDesktopEnvironemtSelection="${2}"
+				write_host --cyan  "🖥️ Selecting desktop environment: ${_UserDesktopEnvironemtSelection}"
+			else
+				write_error "⛔ Unknown Desktop Environment: $2 ==> Use ubuntu-desktop, kubuntu-desktop, xubuntu-desktop, lubuntu-desktop, ubuntu-mate-desktop, ubuntu-budgie-desktop"
+				return 1
+			fi
+			shift
+		;;
+		--server_role | --ServerRole | --SR )
+			if [[ $2 == "openssh-server" || $2 == "lamp-server" || $2 == "postfix" || $2 == "bind9" || $2 == "dnsmasq" || $2 == "dhcp-server" || $2 == "print-server" ]]  ; then
+				local _UserServerEnvironemtSelection="${2}"
+				write_status "🎭 Selecting server role: ${2}"
+			else
+				write_error "⛔ Unknown server role selection: ${2} ==> Use open-ssh-server, lamp-server, postfix, bind9, dnsmasq, dhcp-server, print-server"
+				return 1
+			fi
+			shift
+		;;
 		--role | --Role )
-			local _role="$2"
-			shift # Remove argument name from processing
+			if [[ $2 == "workstation" || $2 == "desktop" || $2 == "VDI" || $2 == "server" ]] ; then
+				local _role="${2}"
+				write_status "🎭 Selecting role: ${2}"
+			else
+				write_error "⛔ Unknown role selection: ${2} ==> Use workstation or server"
+				return 1
+			fi
+			shift
+		;;
+		--ask | --prompt | --interactive )
+			if [[ $2 == "YES" || $2 == "yes" || $2 == "Yes" || $2 == "NO" || $2 == "No" || $2 == "no" ]] ; then
+				local _ask="${2}"
+				write_status "🤔 Prompting for configuration options..."
+			else
+				write_error "⛔ incorretc option: ${2} ==> Use YES or NO"
+				return 1
+			fi
+		;;
+		--source | --URL | --url )
+			local _repo_url="${2}"
+			write_status "🌐 Using URL: ${_repo_url}"
+			shift
+		;;
+		--timezone | --TZ )
+			local Preference_InitialTimeZone="${2}"
+			write_status "🕰️ Using Timezone: ${Preference_InitialTimeZone}"
+			shift
+		;;
+		--disk_encryption | --DC )
+			Preference_DiskEncryption="$2"
+			write_status "🔐 Disk encryption is requested and enabled."
+			shift
+		;;
+		--disk_password | --DP )
+			Preference_Disk_Password="$2"
+			write_status "🔐 Disk encryption password is set."
+			shift
+		;;
+		--initial_user | --IU )
+			Preference_InitialUser="$2"
+			write_status "👤 Initial user is set to: ${Preference_InitialUser}"
+			shift
+		;;
+		--initial_user_password | --IUP )
+			Preference_InitialUserPassword="$2"
+			write_status "🔐 Initial user password is set."
+			shift
+		;;
+		--help | -h )
+			write_information "Usage: ${FUNCNAME[0]} [-p <filename> ] [-u URL ] [-c workstation|ssh-server|ansible-server ]"
+			return 0
+		;;
+		--version | -v )
+			_tgt_ubutnu_ver="$2"
+			write_status "🐧 Ubuntu version requested: ${_tgt_ubutnu_ver}"
+			return 0
+		;;
+		*)
+			write_error "Unknown parameter: $1"
 		;;
 		esac
-		shift # Remove argument value from processing
+		shift 
 	done
 
 	# Evaluate override arguments to defaults...
 	# -t | -m | -d | -f | -r
-	system::process_vm_opt_args "${@}"
+	# system::process_vm_opt_args "${@}"
 
 	# Ensure everything for creating VMs is in place...
 	dependency::virtualization
@@ -10142,18 +10259,44 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	# Fetch the relevand ISO if necessary...
 	system::log_item "🔎 Retreive list of available $ubuntu_flavor $_role versions..."
 	declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
-	dist_logo="$ubuntulogo"
+	dist_logo="${ubuntulogo}"
+	
+	# Check if a version of Ubuntu was specified...
+	if [[ -z ${_tgt_ubutnu_ver} ]]; then
+		write_information "🐧 - No version of Ubuntu specified..."
+		if [[ ${_ask} == "YES" ]]; then
+			write_information "🐧 - Requested to ask for Ubuntu version; prompting for version of Ubuntu to use..."
+			tgt_ubuntu_ver=$($RTD_GUI --colors --title "Select Release Version of $ubuntu_flavor $_role" --inputbox "\n 👍 Please pick an available \Z1 $ubuntu_flavor \Zn version by entering it below.
+			Long Term Support Versions to choose from are the following:\Z4 ${all_lts_versions[*]} \Zn You may also enter an inbetween release version
+			by typing its release number below as well. Please realize that, if you select a really old version, it may only be supported to a limited extent and may fail. 
+			If you are not sure just let me choose intelligently for you... 
+			\Z1 \n${dist_logo} \Zn"  30 90 "${all_lts_versions[-1]}" 3>&1 1>&2 2>&3)
+			case $? in
+				"$DIALOG_CANCEL") return ;;
+				"$DIALOG_ESC") return ;;
+			esac
+			clear
+		else 
+			write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
+			_tgt_ubutnu_ver=${all_lts_versions[-1]}
+		fi
+	else
+		write_information "📜 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
+		_tgt_ubutnu_ver=${all_lts_versions[-1]}
+	fi
 
-	tgt_ubuntu_ver=$($RTD_GUI --colors --title "Select Release Version of $ubuntu_flavor $_role" --inputbox "\n 👍 Please pick an available \Z1 $ubuntu_flavor \Zn version by entering it below.
-	Long Term Support Versions to choose from are the following:\Z4 ${all_lts_versions[*]} \Zn You may also enter an inbetween release version
-	by typing its release number below as well. Please realize that, if you select a really old version, it may only be supported to a limited extent and may fail. 
-	If you are not sure just let me choose intelligently for you... 
-	\Z1 \n${dist_logo} \Zn"  30 90 "${all_lts_versions[-1]}" 3>&1 1>&2 2>&3)
-	case $? in
-		"$DIALOG_CANCEL") return ;;
-		"$DIALOG_ESC") return ;;
-	esac
-	clear
+	# validate selections...
+	for lts_version in "${all_lts_versions[@]}"; do
+		if [[ "${lts_version}" == "${_tgt_ubutnu_ver}" ]]; then
+		local _selection_is_valid="yes"
+		break
+		fi
+	done
+
+	if [[ "${_selection_is_valid}" != "yes" ]]; then
+		write_error "⛔ - The version of Ubuntu selected is not valid. Please select a valid version list. Alternatively, you may let me choose for you..."
+		return 1
+	fi
 
 	# Return the version number selected
 	tgt_ubuntu_ver=${tgt_ubuntu_ver:-${all_lts_versions[-1]}}
@@ -10179,10 +10322,16 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	if [[ ${tgt_ubuntu_ver::2} -lt 23 ]] ; then
 
 		system::log_item "🐧 Ubuntu version ${tgt_ubuntu_ver}: is less than 23, so using debian installer (d-i) and desktop media..."
-		system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --desktop_environment ${_flavor}
-		system::log_item "🔎 Issuing search command: system::rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} ${_role}"
+		if [[ ${_role} == "desktop" ]]; then
+			system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --desktop_environment ${_UserDesktopEnvironemtSelection}
+			system::log_item "🔎 Issuing search command: system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --dist ubuntu --${_role}"
+			: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --distribution ubuntu --${_role})}
+		else
+			system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --server_role ${_UserServerEnvironemtSelection}
+			system::log_item "🔎 Issuing search command: system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --dist ubuntu --${_role}"
+			: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --distribution ubuntu --${_role})}
+		fi
 
-		: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} live)}
 		: ${iso_filename:="$(basename $ubuntu_iso_url)"}
 
 		# Ensure that the file is available for VM creation... 
@@ -10206,7 +10355,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 			--video "virtio" --channel "spicevmc" \
 			--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 			--extra-args="ks=file:${_saveto}/preseed.cfg auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=us \
-			netcfg/get_hostname=${_task}${tgt_ubuntu_ver} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
+			netcfg/get_hostname=RTD_${role} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
 			localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 			--initrd-inject="${_saveto}/preseed.cfg" \
 			--initrd-inject="${_saveto}/ks.cfg" \
