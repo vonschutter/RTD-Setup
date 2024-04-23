@@ -10134,11 +10134,11 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 # End of Documentation
 
 	# Set default values for VM T-Shirts sizes (may vary by OS)...
-	: ${ubuntu_flavor="ubuntu"} 				        # This is the default flavor of Ubuntu to use.
-	: ${_role:="server"} 					# This is the default role of the Ubuntu VM to create.
-	: ${_task:="ubuntu-desktop"} 				# This is the default task to perform on the Ubuntu VM.
-	: ${_cpu:="${_cpu:=2}"} 				# This is the default number of CPUs to use.
-	: ${_mem:="${_mem:=2048}"} 				# This is the default amount of memory to use.
+	: ${ubuntu_flavor="ubuntu"} 				# This is the default flavor of Ubuntu to use.
+	: ${_role:="server"}                                    # This is the default role of the Ubuntu VM to create.
+	: ${_task:="ubuntu-desktop"}                            # This is the default task to perform on the Ubuntu VM.
+	: ${_cpu:="${_cpu:=2}"}                                 # This is the default number of CPUs to use.
+	: ${_mem:="${_mem:=2048}"}                              # This is the default amount of memory to use.
 	: ${_dsk:="${_dsk:=100}"} 				# This is the default size of the disk to use.
 	: ${permanent_download_dir:="/var/lib/libvirt/boot/"} 	# This is the default location for KVM ISO files.
 	: ${_saveto:="$( mktemp -d /tmp/CloudConfig.XXXXXX )"}	# This is the default location preseed files.
@@ -10260,43 +10260,57 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	system::log_item "🔎 Retreive list of available $ubuntu_flavor $_role versions..."
 	declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
 	dist_logo="${ubuntulogo}"
-	
-	# Check if a version of Ubuntu was specified...
+
+	# Check if a version of Ubuntu was specified, otherwise make sure it is...
 	if [[ -z ${_tgt_ubutnu_ver} ]]; then
 		write_information "🐧 - No version of Ubuntu specified..."
 		if [[ ${_ask} == "YES" ]]; then
 			write_information "🐧 - Requested to ask for Ubuntu version; prompting for version of Ubuntu to use..."
-			tgt_ubuntu_ver=$($RTD_GUI --colors --title "Select Release Version of $ubuntu_flavor $_role" --inputbox "\n 👍 Please pick an available \Z1 $ubuntu_flavor \Zn version by entering it below.
-			Long Term Support Versions to choose from are the following:\Z4 ${all_lts_versions[*]} \Zn You may also enter an inbetween release version
-			by typing its release number below as well. Please realize that, if you select a really old version, it may only be supported to a limited extent and may fail. 
-			If you are not sure just let me choose intelligently for you... 
-			\Z1 \n${dist_logo} \Zn"  30 90 "${all_lts_versions[-1]}" 3>&1 1>&2 2>&3)
-			case $? in
-				"$DIALOG_CANCEL") return ;;
-				"$DIALOG_ESC") return ;;
+			extra_option="Manually_specify"
+
+			# Display a menu to choose an Ubuntu version, including an option for manual entry
+			tgt_ubuntu_ver=$($RTD_GUI --colors --title "Select Release Version of $ubuntu_flavor $_role" --menu "\n \Z1\n$dist_logo\Zn \n 👍 Please pick an available \Z1$ubuntu_flavor\Zn version from the list below or choose to manually specify a version. Long Term Support (LTS) Versions to choose from are as follows:\n\n " 35 90 $(( ${#all_lts_versions[@]} + 1 )) \
+			$(for i in "${!all_lts_versions[@]}"; do echo  "${all_lts_versions[$i]}" "$i"; done ) "$extra_option" "$(( ${#all_lts_versions[@]} + 1 ))"  3>&1 1>&2 2>&3)
+			dialog_status=$?
+
+			# Handle the user's menu selection or cancellation based on the captured status
+			case $dialog_status in
+			$DIALOG_CANCEL) echo "Dialog was cancelled."; return ;;
+			$DIALOG_ESC) echo "Dialog was escaped."; return ;;
 			esac
+
+			# Check if the user chose to manually specify a version
+			if [[ "${tgt_ubuntu_ver}" == "${extra_option}" ]]; then
+			tgt_ubuntu_ver=$($RTD_GUI --colors --title "Manual Version Input" --inputbox "\nPlease enter the desired Ubuntu version (e.g., 22.10):" 10 60 3>&1 1>&2 2>&3)
+			
+			# Capture and handle the exit status of the input dialog
+			case $? in
+				$DIALOG_CANCEL) echo "Input was cancelled."; return ;;
+				$DIALOG_ESC) echo "Input was escaped."; return ;;
+			esac
+			fi
+
 			clear
+
 		else 
 			write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
 			_tgt_ubutnu_ver=${all_lts_versions[-1]}
 		fi
-	else
-		write_information "📜 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
-		_tgt_ubutnu_ver=${all_lts_versions[-1]}
 	fi
 
 	# validate selections...
 	for lts_version in "${all_lts_versions[@]}"; do
 		if [[ "${lts_version}" == "${_tgt_ubutnu_ver}" ]]; then
-		local _selection_is_valid="yes"
+			local _selection_is_valid="yes"
+			write_information "🐧 - The version of Ubuntu selected is valid: ${_tgt_ubutnu_ver}"
 		break
 		fi
 	done
 
-	if [[ "${_selection_is_valid}" != "yes" ]]; then
-		write_error "⛔ - The version of Ubuntu selected is not valid. Please select a valid version list. Alternatively, you may let me choose for you..."
-		return 1
-	fi
+	# if [[ "${_selection_is_valid}" != "yes" ]]; then
+	# 	write_error "⛔ - The version of Ubuntu selected is not valid. Please select a valid version list. Alternatively, you may let me choose for you..."
+	# 	return 1
+	# fi
 
 	# Return the version number selected
 	tgt_ubuntu_ver=${tgt_ubuntu_ver:-${all_lts_versions[-1]}}
@@ -10364,44 +10378,14 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	elif [[ ${tgt_ubuntu_ver::2} -ge 23 || ${tgt_ubuntu_ver::2} -lt 24 ]] ; then
 
 		dialog::display_notice "🐧 Ubuntu version ${tgt_ubuntu_ver} no longer supports Debian preseed and not yet 
-		CloudCOnfig so using cloud config and server media to build desktop...
-		\n This is a temporary measure until the new installer is available and it is buggy and unreliable."
-		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: is greater than 23 but less than 24, so using cloud config and server media to build desktop..."
-		system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor ${_flavor:-"ubuntu-desktop"} 
-
-		: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} server)}
-		: ${iso_filename:="$(basename $ubuntu_iso_url)"}
-
-		# Ensure that the file is available for VM creation... 
-		write_status "Checking if $iso_filename already downloaded..."
-		iso=$(find "$permanent_download_dir" -name "$iso_filename")
-		if [ ! -e "$iso" ]; then
-			write_warning "$iso_filename is not in cache, downloading..."
-			wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
-			iso="$permanent_download_dir/$iso_filename"
-		else
-			write_information "💿 - $iso_filename already in cache, using it for VM greenfield creation..."
-		fi
-		
-		system::log_item "🐧 Ubuntu version ${tgt_ubuntu_version}: Running install options for subiquity..."
-
-		"${bin_virt_install}" --name ${vm_name} \
-			--vcpus "${_cpu}" \
-			--memory "${_mem}" \
-			--network "${virt_net}" \
-			--disk size="${_dsk}" \
-			--os-variant="ubuntu21.10" \
-			--video "virtio" --channel "spicevmc" \
-			--disk path="${CloudConfigDir}/cidata.iso,device=cdrom" \
-			--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-			--extra-args="autoinstall" \
-			--noautoconsole  \
-			|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 ) |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+		CloudCOnfig thus it is an unsupported version of Ubuntu. \n\n
+		\n Please consider using a supported version instead. \n\n"
+		return 1
 
 	elif [[ ${tgt_ubuntu_ver::2} -ge 24 ]] ; then
 
 		system::log_item "🐧 Ubuntu version ${tgt_ubuntu_ver}: Using MODERN installer..."
-		system::generate_cloudconfig
+		system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor ${_flavor:-"ubuntu-desktop"} 
 
 		: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} live)}
 		: ${iso_filename:="$(basename $ubuntu_iso_url)"}
