@@ -10202,35 +10202,6 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 				write_error "⛔ incorretc option: ${2} ==> Use YES or NO"
 				return 1
 			fi
-		;;
-		--source | --URL | --url )
-			local _repo_url="${2}"
-			write_status "🌐 Using URL: ${_repo_url}"
-			shift
-		;;
-		--timezone | --TZ )
-			local Preference_InitialTimeZone="${2}"
-			write_status "🕰️ Using Timezone: ${Preference_InitialTimeZone}"
-			shift
-		;;
-		--disk_encryption | --DC )
-			Preference_DiskEncryption="$2"
-			write_status "🔐 Disk encryption is requested and enabled."
-			shift
-		;;
-		--disk_password | --DP )
-			Preference_Disk_Password="$2"
-			write_status "🔐 Disk encryption password is set."
-			shift
-		;;
-		--initial_user | --IU )
-			Preference_InitialUser="$2"
-			write_status "👤 Initial user is set to: ${Preference_InitialUser}"
-			shift
-		;;
-		--initial_user_password | --IUP )
-			Preference_InitialUserPassword="$2"
-			write_status "🔐 Initial user password is set."
 			shift
 		;;
 		--help | -h )
@@ -10249,17 +10220,14 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 		shift 
 	done
 
-	# Evaluate override arguments to defaults...
-	# -t | -m | -d | -f | -r
-	# system::process_vm_opt_args "${@}"
-
 	# Ensure everything for creating VMs is in place...
 	dependency::virtualization
 
 	# Fetch the relevand ISO if necessary...
 	system::log_item "🔎 Retreive list of available $ubuntu_flavor $_role versions..."
-	declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
+	declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+)/ && print "$1\n"' | sort -Vu))
 	dist_logo="${ubuntulogo}"
+
 
 	# Check if a version of Ubuntu was specified, otherwise make sure it is...
 	if [[ -z ${_tgt_ubutnu_ver} ]]; then
@@ -10292,7 +10260,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 
 			clear
 
-		else 
+		else
 			write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
 			_tgt_ubutnu_ver=${all_lts_versions[-1]}
 		fi
@@ -10318,6 +10286,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	# Format the name of the VM to be created...
 	local vm_name="Template_Ubuntu_${tgt_ubuntu_ver}_${_role}_$(date +%Y-%m-%d-%s)"
 
+	# Prepare the summary message for the VM creation...
 	_summary_message="
 	The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in: ${_preseed_file} \n
@@ -10333,88 +10302,146 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 
 	# Check the version of Ubuntu and use the appropriate installer...
 	# Ubuntu is migration installers and methods, so we need to check the version and use the appropriate installer...
-	if [[ ${tgt_ubuntu_ver::2} -lt 23 ]] ; then
 
-		system::log_item "🐧 Ubuntu version ${tgt_ubuntu_ver}: is less than 23, so using debian installer (d-i) and desktop media..."
-		if [[ ${_role} == "desktop" ]]; then
-			system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --desktop_environment ${_UserDesktopEnvironemtSelection}
-			system::log_item "🔎 Issuing search command: system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --dist ubuntu --${_role}"
-			: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --distribution ubuntu --${_role})}
-		else
-			system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --server_role ${_UserServerEnvironemtSelection}
-			system::log_item "🔎 Issuing search command: system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --dist ubuntu --${_role}"
-			: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --distribution ubuntu --${_role})}
-		fi
+	case "${_role}" in
+		workstation | desktop | VDI | server )
+			write_status "🖥️ 	- Using a desktop environment: ${_UserDesktopEnvironemtSelection}"
+			if [[ ${tgt_ubuntu_ver::2} -lt 16 ]] ; then
 
-		: ${iso_filename:="$(basename $ubuntu_iso_url)"}
+				system::log_item "🐧 Ubuntu version ${tgt_ubuntu_ver}: is less than 16, so using debian installer (d-i) and desktop media..."
+				system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --desktop_environment ${_UserDesktopEnvironemtSelection}
+				# system::log_item "🔎 Issuing search command: system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --dist ubuntu --${_role}"
+				: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --distribution ubuntu --${_role})}
 
-		# Ensure that the file is available for VM creation... 
-		write_status "Checking if $iso_filename already downloaded..."
-		iso=$(find "$permanent_download_dir" -name "$iso_filename")
-		if [ ! -e "$iso" ]; then
-			write_warning "$iso_filename is not in cache, downloading..."
-			wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
-			iso="$permanent_download_dir/$iso_filename"
-		else
-			write_information "💿 - $iso_filename already in cache, using it for VM greenfield creation..."
-		fi
+				write_information "💿 - Using online install for VM greenfield creation..."
 
-		system::log_item "🐧 Ubuntu version ${tgt_ubuntu_version}: Running install options for debian installer (d-i)..."
-		"${bin_virt_install}" --name ${vm_name} \
-			--vcpus "${_cpu}" \
-			--memory "${_mem}" \
-			--network "${virt_net}" \
-			--disk size="${_dsk}" \
-			--os-variant="ubuntu21.10" \
-			--video "virtio" --channel "spicevmc" \
-			--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-			--extra-args="ks=file:${_saveto}/preseed.cfg auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=us \
-			netcfg/get_hostname=RTD_${role} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
-			localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
-			--initrd-inject="${_saveto}/preseed.cfg" \
-			--initrd-inject="${_saveto}/ks.cfg" \
-			--noautoconsole || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 ) |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+				system::log_item "🐧 Ubuntu version ${tgt_ubuntu_version}: Running install options for debian installer (d-i)..."
+				"${bin_virt_install}" --name ${vm_name} \
+					--vcpus "${_cpu}" \
+					--memory "${_mem}" \
+					--network "${virt_net}" \
+					--disk size="${_dsk}" \
+					--os-variant="ubuntutrusty" \
+					--video "virtio" --channel "spicevmc" \
+					--location 'http://archive.ubuntu.com/ubuntu/dists/trusty/main/installer-amd64/' \
+					--initrd-inject="${_saveto}/preseed.cfg" \
+					--initrd-inject="${_saveto}/ks.cfg" \
+					--noautoconsole -v || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 ) |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+			elif [[ ${tgt_ubuntu_ver::2} -lt 23 ]] ; then
 
-	elif [[ ${tgt_ubuntu_ver::2} -ge 23 || ${tgt_ubuntu_ver::2} -lt 24 ]] ; then
+				system::log_item "🐧 Ubuntu version ${tgt_ubuntu_ver}: is less than 23, so using debian installer (d-i) and desktop media..."
+				if [[ ${_role} == "desktop" ]]; then
+					system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --desktop_environment ${_UserDesktopEnvironemtSelection}
+					# system::log_item "🔎 Issuing search command: system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --dist ubuntu --${_role}"
+					: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --distribution ubuntu --${_role})}
+				else
+					system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --server_role ${_UserServerEnvironemtSelection}
+					system::log_item "🔎 Issuing search command: system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --dist ubuntu --${_role}"
+					: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --distribution ubuntu --${_role})}
+				fi
 
-		dialog::display_notice "🐧 Ubuntu version ${tgt_ubuntu_ver} no longer supports Debian preseed and not yet 
-		CloudCOnfig thus it is an unsupported version of Ubuntu. \n\n
-		\n Please consider using a supported version instead. \n\n"
-		return 1
+				: ${iso_filename:="$(basename $ubuntu_iso_url)"}
 
-	elif [[ ${tgt_ubuntu_ver::2} -ge 24 ]] ; then
+				# Ensure that the file is available for VM creation... 
+				write_status "Checking if $iso_filename already downloaded..."
+				iso=$(find "$permanent_download_dir" -name "$iso_filename")
+				if [ ! -e "$iso" ]; then
+					write_warning "$iso_filename is not in cache, downloading..."
+					wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
+					iso="$permanent_download_dir/$iso_filename"
+				else
+					write_information "💿 - $iso_filename already in cache, using it for VM greenfield creation..."
+				fi
 
-		system::log_item "🐧 Ubuntu version ${tgt_ubuntu_ver}: Using MODERN installer..."
-		system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor ${_flavor:-"ubuntu-desktop"} 
+				system::log_item "🐧 Ubuntu version ${tgt_ubuntu_version}: Running install options for debian installer (d-i)..."
+				"${bin_virt_install}" --name ${vm_name} \
+					--vcpus "${_cpu}" \
+					--memory "${_mem}" \
+					--network "${virt_net}" \
+					--disk size="${_dsk}" \
+					--os-variant="ubuntu21.10" \
+					--video "virtio" --channel "spicevmc" \
+					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
+					--extra-args="ks=file:${_saveto}/preseed.cfg auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=us \
+					netcfg/get_hostname=RTD_${role} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
+					localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
+					--initrd-inject="${_saveto}/preseed.cfg" \
+					--initrd-inject="${_saveto}/ks.cfg" \
+					--noautoconsole || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 ) |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 
-		: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} live)}
-		: ${iso_filename:="$(basename $ubuntu_iso_url)"}
+			elif [[ ${tgt_ubuntu_ver::2} -ge 23 && ${tgt_ubuntu_ver::2} -lt 24 ]] ; then
 
-		# Ensure that the file is available for VM creation... 
-		write_status "Checking if $iso_filename already downloaded..."
-		iso=$(find "$permanent_download_dir" -name "$iso_filename")
-		if [ ! -e "$iso" ]; then
-			write_warning "$iso_filename is not in cache, downloading..."
-			wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
-			iso="$permanent_download_dir/$iso_filename"
-		else
-			write_information "💿 - $iso_filename already in cache, using it for VM greenfield creation..."
-		fi
-		
-		system::log_item "Ubuntu version ${tgt_ubuntu_ver}: is greated than 23 but less than 24, so using cloud config and desktop media to build desktop..."
-		"${bin_virt_install}" --name ${vm_name} \
-			--vcpus "${_cpu}" \
-			--memory "${_mem}" \
-			--network "${virt_net}" \
-			--disk size="${_dsk}" \
-			--os-variant="ubuntu21.10" \
-			--video "virtio" --channel "spicevmc" \
-			--disk path="${CloudConfigDir}/cidata.iso,device=cdrom" \
-			--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-			--extra-args="autoinstall" \
-			--noautoconsole  || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 ) |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+				dialog::display_notice "🐧 Ubuntu version ${tgt_ubuntu_ver} no longer supports Debian preseed and not yet 
+				CloudCOnfig thus it is an unsupported version of Ubuntu. \n\n
+				\n Please consider using a supported version instead. \n\n"
+				return 1
 
-	fi
+			elif [[ ${tgt_ubuntu_ver::2} -ge 24 ]] ; then
+
+				system::log_item "🐧 Ubuntu version ${tgt_ubuntu_ver}: Using MODERN installer..."
+				system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor ${_flavor:-"ubuntu-desktop"} 
+
+				: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} live)}
+				: ${iso_filename:="$(basename $ubuntu_iso_url)"}
+
+				# Ensure that the file is available for VM creation... 
+				write_status "Checking if $iso_filename already downloaded..."
+				iso=$(find "$permanent_download_dir" -name "$iso_filename")
+				if [ ! -e "$iso" ]; then
+					write_warning "$iso_filename is not in cache, downloading..."
+					wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
+					iso="$permanent_download_dir/$iso_filename"
+				else
+					write_information "💿 - $iso_filename already in cache, using it for VM greenfield creation..."
+				fi
+				
+				system::log_item "Ubuntu version ${tgt_ubuntu_ver}: is greated than 23 but less than 24, so using cloud config and desktop media to build desktop..."
+				"${bin_virt_install}" --name ${vm_name} \
+					--vcpus "${_cpu}" \
+					--memory "${_mem}" \
+					--network "${virt_net}" \
+					--disk size="${_dsk}" \
+					--os-variant="ubuntu21.10" \
+					--video "virtio" --channel "spicevmc" \
+					--disk path="${CloudConfigDir}/cidata.iso,device=cdrom" \
+					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
+					--extra-args="autoinstall" \
+					--noautoconsole  || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 ) |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+			fi
+		;;
+		* )
+				system::log_item "🐧 Ubuntu version ${tgt_ubuntu_ver}: Using SERVER installer..."
+				system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor ${_flavor:-"openssh-server"} 
+
+				: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} live)}
+				: ${iso_filename:="$(basename $ubuntu_iso_url)"}
+
+				# Ensure that the file is available for VM creation... 
+				write_status "Checking if $iso_filename already downloaded..."
+				iso=$(find "$permanent_download_dir" -name "$iso_filename")
+				if [ ! -e "$iso" ]; then
+					write_warning "$iso_filename is not in cache, downloading..."
+					wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
+					iso="$permanent_download_dir/$iso_filename"
+				else
+					write_information "💿 - $iso_filename already in cache, using it for VM greenfield creation..."
+				fi
+				
+				system::log_item "Ubuntu version ${tgt_ubuntu_ver}: is greated than 23 but less than 24, so using cloud config and desktop media to build desktop..."
+				"${bin_virt_install}" --name ${vm_name} \
+					--vcpus "${_cpu}" \
+					--memory "${_mem}" \
+					--network "${virt_net}" \
+					--disk size="${_dsk}" \
+					--os-variant="ubuntu21.10" \
+					--video "virtio" --channel "spicevmc" \
+					--disk path="${CloudConfigDir}/cidata.iso,device=cdrom" \
+					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
+					--extra-args="autoinstall" \
+					--noautoconsole  || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 ) |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+
+		;;
+	esac
 
 	system::log_item "${_summary_message}"
 
@@ -12163,15 +12190,9 @@ template::cloud_config() {
 
 
 cat >> ${2} << EOF
-#cloud-config
+---
 autoinstall:
   version: 1
-  apt:
-    mirror-selection:
-      primary:
-        - uri: http://mymirror.local/repository/Apt/ubuntu/
-        - country-mirror
-        - uri: http://archive.ubuntu.com/ubuntu
   shutdown: reboot
   timezone: geoip
   drivers:
@@ -12191,7 +12212,7 @@ autoinstall:
     layout:
       name: lvm
       sizing-policy: all
-      #password: "${Preference_Disk_Password}"
+      # password: "${Preference_Disk_Password}"
 EOF
 
 # -----------------------------------------------------------------------------------------
@@ -12214,32 +12235,20 @@ cat >> ${2} << EOF
     - name: nvim
       channel: latest/stable
       classic: true
-  package_update: true
-  package_upgrade: true
+  package_update: false
+  package_upgrade: false
   packages:
     - dialog
     - git
     - curl
     - wget
     - zip
-    - tasksel
-    - ubuntu-desktop^
   late-commands:
-    - >-
-      curtin in-target --
-      sed -i /etc/default/grub -e
-      's/GRUB_CMDLINE_LINUX_DEFAULT=".*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/'
-    - curtin in-target -- update-grub
-    - rm /target/etc/netplan/00-installer-config*yaml
-    - >-
-      printf "network:\n  version: 2\n  renderer: NetworkManager" 
-      > /target/etc/netplan/01-network-manager-all.yaml
     - mkdir /target/opt/rtd
-    - git clone --depth=1 ${_git_src_url} /target/opt/rtd
+    - curtin in-target --target=/target -- git clone --depth=1 ${_git_src_url} /target/opt/rtd
     - /usr/bin/chmod 755 /target/opt/rtd/core/rtd*
-    - curtin in-target --target=/target -- /opt/rtd/core/rtd-oem-enable-config.sh
-    - mkdir /target/etc/rtd
-    - cp /autoinstall.yaml /target/etc/rtd/
+    - curtin in-target --target=/target -- /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh
+    - cp /var/log/installer /target/etc/rtd/
 EOF
 ;;
 kubuntu-desktop )
