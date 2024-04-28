@@ -10308,10 +10308,9 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 			write_status "🖥️ 	- Using a desktop environment: ${_UserDesktopEnvironemtSelection}"
 			if [[ ${tgt_ubuntu_ver::2} -lt 16 ]] ; then
 
+				# For legacy Ubuntu builds (less than 16) use the debian installer (d-i) directly from the source tree online...
 				system::log_item "🐧 Ubuntu version ${tgt_ubuntu_ver}: is less than 16, so using debian installer (d-i) and desktop media..."
 				system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --desktop_environment ${_UserDesktopEnvironemtSelection}
-				# system::log_item "🔎 Issuing search command: system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --dist ubuntu --${_role}"
-				: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --distribution ubuntu --${_role})}
 
 				write_information "💿 - Using online install for VM greenfield creation..."
 
@@ -10327,20 +10326,13 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 					--initrd-inject="${_saveto}/preseed.cfg" \
 					--initrd-inject="${_saveto}/ks.cfg" \
 					--noautoconsole -v || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 ) |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+
 			elif [[ ${tgt_ubuntu_ver::2} -lt 23 ]] ; then
 
+				# for interim Ubuntu builds (less than 23) use the debian installer (d-i) using DVD ISO but still PRESEED.cfg...
 				system::log_item "🐧 Ubuntu version ${tgt_ubuntu_ver}: is less than 23, so using debian installer (d-i) and desktop media..."
-				if [[ ${_role} == "desktop" ]]; then
-					system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --desktop_environment ${_UserDesktopEnvironemtSelection}
-					# system::log_item "🔎 Issuing search command: system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --dist ubuntu --${_role}"
-					: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --distribution ubuntu --${_role})}
-				else
-					system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --server_role ${_UserServerEnvironemtSelection}
-					system::log_item "🔎 Issuing search command: system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --dist ubuntu --${_role}"
-					: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --distribution ubuntu --${_role})}
-				fi
-
-				: ${iso_filename:="$(basename $ubuntu_iso_url)"}
+				system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --desktop_environment ${_UserDesktopEnvironemtSelection}
+				: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --distribution ubuntu --${_role})}
 
 				# Ensure that the file is available for VM creation... 
 				write_status "Checking if $iso_filename already downloaded..."
@@ -10371,6 +10363,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 
 			elif [[ ${tgt_ubuntu_ver::2} -ge 23 && ${tgt_ubuntu_ver::2} -lt 24 ]] ; then
 
+				# For interim Ubuntu builds (greater than 23 but less than 24) there is not way to automate the install...
 				dialog::display_notice "🐧 Ubuntu version ${tgt_ubuntu_ver} no longer supports Debian preseed and not yet 
 				CloudCOnfig thus it is an unsupported version of Ubuntu. \n\n
 				\n Please consider using a supported version instead. \n\n"
@@ -10378,6 +10371,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 
 			elif [[ ${tgt_ubuntu_ver::2} -ge 24 ]] ; then
 
+				# For modern Ubuntu builds (greater than 24) use the cloud config and desktop media to build desktop...
 				system::log_item "🐧 Ubuntu version ${tgt_ubuntu_ver}: Using MODERN installer..."
 				system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor ${_flavor:-"ubuntu-desktop"} 
 
