@@ -1149,7 +1149,10 @@ system::generate_cloudconfig() {
 	fi
 
 	# Write out the user-data file
-	template::cloud_config --write "${CloudConfigDir}/user-data"
+	system::log_item "Writing out the user-data file..."
+	template::cloud_config --write "${CloudConfigDir}/user-data" || { system::log_item "Failed to write out the user-data file." ; return 1; }
+	system::log_item "Writing out the autoinstall.yaml file..."
+	template::cloud_config --write "${CloudConfigDir}/autoinstall.yaml" || { system::log_item "Failed to write out the autoinstall.yaml file." ; return 1; }
 
 	system::log_item "Configuration data supplied: 
 	$(cat ${CloudConfigDir}/user-data)"
@@ -12184,7 +12187,7 @@ template::cloud_config() {
 
 
 cat >> ${2} << EOF
----
+# cloud-config
 autoinstall:
   version: 1
   shutdown: reboot
