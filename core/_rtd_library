@@ -1151,29 +1151,32 @@ system::generate_cloudconfig() {
 	# Write out the user-data file
 	system::log_item "Writing out the user-data file..."
 	template::cloud_config --write "${CloudConfigDir}/user-data" || { system::log_item "Failed to write out the user-data file." ; return 1; }
-	system::log_item "Writing out the autoinstall.yaml file..."
-	template::cloud_config --write "${CloudConfigDir}/autoinstall.yaml" || { system::log_item "Failed to write out the autoinstall.yaml file." ; return 1; }
 
-	system::log_item "Configuration data supplied: 
+	# Log configuration data for troupleshooting puropses
+	system::log_item "Configuration data supplied:
 	$(cat ${CloudConfigDir}/user-data)"
 
-	write_information "Generating Ubuntu autoinstall instruction media: ${CloudConfigDir}/cidata.iso"
-	#software::check_native_package_dependency genisoimage
-	if genisoimage -output ${CloudConfigDir}/cidata.iso -volid cidata -joliet -rock ${CloudConfigDir}/user-data ${CloudConfigDir}/meta-data  &>>${_LOGFILE} ; then
-		{ system::log_item "Generated: ${CloudConfigDir}/cidata.iso" success ; }
+	write_information "Generating Ubuntu autoinstall instruction media: ${CloudConfigDir}/CIDATA.iso"
+	software::check_native_package_dependency genisoimage
+
+	# Generate the CIDATA.iso file
+	write_information "Generating: ${CloudConfigDir}/CIDATA.iso"
+	if genisoimage -output ${CloudConfigDir}/CIDATA.iso -volid cidata -joliet -rock -full-iso9660-filenames ${CloudConfigDir}/*  &>>${_LOGFILE} ; then
+		{ system::log_item "Generated: ${CloudConfigDir}/CIDATA.iso" success ; }
 	else
-		{ system::log_item "Failed to generate: ${CloudConfigDir}/cidata.iso" ; return 200; }
+		{ system::log_item "Failed to generate: ${CloudConfigDir}/CIDATA.iso" ; return 200; }
 	fi
 
 	# Secure the cloud config directory
+	write_information "Securing the cloud config directory..."
 	if chown $(stat -c "%U:%G" /var/lib/libvirt/qemu/) "${CloudConfigDir}" ; then
 		if chmod $(stat -c "%a" /var/lib/libvirt/qemu/) "${CloudConfigDir}" ; then
-			system::log_item "Changed ownership and permissions of ${CloudConfigDir} successfully"
+			write_information "Changed ownership and permissions of ${CloudConfigDir} successfully"
 		else
-			system::log_item "Failed to change permissions of ${CloudConfigDir} to $(stat -c "%a" /var/lib/libvirt/qemu/) "
+			write_information "Failed to change permissions of ${CloudConfigDir} to $(stat -c "%a" /var/lib/libvirt/qemu/) "
 		fi
 	else
-		system::log_item "Failed to change ownership of ${CloudConfigDir} to $(stat -c "%U:%G" /var/lib/libvirt/qemu/)"
+		write_error "Failed to change ownership of ${CloudConfigDir} to $(stat -c "%U:%G" /var/lib/libvirt/qemu/)"
 	fi
 	return 0
 }
@@ -3833,10 +3836,10 @@ system::rtd_oem_find_live_release() {
 	# system::rtd_oem_find_live_release 	      10              debian         net            ssh-server
 	# system::rtd_oem_find_live_release 	      19.04.2         ubuntu         live
 	# End of documentation
-	local distro_version="${1:-12}"
-	local distro_flavor="${2:-debian}"
-	local live_or_not="${3:-live}"
-	local desktop_env="${4:-standard}"
+	# local distro_version="${1:-12}"
+	# local distro_flavor="${2:-debian}"
+	# local live_or_not="${3:-live}"
+	# local desktop_env="${4:-standard}"
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
@@ -10307,7 +10310,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	# Ubuntu is migration installers and methods, so we need to check the version and use the appropriate installer...
 
 	case "${_role}" in
-		workstation | desktop | VDI | server )
+		workstation | desktop | VDI )
 			write_status "🖥️ 	- Using a desktop environment: ${_UserDesktopEnvironemtSelection}"
 			if [[ ${tgt_ubuntu_ver::2} -lt 16 ]] ; then
 
@@ -10378,7 +10381,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 				system::log_item "🐧 Ubuntu version ${tgt_ubuntu_ver}: Using MODERN installer..."
 				system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor ${_flavor:-"ubuntu-desktop"} 
 
-				: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} live)}
+				: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --distribution ${ubuntu_flavor} --desktop )}
 				: ${iso_filename:="$(basename $ubuntu_iso_url)"}
 
 				# Ensure that the file is available for VM creation... 
@@ -10391,26 +10394,30 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 				else
 					write_information "💿 - $iso_filename already in cache, using it for VM greenfield creation..."
 				fi
-				
-				system::log_item "Ubuntu version ${tgt_ubuntu_ver}: is greated than 23 but less than 24, so using cloud config and desktop media to build desktop..."
+
+				system::log_item "Ubuntu version ${tgt_ubuntu_ver}: is greated than 23, so using cloud config and desktop media to build desktop..."
 				"${bin_virt_install}" --name ${vm_name} \
 					--vcpus "${_cpu}" \
 					--memory "${_mem}" \
 					--network "${virt_net}" \
 					--disk size="${_dsk}" \
-					--os-variant="ubuntu21.10" \
+					--os-variant="ubuntu24.04" \
 					--video "virtio" --channel "spicevmc" \
-					--disk path="${CloudConfigDir}/cidata.iso,device=cdrom" \
+					--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-					--extra-args="autoinstall" \
 					--noautoconsole  || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 ) |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+					#--initrd-inject="${CloudConfigDir}/autoinstall.yaml" \
+					#--extra-args "ds=nocloud-net;s=/dev/cdrom1/ autoinstall" \
+					# --extra-args="autoinstall" \
+					#--extra-args="subiquity.autoinstallpath=media/ubuntu/CIDATA/autoinstall.yaml" \
+					#--disk "${CloudConfigDir}/seed.img",device=floppy \
 			fi
 		;;
 		* )
 				system::log_item "🐧 Ubuntu version ${tgt_ubuntu_ver}: Using SERVER installer..."
-				system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor ${_flavor:-"openssh-server"} 
+				system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor ubuntu-server
 
-				: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release ${tgt_ubuntu_ver} ${ubuntu_flavor} live)}
+				: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release --version ${tgt_ubuntu_ver} --distribution ${ubuntu_flavor} --server )}
 				: ${iso_filename:="$(basename $ubuntu_iso_url)"}
 
 				# Ensure that the file is available for VM creation... 
@@ -10424,7 +10431,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 					write_information "💿 - $iso_filename already in cache, using it for VM greenfield creation..."
 				fi
 				
-				system::log_item "Ubuntu version ${tgt_ubuntu_ver}: is greated than 23 but less than 24, so using cloud config and desktop media to build desktop..."
+				system::log_item "Ubuntu version ${tgt_ubuntu_ver}: is greater than 23, so using cloud config and server media to build server..."
 				"${bin_virt_install}" --name ${vm_name} \
 					--vcpus "${_cpu}" \
 					--memory "${_mem}" \
@@ -10432,17 +10439,13 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 					--disk size="${_dsk}" \
 					--os-variant="ubuntu21.10" \
 					--video "virtio" --channel "spicevmc" \
-					--disk path="${CloudConfigDir}/cidata.iso,device=cdrom" \
+					--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-					--extra-args="autoinstall" \
+					--extra-args "autoinstall" \
 					--noautoconsole  || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 ) |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
-
+					
 		;;
 	esac
-
-	system::log_item "${_summary_message}"
-
-
 
 	# Clean up residual variables...
 	for i in  PRESEED_FILE vm_kernel vm_initrd source_url _task _role _cpu _dsk _mem tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig _summary_message ; do unset $i ; done
@@ -12187,29 +12190,29 @@ template::cloud_config() {
 
 
 cat >> ${2} << EOF
-# cloud-config
+#cloud-config
 autoinstall:
-  version: 1
-  shutdown: reboot
-  timezone: geoip
-  drivers:
-    install: true
-  ssh:
-    allow-pw: true
-    install-server: true
-    authorized-keys:
-      $([[ -n ${Preference_ssh_pub_key} ]] && echo - ) ${Preference_ssh_pub_key}
-  keyboard:
-    layout: ${Preference_InitialKeyboardLayout}
-  identity:
-    hostname: "${vm_name}"
-    username: "${Preference_InitialUser}"
-    password: "${Preference_InitialUserPassword}"
-  storage:
-    layout:
-      name: lvm
-      sizing-policy: all
-      # password: "${Preference_Disk_Password}"
+    version: 1
+    shutdown: reboot
+    timezone: geoip
+    drivers:
+        install: true
+    ssh:
+        allow-pw: true
+        install-server: true
+        authorized-keys:
+            $([[ -n ${Preference_ssh_pub_key} ]] && echo - ) ${Preference_ssh_pub_key}
+    keyboard:
+        layout: ${Preference_InitialKeyboardLayout}
+    identity:
+        hostname: "${vm_name}"
+        username: "${Preference_InitialUser}"
+        password: "${Preference_InitialUserPassword}"
+    storage:
+        layout:
+            name: lvm
+            sizing-policy: all
+            # password: "${Preference_Disk_Password}"
 EOF
 
 # -----------------------------------------------------------------------------------------
@@ -12228,24 +12231,19 @@ system::log_item "Generating cloud-config for the role: ubuntu-desktop"
 
 
 cat >> ${2} << EOF
-  snaps:
-    - name: nvim
-      channel: latest/stable
-      classic: true
-  package_update: false
-  package_upgrade: false
-  packages:
-    - dialog
-    - git
-    - curl
-    - wget
-    - zip
-  late-commands:
-    - mkdir /target/opt/rtd
-    - curtin in-target --target=/target -- git clone --depth=1 ${_git_src_url} /target/opt/rtd
-    - /usr/bin/chmod 755 /target/opt/rtd/core/rtd*
-    - curtin in-target --target=/target -- /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh
-    - cp /var/log/installer /target/etc/rtd/
+    packages:
+        - dialog
+        - git
+        - curl
+        - wget
+        - zip
+        - p7zip-full
+        - byobu
+        - dialog
+    late-commands:
+        - echo "******************* ${2} Config ********************"
+        - curtin in-target --target=/target -- bash -c git clone --depth=1 ${_git_src_url} /target/opt/rtd
+        - curtin in-target --target=/target -- bash -c /opt/rtd/core/rtd-oem-enable-config.sh
 EOF
 ;;
 kubuntu-desktop )
@@ -12287,20 +12285,19 @@ system::log_item "Generating cloud-config for ubuntu-server"
 # -----------------------------------------------------------------------------------------
 
 cat >> ${2} << EOF
-  packages:
-    - dialog
-    - git
-    - curl
-    - wget
-    - zip
-  late-commands:
-    - echo ******************* Ubuntu Server Generic Config ***********
-    - mkdir /target/opt/rtd
-    - git clone --depth=1 ${_git_src_url} /target/opt/rtd
-    - /usr/bin/chmod 755 /target/opt/rtd/core/rtd*
-    - curtin in-target --target=/target -- /opt/rtd/core/rtd-oem-enable-config.sh
-    - mkdir /target/etc/rtd
-    - cp /autoinstall.yaml /target/etc/rtd/
+    packages:
+        - dialog
+        - git
+        - curl
+        - wget
+        - zip
+        - p7zip-full
+        - byobu
+        - dialog
+    late-commands:
+        - echo "******************* ${2} Config ********************"
+        - git clone --depth=1 ${_git_src_url} /target/opt/rtd
+        - curtin in-target --target=/target -- bash -c /opt/rtd/core/rtd-oem-enable-config.sh
 EOF
 ;;
 ssh-server )
@@ -12308,22 +12305,20 @@ system::log_item "Generating cloud-config for ubuntu-ssh-server"
 # -----------------------------------------------------------------------------------------
 
 cat >> ${2} << EOF
-  packages:
-    - dialog
-    - git
-    - curl
-    - wget
-    - zip
-    - p7zip-full
-    - byobu
-  late-commands:
-    - echo ******************* SSH Server Config ********************
-    - mkdir /target/opt/rtd
-    - git clone --depth=1 ${_git_src_url} /target/opt/rtd
-    - /usr/bin/chmod 755 /target/opt/rtd/core/rtd*
-    - curtin in-target --target=/target -- /opt/rtd/core/rtd-oem-enable-config.sh
-    - mkdir /target/etc/rtd
-    - cp /autoinstall.yaml /target/etc/rtd/
+    packages:
+        - dialog
+        - git
+        - curl
+        - wget
+        - zip
+        - p7zip-full
+        - byobu
+        - dialog
+        - vim
+    late-commands:
+        - echo "******************* ${2} Config ********************"
+        - git clone --depth=1 ${_git_src_url} /target/opt/rtd
+        - curtin in-target --target=/target -- bash -c /opt/rtd/core/rtd-oem-enable-config.sh
 EOF
 ;;
 ansible-server )
@@ -12331,23 +12326,19 @@ system::log_item "Generating cloud-config for ubuntu-ssh-server"
 # -----------------------------------------------------------------------------------------
 
 cat >> ${2} << EOF
-  packages:
-    - dialog
-    - git
-    - curl
-    - wget
-    - zip
-    - p7zip-full
-    - ansible
-    - byobu
-  late-commands:
-    - echo ******************* SSH Server Config ********************
-    - mkdir /target/opt/rtd
-    - git clone --depth=1 ${_git_src_url} /target/opt/rtd
-    - /usr/bin/chmod 755 /target/opt/rtd/core/rtd*
-    - curtin in-target --target=/target -- /opt/rtd/core/rtd-oem-enable-config.sh
-    - mkdir /target/etc/rtd
-    - cp /autoinstall.yaml /target/etc/rtd/
+    packages:
+        - dialog
+        - git
+        - curl
+        - wget
+        - zip
+        - p7zip-full
+        - ansible
+        - byobu
+    late-commands:
+        - echo "******************* ${2} Config ********************"
+        - git clone --depth=1 ${_git_src_url} /target/opt/rtd
+        - curtin in-target --target=/target -- bash -c /opt/rtd/core/rtd-oem-enable-config.sh
 EOF
 ;;
 minecraft-server )
@@ -12355,28 +12346,24 @@ system::log_item "Generating cloud-config for minecraft-server"
 # -----------------------------------------------------------------------------------------
 
 cat >> ${2} << EOF
-  packages:
-    - dialog
-    - git
-    - wget
-    - ansible
-  late-commands:
-    - echo ******************* Minecraft Server Config ***************
-    - mkdir /target/opt/rtd
-    - git clone --depth=1 ${_git_src_url} /target/opt/rtd
-    - /usr/bin/chmod 755 /target/opt/rtd/core/rtd*
-    - curtin in-target --target=/target -- /opt/rtd/core/rtd-oem-enable-config.sh
-    - mkdir /target/etc/rtd
-    - cp /autoinstall.yaml /target/etc/rtd/
-    - mkdir -p /target/etc/systemd/system/getty@tty1.service.d
-    - touch /target/etc/systemd/system/getty@tty1.service.d/override.conf
-    - echo [Service] > /target/etc/systemd/system/getty@tty1.service.d/override.conf
-    - echo ExecStart=  >> /target/etc/systemd/system/getty@tty1.service.d/override.conf
-    - echo 'ExecStart=-/sbin/agetty --noissue --autologin tangarora %I \$TERM' >> /target/etc/systemd/system/getty@tty1.service.d/override.conf
-    - echo Type=idle >> /target/etc/systemd/system/getty@tty1.service.d/override.conf
-    - echo NAutoVTs=1 >> /etc/systemd/logind.conf
-    - echo "Please run rtd-minecraft-server to start the Minecraft Server!" >> /target/etc/update-motd.d/00-header
-    - echo rtd-minecraft-server >> /target/etc/profile
+    packages:
+        - dialog
+        - git
+        - wget
+        - ansible
+    late-commands:
+        - echo "******************* ${2} Config ********************"
+        - git clone --depth=1 ${_git_src_url} /target/opt/rtd
+        - curtin in-target --target=/target -- bash -c /opt/rtd/core/rtd-oem-enable-config.sh
+        - mkdir -p /target/etc/systemd/system/getty@tty1.service.d
+        - touch /target/etc/systemd/system/getty@tty1.service.d/override.conf
+        - echo [Service] > /target/etc/systemd/system/getty@tty1.service.d/override.conf
+        - echo ExecStart=  >> /target/etc/systemd/system/getty@tty1.service.d/override.conf
+        - echo 'ExecStart=-/sbin/agetty --noissue --autologin tangarora %I \$TERM' >> /target/etc/systemd/system/getty@tty1.service.d/override.conf
+        - echo Type=idle >> /target/etc/systemd/system/getty@tty1.service.d/override.conf
+        - echo NAutoVTs=1 >> /etc/systemd/logind.conf
+        - echo "Please run rtd-minecraft-server to start the Minecraft Server!" >> /target/etc/update-motd.d/00-header
+        - echo rtd-minecraft-server >> /target/etc/profile
 EOF
 ;;
 * )
