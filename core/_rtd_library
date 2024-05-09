@@ -10337,7 +10337,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 			write_status "🖥️ 	- Using a desktop environment: ${_UserDesktopEnvironemtSelection}"
 			if [[ ${_tgt_ubuntu_ver::2} -lt 20 ]] ; then
 
-				# For legacy Ubuntu builds (less than 16) use the debian installer (d-i) directly from the source tree online...
+				# For legacy Ubuntu builds (less than 20) use the debian installer (d-i) directly from the source tree online...
 				system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: is less than 16, so using debian installer (d-i) and desktop media..."
 				system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --desktop_environment ${_UserDesktopEnvironemtSelection}
 				write_information "💿 - Using online install for VM greenfield creation..."
@@ -10354,7 +10354,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 					--location "http://archive.ubuntu.com/ubuntu/dists/${_version_name}/main/installer-amd64/" \
 					--initrd-inject="${_saveto}/preseed.cfg" \
 					--initrd-inject="${_saveto}/ks.cfg" \
-					--extra-args="ks=file:${_saveto}/preseed.cfg auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=us \
+					--extra-args="ks=file:${_saveto}/preseed.cfg auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=${Preference_InitialKeyboardLayout} \
 					netcfg/get_hostname=${vm_name} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
 					localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " 
 					--noautoconsole -v || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )  
@@ -10389,7 +10389,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 					--os-variant="ubuntu21.10" \
 					--video "virtio" --channel "spicevmc" \
 					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-					--extra-args="ks=file:${_saveto}/preseed.cfg auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=us \
+					--extra-args="ks=file:${_saveto}/preseed.cfg auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=${Preference_InitialKeyboardLayout} \
 					netcfg/get_hostname=${vm_name} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
 					localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 					--initrd-inject="${_saveto}/preseed.cfg" \
