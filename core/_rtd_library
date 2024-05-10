@@ -10072,8 +10072,10 @@ kvm::make_vm_template_now_from_debian_org() {
 
 
 kvm::make_vm_template_now_from_ubuntu_com() {
-# Description: Function to create a KVM virtual michine disk and define a VM. This function should be
-# used on a Qemu/KVM virtual host that the virtual guest is to be used on.
+# Description: 
+# Automates the creation of a virtual machine (VM) template using Ubuntu as the base OS on a KVM host.
+# This function is ideal for quickly setting up virtual environments with custom configurations.
+# This function should be used on a Qemu/KVM virtual host that the virtual guest is to be used on.
 # NOTE: QCOW2 is a storage format for virtual machine disk images.
 # QCOW stands for QEMU copy on write. The QCOW2 format decouples the physical storage
 # layer from the virtual layer by adding a mapping between logical and physical blocks.
@@ -10082,61 +10084,77 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 # isolated virtual environments called guests or virtual machines (VMs). KVM is part of Linux.
 # For complete info: https://www.redhat.com/en/topics/virtualization/what-is-KVM
 #
-# Function Documentation: kvm::make_vm_template_now_from_ubuntu_com
-# Overview
+# Prerequisites:
+# - Must be run on a Qemu/KVM host with QEMU and KVM installed and configured.
+# - Internet access is required for downloading the Ubuntu ISO file.
+#   Alternatively, the ISO file can be downloaded manually and placed in a specified location.
+#   The default location is /var/lib/libvirt/boot/.
+# - The virt-install tool must be available on the system.
+# - The function should be run with sudo or as the root user.
 #
-# The kvm::make_vm_template_now_from_ubuntu_com function is designed to automate the process of creating a virtual 
-# machine (VM) template based on Ubuntu. It allows for customization of various VM parameters such as CPU, memory, 
-# disk size, and more. The function supports different versions and flavors of Ubuntu and adapts the installation 
-# process accordingly.
+# Notes on QCOW2:
+# - QCOW2 (QEMU Copy On Write version 2) is used for VM disks. It offers features like snapshot support and dynamic disk size allocation.
 #
-# Parameters
+# Notes on KVM:
+# - Kernel-based Virtual Machine (KVM) is a Linux kernel module that allows the kernel to function as a hypervisor. 
+# - More details on KVM: https://www.redhat.com/en/topics/virtualization/what-is-KVM
 #
-#     --ram <value>: Sets the amount of RAM for the VM. The value is specified in megabytes.
-#     --cpus or --cpu <value>: Sets the number of CPU cores for the VM.
-#     --disk or --dsk <value>: Sets the disk size for the VM. The value is specified in gigabytes.
-#     --flavor or --Flavor <value>: Specifies the Ubuntu flavor to use (e.g., ubuntu, kubuntu, lubuntu, xubuntu, etc.).
-#     --role or --Role <value>: Sets the role of the Ubuntu VM (e.g., desktop, server).
+# Parameters:
+# --ram <value>           : Sets the VM's RAM in megabytes (default: 2048 MB).
+# --cpus <value>          : Sets the number of CPU cores (default: 2).
+# --disk <value>          : Sets the disk size in gigabytes (default: 100 GB).
+# --flavor <value>        : Specifies the Ubuntu flavor (default: 'ubuntu').
+# --role <value>          : Specifies the VM's role (e.g., desktop, server) (default: 'desktop').
+# --version <value>       : Specifies the Ubuntu version; uses the latest LTS if not specified.
+# --location <value>      : Override the default location for downloading or accessing the ISO.
+# --ask <value>           : Enables interactive mode for manual input during setup (default: 'NO').
+# --desktop_environment   : Specifies the desktop environment for desktop VMs.
+# --server_role           : Specifies the server role for server VMs.
 #
-# Default Values
+# Defaults:
+# The function uses predefined defaults which can be overridden by specifying parameters.
 #
-#     ubuntu_flavor: Default flavor of Ubuntu (default: "ubuntu").
-#     _role: Default role of the Ubuntu VM (default: "desktop").
-#     _task: Default task to perform on the Ubuntu VM (default: "ssh-server").
-#     _cpu: Default number of CPUs (default: 2).
-#     _mem: Default amount of memory in MB (default: 2048).
-#     _dsk: Default disk size in GB (default: 100).
-#     permanent_download_dir: Default location for KVM ISO files (default: "/var/lib/libvirt/boot/").
-#     _saveto: Default location for preseed files (temporary directory in /tmp).
-#     CloudConfigDir: Default location for cidata files (same as _saveto).
-#     bin_virt_install: Default path for the virt-install binary.
-#     virt_net: Default network to use for the VM.
+# Usage Examples:
+# Example 1: Default VM Creation
+# Creates a VM using default parameters:
+# kvm::make_vm_template_now_from_ubuntu_com
 #
-# Functionality
+# Example 2: Fully Customized VM
+# Creates a VM with 8 GB RAM, 4 CPUs, 250 GB disk, using Ubuntu 20.04 LTS, Kubuntu flavor:
+# kvm::make_vm_template_now_from_ubuntu_com --ram 8192 --cpus 4 --disk 250 --flavor ubuntu --version 20.04 --role desktop
 #
-#     Parameter Parsing: The function starts by parsing optional parameters to override default values for VM configuration.
-#     Dependency Check: Ensures that all necessary dependencies for VM creation are present.
-#     ISO Retrieval: Fetches the relevant Ubuntu ISO based on the specified version and flavor.
-#     VM Configuration: Formats the name of the VM and prepares the configuration summary.
-#     Installation Process: Depending on the Ubuntu version, the function chooses the appropriate installer and method (debian installer, cloud config, modern installer).
-#     VM Creation: Executes the virt-install command with the specified parameters to create the VM.
-#     Logging and Cleanup: Logs the summary message and cleans up residual variables.
+# Example 3: Interactive VM Setup
+# Starts an interactive session to manually specify VM settings during creation:
+# kvm::make_vm_template_now_from_ubuntu_com --ask YES
 #
-# Usage
+# Detailed Steps:
+# 1. Parameter Parsing: Parses and applies provided command-line arguments to override default settings.
+# 2. Dependency Check: Verifies all required software and dependencies are installed.
+# 3. ISO Retrieval: Downloads or locates the specified Ubuntu ISO, depending on version and flavor.
+# 4. VM Configuration: Sets up the VM according to the specified parameters including network and storage.
+# 5. Installation Process: Initiates the installation of the Ubuntu OS on the VM using the virt-install tool.
+# 6. Logging and Cleanup: Logs the setup process and cleans up any temporary files created during the installation.
 #
-# To use this function, invoke it with the desired parameters. For example:
+# Error Handling:
+# Implements error checks at each step to ensure any issues are addressed, such as missing dependencies or download errors.
 #
-# bash
-#
-# kvm::make_vm_template_now_from_ubuntu_com --ram 4096 --cpu 4 --disk 200 --flavor ubuntu --role desktop
 #
 # Notes
 #
-#     The function is part of a larger system presumably dealing with VM management, and it expects certain utilities and conventions to be present in the environment.
-#     It is designed to be flexible with various Ubuntu versions and handles different installation methods based on the version.
+#     The function is part of a larger system presumably dealing with VM management, and it 
+#     expects certain utilities and conventions to be present in the environment.
+#     It is designed to be flexible with various Ubuntu versions and handles different 
+#     installation (preseed.cfg or autoinstall.yaml) methods based on the version.
 #     Error handling is incorporated to manage issues during the VM creation process.
 #     The function includes logging capabilities for tracking the VM creation process.
 #
+#     Please note that the various ubunto versions may or may  not work with the preseed.cfg file
+#     or the autoinstall.yaml correctly as Canonical changes the way the installer works constantly.
+#     For stability and predictability please refer to Debian instead. Also please note that the
+#     automatic installations are created per the Ubuntu documentation, and you may experience issues
+#     with the preseed.cfg file or the autoinstall.yaml file anyway as the documentation appears incomplete.
+#
+# Globals: ${ubuntu_flavor} ${_role} ${_task} ${_cpu} ${_mem} ${_dsk} ${permanent_download_dir} ${_saveto} ${CloudConfigDir} ${bin_virt_install} ${virt_net}
 # End of Documentation
 
 	# Set default values for VM T-Shirts sizes (may vary by OS)...
@@ -10300,19 +10318,21 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	# Format the name of the VM to be created...
 	local vm_name="Template_Ubuntu_${_tgt_ubuntu_ver}_${_role}_$(date +%Y-%m-%d-%s)"
 
-	# Set the version name based on the version number selected for use with net install URL's...
-	local _version_name
-	case "${_tgt_ubuntu_ver::5}" in
-		12.04) _version_name="precise" ;;
-		12.10) _version_name="quantal" ;;
-		14.04) _version_name="trusty" ;;
-		14.10) _version_name="utopic" ;;
-		16.04) _version_name="xenial" ;;
-		16.10) _version_name="yakkety" ;;
-		18.04) _version_name="bionic" ;;
-		18.10) _version_name="cosmic" ;;
-		*) _version_name="Modern version not likeing debian methods" ;;
-	esac
+	# Create auto installation files for the Ubuntu VM...
+	system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --desktop_environment ${_UserDesktopEnvironemtSelection}
+	: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release --version ${_tgt_ubuntu_ver} --distribution ${ubuntu_flavor} --desktop )}
+	: ${iso_filename:="$(basename $ubuntu_iso_url)"}
+
+	# Ensure that the file is available for VM creation... 
+	write_status "Checking if $iso_filename already downloaded..."
+	iso=$(find "$permanent_download_dir" -name "$iso_filename")
+	if [ ! -e "$iso" ]; then
+		write_warning "$iso_filename is not in cache, downloading..."
+		wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
+		iso="$permanent_download_dir/$iso_filename"
+	else
+		write_information "💿 - $iso_filename already in cache, using it for VM greenfield creation..."
+	fi
 
 	# Prepare the summary message for the VM creation...
 	_summary_message="
@@ -10320,7 +10340,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	📋 - Using the instructions in: ${_preseed_file} \n
 	🔧 - Using this source for the packages and files to download: \n
 	🌎 - ISO from ${permanent_download_dir} or \n
-	💿 - URL: http://archive.ubuntu.com/ubuntu/dists/trusty/main/installer-amd64/  \n
+	💿 - URL: https://ftp.halifax.rwth-aachen.de/ubuntu/dists/trusty/main/installer-amd64/  \n
 	🖥️ - Using the network: ${virt_net:=default} \n
 	🖥️ - Memory: ${_mem} \n
 	🖥️ - CPU's: ${_cpu} \n
@@ -10335,13 +10355,12 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	case "${_role}" in
 		workstation | desktop | VDI )
 			write_status "🖥️ 	- Using a desktop environment: ${_UserDesktopEnvironemtSelection}"
-			if [[ ${_tgt_ubuntu_ver::2} -lt 20 ]] ; then
+			if [[ ${_tgt_ubuntu_ver::2} -lt 16 ]] ; then
 
-				# For legacy Ubuntu builds (less than 20) use the debian installer (d-i) directly from the source tree online...
+				# for really old Ubuntu builds (less than 16) use the debian installer (d-i) and using DVD ISO but still PRESEED.cfg...
+				# Ubuntu 14* look for the kernel called vmlinuz.efi and initrd called initrd instead of vmlinuz and initrd.gz, so 
+				# we use a different option to install the VM.
 				system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: is less than 16, so using debian installer (d-i) and desktop media..."
-				system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --desktop_environment ${_UserDesktopEnvironemtSelection}
-				write_information "💿 - Using online install for VM greenfield creation..."
-
 				system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Running install options for debian installer (d-i)..."
 				{
 				"${bin_virt_install}" --name ${vm_name} \
@@ -10349,36 +10368,21 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 					--memory "${_mem}" \
 					--network "${virt_net}" \
 					--disk size="${_dsk}" \
-					--os-variant="ubuntutrusty" \
-					--video "virtio" --channel "spicevmc" \
-					--location "http://archive.ubuntu.com/ubuntu/dists/${_version_name}/main/installer-amd64/" \
+					--os-variant="ubuntu${_tgt_ubuntu_ver::5}" \
+					--video "qxl" --channel "spicevmc" \
+					--location="${iso},kernel=casper/vmlinuz.efi,initrd=casper/initrd" \
+					--extra-args="ks=file:/preseed.cfg auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=${Preference_InitialKeyboardLayout} \
+					netcfg/get_hostname=${vm_name} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
+					localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 					--initrd-inject="${_saveto}/preseed.cfg" \
 					--initrd-inject="${_saveto}/ks.cfg" \
-					--extra-args="ks=file:${_saveto}/preseed.cfg auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=${Preference_InitialKeyboardLayout} \
-					netcfg/get_hostname=${vm_name} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
-					localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " 
-					--noautoconsole -v || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )  
+					--noautoconsole || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )  
 				} 2>&1 |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 
 			elif [[ ${_tgt_ubuntu_ver::2} -lt 23 ]] ; then
 
 				# for interim Ubuntu builds (less than 23) use the debian installer (d-i) using DVD ISO but still PRESEED.cfg...
 				system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: is less than 23, so using debian installer (d-i) and desktop media..."
-				system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --desktop_environment ${_UserDesktopEnvironemtSelection}
-				: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release --version ${_tgt_ubuntu_ver} --distribution ${ubuntu_flavor} --desktop )}
-				: ${iso_filename:="$(basename $ubuntu_iso_url)"}
-
-				# Ensure that the file is available for VM creation... 
-				write_status "Checking if $iso_filename already downloaded..."
-				iso=$(find "$permanent_download_dir" -name "$iso_filename")
-				if [ ! -e "$iso" ]; then
-					write_warning "$iso_filename is not in cache, downloading..."
-					wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
-					iso="$permanent_download_dir/$iso_filename"
-				else
-					write_information "💿 - $iso_filename already in cache, using it for VM greenfield creation..."
-				fi
-
 				system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Running install options for debian installer (d-i)..."
 				{
 				"${bin_virt_install}" --name ${vm_name} \
@@ -10386,11 +10390,11 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 					--memory "${_mem}" \
 					--network "${virt_net}" \
 					--disk size="${_dsk}" \
-					--os-variant="ubuntu21.10" \
+					--os-variant="ubuntu${_tgt_ubuntu_ver::5}" \
 					--video "virtio" --channel "spicevmc" \
 					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-					--extra-args="ks=file:${_saveto}/preseed.cfg auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=${Preference_InitialKeyboardLayout} \
-					netcfg/get_hostname=${vm_name} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
+					--extra-args="ks=file:/preseed.cfg auto=true priority=critical debconf/frontend=noninteractive debian-installer/locale=en_US keyboard-configuration/layoutcode=${Preference_InitialKeyboardLayout} \
+					netcfg/get_hostname=RTD-VDI console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
 					localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 					--initrd-inject="${_saveto}/preseed.cfg" \
 					--initrd-inject="${_saveto}/ks.cfg" \
@@ -10399,33 +10403,21 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 
 			elif [[ ${_tgt_ubuntu_ver::2} -ge 23 && ${_tgt_ubuntu_ver::2} -lt 24 ]] ; then
 
-				# For interim Ubuntu builds (greater than 23 but less than 24) there is not way to automate the install...
+				# For interim Ubuntu builds (greater than 23 but less than 24) there is no way to automate the install.
+				# Only the server media supports automation... This is not a supported version of Ubuntu.
 				dialog::display_notice "🐧 Ubuntu version ${_tgt_ubuntu_ver} no longer supports Debian preseed and not yet 
 				CloudCOnfig thus it is an unsupported version of Ubuntu. \n\n
-				\n Please consider using a supported version instead. \n\n"
+				\n Please consider using a supported version instead: ${all_lts_versions[*]} \n\n"
 				return 1
 
 			elif [[ ${_tgt_ubuntu_ver::2} -ge 24 ]] ; then
 
 				# For modern Ubuntu builds (greater than 24) use the cloud config and desktop media to build desktop...
+				# However, this seems to be half baked... Hope it actually works for you...
 				system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using MODERN installer..."
 				system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor ${_flavor:-"ubuntu-desktop"} 
 
-				: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release --version ${_tgt_ubuntu_ver} --distribution ${ubuntu_flavor} --desktop )}
-				: ${iso_filename:="$(basename $ubuntu_iso_url)"}
-
-				# Ensure that the file is available for VM creation... 
-				write_status "Checking if $iso_filename already downloaded..."
-				iso=$(find "$permanent_download_dir" -name "$iso_filename")
-				if [ ! -e "$iso" ]; then
-					write_warning "$iso_filename is not in cache, downloading..."
-					wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || { read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url" && return 1 ; }
-					iso="$permanent_download_dir/$iso_filename"
-				else
-					write_information "💿 - $iso_filename already in cache, using it for VM greenfield creation..."
-				fi
-
-				system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greated than 23, so using cloud config and desktop media to build desktop..."
+				system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greated than 24, so using cloud config and desktop media to build desktop..."
 				{
 				 "${bin_virt_install}" --name ${vm_name} \
 					--vcpus "${_cpu}" \
@@ -11197,45 +11189,62 @@ template::preseed_cfg::auto_disk_layout() {
 
 	cat >> ${1} <<-EOF
 		# --------------------------------------------------- #
-		#   C.4.11. Disk layout (default encrypted disk)
+		#   C.4.11. Disk layout (default plain non crypt disk)
 		# --------------------------------------------------- #
 		#
 		# Set option to encrypt the hard disk:
-		# By default the harddisk will be encrypted to pretect data
-		# and will need to be unlocked with a password when the
-		# system is booted. In addition a default is prefferred
-		# where the swap space is set to 200% of RAM so that
-		# hibernate can be supported.
-		# d-i partman-auto/choose_recipe select root-encrypted
-
-		$( if [ "${Preference_DiskEncryption}" = "YES" ] || [ "${Preference_DiskEncryption}" = "yes" ]; then
-			echo "d-i partman-auto/method string crypto
-			d-i partman-crypto/passphrase password ${Preference_Disk_Password}
-			d-i partman-crypto/passphrase-again password ${Preference_Disk_Password}
-			d-i partman-auto-crypto/erase_disks boolean false
-			d-i partman-auto-lvm/new_vg_name string rtd-crypt"
-		else
-			echo "d-i partman-auto/method string lvm
-			d-i partman-auto-lvm/new_vg_name string rtd-lvm"
-		fi )
-		d-i partman-lvm/device_remove_lvm boolean true
-		d-i partman-lvm/device_remove_lvm_span boolean true
-		d-i partman-auto/purge_lvm_from_device boolean true
-		d-i partman-lvm/confirm boolean true
-		d-i partman-lvm/confirm_nooverwrite boolean true
-		d-i partman-auto-lvm/guided_size string max
-		d-i partman-md/device_remove_md boolean true
-		d-i partman-md/confirm boolean true
-		d-i partman-basicfilesystems/no_mount_point boolean false
-		d-i partman-partitioning/confirm_write_new_label boolean true
-		d-i partman/choose_partition select finish
-		d-i partman/confirm boolean true
-		d-i partman/confirm_nooverwrite boolean true
+		# By default the harddisk will not be encrypted 
+		# To protect data the disk encrypted and need to be 
+		# unlocked with a password when the system is booted. 
+		# This configuration is controlled by the "Preference_DiskEncryption"
+		# variable set in a configuration file for user preferences
+		# when building VM's. See _rtd_library documentation for more.
+		# For Disk layout: 
 		# You can choose one of the three predefined partitioning recipes:
 		# - atomic: all files in one partition
 		# - home:   separate /home partition
 		# - multi:  separate /home, /var, and /tmp partitions
-		d-i partman-auto/choose_recipe select atomic
+
+		$( if [ "${Preference_DiskEncryption}" = "YES" ] || [ "${Preference_DiskEncryption}" = "yes" ]; then
+			echo "
+			d-i partman-auto/method string crypto
+			d-i partman-crypto/passphrase password ${Preference_Disk_Password}
+			d-i partman-crypto/passphrase-again password ${Preference_Disk_Password}
+			d-i partman-auto-crypto/erase_disks boolean false
+			d-i partman-lvm/confirm boolean true
+			d-i partman-lvm/confirm_nooverwrite boolean true
+			d-i partman-auto-lvm/guided_size string max
+			d-i partman-auto-lvm/new_vg_name string rtd-crypt
+			d-i partman-lvm/device_remove_lvm boolean true
+			d-i partman-lvm/device_remove_lvm_span boolean true
+			d-i partman-auto/purge_lvm_from_device boolean true
+			d-i partman-md/device_remove_md boolean true
+			d-i partman-md/confirm boolean true
+			d-i partman-basicfilesystems/no_mount_point boolean false
+			d-i partman-partitioning/confirm_write_new_label boolean true
+			d-i partman/choose_partition select finish
+			d-i partman/confirm boolean true
+			d-i partman/confirm_nooverwrite boolean true
+			d-i partman-auto/choose_recipe select atomic
+			"
+		else
+			echo "
+			# Setup a simple disk layout with all files in one partition:
+			d-i partman-auto/method string regular
+			d-i partman-auto/choose_recipe select atomic
+			d-i partman-partitioning/confirm_write_new_label boolean true
+			d-i partman/choose_partition select finish
+			d-i partman/confirm boolean true
+			d-i partman/confirm_nooverwrite boolean true
+
+			# For Ubuntu:
+			ubiquity partman-auto/method string regular
+			ubiquity partman-lvm/device_remove_lvm boolean true
+			ubiquity partman-md/device_remove_md boolean true
+			ubiquity partman-auto/choose_recipe select atomic
+			"
+		fi )
+
 	EOF
 }
 
