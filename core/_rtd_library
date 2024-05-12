@@ -1363,18 +1363,20 @@ system::generate_autoyast_file() {
 	# End of documentation
 
 	# Get vm config standard options
-	system::get_vm_config
-
+	system::log_item "Called by: ${FUNCNAME[1]} with options $*"
+	system::get_vm_config || system::log_item "Failed to get configuration options from saved preferences..."
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 		--filename | --file )
 			_autoyast_filename="$2"
+			system::log_item "AutoYaST file will be saved as: ${_autoyast_filename}"
 			shift
 		;;
 		--desktop_environment | --DE )
 			if [[ $2 == "kde" || $2 == "gnome" || $2 == "xfce" || $2 == "lxde" || $2 == "mate" || $2 == "cinnamon" || $2 == "enlightenment" || $2 == "lxqt" ]] ; then
 				_UserDesktopEnvironemtSelection="${2}"
+				system::log_item "Desktop selection: ${_UserDesktopEnvironemtSelection}"
 			else
 				write_error "⛔ Unknown Desktop Environment: $2"
 				return 1
@@ -1384,6 +1386,7 @@ system::generate_autoyast_file() {
 		--server_role | --ServerRole | --SR )
 			if [[ $2 == "lamp" || $2 == "dns" || $2 == "dhcp_dns_server" || $2 == "file_server" || $2 == "print_server" || $2 == "mail_server" || $2 == "monitoring" || $2 == "desktop" ]] ; then
 				_UserServerEnvironemtSelection="${2}"
+				system::log_item "Server selection: ${_UserServerEnvironemtSelection}"
 			else
 				write_error "⛔ Unknown Server selection: $2"
 				return 1
@@ -1393,6 +1396,7 @@ system::generate_autoyast_file() {
 		--product | --product )
 			if [[ $2 == "Leap" || $2 == "SLES" || $2 == "Tumbleweed" ]] ; then
 				_UserProductSelection="$2"
+				system::log_item "Product selection: ${_UserProductSelection}"
 			else
 				write_error "⛔ Unknown product selection: $2"
 				return 1
@@ -1400,11 +1404,18 @@ system::generate_autoyast_file() {
 			shift
 		;;
 		--disk_encryption | --DC )
-			Preference_DiskEncryption="$2"
+			if [[ $2 == "YES" || $2 == "NO" ]] ; then
+				Preference_DiskEncryption="$2"
+				system::log_item "Disk encryption: ${Preference_DiskEncryption}"
+			else
+				write_error "⛔ Unknown disk encryption selection: $2"
+				return 1
+			fi
 			shift
 		;;
 		--disk_password | --DP )
 			Preference_Disk_Password="$2"
+			system::log_item "Disk encryption password set."
 			shift
 		;;
 		--help | -h )
@@ -1417,8 +1428,6 @@ system::generate_autoyast_file() {
 		esac
 		shift 
 	done
-
-	system::log_item "Called by: ${FUNCNAME[1]}"
 
 	# Localized variables based on User preferences, but with suse speciffic defaults:
 	# We cannot have empty tags in XML or validation will fail: so echo stored values with relevant tags.
@@ -10067,7 +10076,92 @@ kvm::make_vm_template_now_from_debian_org() {
 
 
 
+kvm::util::read_common_options() {
+	system::log_item "Reading common options for KVM virtual machine creation..."
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--role | --Role )
+			if [[ $2 == "workstation" || $2 == "desktop" || $2 == "VDI" || $2 == "server" ]] ; then
+				_role="${2}"
+				write_status "🎭 Selecting role: ${2}"
+			else
+				write_error "⛔ Unknown role selection: ${2} ==> Use workstation or server"
+				return 1
+			fi
+			shift
+		;;
+		--ask | --prompt | --interactive )
+			if [[ $2 == "YES" || $2 == "yes" || $2 == "Yes" || $2 == "NO" || $2 == "No" || $2 == "no" ]] ; then
+				_ask="${2}"
+				write_status "🤔 Prompting for configuration options..."
+			else
+				write_error "⛔ incorretc option: ${2} ==> Use YES or NO"
+				return 1
+			fi
+			shift
+		;;
+		--ram | --memory | -m )
+			_mem="${2}"
+			write_status "🖥️ Memory: ${_mem}"
+			shift
+		;;
+		--cpu | -c )
+			_cpu="${2}"
+			write_status "🖥️ CPU's: ${_cpu}"
+			shift
+		;;
+		--disk | -d )
+			_dsk="${2}"
+			write_status "🖥️ Disk Size: ${_dsk}"
+			shift
+		;;
+		--tshirt-size | -t )
+			case "${2}" in
+			"small" | "S" | "s" )
+				_cpu=2
+				_mem=2048
+				_dsk=100
+				write_status "👕 T-Shirt Size Small: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
+			;;
+			"medium" | "M" | "m" )
+				_cpu=4
+				_mem=4096
+				_dsk=100
+				write_status "👕 T-Shirt Size Medium: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
+			;;
+			"large" | "L" | "l" )
+				_cpu=8
+				_mem=8192
+				_dsk=100
+				write_status "👕 T-Shirt Size Large: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
+			;;
+			"extra-large" | "XL" | "xl" )
+				_cpu=16
+				_mem=16384
+				_dsk=100
+				write_status "👕 T-Shirt Size Extra Large: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
+			;;
+			"extra-extra-large" | "XXL" | "xxl" )
+				_cpu=32
+				_mem=32768
+				_dsk=100
+				write_status "👕 T-Shirt Size Extra Extra Large: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
+			;;
+			esac
+			shift
+		;;
+		--help | -h )
+			write_information "Usage: ${FUNCNAME[0]} --role workstation|server --cpu 2 --memory 2048 --disk 100 --tshirt-size small|medium|large|extra-large|extra-extra-large  --ask YES|NO"
+			return 0
+		;;
+		*)
+			system::log_item "Unknown common parameter:[$1] - ignoring..."
+		;;
+		esac
+		shift 
+	done
 
+}
 
 
 
@@ -10170,7 +10264,13 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	: ${bin_virt_install:=$(type -p virt-install)} 		# This is the default location for the virt-install binary.
 	: ${virt_net="$(system::find_vm_bridge)"} 		# This is the default network to use for the VM.
 
+	# Ensure everything for creating VMs is in place...
+	dependency::virtualization
+
 	# Check for optional parameters overrides...
+	kvm::util::read_common_options ${*}
+
+	# Read ubuntu specific options...
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 		--saveto | --location | --path | --dir | --directory | -p )
@@ -10208,28 +10308,8 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 			fi
 			shift
 		;;
-		--role | --Role )
-			if [[ $2 == "workstation" || $2 == "desktop" || $2 == "VDI" || $2 == "server" ]] ; then
-				local _role="${2}"
-				write_status "🎭 Selecting role: ${2}"
-			else
-				write_error "⛔ Unknown role selection: ${2} ==> Use workstation or server"
-				return 1
-			fi
-			shift
-		;;
-		--ask | --prompt | --interactive )
-			if [[ $2 == "YES" || $2 == "yes" || $2 == "Yes" || $2 == "NO" || $2 == "No" || $2 == "no" ]] ; then
-				local _ask="${2}"
-				write_status "🤔 Prompting for configuration options..."
-			else
-				write_error "⛔ incorretc option: ${2} ==> Use YES or NO"
-				return 1
-			fi
-			shift
-		;;
 		--help | -h )
-			write_information "Usage: ${FUNCNAME[0]} [-p <filename> ] [-u URL ] [-c workstation|ssh-server|ansible-server ]"
+			write_information "Usage: ${FUNCNAME[0]} --save-to /tmp --preseed-file /tmp/preseed.cfg --flavor ubuntu --desktop_environment ubuntu-desktop --server_role openssh-server --ask YES"
 			return 0
 		;;
 		--version | -v )
@@ -10238,14 +10318,13 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 			return 0
 		;;
 		*)
-			write_error "Unknown parameter: $1"
+			system::log_item "Unknown parameter: $1"
 		;;
 		esac
 		shift 
 	done
 
-	# Ensure everything for creating VMs is in place...
-	dependency::virtualization
+
 
 	# Determine available versions of Ubuntu to offer...
 	system::log_item "🔎 Retreive list of available $ubuntu_flavor $_role versions..."
@@ -10254,7 +10333,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	dist_logo="${ubuntulogo}"
 
 
-	# Check if a version of Ubuntu was specified, otherwise make sure it is...
+	# Check if a version of Ubuntu was specified, otherwise make sure it is (default to latest LTS)...
 	if [[ -z ${_tgt_ubuntu_ver} ]]; then
 		write_information "🐧 - No version of Ubuntu specified..."
 		if [[ ${_ask} == "YES" ]]; then
@@ -11212,7 +11291,6 @@ template::preseed_cfg::auto_disk_layout() {
 			d-i partman-crypto/passphrase-again password ${Preference_Disk_Password}
 			d-i partman-auto-crypto/erase_disks boolean false
 			d-i partman-lvm/confirm boolean true
-			d-i partman-lvm/confirm_nooverwrite boolean true
 			d-i partman-auto-lvm/guided_size string max
 			d-i partman-auto-lvm/new_vg_name string rtd-crypt
 			d-i partman-lvm/device_remove_lvm boolean true
@@ -11224,7 +11302,6 @@ template::preseed_cfg::auto_disk_layout() {
 			d-i partman-partitioning/confirm_write_new_label boolean true
 			d-i partman/choose_partition select finish
 			d-i partman/confirm boolean true
-			d-i partman/confirm_nooverwrite boolean true
 			d-i partman-auto/choose_recipe select atomic
 			"
 		else
@@ -11235,7 +11312,6 @@ template::preseed_cfg::auto_disk_layout() {
 			d-i partman-partitioning/confirm_write_new_label boolean true
 			d-i partman/choose_partition select finish
 			d-i partman/confirm boolean true
-			d-i partman/confirm_nooverwrite boolean true
 
 			# For Ubuntu:
 			ubiquity partman-auto/method string regular
