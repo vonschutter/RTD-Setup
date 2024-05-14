@@ -1292,75 +1292,75 @@ system::generate_ks_cfg_file() {
 
 system::generate_autoyast_file() {
 	# Description:
-	# Function to dynamically generate an AutoYaST XML file for automated SUSE Linux installations.
-	# This function allows customization of the installation process, including desktop environment,
-	# server role, disk encryption, initial user setup, and more based on provided arguments.
-	#
-	# Globals:
-	#   None explicitly declared within the function, but it expects certain environment variables
-	#   to be set (e.g., _autoyast_filename, _UserDesktopEnvironmentSelection, etc.) based on the arguments passed.
-	#
-	# Arguments:
-	#   --filename <file path>                : Specifies the path and filename where the AutoYaST XML file will be saved.
-	#   --desktop_environment <DE name>       : Selects the desktop environment to install (kde, gnome, xfce, lxde, mate, cinnamon, enlightenment, lxqt).
-	#   --server_role <role name>             : Specifies the server role (lamp, dns, dhcp_dns_server, file_server, print_server, mail_server, monitoring, desktop).
-	#   --disk_encryption <YES|NO>            : Enables or disables disk encryption.
-	#   --disk_password <password>            : Sets the disk encryption password (ignored if disk encryption is NO).
-	#   --initial_user <username>             : Sets the username for the initial user account.
-	#   --initial_user_password <password>    : Sets the password for the initial user account.
-	#   --help | -h                           : Displays usage information for the function.
-	#
-	# Outputs:
-	#   The function generates an AutoYaST XML file at the specified location. It also outputs status messages,
-	#   error messages, and usage information to the console based on the operations performed and arguments provided.
-	#
-	# Returns:
-	#   0 : Successfully generated the AutoYaST XML file.
-	#   1 : Encountered an error due to incorrect or missing arguments.
-	#
-	# Usage:
-	#   To generate an AutoYaST file with specific configurations, call the function with the desired options. For example:
-	#   system::generate_autoyast_file --filename "/path/to/autoyast.xml" --desktop_environment "kde" --server_role "lamp" \
-	#   --disk_encryption "YES" --disk_password "securepassword" --initial_user "admin" --initial_user_password "adminpassword"
-	#
-	#   Providing the --help or -h argument displays usage information:
-	#   system::generate_autoyast_file --help
-	#
-	# Supported desktop Configurations:
-	#    | basic_desktop        | A very basic desktop (previously part of x11 pattern) | pattern
-	#    | budgie               | Budgie Desktop Environment                            | pattern
-	#    | budgie_applets       | Applets for Budgie Desktop Environment                | pattern
-	#    | cinnamon             | Cinnamon Desktop Environment                          | pattern
-	#    | deepin               | Deepin Desktop Environment                            | pattern
-	#    | gnome                | GNOME Desktop Environment (Wayland)                   | pattern
-	#    | gnome_basic          | GNOME Desktop Environment (Basic)                     | pattern
-	#    | gnome_x11            | GNOME Desktop Environment (X11)                       | pattern
-	#    | kde                  | KDE Applications and Plasma 5 Desktop                 | pattern
-	#    | kde_plasma           | KDE Plasma 5 Desktop Base                             | pattern
-	#    | lxde                 | LXDE Desktop Environment                              | pattern
-	#    | lxqt                 | LXQt Desktop Environment                              | pattern
-	#    | mate                 | MATE Desktop Environment                              | pattern
-	#    | xfce                 | XFCE Desktop Environment                              | pattern
-	#    | yast2_desktop        | YaST Desktop Utilities                                | pattern
-	#
-	# Supported Server Configurations:
-	#    | dhcp_dns_server      | DHCP and DNS Server                                   | pattern
-	#    | directory_server     | Directory Server (LDAP)                               | pattern
-	#    | file_server          | File Server                                           | pattern
-	#    | gateway_server       | Internet Gateway                                      | pattern
-	#    | kvm_server           | KVM Host Server                                       | pattern
-	#    | lamp_server          | Web and LAMP Server                                   | pattern
-	#    | mail_server          | Mail and News Server                                  | pattern
-	#    | oracle_server        | Oracle Server Base                                    | pattern
-	#    | print_server         | Print Server                                          | pattern
-	#    | sap-bone             | SAP BusinessOne Server Base                           | pattern
-	#    | sap-hana             | SAP HANA Server Base                                  | pattern
-	#    | sap-nw               | SAP NetWeaver Server Base                             | pattern
-	#    | sap_server           | SAP Application Server Base                           | pattern
-	#    | xen_server           | Xen Virtual Machine Host Server                       | pattern
-	#    | yast2_server         | YaST Server Utilities                                 | pattern
-	#
-	# End of documentation
+# This function dynamically generates an AutoYaST XML file for automated SUSE Linux installations.
+# It allows customization of the installation process, including desktop environment, server role, 
+# disk encryption, initial user setup, and more based on provided arguments.
+#
+# Globals:
+#   None explicitly declared within the function, but it expects certain environment variables
+#   to be set (e.g., _autoyast_filename, _UserDesktopEnvironmentSelection, etc.) based on the arguments passed.
+#
+# Arguments:
+#   --filename <file path>                : Specifies the path and filename where the AutoYaST XML file will be saved.
+#   --desktop_environment <DE name>       : Selects the desktop environment to install (kde, gnome, xfce, lxde, mate, cinnamon, enlightenment, lxqt).
+#   --server_role <role name>             : Specifies the server role (lamp, dns, dhcp_dns_server, file_server, print_server, mail_server, monitoring, desktop).
+#   --disk_encryption <YES|NO>            : Enables or disables disk encryption.
+#   --disk_password <password>            : Sets the disk encryption password (ignored if disk encryption is NO).
+#   --initial_user <username>             : Sets the username for the initial user account.
+#   --initial_user_password <password>    : Sets the password for the initial user account.
+#   --help | -h                           : Displays usage information for the function.
+#
+# Outputs:
+#   The function generates an AutoYaST XML file at the specified location. It also outputs status messages,
+#   error messages, and usage information to the console based on the operations performed and arguments provided.
+#
+# Returns:
+#   0 : Successfully generated the AutoYaST XML file.
+#   1 : Encountered an error due to incorrect or missing arguments.
+#
+# Usage:
+#   To generate an AutoYaST file with specific configurations, call the function with the desired options. For example:
+#   system::generate_autoyast_file --filename "/path/to/autoyast.xml" --desktop_environment "kde" --server_role "lamp" \
+#   --disk_encryption "YES" --disk_password "securepassword" --initial_user "admin" --initial_user_password "adminpassword"
+#
+#   Providing the --help or -h argument displays usage information:
+#   system::generate_autoyast_file --help
+#
+# Supported Desktop Environments:
+#   | basic_desktop        | A very basic desktop (previously part of x11 pattern) | pattern
+#   | budgie               | Budgie Desktop Environment                            | pattern
+#   | budgie_applets       | Applets for Budgie Desktop Environment                | pattern
+#   | cinnamon             | Cinnamon Desktop Environment                          | pattern
+#   | deepin               | Deepin Desktop Environment                            | pattern
+#   | gnome                | GNOME Desktop Environment (Wayland)                   | pattern
+#   | gnome_basic          | GNOME Desktop Environment (Basic)                     | pattern
+#   | gnome_x11            | GNOME Desktop Environment (X11)                       | pattern
+#   | kde                  | KDE Applications and Plasma 5 Desktop                 | pattern
+#   | kde_plasma           | KDE Plasma 5 Desktop Base                             | pattern
+#   | lxde                 | LXDE Desktop Environment                              | pattern
+#   | lxqt                 | LXQt Desktop Environment                              | pattern
+#   | mate                 | MATE Desktop Environment                              | pattern
+#   | xfce                 | XFCE Desktop Environment                              | pattern
+#   | yast2_desktop        | YaST Desktop Utilities                                | pattern
+#
+# Supported Server Roles:
+#   | dhcp_dns_server      | DHCP and DNS Server                                   | pattern
+#   | directory_server     | Directory Server (LDAP)                               | pattern
+#   | file_server          | File Server                                           | pattern
+#   | gateway_server       | Internet Gateway                                      | pattern
+#   | kvm_server           | KVM Host Server                                       | pattern
+#   | lamp_server          | Web and LAMP Server                                   | pattern
+#   | mail_server          | Mail and News Server                                  | pattern
+#   | oracle_server        | Oracle Server Base                                    | pattern
+#   | print_server         | Print Server                                          | pattern
+#   | sap-bone             | SAP BusinessOne Server Base                           | pattern
+#   | sap-hana             | SAP HANA Server Base                                  | pattern
+#   | sap-nw               | SAP NetWeaver Server Base                             | pattern
+#   | sap_server           | SAP Application Server Base                           | pattern
+#   | xen_server           | Xen Virtual Machine Host Server                       | pattern
+#   | yast2_server         | YaST Server Utilities                                 | pattern
+#
+# End of documentation
 
 	# Get vm config standard options
 	system::log_item "Called by: ${FUNCNAME[1]} with options $*"
@@ -1423,7 +1423,7 @@ system::generate_autoyast_file() {
 			return 0
 		;;
 		*)
-			write_error "Unknown parameter: $1"
+			system::log_item "Unknown parameter: $1 ignored."
 		;;
 		esac
 		shift 
@@ -1436,6 +1436,10 @@ system::generate_autoyast_file() {
 	else
 		#Preference_DiskEncryption_SUSE="<encryption_password></encryption_password>"
 		system::log_item "Disk encryption is not enabled."
+	fi
+
+	if [[ -z ${_autoyast_filename} ]] ; then
+		_autoyast_filename="$(mktemp /tmp/autoyast.XXXXXX)"
 	fi
 
 	write_host --cyan "Creating AUTOYAST Instructions (XML): ${_autoyast_filename}"
@@ -9778,69 +9782,105 @@ kvm::make_vm_template_now_from_redhat_com() {
 
 
 make_kvm_virtual_machine_now_from_opensuse_org() {
-# Description: Function to create a SUSE KVM virtual michine disk and define a VM. This function should be
-# used on a Qemu/KVM virtual host that the virtual guest is to be used on.
-# NOTE: QCOW2 is a storage format for virtual .
-# machine disk images QCOW stands for QEMU copy on write. The QCOW2 format decouples the physical storage
-# layer from the virtual layer by adding a mapping between logical and physical blocks.
-# NOTE2: Kernel-based Virtual Machine (KVM) is an open source virtualization technology built into Linux®.
-# Specifically, KVM lets you turn Linux into a hypervisor that allows a host machine to run multiple,
-# isolated virtual environments called guests or virtual machines (VMs). KVM is part of Linux.
-# For complete info: https://www.redhat.com/en/topics/virtualization/what-is-KVM
+# Description: Creates a SUSE KVM virtual machine disk and defines a VM. This function is intended to be 
+# used on a Qemu/KVM virtual host where the virtual guest will run.
 #
-# Use the check_dependencies function to make sure the needed software is available.
-# Usage: Either simply call this function to use the defaults or:
-# Call this function with "function" "RAM_SIZE" "DISK_SIZE" "DISK_FORMAT" "DISK_FILE"
-# Omitting any of the arguments will us the default instead.
+# QCOW2 (QEMU Copy On Write) is a storage format for virtual machine disk images. It decouples the physical 
+# storage layer from the virtual layer by adding a mapping between logical and physical blocks.
+#
+# Kernel-based Virtual Machine (KVM) is an open source virtualization technology built into Linux. KVM allows 
+# a host machine to run multiple, isolated virtual environments called guests or virtual machines (VMs).
+# For more information: https://www.redhat.com/en/topics/virtualization/what-is-KVM
+#
+# Use the check_dependencies function to ensure the required software is available.
+#
+# Usage:
+#   - Call this function with no arguments to use default values.
+#   - Or call this function with the following arguments:
+#     "function" "RAM_SIZE" "DISK_SIZE" "DISK_FORMAT" "DISK_FILE"
+#     Omitting any arguments will use the default values.
 #
 # Globals:
-# Arguments: None
+#   None required but read from the _locations.info file.
+#   _SUSE_LEAP_SOURCE
+#   _SUSE_SLES_SOURCE
+#   _SUSE_TUMBLEWEED_SOURCE
+#
+# Arguments:
+#   --filename <file path>                : Specifies the path and filename where the AutoYaST XML file will be saved.
+#   --desktop_environment <DE name>       : Selects the desktop environment to install (kde, gnome, xfce, lxde, mate, cinnamon, enlightenment, lxqt).
+#   --server_role <role name>             : Specifies the server role (lamp, dns, dhcp_dns_server, file_server, print_server, mail_server, monitoring, desktop).
+#   --disk_encryption <YES|NO>            : Enables or disables disk encryption.
+#   --disk_password <password>            : Sets the disk encryption password (ignored if disk encryption is NO).
+#   --initial_user <username>             : Sets the username for the initial user account.
+#   --initial_user_password <password>    : Sets the password for the initial user account.
+#   --help | -h                           : Displays usage information for the function.
+#   --source_url | --source | --URL       : The source URL for the SUSE version.
+#
 # Outputs:
+#   Information about the created virtual machine.
+#
 # Returns:
-# Usage:
+#   0 on success, 1 on error.
+#
+# Example:
+# 
 # End of Documentation
 
 	dependency::virtualization
-
-	# Check for optional default T-Shirts size overrides... 
-	local OPTIND o a
-	while getopts ':c:m:d:' OPTION; do
-		case "$OPTION" in
-		c )
-			local _cpu="${OPTARG}"
-			write_information "Custom CPU set to: ${OPTARG}"
-		;;
-		m )
-			local _mem="${OPTARG}"
-			write_information "Custom memory set to: ${OPTARG}"
-		;;
-		d )
-			local _dsk="${OPTARG}"
-			write_information "Custom disk sizee set to: ${OPTARG}"
-		;;
-		? )
-			write_host --cyan  "Usage: ${FUNCNAME[0]} or ${FUNCNAME[0]} [-c <#CPU>, -m <MB RAM>, -d <GB Disk>]"
-			return 0
-		;;
-		esac
-	done
-	unset OPTIND
-
 	# Set default values for VM T-Shirts sizes...
 	: ${_cpu="${_cpu:-2}"}
 	: ${_mem="${_mem:-2048}"}
 	: ${_dsk="${_dsk:-100}"}
 	: ${CONFIG:="VDI"}
 
+	# Check for optional default overrides... 
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--source_url | --url | --source | --URL )
+			local source_url="${2}"
+			write_information "📋 instructed to use source: ${_filename}"
+			shift
+		;;
+		--help | -h )
+			echo "Usage: generate_autoyast_file --filename <file path> --desktop_environment <kde|gnome|xfce|lxde|mate|cinnamon|enlightenment|lxqt> --server_role <lamp|dns|dhcp_dns_server|file_server|print_server|mail_server|monitoring|desktop> --disk_encryption <YES|NO> --disk_password <password> --initial_user <username> --initial_user_password <password>"
+			return 0
+		;;
+		*)
+			system::log_item "Unknown parameter: $1 ignored."
+		;;
+		esac
+		shift 
+	done
+
+	system::generate_autoyast_file ${*}
+
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
 
 	# Discover if the appropriate VM net interface is (default or br'0 - n')
-	local virt_net source_url vm_kernel vm_initrd
 	: ${virt_net="$(system::find_vm_bridge)"}
-	: ${source_url:="${_SUSE_LEAP_SOURCE:-"https://download.opensuse.org/distribution/openSUSE-current/repo/oss/"}"}
+	
+	# Set the default source URL for the SUSE version if not already set...
+	# NOTE: Using --source_url first, then the global variable (from _locations.info), then the default.
+	if [[ -z "${source_url}" ]]; then
+		case ${_UserProductSelection} in 
+			"Leap" )
+				: ${source_url:="${_SUSE_LEAP_SOURCE:-"https://download.opensuse.org/distribution/openSUSE-current/repo/oss/"}"}
+			;;
+			"SLES" )
+				: ${source_url:="${_SUSE_SLES_SOURCE:-"https://download.opensuse.org/distribution/leap/15.3/repo/oss/"}"}
+			;;
+			"Tumbleweed" )
+				: ${source_url:="${_SUSE_TUMBLEWEED_SOURCE:-"https://download.opensuse.org/tumbleweed/repo/oss/"}"}
+			;;
+			* )
+				: ${source_url:="${_SUSE_LEAP_SOURCE:-"https://download.opensuse.org/distribution/openSUSE-current/repo/oss/"}"}
+			;;
+		esac
+	fi
 
-	local vm_name="Template_SUSE_VDI_${CONFIG}_$(date +%Y-%m-%d-%H-%M)"
+	local vm_name="Template_SUSE_${CONFIG}_$(date +%Y-%m-%d-%H-%M)"
 
 	_summary_message="
 	The virtual machine (${vm_name}) \n
@@ -9862,9 +9902,9 @@ make_kvm_virtual_machine_now_from_opensuse_org() {
 		--network "${virt_net}" \
 		--disk size="${_dsk}" \
 		--os-variant=opensusetumbleweed \
-		--initrd-inject="${PRESEED_FILE}" \
+		--initrd-inject="${_autoyast_filename}" \
 		--location="${source_url}" \
-		--extra-args "AutoYaST=file:///$(basename ${PRESEED_FILE})"   \
+		--extra-args "AutoYaST=file:///$(basename ${_autoyast_filename})"   \
 		--noautoconsole && dialog::display_summary_message "NOTICE!"  \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
