@@ -55,12 +55,15 @@ dependency_library ()
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 # Ensure access to the rtd library functions:
-dependency_library &>/dev/null || { echo "Library not found!" ; exit 1 ; }
+if dependency_library &>/dev/null ; then 
+	{ echo "Library found and loaded..." ; }
+else
+	{ echo "Library not found!" ; exit 1 ; }
+fi
 
 # This script relies on curl to send web content to standard out (screen)
 # so we need to ensure that this is available on the system.
-check_dependencies curl || (echo "curl not found!" ; exit 1)
-check_dependencies dnsutils || (echo "dnsutils not found!" ; exit 1)
+dependency::command_exists curl dig dialog || { echo "Cannot continue with finding the internet location of this device since the needed software is not available." ; exit 1 ; }
 
 result=$( curl ipinfo.io/$(dig +short myip.opendns.com @resolver1.opendns.com))
 dialog::display_result

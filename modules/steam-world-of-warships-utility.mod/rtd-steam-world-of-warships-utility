@@ -53,11 +53,11 @@ _scriptname="$(basename $0)"
 _tla="${_scriptname:0:3}"
 _log_dir="$HOME/.config/${_tla}/logs" ; mkdir -p $_log_dir
 _log_file="$_log_dir/${_scriptname}.log" ; touch $_log_file
-_wow_location_steam_old=".local/share/Steam/steamapps/common/World of Warships/replays"
-_wow_location_steam_deb=".steam/debian-installation/steamapps/common/World of Warships/replays"
-_wow_location_steam_new=".steam/root/steamapps/common/World of Warships/replays"
-_wow_location_steam_flatpak=".var/app/com.valvesoftware.Steam/steamapps/common/World of Warships/replays"
-_wow_location_steam_snap="snap/steam/steamapps/common/World of Warships/replays"
+_wow_location_steam_old="${HOME}/.local/share/Steam/steamapps/common/World of Warships/replays"
+_wow_location_steam_deb="${HOME}/.steam/debian-installation/steamapps/common/World of Warships/replays"
+_wow_location_steam_new="${HOME}/.steam/root/steamapps/common/World of Warships/replays"
+_wow_location_steam_flatpak="${HOME}/.var/app/com.valvesoftware.Steam/steamapps/common/World of Warships/replays"
+_wow_location_steam_snap="${HOME}/snap/steam/steamapps/common/World of Warships/replays"
 _title="RTD Unofficial Steam World of Warships Utility"
 _steam_install_url_rpm="https://steamcdn-a.akamaihd.net/client/installer/steam.rpm"
 _steam_install_url_deb="https://steamcdn-a.akamaihd.net/client/installer/steam.deb"
@@ -139,16 +139,16 @@ steam::install_proton_ge ()
 	selected_versions=$(yad --title "Select GE-Proton Versions to Install" \
 		--list --checklist \
 		--column "Select" --column "Version" \
-		--width 780 --height 300 \
+		--width 780 --height 500 \
 		"${versions[@]}" \
 		--button="Install:0" --button="Cancel:1" \
 		--print-column="2" --multiple --separator=" " \
 		--separator=" " \
-		--image="${_ui_side_bar}" )
+		--image="${_ui_header}" )
 
 	if [ $? -ne 0 ]; then
 		echo "Installation canceled."
-		exit 1
+		return 1
 	fi
 	action_items=($( for i in ${selected_versions} ; do echo $i ; done))
 	echo "Installing the following versions: ${action_items[*]}"
@@ -205,19 +205,19 @@ steam::install_proton_ge ()
 
 steam::find_replays ()
 {
-	if [[ -d ~/${_wow_location_steam_old} ]] ; then
+	if [[ -d ${_wow_location_steam_old} ]] ; then
 		wow_path="$_wow_location_steam_old"
 		export wow_path
- 	elif [[ -d ~/"${_wow_location_steam_deb}" ]] ; then
+ 	elif [[ -d "${_wow_location_steam_deb}" ]] ; then
 		wow_path="$_wow_location_steam_deb"
 		export wow_path
- 	elif [[ -d ~/"${_wow_location_steam_new}" ]] ; then
+ 	elif [[ -d "${_wow_location_steam_new}" ]] ; then
 		wow_path="$_wow_location_steam_new"
 		export wow_path
- 	elif [[ -d ~/"${_wow_location_steam_flatpak}" ]] ; then
+ 	elif [[ -d "${_wow_location_steam_flatpak}" ]] ; then
 		wow_path="$_wow_location_steam_flatpak"
 		export wow_path
- 	elif [[ -d ~/"${_wow_location_steam_snap}" ]] ; then
+ 	elif [[ -d "${_wow_location_steam_snap}" ]] ; then
 		wow_path="$_wow_location_steam_snap"
 		export wow_path
 	else
@@ -227,14 +227,13 @@ steam::find_replays ()
 }
 
 
-
-
 steam::load_replays ()
 {
 	steam::find_replays
 	while true ; do
-		echo "WoW Path = $wow_path"
-		pushd ~/"$wow_path"
+		steam::system::log_item "WoW Path = $wow_path"
+		pushd "$wow_path" || { yad --error --text "Failed to change to the World of Warships directory..."; return 1; }
+
 		_replay=$( yad \
 			--title="$_title" \
 			--text='<span font-size="xx-large" > \n Please select the replay that you want to see below:\n </span> '\
@@ -244,13 +243,13 @@ steam::load_replays ()
 			--button=Watch:0 \
 			--posx=90 \
 			--posy=90 \
-			--file-selection ) 
+			--file ) 
 			ret=$?
 
 			case $ret in 
 				0 )
 					if [[ -n ${_replay}  ]] ; then
-						system::log_item "Launching replay: ${_replay}"
+						steam::system::log_item "Launching replay: ${_replay}"
 						steam -applaunch 552990 "./replays/$( basename "${_replay}")" && break
 					else
 						rtd_say "No file selected" && break
@@ -311,7 +310,7 @@ steam::wow_manager_ui()
 
 		# Handle the user's selection
 		case $ret in
-		0) clear && system::log_item "Loading replays..." ; steam::load_replays ;;
+		0) clear && steam::system::log_item "Loading replays..." ; steam::load_replays ;;
 		1) clear && echo "[Quit]" | tee -a "${_log_file}" ; break ;;
 		2) clear
 			if command -v steam &> /dev/null; then
@@ -320,9 +319,9 @@ steam::wow_manager_ui()
 				echo "$_error_message_003" | tee -a "${_log_file}"
 			fi
 		;;
-		3) clear && system::log_item "Attemption to install Steam..." ; steam::install_steam  ;;
-		4) clear && system::log_item "Attempting to install Proton GE..." ; steam::install_proton_ge  ;;
-		5) clear && system::log_item "Showing About information: ${DOC} " ; rtd_say "${DOC}"  ;;
+		3) clear && steam::system::log_item "Attemption to install Steam..." ; steam::install_steam  ;;
+		4) clear && steam::system::log_item "Attempting to install Proton GE..." ; steam::install_proton_ge  ;;
+		5) clear && steam::system::log_item "Showing About information: ${DOC} " ; rtd_say "${DOC}"  ;;
 		252) clear && echo "[ESC]" | tee -a "${_log_file}" && break ;;
 		*) clear && echo "[Unknown Request]" | tee -a "$${_log_file}" && break ;;
 		esac
@@ -354,7 +353,7 @@ steam::install_steam ()
 
 
 
-system::log_item ()
+steam::system::log_item ()
 {
 	if [[ -z $_log_file ]] ; then
 		# If log file not set globally, set it to defaults for this function a.k.a. script name
@@ -414,8 +413,8 @@ rtd_say ()
 	--title="$_title" \
 	--tail --listen --wrap --monitor --text-info \
 	--width=1024 \
-	--height=600 \
-	--image="$_ui_side_bar" \
+	--height=768 \
+	--image="$_ui_header" \
 	--posx=90 \
 	--posy=90 \
 	--buttons-layout=center \
@@ -441,7 +440,7 @@ write_error ()
 	fi
 
 	# Tell the loging function to log the message requested...
-	[ -n "${text}" ] && system::log_item "🧩 💥 ${FUNCNAME[1]}: ${text}"
+	[ -n "${text}" ] && steam::system::log_item "🧩 💥 ${FUNCNAME[1]}: ${text}"
 
 }
 
@@ -507,9 +506,9 @@ Quit:              Exit this utility\n\
 
 
 if echo "$OSTYPE" |grep "linux" ; then
-	system::log_item "Linux detected..." 
+	steam::system::log_item "Linux detected..." 
 	if hash yad ; then
-		system::log_item "Yad is installed..."
+		steam::system::log_item "Yad is installed..."
 		steam::wow_manager_ui  
 	else
 		echo "$_error_message_002" | tee -a "$_log_file"
