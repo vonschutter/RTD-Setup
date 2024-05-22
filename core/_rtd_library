@@ -841,7 +841,7 @@ system::preseed_to_ubuntu_ks_cfg ()
 }
 
 
-system::make_preseed_cfg ()
+system::make_preseed_cfg()
 {
 # Description: Function to write out a debina preeseed file to a location requested by the first parameter.
 # Other parameters accepted are CONFIG (multiselect de), SRVFUNC (task "Minecraft" "Tasks")
@@ -1291,7 +1291,7 @@ system::generate_ks_cfg_file() {
 
 
 system::generate_autoyast_file() {
-	# Description:
+# Description:
 # This function dynamically generates an AutoYaST XML file for automated SUSE Linux installations.
 # It allows customization of the installation process, including desktop environment, server role, 
 # disk encryption, initial user setup, and more based on provided arguments.
@@ -1365,69 +1365,9 @@ system::generate_autoyast_file() {
 	# Get vm config standard options
 	system::log_item "Called by: ${FUNCNAME[1]} with options $*"
 	system::get_vm_config || system::log_item "Failed to get configuration options from saved preferences..."
-
-	while [[ $# -gt 0 ]]; do
-		case "$1" in
-		--filename | --file )
-			_autoyast_filename="$2"
-			system::log_item "AutoYaST file will be saved as: ${_autoyast_filename}"
-			shift
-		;;
-		--desktop_environment | --DE )
-			if [[ $2 == "kde" || $2 == "gnome" || $2 == "xfce" || $2 == "lxde" || $2 == "mate" || $2 == "cinnamon" || $2 == "enlightenment" || $2 == "lxqt" ]] ; then
-				_UserDesktopEnvironemtSelection="${2}"
-				system::log_item "Desktop selection: ${_UserDesktopEnvironemtSelection}"
-			else
-				write_error "⛔ Unknown Desktop Environment: $2"
-				return 1
-			fi
-			shift
-		;;
-		--server_role | --ServerRole | --SR )
-			if [[ $2 == "lamp" || $2 == "dns" || $2 == "dhcp_dns_server" || $2 == "file_server" || $2 == "print_server" || $2 == "mail_server" || $2 == "monitoring" || $2 == "desktop" ]] ; then
-				_UserServerEnvironemtSelection="${2}"
-				system::log_item "Server selection: ${_UserServerEnvironemtSelection}"
-			else
-				write_error "⛔ Unknown Server selection: $2"
-				return 1
-			fi
-			shift
-		;;
-		--product | --product )
-			if [[ $2 == "Leap" || $2 == "SLES" || $2 == "Tumbleweed" ]] ; then
-				_UserProductSelection="$2"
-				system::log_item "Product selection: ${_UserProductSelection}"
-			else
-				write_error "⛔ Unknown product selection: $2"
-				return 1
-			fi
-			shift
-		;;
-		--disk_encryption | --DC )
-			if [[ $2 == "YES" || $2 == "NO" ]] ; then
-				Preference_DiskEncryption="$2"
-				system::log_item "Disk encryption: ${Preference_DiskEncryption}"
-			else
-				write_error "⛔ Unknown disk encryption selection: $2"
-				return 1
-			fi
-			shift
-		;;
-		--disk_password | --DP )
-			Preference_Disk_Password="$2"
-			system::log_item "Disk encryption password set."
-			shift
-		;;
-		--help | -h )
-			echo "Usage: generate_autoyast_file --filename <file path> --desktop_environment <kde|gnome|xfce|lxde|mate|cinnamon|enlightenment|lxqt> --server_role <lamp|dns|dhcp_dns_server|file_server|print_server|mail_server|monitoring|desktop> --disk_encryption <YES|NO> --disk_password <password> --initial_user <username> --initial_user_password <password>"
-			return 0
-		;;
-		*)
-			system::log_item "Unknown parameter: $1 ignored."
-		;;
-		esac
-		shift 
-	done
+	
+	# Read input and set specific options for SUSE... (roles, desktops, etc.)
+	kvm::util::read_distro_options --distribution suse ${*} 
 
 	# Localized variables based on User preferences, but with suse speciffic defaults:
 	# We cannot have empty tags in XML or validation will fail: so echo stored values with relevant tags.
@@ -1438,6 +1378,8 @@ system::generate_autoyast_file() {
 		system::log_item "Disk encryption is not enabled."
 	fi
 
+	# Ensure that a filename is provided for the AutoYaST XML file, otherwise create a temporary file
+	# and store the path in the _autoyast_filename variable. This can be read by other functions if needed.
 	if [[ -z ${_autoyast_filename} ]] ; then
 		_autoyast_filename="$(mktemp /tmp/autoyast.XXXXXX)"
 	fi
@@ -1591,120 +1533,12 @@ system::get_vm_config() {
 		
 		return $?
 	else
-		write_information "Generating preseed.cfg for: ${_role} ${_task} automatically using defaults..."
+		write_information "Prompting for VM settings is not requested: ${_role} ${_task} automatically using defaults or parameter instructions..."
 		return 0
 	fi
 
 }
 
-
-
-# dependency::command_exists() {
-# 	# Description: Function to check if a command exists.
-# 	# The purpose of this function is to check if a command exists in the system.
-# 	# To use this function, simply call it passing the command name as an argument.
-
-# 	# Globals: None
-# 	# Arguments: ["Command name"]
-# 	# Outputs: None
-# 	# Returns: 0 if the command exists, 1 if it does not
-# 	# Usage:	
-# 	# dependency::command_exists "command"
-# 	#	
-# 	# End of Documentation
-
-# 	# List of required command(s) from input:
-# 	required_commands=($@)
-
-# 	# Function to check if a command is available
-# 	command_exists() {
-# 		command -v "$1" >/dev/null 2>&1
-# 	}
-
-# 	# Check each command and collect the missing ones
-# 	missing_commands=()
-# 	for cmd in "${required_commands[@]}"; do
-# 		if ! command_exists "$cmd"; then
-# 			missing_commands+=("$cmd")
-# 		fi
-# 	done
-
-# 	install_missing_commands() {
-# 		local distro
-# 		distro=$(system::distribution_type)
-
-# 		for cmd in "${missing_commands[@]}"; do
-# 			case "$distro" in
-# 			debian)
-# 				# Debian and Ubuntu
-# 				local cmd=$1
-# 				# Check if the command exists
-# 				if ! command -v "$cmd" &> /dev/null; then
-# 					# Attempt to execute the command to trigger 'command-not-found'
-# 					# and capture its output
-# 					local install_info
-# 					install_info=$( $cmd 2>&1 )
-
-# 					# Extract the package suggestion
-# 					local pkg
-# 					pkg=$(echo "$install_info" | grep -oP 'sudo apt install \K[^ ]+')
-
-# 					if [ -n "$pkg" ]; then
-# 						write_status "Installing '$cmd' using package '$pkg'..."
-# 						apt install -y "$pkg"
-# 					else
-# 						write_error "Package for command '$cmd' not found."
-# 					fi
-# 				fi
-# 				;;
-# 			redhat)
-# 				# Fedora and RHEL
-# 				local pkg
-# 				pkg=$(dnf provides */$cmd | grep ' : ' | head -n1 | cut -d' ' -f1)
-# 				if [[ -n "$pkg" ]]; then
-# 					dnf install -y "$pkg"
-# 				fi
-# 				;;
-# 			suse)
-# 				# openSUSE / SUSE
-# 				for cmd in "${missing_commands[@]}"; do
-# 					cnf_output=$(cnf "$cmd" 2>&1)
-# 					if [[ $cnf_output == *"can be found in following package"* ]]; then
-# 						# Extracting package name
-# 						pkg=$(echo "$cnf_output" | grep "^\s*\*" | awk '{print $2}')
-# 						if [[ -n "$pkg" ]]; then
-# 							zypper install -y "$pkg"
-# 						else
-# 							write_error "Package for command '$cmd' not found."
-# 						fi
-# 					else
-# 						write_error "Command '$cmd' not found in cnf database."
-# 					fi
-# 				done
-# 			;;
-# 			*)
-# 				write_error "Unsupported distribution: $distro"
-# 				exit 1
-# 				;;
-# 			esac
-# 		done
-# 	}
-
-# 	if [ ${#missing_commands[@]} -eq 0 ]; then
-# 		return 0
-# 	else
-# 		read -p "${#missing_commands[@]} command(s) are missing: ${missing_commands[*]}. Do you want to install them? [y/N]: " response
-# 		if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-# 			# Ensure the user has sudo privileges
-# 			[[ $EUID -eq 0 ]] || system::ensure_admin 
-# 			install_missing_commands
-# 			return $? # Return the exit status of the installation(s) 
-# 		else
-# 			write_error "Required command(s) not found: ${missing_commands[*]}"
-# 			return 1
-# 		fi
-# 	fi
-# }
 
 
 
@@ -8319,31 +8153,37 @@ system::log_item() {
 	case "${FUNCNAME[1]}" in
 		write_error)
 			log_type="ERR!"
+			log_ico="💥"
 			log_message="$*"
 		;;
 		write_warning)
 			log_type="WARN"
+			log_icon="⚠ "
 			log_message="$*"
 		;;
 		write_information)
 			log_type="INFO"
+			log_icon="🛈 "
 			log_message="$*"
 		;;
 		write_host)
 			log_type="HOST"
+			log_icon="💻"
 			log_message="$*"
 		;;
 		write_status)
 			log_type="STAT"
+			log_icon="✔ "
 			log_message="$*"
 		;;
 		*)
 			log_type="LOGD"
+			log_icon="📜"
 			log_message="${FUNCNAME[1]}: $*"
 		;;
 	esac
 
-	echo "${log_prefix} ${log_type} : ${log_message}" >> "$logfile"
+	echo "${log_prefix} ${log_icon} : ${log_type} : ${log_message}" >> "$logfile"
 }
 
 
@@ -9555,51 +9395,117 @@ rtd_setup_choices_server() {
 
 
 
+system::validate_parameters() {
+# Description: Function to validate that all parameters match the pattern --option "value".
+# Globals: None
+# Arguments: $@ - The parameters to validate.
+# Outputs: Error messages for any invalid parameters.
+# Returns: 0 if all parameters are valid, 1 if any invalid parameters are found.
+# Usage: validate_parameters "$@"
+# End of documentation
+
+	# Log the start of parameter validation
+	system::log_item "Validating parameter format..."
+	system::log_item "Parameters: $*"
+	# Initialize an index to iterate through the parameters
+	local index=0
+
+	# Iterate through the parameters
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--*)
+			# Check if the next parameter is provided and is not another option
+			if [[ -z "$2" || "$2" == --* ]]; then
+			write_error "⛔ Invalid parameter format: '$1' must be followed by a value."
+			return 1
+			fi
+			# Log the valid parameter and its value
+			system::log_item "Valid parameter format: '$1' with value: '$2'"
+			shift 2
+		;;
+		*)
+			write_error "⛔ Unexpected parameter format: '$1'. Expected an option starting with '--'."
+			return 1
+		;;
+		esac
+		index=$((index + 1))
+	done
+
+	# Log the successful validation of parameters
+	system::log_item "All $index parameter pairs are valid."
+	return 0
+}
+
 
 
 
 
 
 kvm::util::read_common_options() {
+# Description: Function to read common options for KVM virtual machine creation. This function processes 
+# various parameters such as role, memory, CPU, disk size, and t-shirt size, setting them for the VM.
+# It also handles interactive prompts for configuration options if specified.
+# Globals: _tshirt_cpu_* _tshirt_mem_* _tshirt_dsk_* for small|medioum|large|extra-large|extra-extra-large
+#          as is saved in a configuration file for the user VM preferences.
+# Arguments: 
+# Outputs: Status and error messages
+# Returns: 0 if successful, 1 if an error occurs
+# Usage: kvm::util::read_common_options --role workstation|desktop|VDI|server --cpu 2 --memory 2048 --disk 100 
+#        --tshirt-size small|medium|large|extra-large|extra-extra-large --ask YES|NO
+# End of documentation
+
+	# Log the start of reading common options for KVM VM creation
 	system::log_item "Reading common options for KVM virtual machine creation..."
+	ALL_PARAMS=("$@")
+
+	# Ensure that the parameters are in a valid format
+	system::validate_parameters "${ALL_PARAMS[@]}"
+
+	# Process each argument passed to the function
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 		--role | --Role )
+			# Handle the role option: validate and set the role if valid
 			if [[ $2 == "workstation" || $2 == "desktop" || $2 == "VDI" || $2 == "server" ]] ; then
 				_role="${2}"
 				write_status "🎭 Selecting role: ${2}"
 			else
-				write_error "⛔ Unknown role selection: ${2} ==> Use workstation or server"
+				write_error "⛔ Unknown role selection: ${2} ==> Use workstation, desktop, VDI, or server"
 				return 1
 			fi
-			shift
+			shift 2
 		;;
 		--ask | --prompt | --interactive )
+			# Handle the interactive prompt option: validate and set the prompt option if valid
 			if [[ $2 == "YES" || $2 == "yes" || $2 == "Yes" || $2 == "NO" || $2 == "No" || $2 == "no" ]] ; then
 				_ask="${2}"
 				write_status "🤔 Prompting for configuration options..."
 			else
-				write_error "⛔ incorretc option: ${2} ==> Use YES or NO"
+				write_error "⛔ Incorrect option: ${2} ==> Use YES or NO"
 				return 1
 			fi
-			shift
+			shift 2
 		;;
 		--ram | --memory | -m )
+			# Handle the memory option: set the memory size
 			_mem="${2}"
 			write_status "🖥️ Memory: ${_mem}"
-			shift
+			shift 2
 		;;
 		--cpu | -c )
+			# Handle the CPU option: set the number of CPUs
 			_cpu="${2}"
 			write_status "🖥️ CPU's: ${_cpu}"
-			shift
+			shift 2
 		;;
 		--disk | -d )
+			# Handle the disk option: set the disk size
 			_dsk="${2}"
 			write_status "🖥️ Disk Size: ${_dsk}"
-			shift
+			shift 2
 		;;
 		--tshirt-size | -t )
+			# Handle the T-shirt size option: set CPU, memory, and disk size based on the selected size
 			case "${2}" in
 			"small" | "S" | "s" )
 				_cpu=${_tshirt_cpu_small:-"2"}
@@ -9632,18 +9538,328 @@ kvm::util::read_common_options() {
 				write_status "👕 T-Shirt Size Extra Extra Large: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
 			;;
 			esac
-			shift
-		;;
-		--help | -h )
-			write_information "Usage: ${FUNCNAME[0]} --role workstation|server --cpu 2 --memory 2048 --disk 100 --tshirt-size small|medium|large|extra-large|extra-extra-large  --ask YES|NO"
-			return 0
+			shift 2
 		;;
 		*)
+			# Log any unknown parameters and ignore them
 			system::log_item "Unknown common parameter:[$1] - ignoring..."
+			shift
 		;;
 		esac
 		shift 
 	done
+
+}
+
+
+
+
+kvm::util::read_distro_options() {
+# Description: Function to read distribution specific options for KVM virtual machine creation. This function processes
+# various parameters such as desktop environment, server role, and source URL, setting them for the VM.
+# It also handles interactive prompts for configuration options if specified.
+# Globals: None
+# Arguments:
+# Outputs: Status and error messages
+# Returns: 0 if successful, 1 if an error occurs
+# Usage: kvm::util::read_distro_options --desktop_environment @deepin-desktop-environment --server_role @web-server-environment --source https://dl.fedoraproject.org/pub/fedora/linux/releases/39/Everything/x86_64/os/
+# End of documentation
+
+	# Log the start of reading distribution specific options for KVM VM creation
+	system::log_item "Reading distribution specific options for KVM virtual machine creation..."
+	ALL_PARAMS=("$@")
+
+	# Ensure that the parameters are in a valid format
+	system::validate_parameters "${ALL_PARAMS[@]}"
+
+	# process each argument passed to the function and find the distributoin option if it exists
+	system::log_item "Reading if distribution has been explicitly requested..."
+	while [[ $# -gt 0 ]]; do
+		case "$1" in 
+			--distribution | --distro | --dist | -d )
+				# Handle the distribution option: set the distribution
+				_distribution="$2"
+				write_status "🐧 Distribution requested explicitly: ${_distribution}"
+				shift 2
+			;;
+			*)
+				shift
+			;;
+		esac
+		shift
+	done
+
+
+	# If a distribution is not set, try to determine it from the calling function name
+	if [[ -z "${_distribution}" ]]; then
+		# List of distributions to check
+		system::log_item "Determining distribution from function name; looking for fedora, ubuntu, debian, suse, centos, rhel, or microsoft..."
+		distributions=("fedora" "ubuntu" "debian" "suse" "centos" "rhel" "microsoft")
+		
+		# Iterate over the distributions and check if the function name contains one of them
+		for distro in "${distributions[@]}"; do
+			if [[ ${FUNCNAME[1]} == *"$distro"* ]]; then
+				_distribution="$distro"
+				system::log_item "Distribution determined from function name: ${_distribution}"
+				break
+			fi
+		done
+	else 
+		system::log_item "Distribution set by caller: ${_distribution}"
+	fi
+
+	# Finally check if the distribution is set, if not log an error
+	if [[ -z "${_distribution}" ]]; then
+		# Log an error if the distribution is not set
+		write_error "⛔ Distribution not set or determined, ingoring any speciffic settings and continuing with defaults..."
+	fi
+
+	# Process known distribution speciffic options
+	kvm::util::read_distro_options::process_all_params() {
+		case "${_distribution}" in 
+			"fedora" | "Fedora" | "FEDORA" )
+				system::log_item "🐧 Set the requested options for Fedora..."
+				while [[ $# -gt 0 ]] ; do
+					case ${1} in
+						--desktop_environment | --DE )
+							if [[ $2 == "@deepin-desktop-environment" || $2 == "@sway-desktop-environment" || $2 == "@basic-desktop-environment" || $2 == "@(i3-desktop-environment" || $2 == "@developer-workstation-environment" || $2 == "@budgie-desktop-environment" || $2 == "@sugar-desktop-environment" || $2 == "@mate-desktop-environment" || $2 == "@kde-desktop-environment" || $2 == "@xfce-desktop-environment" || $2 == "@lxde-desktop-environment" || $2 == "@lxqt-desktop-environment" || $2 == "@cinnamon-desktop-environment" || $2 == "@mate-desktop-environment" || $2 == "@workstation-product-environment" ]] ; then
+								_UserDesktopEnvironemtSelection="${2}"
+								write_host --cyan  "🖥️ Selecting desktop environment: ${_UserDesktopEnvironemtSelection}"
+							else
+								write_error "⛔ Unknown Desktop Environment: $2 ==> Use deepin-desktop-environment, sway-desktop-environment, basic-desktop-environment, i3-desktop-environment, developer-workstation-environment, budgie-desktop-environment, sugar-desktop-environment, mate-desktop-environment, kde-desktop-environment, xfce-desktop-environment, lxde-desktop-environment, lxqt-desktop-environment, cinnamon-desktop-environment, mate-desktop-environment, workstation-product-environment"
+								return 1
+							fi
+							shift 2
+						;;
+						--server_role | --ServerRole | --SR )
+							if [[ $2 == "@minimal-environment" || $2 == "@web-server-environment" || $2 == "@freeipa-server" || $2 == "@network-server" || $2 == "@cloud-server-environment" || $2 == "@infrastructure-server-environment" ]] ; then
+								_UserServerEnvironemtSelection="${2}"
+								write_status "🎭 Selecting server role: ${2}"
+							else
+								write_error "⛔ Unknown server role selection: ${2} ==> Use web-server-environment, freeipa-server, network-server, cloud-server-environment, infrastructure-server-environment"
+								return 1
+							fi
+							shift 2
+						;;
+						--source | --URL | --url )
+							_repo_url="${2}"
+							write_status "🌐 Using URL: ${_repo_url}"
+							shift 2
+						;;
+						*)
+							shift
+						;;
+					esac
+					shift
+				done
+			;;
+			"ubuntu" | "Ubuntu" | "UBUNTU" )
+				while [[ $# -gt 0 ]]; do
+					case "$1" in
+					--saveto | --location | --path | --dir | --directory | -p )
+						_saveto="$2"
+						write_host --cyan  "📜 Directed to create preseed instructions file: ${_saveto}/preseed.cfg"
+						shift 2
+					;;
+					--file | --preseed | --preseed_file | --preseed_cfg | --preseed_cfg_file | --preseed_file )
+						_preseed_file="$2"
+						write_host --cyan  "📜 Directed to create preseed instructions file: ${_preseed_file}"
+						shift 2
+					;;
+					--flavor | --Flavor )
+						# Ubuntu flavor to use (e.g. ubuntu, kubuntu, lubuntu, xubuntu, etc.)
+						_flavor="$2"
+						shift  2
+					;;
+					--desktop_environment | --DE )
+						if [[ $2 == "ubuntu-desktop" || $2 == "kubuntu-desktop" || $2 == "xubuntu-desktop" || $2 == "lubuntu-desktop" || $2 == "ubuntu-mate-desktop" || $2 == "ubuntu-budgie-desktop" ]] ; then
+							_UserDesktopEnvironemtSelection="${2}"
+							write_host --cyan  "🖥️ Selecting desktop environment: ${_UserDesktopEnvironemtSelection}"
+						else
+							write_error "⛔ Unknown Desktop Environment: $2 ==> Use ubuntu-desktop, kubuntu-desktop, xubuntu-desktop, lubuntu-desktop, ubuntu-mate-desktop, ubuntu-budgie-desktop"
+							return 1
+						fi
+						shift 2
+					;;
+					--server_role | --ServerRole | --SR )
+						if [[ $2 == "openssh-server" || $2 == "xubuntu-core" || $2 == "lamp-server" || $2 == "postfix" || $2 == "bind9" || $2 == "dnsmasq" || $2 == "dhcp-server" || $2 == "print-server" ]]  ; then
+							_UserServerEnvironemtSelection="${2}"
+							write_status "🎭 Selecting server role: ${2}"
+						else
+							write_error "⛔ Unknown server role selection: ${2} ==> Use open-ssh-server, xubuntu-core, lamp-server, postfix, bind9, dnsmasq, dhcp-server, print-server"
+							return 1
+						fi
+						shift 2
+					;;
+					--help | -h )
+						write_information "Usage: ${FUNCNAME[0]} --save-to /tmp --preseed-file /tmp/preseed.cfg --flavor ubuntu --desktop_environment ubuntu-desktop --server_role openssh-server --ask YES"
+						return 0
+					;;
+					--version | -v )
+						_tgt_ubuntu_ver="$2"
+						write_status "🐧 Ubuntu version requested: ${_tgt_ubuntu_ver}"
+						return 0
+					;;
+					*)
+						shift
+					;;
+					esac
+					shift 
+				done
+			;;
+			"debian" | "Debian" | "DEBIAN" )
+				while [[ $# -gt 0 ]]; do
+					case "$1" in
+					--desktop_environment | --DE )
+						if [[ $2 == "gnome-desktop" || $2 == "kde-desktop" || $2 == "lxde-desktop" || $2 == "xfce-desktop" || $2 == "mate-desktop" || $2 == "cinnamon-desktop"  ]] ; then
+							_UserDesktopEnvironemtSelection="${2}"
+							write_host --cyan  "🖥️ Selecting desktop environment: ${_UserDesktopEnvironemtSelection}"
+						else
+							write_error "⛔ Unknown Desktop Environment: $2 ==> Use gnome-desktop, kde-desktop, lxde-desktop, xfce-desktop, mate-desktop, cinnamon-desktop"
+							return 1
+						fi
+						shift 2
+					;;
+					--server_role | --ServerRole | --SR )
+						if [[ $2 == "openssh-server" || $2 == "lamp-server" || $2 == "postfix" || $2 == "bind9" || $2 == "dnsmasq" || $2 == "dhcp-server" || $2 == "print-server" ]]  ; then
+							_UserServerEnvironemtSelection="${2}"
+							write_status "🎭 Selecting server role: ${2}"
+						else
+							write_error "⛔ Unknown server role selection: ${2} ==> Use web-server-environment, freeipa-server, network-server, cloud-server-environment, infrastructure-server-environment"
+							return 1
+						fi
+						shift 2
+					;;
+					*)
+						shift
+					;;
+					esac
+					shift 
+				done
+			;;
+			"suse" | "SUSE" | "Suse" | "openSUSE" | "OpenSUSE" | "opensuse" | "OpenSuse" | "OPENSUSE" | "OPENSuse" | "OPENSUSE" )
+				while [[ $# -gt 0 ]]; do
+					case "$1" in
+					--source_url | --url | --source | --URL )
+						source_url="${2}"
+						system::log_item "📋 instructed to use source: ${_filename}"
+						shift 2
+					;;
+					--filename | --file )
+						_autoyast_filename="$2"
+						system::log_item "AutoYaST file will be saved as: ${_autoyast_filename}"
+						shift 2
+					;;
+					--desktop_environment | --DE )
+						if [[ $2 == "kde" || $2 == "gnome" || $2 == "xfce" || $2 == "lxde" || $2 == "mate" || $2 == "cinnamon" || $2 == "enlightenment" || $2 == "lxqt" ]] ; then
+							_UserDesktopEnvironemtSelection="${2}"
+							system::log_item "Desktop selection: ${_UserDesktopEnvironemtSelection}"
+						else
+							write_error "⛔ Unknown Desktop Environment: $2"
+							return 1
+						fi
+						shift 2
+					;;
+					--server_role | --ServerRole | --SR )
+						if [[ $2 == "lamp" || $2 == "dns" || $2 == "dhcp_dns_server" || $2 == "file_server" || $2 == "print_server" || $2 == "mail_server" || $2 == "monitoring" || $2 == "desktop" || $2 == "gateway_server" || $2 == "kvm_server" || $2 == "sap-bone" || $2 == "sap-hana" || $2 == "sap-nw" || $2 == "sap_server" || $2 == "xen_server" || $2 == "yast2_server" || $2 == "directory_server"  ]] ; then
+							_UserServerEnvironemtSelection="${2}"
+							system::log_item "Server selection: ${_UserServerEnvironemtSelection}"
+						else
+							write_error "⛔ Unknown Server selection: $2"
+							return 1
+						fi
+						shift 2
+					;;
+					--product | --product )
+						if [[ $2 == "Leap" || $2 == "SLES" || $2 == "Tumbleweed" ]] ; then
+							_UserProductSelection="$2"
+							system::log_item "Product selection: ${_UserProductSelection}"
+						else
+							write_error "⛔ Unknown product selection: $2"
+							return 1
+						fi
+						shift 2
+					;;
+					--disk_encryption | --DC )
+						if [[ $2 == "YES" || $2 == "NO" ]] ; then
+							Preference_DiskEncryption="$2"
+							system::log_item "Disk encryption: ${Preference_DiskEncryption}"
+						else
+							write_error "⛔ Unknown disk encryption selection: $2"
+							return 1
+						fi
+						shift 2
+					;;
+					--disk_password | --DP )
+						Preference_Disk_Password="$2"
+						system::log_item "Disk encryption password set."
+						shift
+					;;
+					*)
+						shift
+					;;
+					esac
+					shift 
+				done
+			;;
+			"rhel" | "RHEL" | "RedHat" | "REDHAT" )
+				system::log_item "🐧 Set the requested options for RedHat..."
+				while [[ $# -gt 0 ]] ; do
+					case ${1} in
+						--desktop_environment | --DE )
+							if [[ $2 == "@deepin-desktop-environment" || $2 == "@sway-desktop-environment" || $2 == "@basic-desktop-environment" || $2 == "@developer-workstation-environment" || $2 == "@sugar-desktop-environment" || $2 == "@kde-desktop-environment" || $2 == "@workstation-product-environment" ]] ; then
+								_UserDesktopEnvironemtSelection="${2}"
+								write_host --cyan  "🖥️ Selecting desktop environment: ${_UserDesktopEnvironemtSelection}"
+							else
+								write_error "⛔ Unknown Desktop Environment: $2 ==> Use basic-desktop-environment, developer-workstation-environment, sugar-desktop-environment, kde-desktop-environment, workstation-product-environment"
+								return 1
+							fi
+							shift 2
+						;;
+						--server_role | --ServerRole | --SR )
+							if [[ $2 == "@minimal-environment" || $2 == "@web-server-environment" || $2 == "@freeipa-server" || $2 == "@network-server" || $2 == "@cloud-server-environment" || $2 == "@infrastructure-server-environment" ]] ; then
+								_UserServerEnvironemtSelection="${2}"
+								write_status "🎭 Selecting server role: ${2}"
+							else
+								write_error "⛔ Unknown server role selection: ${2} ==> Use web-server-environment, freeipa-server, network-server, cloud-server-environment, infrastructure-server-environment"
+								return 1
+							fi
+							shift 2
+						;;
+						--source | --URL | --url )
+							_repo_url="${2}"
+							write_status "🌐 Using URL: ${_repo_url}"
+							shift 2
+						;;
+						*)
+							shift
+						;;
+					esac
+				done
+			;;
+			"Windows" | "WINDOWS" | "Win" | "Win11" | "Win10" )
+				system::log_item "❖ Set the requested options for Windows..."
+				while  [[ $# -gt 0 ]] ; do
+					case "$1" in
+						--winver )
+							target_winver="$2"
+							write_information "❖ Custom Windows version requested and set to: ${target_winver}"
+							shift 2
+						;;
+						*)
+							shift
+						;;
+					esac
+					shift
+				done
+			;;
+			*)
+				# Log any unknown distribution and set the default values
+				system::log_item "⛔ No valid distribution requested or found, ignoring distribution speciffic VM settings..."
+			;;
+		esac
+	}
+	kvm::util::read_distro_options::process_all_params "${ALL_PARAMS[@]}"
 
 }
 
@@ -9750,58 +9966,11 @@ make_kvm_virtual_machine_now_from_fedora_org() {
 	# Set default values for VM T-Shirts sizes...
 	kvm::util::read_common_options ${*}
 
-	#system::process_vm_opt_args ${*}
+	# Set specific options for Fedora...
+	kvm::util::read_distro_options ${*}
+
+	# Check that virtualization is supported on the host
 	dependency::virtualization
-
-	# Check for optional default distribution speciffic overrides... 
-	while [[ $# -gt 0 ]]; do
-		case "$1" in
-		--desktop_environment | --DE )
-			if [[ $2 == "@deepin-desktop-environment" || $2 == "@sway-desktop-environment" || $2 == "@basic-desktop-environment" || $2 == "@(i3-desktop-environment" || $2 == "@developer-workstation-environment" || $2 == "@budgie-desktop-environment" || $2 == "@sugar-desktop-environment" || $2 == "@mate-desktop-environment" || $2 == "@kde-desktop-environment" || $2 == "@xfce-desktop-environment" || $2 == "@lxde-desktop-environment" || $2 == "@lxqt-desktop-environment" || $2 == "@cinnamon-desktop-environment" || $2 == "@mate-desktop-environment" || $2 == "@workstation-product-environment" ]] ; then
-				local _UserDesktopEnvironemtSelection="${2}"
-				write_host --cyan  "🖥️ Selecting desktop environment: ${_UserDesktopEnvironemtSelection}"
-			else
-				write_error "⛔ Unknown Desktop Environment: $2 ==> Use deepin-desktop-environment, sway-desktop-environment, basic-desktop-environment, i3-desktop-environment, developer-workstation-environment, budgie-desktop-environment, sugar-desktop-environment, mate-desktop-environment, kde-desktop-environment, xfce-desktop-environment, lxde-desktop-environment, lxqt-desktop-environment, cinnamon-desktop-environment, mate-desktop-environment, workstation-product-environment"
-				return 1
-			fi
-			shift
-		;;
-		--server_role | --ServerRole | --SR )
-			if [[ $2 == "@minimal-environment" || $2 == "@web-server-environment" || $2 == "@freeipa-server" || $2 == "@network-server" || $2 == "@cloud-server-environment" || $2 == "@infrastructure-server-environment" ]] ; then
-				local _UserServerEnvironemtSelection="${2}"
-				write_status "🎭 Selecting server role: ${2}"
-			else
-				write_error "⛔ Unknown server role selection: ${2} ==> Use web-server-environment, freeipa-server, network-server, cloud-server-environment, infrastructure-server-environment"
-				return 1
-			fi
-			shift
-		;;
-		--role | --Role )
-			if [[ $2 == "workstation" || $2 == "server" ]] ; then
-				local _role="${2}"
-				write_status "🎭 Selecting role: ${2}"
-			else
-				write_error "⛔ Unknown role selection: ${2} ==> Use workstation or server"
-				return 1
-			fi
-			shift
-		;;
-		--source | --URL | --url )
-			local _repo_url="${2}"
-			write_status "🌐 Using URL: ${_repo_url}"
-			shift
-		;;
-		--help | -h )
-			write_information "Usage: ${FUNCNAME[0]} --role workstation|server --cpu 2 --memory 2048 --disk 100 --source https://dl.fedoraproject.org/pub/fedora/linux/releases/39/Everything/x86_64/os/"
-			return 0
-		;;
-		*)
-			write_error "Unknown parameter: $1"
-		;;
-		esac
-		shift 
-	done
-
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: "${virt_net="$(system::find_vm_bridge)"}"
@@ -9832,7 +10001,7 @@ make_kvm_virtual_machine_now_from_fedora_org() {
 	fi
 
 
-	local vm_name="Template_Fedora_VDI_${_service}_$(date +%Y-%m-%d-%H-%M)"
+	local vm_name="Template_Fedora_${_service}_$(date +%Y-%m-%d-%H-%M)"
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in Kickstart: ${_preseed_file} \n
@@ -9887,19 +10056,19 @@ kvm::make_vm_template_now_from_redhat_com() {
 # Usage:
 # End of Documentation
 
-	dependency::virtualization
-
-	# Check for optional default T-Shirts size overrides... 
-	# Set default values for VM T-Shirts sizes...
-	kvm::util::read_common_options ${*}
-
-	#system::process_vm_opt_args ${*}
-	dependency::virtualization
-
 	# Set default values for VM T-Shirts sizes...
 	: ${_cpu="${_cpu:-2}"}
 	: ${_mem="${_mem:-2048}"}
 	: ${_dsk="${_dsk:-100}"}
+
+	# Set default values for VM T-Shirts sizes...
+	kvm::util::read_common_options ${*}
+
+	# Set specific options for RedHat...
+	kvm::util::read_distro_options ${*}
+
+	# Check that virtualization is supported on the host
+	dependency::virtualization
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: ${virt_net="$(system::find_vm_bridge)"}
@@ -9914,22 +10083,31 @@ kvm::make_vm_template_now_from_redhat_com() {
 
 	: ${_os_version:="${_DEFAULT_REDHAT_VER}"}
 	: ${_mirrorlist_url="https://mirrors.almalinux.org/mirrorlist/${_os_version}/baseos"}
-	: ${_source_url="https://repo.almalinux.org/almalinux/${_os_version}/BaseOS/x86_64/kickstart/"}
+	: ${_source_url:="https://repo.almalinux.org/almalinux/${_os_version}/BaseOS/x86_64/kickstart/"}
 	: ${_preseed_file="$( mktemp ).cfg"}
 	: ${_config="${1:-"workstation"}"}
-	system::generate_ks_cfg_file -u "${_source_url}" -c "${_config}" -p "${_preseed_file}" -e "@workstation-product-environment"
+	if [[ ${_role} == "workstation" ]] ; then
+		local _service="VDI"
+		system::generate_ks_cfg_file --source "${_source_url}" --role "${_role}" --file "${_preseed_file}" --DE "${_UserDesktopEnvironemtSelection:="@basic-desktop-environment"}"
+	elif [[ ${_role} == "server" ]] ; then
+		local _service="SRV"
+		system::generate_ks_cfg_file --source "${_source_url}" --role "${_role}" --file "${_preseed_file}" --SR "${_UserServerEnvironemtSelection:="@network-server"}"
+	else
+		write_error "Unknown role selection: ${_role} ==> Use workstation or server"
+		return 1
+	fi
 
-	local vm_name="Template_RedHat_VDI_${_config}_$(date +%Y-%m-%d-%H-%M)"
+
+	local vm_name="Template_RedHat_${_service}_$(date +%Y-%m-%d-%H-%M)"
 
 	_summary_message="The virtual machine (${vm_name}) \n
-	📋 - Using the instructions in PRESEED: ${_preseed_file} \n
-	🔧 - And Using this source for the packages and files to download: \n
-	🌎 - ${_source_url} \n
-	🌎 - ${_mirrorlist_url} \n
-	✅ - Using the network: ${virt_net:=default} \n
-	✅ - Memory: ${_mem} \n
-	✅ - CPU's: ${_cpu} \n
-	✅ - Disk Size: ${_dsk} \n You may attach to this server and see the progress at IP: $(hostname -I)"
+	📋 - Using the instructions in Kickstart: ${_preseed_file} \n
+	🔧 - Using this source for the packages and files to download: \n
+	🌎 - ${_source_url%%/*pub*} \n
+	🖥️ - Using the network: ${virt_net:=default} \n
+	🖥️ - Memory: ${_mem} \n
+	🖥️ - CPU's: ${_cpu} \n
+	🖥️ - Disk Size: ${_dsk} \n You may attach to this server and see the progress at IP: $(hostname -I)"
 
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
 		--vcpus "${_cpu}" \
@@ -9940,7 +10118,7 @@ kvm::make_vm_template_now_from_redhat_com() {
 		--initrd-inject="${_preseed_file}" \
 		--location="${_source_url}" \
 		--extra-args "inst.ks=file:/$(basename $_preseed_file)" \
-		--noautoconsole && dialog::display_summary_message "NOTICE!"  \
+		--noautoconsole && dialog::display_summary_message "NOTICE!" \
 	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 
 	for i in  _preseed_file vm_kernel vm_initrd _source_url _config _mirrorlist_url _os_version ; do unset $i ; done
@@ -9997,32 +10175,19 @@ make_kvm_virtual_machine_now_from_opensuse_org() {
 # 
 # End of Documentation
 
-	dependency::virtualization
-	# Set default values for VM T-Shirts sizes...
+	# Set default values for VM T-Shirts size...
 	: ${_cpu="${_cpu:-2}"}
 	: ${_mem="${_mem:-2048}"}
 	: ${_dsk="${_dsk:-100}"}
 	: ${CONFIG:="VDI"}
 
-	# Check for optional default overrides... 
-	while [[ $# -gt 0 ]]; do
-		case "$1" in
-		--source_url | --url | --source | --URL )
-			local source_url="${2}"
-			write_information "📋 instructed to use source: ${_filename}"
-			shift
-		;;
-		--help | -h )
-			echo "Usage: generate_autoyast_file --filename <file path> --desktop_environment <kde|gnome|xfce|lxde|mate|cinnamon|enlightenment|lxqt> --server_role <lamp|dns|dhcp_dns_server|file_server|print_server|mail_server|monitoring|desktop> --disk_encryption <YES|NO> --disk_password <password> --initial_user <username> --initial_user_password <password>"
-			return 0
-		;;
-		*)
-			system::log_item "Unknown parameter: $1 ignored."
-		;;
-		esac
-		shift 
-	done
+	# Check that virtualization is supported on the host
+	dependency::virtualization
 
+	# Set default values for VM T-Shirts sizes, overriding defaults if so instructed...
+	kvm::util::read_common_options ${*}
+
+	# Generate the AutoYaST file based on parameters provided...
 	system::generate_autoyast_file ${*}
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
@@ -10039,7 +10204,7 @@ make_kvm_virtual_machine_now_from_opensuse_org() {
 				: ${source_url:="${_SUSE_LEAP_SOURCE:-"https://download.opensuse.org/distribution/openSUSE-current/repo/oss/"}"}
 			;;
 			"SLES" )
-				: ${source_url:="${_SUSE_SLES_SOURCE:-"https://download.opensuse.org/distribution/leap/15.3/repo/oss/"}"}
+				: ${source_url:="${_SUSE_SLES_SOURCE:-"https://download.opensuse.org/distribution/leap/15.5/repo/oss/"}"}
 			;;
 			"Tumbleweed" )
 				: ${source_url:="${_SUSE_TUMBLEWEED_SOURCE:-"https://download.opensuse.org/tumbleweed/repo/oss/"}"}
@@ -10111,49 +10276,26 @@ kvm::make_vm_template_now_from_debian_org() {
 # Usage:
 # End of Documentation
 
-	# Set default values for VM 
+	# Set default values for VM T-Shirts sizes...
+	: ${_cpu="${_cpu:-2}"}
+	: ${_mem="${_mem:-2048}"}
+	: ${_dsk="${_dsk:-100}"}
 	: ${_role:="desktop"}
 	: ${_task:="ssh-server"}
-	: ${_cpu:="${_cpu:=2}"}
-	: ${_mem:="${_mem:=2048}"}
-	: ${_dsk:="${_dsk:=100}"}
 
 	# Set default values for VM T-Shirts sizes...
 	kvm::util::read_common_options ${*}
 
-	#system::process_vm_opt_args ${*}
-	dependency::virtualization
+	# Set specific options for Debian...
+	kvm::util::read_distro_options ${*}
 
-	# Check distribution speciffic option overrides... 
-	while [[ $# -gt 0 ]]; do
-		case "$1" in
-		--desktop_environment | --DE )
-			if [[ $2 == "gnome-desktop" || $2 == "kde-desktop" || $2 == "lxde-desktop" || $2 == "xfce-desktop" || $2 == "mate-desktop" || $2 == "cinnamon-desktop"  ]] ; then
-				local _UserDesktopEnvironemtSelection="${2}"
-				write_host --cyan  "🖥️ Selecting desktop environment: ${_UserDesktopEnvironemtSelection}"
-			else
-				write_error "⛔ Unknown Desktop Environment: $2 ==> Use gnome-desktop, kde-desktop, lxde-desktop, xfce-desktop, mate-desktop, cinnamon-desktop"
-				return 1
-			fi
-			shift
-		;;
-		--server_role | --ServerRole | --SR )
-			if [[ $2 == "openssh-server" || $2 == "lamp-server" || $2 == "postfix" || $2 == "bind9" || $2 == "dnsmasq" || $2 == "dhcp-server" || $2 == "print-server" ]]  ; then
-				local _UserServerEnvironemtSelection="${2}"
-				write_status "🎭 Selecting server role: ${2}"
-			else
-				write_error "⛔ Unknown server role selection: ${2} ==> Use web-server-environment, freeipa-server, network-server, cloud-server-environment, infrastructure-server-environment"
-				return 1
-			fi
-			shift
-		;;
-		esac
-		shift 
-	done
+	# Check that virtualization is supported on the host
+	dependency::virtualization
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet, and set variables.
 	: "${bin_virt_install:=$(type -p virt-install)}"
 
+	# Set the default source URL for the Debian version if not already set... and add some options depending on the role.
 	case "${_role}" in
 		desktop | Desktop | VDI | vdi | workstation | Workstation)
 			write_status "🖥️ 	- Using a desktop environment: ${_UserDesktopEnvironemtSelection}"
@@ -10300,7 +10442,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 #     Error handling is incorporated to manage issues during the VM creation process.
 #     The function includes logging capabilities for tracking the VM creation process.
 #
-#     Please note that the various ubunto versions may or may  not work with the preseed.cfg file
+#     Please note that the various Ubuntu versions may or may  not work with the preseed.cfg file
 #     or the autoinstall.yaml correctly as Canonical changes the way the installer works constantly.
 #     For stability and predictability please refer to Debian instead. Also please note that the
 #     automatic installations are created per the Ubuntu documentation, and you may experience issues
@@ -10322,67 +10464,14 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	: ${bin_virt_install:=$(type -p virt-install)} 		# This is the default location for the virt-install binary.
 	: ${virt_net="$(system::find_vm_bridge)"} 		# This is the default network to use for the VM.
 
-	# Ensure everything for creating VMs is in place...
-	dependency::virtualization
-
-	# Check for optional parameters overrides...
+	# Set default values for VM T-Shirts sizes...
 	kvm::util::read_common_options ${*}
 
-	# Read ubuntu specific options...
-	while [[ $# -gt 0 ]]; do
-		case "$1" in
-		--saveto | --location | --path | --dir | --directory | -p )
-			local _saveto="$2"
-			write_host --cyan  "📜 Directed to create preseed instructions file: ${_saveto}/preseed.cfg"
-			shift
-		;;
-		--file | --preseed | --preseed_file | --preseed_cfg | --preseed_cfg_file | --preseed_file )
-			local _preseed_file="$2"
-			write_host --cyan  "📜 Directed to create preseed instructions file: ${_preseed_file}"
-			shift
-		;;
-		--flavor | --Flavor )
-			# Ubuntu flavor to use (e.g. ubuntu, kubuntu, lubuntu, xubuntu, etc.)
-			local _flavor="$2"
-			shift # Remove argument name from processing
-		;;
-		--desktop_environment | --DE )
-			if [[ $2 == "ubuntu-desktop" || $2 == "kubuntu-desktop" || $2 == "xubuntu-desktop" || $2 == "lubuntu-desktop" || $2 == "ubuntu-mate-desktop" || $2 == "ubuntu-budgie-desktop" ]] ; then
-				local _UserDesktopEnvironemtSelection="${2}"
-				write_host --cyan  "🖥️ Selecting desktop environment: ${_UserDesktopEnvironemtSelection}"
-			else
-				write_error "⛔ Unknown Desktop Environment: $2 ==> Use ubuntu-desktop, kubuntu-desktop, xubuntu-desktop, lubuntu-desktop, ubuntu-mate-desktop, ubuntu-budgie-desktop"
-				return 1
-			fi
-			shift
-		;;
-		--server_role | --ServerRole | --SR )
-			if [[ $2 == "openssh-server" || $2 == "xubuntu-core" || $2 == "lamp-server" || $2 == "postfix" || $2 == "bind9" || $2 == "dnsmasq" || $2 == "dhcp-server" || $2 == "print-server" ]]  ; then
-				local _UserServerEnvironemtSelection="${2}"
-				write_status "🎭 Selecting server role: ${2}"
-			else
-				write_error "⛔ Unknown server role selection: ${2} ==> Use open-ssh-server, xubuntu-core, lamp-server, postfix, bind9, dnsmasq, dhcp-server, print-server"
-				return 1
-			fi
-			shift
-		;;
-		--help | -h )
-			write_information "Usage: ${FUNCNAME[0]} --save-to /tmp --preseed-file /tmp/preseed.cfg --flavor ubuntu --desktop_environment ubuntu-desktop --server_role openssh-server --ask YES"
-			return 0
-		;;
-		--version | -v )
-			_tgt_ubuntu_ver="$2"
-			write_status "🐧 Ubuntu version requested: ${_tgt_ubuntu_ver}"
-			return 0
-		;;
-		*)
-			system::log_item "Unknown parameter: $1"
-		;;
-		esac
-		shift 
-	done
+	# Set specific options for Debian...
+	kvm::util::read_distro_options ${*}
 
-
+	# Check that virtualization is supported on the host
+	dependency::virtualization
 
 	# Determine available versions of Ubuntu to offer...
 	system::log_item "🔎 Retreive list of available $ubuntu_flavor $_role versions..."
@@ -10646,40 +10735,9 @@ kvm::make_vm_template_now_from_microsoft() {
 # Omitting any of the arguments will us the default instead.
 #
 # End of Documentation
-	dependency::virtualization
 
 	# Check for optional default T-Shirts size overrides... 
 	local _cpu _mem _dsk _saveto AutoUnattend PostTasks WindowsMedia _uefi_option _virt_net
-
-	while  [[ $# -gt 0 ]] ; do
-		case "$1" in
-			--cpu)
-				_cpu="$2"
-				write_information "Custom CPU requested andset to: ${_cpu}"
-				shift 2
-			;;
-			--mem)
-				_mem="$2"
-				write_information "Custom memory requested andset to: ${_mem}"
-				shift 2
-			;;
-			--disk)
-				_dsk="$2"
-				write_information "Custom disk size requested andset to: ${_dsk}"
-				shift 2
-			;;
-			--winver )
-				target_winver="$2"
-				write_information "Custom Windows version requested and set to: ${target_winver}"
-				shift 2
-			;;
-			*)
-				write_host --cyan "Usage: ${FUNCNAME[0]} [--cpu <#CPU>] [--mem <MB RAM>] [--disk <GB Disk>] [--winver <win11 | win10 | win8 | win7>]"
-				return 0
-			;;
-		esac
-	done
-
 
 	# Set default values for VM T-Shirts sizes...
 	: ${_cpu="${_cpu:-2}"}
@@ -10697,6 +10755,15 @@ kvm::make_vm_template_now_from_microsoft() {
 	: ${RTD_GUI:="dialog"}
 	: ${_TLA:="$(basename "$0" | cut -c1-3)"}
 
+	# Set default values for VM T-Shirts sizes...
+	kvm::util::read_common_options ${*}
+
+	# Set specific options for Debian...
+	kvm::util::read_distro_options ${*}
+
+	# Check that virtualization is supported on the host
+	dependency::virtualization
+
 	# Select the appropriate Windows ISO and UEFI boot option based on requested Windows version...
 	case ${target_winver} in
 		win12 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win11_English_x64.iso"} 
@@ -10712,8 +10779,6 @@ kvm::make_vm_template_now_from_microsoft() {
 		win7 ) : ${WindowsMedia="/var/lib/libvirt/boot/Win7_English_x64v1.iso"} 
 			;;
 	esac
-
-
 
 	# Check for the needed ISO file and request it if not found...
 	if [[ ! -e "${WindowsMedia}" ]]; then
@@ -10856,61 +10921,36 @@ make_kvm_virtual_machine_now_from_iso() {
 # Usage:
 # End of Documentation
 
-	dependency::virtualization
-
-	# Check for optional default T-Shirts size overrides... 
-	local OPTIND o a
-	while getopts ':c:m:d:' OPTION; do
-		case "$OPTION" in
-		c )
-			local _cpu="${OPTARG}"
-			write_information "Custom CPU set to: ${OPTARG}"
-		;;
-		m )
-			local _mem="${OPTARG}"
-			write_information "Custom memory set to: ${OPTARG}"
-		;;
-		d )
-			local _dsk="${OPTARG}"
-			write_information "Custom disk sizee set to: ${OPTARG}"
-		;;
-		? )
-			write_host --cyan  "Usage: ${FUNCNAME[0]} or ${FUNCNAME[0]} [-c <#CPU>, -m <MB RAM>, -d <GB Disk>]"
-			return 0
-		;;
-		esac
-	done
-	unset OPTIND
-
 	# Set default values for VM T-Shirts sizes...
 	: ${_cpu="${_cpu:-2}"}
 	: ${_mem="${_mem:-2048}"}
 	: ${_dsk="${_dsk:-100}"}
+
+	# Set default values for VM T-Shirts sizes...
+	kvm::util::read_common_options ${*}
+
+	# Check that virtualization is supported on the host
+	dependency::virtualization
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
 	: "${target_iso:="/var/lib/libvirt/boot/ubuntu-21.04-desktop-amd64.iso"}"
 
 	#Verify ISO presesnce
-		if [[ ! -f "$target_iso" ]]; then
-			$RTD_GUI --backtitle "${BRANDING:-"rtd"}" --title "NOTICE!" --msgbox "OOOPS! I cannot find the ISO image to build the VM... " 10 60
-			clear
-		fi
+	if [[ ! -f "$target_iso" ]]; then
+		$RTD_GUI --backtitle "${BRANDING:-"rtd"}" --title "NOTICE!" --msgbox "OOOPS! I cannot find the ISO image to build the VM... " 10 60
+		clear
+	fi
+
 	# Discover if the appropriate VM net interface is (default or br'0 - n')
 	: ${virt_net="$(system::find_vm_bridge)"}
 	_summary_message="
 	The virtual machine (${vm_name}) \n
-	📋 - Using the instructions in: ${_preseed_file} \n
-	🔧 - Using this source for the packages and files to download: \n
-	🌎 - ${_source_url%%/*pub*} \n
 	🖥️ - Using the network: ${virt_net:=default} \n
 	🖥️ - Memory: ${_mem} \n
 	🖥️ - CPU's: ${_cpu} \n
-	🖥️ - Disk Size: ${_dsk} \n 
+	🖥️ - Disk Size: ${_dsk} \n "
 	
-	NOTE: You may connecct to the VM and see the progress at IP: $(hostname -I) \n
-	      After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
-
 	# create image and run installer
 	"${BIN_VIRT_INSTALL}" --name VDI_Ubuntu_"$CONFIG"_"$RANDOM" \
 		--vcpus "${2:-2}" \
@@ -10919,9 +10959,10 @@ make_kvm_virtual_machine_now_from_iso() {
 		--disk size="${4:-30}" \
 		--os-variant="${1:-debian10}" \
 		--cdrom="${target_iso}" \
-		--cloud-init meta-data=
-		--noautoconsole &&  dialog::display_summary_message "NOTICE!"  \
-	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
+		--livecd \
+		--tpm backend.type=emulator,backend.version=2.0,model=tpm-crb  \
+		--video "qxl" \
+		--channel "spicevmc" || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
 }
 
 
@@ -11585,9 +11626,10 @@ template::kickstart_cfg() {
 
 		# Post-installation Script
 		%post --interpreter=/bin/bash
-		git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd
+		git clone --depth 1 https://github.com/vonschutter/RTD-Setup.git /opt/rtd
 		chmod 755 /opt/rtd/core/rtd-oem-enable-config.sh
 		bash /opt/rtd/core/rtd-oem-enable-config.sh
+		systemctl enable sshd
 		%end
 		KS_EOF
 		return
@@ -11625,9 +11667,10 @@ template::kickstart_cfg() {
 
 		# Post-installation Script
 		%post --interpreter=/bin/bash
-		git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd
+		git clone --depth 1 https://github.com/vonschutter/RTD-Setup.git /opt/rtd
 		chmod 755 /opt/rtd/core/rtd-oem-enable-config.sh
 		bash /opt/rtd/core/rtd-oem-enable-config.sh
+		systemctl enable sshd
 		%end
 		KS_EOF
 		return
@@ -13480,7 +13523,7 @@ write_host() {
 	echo -e "${_text} "
 
 	# Tell the loging function to log the message requested...
-	system::log_item "🧩 💻 ${FUNCNAME[1]}: ${_text}"
+	system::log_item "${FUNCNAME[0]}: 💻 ${FUNCNAME[1]}: ${_text}"
 
 }
 
@@ -13501,16 +13544,16 @@ write_error() {
 
 	if [[ "${TERMUITXT}" == "nocolor" ]]; then
 		if [[ -n "${text}" ]]; then
-			echo "🧩 💥 ${FUNCNAME[1]}: ${text}"
+			echo "💥 ${FUNCNAME[1]}: ${text}"
 		fi
 	else
 		if [[ -n "${text}" ]]; then
-			echo -e "$(tput bold; tput setaf 1)🧩 💥 ${FUNCNAME[1]}: ${text}$(tput sgr0)"
+			echo -e "$(tput bold; tput setaf 1)💥 ${FUNCNAME[1]}: ${text}$(tput sgr0)"
 		fi
 	fi
 
 	# Tell the loging function to log the message requested...
-	[ -n "${text}" ] && system::log_item "🧩 💥 ${FUNCNAME[1]}: ${text}"
+	[ -n "${text}" ] && system::log_item "${FUNCNAME[0]}: 💥 ${FUNCNAME[1]}: ${text}"
 
 }
 
@@ -13531,13 +13574,13 @@ write_warning() {
 	local text=$1
 
 	if [[ "${TERMUITXT}" == "nocolor" ]]; then
-		[ -n "${text}" ] && echo "🧩 ⚠ ${FUNCNAME[1]}: ${text}"
+		[ -n "${text}" ] && echo "⚠ ${FUNCNAME[1]}: ${text}"
 	else
-		[ -n "${text}" ] && echo -e "$(tput bold; tput setaf 3)🧩 ⚠  ${FUNCNAME[1]}: ${text}$(tput sgr0)"
+		[ -n "${text}" ] && echo -e "$(tput bold; tput setaf 3)⚠  ${FUNCNAME[1]}: ${text}$(tput sgr0)"
 	fi
 
 	# Tell the loging function to log the message requested...
-	[ -n "${text}" ] && system::log_item "🧩 ⚠ ${FUNCNAME[1]}: ${text}"
+	[ -n "${text}" ] && system::log_item "${FUNCNAME[0]}: ⚠ ${FUNCNAME[1]}: ${text}"
 	
 }
 
@@ -13558,13 +13601,13 @@ write_status() {
 	local text=$1
 
 	if [[ "${TERMUITXT}" == "nocolor" ]] ; then
-		[ -n "${text}" ] && echo "🧩 ✓ ${FUNCNAME[1]}: ${text}"
+		[ -n "${text}" ] && echo "✓ ${FUNCNAME[1]}: ${text}"
 	else
-		[ -n "${text}" ] && echo -e "$(tput bold; tput setaf 2)🧩 ✓ ${FUNCNAME[1]}: ${text}$(tput sgr0)"
+		[ -n "${text}" ] && echo -e "$(tput bold; tput setaf 2)✓ ${FUNCNAME[1]}: ${text}$(tput sgr0)"
 	fi
 
 	# Tell the loging function to log the message requested...
-	[ -n "${text}" ] && system::log_item "🧩 ✓ ${FUNCNAME[1]}: ${text}"
+	[ -n "${text}" ] && system::log_item "${FUNCNAME[0]}: ✓ ${FUNCNAME[1]}: ${text}"
 	
 }
 
@@ -13585,13 +13628,13 @@ write_information() {
 	local text=$1
 
 	if [[ "${TERMUITXT}" == "nocolor" ]] ; then
-		[ -n "${text}" ] && echo -e "🧩 ℹ ${FUNCNAME[1]}: ${text}"
+		[ -n "${text}" ] && echo -e "ℹ ${FUNCNAME[1]}: ${text}"
 	else
-		[ -n "${text}" ] && echo -e "$(tput bold; tput setaf 4)🧩 ℹ ${FUNCNAME[1]}: ${text}$(tput sgr0)"
+		[ -n "${text}" ] && echo -e "$(tput bold; tput setaf 4)ℹ ${FUNCNAME[1]}: ${text}$(tput sgr0)"
 	fi
 
 	# Tell the loging function to log the message requested...
-	system::log_item "🧩 ℹ ${FUNCNAME[1]}: ${text}"
+	system::log_item "${FUNCNAME[0]}: ℹ ${FUNCNAME[1]}: ${text}"
 	
 }
 
