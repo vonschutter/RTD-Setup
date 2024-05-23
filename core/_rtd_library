@@ -47,7 +47,7 @@ export RTD_VERSION="2.03"
 2     backup_running_vm                                  ;  Backs up all running virtual machines on the local computer
 3     check_dependencies                                 ;  Checks that software requirements are met so scripts do not fail
 4     create_iso_image                                   ;  Creates an OS iso image
-5     create_iso_image_debian                            ;  Creates a Debian iso image
+5     system::create_iso_image_debian                            ;  Creates a Debian iso image
 6     create_physical_media_from_iso                     ;  Create physical media thumb drive from an ISO file
 7     dependency::command_exists                         ;  Check if a command exists and attempt to install it if it does not (find matching package)
 8     dependency::desktop                                ;  Check if you are running a given desktop (kde, gnome, xfce)
@@ -643,7 +643,7 @@ yad::display_progressbar_pulsating() {
 	# Usage:
 	#
 	# This function takes a command as an argument and executes it. The command output is displayed in a progress box using the 'yad' command.
-	# The progress box shows a pulsating animatsystem::prepare_environment_for_iso_creationion and automatically closes when the command execution is complete.
+	# The progress box shows a pulsating animate system::prepare_environment_for_iso_creationion and automatically closes when the command execution is complete.
 	#
 	# Example usage:
 	# yad::display_cmd_output "apt -y upgrade"
@@ -871,105 +871,12 @@ system::make_preseed_cfg()
 
 	system::log_item "Called by: ${FUNCNAME[1]}"
 
-	# Defaults:
-	local _saveto="$( mktemp -d )"	# Where to save the preseed file
-	local _role="default"		# selects d-i preseed/late_command actions based on role.
-	local _task="ssh-server"	# Package selection: What DE to install, or ssh-server
-	unset _ask
 
-	while [[ $# -gt 0 ]]; do
-		case "$1" in
-		--saveto | --location | --path | --dir | --directory | -p )
-			local _saveto="$2"
-			write_host --cyan  "📜 Directed to create preseed instructions file: ${_saveto}/preseed.cfg"
-			shift
-		;;
-		--file | --preseed | --preseed_file | --preseed_cfg | --preseed_cfg_file | --preseed_file )
-			local _preseed_file="$2"
-			write_host --cyan  "📜 Directed to create preseed instructions file: ${_preseed_file}"
-			shift
-		;;
-		--desktop_environment | --DE )
-			if [[ $2 == "gnome-desktop" || $2 == "kde-desktop" || $2 == "xfce-desktop" || $2 == "lxde-desktop" || $2 == "cinnamon-desktop" || $2 == "mate-desktop" || $2 == "lxqt-desktop" || $2 == "ubuntu-desktop" || $2 == "kubuntu-desktop" || $2 == "xubuntu-desktop" || $2 == "lubuntu-desktop" || $2 == "ubuntu-mate-desktop" || $2 == "ubuntu-budgie-desktop" ]] ; then
-				local _UserDesktopEnvironemtSelection="${2}"
-				write_host --cyan  "🖥️ Selecting desktop environment: ${_UserDesktopEnvironemtSelection}"
-			else
-				write_error "⛔ Unknown Desktop Environment: $2 ==> Use deepin-desktop-environment, sway-desktop-environment, basic-desktop-environment, i3-desktop-environment, developer-workstation-environment, budgie-desktop-environment, sugar-desktop-environment, mate-desktop-environment, kde-desktop-environment, xfce-desktop-environment, lxde-desktop-environment, lxqt-desktop-environment, cinnamon-desktop-environment, mate-desktop-environment, workstation-product-environment, ubuntu-desktop, kubuntu-desktop, xubuntu-desktop, lubuntu-desktop, ubuntu-mate-desktop, ubuntu-budgie-desktop" 
-				return 1
-			fi
-			shift
-		;;
-		--server_role | --ServerRole | --SR )
-			if [[ $2 == "openssh-server" || $2 == "lamp-server" || $2 == "postfix" || $2 == "bind9" || $2 == "dnsmasq" || $2 == "dhcp-server" || $2 == "print-server" ]]  ; then
-				local _UserServerEnvironemtSelection="${2}"
-				write_status "🎭 Selecting server role: ${2}"
-			else
-				write_error "⛔ Unknown server role selection: ${2} ==> Use web-server-environment, freeipa-server, network-server, cloud-server-environment, infrastructure-server-environment or print-server-environment"
-				return 1
-			fi
-			shift
-		;;
-		--role | --Role )
-			if [[ $2 == "workstation" || $2 == "desktop" || $2 == "server" ]] ; then
-				local _role="${2}"
-				write_status "🎭 Selecting role: ${2}"
-			else
-				write_error "⛔ Unknown role selection: ${2} ==> Use workstation or server"
-				return 1
-			fi
-			shift
-		;;
-		--ask | --prompt | --interactive )
-			if [[ $2 == "YES" || $2 == "yes" || $2 == "Yes" || $2 == "NO" || $2 == "No" || $2 == "no" ]] ; then
-				local _ask="${2}"
-				write_status "🤔 Prompting for configuration options..."
-			else
-				write_error "⛔ incorretc option: ${2} ==> Use YES or NO"
-				return 1
-			fi
-		;;
-		--source | --URL | --url )
-			local _repo_url="${2}"
-			write_status "🌐 Using URL: ${_repo_url}"
-			shift
-		;;
-		--timezone | --TZ )
-			local Preference_InitialTimeZone="${2}"
-			write_status "🕰️ Using Timezone: ${Preference_InitialTimeZone}"
-			shift
-		;;
-		--disk_encryption | --DC )
-			Preference_DiskEncryption="$2"
-			write_status "🔐 Disk encryption is requested and enabled."
-			shift
-		;;
-		--disk_password | --DP )
-			Preference_Disk_Password="$2"
-			write_status "🔐 Disk encryption password is set."
-			shift
-		;;
-		--initial_user | --IU )
-			Preference_InitialUser="$2"
-			write_status "👤 Initial user is set to: ${Preference_InitialUser}"
-			shift
-		;;
-		--initial_user_password | --IUP )
-			Preference_InitialUserPassword="$2"
-			write_status "🔐 Initial user password is set."
-			shift
-		;;
-		--help | -h )
-			write_information "Usage: ${FUNCNAME[0]} [-p <filename> ] [-u URL ] [-c workstation|ssh-server|ansible-server ]"
-			return 0
-		;;
-		*)
-			write_error "Unknown parameter: $1"
-		;;
-		esac
-		shift 
-	done
+	# Read requested configuration options
+	kvm::util::read_common_options "$@"
+	kvm::util::read_distro_options "$@"
 
-	system::log_item "Role: ${_role} | Desktop: ${_UserDesktopEnvironemtSelection} | Server: ${_UserServerEnvironemtSelection} | Ask: ${_ask} | Save to: ${_saveto}"
+	system::log_item "Distribution: Role: ${_role} | Desktop: ${_UserDesktopEnvironemtSelection:-"Not selected"} | Server: ${_UserServerEnvironemtSelection:-"Not selected"} | Ask: ${_ask} | Save to: ${_saveto}"
 	system::log_item "Transferring standard selections _role to the preseed file multiselect option..."
 	case "${_role}" in
 		workstation | desktop )
@@ -995,29 +902,33 @@ system::make_preseed_cfg()
         # system::get_vm_config will load the preferences from the config file if it exists
         # otherwise it will use the defaults set in the function.
         # it will return predefined variables that can be used in the preseed file.
-	if [[ "$_ask" == "YES" ]] ; then
+	if [[ "$_ask" == "YES" || "$_ask" == "Yes" || "$_ask" == "yes" ]]; then
 		system::log_item "Prompting for configuration options..."
-		system::get_vm_config || dialog::yesno "Cancelled or sommething went wrong... continue with defaults?"
-                exit_status=$?
-
-                case $exit_status in
-			0 )   
-				system::log_item "Save coices and continue..." 
+		if system::get_vm_config --ask || dialog::yesno "Cancelled or something went wrong... continue with defaults?"; then
+			exit_status=$?
+			
+			case $exit_status in
+			0 )
+				system::log_item "Save choices and continue..."
 			;;
-			1 )   
-				system::log_item "[Cancel] pressed; not updating or changing any configuration items..." 
+			1 )
+				system::log_item "[Cancel] pressed; not updating or changing any configuration items..."
 			;;
 			255 )
-				 ystem::log_item "[ESC] pressed, exiting the dialog immediatley..." ; return 1 
+				system::log_item "[ESC] pressed, exiting the dialog immediately..."; return 1
 			;;
-			* )   
-				system::log_item "[ERROR] Dialog closed or unexpected error." ; rtd_oem_pause 1 "Dialog closed or unexpected error." 
+			* )
+				system::log_item "[ERROR] Dialog closed or unexpected error."; rtd_oem_pause 1 "Dialog closed or unexpected error."
 			;;
-                esac
+			esac
+		fi
 	else
 		system::log_item "Using default configuration options..."
-		system::get_vm_config || system::log_item "Failed to get configuration options from saved preferences..."
+		if ! system::get_vm_config; then
+			system::log_item "Failed to get configuration options from saved preferences..."
+		fi
 	fi
+
 
 	# If the user has requested to copy their SSH key to the host, then do so:
 	if [[ "${Preference_CopySSHKey}" == "yes" || "${Preference_CopySSHKey}" == "YES" ]] ; then
@@ -1040,9 +951,12 @@ system::make_preseed_cfg()
 	template::preseed_cfg::late_command ${PRESEED_FILE}
 
 	system::preseed_to_ubuntu_ks_cfg "${_saveto}"
-	system::log_item "Preseed file created: ${PRESEED_FILE}
-	Containging DATA:
-	$(cat ${PRESEED_FILE})"
+	system::log_item "Preseed file created: ${PRESEED_FILE}"
+
+	if [[ "$_LOGLEVEL" == "debug" ]]; then 
+		system::log_item "Containging DATA:
+		$(cat ${PRESEED_FILE})"
+	fi
 }
 
 
@@ -5110,39 +5024,48 @@ system::prepare_environment_for_iso_creation() {
 	# End of Documentation
 
         if [[ "$1" == "--cleanup" ]]; then
-                for dir in "$tmp_download_dir" "$tmp_disc_dir" "$tmp_initrd_dir"; do
-                if [ -z "$dir" ]; then
-                        system::log_item "Warning: Directory variable is not set for the directory cleanup."
-                fi
+		for dir in "$tmp_download_dir" "$tmp_disc_dir" "$tmp_initrd_dir"; do
+			if [ -z "$dir" ]; then
+				system::log_item "Warning: Directory variable is not set for the directory cleanup."
+			fi
 
-                if [ "$dir" = "/" ] || [[ "$dir" =~ ^/[^/]+/?$ ]] || [ "$dir" = "$HOME" ]; then
-                        system::log_item "Error: Attempt to delete critical directory $dir"
-                fi
-                done
+			if [ "$dir" = "/" ] || [[ "$dir" =~ ^/[^/]+/?$ ]] || [ "$dir" = "$HOME" ]; then
+				system::log_item "Error: Attempt to delete critical directory $dir"
+			else 
+				if [ -d "$dir" ]; then
+					system::log_item "Cleaning up temporary directory: $dir"
+					rm -rf "$dir"
+				else
+					system::log_item "Warning: Directory $dir does not exist."
+				fi
+			fi
+		done
 
-                unset bin_7z
-                unset bin_xorriso
-                unset bin_cpio
-                unset bin_qemu_img
-                unset bin_kvm
-                unset bin_qemu_system_x86_64
-                unset put_iso_file_here_when_done
-                unset put_qcow_file_here_when_done
-                unset VOLUME_TITLE
-                unset ssh_public_key_file
-                unset permanent_download_dir
-                unset isohdpfx_bin
-                unset current_dir
-                unset script_dir
-                unset tmp_download_dir
-                unset tmp_disc_dir
-                unset tmp_initrd_dir
-                unset _dependencies
-                return 0
+		unset bin_7z
+		unset bin_xorriso
+		unset bin_cpio
+		unset bin_qemu_img
+		unset bin_kvm
+		unset bin_qemu_system_x86_64
+		unset put_iso_file_here_when_done
+		unset put_qcow_file_here_when_done
+		unset VOLUME_TITLE
+		unset ssh_public_key_file
+		unset permanent_download_dir
+		unset isohdpfx_bin
+		unset current_dir
+		unset script_dir
+		unset tmp_download_dir
+		unset tmp_disc_dir
+		unset tmp_initrd_dir
+		unset _dependencies
+		return 0
         else
                 system::log_item "Preparing environment for ISO creation..."
 
                 : "${target_iso="$put_iso_file_here_when_done/$target_iso_file_name"}"
+
+		# List of package dependencies for the script depending on the distro (naming may vary)
                 if cat "/etc/os-release" | grep "debian" ; then
                         _dependencies="dos2unix cpio gzip genisoimage wget fakeroot xorriso isolinux qemu-system libvirt-daemon-system"
                 elif cat "/etc/os-release" | grep "fedora" ; then
@@ -5153,8 +5076,26 @@ system::prepare_environment_for_iso_creation() {
                         write_error "Neither debian, fedora, or suse base distros or derivatives could be found; NOT installing dependencies."
                         return 1
                 fi
+		
+		# set index to be augmented and count the total number of dependencies
+		local index=0
+		local total_dependencies=0
+		for dep in $_dependencies; do
+			((total_dependencies++))
+		done
 
-                for i in $_dependencies; do check_dependencies $i ; done
+		# Check for dependencies
+                for i in $_dependencies; do 
+			software::check_native_package_dependency $i && ((index++))
+		done
+
+		# Compare the count of available dependencies to the total number of dependencies
+		if [[ $index -eq $total_dependencies ]]; then
+			system::log_item "All dependencies are available."
+		else
+			write_error "⛔ Some dependencies are missing. Available: $index, Required: $total_dependencies"
+			return 1
+		fi		
 
                 : "${bin_7z:=$(type -P 7z)}"
                 : "${bin_xorriso:=$(type -P xorriso)}"
@@ -5164,13 +5105,14 @@ system::prepare_environment_for_iso_creation() {
                 : "${bin_qemu_system_x86_64:=$(type -P qemu-system-x86_64 )}"
                 : "${put_iso_file_here_when_done:="/home/$SUDO_USER/Virtual-DVDs"}"
                 : "${put_qcow_file_here_when_done:="/home/$SUDO_USER/Virtual-HDs"}"
-                : "${VOLUME_TITLE:="RTD Auto Installer"}"
+                : "${VOLUME_TITLE:="🤖 RTD_AUTO_INSTALLER 🤖"}"
                 : "${ssh_public_key_file:="/home/$SUDO_USER/.ssh/id_rsa.pub"}"
                 : "${permanent_download_dir:="/home/$SUDO_USER/Virtual-DVDs/Downloaded"}"
 
                 system::log_item "Checking for presence of (isohdpfx.bin)..."
                 if [[ -e /usr/lib/ISOLINUX/isohdpfx.bin ]]; then
                         : "${isohdpfx_bin:="/usr/lib/ISOLINUX/isohdpfx.bin"}"
+			write_information "Found: $isohdpfx_bin"
                 else
                         write_warning "An important file (isohdpfx.bin) was not found in the expected location. Attepting to workaround the issue..."
                         if hash locate 2>/dev/null ; then
@@ -5194,7 +5136,7 @@ system::prepare_environment_for_iso_creation() {
                 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
                 tmp_download_dir=$(mktemp -d )
                 tmp_disc_dir=$(mktemp -d )
-                tmp_initrd_dir=$(mktemp -d )
+                
 
                 for i in $put_qcow_file_here_when_done\
                         $put_iso_file_here_when_done\
@@ -5233,7 +5175,9 @@ system::download_and_manipulate_iso_debian() {
 	# system::download_and_manipulate_iso_debian xfce-desktop
 	#
 	# End of Documentation
-        local _role=$1
+
+ 	kvm::util::read_common_options "$@"
+	kvm::util::read_distro_options "$@"
 	system::prepare_environment_for_iso_creation
 
 	# Determine the name of the ISO file to create, and wich iso to download using default values if none are provided.
@@ -5242,10 +5186,10 @@ system::download_and_manipulate_iso_debian() {
 	: "${_SOURCE_ISO_URL:="https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/$(curl --silent  https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/SHA256SUMS | \grep -o "debian-.*netinst*.iso" |grep -v mac |grep -v edu)"}"
 	: "${_SOURCE_FIRMWARE:="http://cdimage.debian.org/cdimage/unofficial/non-free/firmware/buster/current/firmware.zip"}"
 	: "${_CURRENT_DEB_ISO:="$(curl --silent  https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/SHA256SUMS | \grep -o "debian-.*netinst*.iso" |grep -v mac |grep -v edu)"}"
-	: "${target_iso_file_name="${_role:-"ssh-server"}-$_CURRENT_DEB_ISO"}"
+	: "${target_iso_file_name="Auto_Install_${_CURRENT_DEB_ISO%.iso}-${_role:-"ssh-server"}.iso"}"
 	target_iso="$put_iso_file_here_when_done/$target_iso_file_name"
 	iso_store="$put_iso_file_here_when_done/Downloaded/$_CURRENT_DEB_ISO"
-
+	tmp_initrd_dir=$(mktemp -d )
 
 	if [[ ! -f "$iso_store" ]]; then
 		write_status "Geting install image..."
@@ -5255,17 +5199,11 @@ system::download_and_manipulate_iso_debian() {
 	fi
 
 	$bin_7z x "$iso_store" "-o$tmp_disc_dir" || write_error  "FAILED to download and/or extract $_SOURCE_ISO_URL" 
-	mkdir "$tmp_disc_dir/custom" && system::log_item "Created custom directory in $tmp_disc_dir" || write_error  "FAILED to create custom directory in $tmp_disc_dir"
+	mkdir -p "$tmp_initrd_dir/custom" && system::log_item "Created custom directory in $tmp_disc_dir" || write_error  "FAILED to create custom directory in $tmp_disc_dir"
 	
-	# write_status "Geting non-free firmware..."
-	# write_information "Download: $_SOURCE_FIRMWARE"
-	# wget -4  -q --show-progress "$_SOURCE_FIRMWARE" -O "$tmp_download_dir/firmware.zip" && ( mkdir "$tmp_disc_dir/firmware" & "$bin_7z" x "$tmp_download_dir/firmware.zip" "-o$tmp_disc_dir/firmware" )
-	# write_information "Retreived: $(ls "$tmp_disc_dir"/firmware )"
-
 	# Load the installation answers template.
 	write_status "Getting intall instructions template... "
-	system::make_preseed_cfg -a ask -p "$tmp_initrd_dir" -r $_role || ( write_error "Failed to create preseed.cfg template" ; dialog::display_error "Something went wrong, please chack the logfile $_LOGFILE" )
-
+	system::make_preseed_cfg --ask yes --saveto "$tmp_initrd_dir" --role "$_role" --distribution debian --server_role "$_UserServerEnvironemtSelection" || ( write_error "Failed to create preseed.cfg template" ; dialog::display_error "Something went wrong, please check the logfile $_LOGFILE" )
 
 	# ----------------------- Modify Boot Media --------------------------- #
 	# Edit the grub.cfg file...
@@ -5288,31 +5226,62 @@ system::download_and_manipulate_iso_debian() {
 	sed -i 's/^timeout 0$/timeout 100/' "$tmp_disc_dir/isolinux/isolinux.cfg"
 	# --------------------------------------------------------------------- #
 
-	write_status "Injecting created content into the new ISO..."
-	pushd "$tmp_initrd_dir" || write_error "failed to enter init directory: $tmp_initrd_dir"
-		write_status "# Modify the CLI Installer" 
-		gzip -d -c "$tmp_disc_dir/install.amd/initrd.gz" > "./initrd"
-		echo "./preseed.cfg" | fakeroot "$bin_cpio" -o -H newc -A -F "./initrd"
-		echo "./task.sh" | fakeroot "$bin_cpio" -o -H newc -A -F "./initrd"
-		find ./custom | fakeroot "$bin_cpio" -o -H newc -A -F ./initrd
-		cat ./initrd | gzip -9c > "$tmp_disc_dir/install.amd/initrd.gz"
-		rm "$tmp_initrd_dir/initrd"
-
-		write_status "# Modify the GTK Installer"
-		gzip -d -c  "$tmp_disc_dir/install.amd/gtk/initrd.gz"  > "./initrd"
-		echo "./preseed.cfg" | fakeroot "$bin_cpio" -o -H newc -A -F "./initrd"
-		echo "./task.sh" | fakeroot "$bin_cpio" -o -H newc -A -F "./initrd"
-		find "./custom" | fakeroot "$bin_cpio" -o -H newc -A -F "./initrd"
-		cat "./initrd" | gzip -9c > "$tmp_disc_dir/install.amd/gtk/initrd.gz"
-	popd || (write_error  "Failed to popd"  & rtd_oem_pause 1)
 	
-        rtd_oem_setup_brand_splash_screen
+
+	system::download_and_manipulate_iso_debian::modify_installer() {
+		local initrd_path="$1"
+
+		write_status "🔧 Modifying the installer: $initrd_path"
+		gzip -d -c "$initrd_path" > "$tmp_initrd_dir/initrd" || { write_error "Failed to extract $initrd_path"; return 1; }
+
+		for file in "preseed.cfg" "task.sh" "custom"; do
+			if [ -e "./$file" ]; then
+				if [ "$file" == "custom" ]; then
+					find "./custom" | fakeroot "$bin_cpio" -o -H newc -A -F "./initrd"
+				else
+					echo "./$file" | fakeroot "$bin_cpio" -o -H newc -A -F "./initrd"
+				fi
+			else
+				write_error "No $file found in $(pwd)"
+			fi
+		done
+
+		write_status "🔩📀 Injecting created content into the new INITRD in the folder $tmp_disc_dir ..."
+		if cat "$tmp_initrd_dir/initrd" | gzip -9c > "$initrd_path"; then
+			write_status "🔧 Modified the installer: $initrd_path"
+		else
+			write_error "❌ Failed to modify the installer: $initrd_path"
+		fi
+
+		rm "$tmp_initrd_dir/initrd" || write_error "Failed to remove initrd file"
+	}
+
+	pushd "$tmp_initrd_dir" || { write_error "Failed to enter init directory: $tmp_initrd_dir"; exit 1; }
+
+	system::download_and_manipulate_iso_debian::modify_installer "$tmp_disc_dir/install.amd/initrd.gz" || rtd_oem_pause 1 "Failed to modify installer: $tmp_disc_dir/install.amd/initrd.gz"
+	system::download_and_manipulate_iso_debian::modify_installer "$tmp_disc_dir/install.amd/gtk/initrd.gz" || rtd_oem_pause 1 "Failed to modify installer: $tmp_disc_dir/install.amd/gtk/initrd.gz"
+
+	popd || { write_error "Failed to popd"; rtd_oem_pause 1; }
+	
+        rtd_oem_setup_brand_splash_screen "$tmp_disc_dir/splash.png" "${_FULLNAME:-"RunTime Data"} OEM Install: $PREFERENCE"
+	system::create_iso_image_debian	 --target-iso "$target_iso" --iso-source-dir "$tmp_disc_dir"
+	ret_val=$?
+	if [[ $ret_val -eq 255 ]]; then
+		system::log_item "User declined to create a bootable thumbdrive from the new ISO media."
+		return 255
+	elif [[ $ret_val -eq 0 ]]; then
+		system::log_item "Successfully created a bootable thumbdrive from the new ISO media."
+		return 0
+	else
+		rtd_oem_pause 1 "An error may have occurred (review above outout) then: Press [ENTER] to continue:"
+		return 1
+	fi
 
 }
 
 
 
-create_iso_image_debian() {
+system::create_iso_image_debian() {
 	# Description: Function to generate the new ISO file from the extracted and
 	# altered original ISO.
 	# Delete old iso file if there...
@@ -5328,92 +5297,117 @@ create_iso_image_debian() {
 	# : "${target_iso}"
 	# : "${put_iso_file_here_when_done}"
 
-	# Check for required input...
-	# [[ -z "${target_iso}" ]] || rtd_oem_pause 1 "${FUNCNAME[0]} requires atleast one parameter."
+
+
+	system::validate_parameters ${*}
+	while [[ $# -gt 0 ]]; do
+		case $1 in
+			--target-iso )
+				target_iso="$2"
+				shift 2
+				;;
+			--iso-source-dir )
+				iso_source_dir="$2"
+				shift 2
+				;;
+			--isohdpfx-bin )
+				isohdpfx_bin="$2"
+				shift 2
+				;;
+			--prompt )
+				prompt="$2"
+				shift 2
+				;;
+			*)
+				write_error "Unknown option: $1"
+				shift
+				;;
+		esac
+	done
+
+	system::log_item "Check for required information (a target and source directory)..."
+	system::check_required_variables target_iso iso_source_dir isohdpfx_bin 
 
 	write_status "------ CREATING ISO: ${target_iso}    --------"
+	write_information "Volume Title: ${VOLUME_TITLE:-"RTD"}"
+	write_information "ISO Source: ${iso_source_dir}"
+	write_information "ISO Target: ${target_iso}"
+	write_information "ISO Boot Media: ${isohdpfx_bin}"
+
 	if [ -f "${target_iso}" ]; then
 		rm -f "${target_iso}"
 	fi
-	system::log_item "Creating ISO: ${target_iso}"
 
-	pushd "$tmp_disc_dir" || system::log_item  "Failed to enter $tmp_disc_dir"
-	[[ -e '[BOOT]' ]] && ( rm -r '[BOOT]' || system::log_item  "Failed to delete [BOOT] directory" )
+	pushd "${iso_source_dir}" || system::log_item  "Failed to enter ${iso_source_dir}"
 
-	"$bin_xorriso" -as mkisofs -r \
-		-V "${VOLUME_TITLE:-"Made by ${FUNCNAME[0]}"}" \
-		-J -b "isolinux/isolinux.bin" \
-		-c boot.cat \
-		-no-emul-boot \
-		-boot-load-size 4 \
-		-boot-info-table \
-		-input-charset utf-8 \
-		-isohybrid-mbr "${isohdpfx_bin}" \
-		-eltorito-alt-boot \
-		-e boot/grub/efi.img \
-		-no-emul-boot \
-		-isohybrid-gpt-basdat -o "${target_iso}" ./ &>> "${_LOGFILE}" || rtd_oem_pause 1 "${FUNCNAME[0]}: An error may have occurred (review above outout) then: Press [ENTER] to continue:"
-	chmod 777 "${target_iso}" &>>"${_LOGFILE}" || rtd_oem_pause 1 "${FUNCNAME[0]}: An error may have occurred (review above outout) then: Press [ENTER] to continue:"
-        
-        popd || write_error  "Failed to popd" 
-	
-        test_iso_boot_media "${target_iso}"
-	
-        if ${RTD_GUI} --yesno "Would you like to make a bootable thumbdrive from this ISO media?" "${HEIGHT}" "${WIDTH}" ; then
-		create_physical_media_from_iso "${target_iso}" || create_physical_media_from_iso
-	else
-		return
-	fi
-	
-	system::prepare_environment_for_iso_creation --cleanup
-}
+		[[ -e '[BOOT]' ]] && ( rm -r '[BOOT]' || system::log_item  "Failed to delete [BOOT] directory" )
 
+		[[ -f "isolinux/isolinux.bin" ]]; [[ -f "isolinux/boot.cat" ]]; [[ -f "isolinux/isolinux.cfg" ]] || system::log_item  "Missing files in ${iso_source_dir}/isolinux"
 
-
-create_iso_image() {
-	# Description: Function to generate a bootable ISO file from source folder or an extracted and
-	# altered original ISO. The function takes 3 arguments: target file name, folder to use as source
-	# and volume title. The first argument is mandatory since it makes not sense unless it is known
-	# what source to use for makeing the ISO file.
-	#
-	# Globals:
-	# Arguments: None
-	# Outputs:
-	# Returns:
-	# Usage:
-	# create_iso_image  ~/mybootablecdfolder ~/mybootable.iso "My cool bootable iso title"
-	#
-	# This function will over write the old iso file if there...
-	#
-	# End of Documentation
-
-	# Check for required input...
-
-	write_status "------ CREATING ISO: $target_iso    --------"
-	if [ -f "$target_iso" ]; then
-		rm -f "$target_iso"
-	fi
-
-	cd "$tmp_disc_dir" || echo "failed to enter $tmp_disc_dir "
-	rm -r '[BOOT]'
-	"$bin_xorriso" -as mkisofs -r -V "$VOLUME_TITLE" \
-			-J -b isolinux.bin \
+		"$bin_xorriso" -as mkisofs -r \
+			-V "${VOLUME_TITLE:-"RTD"}" \
+			-J -b "isolinux/isolinux.bin" \
 			-c boot.cat \
 			-no-emul-boot \
 			-boot-load-size 4 \
 			-boot-info-table \
 			-input-charset utf-8 \
-			-isohybrid-mbr "$isohdpfx_bin" \
+			-isohybrid-mbr "${isohdpfx_bin}" \
 			-eltorito-alt-boot \
 			-e boot/grub/efi.img \
 			-no-emul-boot \
-			-isohybrid-gpt-basdat \
-			-o "$target_iso" ./ || rtd_oem_pause 1 "${FUNCNAME[0]}: An error may have occurred (review above outout) then: Press [ENTER] to continue:"
-	chmod 777 "$target_iso" || rtd_oem_pause 1 "${FUNCNAME[0]}: An error may have occurred (review above outout) then: Press [ENTER] to continue:"
+			-isohybrid-gpt-basdat -o "${target_iso}" ./ &>>"${_LOGFILE}" || rtd_oem_pause 1 "An error may have occurred (review above outout) then: Press [ENTER] to continue:"
 
+		chmod 777 "${target_iso}" &>>"${_LOGFILE}" || rtd_oem_pause 1 "${FUNCNAME[0]}: An error may have occurred (review above outout) then: Press [ENTER] to continue:"
+		
+        popd || { write_error "Failed to popd"; rtd_oem_pause 1; }
+	
+        test_iso_boot_media "${target_iso}"
+
+	while true; do
+		exec 3>&1
+			selection=$($RTD_GUI \
+			--backtitle "$BRANDING" --title "Create Automatic OS Install Media" --menu "Please select which media to create:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
+			"1" "Create bootable USB Media" \
+			"2" "Add ISO to my Ventoy media (for multiple boot)" \
+			"3" "Just show me the location of the new ISO file" \
+			2>&1 1>&3)
+			exit_status=$?
+		exec 3>&-
+		clear
+
+		case $exit_status in
+			"$DIALOG_CANCEL") return 255 ;;
+			"$DIALOG_ESC") return 255 ;;
+		esac
+
+		case $selection in
+			1)
+				if $RTD_GUI --yesno "Proceed to make a bootable thumbdrive from this ISO media?" "$HEIGHT" "$WIDTH"; then
+					create_physical_media_from_iso "$target_iso"
+				else
+					return 255
+				fi
+			;;
+			2)
+				if $RTD_GUI --yesno "Proceed to add this ISO to your Ventoy media for multiple boot options?" "$HEIGHT" "$WIDTH"; then
+					util::add_iso_to_ventoy "$target_iso"
+				else
+					return 255
+				fi
+			;;
+			3)
+				$RTD_GUI --msgbox "The new ISO file is located at: $target_iso" "$HEIGHT" "$WIDTH"
+				return 0
+			;;
+			*)
+				dialog::display_error "Invalid selection: $selection"
+			;;
+		esac
+	done
+	
 	system::prepare_environment_for_iso_creation --cleanup
 }
-
 
 
 create_physical_media_from_iso() {
@@ -5456,19 +5450,7 @@ create_physical_media_from_iso() {
 	: ${Title="OS Media Manger"}
 
 	if [ ! "$UID" -eq 0 ]; then
-		# find  a diferent way... tempfile not universal...
-		data=$(tempfile 2>/dev/null)
-		trap "rm -f $data" 0 1 2 5 15
-		dialog --title "${Title}" --backtitle "${BackTitle}" --insecure --passwordbox "\n This functionality requires elevated priviledges. \n Please provide your (sudo) password" 10 90 2> $data
-		ret=$? ; clear
-		case $ret in
-			0) cat $data | sudo -S bash "$0" "$*" ;;
-			1) echo "Request cancelled" ;;
-			255) [ -s $data ] && rm $data &>/dev/null || echo "[esc] Request aborted" ;;
-			* ) rm $data &>/dev/null ; exit 1
-		esac
-		rm $data &>/dev/null
-		exit
+		ensure_admin
 	fi
 
 	if [[ -z "$1" ]]; then
@@ -5537,9 +5519,9 @@ create_physical_media_from_iso() {
 					dialog --title "${Title}" --backtitle "${BackTitle}" --yesno "Please Confirm:\n Write the ISO file: \n ${target_iso} \n To the drive: \n ${USBTargetDevice}" 25 90
 						case $? in
 							0 ) ( dd if=${target_iso} of=${USBTargetDevice} status=progress 2>&1 |dialog --title "${Title}" --backtitle "${BackTitle}" --programbox "Please wait, writing disk now:" 25 90) ;;
-							1 ) echo "Request cancelled"; create_physical_media_from_iso ;;
-							255 ) echo "[ESC] key pressed."; return 255 ;;
-							* ) echo "An unknown event occurred!" ; return 1 ;;
+							1 ) write_status "Request cancelled" ;;
+							255 ) write_status "[ESC] key pressed."; return 255 ;;
+							* ) write_warning "An unknown event occurred!" ; return 1 ;;
 						esac
 					clear ; return
 				;;
@@ -5552,6 +5534,129 @@ create_physical_media_from_iso() {
 	fi
 	return
 }
+
+
+
+
+util::add_iso_to_ventoy() {
+	# Description: Function to add an ISO file to a Ventoy USB drive for multiple boot options.
+	# Globals: None
+	# Arguments: 
+	#   $1 - The path to the ISO file to be added.
+	# Outputs: Status and error messages.
+	# Returns: 0 if successful, 1 if an error occurs.
+	# Usage: util::add_iso_to_ventoy "/path/to/iso/file"
+	# End of documentation
+
+	local iso_file="$1"
+	local device_list=()
+	local ventoy_drive
+	local mount_point
+	local mounted_by_script
+	local exit_status
+	local rtd_ventoy_dir="OEMImages"
+
+	# Check if the ISO file exists
+	if [[ ! -f "$iso_file" ]]; then
+		dialog::display_error "💿 ISO file not found: $iso_file"
+		return 1
+	fi
+	
+	# Build the list of available USB devices
+	util::add_iso_to_ventoy::build_device_list() {
+		local name size model
+		while read -r line; do
+			name=$(echo "$line" | awk '{print $1}')
+			size=$(echo "$line" | awk '{print $2}')
+			model=$(echo "$line" | awk '{print $3}')
+			device_list+=("$name" "$model $size")
+		done < <(lsblk -d -o NAME,SIZE,MODEL,TRAN | grep -E "sd[b-z]|nvme[0-9]n[0-9]" | grep "usb")
+	}
+
+	# Check if any USB drives are available before proceeding
+	system::log_item "Checking for USB drives... (devicelist= ${device_list[*]})" 
+	if [[ ${#device_list[@]} -eq 0 ]]; then
+		until [[ ${#device_list[@]} -gt 0 ]]; do
+			dialog::display_notice "🔌 No USB drives found. Please insert a USB drive and press [OK]."
+			util::add_iso_to_ventoy::build_device_list
+		done
+	fi
+
+	# Prompt the user to select the Ventoy USB drive
+	exec 3>&1
+		ventoy_drive=$(dialog --backtitle "$BRANDING" --title "💾 Select Ventoy USB drive" --menu "Select Ventoy USB drive to save the ISO in:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" "${device_list[@]}" 2>&1 1>&3)
+		exit_status=$?
+	exec 3>&-
+
+	if [[ $exit_status -ne 0 || -z "$ventoy_drive" ]]; then
+		dialog::display_error "🔌 No Ventoy USB drive selected or dialog was canceled."
+		return 1
+	fi
+
+	# Check if the drive is already mounted
+	mount_point=$(lsblk -n -o MOUNTPOINT "/dev/${ventoy_drive}1")
+	
+	# Mount the Ventoy drive if it is not already mounted
+	if [[ -z "$mount_point" ]]; then
+		# If not mounted, create a mount point and mount the drive
+		mount_point=$(mktemp -d)
+		if ! mount "/dev/$ventoy_drive"1 "$mount_point"; then
+			dialog::display_error "💥 Failed to mount /dev/$ventoy_drive1"
+			rmdir "$mount_point"
+			return 1
+		fi
+		mounted_by_script=true
+	else
+		mounted_by_script=false
+	fi
+
+	if [[ -n "$mount_point" ]]; then
+		write_status "Mounted Ventoy drive: /dev/$ventoy_drive -> $mount_point"
+		if [[ -f "$mount_point/.config/oem.json" ]]; then
+			write_status "Ventoy configuration file found: .config/oem.json"
+			_oem_id=$(jq -r '.TLA' "$mount_point/.config/oem.json")
+			write_status "OEM ID: $_oem_id"
+		else
+			write_information "Ventoy OEM configuration file not found: $mount_point"
+			write_information "This is a generic Ventoy drive."
+		fi
+	else
+		dialog::display_error "🔌 Ventoy drive is not mounted: /dev/$ventoy_drive"
+		return 1
+	fi
+
+	if [[ ! -d "$mount_point/$rtd_ventoy_dir" ]]; then
+		write_warning "📁 Ventoy directory not found (!) creating it now: $mount_point/$rtd_ventoy_dir"
+		mkdir -p "$mount_point/$rtd_ventoy_dir" || system::log_item "Failed to create: $mount_point/$rtd_ventoy_dir"
+	fi
+
+	# Copy the ISO file to the Ventoy drive
+	if cp "$iso_file" "$mount_point/$rtd_ventoy_dir"; then
+		dialog::display_notice "✅💿📥 Successfully added ISO to Ventoy drive: $iso_file Boot from the Ventoy drive on another computer to access the new ISO."
+	else
+		dialog::display_error "❌💿📥 Failed to copy ISO to Ventoy drive: $iso_file"
+		if $mounted_by_script; then
+			{ umount "$mount_point" ; } && { rmdir "$mount_point" ; }
+		fi
+		return 1
+	fi
+	
+	# Unmount the Ventoy drive and clean up if it was mounted by this script
+	if $mounted_by_script; then
+		if umount "$mount_point"; then
+			write_status "✅ ⏏️ Successfully unmounted Ventoy drive."
+			rmdir "$mount_point"
+		else
+			write_error "❌ ⏏️ Failed to unmount Ventoy drive."
+			return 1
+		fi
+	fi
+	
+	return 0
+}
+
+
+
 
 
 
@@ -5574,10 +5679,26 @@ rtd_oem_setup_brand_splash_screen() {
 	#
 	# End of Documentation
 
-	image_file_to_brand=$1
-	text_to_brand_with=$2
+	system::validate_parameters ${*}
+	while [[ $# -gt 0 ]]; do
+		case $1 in
+			--target-iso )
+				target_iso="$2"
+				shift 2
+				;;
+			--iso-source-dir )
+				iso_source_dir="$2"
+				shift 2
+				;;
+			*)
+				write_error "Unknown option: $1"
+				shift
+				;;
+		esac
+	done
+	
 
-	# Ensure that imagemagik is installed so images can be manipulated.
+	system::log_item "🔯 Ensure that imagemagik is installed so images can be manipulated."
 	check_dependencies imagemagick
 
 	# Default locations and splash screens based on debian and ubuntu, meaning this function will assume you are
@@ -5591,8 +5712,8 @@ rtd_oem_setup_brand_splash_screen() {
 		fi )" }"
 	: "${text_to_brand_with:="RunTime Data OEM Install: $PREFERENCE"}"
 
-	echo -e $GREEN "found: $image_file_to_brand"  $ENDCOLOR
-	echo -e $GREEN "branding with: $text_to_brand_with " $ENDCOLOR
+	write_status "found: $image_file_to_brand" 
+	write_status "branding with: $text_to_brand_with " 
 
 	if [ -f $image_file_to_brand ]; then
 		convert $image_file_to_brand -gravity north -stroke '#000C' -strokewidth 3 -annotate 0 "$text_to_brand_with" -stroke none -strokewidth 3 -fill white -annotate 0 " $text_to_brand_with "  edit-out.png
@@ -9444,10 +9565,12 @@ system::validate_parameters() {
 kvm::util::read_common_options() {
 # Description: Function to read common options for KVM virtual machine creation. This function processes 
 # various parameters such as role, memory, CPU, disk size, and t-shirt size, setting them for the VM.
-# It also handles interactive prompts for configuration options if specified.
+# The function also validates the parameters and sets the prompt option for interactive configuration
+# if requested by the user.
+#
 # Globals: _tshirt_cpu_* _tshirt_mem_* _tshirt_dsk_* for small|medioum|large|extra-large|extra-extra-large
 #          as is saved in a configuration file for the user VM preferences.
-# Arguments: 
+# Arguments: $@ - The parameters to process.
 # Outputs: Status and error messages
 # Returns: 0 if successful, 1 if an error occurs
 # Usage: kvm::util::read_common_options --role workstation|desktop|VDI|server --cpu 2 --memory 2048 --disk 100 
@@ -9479,7 +9602,7 @@ kvm::util::read_common_options() {
 			# Handle the interactive prompt option: validate and set the prompt option if valid
 			if [[ $2 == "YES" || $2 == "yes" || $2 == "Yes" || $2 == "NO" || $2 == "No" || $2 == "no" ]] ; then
 				_ask="${2}"
-				write_status "🤔 Prompting for configuration options..."
+				write_status "🤔 Enabled prompting for configuration options..."
 			else
 				write_error "⛔ Incorrect option: ${2} ==> Use YES or NO"
 				return 1
@@ -9559,7 +9682,7 @@ kvm::util::read_distro_options() {
 # various parameters such as desktop environment, server role, and source URL, setting them for the VM.
 # It also handles interactive prompts for configuration options if specified.
 # Globals: None
-# Arguments:
+# Arguments: $@ - The parameters to process.
 # Outputs: Status and error messages
 # Returns: 0 if successful, 1 if an error occurs
 # Usage: kvm::util::read_distro_options --desktop_environment @deepin-desktop-environment --server_role @web-server-environment --source https://dl.fedoraproject.org/pub/fedora/linux/releases/39/Everything/x86_64/os/
@@ -9691,10 +9814,6 @@ kvm::util::read_distro_options() {
 						fi
 						shift 2
 					;;
-					--help | -h )
-						write_information "Usage: ${FUNCNAME[0]} --save-to /tmp --preseed-file /tmp/preseed.cfg --flavor ubuntu --desktop_environment ubuntu-desktop --server_role openssh-server --ask YES"
-						return 0
-					;;
 					--version | -v )
 						_tgt_ubuntu_ver="$2"
 						write_status "🐧 Ubuntu version requested: ${_tgt_ubuntu_ver}"
@@ -9728,6 +9847,16 @@ kvm::util::read_distro_options() {
 							write_error "⛔ Unknown server role selection: ${2} ==> Use web-server-environment, freeipa-server, network-server, cloud-server-environment, infrastructure-server-environment"
 							return 1
 						fi
+						shift 2
+					;;
+					--saveto | --location | --path | --dir | --directory | -p )
+						_saveto="$2"
+						write_host --cyan  "📜 Directed to create preseed instructions file: ${_saveto}/preseed.cfg"
+						shift 2
+					;;
+					--file | --preseed | --preseed_file | --preseed_cfg | --preseed_cfg_file | --preseed_file )
+						_preseed_file="$2"
+						write_host --cyan  "📜 Directed to create preseed instructions file: ${_preseed_file}"
 						shift 2
 					;;
 					*)
@@ -9795,6 +9924,16 @@ kvm::util::read_distro_options() {
 						system::log_item "Disk encryption password set."
 						shift
 					;;
+					--saveto | --location | --path | --dir | --directory | -p )
+						_saveto="$2"
+						write_host --cyan  "📜 Directed to create instructions file: ${_saveto}/preseed.cfg"
+						shift 2
+					;;
+					--file )
+						_preseed_file="$2"
+						write_host --cyan  "📜 Directed to create instructions file: ${_preseed_file}"
+						shift 2
+					;;
 					*)
 						shift
 					;;
@@ -9837,7 +9976,7 @@ kvm::util::read_distro_options() {
 					esac
 				done
 			;;
-			"Windows" | "WINDOWS" | "Win" | "Win11" | "Win10" )
+			"Windows" | "WINDOWS" | "Win" | "Win11" | "Win10" | "Microsoft" | "microsoft" )
 				system::log_item "❖ Set the requested options for Windows..."
 				while  [[ $# -gt 0 ]] ; do
 					case "$1" in
@@ -9977,7 +10116,7 @@ make_kvm_virtual_machine_now_from_fedora_org() {
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
 	: "${_DEFAULT_FEDORA_VER:="$(curl -s https://dl.fedoraproject.org/pub/fedora/linux/releases/ | grep -oP 'href="\K[0-9]+(?=/")' | sort -n | tail -1)"}"
 	: "${_os_version=$( $RTD_GUI --title "🐧 Select Release Version of Fedora" --inputbox "Please pick an available OS version by entering it below. \
-	If you are not sure just let me choose for you... \n ${fedoralogo} "  25 110 "${_DEFAULT_FEDORA_VER:-"39"}" 3>&1 1>&2 2>&3)}"
+	If you are not sure just let me choose for you... \n ${fedoralogo} "  25 110 "${_DEFAULT_FEDORA_VER:-"40"}" 3>&1 1>&2 2>&3)}"
 		case $? in
 			"$DIALOG_CANCEL") return ;;
 			"$DIALOG_ESC") return ;;
@@ -10012,6 +10151,8 @@ make_kvm_virtual_machine_now_from_fedora_org() {
 	🖥️ - CPU's: ${_cpu} \n
 	🖥️ - Disk Size: ${_dsk} \n You may attach to this server and see the progress at IP: $(hostname -I)"
 
+	write_information "Creating VM: ${vm_name}..."
+	{
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
 		--vcpus "${_cpu}" \
 		--memory "${_mem}" \
@@ -10021,8 +10162,8 @@ make_kvm_virtual_machine_now_from_fedora_org() {
 		--initrd-inject="${_preseed_file}" \
 		--location="${_source_url}" \
 		--extra-args "inst.ks=file:/$(basename $_preseed_file)" \
-		--noautoconsole && dialog::display_summary_message "NOTICE!" \
-	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
+		--noautoconsole  || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 ) 
+	} 2>&1 |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 
 	for i in  _preseed_file vm_kernel vm_initrd _source_url _config _mirrorlist_url _os_version _summary_message ; do unset $i ; done
 }
@@ -10109,6 +10250,9 @@ kvm::make_vm_template_now_from_redhat_com() {
 	🖥️ - CPU's: ${_cpu} \n
 	🖥️ - Disk Size: ${_dsk} \n You may attach to this server and see the progress at IP: $(hostname -I)"
 
+
+	write_information "Creating VM: ${vm_name}..."
+	{
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
 		--vcpus "${_cpu}" \
 		--memory "${_mem}" \
@@ -10118,8 +10262,8 @@ kvm::make_vm_template_now_from_redhat_com() {
 		--initrd-inject="${_preseed_file}" \
 		--location="${_source_url}" \
 		--extra-args "inst.ks=file:/$(basename $_preseed_file)" \
-		--noautoconsole && dialog::display_summary_message "NOTICE!" \
-	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
+		--noautoconsole  || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 ) 
+	} 2>&1 |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 
 	for i in  _preseed_file vm_kernel vm_initrd _source_url _config _mirrorlist_url _os_version ; do unset $i ; done
 }
@@ -10230,7 +10374,8 @@ make_kvm_virtual_machine_now_from_opensuse_org() {
 	NOTE: You may connecct to the VM and see the progress at IP: $(hostname -I) \n
 	      After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
 
-	# create image and run installer
+	write_status "Creating virtual machine (${vm_name})"
+	{
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
 		--vcpus "${_cpu}" \
 		--memory "${_mem}" \
@@ -10240,8 +10385,8 @@ make_kvm_virtual_machine_now_from_opensuse_org() {
 		--initrd-inject="${_autoyast_filename}" \
 		--location="${source_url}" \
 		--extra-args "AutoYaST=file:///$(basename ${_autoyast_filename})"   \
-		--noautoconsole && dialog::display_summary_message "NOTICE!"  \
-	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
+		--noautoconsole  || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 ) 
+	} 2>&1 |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 
 	for i in  PRESEED_FILE vm_kernel vm_initrd source_url CONFIG ; do unset $i ; done
 }
@@ -10341,7 +10486,8 @@ kvm::make_vm_template_now_from_debian_org() {
 	      After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
 
 
-	# create image and run installer
+	write_status "🔧 - Creating the VM..."	
+	{
 	"${bin_virt_install}" --name "${vm_name}" \
 		--vcpus "${_cpu}" \
 		--memory "${_mem}" \
@@ -10353,8 +10499,8 @@ kvm::make_vm_template_now_from_debian_org() {
 		--initrd-inject="${PRESEED_FILE}" \
 		--install kernel="${vm_kernel}",initrd="${vm_initrd}" \
 		--extra-args "ks=file:/$(basename $PRESEED_FILE) ${ui_diplay_style}" \
-		--noautoconsole && dialog::display_summary_message "NOTICE!"  \
-	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
+		--noautoconsole  || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 ) 
+	} 2>&1 |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 
 	for i in  PRESEED_FILE vm_kernel vm_initrd source_url ui_diplay_style vm_name vm_usecase ; do unset $i ; done
 
@@ -10873,6 +11019,7 @@ kvm::make_vm_template_now_from_microsoft() {
 	      After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
 
 	write_status "Creating and starting Virtual machine... "
+	{
 	"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
 		--vcpus "${_cpu}" \
 		--memory "${_mem}" \
@@ -10885,8 +11032,8 @@ kvm::make_vm_template_now_from_microsoft() {
 		--livecd \
 		--tpm backend.type=emulator,backend.version=2.0,model=tpm-crb  \
 		${uefi_option} \
-		--noautoconsole && dialog::display_summary_message "NOTICE!"  \
-	|| ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )
+		--noautoconsole  || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 ) 
+	} 2>&1 |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 
 	rm -f "${PostTasks}" || system::log_item "Failed to remove ${PostTasks}..."
 	for i in WindowsInstructions CONFIG WindowsMedia AutoUnattend PostTasks target_winver mem_size uefi_option cpu_count disk_size preferred_video ; do unset $i ; done
@@ -13810,7 +13957,7 @@ if [[ $sourced -eq 0  ]] ; then
 	fi
 else 
 	write_host --yellow "Library is run directly as an executable! This does nothing by itself."
-	loader --help
+	write_host --cyan "Use (bash $0 --help) to se how to use this library."
 fi
 
 # Find and load all dependant files for this library... 
