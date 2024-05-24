@@ -3385,13 +3385,17 @@ system::toggle_oem_auto_login() {
 		on )
 			write_status "✅ SUSE: toggling auto login on... *******"
 			
-			# if grep -q 'DISPLAYMANAGER_AUTOLOGIN="${_OEM_USER:-"tangarora"}"' ${_config_file} && grep -q 'DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"' ${_config_file}; then
-			# 	echo "auto login is already enabled"
-			# else
-			# 	cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak || write_error "❗💾 Could not backup: ${_config_file}! "
-			# 	sed -i 's/DISPLAYMANAGER_AUTOLOGIN=""/DISPLAYMANAGER_AUTOLOGIN="${_OEM_USER:-"tangarora"}"/' ${_config_file} || write_error "❗📄 Could not write to file: ${_config_file}!"
-			# 	sed -i 's/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="no"/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"/' ${_config_file} || write_error "❗📄 Could not write to file: ${_config_file}!"
-			# fi
+			if grep -q 'DISPLAYMANAGER_AUTOLOGIN="${_OEM_USER:-"tangarora"}"' ${_config_file} && grep -q 'DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"' ${_config_file}; then
+				echo "auto login is already enabled"
+				# Another quirk of SUSE is that sddm.conf is there but not used, it does prevent autologin from working tough...
+				mv /etc/sddm.conf ${_backup_dir}/sddm.conf.rtd-bak
+			else
+				# Another quirk of SUSE is that sddm.conf is there but not used, it does prevent autologin from working tough...
+				mv /etc/sddm.conf ${_backup_dir}/sddm.conf.rtd-bak
+				cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak || write_error "❗💾 Could not backup: ${_config_file}! "
+				sed -i 's/DISPLAYMANAGER_AUTOLOGIN=""/DISPLAYMANAGER_AUTOLOGIN="${_OEM_USER:-"tangarora"}"/' ${_config_file} || write_error "❗📄 Could not write to file: ${_config_file}!"
+				sed -i 's/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="no"/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"/' ${_config_file} || write_error "❗📄 Could not write to file: ${_config_file}!"
+			fi
 			;;
 	esac
 	
