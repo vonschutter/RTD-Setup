@@ -3371,10 +3371,11 @@ system::toggle_oem_auto_login() {
 
 	# Special case for SUSE...
 	if [[ -e /etc/sysconfig/displaymanager ]] ; then
-		local _config_file="/etc/sysconfig/displaymanager"
-		case $_flip in
+	local _config_file="/etc/sysconfig/displaymanager"
+	
+	case $_flip in
 		off )
-			write_status "⛔ SUSE: toggeling auto login off... *******"
+			write_status "⛔ SUSE: toggling auto login off... *******"
 			if rm ${_config_file} && mv ${_backup_dir}/${_config_file##*/}.rtd-bak ${_config_file} ; then
 				write_status "💾 Restored previous configuration..."
 			else
@@ -3382,14 +3383,21 @@ system::toggle_oem_auto_login() {
 			fi
 			;;
 		on )
-			write_status "✅ SUSE: toggeling auto login on... *******"
-			cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak || write_error "❗💾 Could not backup: ${_config_file}! "
-			#sed -i 's/DISPLAYMANAGER_AUTOLOGIN=""/DISPLAYMANAGER_AUTOLOGIN="tangarora"/' ${_config_file} || write_error "❗📄 Could not write to file: ${_config_file}!"
-			#sed -i 's/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="no"/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"/' ${_config_file} || write_error "❗📄 Could not write to file: ${_config_file}!"
+			write_status "✅ SUSE: toggling auto login on... *******"
+			
+			if grep -q 'DISPLAYMANAGER_AUTOLOGIN="${_OEM_USER:-"tangarora"}"' ${_config_file} && grep -q 'DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"' ${_config_file}; then
+				echo "auto login is already enabled"
+			else
+				cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak || write_error "❗💾 Could not backup: ${_config_file}! "
+				sed -i 's/DISPLAYMANAGER_AUTOLOGIN=""/DISPLAYMANAGER_AUTOLOGIN="${_OEM_USER:-"tangarora"}"/' ${_config_file} || write_error "❗📄 Could not write to file: ${_config_file}!"
+				sed -i 's/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="no"/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"/' ${_config_file} || write_error "❗📄 Could not write to file: ${_config_file}!"
+			fi
 			;;
-		esac
-		local toggle=done
+	esac
+	
+	local toggle=done
 	fi
+
 
 
 	# Toggle auto login for Terminal target env. (no GUI).
@@ -12488,7 +12496,7 @@ template::AutoYast_xml() {
 	</timezone>
 
 	<login_settings>
-		<autologin_user>tangarora</autologin_user>
+		<autologin_user>${Preference_InitialUser:-"tangarora"}</autologin_user>
 		<password_less_login config:type="boolean">true</password_less_login>
 	</login_settings>
 
