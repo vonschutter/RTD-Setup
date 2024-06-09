@@ -356,7 +356,49 @@ _OEM_dependencies="_branding.info _locations.info _rtd_recipies.info"
 
 
 
-dialog::display_cmd_output () {
+system::detect_session() {
+# Description: Function to detect the current session type (tty, ssh, gui, wayland, etc.)
+# Globals: None
+# Arguments: None
+# Outputs: Session type detected (TTY, SSH, GUI, WAYLAND) both echoed and stored in _SESSION_TYPE variable.
+#		- SSH
+#		- GUI
+#		- WAYLAND
+#		- TTY
+#
+#
+# Returns: 0
+# Examples: 
+# 		- system::detect_session ; echo $_SESSION_TYPE
+#		- MySession=$(system::detect_session) ; echo $MySession
+#
+# Dependencies: None
+# 
+# End of Documentation
+
+	if [ -n "${SSH_CLIENT}" ] || [ -n "${SSH_TTY}" ]; then
+		_SESSION_TYPE="SSH"
+		system::log_item "👌 SSH session detected."
+	elif [ -n "${DISPLAY}" ]; then
+		_SESSION_TYPE="GUI"
+		system::log_item "👌 An X session is running."
+	elif [ -n "$WAYLAND_DISPLAY" ]; then
+		_SESSION_TYPE="WAYLAND"
+		system::log_item "👌 A Wayland session is running."
+	else
+		_SESSION_TYPE="TTY"
+		system::log_item "👌 TTY session detected."
+	fi
+
+	echo "${_SESSION_TYPE}"
+	return 0
+
+}
+
+
+
+
+dialog::display_cmd_output() {
 	# Description: Function to display a command output in a dialog box. 
 	# 
 	# Globals: dialog 
@@ -1524,8 +1566,17 @@ dependency::command_exists() {
 		if [[ -f "$response_file" ]]; then
 			response=$(cat "$response_file")
 		else
-			read -p "${#missing_commands[@]} command(s) are missing: ${missing_commands[*]}. Do you want to install them? [y/N]: " response
-			echo "$response" > "$response_file"
+			local _session=$(system::detect_session)
+			if [[ "$_session" == "TTY" || "$_session" == "SSH" ]]; then
+				read -p "${#missing_commands[@]} command(s) are missing: ${missing_commands[*]}. Do you want to install them? [y/N]: " response
+				echo "$response" > "$response_file"
+			elif [[ "$_session" == "GUI" || "$_session" == "WAYLAND" ]]; then
+				response=$(zenity --question --text="${#missing_commands[@]} command(s) are missing: ${missing_commands[*]}. Do you want to install them?")
+				echo "$response" > "$response_file"
+			else 
+				read -p "${#missing_commands[@]} command(s) are missing: ${missing_commands[*]}. Do you want to install them? [y/N]: " response
+				echo "$response" > "$response_file"
+			fi
 		fi
 
 		if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
@@ -5814,7 +5865,7 @@ system::get_tgt_ubuntu_version()
 
 	# Check if a version of Ubuntu was specified, otherwise make sure it is (default to latest LTS)...
 	if [[ -z ${_tgt_ubuntu_ver} ]]; then
-		write_information "🐧 - No version of Ubuntu specified..."
+		write_information "🐧 - No version of Ubuntu specified as a parameter..."
 		if [[ ${_ask} == "YES" ]]; then
 			write_information "🐧 - Requested to ask for Ubuntu version; prompting for version of Ubuntu to use..."
 			extra_option="Manually_specify"
@@ -14167,7 +14218,7 @@ case $1 in
 				$selection )
 					result=$(while IFS= read -r 'line'; do
 						[[ "$line" == "$selection() {" ]]		&& printline="yes"
-						[[ "$line" == "$selection() { " ]]		&& printline="no"
+						[[ "$line" == "$selection() { " ]]		&& printline="yes"
 						[[ "$line" == "# End of documentation"* ]]	&& printline="no"
 						[[ "$line" == *"# End of documentation"* ]]	&& printline="no"
 						[[ "$line" == *End*of*Documentation* ]]		&& printline="no"
@@ -14186,33 +14237,43 @@ case $1 in
 			DisplayList=$(list_loaded_internal_functions --zformat)
 			IFS_SAV=$IFS
 			IFS=$(echo -en "\n\b")
-			selection=$(zenity --list --modal --text="Select a function below, to see the function's documentation \n and usage:" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1000}" --print-column=2 --column="Number" --column="Function" --column="Description" ${DisplayList} 2>/dev/null )
+			selection=$(zenity --list --modal --text="Select a function below, to see the function's documentation \n and usage:" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1000}" --print-column=2 --column="Number" --column="Function" --column="Description" ${DisplayList} 2>/dev/null)
 			exit_status=$?
 			IFS=$IFS_SAV
 			exec 3>&-
+
 			case $exit_status in
 				1) clear && echo [Cancel] && exit ;;
 				255) clear && echo [ESC] && exit ;;
 			esac
+			export selection
 
 			case "$selection" in
 				"$selection" )
-					result=$(while IFS= read -r 'line'; do
-						# if echo "$line" |grep "$selection ()" ; then printline="yes" ; fi
-						[[ "$line" == "${selection/ /}()" ]]		&& printline="yes"
-						[[ "$line" =~ ?"$selection ()" ]]		&& printline="yes"
-						[[ "$line" == *"$selection ()"* ]]		&& printline="yes"
-						[[ "$line" == "# End of documentation"* ]]	&& printline="no"
-						[[ "$line" == *"# End of documentation"* ]]	&& printline="no"
-						[[ "$line" == *End*of*Documentation* ]]		&& printline="no"
-						[[ "$line" == "# End of Documentation" ]]	&& printline="no"
-						[[ "$printline" == "yes" ]]			&& echo "$line" | grep -E '(^|\s*)#\s*'
-					done < $0 )
-					zenity --info --modal --ok-label=BACK --title "RTD Functon: $selection" --text="$result" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1000}"
+					system::log_item "Selection = [${selection:1:-1}]"
+					result=$(while read -r line; do		
+						if [[ "$line" == "${selection:1:-1}() {"* ]]; then
+							system::log_item "Found function definition: $line"
+							printline="yes"
+						fi
+
+						if [[ "$printline" == "yes" ]]; then
+							echo "$line" | grep -E '(^|\s*)#\s*' | sed 's/#//'
+						fi
+
+						if [[ "$line" == "# End of documentation"* || "$line" == *"# End of documentation"* || "$line" == *End*of*Documentation* ]]; then
+							system::log_item "End of Documentation found: $line"
+							printline="no"
+						fi
+					done < "${0}")
+
+					system::log_item "Result: $result"
+					echo "$result" | zenity --text-info --modal --ok-label=BACK --title "RTD Function: [${selection}]" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1000}"
+					unset result
 				;;
 				* )
-				# Trap unknown exit code...
-				exit
+					# Trap unknown exit code...
+					exit
 				;;
 			esac
 		done
