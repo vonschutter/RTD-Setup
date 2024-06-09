@@ -5937,26 +5937,6 @@ rtd_oem_ubuntu_auto_install_iso_builder() {
 
 	write_information "Retreive list of available Ubuntu versions..."
 	system::get_tgt_ubuntu_version
-	# all=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
-
-	# # Ask for desired version to use:
-	# ubuntu_ver=$($RTD_GUI --title "Select Release Version of Ubuntu" --inputbox "Please pick an available ubuntu version by entering it below. Versions to choose from: ${all[*]} If you are not sure just let me choose for you... \n $picachu "  25 110 "${all[-1]}" 3>&1 1>&2 2>&3) ;clear
-	# [ "$ubuntu_ver" ] || ubuntu_ver=${all[-1]}
-
-	# write_information Find the precice location of the requested ISO image:
-	# ISO_URL=$(system::rtd_oem_find_live_release --version ${_tgt_ubuntu_ver} --distribution ${ubuntu_flavor} --desktop)
-	# 	echo "requested iso for download : $ISO_URL"
-	# 	ISO_FILENAME=$(basename $ISO_URL)
-	# 	BASE=$(basename $ISO_URL .iso)
-
-
-	# write_status "Checking if $ISO_FILENAME already downloaded..."
-	# iso=$(find "$permanent_download_dir" -name "$ISO_FILENAME")
-	# if [ ! -e "$iso" ]; then
-	# 	echo "$ISO_FILENAME is not in cache, downloading..."
-	# 	wget -nc $ISO_URL -P "$permanent_download_dir" || read -p "Failure to download ISO file"
-	# 	iso="$permanent_download_dir/$ISO_FILENAME"
-	# fi
 
 	if [[ "$HOME" == "/root" ]] ; then HOME=/home/$SUDO_USER ; fi
 	system::get_ubuntu_media $HOME/Virtual-DVDs/Downloaded
@@ -9855,10 +9835,9 @@ kvm::util::read_common_options() {
 		*)
 			# Log any unknown parameters and ignore them
 			system::log_item "Unknown common parameter:[$1] - ignoring..."
-			shift
+			shift 2
 		;;
 		esac
-		shift 
 	done
 
 }
@@ -9898,7 +9877,6 @@ kvm::util::read_distro_options() {
 				shift
 			;;
 		esac
-		shift
 	done
 
 
@@ -9959,10 +9937,9 @@ kvm::util::read_distro_options() {
 							shift 2
 						;;
 						*)
-							shift
+							shift 2
 						;;
 					esac
-					shift
 				done
 			;;
 			"ubuntu" | "Ubuntu" | "UBUNTU" )
@@ -10009,10 +9986,9 @@ kvm::util::read_distro_options() {
 						return 0
 					;;
 					*)
-						shift
+						shift 2
 					;;
 					esac
-					shift 
 				done
 			;;
 			"debian" | "Debian" | "DEBIAN" )
@@ -10049,10 +10025,9 @@ kvm::util::read_distro_options() {
 						shift 2
 					;;
 					*)
-						shift
+						shift 2
 					;;
 					esac
-					shift 
 				done
 			;;
 			"suse" | "SUSE" | "Suse" | "openSUSE" | "OpenSUSE" | "opensuse" | "OpenSuse" | "OPENSUSE" | "OPENSuse" | "OPENSUSE" )
@@ -10124,10 +10099,9 @@ kvm::util::read_distro_options() {
 						shift 2
 					;;
 					*)
-						shift
+						shift 2
 					;;
 					esac
-					shift 
 				done
 			;;
 			"rhel" | "RHEL" | "RedHat" | "REDHAT" )
@@ -10160,7 +10134,7 @@ kvm::util::read_distro_options() {
 							shift 2
 						;;
 						*)
-							shift
+							shift 2
 						;;
 					esac
 				done
@@ -10175,10 +10149,9 @@ kvm::util::read_distro_options() {
 							shift 2
 						;;
 						*)
-							shift
+							shift 2
 						;;
 					esac
-					shift
 				done
 			;;
 			*)
@@ -10798,7 +10771,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	: ${CloudConfigDir:="$_saveto"} 			# This is the default location cidata files.
 	: ${bin_virt_install:=$(type -p virt-install)} 		# This is the default location for the virt-install binary.
 	: ${virt_net="$(system::find_vm_bridge)"} 		# This is the default network to use for the VM.
-
+	
 	# Set default values for VM T-Shirts sizes...
 	kvm::util::read_common_options ${*}
 
@@ -10808,93 +10781,16 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	# Check that virtualization is supported on the host
 	dependency::virtualization
 
-	# # Determine available versions of Ubuntu to offer...
-	# system::log_item "🔎 Retreive list of available $ubuntu_flavor $_role versions..."
-	# declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
-	# declare -a all_normal_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+)/ && print "$1\n"' | sort -Vu))
-	# dist_logo="${ubuntulogo}"
+	# get the version of Ubuntu to use...
+	system::get_tgt_ubuntu_version 
 
-
-	# # Check if a version of Ubuntu was specified, otherwise make sure it is (default to latest LTS)...
-	# if [[ -z ${_tgt_ubuntu_ver} ]]; then
-	# 	write_information "🐧 - No version of Ubuntu specified..."
-	# 	if [[ ${_ask} == "YES" ]]; then
-	# 		write_information "🐧 - Requested to ask for Ubuntu version; prompting for version of Ubuntu to use..."
-	# 		extra_option="Manually_specify"
-
-	# 		# Display a menu to choose an Ubuntu version, including an option for manual entry
-	# 		_tgt_ubuntu_ver=$($RTD_GUI --colors --title "Select Release Version of $ubuntu_flavor $_role" --menu "\n \Z1\n$dist_logo\Zn \n 👍 Please pick an available \Z1$ubuntu_flavor\Zn version from the list below or choose to manually specify a version. Long Term Support (LTS) Versions to choose from are as follows:\n\n " 35 90 $(( ${#all_lts_versions[@]} + 1 )) \
-	# 		$(for i in "${!all_lts_versions[@]}"; do echo  "${all_lts_versions[$i]}" "$i"; done ) "$extra_option" "$(( ${#all_lts_versions[@]} + 1 ))"  3>&1 1>&2 2>&3)
-	# 		dialog_status=$?
-
-	# 		# Handle the user's menu selection or cancellation based on the captured status
-	# 		case $dialog_status in
-	# 			$DIALOG_CANCEL) echo "Dialog was cancelled."; return ;;
-	# 			$DIALOG_ESC) echo "Dialog was escaped."; return ;;
-	# 		esac
-
-	# 		# Check if the user chose to manually specify a version
-	# 		if [[ "${_tgt_ubuntu_ver}" == "${extra_option}" ]]; then
-	# 			_tgt_ubuntu_ver=$($RTD_GUI --colors --title "Manual Version Input" --inputbox "\nPlease enter the desired Ubuntu version (e.g., 22.10):" 10 60 3>&1 1>&2 2>&3)
-				
-	# 			# Capture and handle the exit status of the input dialog
-	# 			case $? in
-	# 				$DIALOG_CANCEL) echo "Input was cancelled."; return ;;
-	# 				$DIALOG_ESC) echo "Input was escaped."; return ;;
-	# 			esac
-	# 		fi
-
-	# 		clear
-	# 	else
-	# 		write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
-	# 		_tgt_ubuntu_ver=${all_lts_versions[-1]}
-	# 	fi
-	# fi
-
-	# # Validate Ubuntu LTS version selections against available versions (manual selection may have occurred)...
-	# for lts_version in "${all_lts_versions[@]}"; do
-	# 	if [[ "${lts_version}" == "${_tgt_ubuntu_ver}" ]]; then
-	# 		local _selection_is_valid="yes"
-	# 		write_information "🐧 - The version of Ubuntu selected is valid: ${_tgt_ubuntu_ver}"
-	# 	fi
-	# done
-
-	# # Validate Ubuntu normal version selections against available versions (manual selection may have occurred)...
-	# for normal_version in "${all_normal_versions[@]}"; do
-	# 	if [[ "${normal_version}" == "${_tgt_ubuntu_ver}" ]]; then
-	# 		local _selection_is_valid="yes"
-	# 		write_information "🐧 - The version of Ubuntu selected is valid: ${_tgt_ubuntu_ver}"
-	# 	fi
-	# done
-
-	# if [[ "${_selection_is_valid}" != "yes" ]]; then
-	# 	write_error "⛔ - The version of Ubuntu selected [${_tgt_ubuntu_ver}] is not valid. Please select a valid version list. Alternatively, you may let me choose for you..."
-	# 	read -p "Press [ENTER] to continue..." 
-	# 	return 1
-	# fi
-
-	# Return the version number selected
-	# _tgt_ubuntu_ver=${_tgt_ubuntu_ver:-${all_lts_versions[-1]}}
-
-	system::get_tgt_ubuntu_version
 	# Format the name of the VM to be created...
 	local vm_name="Template_Ubuntu_${_tgt_ubuntu_ver}_${_role}_$(date +%Y-%m-%d-%s)"
 
 	# Create auto installation files for the Ubuntu VM...
-	system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --desktop_environment ${_UserDesktopEnvironmentSelection}
+	system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --desktop_environment ${_UserDesktopEnvironmentSelection} --ask ${_ask} 
 	: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release --version ${_tgt_ubuntu_ver} --distribution ${ubuntu_flavor} --desktop )}
 	: ${iso_filename:="$(basename $ubuntu_iso_url)"}
-
-	# # Ensure that the file is available for VM creation... 
-	# write_status "Checking if $iso_filename already downloaded..."
-	# iso=$(find "$permanent_download_dir" -name "$iso_filename")
-	# if [ ! -e "$iso" ]; then
-	# 	write_warning "$iso_filename is not in cache, downloading..."
-	# 	wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
-	# 	iso="$permanent_download_dir/$iso_filename"
-	# else
-	# 	write_information "💿 - $iso_filename already in cache, using it for VM greenfield creation..."
-	# fi
 
 	# ensure local media:    [/where/to/look/first] 
 	system::get_ubuntu_media /var/lib/libvirt/boot
