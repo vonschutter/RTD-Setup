@@ -357,23 +357,23 @@ _OEM_dependencies="_branding.info _locations.info _rtd_recipies.info"
 
 
 system::detect_session() {
-# Description: Function to detect the current session type (tty, ssh, gui, wayland, etc.)
+# Description: Detects the current session type (TTY, SSH, GUI, Wayland).
 # Globals: None
 # Arguments: None
-# Outputs: Session type detected (TTY, SSH, GUI, WAYLAND) both echoed and stored in _SESSION_TYPE variable.
-#		- SSH
-#		- GUI
-#		- WAYLAND
-#		- TTY
-#
+# Outputs: Echoes and stores the detected session type in the _SESSION_TYPE variable.
+#          Possible values are:
+#          - SSH
+#          - GUI
+#          - WAYLAND
+#          - TTY
 #
 # Returns: 0
 # Examples: 
-# 		- system::detect_session ; echo $_SESSION_TYPE
-#		- MySession=$(system::detect_session) ; echo $MySession
+#          - system::detect_session; echo $_SESSION_TYPE
+#          - MySession=$(system::detect_session); echo $MySession
 #
-# Dependencies: None
-# 
+# Dependencies: A standard Linux system with Bash and common utilities.
+#
 # End of Documentation
 
 	if [ -n "${SSH_CLIENT}" ] || [ -n "${SSH_TTY}" ]; then
@@ -399,18 +399,27 @@ system::detect_session() {
 
 
 dialog::display_cmd_output() {
-	# Description: Function to display a command output in a dialog box. 
-	# 
-	# Globals: dialog 
-	# Arguments: ["String to execute"]
-	# Outputs: Message in dialog box
-	# Returns: 0 or ESC
-	# Usage:
-	#
-	#
-	# dialog::display_cmd_output apt -y upgrade
-	#
-	# End of Documentation
+# Description: Displays the output of a command in a dialog box.
+#
+# This function takes a command as an argument and executes it. 
+# The output of the command is then displayed in a dialog box.
+# This is a convenient way to display the output of a command in a terminal in a nice way.
+# The dialog box is displayed using the 'dialog' command, which must be installed on the system.
+# If the user cancels the operation, the function returns ESC.
+# 
+# Globals: 
+#   - dialog
+# Arguments: 
+#   - ["String to execute"]: The command to be executed and its arguments.
+# Outputs: 
+#   - Displays the command output in a dialog box.
+# Returns: 
+#   - 0 on success, ESC on user cancellation.
+#
+# Usage:
+#   dialog::display_cmd_output "apt -y upgrade"
+#
+# End of Documentation
 	_cmd="$*"
 
 
@@ -424,32 +433,35 @@ dialog::display_cmd_output() {
 
 
 dialog::copy_file_progress() {
-# Description: Function to display a file copy dialog. 
-# This is a simple way to show a progress bar while copying a set of files from one destination
-# in a nice way. To use this function simply call it passing source and destination.
-# 
-# Globals: dialog 
-# Arguments: ["String to display"]
-# Outputs: Message in dialog box
-# Returns: 0 or ESC
-# Usage:
+# Description: Displays a file copy progress dialog.
+# This function shows a progress bar while copying files from a source directory to a destination directory.
 #
-# dialog::copy_file_progress source destination
+# Globals: 
+#   - dialog
+# Arguments: 
+#   - "source": The directory containing the files to be copied.
+#   - "destination": The directory where the files will be copied to.
+# Outputs: 
+#   - Displays a progress dialog box showing the file copy progress.
+# Returns: 
+#   - 0 on success, ESC on user cancellation.
+#
+# Usage:
+#   dialog::copy_file_progress "source" "destination"
 #
 # Example:
-# dialog::copy_file_progress "/path/to/source" "/path/to/destination"
+#   dialog::copy_file_progress "/path/to/source" "/path/to/destination"
 #
-# This function takes two arguments: the source directory containing the files to be copied,
-# and the destination directory where the files will be copied to. It creates a progress bar
-# dialog using the 'dialog' command and updates it as each file is copied. The progress bar
-# shows the percentage of files copied and the name of the current file being copied.
-# The function returns 0 if the copying process completes successfully, or ESC if the user
-# cancels the operation.
+# Details:
+#   - This function takes two arguments: the source directory containing the files to be copied,
+#     and the destination directory where the files will be copied to.
+#   - It creates a progress bar dialog using the 'dialog' command and updates it as each file is copied.
+#   - The progress bar shows the percentage of files copied and the name of the current file being copied.
+#   - The function returns 0 if the copying process completes successfully, or ESC if the user cancels the operation.
 #
 # Note: The 'dialog' command must be installed for this function to work.
 #
 # End of Documentation
-# Source
 	_dirs=(${1}/* )
 
 	# Destination directory
@@ -492,6 +504,36 @@ EOF
 
 
 dialog::copy_with_progress() {
+# Description: Function to display a progress bar while copying an ISO file to a destination.
+# This function uses 'dialog' to create a progress bar that shows the percentage of an ISO file being copied.
+#
+# Globals:
+#   - None
+# Arguments:
+#   - "$1": The path to the ISO file to be copied.
+#   - "$2": The destination path where the ISO file will be copied.
+#   - "$3": The mount point directory (used for display purposes).
+# Outputs:
+#   - Displays a dialog box with the copy progress.
+# Returns:
+#   - 0 on success.
+#
+# Usage:
+#   dialog::copy_with_progress "/path/to/iso/file.iso" "/path/to/destination" "/mount/point"
+#
+# Example:
+#   dialog::copy_with_progress "/home/user/file.iso" "/mnt/usb/file.iso" "/mnt/usb"
+#
+# Dependencies:
+#   - dialog: To display the progress bar.
+#   - pv: To monitor the progress of the file copy.
+#   - mktemp: To create a temporary named pipe.
+#
+# Notes:
+#   - Ensure 'dialog' and 'pv' are installed on your system for this function to work correctly.
+#
+# End of Documentation
+
 	local iso_file="$1"
 	local destination="$2"
 	local mount_point="$3"
@@ -521,20 +563,32 @@ dialog::copy_with_progress() {
 
 
 dialog::display_notice () {
-	# Description: Function to display an information notice. The purpose of this function
-	# is simply to make it easy and convenient to display a message to an end user in a terminal
-	# in a nice way. To use this function, simply call it passing whatever string you want displayed
-	# using dialog.
-	# Globals: "${RTD_GUI}" (will default to dialog), "${PUBLICATION}" (optional)
-	# Arguments: ["String to display"]
-	# Outputs: Message in dialog box
-	# Returns: 0 or ESC
-	# Usage:
-
-	#
-	# dialog::display_notice "The message that you want to display"
-	#
-	# End of Documentation
+# Description: Displays an information notice using a dialog box.
+# This function provides a convenient way to display a message to an end user in a terminal.
+#
+# Globals:
+#   - "${RTD_GUI}" (optional): Specifies the command to use for displaying the dialog (defaults to 'dialog').
+#   - "${PUBLICATION}" (optional): Sets the backtitle of the dialog box.
+# Arguments:
+#   - "$1": The message string to be displayed in the dialog box.
+# Outputs:
+#   - Displays the specified message in a dialog box.
+# Returns:
+#   - 0 on success, ESC on user cancellation.
+#
+# Usage:
+#   dialog::display_notice "The message that you want to display"
+#
+# Example:
+#   dialog::display_notice "This is an important notice for the user."
+#
+# Dependencies:
+#   - dialog: To display the message in a dialog box.
+#
+# Notes:
+#   - Ensure 'dialog' is installed on your system for this function to work correctly.
+#
+# End of Documentation
 
 	system::log_item "checking for dialog..."
 	if ! hash "${RTD_GUI:-dialog}" &>/dev/null ; then
@@ -553,21 +607,33 @@ dialog::display_notice () {
 
 
 
-dialog::display_error()
-{
-	# Description: Function to display an error notice. The purpose of this function
-	# is simply to make it easy and convenient to display an ERROR message to an end user in a terminal
-	# in a nice way. To use this function, simply call it passing whatever string you want displayed
-	# using dialog.
-	# Globals: "${RTD_GUI}" (will default to dialog), "${PUBLICATION}" (optional)
-	# Arguments: ["String to display"]
-	# Outputs: Message in dialog box
-	# Returns: 0 or ESC
-	# Usage:
-	#
-	# dialog::display_error "The message that you want to display"
-	#
-	# End of Documentation
+dialog::display_error() {
+# Description: Displays an error notice using a dialog box.
+# This function provides a convenient way to display an error message to an end user in a terminal.
+#
+# Globals:
+#   - "${RTD_GUI}" (optional): Specifies the command to use for displaying the dialog (defaults to 'dialog').
+#   - "${PUBLICATION}" (optional): Sets the backtitle of the dialog box.
+# Arguments:
+#   - "$1": The error message string to be displayed in the dialog box.
+# Outputs:
+#   - Displays the specified error message in a dialog box.
+# Returns:
+#   - 0 on success, ESC on user cancellation.
+#
+# Usage:
+#   dialog::display_error "The message that you want to display"
+#
+# Example:
+#   dialog::display_error "An unexpected error occurred. Please try again."
+#
+# Dependencies:
+#   - dialog: To display the error message in a dialog box.
+#
+# Notes:
+#   - Ensure 'dialog' is installed on your system for this function to work correctly.
+#
+# End of Documentation
 
 	system::log_item "checking for dialog..."
 	if ! hash "${RTD_GUI:-dialog}" &>/dev/null ; then
@@ -588,24 +654,24 @@ dialog::display_error()
 
 
 dialog::display_summary_message() {
-	# Description: Function to read a variable "result" and display its contents. The purpose of this function
-	# is simply to make it easy and convenient to display a message to an end user in a terminal
-	# in a nice way. To use this function, simply call it after populating the variable result.
-	# 
-	# Globals: ${result}, ${BRANDING}
-	# 
-	# Arguments: ["Title to display"]
-	# 
-	# Outputs: Message in dialog box
-	# 
-	# Returns: 0 or ESC
-	# 
-	# Usage:
-	# 
-	# result=$( command with output)
-	# dialog::display_result "title of the message"
-	# 
-	# End of Documentation
+# Description: Function to read a variable "result" and display its contents. The purpose of this function
+# is simply to make it easy and convenient to display a message to an end user in a terminal
+# in a nice way. To use this function, simply call it after populating the variable result.
+# 
+# Globals: ${result}, ${BRANDING}
+# 
+# Arguments: ["Title to display"]
+# 
+# Outputs: Message in dialog box
+# 
+# Returns: 0 or ESC
+# 
+# Usage:
+# 
+# result=$( command with output)
+# dialog::display_result "title of the message"
+# 
+# End of Documentation
 
 	if ! hash dialog &>/dev/null ; then	
 		system::log_item "dialog not found..."
@@ -629,19 +695,38 @@ dialog::display_summary_message() {
 
 
 dialog::display_result() {
-	# Description: Function to read a variable "result" and display its contents. The purpose of this function
-	# is simply to make it easy and convenient to display a message to an end user in a terminal
-	# in a nice way. To use this function, simply call it after populating the variable result.
-	# Globals: ${result}, ${BRANDING}
-	# Arguments: ["Title to display"]
-	# Outputs: Message in dialog box
-	# Returns: 0 or ESC
-	# Usage:
+	# Description: Displays the contents of the variable "result" in a message box.
+	# This function makes it easy and convenient to display a message to an end user in a terminal.
+	# It checks for the availability of the dialog utility and uses it to display a message box.
 	#
-	# result=$( command with output)
-	# dialog::display_result "title of the message"
+	# Globals:
+	#   - ${result}: The variable whose contents will be displayed.
+	#   - ${BRANDING} (optional): Sets the backtitle of the dialog box.
+	# Arguments:
+	#   - "$1": The title of the message box.
+	# Outputs:
+	#   - Displays the content of the "result" variable in a dialog box.
+	# Returns:
+	#   - 0 on success, ESC on user cancellation.
+	#
+	# Usage:
+	#   result=$(command_with_output)
+	#   dialog::display_result "Title of the message"
+	#
+	# Example:
+	#   result=$(ls -l)
+	#   dialog::display_result "Directory Listing"
+	#
+	# Dependencies:
+	#   - dialog: To display the message box.
+	#
+	# Notes:
+	#   - If the dialog utility is not found, the function checks for dependencies and returns 1 if they are not met.
+	#   - The backtitle, colors, collapse, height, and width of the message box are customizable using environment variables.
 	#
 	# End of Documentation
+
+
 	system::log_item "checking for dialog..."
 	if ! hash "${RTD_GUI:-dialog}" &>/dev/null ; then
 		system::log_item "${RTD_GUI:-dialog} not found..."
@@ -661,23 +746,33 @@ dialog::display_result() {
 
 
 yad::display_cmd_output() {
-	# Description: Function to display a command output in a yad box. 
-	# 
-	# Globals: yad 
-	# Arguments: ["String to execute"]
-	# Outputs: Message in dialog box
-	# Returns: 0 or ESC
+	# Description: Displays the output of a command in a YAD box.
+	# This function takes a command as an argument, executes it, and displays the output in a YAD box.
+	#
+	# Globals:
+	#   - yad
+	# Arguments:
+	#   - "$@": The command to be executed and its arguments.
+	# Outputs:
+	#   - Displays the command output in a YAD box.
+	# Returns:
+	#   - 0 on success or if the YAD box is closed with the "Close" button.
+	#   - "ESC" if the YAD box is closed with the "ESC" key.
+	#
 	# Usage:
+	#   yad::display_cmd_output "command_to_execute"
 	#
-	# This function takes a command as an argument and executes it. The output of the command is displayed in a yad yad box.
-	# Any error messages are also displayed in the yad box.
-	# The function returns 0 if the command execution is successful or if the yad box is closed with the "Close" button.
-	# If the yad box is closed with the "ESC" key, the function returns "ESC".
+	# Example:
+	#   yad::display_cmd_output "apt -y upgrade"
 	#
-	# Example usage:
-	# yad::display_cmd_output "apt -y upgrade"
+	# Dependencies:
+	#   - yad: To display the command output in a YAD box.
+	#
+	# Notes:
+	#   - If the YAD utility is not found, the function checks for dependencies and returns 1 if they are not met.
 	#
 	# End of Documentation
+
 	# Command to execute
 	local cmd=$@
 
@@ -706,21 +801,34 @@ yad::display_cmd_output() {
 
 
 yad::display_progressbar_pulsating() {
-	# Description: Function to display a command output in a progress box. 
-	# 
-	# Globals: yad 
-	# Arguments: ["String to execute"]
-	# Outputs: Message in yad box
-	# Returns: 0 or ESC
+	# Description: Displays the output of a command in a pulsating progress box.
+	# This function takes a command as an argument, executes it, and displays the output in a progress box using the 'yad' command.
+	#
+	# Globals:
+	#   - yad
+	# Arguments:
+	#   - "$*": The command to be executed and its arguments.
+	# Outputs:
+	#   - Displays the command output in a YAD progress box.
+	# Returns:
+	#   - 0 on success or if the YAD box is closed with the "Close" button.
+	#   - "ESC" if the YAD box is closed with the "ESC" key.
+	#
 	# Usage:
+	#   yad::display_progressbar_pulsating "command_to_execute"
 	#
-	# This function takes a command as an argument and executes it. The command output is displayed in a progress box using the 'yad' command.
-	# The progress box shows a pulsating animate system::prepare_environment_for_iso_creationion and automatically closes when the command execution is complete.
+	# Example:
+	#   yad::display_progressbar_pulsating "apt -y upgrade"
 	#
-	# Example usage:
-	# yad::display_cmd_output "apt -y upgrade"
+	# Dependencies:
+	#   - yad: To display the command output in a YAD progress box.
+	#
+	# Notes:
+	#   - The progress box shows a pulsating animation and automatically closes when the command execution is complete.
+	#   - If the YAD utility is not found, the function checks for dependencies and returns 1 if they are not met.
 	#
 	# End of Documentation
+
 	_cmd="$*"
 
 	system::log_item "checking for yad..."
@@ -740,15 +848,31 @@ yad::display_progressbar_pulsating() {
 
 
 zenity::display_info() {
-	# Description: Function to display an information notice.
-	# The purpose of this function is to make it easy and convenient to display a message to an end user in a GUI in a nice way.
-	# To use this function, simply call it passing whatever string you want displayed.
+	# Description: Displays an information notice using a Zenity info box.
+	# This function provides a convenient way to display a message to an end user in a GUI.
 	#
-	# Globals: "$_TITLE" (optional), "$selection" (optional)
-	# Arguments: ["String to display"]
-	# Outputs: Message in zenity info box
-	# Returns: None
-	# Usage: zenity::display_info "The message that you want to display"
+	# Globals:
+	#   - $_TITLE (optional): Sets the title of the Zenity info box.
+	#   - $selection (optional): Additional text to include in the title.
+	# Arguments:
+	#   - "$*": The message string to be displayed in the Zenity info box.
+	# Outputs:
+	#   - Displays the specified message in a Zenity info box.
+	# Returns:
+	#   - None
+	#
+	# Usage:
+	#   zenity::display_info "The message that you want to display"
+	#
+	# Example:
+	#   zenity::display_info "This is an important notice for the user."
+	#
+	# Dependencies:
+	#   - zenity: To display the message in a Zenity info box.
+	#
+	# Notes:
+	#   - If the Zenity utility is not found, the function checks for dependencies and returns 1 if they are not met.
+	#   - The info box is customizable using the global variables $_TITLE and $selection.
 	#
 	# End of Documentation
 
@@ -763,19 +887,32 @@ zenity::display_info() {
 
 
 zenity::display_url() {
-# Description: to display the content of a URL in a GUI using zenity.
-# This function makes it easy and convenient to display web content to an end user in a nice way.
-# To use this function, simply call it passing the URL as an argument.
-#
-# Globals: $_TITLE (optional)
-# Arguments: ["URL"]
-# Outputs: Formatted HTML message in a zenity window
-# Returns: None
-# Usage:
-#
-# zenity::display_url "https://www.someplace.com/index.html"
-#
-# End of Documentation
+	# Description: Displays the content of a URL in a GUI using Zenity.
+	# This function makes it easy and convenient to display web content to an end user in a nice way.
+	# To use this function, simply call it passing the URL as an argument.
+	#
+	# Globals:
+	#	$_TITLE (optional): Sets the title of the Zenity window.
+	# Arguments:
+	#	["URL"]: The URL whose content will be displayed.
+	# Outputs:
+	#	- Formatted HTML message in a Zenity window.
+	# Returns:
+	#	- None
+	#
+	# Usage:
+	#	zenity::display_url "https://www.someplace.com/index.html"
+	#
+	# Example:
+	#	zenity::display_url "https://www.example.com"
+	#
+	# Dependencies:
+	#	- zenity: To display the URL content in a Zenity window.
+	#
+	# Notes:
+	#	- If the Zenity utility is not found, the function checks for dependencies and returns 1 if they are not met.
+	#
+	# End of Documentation
 
 	_url="${*}"
 	hash zenity &>/dev/null || check_dependencies zenity &>/dev/null || return 1
@@ -786,19 +923,32 @@ zenity::display_url() {
 
 
 zenity::display_file() {
-# Description: Function to display the content of a text file. The purpose of this function
-# is simply to make it easy and convenient to display text content to an end user in a GUI
-# in a nice way. To use this function simply call it passing whatever file path you need.
-#
-# Globals: $_TITLE (optional)
-# Arguments: ["/path/to/file.txt"]
-# Outputs: Message in zenity window
-# Returns:
-# Usage:
-#
-#   zenity::display_file  "/path/to/file.txt"
-#
-# End of Documentation
+	# Description: Displays the content of a text file in a Zenity window.
+	# This function makes it easy and convenient to display text content to an end user in a GUI.
+	# To use this function, simply call it passing the file path as an argument.
+	#
+	# Globals:
+	#	$_TITLE (optional): Sets the title of the Zenity window.
+	# Arguments:
+	#	["/path/to/file.txt"]: The path to the text file to be displayed.
+	# Outputs:
+	#	- Displays the content of the specified text file in a Zenity window.
+	# Returns:
+	#	- None
+	#
+	# Usage:
+	#	zenity::display_file "/path/to/file.txt"
+	#
+	# Example:
+	#	zenity::display_file "/path/to/file.txt"
+	#
+	# Dependencies:
+	#	- zenity: To display the text file content in a Zenity window.
+	#
+	# Notes:
+	#	- If the Zenity utility is not found, the function checks for dependencies and returns 1 if they are not met.
+	#
+	# End of Documentation
 
 	_filename="${*}"
 	hash zenity &>/dev/null || check_dependencies zenity &>/dev/null || return 1
@@ -809,20 +959,33 @@ zenity::display_file() {
 
 
 term::animate_while_command() {
-# Description:
-# A simple function to display and animation during a silent acton.
-# This is useful for uning anoter functiona that may take some time. 
-# Note that this works best if the function doe not print to terminal.
-#
-# Globals:
-# Arguments: 
-# Outputs: Standard out
-# Returns:
-# Usage: 
-# term::animate_while_command ; EXPRESSION of COMMAND or FUNCTION 
-# 
-#
-# End of documentation
+	# Description: Displays an animation during the execution of a silent command.
+	# This function is useful for running another function or command that may take some time to complete.
+	# Note that this works best if the function or command does not print to the terminal.
+	#
+	# Globals:
+	#	- None
+	# Arguments:
+	#	- "$@": The command or function to be executed.
+	# Outputs:
+	#	- Standard output (suppressed)
+	# Returns:
+	#	- 0 on success, 1 if no command is specified.
+	#
+	# Usage:
+	#	term::animate_while_command "command_or_function"
+	#
+	# Example:
+	#	term::animate_while_command "sleep 10"
+	#
+	# Dependencies:
+	#	- term::start_animation: To start the animation.
+	#	- term::stop_animation: To stop the animation.
+	#
+	# Notes:
+	#	- Ensure that the command or function passed as an argument does not produce output to the terminal for best results.
+	#
+	# End of Documentation
 
 	
         if [[ -z ${1} ]] ; then
@@ -14268,7 +14431,7 @@ case $1 in
 					done < "${0}")
 
 					system::log_item "Result: $result"
-					echo "$result" | zenity --text-info --modal --ok-label=BACK --title "RTD Function: [${selection}]" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1000}"
+					echo -e "$result" | zenity --text-info --font=monospace --modal --ok-label=BACK --title "RTD Function: [${selection}]" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1000}"
 					unset result
 				;;
 				* )
