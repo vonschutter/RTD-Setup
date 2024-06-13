@@ -3,7 +3,7 @@ if [[ -z "$BASH_VERSINFO" ]]; then
 	echo "SHELL ENV ERROR: You must use a BASH Shell to load this library. Exiting..."
 	exit 255
 fi
-export RTD_VERSION="2.03"
+export RTD_VERSION="2.04"
 : << 'Library_Documentation'
 ::              R T D   F u n c t i o n   L i b r a r y
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -49,7 +49,7 @@ export RTD_VERSION="2.03"
 6     dependency::desktop                                ;   Check if you are running a given desktop (kde, gnome, xfce)
 7     dependency::file                                   ;   Find and source an external script of a any name provided
 8     dependency::os_linux                               ;   Verify if we are running bash in a linux session
-9     dependency::search_local                           ;   Internal function to search defined paths for a given files name...
+9     dependency::search_local                           ;   Function to search for a file in a set of predefined paths and source it if found.
 10    dependency::virtualization                         ;   Check that Virtualization is supported and handle deviations
 11    dialog::check_menu_availability                    ;   Checks if it is possible to display graphical menus in a terminal
 12    dialog::copy_file_progress                         ;   Display a progress box in terminal while copying files from one place to another
@@ -1067,47 +1067,66 @@ term::animate_while_command() {
 
 
 
-system::preseed_to_ubuntu_ks_cfg ()
+system::preseed_to_ubuntu_ks_cfg()
 {
-# Description: generates a preseed section [Ubuntu only] (ks.cfg)
-# Globals: $PRESEED (filename)
-# Arguments: Where to place file (directory)
-# Outputs: one preseed file section
-# Returns: instruction for Ubuntu's convoluted support for both preseed and kickstart files.
-# Usage: rtd_oem_preseed_ubuntu_cfg_KS_CFG_Options "directory"
-# End of documentation
+# Description: Generates a preseed section [Ubuntu only] (ks.cfg).
+# This function creates a Kickstart configuration file (ks.cfg) from a preseed file for legacy Ubuntu installations.
+#
+# Globals:
+#	- $PRESEED (filename): The name of the preseed file.
+# Arguments:
+#	- "$1": The directory where the ks.cfg file will be placed.
+# Outputs:
+#	- Generates one preseed file section.
+# Returns:
+#	- Instructions for Ubuntu's convoluted support for both preseed and kickstart files.
+#
+# Usage:
+#	system::preseed_to_ubuntu_ks_cfg "directory"
+#
+# Example:
+#	system::preseed_to_ubuntu_ks_cfg "/path/to/directory"
+#
+# Dependencies:
+#	- None
+#
+# Notes:
+#	- Ensure the preseed file exists in the specified directory before calling this function.
+#
+# End of Documentation
+
 	system::log_item "Saving preeseed file as $1/ks.cfg for legacy Ubuntu installs..."
 	cat $1/preseed.cfg >$1/ks.cfg
 }
 
 
-system::make_preseed_cfg()
+system::make_preseed_cfg() 
 {
-# Description: Function to write out a debina preeseed file to a location requested by the first parameter.
-# Other parameters accepted are CONFIG (multiselect de), SRVFUNC (task "Minecraft" "Tasks")
-# some parameters have defaults.
-# Globals:
-# Arguments: [-p <path> ] [-r server|desktop|minecraft ] [-t gnome-desktop|kde-desktop|xfce-desktop|mate-desktop|cinnamon-desktop ]
-# Outputs: /path/to/preseed.cfg
-# Returns:
-# Usage: system::make_preseed_cfg -r "${_role}" -p "$( mktemp -d)" -t ${_task}
-# Example:
-# 
-# system::make_preseed_cfg -r "${_role}" -p "$( mktemp -d)" -t ${_task}
-#
-# To install a basic server: 
-# system::make_preseed_cfg -r "default" -p "$( mktemp -d)" -t ssh-server
-#
-# To install a basic ansible server:
-# system::make_preseed_cfg -r "default" -p "$( mktemp -d)" -t ansible-server
-#
-# To autoinstall a basic minecraft server:
-# system::make_preseed_cfg -r "minecraft-server" -p "$( mktemp -d)" -t ssh-server
-# 
-# To autoinstall a basic desktop with gnome:
-# system::make_preseed_cfg -r "default" -p "$( mktemp -d)" -t gnome-desktop
-# 
-# End of documentation
+	# Description: Function to write out a debina preeseed file to a location requested by the first parameter.
+	# Other parameters accepted are CONFIG (multiselect de), SRVFUNC (task "Minecraft" "Tasks")
+	# some parameters have defaults.
+	# Globals:
+	# Arguments: [-p <path> ] [-r server|desktop|minecraft ] [-t gnome-desktop|kde-desktop|xfce-desktop|mate-desktop|cinnamon-desktop ]
+	# Outputs: /path/to/preseed.cfg
+	# Returns:
+	# Usage: system::make_preseed_cfg -r "${_role}" -p "$( mktemp -d)" -t ${_task}
+	# Example:
+	# 
+	# system::make_preseed_cfg -r "${_role}" -p "$( mktemp -d)" -t ${_task}
+	#
+	# To install a basic server: 
+	# system::make_preseed_cfg -r "default" -p "$( mktemp -d)" -t ssh-server
+	#
+	# To install a basic ansible server:
+	# system::make_preseed_cfg -r "default" -p "$( mktemp -d)" -t ansible-server
+	#
+	# To autoinstall a basic minecraft server:
+	# system::make_preseed_cfg -r "minecraft-server" -p "$( mktemp -d)" -t ssh-server
+	# 
+	# To autoinstall a basic desktop with gnome:
+	# system::make_preseed_cfg -r "default" -p "$( mktemp -d)" -t gnome-desktop
+	# 
+	# End of documentation
 
 	system::log_item "Called by: ${FUNCNAME[1]}"
 
@@ -1207,16 +1226,38 @@ system::make_preseed_cfg()
 
 
 system::generate_cloudconfig() {
-	# Description:
-	# Function to generate a cloud config file for use in deploying servers
+	# Description: Generates a cloud config file for deploying servers.
+	#
+	# This function generates a cloud config file for use in deploying servers. It supports various
+	# options to customize the configuration, including setting the directory for cloud config files,
+	# specifying the role of the VM, and setting the VM name.
 	#
 	# Globals:
-	# Arguments: 
-	# Outputs: 
+	#	- GIT_RTD_SRC_URL: The Git repository URL for RTD source.
+	#	- GIT_Profile: The Git profile name.
+	#	- _TLA: The three-letter acronym for the project.
+	# Arguments:
+	#	- --CloudConfigDir <directory>: Directory to save cloud config files.
+	#	- --flavor <ubuntu-flavor>: Role of the VM (e.g., ubuntu-desktop, ubuntu-server).
+	#	- --vmname <hostname>: Hostname of the VM to be created.
+	# Outputs:
+	#	- Cloud config files in the specified directory.
 	# Returns:
-	# Usage: gen_cloudconfig 
+	#	- 0 on success.
+	#	- 1 on error.
+	# Usage:
+	#	system::generate_cloudconfig [--CloudConfigDir <directory>] [--flavor <ubuntu-flavor>] [--vmname <hostname>]
 	#
+	# Example:
+	#	system::generate_cloudconfig --CloudConfigDir /tmp/cloudconfig --flavor ubuntu-server --vmname myvm
 	#
+	# Notes:
+	#	- This function uses the DigitalOcean metadata service to configure servers before login.
+	#	- Cloud config scripts are YAML formatted files that provide simple, readable methods for setting up common configuration items.
+	#	- The function supports various Ubuntu flavors and can include SSH keys in the configuration.
+	#	- Generates an ISO file with the cloud config data for use in deploying VMs.
+	#
+	# Background:
 	# With the introduction of the DigitalOcean metadata service, it is possible to start configuring your 
 	# servers before you even log in. In short, the metadata service is an HTTP location that your server 
 	# can access during the boot process.
@@ -1338,13 +1379,44 @@ system::generate_cloudconfig() {
 
 
 system::generate_ks_cfg_file() {
-	# Description: Function to generate an installation configuration file for Fedora/Red Hat.
-	# Globals: 
-	# Arguments: [-p <filename> ] [-u URL ] [-c workstation|ssh-server|ansible-server ]
-	# Outputs: One kick start configuration file.
-	# Returns: 0/1
-	# Usage: system::generate_ks_cfg_file [-p <filename> ] [-u URL ] [-c workstation|ssh-server|ansible-server ]
-	# End of documentation
+	# Description: Generates an installation configuration file (kickstart) for Fedora/Red Hat.
+	#
+	# This function generates a kickstart configuration file for automating the installation of
+	# Fedora or Red Hat systems. It supports various options to customize the installation,
+	# including specifying the filename, repository URL, desktop environment, server role, timezone,
+	# disk encryption, and initial user settings.
+	#
+	# Globals:
+	#	- None
+	# Arguments:
+	#	- --filename <filename>: Name of the kickstart file to create.
+	#	- --desktop_environment <environment>: Desktop environment to install (e.g., deepin-desktop-environment, sway-desktop-environment).
+	#	- --server_role <role>: Server role to install (e.g., minimal-environment, web-server-environment).
+	#	- --role <role>: General role of the system (workstation or server).
+	#	- --source <URL>: Repository URL for installation source.
+	#	- --timezone <timezone>: Timezone to set for the system.
+	#	- --disk_encryption <yes/no>: Whether to enable disk encryption.
+	#	- --disk_password <password>: Password for disk encryption.
+	#	- --initial_user <username>: Initial user to create.
+	#	- --initial_user_password <password>: Password for the initial user.
+	# Outputs:
+	#	- One kickstart configuration file.
+	# Returns:
+	#	- 0 on success.
+	#	- 1 on error.
+	#
+	# Usage:
+	#	system::generate_ks_cfg_file --filename <filename> --source <URL> --role <workstation|server> [options]
+	#
+	# Example:
+	#	system::generate_ks_cfg_file --filename ks.cfg --source http://repo.url --role workstation --desktop_environment kde-desktop-environment
+	#
+	# Notes:
+	#	- This function uses various options to customize the kickstart configuration file.
+	#	- Ensure that mandatory parameters (filename, source URL, and role) are provided.
+	#	- Supports a wide range of desktop environments and server roles for customization.
+	#
+	# End of Documentation
 
 	system::log_item "Called by: ${FUNCNAME[1]}"
 	# Get vm config standard options
@@ -1352,7 +1424,7 @@ system::generate_ks_cfg_file() {
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
-		--filename | --file )
+		--filename | --file )	
 			local _ks_file="$2"
 			write_host --cyan  "📜 Directed to create kickstart instructions file: ${_ks_file}"
 			shift
@@ -1553,18 +1625,39 @@ system::generate_autoyast_file() {
 
 
 system::get_vm_config() {
-	# Description: This function gets a value from a configuration file.
-	# Parameters:
-	#   - config_file: The path to the configuration file.
-	#   - key: The key to get the value for.
-	# Returns: The value for the key.
+	# Description: Retrieves VM configuration values from a configuration file or defaults.
+	#
+	# This function loads VM configuration values from a specified configuration file or uses
+	# default values if the configuration file is not found. It can also prompt the user to
+	# input these values interactively.
+	#
+	# Globals:
+	#	- _OEM_USER_VM_PREFERENCES: Path to the user VM preferences file.
+	#	- _TLA: Three-letter acronym for the project.
+	# Arguments:
+	#	- --ask (optional): Prompts the user to input configuration values interactively.
+	# Outputs:
+	#	- Configuration values loaded into variables.
+	# Returns:
+	#	- 0 on success.
+	#	- 1 on error or user cancellation.
+	#
+	# Usage:
+	#	system::get_vm_config
+	#	system::get_vm_config --ask
 	#
 	# Example:
 	#	system::get_vm_config
 	#	system::get_vm_config --ask
 	#
+	# Notes:
+	#	- The function uses a configuration file to load saved preferences or defaults to predefined values.
+	#	- If the --ask flag is provided, it will prompt the user to input configuration values interactively using dialog.
+	#	- Configuration values are logged and saved for troubleshooting and reuse.
 	#
-	# End of documentation
+	# End of Documentation
+
+
 	local _config_file=${_OEM_USER_VM_PREFERENCES:-"/home/${SUDO_USER}/.config/${_TLA,,}/build_defaults.inf"}
 	if [[ "$1" == "--ask" ]] ; then 
 		local _ask="YES"
@@ -1695,22 +1788,52 @@ system::get_vm_config() {
 
 
 
-
 dependency::command_exists() {
-# Description: Function to check if a command exists.
-# The purpose of this function is to check if a command exists in the system.
-# To use this function, simply call it passing the command name as an argument.
+	# Description: Checks if specified commands exist on the system and installs missing ones.
+	#
+	# This function checks if specified commands are available on the system. If any commands are missing,
+	# it prompts the user to install them. The function supports both terminal and GUI prompts based on 
+	# the session type. Additionally, it can automatically install missing commands without prompting 
+	# the user when the `--auto` flag is used.
+	#
+	# Globals:
+	#	- None
+	# Arguments:
+	#	- Command names to check (e.g., "command1 command2").
+	#	- "--auto" (optional): Automatically installs missing commands without prompting.
+	# Outputs:
+	#	- Prompts the user to install missing commands if any (unless `--auto` is specified).
+	# Returns:
+	#	- 0 if all commands exist.
+	#	- 1 if any commands are missing and not installed.
+	#
+	# Usage:
+	#	dependency::command_exists [--auto] "command1 command2"
+	#
+	# Example:
+	#	dependency::command_exists "curl git"
+	#	dependency::command_exists --auto "curl git"
+	#
+	# Notes:
+	#	- This function detects the current session type (TTY, SSH, GUI, WAYLAND) to determine 
+	#	  the appropriate prompt method.
+	#	- Uses `zenity` for GUI prompts if available.
+	#	- Prompts the user to install missing commands and attempts to install them 
+	#	  using `system::install_missing_commands`.
+	#	- Stores the user's response in a temporary file to avoid repeated prompts within the same session.
+	#	- The `--auto` flag suppresses prompts and automatically installs missing commands.
+	#
+	# End of Documentation
 
-# Globals: None
-# Arguments: ["Command name"]
-# Outputs: None
-# Returns: 0 if the command exists, 1 if it does not
-# Usage:    
-# dependency::command_exists "command"
-#    
-# End of Documentation
+	local _auto_mode=0
 
-# List of required command(s) from input:
+	# Check for the --auto flag
+	if [[ "$1" == "--auto" ]]; then
+		_auto_mode=1
+		shift
+	fi
+
+	# List of required commands from input
 	required_commands=($@)
 
 	# Function to check if a command is available
@@ -1722,7 +1845,7 @@ dependency::command_exists() {
 	missing_commands=()
 	for cmd in ${required_commands[*]}; do
 		if ! command_exists $cmd ; then
-		missing_commands+=("$cmd")
+			missing_commands+=("$cmd")
 		fi
 	done
 
@@ -1731,7 +1854,9 @@ dependency::command_exists() {
 	else
 		local response_file="/tmp/missing_commands_response"
 		
-		if [[ -f "$response_file" ]]; then
+		if [[ $_auto_mode -eq 1 ]]; then
+			response="yes"
+		elif [[ -f "$response_file" ]]; then
 			response=$(cat "$response_file")
 		else
 			local _session=$(system::detect_session)
@@ -1763,9 +1888,102 @@ dependency::command_exists() {
 
 
 
+# dependency::command_exists() {
+# # Description: Function to check if a command exists.
+# # The purpose of this function is to check if a command exists in the system.
+# # To use this function, simply call it passing the command name as an argument.
+
+# # Globals: None
+# # Arguments: ["Command name"]
+# # Outputs: None
+# # Returns: 0 if the command exists, 1 if it does not
+# # Usage:    
+# # dependency::command_exists "command"
+# #    
+# # End of Documentation
+
+# # List of required command(s) from input:
+# 	required_commands=($@)
+
+# 	# Function to check if a command is available
+# 	command_exists() {
+# 		command -v "$1" >/dev/null 2>&1
+# 	}
+
+# 	# Check each command and collect the missing ones
+# 	missing_commands=()
+# 	for cmd in ${required_commands[*]}; do
+# 		if ! command_exists $cmd ; then
+# 		missing_commands+=("$cmd")
+# 		fi
+# 	done
+
+# 	if [ ${#missing_commands[@]} -eq 0 ]; then
+# 		return 0
+# 	else
+# 		local response_file="/tmp/missing_commands_response"
+		
+# 		if [[ -f "$response_file" ]]; then
+# 			response=$(cat "$response_file")
+# 		else
+# 			local _session=$(system::detect_session)
+# 			if [[ "$_session" == "TTY" || "$_session" == "SSH" ]]; then
+# 				read -p "${#missing_commands[@]} command(s) are missing: ${missing_commands[*]}. Do you want to install them? [y/N]: " response
+# 				echo "$response" > "$response_file"
+# 			elif [[ "$_session" == "GUI" || "$_session" == "WAYLAND" ]]; then
+# 				response=$(zenity --question --text="${#missing_commands[@]} command(s) are missing: ${missing_commands[*]}. Do you want to install them?")
+# 				echo "$response" > "$response_file"
+# 			else 
+# 				read -p "${#missing_commands[@]} command(s) are missing: ${missing_commands[*]}. Do you want to install them? [y/N]: " response
+# 				echo "$response" > "$response_file"
+# 			fi
+# 		fi
+
+# 		if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+# 			# Ensure the user has sudo privileges before installation
+# 			system::install_missing_commands "${missing_commands[*]}"
+# 			local install_status=$?
+# 			rm -f "$response_file"  # Clean up the response file
+# 			return $install_status
+# 		else
+# 			write_error "Required command(s) not found: ${missing_commands[*]}"
+# 			rm -f "$response_file"  # Clean up the response file
+# 			return 1
+# 		fi
+# 	fi
+# }
+
+
+
 
 system::install_missing_commands() {
-
+	# Description: Installs missing commands based on the distribution type.
+	#
+	# This function checks if specified commands are available on the system and installs them if they are missing.
+	# It supports Debian, Ubuntu, Fedora, RHEL, openSUSE, and SUSE distributions.
+	#
+	# Globals:
+	#	- None
+	# Arguments:
+	#	- List of commands to check and install.
+	# Outputs:
+	#	- Status messages indicating the presence or installation of commands.
+	# Returns:
+	#	- 0 if all commands are found or installed successfully.
+	#	- 1 if no command is specified or if an error occurs.
+	#
+	# Usage:
+	#	system::install_missing_commands <command1> <command2> ...
+	#
+	# Example:
+	#	system::install_missing_commands curl git
+	#
+	# Notes:
+	#	- This function relies on the `system::distribution_type` function to detect the distribution type.
+	#	- It attempts to install missing commands using the native package manager for each supported distribution.
+	#	- For Debian-based systems, it also attempts to install commands via snap if not available in apt.
+	#
+	# End of Documentation
 	if [ "$#" -eq 0 ]; then
 		write_error "No command specified to find and install."
 		return 1
@@ -1839,8 +2057,56 @@ system::install_missing_commands() {
 
 
 dependency::desktop() {
-	# Description: This function simplifies identifying the currently running desktop.
+	# Description: Identifies the currently running desktop environment.
 	#
+	# This function simplifies the process of determining the desktop environment currently in use.
+	# It addresses the inconsistencies in using environment variables such as DESKTOP_SESSION and GDMSESSION.
+	# The function checks multiple sources to reliably identify the running desktop environment.
+	#
+	# Globals:
+	#	- None
+	# Arguments:
+	#	- "$1": The desktop environment to check for (e.g., gnome, kde, xfce, mate).
+	# Outputs:
+	#	- Logs the process of identifying the desktop environment.
+	# Returns:
+	#	- 0 if the specified desktop environment is found.
+	#	- 1 if the specified desktop environment is not found.
+	#
+	# Usage:
+	#	dependency::desktop <desktop_environment>
+	#
+	# Example:
+	#	dependency::desktop gnome   # Check if there is a running GNOME desktop session
+	#	dependency::desktop kde     # Check if there is a running KDE desktop session
+	#	dependency::desktop xfce    # Check if there is a running Xfce desktop session
+	#	dependency::desktop mate    # Check if there is a running MATE desktop session
+	#
+	# Dependencies:
+	#	- system::log_item: For logging the process of identifying the desktop environment.
+	#
+	# Notes:
+	#	This function checks various environment variables and processes to identify the desktop 
+	#   environment.It first attempts to use XDG_CURRENT_DESKTOP. If that is unset, it searches 
+	#   for known desktop processes.
+	#	The function checks for the following desktop environments:
+	#	- KDE
+	#	- GNOME
+	#	- MATE
+	#	- Xfce
+	#	- Cinnamon
+	#	- LXDE
+	#	- LXQt
+	#	- Unity
+	#	- Pantheon
+	#	- Sway
+	#	- Enlightenment
+	#	- Openbox
+	#	- IceWM
+	#	- Fluxbox
+	#	- JWM
+	#
+	# Reference:
 	# The main problem with checking the DESKTOP_SESSION is that it is set by the display
 	# manager rather than the desktop session and is subject to inconsistencies.
 	# For lightdm on Debian, the values come from the names of files under /usr/share/xsessions/.
@@ -1859,40 +2125,49 @@ dependency::desktop() {
 	# in a directory bearing its name, this approach should work. This will hopefully
 	# be the case for all distros/desktops!
 	#
-	# Globals:    None
-	# Arguments:  None
-	# Outputs:    Standard error 1/0
-	# Returns:    0 = desktop is what you are searching for. 1 = is not what you are searching for.
-	# Usage:      dependency::desktop gnome|kde|xfce|mate
-	# 
-	# This function checks if there is a running desktop session that matches the specified desktop environment.
-	# It attempts to find the currently running desktop environment reliably by checking various environment variables
-	# and processes. If the specified desktop environment is found, it returns 0; otherwise, it returns 1.
-	#
-	# Example usage:
-	#   dependency::desktop gnome   # Check if there is a running GNOME desktop session
-	#   dependency::desktop kde     # Check if there is a running KDE desktop session
-	#   dependency::desktop xfce    # Check if there is a running Xfce desktop session
-	#   dependency::desktop mate    # Check if there is a running MATE desktop session
-	#
 	# End of documentation
 	local _sought="${1,,}"
 	system::log_item "checking if there is a running $_sought desktop session..."
 	local _desktop
 
 	# Try to find the currently running desktop environment reliably...
-	if [[ "$XDG_CURRENT_DESKTOP" == "" ]] ; then
-		system::log_item "XDG_CURRENT_DESKTOP appears to be unset, attempting to search processes for desktop match... "
-	elif  pgrep -f "plasmashell" ; then
-		local _desktop="kde"
-	elif  pgrep -f "gnome-shell"; then
-		local _desktop="gnome"
-	elif  pgrep -f "mate"; then
-		local _desktop="mate"
-	elif  pgrep -f "xfce"; then
-		local _desktop="xfce"
+	if [[ -z "$XDG_CURRENT_DESKTOP" ]]; then
+		system::log_item "XDG_CURRENT_DESKTOP appears to be unset, attempting to search processes for desktop match..."
+		if pgrep -f "plasmashell" &>/dev/null; then
+			_desktop="kde"
+		elif pgrep -f "gnome-shell" &>/dev/null; then
+			_desktop="gnome"
+		elif pgrep -f "mate-session" &>/dev/null; then
+			_desktop="mate"
+		elif pgrep -f "xfce4-session" &>/dev/null; then
+			_desktop="xfce"
+		elif pgrep -f "cinnamon" &>/dev/null; then
+			_desktop="cinnamon"
+		elif pgrep -f "lxsession" &>/dev/null; then
+			_desktop="lxde"
+		elif pgrep -f "lxqt-session" &>/dev/null; then
+			_desktop="lxqt"
+		elif pgrep -f "unity-panel" &>/dev/null; then
+			_desktop="unity"
+		elif pgrep -f "pantheon-session" &>/dev/null; then
+			_desktop="pantheon"
+		elif pgrep -f "sway" &>/dev/null; then
+			_desktop="sway"
+		elif pgrep -f "enlightenment" &>/dev/null; then
+			_desktop="enlightenment"
+		elif pgrep -f "openbox" &>/dev/null; then
+			_desktop="openbox"
+		elif pgrep -f "icewm" &>/dev/null; then
+			_desktop="icewm"
+		elif pgrep -f "fluxbox" &>/dev/null; then
+			_desktop="fluxbox"
+		elif pgrep -f "jwm" &>/dev/null; then
+			_desktop="jwm"
+		else
+			_desktop="unknown"
+		fi
 	else
-		local _desktop="$XDG_CURRENT_DESKTOP"
+		_desktop="$XDG_CURRENT_DESKTOP"
 	fi
 
 	# Check what we found...
@@ -1907,28 +2182,54 @@ dependency::desktop() {
 
 
 
-dependency::os_linux () {
-	# Description: This function simplifies checking if the currently OS is Linux or not. 
-	#  
-	# Globals:	None
-	# Arguments:	None
-	# Outputs:	Standard error 1/0
-	# Returns:	0 = Running in Linux. 1 = is not running in Linux.
-	# Usage: 	dependency::os_linux
-	# End of documentation
+dependency::os_linux() {
+	# Description: Checks if the current operating system is Linux.
+	#
+	# This function simplifies the process of determining if the operating system is Linux.
+	# It provides clear error messages for unsupported operating systems.
+	#
+	# Globals:
+	#	- None
+	# Arguments:
+	#	- None
+	# Outputs:
+	#	- Standard error messages if the OS is not Linux.
+	# Returns:
+	#	- 0 if the operating system is Linux.
+	#	- 1 if the operating system is not Linux.
+	#
+	# Usage:
+	#	dependency::os_linux
+	#
+	# Example:
+	#	dependency::os_linux
+	#
+	# Dependencies:
+	#	- write_error: Function to log error messages.
+	#
+	# Notes:
+	#	- This function checks the OSTYPE environment variable to determine the operating system.
+	#	- Provides specific messages for unsupported operating systems like macOS, CYGWIN, MSYS, and FreeBSD.
+	#
+	# End of Documentation
 
-       	if echo "$OSTYPE" |grep -q "linux" ; then
+	if echo "$OSTYPE" | grep -q "linux"; then
 		return 0
 	elif [[ "$OSTYPE" == "darwin"* ]]; then
-		write_error "${FUNCNAME[0]}: Mac OSX is currently not supported ..."  ; return 1
+		write_error "${FUNCNAME[0]}: Mac OSX is currently not supported."
+		return 1
 	elif [[ "$OSTYPE" == "cygwin" ]]; then
-		write_error "${FUNCNAME[0]}: CYGWIN is currently unsupported..."  ; return 1
+		write_error "${FUNCNAME[0]}: CYGWIN is currently unsupported."
+		return 1
 	elif [[ "$OSTYPE" == "msys" ]]; then
-		write_error "${FUNCNAME[0]}: Lightweight shell is currently unsupported ... "  ; return 1
+		write_error "${FUNCNAME[0]}: Lightweight shell is currently unsupported."
+		return 1
 	elif [[ "$OSTYPE" == "freebsd"* ]]; then
-		write_error "${FUNCNAME[0]}: Free BSD is currently unsupported... " ; return 1
+		write_error "${FUNCNAME[0]}: FreeBSD is currently unsupported."
+		return 1
 	else
-		echo "I have no Idea what this OS is" ; return 1
+		write_error "${FUNCNAME[0]}: Unsupported operating system: $OSTYPE."
+		return 1
 	fi
 }
 
@@ -1937,10 +2238,9 @@ dependency::os_linux () {
 system::check_file_limits() {
 	# Description:
 	#
-	# This function is designed to check and display the current usage of file
-	# descriptors against the set limits in a Linux system. It provides a clear
-	# overview of open files and system limits, aiding in resource monitoring and
-	# troubleshooting.
+	# This function is designed to check and display the current usage of file descriptors against
+	# the set limits in a Linux system. It provides a clear overview of open files and system limits,
+	# aiding in resource monitoring and troubleshooting.
 	#
 	# The function performs the following actions:
 	# - Retrieves the count of currently open files using `lsof`.
@@ -1948,35 +2248,31 @@ system::check_file_limits() {
 	# - Obtains the system-wide file handle limit.
 	# - Displays the collected information in a user-friendly format.
 	#
-	# Additionally, it includes a spinner animation to indicate progress while
-	# gathering data, enhancing the user experience during potentially longer
-	# operations.
+	# Additionally, it includes a spinner animation to indicate progress while gathering data,
+	# enhancing the user experience during potentially longer operations.
 	#
 	# Usage:
-	#   Call `system::check_file_limits` from the terminal or within a script to
-	#   execute the function.
+	#   Call `system::check_file_limits` from the terminal or within a script to execute the function.
 	#
 	# Notes:
-	# - The function uses a temporary file (`/tmp/open_files_count`) to store the
-	#   count of open files, which is then read and displayed.
-	# - The spinner is implemented as a nested function `system::check_file_limits::spinner`,
-	#   which visually indicates ongoing processing.
-	# - The `printf` command is used with formatting to align and present the data
-	#   clearly, including the use of thousand separators for better readability.
-	# - The function checks if current usage exceeds any of the defined limits and
-	#   displays appropriate warnings or critical alerts.
+	# - Uses a temporary file (`/tmp/open_files_count`) to store the count of open files.
+	# - Implements a spinner animation to indicate ongoing processing.
+	# - Uses `printf` with formatting to align and present data clearly, including thousand separators.
+	# - Checks if current usage exceeds any of the defined limits and displays appropriate warnings or
+	#   critical alerts.
 	#
 	# Dependencies:
 	# - Requires `lsof`, `sysctl`, `awk`, and standard bash utilities.
 	#
 	# Limitations:
-	# - The spinner animation relies on the terminal's ability to interpret control
-	#   characters for cursor movement. May not work correctly in all terminal
-	#   environments.
-	# - Number formatting is locale-dependent and assumes `en_US.UTF-8` is available
-	#   and correctly configured on the system.
+	# - Spinner animation relies on the terminal's ability to interpret control characters for cursor
+	#   movement. May not work in all terminal environments.
+	# - Number formatting is locale-dependent and assumes `en_US.UTF-8` is available and correctly
+	#   configured on the system.
 	#
-	# End of documentation
+	# End of Documentation
+
+
 
     # Get the number of currently open files in the background
 	lsof | wc -l > /tmp/open_files_count &
@@ -2139,10 +2435,71 @@ system::distribution_type() {
 
 }
 
+dependency::search_local() {
+	# Description: 
+	# This function searches a predetermined set of paths for a given file and sources it if found.
+	# It is not typically useful to call this directly; it is part of the dependency::file function.
+	#
+	# Globals:
+	#	- ${SUDO_USER} (optional): Used to determine user-specific paths.
+	# Arguments:
+	#	- "$1": The name of the file to search for.
+	# Outputs:
+	#	- Logs the search process and results.
+	#	- Sources the found file.
+	# Returns:
+	#	- 0 if the file is found and sourced successfully.
+	#	- 1 if the file is not found.
+	#
+	# Usage:
+	#	Called internally by dependency::file; not intended for direct use.
+	#
+	# Example:
+	#	dependency::file "somefile.sh" (calls dependency::search_local internally)
+	#
+	# Dependencies:
+	#	- system::log_item: For logging the search process.
+	#
+	# Notes:
+	#	- Ensure that the paths to be searched are correct and accessible.
+	#	- This function is designed to be used internally and may not be useful when called directly.
+	#   - The predetermined paths are: /opt/${_TLA:-"rtd"} (calue of _TLA if set, otherwise "rtd"), 
+	#     /home/${SUDO_USER}/GIT, /home/${SUDO_USER}/bin, and the script directory (location of calling script ).
+	#	- I all esle fails, the function will search the user's entire home directory.
+	#
+	# End of Documentation
+
+	system::log_item "Requested dependency file: ${1} ..."
+	local script_path="$(readlink -f "$0")"
+	local script_dir="$(dirname "$script_path")"
+	local _tla="${_TLA,,}"
+	local _tla="${_tla:-"rtd"}"
+	local paths=(
+		"$(dirname "$(find /opt/${_tla} -name ${1} 2>/dev/null | head -n 1 )")/${1}"
+		"$(dirname "$(find /home/${SUDO_USER}/GIT -name ${1} 2>/dev/null | head -n 1 )")/${1}"
+		"$(dirname "$(find /home/${SUDO_USER}/bin -name ${1} 2>/dev/null | head -n 1 )")/${1}"
+		"${script_dir}/${1}"
+		"./${1}"
+		"$(dirname "$(find /home/${SUDO_USER} -name ${1} 2>/dev/null | head -n 1 )")/${1}"
+		)
+
+	for path in "${paths[@]}"; do 
+		system::log_item "Searching for ${path} ..."
+		if [[ -e "${path}" ]]; then
+			system::log_item "Found ${path}"
+			source "${path}"
+			return 0
+		fi
+	done
+
+	return 1
+}
+
+
 
 
 dependency::file () {
-	# Description: Function to check for a bash library or script file and source it.
+	# Description: Checks for a Bash library or script file and sources it.
 	#
 	# This function searches a predetermined set of paths for a given file and sources it if found.
 	# It first searches for the file locally in a set of predefined paths. If the file is found, it is sourced.
@@ -2150,57 +2507,34 @@ dependency::file () {
 	# If the download is successful, the file is sourced. If the download fails, the function logs an error and exits.
 	#
 	# Globals:
-	#   _GIT_PROFILE: The GitHub profile to use for downloading the file (default: vonschutter)
+	#	- _GIT_PROFILE: The GitHub profile name to use for downloading the file.
 	# Arguments:
-	#   Filename: The name of the file to search for and source
+	#	- "$1": The name of the file to search for and source.
 	# Outputs:
-	#   None
+	#	- None
 	# Returns:
-	#   Standard error level
+	#	- 0 if the file is sourced successfully, 1 if the file is not found or download fails.
+	#
 	# Usage:
-	#   dependency::file <filename>
-	#   Example: dependency::file _config.ini
+	#	dependency::file <filename>
+	#
+	# Example:
+	#	dependency::file _config.ini
 	#
 	# Dependencies:
-	#   This function depends on the following functions:
-	#   - system::log_item: A function to log messages
+	#	This function depends on the following functions:
+	#	- system::log_item: Logs messages.
+	#	- dependency::search_local: Searches for a file locally in predefined paths.
 	#
-	# End of documentation
+	# Notes:
+	#	- Ensure the GitHub profile and repository structure are correct for downloading the file.
+	#
+	# End of Documentation
 
 
 	local _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
 	local _tgt="${1}"
 	
-	dependency::search_local () {
-		# Description: Internal function!
-		# It may not be useful to call this directly. This function searches 
-		# a predetermined set of paths for a given file, and source it if found.
-		# it is part of the function dependency::file -- use this instead.
-		# End of Documentation
-
-		system::log_item "Requested dependency file: ${1} ..."
-		local script_path="$(readlink -f "$0")"
-		local script_dir="$(dirname "$script_path")"
-		local paths=(
-			"$(dirname "$(find /opt/rtd -name ${1} 2>/dev/null | head -n 1 )")/${1}"
-			"$(dirname "$(find /home/${SUDO_USER}/GIT -name ${1} 2>/dev/null | head -n 1 )")/${1}"
-			"$(dirname "$(find /home/${SUDO_USER}/bin -name ${1} 2>/dev/null | head -n 1 )")/${1}"
-			"${script_dir}/${1}"
-			"./${1}"
-			)
-
-		for path in "${paths[@]}"; do 
-			system::log_item "Searching for ${path} ..."
-			if [[ -e "${path}" ]]; then
-				system::log_item "Found ${path}"
-				source "${path}"
-				return 0
-			fi
-		done
-
-		return 1
-	}
-
 	if dependency::search_local "${1}" ; then
 		return 0
 	else
@@ -2223,16 +2557,36 @@ dependency::file () {
 
 
 oem::deploy_themes() {
-	# Description: Function to download and deploy themes from Github.
-	#              The github location is defined in the _locations file for consistency.
+	# Description: Downloads and deploys themes from GitHub.
+	#              The GitHub location is defined in the _locations file for consistency.
 	#
 	# Globals:
-	# Arguments: None
+	#	- GIT_Theme_URL: The URL of the GitHub repository to clone themes from.
+	#	- _THEME_DIR: The directory where the themes will be deployed.
+	#	- _TLA: Optional variable used to construct the default theme directory.
+	# Arguments:
+	#	- "$1" (optional): The URL of the GitHub repository to clone themes from. Overrides GIT_Theme_URL if provided.
 	# Outputs:
-	# Returns: Standard error level.
-	# Usage: simply call function in a script, or override the default location in _locations:
-	#        oem::deploy_themes https://www.github.com/myuser/myrepo.git
-	# End of documentation
+	#	- None
+	# Returns:
+	#	- 0 if the themes are deployed successfully, 1 if an error occurs.
+	#
+	# Usage:
+	#	oem::deploy_themes [https://www.github.com/myuser/myrepo.git]
+	#
+	# Example:
+	#	oem::deploy_themes https://www.github.com/myuser/myrepo.git
+	#
+	# Dependencies:
+	#	- git: To clone the repository.
+	#	- write_error: To log error messages.
+	#	- write_status: To log status messages.
+	#
+	# Notes:
+	#	- Ensure the GitHub URL is correct and accessible.
+	#	- Ensure the _locations file is properly configured if not passing the URL as an argument.
+	#
+	# End of Documentation
 
 	local GIT_Theme_URL="${1:-"$GIT_Theme_URL"}"
 	local _THEME_DIR="${_THEME_DIR:-"/opt/${_TLA:-rtd}/themes"}"
@@ -2257,57 +2611,266 @@ oem::deploy_themes() {
 
 
 
-dependency::virtualization() {
-	# Description: Common function to check on the required components for making virtual machines. 
+dependency::check_hardware_virtualization_support() {
+	# Description: Checks if the hardware supports virtualization (VT-x or AMD-V).
+	#
+	# This function checks if the hardware on the system supports virtualization technologies
+	# such as Intel VT-x or AMD-V. It provides status messages indicating the presence or
+	# absence of virtualization support.
 	#
 	# Globals:
-	# Arguments: None
+	#	- None
+	# Arguments:
+	#	- "--quiet" (optional): If specified, suppresses status messages.
 	# Outputs:
-	# Returns: nothing
-	# Usage: simply call function in a script
-	# End of documentation
+	#	- Status messages indicating hardware support for virtualization.
+	# Returns:
+	#	- 0 if hardware supports virtualization.
+	#	- 1 if hardware does not support virtualization.
+	#
+	# Usage:
+	#	dependency::check_hardware_virtualization_support [--quiet]
+	#
+	# Example:
+	#	dependency::check_hardware_virtualization_support
+	#	dependency::check_hardware_virtualization_support --quiet
+	#
+	# Notes:
+	#	- This function uses the `lscpu` command to check for virtualization support.
+	#	- It looks for the presence of 'vmx' (Intel VT-x) or 'svm' (AMD-V) flags in the CPU info.
+	#	- Status messages can be suppressed using the `--quiet` flag.
+	#
+	# End of Documentation
 
-	OS_NAME=$(hostnamectl | awk '/Operating System/ {print $3}')
-	write_status "${FUNCNAME[0]}: Checking for virtualization software..."
+	local _quiet_mode=0
+	if [[ "$1" == "--quiet" ]]; then
+		_quiet_mode=1
+	fi
 
-	local _probable_dependencies
-	case $OS_NAME in
+	_log_status() {
+		if [[ $_quiet_mode -eq 0 ]]; then
+			write_status "$1"
+		else
+			system::log_item "$1"
+		fi
+	}
+
+	_log_error() {
+		if [[ $_quiet_mode -eq 0 ]]; then
+			write_error "$1"
+		else
+			system::log_item "$1"
+		fi
+	}
+
+	if lscpu | grep -E 'vmx|svm' >/dev/null 2>&1; then
+		_log_status "⛼ Hardware supports virtualization (VT-x or AMD-V)."
+		return 0
+	else
+		_log_error "🚫 Hardware virtualization support (VT-x or AMD-V) not found. Virtual machines may not run efficiently."
+		return 1
+	fi
+}
+
+
+
+
+dependency::check_if_running_in_vm() {
+	# Description: Checks if the system is running inside a virtual machine.
+	#
+	# This function checks if the system is running inside a virtual machine by using the `virt-what` command.
+	# It provides status messages indicating whether the system is virtualized and attempts to install `virt-what`
+	# if it is not already installed.
+	#
+	# Globals:
+	#	- None
+	# Arguments:
+	#	- "--quiet" (optional): If specified, suppresses status messages.
+	# Outputs:
+	#	- Status messages indicating if the system is running inside a virtual machine.
+	#	- Attempts to install `virt-what` if it is not found.
+	# Returns:
+	#	- 0 if the system is not running inside a virtual machine.
+	#	- 1 if `virt-what` could not be installed or if virtualization status cannot be determined.
+	#	- 2 if the system is running inside a virtual machine.
+	#
+	# Usage:
+	#	dependency::check_if_running_in_vm [--quiet]
+	#
+	# Example:
+	#	dependency::check_if_running_in_vm
+	#	dependency::check_if_running_in_vm --quiet
+	#
+	# Notes:
+	#	- This function uses `virt-what` to detect virtualization.
+	#	- If `virt-what` is not installed, it attempts to install it using `software::add_native_package`.
+	#	- Status messages can be suppressed using the `--quiet` flag.
+	#
+	# End of Documentation
+
+	local _quiet_mode=0
+	if [[ "$1" == "--quiet" ]]; then
+		_quiet_mode=1
+	fi
+
+	_log_status() {
+		if [[ $_quiet_mode -eq 0 ]]; then
+			write_status "$1"
+		else
+			system::log_item "$1"
+		fi
+	}
+
+	_log_error() {
+		if [[ $_quiet_mode -eq 0 ]]; then
+			write_error "$1"
+		else
+			system::log_item "$1"
+		fi
+	}
+	
+	if command -v virt-what >/dev/null 2>&1; then
+		local _vm_type=$(virt-what)
+		if [ -n "$_vm_type" ]; then
+			_log_status "⛼ Running inside a virtual machine: $_vm_type"
+			return 2
+		else
+			_log_status "⛼ Not running inside a virtual machine."
+			return 0
+		fi
+	else
+		_log_error "⛔ virt-what is not installed. Unable to determine if running inside a VM."
+		# Attempt to install virt-what if not found
+		software::add_native_package "virt-what"
+		# Re-run virt-what after installation
+		if command -v virt-what >/dev/null 2>&1; then
+			local _vm_type=$(virt-what)
+			if [ -n "$_vm_type" ]; then
+				_log_status "⛼ Running inside a virtual machine: $_vm_type"
+				return 2
+			else
+				_log_status "⛼ Not running inside a virtual machine."
+				return 0
+			fi
+		else
+			_log_error "💥 Failed to install virt-what. Unable to determine if running inside a VM."
+			return 1
+		fi
+	fi
+}
+
+
+
+dependency::virtualization() {
+	# Description: Checks for required components for making virtual machines and verifies hardware support for virtualization.
+	#
+	# This function checks if the necessary software (KVM, QEMU, etc.) for creating virtual machines is installed and
+	# installs it if missing. It also verifies if the hardware supports virtualization (VT-x or AMD-V) and checks if
+	# the script is running inside a virtual machine using `virt-what`.
+	#
+	# Globals:
+	#	- None
+	# Arguments:
+	#	- "--quiet" (optional): If specified, suppresses status messages.
+	# Outputs:
+	#	- Status messages indicating the presence or installation of virtualization software (unless --quiet is specified).
+	#	- Warnings if hardware virtualization is not supported or if running inside a VM.
+	# Returns:
+	#	- 0 if virtualization is supported on hardware.
+	#	- 1 if virtualization is not supported.
+	#	- 2 if virtualization is supported but the system is running in a VM.
+	#
+	# Usage:
+	#	dependency::virtualization [--quiet]
+	#
+	# Example:
+	#	dependency::virtualization
+	#	dependency::virtualization --quiet
+	#
+	# Notes:
+	#	- This function is designed to work on multiple Linux distributions including openSUSE, Fedora, RHEL, CentOS, Debian, and Ubuntu.
+	#	- Ensures that KVM and QEMU are available, and installs them if missing.
+	#	- Verifies hardware support for virtualization using `lscpu` command.
+	#	- Checks if running inside a virtual machine using `virt-what`.
+	#
+	# End of Documentation
+
+	local _quiet_mode=0
+	if [[ "$1" == "--quiet" ]]; then
+		_quiet_mode=1
+	fi
+
+	_log_status() {
+		if [[ $_quiet_mode -eq 0 ]]; then
+			write_status "$1"
+		else
+			system::log_item "$1"
+		fi
+	}
+
+	_log_error() {
+		if [[ $_quiet_mode -eq 0 ]]; then
+			write_error "$1"
+		else
+			system::log_item "$1"
+		fi
+	}
+
+	# Perform checks
+	dependency::check_hardware_virtualization_support
+	local _hv_support=$?
+	dependency::check_if_running_in_vm
+	local _vm_check=$?
+
+	if [[ $_hv_support -eq 0 && $_vm_check -eq 0 ]]; then
+		return 0
+	elif [[ $_hv_support -eq 1 ]]; then
+		return 1
+	elif [[ $_vm_check -eq 2 ]]; then
+		return 2
+	fi
+
+	local _OS_NAME=$(hostnamectl | awk '/Operating System/ {print $3}')
+	_log_status "${FUNCNAME[0]}: Checking for virtualization software..."
+
+	case $_OS_NAME in
 		openSUSE|Tumbleweed)
 			if ! command -v qemu-system-x86_64 >/dev/null 2>&1; then
-				write_status "KVM or QEMU not found. Installing virtualization software for $OS_NAME..."
-				zypper install -y --recommends -t pattern "kvm_server" "kvm_tools" | tee -a "${_LOGFILE}"
+				_log_status "KVM or QEMU not found. Installing virtualization software for $_OS_NAME..."
+				software::add_native_package "kvm_server"
+				software::add_native_package "kvm_tools"
 				sudo systemctl enable --now libvirtd
 			else
-				write_status "KVM and QEMU are available..."
+				_log_status "KVM and QEMU are available..."
 			fi
 		;;
 		Fedora | RHEL | CentOS)
 			if ! command -v qemu-system-x86_64 >/dev/null 2>&1; then
-				write_status "KVM or QEMU not found. Installing virtualization software for $OS_NAME..."
+				_log_status "KVM or QEMU not found. Installing virtualization software for $_OS_NAME..."
 				software::add_native_package "@virtualization"
 				sudo systemctl enable --now libvirtd
 			else
-				write_status "KVM and QEMU are available..."
+				_log_status "KVM and QEMU are available..."
 			fi
 		;;
 		Debian | Ubuntu | TUXEDO | *)
 			if ! command -v qemu-system-x86_64 >/dev/null 2>&1; then
-				write_status "KVM or QEMU not found. Installing virtualization software for $OS_NAME..."
-				local count=1
-				for dependency in qemu-kvm libvirt-daemon  bridge-utils virtinst libvirt-daemon-system libosinfo-bin ; do
-					write_status "${count} - Verifying dependency (${dependency})..."
-					software::add_native_package "$dependency" 
-					count=$((count + 1))
+				_log_status "KVM or QEMU not found. Installing virtualization software for $_OS_NAME..."
+				local _count=1
+				for _dependency in qemu-kvm libvirt-daemon bridge-utils virtinst libvirt-daemon-system libosinfo-bin; do
+					_log_status "${_count} - Verifying dependency (${_dependency})..."
+					software::add_native_package "$_dependency"
+					_count=$((_count + 1))
 				done
 				sudo systemctl enable --now libvirtd
 			else
-				write_status "KVM and QEMU are available..."
+				_log_status "KVM and QEMU are available..."
 			fi
-
 		;;
 	esac
 	wait # Wait for all background processes to finish
 }
+
 
 
 
@@ -8692,7 +9255,7 @@ system::log_item() {
 		;;
 	esac
 
-	echo "${log_prefix} ${log_icon} : ${log_type} : ${log_message}" >> "$logfile"
+	echo -e "${log_prefix} ${log_icon} : ${log_type} : ${log_message}" >> "$logfile"
 }
 
 
@@ -14419,24 +14982,35 @@ case $1 in
 			case "$selection" in
 				"$selection" )
 					system::log_item "Selection = [${selection:1:-1}]"
-					result=$(while read -r line; do		
-						if [[ "$line" == "${selection:1:-1}() {"* ]]; then
+					result=$(while read -r line; do
+						# Flip the printline flag if the function is found...
+						if [[ "$line" == "${selection:1:-1}() {"* || "$line" == "${selection:1:-1}()"* || "$line" == "${selection}()"* ]]; then
 							system::log_item "Found function definition: $line"
 							printline="yes"
 						fi
 
+						# If the printline flag is set, print the line...
 						if [[ "$printline" == "yes" ]]; then
-							echo "$line" | grep -E '(^|\s*)#\s*' | sed 's/#//'
-						fi
-
-						if [[ "$line" == "# End of documentation"* || "$line" == *"# End of documentation"* || "$line" == *End*of*Documentation* ]]; then
-							system::log_item "End of Documentation found: $line"
-							printline="no"
+							# Flip the sucess flag if the function was found...
+							local _req_sucess=true
+							if [[ "$line" == "# End of documentation"* || "$line" == *"# End of documentation"* || "$line" == *End*of*Documentation* ]]; then
+								# If the end of documentation is found, stop printing...
+								system::log_item "End of Documentation found: $line"
+								printline="no"
+							else
+								# Print the line...
+								echo "$line" | grep -E '(^|\s*)#\s*' | sed 's/#//'
+							fi
 						fi
 					done < "${0}")
 
-					system::log_item "Result: $result"
-					echo -e "$result" | zenity --text-info --font=monospace --modal --ok-label=BACK --title "RTD Function: [${selection}]" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1000}"
+					if [[ ! "$_req_sucess" == "true" ]]; then
+						# If the function is not found, log it...
+						system::log_item "Selection not found: [${selection}]: $line"
+						unset _req_sucess
+					fi
+					system::log_item "Displaying [${selection}] in a [${ZHEIGHT:-600}]x[${ZWIDTH:-1024}]: \n $result"
+					echo -e "$result" | zenity --text-info --font=monospace --modal --ok-label=BACK --title "RTD Function: [${selection}]" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1024}"
 					unset result
 				;;
 				* )
