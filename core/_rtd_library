@@ -1298,6 +1298,7 @@ system::generate_cloudconfig() {
 
 	# get default VM configurations options from the system::get_vm_config
 	system::get_vm_config
+	kvm::util::read_distro_options "$@"
 
 	# Directory for cloud config files, if not set, create a temporary directory and use that.
 	local CloudConfigDir="${CloudConfigDir:=$( mktemp -d /tmp/CloudConfig.XXXXXX )}"
@@ -1309,66 +1310,7 @@ system::generate_cloudconfig() {
 	# Parse the command line options overwriting the defaults or saved preferences
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
-		--CloudConfigDir | cloudconfigdir )
-			# where to save cloud config files to incerted into the VM
-			local CloudConfigDir="$2"
-			shift # Remove argument name from processing
-			;;
-		--flavor | --Flavor | --FLAVOR | --flavour | --Flavour | --FLAVOUR )
-			local _flavor="$2"
-			shift # Remove argument name from processing
-		;;
-		--desktop_environment | --DesktopEnvironment | --desktop-environment | --Desktop-Environment | --DE | --de )
-			# The role of the VM, e.g. ubuntu-desktop, ubuntu-server, kubuntu-desktop, etc.
-			local Preference_Role="$2"
-			case ${Preference_Role} in 
-			ubuntu-desktop | ubuntu-server | kubuntu-desktop | ssh-server | ansible-server | minecraft-server | ubuntu-server-minimal )
-				system::log_item "Requested Role: ${Preference_Role}"
-				;;
-			* )
-				system::log_item "ERROR: Unknown ubuntu flavor: ${Preference_Role}"
-				dialog::display_error "ERROR: Unknown Role: ${Preference_Role}\n
-				Usage: $(FUNCNAME[0]) [--desktop-environment <env>]\n
-				Where <env> is the type of desktop to create, e.g. :
-				ubuntu-desktop, 
-				ubuntu-server, 
-				kubuntu-desktop, 
-				ssh-server,
-				ansible-server,
-				minecraft-server
-				
-				GOT (${Preference_Role})"
-				return 1
-				;;
-			esac
-			shift # Remove argument name from processing
-			;;
-		--server-role | --Server-Role | --server_role | --ServerRole | --SR | --sr )
-			# The role of the VM, e.g. ubuntu-desktop, ubuntu-server, kubuntu-desktop, etc.
-			local Preference_Role="$2"
-			case ${Preference_Role} in 
-			ubuntu-desktop | ubuntu-server | kubuntu-desktop | ssh-server | ansible-server | minecraft-server | ubuntu-server-minimal )
-				system::log_item "Requested Role: ${Preference_Role}"
-				;;
-			* )
-				system::log_item "ERROR: Unknown ubuntu flavor: ${Preference_Role}"
-				dialog::display_error "ERROR: Unknown Server Role: ${Preference_Role}\n
-				Usage: $(FUNCNAME[0]) [--server-role <role>]\n
-				Where <role> is the type of server service to create, e.g. :
-				ubuntu-desktop, 
-				ubuntu-server, 
-				kubuntu-desktop, 
-				ssh-server,
-				ansible-server,
-				minecraft-server
-				
-				GOT (${Preference_Role})"
-				return 1
-				;;
-			esac
-			shift # Remove argument name from processing
-			;;
-		--vmname | --VMName | --vm_name | --VmName )
+		--vmname | --VMName | --vm_name | --VmName | --vm-name | --VM-Name | --hostname | --HostName | --host-name | --Host-Name )
 			# The hostname of the VM to be created
 			local vm_name="$2"
 			[[ "$vm_name" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,253}[a-zA-Z0-9])?$ ]] && [[ ${#vm_name} -le 255 ]] && system::log_item "$vm_name: Valid hostname" || system::log_item "$vm_name: Invalid hostname"
@@ -10880,7 +10822,7 @@ kvm::util::read_distro_options() {
 			"fedora" | "Fedora" | "FEDORA" )
 				system::log_item "🐧 Set the requested options for Fedora..."
 				while [[ $# -gt 0 ]] ; do
-					case ${1} in
+					case "${1}" in
 						--desktop_environment | --DE )
 							if [[ $2 == "@deepin-desktop-environment" || $2 == "@sway-desktop-environment" || $2 == "@basic-desktop-environment" || $2 == "@(i3-desktop-environment" || $2 == "@developer-workstation-environment" || $2 == "@budgie-desktop-environment" || $2 == "@sugar-desktop-environment" || $2 == "@mate-desktop-environment" || $2 == "@kde-desktop-environment" || $2 == "@xfce-desktop-environment" || $2 == "@lxde-desktop-environment" || $2 == "@lxqt-desktop-environment" || $2 == "@cinnamon-desktop-environment" || $2 == "@mate-desktop-environment" || $2 == "@workstation-product-environment" ]] ; then
 								_UserDesktopEnvironmentSelection="${2}"
@@ -10914,7 +10856,12 @@ kvm::util::read_distro_options() {
 			;;
 			"ubuntu" | "Ubuntu" | "UBUNTU" )
 				while [[ $# -gt 0 ]]; do
-					case "$1" in
+					case "${1}" in
+					--CloudConfigDir | cloudconfigdir )
+						# where to save cloud config files to incerted into the VM
+						CloudConfigDir="$2"
+						shift 2 
+					;;
 					--saveto | --location | --path | --dir | --directory | -p )
 						_saveto="$2"
 						write_host --cyan  "📜 Directed to create preseed instructions file: ${_saveto}/preseed.cfg"
@@ -10925,23 +10872,23 @@ kvm::util::read_distro_options() {
 						write_host --cyan  "📜 Directed to create preseed instructions file: ${_preseed_file}"
 						shift 2
 					;;
-					--flavor | --Flavor )
+					--flavor | --Flavor | --FLAVOR | --flavour | --Flavour | --FLAVOUR )
 						# Ubuntu flavor to use (e.g. ubuntu, kubuntu, lubuntu, xubuntu, etc.)
 						_flavor="$2"
 						shift  2
 					;;
-					--desktop_environment | --DE )
+					--desktop_environment | --DesktopEnvironment | --desktop-environment | --Desktop-Environment | --DE | --de )
 						if [[ $2 == "ubuntu-desktop" || $2 == "kubuntu-desktop" || $2 == "xubuntu-desktop" || $2 == "lubuntu-desktop" || $2 == "ubuntu-mate-desktop" || $2 == "ubuntu-budgie-desktop" ]] ; then
 							_UserDesktopEnvironmentSelection="${2}"
 							write_host --cyan  "🖥️ Selecting desktop environment: ${_UserDesktopEnvironmentSelection}"
 						else
-							write_error "⛔ Unknown Desktop Environment: $2 ==> Use ubuntu-desktop, kubuntu-desktop, xubuntu-desktop, lubuntu-desktop, ubuntu-mate-desktop, ubuntu-budgie-desktop"
+							write_error "⛔ Unknown Desktop Environment: [${2}] ==> Use ubuntu-desktop, kubuntu-desktop, xubuntu-desktop, lubuntu-desktop, ubuntu-mate-desktop, ubuntu-budgie-desktop"
 							return 1
 						fi
 						shift 2
 					;;
-					--server_role | --ServerRole | --SR )
-						if [[ $2 == "ubuntu-server" || $2 == "xubuntu-core" || $2 == "lamp-server" || $2 == "postfix" || $2 == "bind9" || $2 == "dnsmasq" || $2 == "dhcp-server" || $2 == "print-server" ]]  ; then
+					--server-role | --Server-Role | --server_role | --ServerRole | --SR | --sr )
+						if [[ $2 == "ubuntu-server" || $2 == "server-desktop" || $2 == "lamp-server" || $2 == "postfix" || $2 == "bind9" || $2 == "dnsmasq" || $2 == "dhcp-server" || $2 == "print-server" ]]  ; then
 							_UserServerEnvironemtSelection="${2}"
 							write_status "🎭 Selecting server role: ${2}"
 						else
@@ -10956,6 +10903,7 @@ kvm::util::read_distro_options() {
 						return 0
 					;;
 					*)
+						system::log_item "Unknown option: $1 - ignoring..."
 						shift 2
 					;;
 					esac
@@ -10963,7 +10911,7 @@ kvm::util::read_distro_options() {
 			;;
 			"debian" | "Debian" | "DEBIAN" )
 				while [[ $# -gt 0 ]]; do
-					case "$1" in
+					case "${1}" in
 					--desktop_environment | --DE )
 						if [[ $2 == "gnome-desktop" || $2 == "kde-desktop" || $2 == "lxde-desktop" || $2 == "xfce-desktop" || $2 == "mate-desktop" || $2 == "cinnamon-desktop"  ]] ; then
 							_UserDesktopEnvironmentSelection="${2}"
@@ -11002,7 +10950,7 @@ kvm::util::read_distro_options() {
 			;;
 			"suse" | "SUSE" | "Suse" | "openSUSE" | "OpenSUSE" | "opensuse" | "OpenSuse" | "OPENSUSE" | "OPENSuse" | "OPENSUSE" )
 				while [[ $# -gt 0 ]]; do
-					case "$1" in
+					case "${1}" in
 					--source_url | --url | --source | --URL )
 						source_url="${2}"
 						system::log_item "📋 instructed to use source: ${_filename}"
@@ -11077,7 +11025,7 @@ kvm::util::read_distro_options() {
 			"rhel" | "RHEL" | "RedHat" | "REDHAT" )
 				system::log_item "🐧 Set the requested options for RedHat..."
 				while [[ $# -gt 0 ]] ; do
-					case ${1} in
+					case "${1}" in
 						--desktop_environment | --DE )
 							if [[ $2 == "@deepin-desktop-environment" || $2 == "@sway-desktop-environment" || $2 == "@basic-desktop-environment" || $2 == "@developer-workstation-environment" || $2 == "@sugar-desktop-environment" || $2 == "@kde-desktop-environment" || $2 == "@workstation-product-environment" ]] ; then
 								_UserDesktopEnvironmentSelection="${2}"
@@ -14128,7 +14076,7 @@ EOF
 # -----------------------------------------------------------------------------------------
 # Add CUSTOM section to the cloud config file based on the role of the VM
 # -----------------------------------------------------------------------------------------
-
+Preference_Role=${_UserServerEnvironemtSelection:-"ubuntu-server"}
 case ${Preference_Role} in
 ubuntu-desktop )
 system::log_item "Generating cloud-config for the role: ubuntu-desktop"
@@ -14214,7 +14162,7 @@ cat >> ${2} << EOF
         - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
 EOF
 ;;
-xubuntu-core )
+server-desktop )
 system::log_item "Generating cloud-config for ${2}"
 # -----------------------------------------------------------------------------------------
 cat >> ${2} << EOF
@@ -14229,7 +14177,30 @@ cat >> ${2} << EOF
         - byobu
         - vim
         - neofetch
-        - xubuntu-core
+        $( if [[ -n "${_UserDesktopEnvironmentSelection}" ]] ; then echo - ${_UserDesktopEnvironmentSelection} ; fi )
+    late-commands:
+        - echo "******************* ${Preference_Role} Config ********************"
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${_git_src_url} /opt/rtd ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
+EOF
+;;
+kde )
+system::log_item "Generating cloud-config for ${2}"
+# -----------------------------------------------------------------------------------------
+cat >> ${2} << EOF
+    packages:
+        - dialog
+        - git
+        - curl
+        - wget
+        - zip
+        - p7zip-full
+        - ansible
+        - byobu
+        - vim
+        - neofetch
+        - kubuntu-desktop
     late-commands:
         - echo "******************* ${Preference_Role} Config ********************"
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
@@ -15667,7 +15638,7 @@ case $1 in
 
 		function display_documentation () {
 			local selected_function="$1"
-
+			selected_function="${selected_function%%|*}" 
 			result=$(while read -r line; do
 				if [[ "$line" == "${selected_function}() {"* || "$line" == "${selected_function}()"* || "$line" == "${selected_function}()"* ]]; then
 					printline="yes"
@@ -15695,18 +15666,17 @@ case $1 in
 
 			YAD_PID=$!
 
-			yad --text-info --no-markup --filename=/tmp/yad_doc.txt --plug=$YAD_KEY --tabnum=2 --margins=10 --wrap --no-buttons &
+			echo "$result" | yad --text-info --text="Documentation:" --no-markup --filename=/tmp/yad_doc.txt --plug=$YAD_KEY --tabnum=2 --margins=10 --wrap --no-buttons --listen &
 
 			yad --list --no-markup --title="Select Function" --text="Functions:" --column="Number" --column="Function" --column="Description" \
-				 --center --print-column=2 --plug=$YAD_KEY --tabnum=1 \
+				--dclick-action="Ctrl+Enter" --select-action="display_documentation $selected_function" --center --print-column=2 --plug=$YAD_KEY --tabnum=1 \
 				"${functions_list[@]}" | while IFS='|' read -r selected_function; do
 
 				if [ -z "$selected_function" ]; then
 				echo "No function selected, continuing..."
 				continue
 				fi
-
-				selected_function="${selected_function%%|*}"  
+				
 				display_documentation "$selected_function"
 			done
 
