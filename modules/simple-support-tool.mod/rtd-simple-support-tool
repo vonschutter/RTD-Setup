@@ -628,6 +628,10 @@ show_deploy_VDI_VM_now_menu ()
 		selection=$($RTD_GUI --backtitle "$BRANDING" --title "Create a Virtual Desktop (VDI) Template"  --menu "Please select which VDI Template to create on this server:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
 		"1"  "Ubuntu Standard Desktop        (more MAC like)" \
 		"2"  "Ubuntu KDE Desktop             (more Windows like)" \
+		"3"  "Ubuntu Xubuntu Desktop         (light weight server VDI)" \
+		"4"  "Ubuntu Mate Desktop            (light weight Server VDI)" \
+		"5"  "Ubuntu Lubuntu Desktop         (light weight Server VDI)" \
+		"6"  "Ubuntu Cinnamon Desktop        (Convenient features)" \
 		"3"  "Debian Default Desktop         (reseal manually)" \
 		"4"  "Debian Cinnamon Desktop        (reseal manually)" \
 		"5"  "Debian Plasma Desktop          (reseal manually)" \
@@ -651,7 +655,7 @@ show_deploy_VDI_VM_now_menu ()
 			echo "Program terminated by user..."
 		;;
 		1 )
-			kvm::make_vm_template_now_from_ubuntu_com --role desktop --flavor ubuntu --desktop_environment ubuntu-desktop --ask YES --tshirt-size medium
+			kvm::make_vm_template_now_from_ubuntu_com --role desktop --flavor ubuntu --desktop_environment ubuntu-desktop --ask YES
 			cleanup_and_finish nomessage
 		;;
 		2 )
@@ -659,33 +663,49 @@ show_deploy_VDI_VM_now_menu ()
 			cleanup_and_finish nomessage
 		;;
 		3 )
-			kvm::make_vm_template_now_from_debian_org --role workstation --DE gnome-desktop --tshirt-size small
+			kvm::make_vm_template_now_from_ubuntu_com --role server --flavor ubuntu --server_role server-desktop --DE xubuntu-desktop --ask YES
 			cleanup_and_finish nomessage
 		;;
 		4 )
-			kvm::make_vm_template_now_from_debian_org --role workstation --DE cinnamon-desktop --tshirt-size small
+			kvm::make_vm_template_now_from_ubuntu_com --role server --flavor ubuntu --server_role server-desktop --DE ubuntu-mate-desktop --ask YES
 			cleanup_and_finish nomessage
 		;;
 		5 )
-			kvm::make_vm_template_now_from_debian_org --role workstation --DE kde-desktop --tshirt-size small
+			kvm::make_vm_template_now_from_ubuntu_com --role server --flavor ubuntu --server_role server-desktop --DE lubuntu-desktop --ask YES
 			cleanup_and_finish nomessage
 		;;
 		6 )
-			kvm::make_vm_template_now_from_debian_org --role workstation --DE lxde-desktop --tshirt-size small
+			kvm::make_vm_template_now_from_ubuntu_com --role server --flavor ubuntu --server_role server-desktop --DE cinnamon-desktop-environment --ask YES
 			cleanup_and_finish nomessage
 		;;
 		7 )
-			make_kvm_virtual_machine_now_from_fedora_org --role workstation --DE "@workstation-product-environment" --tshirt-size small
+			kvm::make_vm_template_now_from_debian_org --role workstation --DE gnome-desktop --tshirt-size small
 			cleanup_and_finish nomessage
 		;;
 		8 )
-			make_kvm_virtual_machine_now_from_opensuse_org --DE kde --product Leap --tshirt-size small
+			kvm::make_vm_template_now_from_debian_org --role workstation --DE cinnamon-desktop --tshirt-size small
 			cleanup_and_finish nomessage
 		;;
 		9 )
-			kvm::make_vm_template_now_from_microsoft --winver win10 --tshirt-size medium
+			kvm::make_vm_template_now_from_debian_org --role workstation --DE kde-desktop --tshirt-size small
+			cleanup_and_finish nomessage
 		;;
 		10 )
+			kvm::make_vm_template_now_from_debian_org --role workstation --DE lxde-desktop --tshirt-size small
+			cleanup_and_finish nomessage
+		;;
+		11 )
+			make_kvm_virtual_machine_now_from_fedora_org --role workstation --DE "@workstation-product-environment" --tshirt-size small
+			cleanup_and_finish nomessage
+		;;
+		12 )
+			make_kvm_virtual_machine_now_from_opensuse_org --DE kde --product Leap --tshirt-size small
+			cleanup_and_finish nomessage
+		;;
+		13 )
+			kvm::make_vm_template_now_from_microsoft --winver win10 --tshirt-size medium
+		;;
+		14 )
 			kvm::make_vm_template_now_from_microsoft --winver win11 --tshirt-size medium
 		;;
 		esac
