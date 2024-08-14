@@ -10785,6 +10785,12 @@ kvm::util::read_distro_options() {
 				write_status "🐧 Distribution requested explicitly: ${_distribution}"
 				shift 2
 			;;
+			--winver | --windows-version | --windows | --win | -w )
+				# Handle the Windows version option: set the Windows version
+				_distribution="Windows"
+				write_status "🪟 Distribution requested explicitly: ${_distribution}"
+				shift 2
+			;;
 			*)
 				shift
 			;;
@@ -10824,7 +10830,7 @@ kvm::util::read_distro_options() {
 				while [[ $# -gt 0 ]] ; do
 					case "${1}" in
 						--desktop_environment | --DE )
-							if [[ $2 == "@deepin-desktop-environment" || $2 == "@sway-desktop-environment" || $2 == "@basic-desktop-environment" || $2 == "@(i3-desktop-environment" || $2 == "@developer-workstation-environment" || $2 == "@budgie-desktop-environment" || $2 == "@sugar-desktop-environment" || $2 == "@mate-desktop-environment" || $2 == "@kde-desktop-environment" || $2 == "@xfce-desktop-environment" || $2 == "@lxde-desktop-environment" || $2 == "@lxqt-desktop-environment" || $2 == "@cinnamon-desktop-environment" || $2 == "@mate-desktop-environment" || $2 == "@workstation-product-environment" ]] ; then
+							if [[ $2 == "@deepin-desktop-environment" || $2 == "@sway-desktop-environment" || $2 == "@basic-desktop-environment" || $2 == "@i3-desktop-environment" || $2 == "@developer-workstation-environment" || $2 == "@budgie-desktop-environment" || $2 == "@sugar-desktop-environment" || $2 == "@mate-desktop-environment" || $2 == "@kde-desktop-environment" || $2 == "@xfce-desktop-environment" || $2 == "@lxde-desktop-environment" || $2 == "@lxqt-desktop-environment" || $2 == "@cinnamon-desktop-environment" || $2 == "@mate-desktop-environment" || $2 == "@workstation-product-environment" ]] ; then
 								_UserDesktopEnvironmentSelection="${2}"
 								write_host --cyan  "🖥️ Selecting desktop environment: ${_UserDesktopEnvironmentSelection}"
 							else
@@ -11029,9 +11035,9 @@ kvm::util::read_distro_options() {
 						--desktop_environment | --DE )
 							if [[ $2 == "@deepin-desktop-environment" || $2 == "@sway-desktop-environment" || $2 == "@basic-desktop-environment" || $2 == "@developer-workstation-environment" || $2 == "@sugar-desktop-environment" || $2 == "@kde-desktop-environment" || $2 == "@workstation-product-environment" ]] ; then
 								_UserDesktopEnvironmentSelection="${2}"
-								write_host --cyan  "🖥️ Selecting desktop environment: ${_UserDesktopEnvironmentSelection}"
+								system::log_item --cyan  "🖥️ Selecting desktop environment: ${_UserDesktopEnvironmentSelection}"
 							else
-								write_error "⛔ Unknown Desktop Environment: $2 ==> Use basic-desktop-environment, developer-workstation-environment, sugar-desktop-environment, kde-desktop-environment, workstation-product-environment"
+								system::log_item "⛔ Unknown Desktop Environment: $2 ==> Use basic-desktop-environment, developer-workstation-environment, sugar-desktop-environment, kde-desktop-environment, workstation-product-environment"
 								return 1
 							fi
 							shift 2
@@ -11039,9 +11045,9 @@ kvm::util::read_distro_options() {
 						--server_role | --ServerRole | --SR )
 							if [[ $2 == "@minimal-environment" || $2 == "@web-server-environment" || $2 == "@freeipa-server" || $2 == "@network-server" || $2 == "@cloud-server-environment" || $2 == "@infrastructure-server-environment" ]] ; then
 								_UserServerEnvironemtSelection="${2}"
-								write_status "🎭 Selecting server role: ${2}"
+								system::log_item "🎭 Selecting server role: ${2}"
 							else
-								write_error "⛔ Unknown server role selection: ${2} ==> Use web-server-environment, freeipa-server, network-server, cloud-server-environment, infrastructure-server-environment"
+								system::log_item "⛔ Unknown server role selection: ${2} ==> Use web-server-environment, freeipa-server, network-server, cloud-server-environment, infrastructure-server-environment"
 								return 1
 							fi
 							shift 2
@@ -11057,13 +11063,13 @@ kvm::util::read_distro_options() {
 					esac
 				done
 			;;
-			"Windows" | "WINDOWS" | "Win" | "Win11" | "Win10" | "Microsoft" | "microsoft" )
-				system::log_item "❖ Set the requested options for Windows..."
+			"Windows" | "WINDOWS" | "Win" | "Win11" | "Win10" | "Microsoft" | "microsoft" | windows)
+				system::log_item "🪟 Set the requested options for Windows..."
 				while  [[ $# -gt 0 ]] ; do
 					case "$1" in
 						--winver )
 							target_winver="$2"
-							write_information "❖ Custom Windows version requested and set to: ${target_winver}"
+							system::log_item "🪟 Custom Windows version requested and set to: ${target_winver}"
 							shift 2
 						;;
 						*)
@@ -11404,7 +11410,7 @@ make_kvm_virtual_machine_now_from_opensuse_org() {
 	: ${_mem="${_mem:-2048}"}
 	: ${_dsk="${_dsk:-100}"}
 	: ${CONFIG:="VDI"}
-
+	: ${_autoyast_filename:="$( mktemp -d )/autoyast.xml"}
 	# Check that virtualization is supported on the host
 	dependency::virtualization
 
@@ -11413,6 +11419,7 @@ make_kvm_virtual_machine_now_from_opensuse_org() {
 
 	# Generate the AutoYaST file based on parameters provided...
 	system::generate_autoyast_file ${*}
+
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
@@ -13125,7 +13132,6 @@ template::kickstart_cfg() {
 		git
 		curl
 		dialog
-		yad
 		neofetch
 		ansible
 		vim-ansible
@@ -13171,7 +13177,11 @@ template::kickstart_cfg() {
 		git
 		curl
 		dialog
+		yad
 		neofetch
+		ansible
+		p7zip
+		p7zip-plugins
 		%end
 
 		# Post-installation Script
@@ -13880,9 +13890,7 @@ template::AutoYast_xml() {
 	<software>
 		<install_recommended config:type="boolean">true</install_recommended>
 		<patterns config:type="list">
-		<pattern>base</pattern>
-		<pattern>${_UserDesktopEnvironmentSelection:-"kde"}</pattern>
-		<pattern>${_UserServerEnvironemtSelection:-"file_server"}</pattern>
+		<pattern>${_UserDesktopEnvironmentSelection}</pattern>
 		</patterns>
 
 		<packages config:type="list">
@@ -13900,6 +13908,7 @@ template::AutoYast_xml() {
 		<package>jq</package>
 		<package>p7zip-full</package>
 		<package>xhost</package>
+		<package>rsync</package>
 		</packages>
 
 		<products config:type="list">
@@ -13966,7 +13975,8 @@ template::AutoYast_xml() {
 	cp *.xml /opt/rtd/
 	sudo zypper ar -cfp 90 ${_SUSE_PACKMAN_LEAP} packman
 	zypper --gpg-auto-import-keys refresh
-	zypper dup --from packman -y --force-resolution
+	# zypper dup --from packman -y --force-resolution
+	zypper in -y yad
 	]]>
 		</source>
 		</script>
