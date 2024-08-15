@@ -561,13 +561,19 @@ show_deploy_server_VM_now_menu ()
 		exec 3>&1
 		selection=$($RTD_GUI \
 		--backtitle "$BRANDING" --title "Create Template VM Server"  --menu "Please select which type of VM to create:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
-		"1" "Ubuntu Server" \
-		"2" "Ubuntu Graphical Server" \
-		"3" "Debian Print Server" \
-		"4" "Debian Minimal Server" \
-		"5" "Minecraft Server" \
-		"6" "Fedora Minimal Server" \
-		"7" "Ansible Server" \
+		"1" "🐧 Ubuntu Server" \
+		"2" "🐧 Ubuntu LAMP Server" \
+		"3" "🐧 Ubuntu Postfix Server" \
+		"4" "🐧 Ubuntu Bind9 Server" \
+		"5" "🐧 Ubuntu DHCP Server" \
+		"6" "🐧 Ubuntu Samba Server" \
+		"7" "🐧 Ubuntu Print Server" \
+		"8" "🐧 Ubuntu Graphical Server" \
+		"9" "🌀 Debian Print Server" \
+		"10" "🌀 Debian Minimal Server" \
+		"11" "⛏️ Minecraft Server" \
+		"12" "🎩 Fedora Minimal Server" \
+		"13" "🎩 Fedora Ansible Server" \
 		2>&1 1>&3)
 		exit_status=$?
 		exec 3>&-
@@ -584,32 +590,56 @@ show_deploy_server_VM_now_menu ()
 			write_information "Program terminated by user..."
 		;;
 		1 )
-			kvm::make_vm_template_now_from_ubuntu_com --role server --flavor ubuntu --server_role ssh-server --ask YES
+			kvm::make_vm_template_now_from_ubuntu_com --role server --flavor ubuntu --server_role ubuntu-server --ask YES
 			cleanup_and_finish nomessage
 		;;
 		2 )
-			kvm::make_vm_template_now_from_ubuntu_com --role server --flavor ubuntu --server_role server-desktop --DE xubuntu-desktop --ask YES
+			kvm::make_vm_template_now_from_ubuntu_com --role server --flavor ubuntu --server_role lamp-server --ask YES
 			cleanup_and_finish nomessage
 		;;
 		3 )
-			kvm::make_vm_template_now_from_debian_org --role server --server_role print-server
+			kvm::make_vm_template_now_from_ubuntu_com --role server --flavor ubuntu --server_role postfix --ask YES
 			cleanup_and_finish nomessage
 		;;
 		4 )
+			kvm::make_vm_template_now_from_ubuntu_com --role server --flavor ubuntu --server_role bind9 --ask YES
+			cleanup_and_finish nomessage
+		;;
+		5 ) 
+			kvm::make_vm_template_now_from_ubuntu_com --role server --flavor ubuntu --server_role dhcp-server --ask YES
+			cleanup_and_finish nomessage
+		;;
+		6 ) 
+			kvm::make_vm_template_now_from_ubuntu_com --role server --flavor ubuntu --server_role samba --ask YES
+			cleanup_and_finish nomessage
+		;;
+		7 ) 
+			kvm::make_vm_template_now_from_ubuntu_com --role server --flavor ubuntu --server_role print-server --ask YES
+			cleanup_and_finish nomessage
+		;;
+		8 )
+			kvm::make_vm_template_now_from_ubuntu_com --role server --flavor ubuntu --server_role server-desktop --DE xubuntu-desktop --ask YES
+			cleanup_and_finish nomessage
+		;;
+		9 )
+			kvm::make_vm_template_now_from_debian_org --role server --server_role print-server
+			cleanup_and_finish nomessage
+		;;
+		10 )
 			kvm::make_vm_template_now_from_debian_org --role server --server_role openssh-server
 			cleanup_and_finish nomessage
 		;;
-		5 )
+		11 )
 			kvm::make_vm_template_now_from_ubuntu_com --role server --server_role minecraft-server --tshirt-size medium
 			cleanup_and_finish nomessage
 		;;
-		6 )
+		12 )
 			PRESEED_FILE="$(mktemp)"
 			generate_fedora_ks_cfg_file "${PRESEED_FILE}" ssh-server
 			make_kvm_virtual_machine_now_from_fedora_org fedora30
 			cleanup_and_finish nomessage
 		;;
-		7 )
+		13 )
 			PRESEED_FILE="$(mktemp)"
 			generate_fedora_ks_cfg_file "${PRESEED_FILE}" ansible-server
 			make_kvm_virtual_machine_now_from_fedora_org fedora30

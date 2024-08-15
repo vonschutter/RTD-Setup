@@ -47,7 +47,7 @@ MINECRAFT_JAR=server.jar
 #
 
 function check_dependencies (){
-	# Simple function to check if sofware is available and take action
+	# Simple function to check if software is available and take action
 	# if it is not. Software name must match command to envoke it.
 	#---------------------------------------------------------------
 	echo "Checking for script dependencies and install if not there..."
@@ -81,7 +81,7 @@ function install_software (){
 		export DEBIAN_FRONTEND=noninteractive
 		sudo apt-get -y -qq --allow-change-held-packages --ignore-missing install "$@"
 	else
-		echo -e $YELLOW "This system does not seem to have a software managment system" $ENDCOLOR
+		echo -e $YELLOW "This system does not seem to have a software management system" $ENDCOLOR
 		_cleanup
 		exit 1
 	fi
@@ -137,20 +137,15 @@ function run_minecraft_server_manager (){
 
 
 function check_java (){
-	~/bin/java/bin/java --version >/dev/null
-	if [ $? -eq 0 ]; then
+	if ~/bin/java/bin/java --version >/dev/null ; then
 		echo "java of some version is present. I respect your choice... and will try to run! --- OK!"
 	else
 		echo Java is not present where expected... will now download:
-		for i in {20..40} ; do
-			if wget https://download.oracle.com/java/${i}/latest/jdk-${i}_linux-x64_bin.tar.gz ; then
-				break 
-			fi
-		done
-		# wget https://download.oracle.com/java/20/latest/jdk-20_linux-x64_bin.tar.gz
-		mkdir ~/bin/java 
-		tar xvf jdk-20_linux-x64_bin.tar.gz --directory ~/bin/java/ --strip 1
-		#check_dependencies default-jre
+		if wget -O java.tar.gz https://javadl.oracle.com/webapps/download/AutoDL?BundleId=250118_d8aa705069af427f9b83e66b34f5e380  ; then
+			mkdir ~/bin/java
+			tar xvf java.tar.gz --directory ~/bin/java/ --strip 1
+			break 
+		fi
 	fi
 }
 
@@ -163,7 +158,7 @@ function find_active_newtork_interface (){
 }
 
 
- function minecraft_update() {
+function minecraft_update() {
 	# Get minecraft version publication file and get the latest server URL
 	# This is an unneccessarily complicated way by Mojang!
 	cd $MINECRAFT_HOME || { echo "Failure change to Minecraft folder. Is it there?"; exit 1; }
