@@ -268,8 +268,8 @@ start.sh () {
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 pushd $(dirname "$0")
-properties_file="./server.properties"
-MC_SERVER_NAME=`cat server.properties |grep "motd=.*" `
+properties_file="server.properties"
+MC_SERVER_NAME=$(cat $properties_file |grep "motd=.*")
 export $MC_SERVER_NAME
 
 # Function to update the game mode
@@ -288,25 +288,18 @@ update_gamemode() {
 }
 
 # Display the menu to choose the game mode
-choice=$(dialog --title "Minecraft Launcher" \
-    --menu "Choose the game mode:" 15 50 2 \
-    --timeout 10 \
-    --default-item 2 \
+choice=$(dialog --timeout 10 --default-item 2 --title "Minecraft Launcher" --menu "Choose the game mode:" 15 50 2 \
     1 "Creative Mode" \
     2 "Survival Mode" 3>&1 1>&2 2>&3)
 
-# Exit if the user pressed Cancel
-if [ $? -ne 0 ]; then
-    clear
-    exit
-fi
-
-# Update the server.properties file based on the choice
 case $choice in
     1)
         update_gamemode "creative"
         ;;
     2)
+        update_gamemode "survival"
+        ;;
+    *)
         update_gamemode "survival"
         ;;
 esac
