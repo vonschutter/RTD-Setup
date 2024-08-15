@@ -10894,7 +10894,7 @@ kvm::util::read_distro_options() {
 						shift 2
 					;;
 					--server-role | --Server-Role | --server_role | --ServerRole | --SR | --sr )
-						if [[ $2 == "ubuntu-server" || $2 == "server-desktop" || $2 == "minecraft-server" || $2 == "lamp-server" || $2 == "postfix" || $2 == "bind9" || $2 == "dnsmasq" || $2 == "dhcp-server" || $2 == "print-server" || $2 == "samba" ]]  ; then
+						if [[ $2 == "ubuntu-server" || $2 == "server-desktop" || $2 == "minecraft" || $2 == "lamp-server" || $2 == "postfix" || $2 == "bind9" || $2 == "dnsmasq" || $2 == "dhcp-server" || $2 == "print-server" || $2 == "samba" ]]  ; then
 							_UserServerEnvironemtSelection="${2}"
 							write_status "🎭 Selecting server role: ${2}"
 						else
@@ -11885,7 +11885,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	system::get_tgt_ubuntu_version 
 
 	# Format the name of the VM to be created...
-	local vm_name="Template_${_flavor}_${_tgt_ubuntu_ver}_${_UserDesktopEnvironmentSelection}${_UserServerEnvironemtSelection}${_role}_$(date +%Y-%m-%d-%s)"
+	local vm_name="Template_${_flavor}_${_tgt_ubuntu_ver}_${_UserDesktopEnvironmentSelection}_${_UserServerEnvironemtSelection}_${_role}_$(date +%Y-%m-%d-%s)"
 
 	# ensure local media:          [/where/to/look/first] 
 	system::get_ubuntu_media --dir ${permanent_download_dir} --flavor ${_flavor} --version ${_tgt_ubuntu_ver} --type ${_role}
@@ -14218,7 +14218,7 @@ cat >> ${2} << EOF
         - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
 EOF
 ;;
-minecraft-server )
+minecraft )
 system::log_item "Generating cloud-config for minecraft-server"
 # -----------------------------------------------------------------------------------------
 cat >> ${2} << EOF
