@@ -11596,7 +11596,7 @@ kvm::make_vm_template_now_from_debian_org() {
 
 
 kvm::get_zorin_iso() {
-	# Description: Downloads the latest Zorin OS ISO file for KVM.
+	# Description: Downloads the latest Zorin OS ISO file for KVM if not already present.
 	#
 	# This function checks the Zorin OS mirror for the latest directory and the highest version number file
 	# within that directory. If the file does not already exist in /var/lib/libvirt/boot, it downloads the file.
@@ -11624,13 +11624,11 @@ kvm::get_zorin_iso() {
 	#	- The function logs progress and errors using system::log_item.
 	#
 	# End of Documentation
-	
-	# Function to get the latest directory
+
 	get_latest_directory() {
 		curl -s https://mirror.zetup.net/zorinos/ | grep -oP 'href="\K[0-9]+(?=/)' | sort -n | tail -1 
 	}
 
-	# Function to get the highest version number file
 	get_highest_version_file() {
 		local directory=$1
 		local version_prefix=${2:-Core}
@@ -11638,7 +11636,6 @@ kvm::get_zorin_iso() {
 		curl -s https://mirror.zetup.net/zorinos/$directory/ | grep -oP 'Zorin-OS-[0-9.]+-'$version_prefix'-[0-9a-zA-Z-]+\.iso' | sort -V | tail -1
 	}
 
-	# Function to download the file
 	download_file() {
 		local directory=$1
 		local file=$2
@@ -11649,13 +11646,14 @@ kvm::get_zorin_iso() {
 		curl -o "$destination" "$url"
 		if [ $? -eq 0 ]; then
 			system::log_item "Download completed successfully."
+			echo $file_path
+			iso=$file_path
 		else
 			system::log_item "Download failed."
 			return 1
 		fi
 	}
 
-	# Main script
 	latest_directory=$(get_latest_directory)
 	if [ -z "$latest_directory" ]; then
 		system::log_item "No directories found."
@@ -11678,9 +11676,10 @@ kvm::get_zorin_iso() {
 		iso=$file_path
 	else
 		system::log_item "Latest version file: $highest_version_file"
-		download_file "$latest_directory" "$highest_version_file"
+		download_file "$latest_directory" "$highest_version_file" 
 	fi
 }
+
 
 
 
@@ -11734,7 +11733,6 @@ kvm::make_vm_template_now_from_zorin() {
 	: ${CloudConfigDir:="$_saveto"}                         # This is the default location cidata files.
 	: ${bin_virt_install:=$(type -p virt-install)}          # This is the default location for the virt-install binary.
 	: ${virt_net="$(system::find_vm_bridge)"}               # This is the default network to use for the VM.
-	iso="/home/stephans/Virtual-DVDs/Downloaded/Linux-Zorin-OS-17.1-Pro-64-bit.iso"
 
 	_ask=YES
 	vm_name="Zorin-OS-16-Pro-64-bit"	
@@ -11749,8 +11747,21 @@ kvm::make_vm_template_now_from_zorin() {
 
 	kvm::get_zorin_iso || ( dialog::display_error "💥 - An ERROR has occurred. Unable to get Zorin ISO file. Please press [OK] to continue..." && return 1 )
 
-	system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --ask ${_ask} 
+	system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --ask ${_ask:-"NO"} || ( dialog::display_error "💥 - An ERROR has occurred. Unable to create preseed file. Please press [OK] to continue..." && return 1 )
 
+	_summary_message="
+	The virtual machine (${vm_name}) \n
+	📋 - Using the instructions in: ${_preseed_file} \n
+	🔧 - Using this source: \n
+	🌎 - ${iso} \n
+	🖥️ - Using the network: ${virt_net:=default} \n
+	🖥️ - Memory: ${_mem} \n
+	🖥️ - CPU's: ${_cpu} \n
+	🖥️ - Disk Size: ${_dsk} \n 
+	
+	NOTE: You may connecct to the VM and see the progress at IP: \n
+	$(hostname -I) \n
+	After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
 	
 	"${bin_virt_install}" --name ${vm_name} \
 		--vcpus "${_cpu}" \
@@ -11766,7 +11777,7 @@ kvm::make_vm_template_now_from_zorin() {
 		--initrd-inject="${_saveto}/preseed.cfg" \
 		--initrd-inject="${_saveto}/ks.cfg" \
 		--noautoconsole || ( read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1 )  
-	#} 2>&1 |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+	} 2>&1 |tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 }
 
 
@@ -13356,13 +13367,14 @@ cat >> ${outfile} <<'EOF'
 		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
 	)
 
-	if exist %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1 (
-		@title "CMD: _Chris-Titus-Post-Windows-Install-App.ps1 File found locally..."
-		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1
-		) else (
-		@title "CMD: Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet..."
-		powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
-	)
+	powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
+	:: if exist %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1 (
+	:: 	@title "CMD: _Chris-Titus-Post-Windows-Install-App.ps1 File found locally..."
+	:: 	powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1
+	:: 	) else (
+	:: 	@title "CMD: Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet..."
+	:: 	powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
+	:: )
 	goto end
 
 
@@ -13391,13 +13403,14 @@ cat >> ${outfile} <<'EOF'
 		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
 	)
 
-	if exist %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1 (
-		@title "CMD: _Chris-Titus-Post-Windows-Install-App.ps1 File found locally..."
-		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1
-		) else (
-		@title "CMD: Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet..."
-		powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
-	)
+	powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
+	:: if exist %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1 (
+	:: 	@title "CMD: _Chris-Titus-Post-Windows-Install-App.ps1 File found locally..."
+	:: 	powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1
+	:: 	) else (
+	:: 	@title "CMD: Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet..."
+	:: 	powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
+	:: )
 	goto end
 
 
