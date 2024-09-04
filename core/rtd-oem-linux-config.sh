@@ -180,11 +180,11 @@ oem_linux_config ()
 		if [ -z "${RTDFUNCTIONS}" ]; then
 			dependency_rtd_library || { echo "📚 Failed to find _rtd_library"; exit 1; }
 		else
-			echo "📚 _rtd_library is already loaded..."
+			write_information "📚 _rtd_library is already loaded..."
 		fi
 
 		for i in $_requirements ; do 
-			software::check_native_package_dependency $i 
+			software::check_native_package_dependency $i
 		done
 		
 		system::wait_for_internet_availability

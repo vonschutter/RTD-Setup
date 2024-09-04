@@ -2809,7 +2809,7 @@ dependency::virtualization() {
 	local _vm_check=$?
 
 	if [[ $_hv_support -eq 0 && $_vm_check -eq 0 ]]; then
-		return 0
+		write_status "✅ Virtualization support and environment check passed."
 	elif [[ $_hv_support -eq 1 ]]; then
 		return 1
 	elif [[ $_vm_check -eq 2 ]]; then
@@ -8708,7 +8708,7 @@ software::add_native_package() {
 			sudo zypper install -y ${1} || { write_error "Failed to install ${1} using ZYPPER" ; return 1 ; }
 			{ write_information "The software package ${1} has been installed sucessfully..." ; return 0 ; }
 
-		elif hash apt 2>/dev/null; then
+		elif hash apt-get 2>/dev/null; then
 			write_status "📦 Installing ${1} using DEB:"
 			sudo apt-get -y install ${1} || { write_error "Failed to install ${1} using DEB" ; return 1 ; }
 			{ write_information "The software package ${1} has been installed sucessfully..." ; return 0 ; }
@@ -11723,6 +11723,9 @@ kvm::make_vm_template_now_from_zorin() {
 	#	- Ensure that the necessary dependencies and utilities are installed and configured.
 	#
 	# End of Documentation
+	
+	# Check that virtualization is supported on the host
+	dependency::virtualization
 
 	: ${ubuntu_flavor="ubuntu"}                             # This is the default flavor of Ubuntu to use.
 	: ${_role:="workstation"}                               # This is the default role of the Ubuntu VM to create.
@@ -11742,9 +11745,6 @@ kvm::make_vm_template_now_from_zorin() {
 
 	# Set specific options for Debian...
 	kvm::util::read_distro_options ${*}
-
-	# Check that virtualization is supported on the host
-	dependency::virtualization
 
 	kvm::get_zorin_iso || ( dialog::display_error "💥 - An ERROR has occurred. Unable to get Zorin ISO file. Please press [OK] to continue..." && return 1 )
 
@@ -12006,8 +12006,8 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 		server | Server | SERVER )
 				system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than 23, so using cloud config to build server..."
 				system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using SERVER installer as requested..."
-				system::generate_cloudconfig --vm-name $(echo "${vm_name}" | grep -o '[0-9-]*')  --CloudConfigDir "${CloudConfigDir}" --flavor ${_flavor:-"ubuntu"} --server-role ${_UserServerEnvironemtSelection:="ubuntu-server"} --ask ${_ask}
-				
+				system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor ${_flavor:-"ubuntu"} --server-role ${_UserServerEnvironemtSelection:="ubuntu-server"} --ask ${_ask}
+				#--vm-name $(echo "${vm_name}" | grep -o '[0-9-]*') 
 				local _virt_cmd="
 				 "${bin_virt_install}" --name ${vm_name} 
 					--vcpus "${_cpu}" 
@@ -15786,7 +15786,7 @@ case $1 in
 			write_host --red "shellcheck command not found! Please install it to use this function."
 		fi 
 	;;
-	--V )
+	--V | --v | --version )
 		echo "$RTD_VERSION"
 		return 0
 	;;

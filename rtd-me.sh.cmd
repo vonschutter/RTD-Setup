@@ -34,16 +34,16 @@ GOTO :CMDSCRIPT
 #::
 #:: Background: This system configuration and installation script was originally developed
 #:: 		for RuntimeData, a small OEM in Buffalo Center, IA. The purpose of the script
-#:: 		was to install and/or configure Ubuntu, Zorin, or Microsoft OS PC's. This OEM and store nolonger
+#:: 		was to install and/or configure Ubuntu, Zorin, or Microsoft OS PC's. This OEM and store no longer
 #:: 		exists as its owner has passed away. This script is shared in the hopes that
-#:: 		someone will find it usefull.
+#:: 		someone will find it useful.
 #::
 #::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #
 #	NOTE:	This terminal program is written and documented to a very high degree. The reason for doing this is that
-#		these scripts are seldom changed and when they are, it is usefull to be able to understand why and how
+#		these scripts are seldom changed and when they are, it is useful to be able to understand why and how
 #		things were built. Obviously, this becomes a useful learning tool as well; for all people that want to
 #		learn how to write admin scripts. It is a good and necessary practice to document extensively and follow
 #		patterns when building your own apps and config scripts. Failing to do so will result in a costly mess
@@ -54,9 +54,9 @@ GOTO :CMDSCRIPT
 #
 #
 #	RTD admin scrips are placed in /opt/rtd/scripts. Optionally scripts may use the common
-#	functions in _rtd_functions and _rtd_recipies.
-#	  _rtd_functions -- contain usefull admin functions for scripts, such as "how to install software" on different systems.
-#	  _rtd_recipies  -- contain software installation and configuration "recipies".
+#	functions in _rtd_functions and _rtd_recipes.
+#	  _rtd_functions -- contain useful admin functions for scripts, such as "how to install software" on different systems.
+#	  _rtd_recipes  -- contain software installation and configuration "recipes".
 #	Scripts may also be stand-alone if there is a reason for this.
 #
 #	Taxonomy of this script: we prioritize the use of functions over monolithic script writing, and proper indentation
@@ -68,7 +68,7 @@ GOTO :CMDSCRIPT
 #		...code...
 #	}
 #
-#	We also like to log all activity, and to echo status output to the screen in a frienly way. To accomplish this,
+#	We also like to log all activity, and to echo status output to the screen in a friendly way. To accomplish this,
 #	the table below may be used as appropriate:
 #
 #
