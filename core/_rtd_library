@@ -1317,7 +1317,7 @@ system::generate_cloudconfig() {
 			shift # Remove argument name from processing
 			;;
 		*)
-			system::log_item "INFO: No known long parameters provided. Parameter: $1"
+			system::log_item "INFO: No known vm_name parameters provided. Parameter: $1"
 			;;
 		esac
 		shift # Remove argument value from processing
@@ -10906,11 +10906,12 @@ kvm::util::read_distro_options() {
 					--version | -v )
 						_tgt_ubuntu_ver="$2"
 						write_status "🐧 Ubuntu version requested: ${_tgt_ubuntu_ver}"
+						shift 2
 						return 0
 					;;
 					*)
 						system::log_item "Unknown option: $1 - ignoring..."
-						shift 2
+						shift
 					;;
 					esac
 				done
@@ -11763,6 +11764,7 @@ kvm::make_vm_template_now_from_zorin() {
 	$(hostname -I) \n
 	After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
 	
+	{
 	"${bin_virt_install}" --name ${vm_name} \
 		--vcpus "${_cpu}" \
 		--memory "${_mem}" \
@@ -11783,95 +11785,96 @@ kvm::make_vm_template_now_from_zorin() {
 
 
 kvm::make_vm_template_now_from_ubuntu_com() {
-# Description: 
-# Automates the creation of a virtual machine (VM) template using Ubuntu as the base OS on a KVM host.
-# This function is ideal for quickly setting up virtual environments with custom configurations.
-# This function should be used on a Qemu/KVM virtual host that the virtual guest is to be used on.
-# NOTE: QCOW2 is a storage format for virtual machine disk images.
-# QCOW stands for QEMU copy on write. The QCOW2 format decouples the physical storage
-# layer from the virtual layer by adding a mapping between logical and physical blocks.
-# NOTE2: Kernel-based Virtual Machine (KVM) is an open source virtualization technology built into Linux®.
-# Specifically, KVM lets you turn Linux into a hypervisor that allows a host machine to run multiple,
-# isolated virtual environments called guests or virtual machines (VMs). KVM is part of Linux.
-# For complete info: https://www.redhat.com/en/topics/virtualization/what-is-KVM
-#
-# Prerequisites:
-# - Must be run on a Qemu/KVM host with QEMU and KVM installed and configured.
-# - Internet access is required for downloading the Ubuntu ISO file.
-#   Alternatively, the ISO file can be downloaded manually and placed in a specified location.
-#   The default location is /var/lib/libvirt/boot/.
-# - The virt-install tool must be available on the system.
-# - The function should be run with sudo or as the root user.
-#
-# Notes on QCOW2:
-# - QCOW2 (QEMU Copy On Write version 2) is used for VM disks. It offers features like snapshot support and dynamic disk size allocation.
-#
-# Notes on KVM:
-# - Kernel-based Virtual Machine (KVM) is a Linux kernel module that allows the kernel to function as a hypervisor. 
-# - More details on KVM: https://www.redhat.com/en/topics/virtualization/what-is-KVM
-#
-# Parameters:
-# --ram <value>           : Sets the VM's RAM in megabytes (default: 2048 MB).
-# --cpus <value>          : Sets the number of CPU cores (default: 2).
-# --disk <value>          : Sets the disk size in gigabytes (default: 100 GB).
-# --flavor <value>        : Specifies the Ubuntu flavor (default: 'ubuntu').
-# --role <value>          : Specifies the VM's role (e.g., desktop, server) (default: 'server').
-# --version <value>       : Specifies the Ubuntu version; uses the latest LTS if not specified.
-# --location <value>      : Override the default location for downloading or accessing the ISO.
-# --ask <value>           : Enables interactive mode for manual input during setup (default: 'NO').
-# --desktop_environment   : Specifies the desktop environment for desktop VMs.
-# --server_role           : Specifies the server role for server VMs.
-#
-# Defaults:
-# The function uses predefined defaults which can be overridden by specifying parameters.
-#
-# Usage Examples:
-# Example 1: Default VM Creation
-# Creates a VM using default parameters:
-# kvm::make_vm_template_now_from_ubuntu_com
-#
-# Example 2: Fully Customized VM
-# Creates a VM with 8 GB RAM, 4 CPUs, 250 GB disk, using Ubuntu 20.04 LTS, Kubuntu flavor:
-# kvm::make_vm_template_now_from_ubuntu_com --ram 8192 --cpus 4 --disk 250 --flavor ubuntu --version 20.04 --role desktop
-#
-# Example 3: Interactive VM Setup
-# Starts an interactive session to manually specify VM settings during creation:
-# kvm::make_vm_template_now_from_ubuntu_com --ask YES
-#
-# Detailed Steps:
-# 1. Parameter Parsing: Parses and applies provided command-line arguments to override default settings.
-# 2. Dependency Check: Verifies all required software and dependencies are installed.
-# 3. ISO Retrieval: Downloads or locates the specified Ubuntu ISO, depending on version and flavor.
-# 4. VM Configuration: Sets up the VM according to the specified parameters including network and storage.
-# 5. Installation Process: Initiates the installation of the Ubuntu OS on the VM using the virt-install tool.
-# 6. Logging and Cleanup: Logs the setup process and cleans up any temporary files created during the installation.
-#
-# Error Handling:
-# Implements error checks at each step to ensure any issues are addressed, such as missing dependencies or download errors.
-#
-#
-# Notes
-#
-#     The function is part of a larger system presumably dealing with VM management, and it 
-#     expects certain utilities and conventions to be present in the environment.
-#     It is designed to be flexible with various Ubuntu versions and handles different 
-#     installation (preseed.cfg or autoinstall.yaml) methods based on the version.
-#     Error handling is incorporated to manage issues during the VM creation process.
-#     The function includes logging capabilities for tracking the VM creation process.
-#
-#     Please note that the various Ubuntu versions may or may  not work with the preseed.cfg file
-#     or the autoinstall.yaml correctly as Canonical changes the way the installer works constantly.
-#     For stability and predictability please refer to Debian instead. Also please note that the
-#     automatic installations are created per the Ubuntu documentation, and you may experience issues
-#     with the preseed.cfg file or the autoinstall.yaml file anyway as the documentation appears incomplete.
-#
-# Globals: ${ubuntu_flavor} ${_role} ${_task} ${_cpu} ${_mem} ${_dsk} ${permanent_download_dir} ${_saveto} ${CloudConfigDir} ${bin_virt_install} ${virt_net}
-# End of Documentation
+	# Description: 
+	# Automates the creation of a virtual machine (VM) template using Ubuntu as the base OS on a KVM host.
+	# This function is ideal for quickly setting up virtual environments with custom configurations.
+	# This function should be used on a Qemu/KVM virtual host that the virtual guest is to be used on.
+	# NOTE: QCOW2 is a storage format for virtual machine disk images.
+	# QCOW stands for QEMU copy on write. The QCOW2 format decouples the physical storage
+	# layer from the virtual layer by adding a mapping between logical and physical blocks.
+	# NOTE2: Kernel-based Virtual Machine (KVM) is an open source virtualization technology built into Linux®.
+	# Specifically, KVM lets you turn Linux into a hypervisor that allows a host machine to run multiple,
+	# isolated virtual environments called guests or virtual machines (VMs). KVM is part of Linux.
+	# For complete info: https://www.redhat.com/en/topics/virtualization/what-is-KVM
+	#
+	# Prerequisites:
+	# - Must be run on a Qemu/KVM host with QEMU and KVM installed and configured.
+	# - Internet access is required for downloading the Ubuntu ISO file.
+	#   Alternatively, the ISO file can be downloaded manually and placed in a specified location.
+	#   The default location is /var/lib/libvirt/boot/.
+	# - The virt-install tool must be available on the system.
+	# - The function should be run with sudo or as the root user.
+	#
+	# Notes on QCOW2:
+	# - QCOW2 (QEMU Copy On Write version 2) is used for VM disks. It offers features like snapshot support and dynamic disk size allocation.
+	#
+	# Notes on KVM:
+	# - Kernel-based Virtual Machine (KVM) is a Linux kernel module that allows the kernel to function as a hypervisor. 
+	# - More details on KVM: https://www.redhat.com/en/topics/virtualization/what-is-KVM
+	#
+	# Parameters:
+	# --ram <value>           : Sets the VM's RAM in megabytes (default: 2048 MB).
+	# --cpus <value>          : Sets the number of CPU cores (default: 2).
+	# --disk <value>          : Sets the disk size in gigabytes (default: 100 GB).
+	# --flavor <value>        : Specifies the Ubuntu flavor (default: 'ubuntu').
+	# --role <value>          : Specifies the VM's role (e.g., desktop, server) (default: 'server').
+	# --version <value>       : Specifies the Ubuntu version; uses the latest LTS if not specified.
+	# --location <value>      : Override the default location for downloading or accessing the ISO.
+	# --ask <value>           : Enables interactive mode for manual input during setup (default: 'NO').
+	# --desktop_environment   : Specifies the desktop environment for desktop VMs.
+	# --server_role           : Specifies the server role for server VMs.
+	#
+	# Defaults:
+	# The function uses predefined defaults which can be overridden by specifying parameters.
+	#
+	# Usage Examples:
+	# Example 1: Default VM Creation
+	# Creates a VM using default parameters:
+	# kvm::make_vm_template_now_from_ubuntu_com
+	#
+	# Example 2: Fully Customized VM
+	# Creates a VM with 8 GB RAM, 4 CPUs, 250 GB disk, using Ubuntu 20.04 LTS, Kubuntu flavor:
+	# kvm::make_vm_template_now_from_ubuntu_com --ram 8192 --cpus 4 --disk 250 --flavor ubuntu --version 20.04 --role desktop
+	#
+	# Example 3: Interactive VM Setup
+	# Starts an interactive session to manually specify VM settings during creation:
+	# kvm::make_vm_template_now_from_ubuntu_com --ask YES
+	#
+	# Detailed Steps:
+	# 1. Parameter Parsing: Parses and applies provided command-line arguments to override default settings.
+	# 2. Dependency Check: Verifies all required software and dependencies are installed.
+	# 3. ISO Retrieval: Downloads or locates the specified Ubuntu ISO, depending on version and flavor.
+	# 4. VM Configuration: Sets up the VM according to the specified parameters including network and storage.
+	# 5. Installation Process: Initiates the installation of the Ubuntu OS on the VM using the virt-install tool.
+	# 6. Logging and Cleanup: Logs the setup process and cleans up any temporary files created during the installation.
+	#
+	# Error Handling:
+	# Implements error checks at each step to ensure any issues are addressed, such as missing dependencies or download errors.
+	#
+	#
+	# Notes
+	#
+	#     The function is part of a larger system presumably dealing with VM management, and it 
+	#     expects certain utilities and conventions to be present in the environment.
+	#     It is designed to be flexible with various Ubuntu versions and handles different 
+	#     installation (preseed.cfg or autoinstall.yaml) methods based on the version.
+	#     Error handling is incorporated to manage issues during the VM creation process.
+	#     The function includes logging capabilities for tracking the VM creation process.
+	#
+	#     Please note that the various Ubuntu versions may or may  not work with the preseed.cfg file
+	#     or the autoinstall.yaml correctly as Canonical changes the way the installer works constantly.
+	#     For stability and predictability please refer to Debian instead. Also please note that the
+	#     automatic installations are created per the Ubuntu documentation, and you may experience issues
+	#     with the preseed.cfg file or the autoinstall.yaml file anyway as the documentation appears incomplete.
+	#
+	# Globals: ${ubuntu_flavor} ${_role} ${_task} ${_cpu} ${_mem} ${_dsk} ${permanent_download_dir} ${_saveto} ${CloudConfigDir} ${bin_virt_install} ${virt_net}
+	# End of Documentation
 
 	# Set default values for VM T-Shirts sizes (may vary by OS)...
 	: ${_flavor="ubuntu"} 				        # This is the default flavor of Ubuntu to use.
 	: ${_role:="server"}                                    # This is the default role of the Ubuntu VM to create.
 	#: ${_UserDesktopEnvironmentSelection:="ubuntu-desktop"} # This is the default task to perform on the Ubuntu VM.
+	#: ${_UserServerEnvironemtSelection:="ssh-server"} 	 # This is the default server role for the Ubuntu VM.
 	: ${_cpu:="${_cpu:=2}"}                                 # This is the default number of CPUs to use.
 	: ${_mem:="${_mem:=2048}"}                              # This is the default amount of memory to use.
 	: ${_dsk:="${_dsk:=100}"} 				# This is the default size of the disk to use.
@@ -11881,13 +11884,12 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	: ${bin_virt_install:=$(type -p virt-install)} 		# This is the default location for the virt-install binary.
 	: ${virt_net="$(system::find_vm_bridge)"} 		# This is the default network to use for the VM.
 	: ${_ask="NO"} 						# This is the default for interactive mode for manual input during setup.
-	#: ${_UserServerEnvironemtSelection:="ssh-server"} 	# This is the default server role for the Ubuntu VM.
-	
+
 	# Set default values for VM T-Shirts sizes...
 	kvm::util::read_common_options ${*}
 
 	# Set specific options for Debian...
-	kvm::util::read_distro_options ${*}
+	kvm::util::read_distro_options --distro ubuntu ${*}
 
 	# Check that virtualization is supported on the host
 	dependency::virtualization
@@ -12004,7 +12006,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 		server | Server | SERVER )
 				system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than 23, so using cloud config to build server..."
 				system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using SERVER installer as requested..."
-				system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor ${_flavor:-"ubuntu"} --server-role ${_UserServerEnvironemtSelection:="ubuntu-server"} --ask ${_ask}
+				system::generate_cloudconfig --vm-name $(echo "${vm_name}" | grep -o '[0-9-]*')  --CloudConfigDir "${CloudConfigDir}" --flavor ${_flavor:-"ubuntu"} --server-role ${_UserServerEnvironemtSelection:="ubuntu-server"} --ask ${_ask}
 				
 				local _virt_cmd="
 				 "${bin_virt_install}" --name ${vm_name} 
@@ -12031,7 +12033,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	esac
 
 	# Clean up residual variables...
-	for i in  PRESEED_FILE vm_kernel vm_initrd source_url _task _role _cpu _dsk _mem _tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig CloudConfigDir _summary_message _saveto ; do unset $i ; done
+	for i in  _UserDesktopEnvironmentSelection _UserServerEnvironemtSelection PRESEED_FILE vm_kernel vm_initrd source_url _task _role _cpu _dsk _mem _tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig CloudConfigDir _summary_message _saveto ; do unset $i ; done
 }
 
 
@@ -13036,10 +13038,8 @@ template::preseed_cfg::late_command() {
 			# --------------------------------------------------- #
 			# C.4.12. Default preseed Addon Tasks
 			# --------------------------------------------------- #
-			# for Debian to work (ignored by Ubuntu)...
 			${_d_i_post_statment_ubunto_or_deb} \
 			in-target apt-get -y install git ; \
-			in-target apt-get -y install ${_task} ; \
 			in-target apt-get -y install dialog p7zip-full virt-what curl wget ; \
 			in-target apt-get -y install spice-vdagent qemu-guest-agent ; \
 			in-target apt-get -y install neofetch ; \

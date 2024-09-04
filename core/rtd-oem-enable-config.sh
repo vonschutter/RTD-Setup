@@ -10,7 +10,7 @@
 #::
 #::	Purpose: To enable configuration of a newly built linux install. This file will be referenced by
 #::		 either Debian setup (Debian , ubuntu, etc.), SUSE auto yast, or Anaconda (red Hat, Fedora etc.).
-#::		 This script configures the system to auto login, and run the systen configuration choices menu.
+#::		 This script configures the system to auto login, and run the system configuration choices menu.
 #::
 #::	Usage:	Simply execute this script to accomplish this task. No parameters required.
 #::
@@ -29,10 +29,10 @@
 # This script is intended to live in the ~/bin/ or /bin/ folder, alternatively in the $PATH.
 # By default this script is placed in /opt/rtd/core/
 #
-# NOTE: this script is run by the power tools system setup and therefore the oem tools are asumed to be present.
+# NOTE: this script is run by the power tools system setup and therefore the oem tools are assumed to be present.
 #
 # 1 - To see options to use the rtd library type: "bash _rtd_library --help"
-# 2 - To see usefull documentation on each function in this library: "bash _rtd_library --devhelp or --devhelp-gtk"
+# 2 - To see useful documentation on each function in this library: "bash _rtd_library --devhelp or --devhelp-gtk"
 
 if [[ $EUID -ne 0 ]]; then { echo "This script must be run as root" ; exit 1; } ; fi
 
