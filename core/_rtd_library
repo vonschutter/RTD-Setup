@@ -2968,8 +2968,19 @@ system::find_vm_bridge() {
 	#     The function uses grep to filter the network devices and ls to list them from /sys/class/net, 
 	#     which is a standard location for network interface information in Linux.
 	# End of documentation
+	
+	# Alternative short hand: 
+	# if ls /sys/class/net | grep '^br' | head -n 1 | xargs -I {} echo "bridge:{}" |grep br ; else echo default; fi
 
-	if ls /sys/class/net |grep br |grep -v virbr >/dev/null; then echo "bridge:$(ls /sys/class/net)" |grep br ; else echo default;fi
+	# Check for bridge interfaces
+	bridge=$(ls /sys/class/net | grep '^br' | head -n 1)
+	
+	# Output the first bridge found or "default" if none exists
+	if [[ -n "$bridge" ]]; then
+		echo "bridge:$bridge"
+	else
+		echo "default"
+	fi
 }
 
 
