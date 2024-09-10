@@ -1298,7 +1298,7 @@ system::generate_cloudconfig() {
 
 	# get default VM configurations options from the system::get_vm_config
 	system::get_vm_config
-	kvm::util::read_distro_options "$@"
+	kvm::util::read_distro_options --distribution ubuntu "$@"
 
 	# Directory for cloud config files, if not set, create a temporary directory and use that.
 	local CloudConfigDir="${CloudConfigDir:=$( mktemp -d /tmp/CloudConfig.XXXXXX )}"
@@ -5998,7 +5998,7 @@ system::download_and_manipulate_iso_debian() {
 	# End of Documentation
 
  	kvm::util::read_common_options "$@"
-	kvm::util::read_distro_options "$@"
+	kvm::util::read_distro_options --distribution debian "$@"
 	system::prepare_environment_for_iso_creation
 
 	# Determine the name of the ISO file to create, and wich iso to download using default values if none are provided.
@@ -6850,7 +6850,7 @@ rtd_oem_ubuntu_auto_install_iso_builder() {
 	kvm::util::read_common_options ${*} 
 
 	# Set specific options for Ubuntu...
-	kvm::util::read_distro_options ${*} 
+	kvm::util::read_distro_options --distribution ubuntu ${*} 
 
 	CONFIG=${_UserDesktopEnvironmentSelection}
 	system::log_item "Config set to: $CONFIG"
@@ -10777,6 +10777,11 @@ kvm::util::read_distro_options() {
 # Outputs: Status and error messages
 # Returns: 0 if successful, 1 if an error occurs
 # Usage: kvm::util::read_distro_options --desktop_environment @deepin-desktop-environment --server_role @web-server-environment --source https://dl.fedoraproject.org/pub/fedora/linux/releases/39/Everything/x86_64/os/
+# 
+# Please note that the desktop environment and server role options are distribution specific and may not be available for all distributions.
+# Therefore the function wiill attempt to determine the distribution from the calling function name and set the options accordingly, if
+# the distribution is not set explicitly.
+#
 # End of documentation
 
 	# Log the start of reading distribution specific options for KVM VM creation
@@ -10812,8 +10817,8 @@ kvm::util::read_distro_options() {
 	# If a distribution is not set, try to determine it from the calling function name
 	if [[ -z "${_distribution}" ]]; then
 		# List of distributions to check
-		system::log_item "Determining distribution from function name; looking for fedora, ubuntu, debian, suse, centos, rhel, or microsoft..."
-		distributions=("fedora" "ubuntu" "debian" "suse" "centos" "rhel" "microsoft")
+		system::log_item "Determining distribution from function name; looking for fedora, ubuntu, debian, suse, centos, rhel, zorin, or microsoft..."
+		distributions=("fedora" "ubuntu" "debian" "suse" "centos" "rhel" "microsoft" "zorin" )
 		
 		# Iterate over the distributions and check if the function name contains one of them
 		for distro in "${distributions[@]}"; do
@@ -11204,7 +11209,7 @@ make_kvm_virtual_machine_now_from_fedora_org() {
 	kvm::util::read_common_options ${*}
 
 	# Set specific options for Fedora...
-	kvm::util::read_distro_options ${*}
+	kvm::util::read_distro_options --distribution fedora ${*}
 
 	# Check that virtualization is supported on the host
 	dependency::virtualization
@@ -11304,7 +11309,7 @@ kvm::make_vm_template_now_from_redhat_com() {
 	kvm::util::read_common_options ${*}
 
 	# Set specific options for RedHat...
-	kvm::util::read_distro_options ${*}
+	kvm::util::read_distro_options --distribution redhat ${*}
 
 	# Check that virtualization is supported on the host
 	dependency::virtualization
@@ -11531,7 +11536,7 @@ kvm::make_vm_template_now_from_debian_org() {
 	kvm::util::read_common_options ${*}
 
 	# Set specific options for Debian...
-	kvm::util::read_distro_options ${*}
+	kvm::util::read_distro_options --distribution debian ${*}
 
 	# Check that virtualization is supported on the host
 	dependency::virtualization
@@ -11755,7 +11760,7 @@ kvm::make_vm_template_now_from_zorin() {
 	kvm::util::read_common_options ${*}
 
 	# Set specific options for Debian...
-	kvm::util::read_distro_options ${*}
+	kvm::util::read_distro_options --distribution ubuntu ${*}
 
 	kvm::get_zorin_iso || ( dialog::display_error "💥 - An ERROR has occurred. Unable to get Zorin ISO file. Please press [OK] to continue..." && return 1 )
 
@@ -12108,7 +12113,7 @@ kvm::make_vm_template_now_from_microsoft() {
 	kvm::util::read_common_options ${*}
 
 	# Set specific options for Debian...
-	kvm::util::read_distro_options ${*}
+	kvm::util::read_distro_options --distribution microsoft ${*}
 
 	# Check that virtualization is supported on the host
 	dependency::virtualization
