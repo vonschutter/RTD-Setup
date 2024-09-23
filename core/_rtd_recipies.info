@@ -1186,13 +1186,13 @@ Single_Install_MEGA.nz_Encrypted_Cloud_Storage (){
 			write_information "Downloading ${product} from: ${URL}"
 		elif hostnamectl | grep -i "openSUSE" ; then
 			# Grab the SUSE name and version and format it like Mega does their download URL...
-			TGT="$(hostnamectl |grep -i suse |head -n 1|cut -f5,6,7 -d' ')" ; TGT=${TGT// /_}
-			URL="https://mega.nz/linux/MEGAsync/${TGT}/x86_64/${product}-${TGT}.x86_64.rpm"
+			TGT=$(hostnamectl | awk -F ': ' '/Operating System:/ {gsub(/ /, "_", $2); print $2}')
+			URL="https://mega.nz/linux/repo/${TGT}/x86_64/${product}-${TGT}.x86_64.rpm"
 			write_information "Downloading ${product} from: ${URL}"
 		elif hostnamectl | grep -i "Fedora" ; then
 			# Grab the Fedora name and version and format it like Mega does their download URL...
-			TGT="$(hostnamectl |grep -i fedora |tail -n 2|cut -f5,6 -d' ')" ; TGT=${TGT// /_}
-			URL="https://mega.nz/linux/MEGAsync/${TGT::-2}/x86_64/${product}-${TGT::-2}.x86_64.rpm"
+			TGT="$(hostnamectl |grep -i Fedora |cut -f7 -d' ')_$(hostnamectl |grep -i Fedora |cut -f9 -d' ')"
+			URL="https://mega.nz/linux/repo/${TGT}/x86_64/${product}-${TGT}.x86_64.rpm"
 			write_information "Downloading ${product} from: ${URL}"
 		else
 			write_error "I am not sure how to find the Mega sync download for $( hostnamectl |grep "Operating") "
@@ -1202,7 +1202,11 @@ Single_Install_MEGA.nz_Encrypted_Cloud_Storage (){
 		fi
 
 		# If a known distributio was found and URL set, use "software::vendor_download_and_install" function to install app...
-		[[ -n "${URL}" ]] && software::vendor_download_and_install ${URL}
+		if [[ -n "${URL}" ]] && software::vendor_download_and_install ${URL}; then
+			write_information "MEGA software installed successfully..."
+		else
+			write_error "MEGA software did not install correctly..."
+		fi
 	}
 	fetch_mega_file megasync
 	fetch_mega_file megacmd
