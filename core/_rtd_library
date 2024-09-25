@@ -1677,6 +1677,14 @@ dependency::virtualization() {
 		else
 			dependency::virtualization_log_status "KVM and QEMU are available..."
 		fi
+
+		if ! command -v virt-install >/dev/null 2>&1; then
+			dependency::virtualization_log_status "virt-install not found. Installing virt-install for $_OS_NAME..."
+			software::add_native_package "virt-install"
+			:${BIN_VIRT_INSTALL:=$(type -P virt-install)}
+		else
+			dependency::virtualization_log_status "virt-install is available..."
+		fi
 		;;
 	Fedora | RHEL | CentOS)
 		if ! command -v qemu-system-x86_64 >/dev/null 2>&1; then
@@ -1685,6 +1693,14 @@ dependency::virtualization() {
 			sudo systemctl enable --now libvirtd
 		else
 			dependency::virtualization_log_status "KVM and QEMU are available..."
+		fi
+
+		if ! command -v virt-install >/dev/null 2>&1; then
+			dependency::virtualization_log_status "virt-install not found. Installing virt-install for $_OS_NAME..."
+			software::add_native_package "virt-install"
+			:${BIN_VIRT_INSTALL:=$(type -P virt-install)}
+		else
+			dependency::virtualization_log_status "virt-install is available..."
 		fi
 		;;
 	Debian | Ubuntu | TUXEDO | *)
@@ -1699,6 +1715,14 @@ dependency::virtualization() {
 			sudo systemctl enable --now libvirtd
 		else
 			dependency::virtualization_log_status "KVM and QEMU are available..."
+		fi
+
+		if ! command -v virt-install >/dev/null 2>&1; then
+			dependency::virtualization_log_status "virt-install not found. Installing virt-install for $_OS_NAME..."
+			software::add_native_package "virt-install"
+			:${BIN_VIRT_INSTALL:=$(type -P virt-install)}
+		else
+			dependency::virtualization_log_status "virt-install is available..."
 		fi
 		;;
 	esac
@@ -3512,19 +3536,14 @@ system::get_Windows_Product_Key() {
 
 
 system::wait_for_internet_availability() {
-	# Description: Function that, when called, will wait for an active internet connection
-	# to be available before before continuing. Most softwrare install activities
-	# need an active internet connection to be able to install and update software.
-	# Naturally, some in house loads use local mirrors, but if you can see the
-	# internet, you would have access to your own ropositories as well...
+	# Description: Waits for an active internet connection before proceeding.
 	# Globals:
+	#   _OEM_TEST_IPS: Optional, space-separated list of IPs for connectivity testing.
 	# Arguments: None
-	# Outputs:
-	# Returns:
-	# Usage: system::wait_for_internet_availability
-	# End of documentation
+	# Outputs: Status messages regarding connectivity.
+	# Returns: 0 if internet is available, 1 otherwise.
 
-	# Array of IPs for testing internet connectivity (may be set globally)
+	# Array of IPs for testing internet connectivity (can be set globally)
 	local -a test_ips
 	if [[ -n "$_OEM_TEST_IPS" ]]; then
 		IFS=' ' read -r -a test_ips <<<"$_OEM_TEST_IPS"
@@ -3536,39 +3555,51 @@ system::wait_for_internet_availability() {
 	local -i attempt=1
 	local ip
 
+	# Print status message
 	write_status "🌐 Checking for internet connectivity..."
 
-	# Do ping test...
+	# Check for dependencies
+	dependency::command_exists curl || { write_error "Missing dependency: curl"; return 1; }
+	dependency::command_exists jq || { write_error "Missing dependency: jq"; return 1; }
+
+	# Iterate through each IP and attempt to establish connectivity
 	for ip in "${test_ips[@]}"; do
-		# Will partially work only with ping, but try to enusre cmd is available...
-		dependency::command_exists curl || _missingcmd="curl"
-		dependency::command_exists jq || _missingcmd="jq"
 		attempt=1
 		while ((attempt <= max_attempts)); do
-			if ping -c 1 -W 1 "$ip" &>/dev/null; then
-				# Lookup external IP...
-				write_status "🌐 Internet ping access confirmed to IP: $ip"
-				local response
-				response=$(curl -s https://httpbin.org/ip)
-				RTD_INTERNET_IP=$(echo "$response" | jq -r '.origin')
-				if [[ -n "$RTD_INTERNET_IP" ]]; then
-					write_status "🌐 Internet access confirmed through IP: $RTD_INTERNET_IP"
-					export RTD_INTERNET_IP
-				else
-					write_status "❗📶 Could not determine external egress IP. Missing: $_missingcmd ?"
-				fi
+		if ping -c 1 -W 1 "$ip" &>/dev/null; then
+			write_status "🌐 Internet ping access confirmed to IP: $ip"
+
+			# Attempt to fetch the external IP address
+			local response
+			response=$(curl -s --connect-timeout 5 https://httpbin.org/ip)
+			
+			if [[ $? -eq 0 ]]; then
+			RTD_INTERNET_IP=$(echo "$response" | jq -r '.origin' 2>/dev/null)
+
+			if [[ -n "$RTD_INTERNET_IP" ]]; then
+				write_status "🌐 Internet access confirmed through IP: $RTD_INTERNET_IP"
+				export RTD_INTERNET_IP
 				return 0
 			else
-				write_status "📶 Attempt $attempt of $max_attempts failed to reach $ip"
-				((attempt++))
-				sleep 10
+				write_status "❗📶 Could not parse external IP address. Check: jq availability or response format."
 			fi
+			else
+			write_status "❗📶 Failed to fetch external IP using curl. Retrying..."
+			fi
+		else
+			write_status "📶 Attempt $attempt of $max_attempts failed to reach $ip"
+		fi
+
+		((attempt++))
+		sleep 10
 		done
 	done
 
+	# Error message if all attempts fail
 	write_error "❗📶 Unable to confirm internet access after $max_attempts attempts on each tested IP."
 	return 1
 }
+
 
 system::io_on_notify_wait() {
 	# Description: Function that, when called, will wait for a disk change
@@ -6415,7 +6446,8 @@ system::get_tgt_ubuntu_version() {
 	# Check if a version of Ubuntu was specified, otherwise make sure it is (default to latest LTS)...
 	if [[ -z ${_tgt_ubuntu_ver} ]]; then
 		write_information "🐧 - No version of Ubuntu specified as a parameter..."
-		if [[ ${_ask} == "YES" ]]; then
+		case ${_ask} in
+		"yes" | "YES" | "Yes" | "y" | "Y")
 			write_information "🐧 - Requested to ask for Ubuntu version; prompting for version of Ubuntu to use..."
 			extra_option="Manually_specify"
 
@@ -6427,12 +6459,16 @@ system::get_tgt_ubuntu_version() {
 			# Handle the user's menu selection or cancellation based on the captured status
 			case $dialog_status in
 			$DIALOG_CANCEL)
-				echo "Dialog was cancelled."
-				return
+				echo "Dialog was cancelled. ($dialog_status)"
+				write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
+				_tgt_ubuntu_ver=${all_lts_versions[-1]}
+				return 
 				;;
 			$DIALOG_ESC)
-				echo "Dialog was escaped."
-				return
+				echo "Dialog was escaped. ($dialog_status)"
+				write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
+				_tgt_ubuntu_ver=${all_lts_versions[-1]}
+				return 
 				;;
 			esac
 
@@ -6443,21 +6479,27 @@ system::get_tgt_ubuntu_version() {
 				# Capture and handle the exit status of the input dialog
 				case $? in
 				$DIALOG_CANCEL)
-					echo "Input was cancelled."
-					return
+					echo "Input was cancelled. ($dialog_status)"
+					write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
+					_tgt_ubuntu_ver=${all_lts_versions[-1]}
+					return 
 					;;
 				$DIALOG_ESC)
-					echo "Input was escaped."
-					return
+					echo "Input was escaped. ($dialog_status)"
+					write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
+					_tgt_ubuntu_ver=${all_lts_versions[-1]}
+					return 
 					;;
 				esac
 			fi
 
 			clear
-		else
+			;;
+		"no" | "NO" | "No" | "n" | "N")
 			write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
 			_tgt_ubuntu_ver=${all_lts_versions[-1]}
-		fi
+			;;
+		esac
 	fi
 
 	# Validate Ubuntu LTS version selections against available versions (manual selection may have occurred)...
@@ -11493,13 +11535,14 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	dependency::virtualization
 
 	# get the version of Ubuntu to use; sets variable _tgt_ubuntu_ver...
-	system::get_tgt_ubuntu_version
+	system::get_tgt_ubuntu_version 
 
 	# Format the name of the VM to be created...
 	local vm_name="Template_${_flavor}_${_tgt_ubuntu_ver}_${_UserDesktopEnvironmentSelection}_${_UserServerEnvironemtSelection}_${_role}_$(date +%Y-%m-%d-%s)"
 
 	# ensure local media:          [/where/to/look/first]
 	system::get_ubuntu_media --dir ${permanent_download_dir} --flavor ${_flavor} --version ${_tgt_ubuntu_ver} --type ${_role}
+	: ${iso:="$permanent_download_dir/$iso_filename"}
 
 	# Prepare the summary message for the VM creation...
 	_summary_message="
@@ -11604,20 +11647,20 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	server | Server | SERVER)
 		system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than 23, so using cloud config to build server..."
 		system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using SERVER installer as requested..."
-		system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor ${_flavor:-"ubuntu"} --server-role ${_UserServerEnvironemtSelection:="ubuntu-server"} --ask ${_ask}
-		#--vm-name $(echo "${vm_name}" | grep -o '[0-9-]*')
+		system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor ${_flavor:-"ubuntu"} --server-role ${_UserServerEnvironemtSelection:="ubuntu-server"} --ask ${_ask} 
+		
 		local _virt_cmd="
-				 "${bin_virt_install}" --name ${vm_name}
-					--vcpus "${_cpu}"
-					--memory "${_mem}"
-					--network "${virt_net}"
-					--disk size="${_dsk}"
-					--os-variant="ubuntu24.04"
-					--video "virtio" --channel "spicevmc"
-					--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom"
-					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd"
-					--extra-args "autoinstall"
-					--noautoconsole"
+			${bin_virt_install} --name  ${vm_name:-"Ubuntu-Server-${_tgt_ubuntu_ver}-$(date +%Y-%m-%d-%s)"} 
+			--vcpus "${_cpu}" 
+			--memory "${_mem}" 
+			--network "${virt_net}" 
+			--disk size="${_dsk}" 
+			--os-variant="ubuntu24.04" 
+			--video "virtio" --channel "spicevmc" 
+			--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" 
+			--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" 
+			--extra-args "autoinstall" 
+			--noautoconsole"
 
 		# Log the VM launch command...
 		system::log_item "VM launch command issued:
@@ -11625,7 +11668,17 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 
 		# Launch the VM and log the output...
 		{
-			${_virt_cmd} || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
+			"${bin_virt_install}" --name  ${vm_name:-"Ubuntu-Server-${_tgt_ubuntu_ver}-$(date +%Y-%m-%d-%s)"}  \
+			--vcpus "${_cpu}" \
+			--memory "${_mem}" \
+			--network "${virt_net}" \
+			--disk size="${_dsk}" \
+			--os-variant="ubuntu24.04" \
+			--video "virtio" --channel "spicevmc" \
+			--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
+			--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
+			--extra-args "autoinstall" \
+			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 		} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 		;;
 	esac
