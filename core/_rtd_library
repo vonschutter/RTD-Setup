@@ -74,17 +74,17 @@ export RTD_VERSION="2.04"
 30    is_software_package_installed                      ;     Checks to see if a software package already is installed
 31    kvm::backup_all_running_vm                         ;     Backup all running virtual machines
 32    kvm::get_zorin_iso                                 ;     Get the Zorin OS ISO file (latest or prompt user for selection	)
-33    kvm::make_vm_template_now_from_debian_org          ;     Generate a Debian virtual machine template directly from debian.org
-34    kvm::make_vm_template_now_from_microsoft           ;     Make a virtual machine running Windows
+33    kvm::make_vm_now_from_debian_org          ;     Generate a Debian virtual machine template directly from debian.org
+34    kvm::make_vm_now_from_microsoft           ;     Make a virtual machine running Windows
 35    kvm::make_vm_template_now_from_redhat_com          ;     Generate a RedHat (or compatible) vm template to be cloned later
-36    kvm::make_vm_template_now_from_ubuntu_com          ;     Immediately create a virtual machine from ubuntu.com
-37    kvm::make_vm_template_now_from_zorin               ;     Generate a Zorin virtual machine template directly from zorinos.com
+36    kvm::make_vm_now_from_ubuntu_com          ;     Immediately create a virtual machine from ubuntu.com
+37    kvm::make_vm_now_from_zorin               ;     Generate a Zorin virtual machine template directly from zorinos.com
 38    kvm::util::read_common_options                     ;     Read common options for kvm functions
 39    kvm::util::read_distro_options                     ;     Read distro options for kvm functions (non common)
 40    list_loaded_internal_functions                     ;     List all internal library functions loaded... for debugging/support purposes.
 41    list_loaded_software_functions                     ;     List all software (_rtd_recipes) functions loaded... for debugging/support purposes.
-42    make_kvm_virtual_machine_now_from_fedora_org       ;     Generate a Fedora virtual machine template directly from Fedora.org
-43    make_kvm_virtual_machine_now_from_opensuse_org     ;     Generate an OpenSUSE virtual machine template directly from opensuse.org
+42    kvm::make_vm_now_from_fedora_org       ;     Generate a Fedora virtual machine template directly from Fedora.org
+43    kvm::make_vm_now_from_opensuse_org     ;     Generate an OpenSUSE virtual machine template directly from opensuse.org
 44    oem::check_boot_splash_screen_enable               ;     Check if the boot splash screen should be enabled
 45    oem::deploy_themes                                 ;     Deploy themes to the system supplied by OEM (see RTD-Setup/themes)
 46    oem::register_all_tools                            ;     Register all OEM scripts so that they are accessible by terminal
@@ -96,7 +96,7 @@ export RTD_VERSION="2.04"
 52    rtd_oem_pause                                      ;     Pause function
 53    rtd_oem_release_upgrade                            ;     Attempt to perform a release upgrade for supported systems
 54    rtd_oem_remove_non_western_latin_fonts             ;     Remove all non-latin fonts from a distribution. for the western world these are not needed and slow the system
-55    rtd_oem_setup_brand_splash_screen                  ;     Brands splash screens on a bootable distribution install media
+55    oem::setup_brand_splash_screen                  ;     Brands splash screens on a bootable distribution install media
 56    rtd_oem_turn_on_gui_network_management             ;     Set network managers to manage network interfaces if not set
 57    rtd_oem_ubuntu_auto_install_iso_builder            ;     Creates automatic install media for Ubuntu
 58    rtd_ppa_checker                                    ;     Checks PPA archives on supported distributions
@@ -160,7 +160,7 @@ export RTD_VERSION="2.04"
 116   system::generate_ks_cfg_file                       ;     Creates a kickstart file for fedora
 117   system::get_tgt_ubuntu_version                     ;     Get the target version of Ubuntu to download (latest or propt user for selection)
 118   system::get_ubuntu_media                           ;     Get the Ubuntu media (ISO) for the target version (detected or selected)
-119   system::get_vm_config                              ;     Get the configuration for a virtual machine
+119   kvm::get_vm_config_preferences                              ;     Get the configuration for a virtual machine
 120   system::get_Windows_Product_Key                    ;     Retrieves a Microsoft Windows product key if it is stored in BIOS (common for OEM)
 121   system::install_missing_commands                   ;     Install missing commands on the system
 122   system::io_on_notify_wait                          ;     Wait for a disk change and then execute a command
@@ -198,7 +198,7 @@ export RTD_VERSION="2.04"
 154   term::animate_while_command                        ;     Display terminal output during a silent task execution
 155   term::start_animation                              ;     Start simple animation to let user know a silent action is currently executing
 156   term::stop_animation                               ;     Stop simple animation to let user know a silent action is done executing
-157   test_iso_boot_media                                ;     Test bootable media using QEMU
+157   tool::test_iso_boot_media                                ;     Test bootable media using QEMU
 158   tool::compress_all_items_here                      ;     Compress all items in the current folder
 159   tool::compress_provided_items                      ;     Compress provided items
 160   tool::recompress_all_items_in_folder               ;     Recompress all items in a folder a desired format
@@ -2031,7 +2031,7 @@ system::download_and_manipulate_iso_debian() {
 		rtd_oem_pause 1
 	}
 
-	rtd_oem_setup_brand_splash_screen "$tmp_disc_dir/splash.png" "${_FULLNAME:-"RunTime Data"} OEM Install: $PREFERENCE"
+	oem::setup_brand_splash_screen "$tmp_disc_dir/splash.png" "${_FULLNAME:-"RunTime Data"} OEM Install: $PREFERENCE"
 	system::create_iso_image_debian --target-iso "$target_iso" --iso-source-dir "$tmp_disc_dir"
 	ret_val=$?
 	if [[ $ret_val -eq 255 ]]; then
@@ -2131,7 +2131,7 @@ system::create_iso_image_debian() {
 		rtd_oem_pause 1
 	}
 
-	test_iso_boot_media "${target_iso}"
+	tool::test_iso_boot_media "${target_iso}"
 
 	while true; do
 		exec 3>&1
@@ -2338,12 +2338,12 @@ system::make_preseed_cfg() {
 	touch "${PRESEED_FILE}" 2>&1 | tee -a "${_LOGFILE}"
 	touch "${TASK_FILE}" 2>&1 | tee -a "${_LOGFILE}"
 
-	# system::get_vm_config will load the preferences from the config file if it exists
+	# kvm::get_vm_config_preferences will load the preferences from the config file if it exists
 	# otherwise it will use the defaults set in the function.
 	# it will return predefined variables that can be used in the preseed file.
 	if [[ "$_ask" == "YES" || "$_ask" == "Yes" || "$_ask" == "yes" ]]; then
 		system::log_item "Prompting for configuration options..."
-		if system::get_vm_config --ask || dialog::yesno "Cancelled or something went wrong... continue with defaults?"; then
+		if kvm::get_vm_config_preferences --ask || dialog::yesno "Cancelled or something went wrong... continue with defaults?"; then
 			exit_status=$?
 
 			case $exit_status in
@@ -2365,7 +2365,7 @@ system::make_preseed_cfg() {
 		fi
 	else
 		system::log_item "Using default configuration options..."
-		if ! system::get_vm_config; then
+		if ! kvm::get_vm_config_preferences; then
 			system::log_item "Failed to get configuration options from saved preferences..."
 		fi
 	fi
@@ -2465,8 +2465,8 @@ system::generate_cloudconfig() {
 	#
 	# End of Documentation
 
-	# get default VM configurations options from the system::get_vm_config
-	system::get_vm_config
+	# get default VM configurations options from the kvm::get_vm_config_preferences
+	kvm::get_vm_config_preferences
 	kvm::util::read_distro_options --distribution ubuntu "$@"
 
 	# Directory for cloud config files, if not set, create a temporary directory and use that.
@@ -2579,7 +2579,7 @@ system::generate_ks_cfg_file() {
 
 	system::log_item "Called by: ${FUNCNAME[1]}"
 	# Get vm config standard options
-	system::get_vm_config
+	kvm::get_vm_config_preferences
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
@@ -2750,7 +2750,7 @@ system::generate_autoyast_file() {
 
 	# Get vm config standard options
 	system::log_item "Called by: ${FUNCNAME[1]} with options $*"
-	system::get_vm_config || system::log_item "Failed to get configuration options from saved preferences..."
+	kvm::get_vm_config_preferences || system::log_item "Failed to get configuration options from saved preferences..."
 
 	# Read input and set specific options for SUSE... (roles, desktops, etc.)
 	kvm::util::read_distro_options --distribution suse ${*}
@@ -2782,166 +2782,7 @@ system::generate_autoyast_file() {
 	return 0
 }
 
-system::get_vm_config() {
-	# Description: Retrieves VM configuration values from a configuration file or defaults.
-	#
-	# This function loads VM configuration values from a specified configuration file or uses
-	# default values if the configuration file is not found. It can also prompt the user to
-	# input these values interactively.
-	#
-	# Globals:
-	#	- _OEM_USER_VM_PREFERENCES: Path to the user VM preferences file.
-	#	- _TLA: Three-letter acronym for the project.
-	# Arguments:
-	#	- --ask (optional): Prompts the user to input configuration values interactively.
-	# Outputs:
-	#	- Configuration values loaded into variables.
-	# Returns:
-	#	- 0 on success.
-	#	- 1 on error or user cancellation.
-	#
-	# Usage:
-	#	system::get_vm_config
-	#	system::get_vm_config --ask
-	#
-	# Example:
-	#	system::get_vm_config
-	#	system::get_vm_config --ask
-	#
-	# Notes:
-	#	- The function uses a configuration file to load saved preferences or defaults to predefined values.
-	#	- If the --ask flag is provided, it will prompt the user to input configuration values interactively using dialog.
-	#	- Configuration values are logged and saved for troubleshooting and reuse.
-	#
-	# End of Documentation
 
-	local _config_file=${_OEM_USER_VM_PREFERENCES:-"/home/${SUDO_USER}/.config/${_TLA,,}/build_defaults.inf"}
-	if [[ "$1" == "--ask" ]]; then
-		local _ask="YES"
-	else
-		local _ask="NO"
-	fi
-
-	system::log_item "Loading Global Config if available otherwise use defaults..."
-	Preference_DiskEncryption="${_ENCRYPT_DISK:-"YES"}"
-	Preference_Disk_Password="${_TEMP_DISK_PASSWORD:-"letmein1234"}"
-	Preference_InitialUser="${_OEM_USER:-"tangarora"}"
-	Preference_InitialUserFullName="${_OEM_USER_FULLNAME:-"RTD User"}"
-	Preference_InitialUserGroup="${_OEM_USER_GROUP:-"sudo"}"
-	Preference_InitialUserPassword="${_OEM_USER_PASSWORD:-"letmein1234"}"
-	Preference_InitialKeyboardLayout="${_OEM_USER_KEYBOARD_LAYOUT:-"us"}"
-	Preference_InitialLanguage="${_OEM_USER_LANGUAGE:-"en_US"}"
-	Preference_InitialLanguageEncoding="${_OEM_USER_LANGUAGE:-"UTF8"}"
-	Preference_InitialTimeZone="${_OEM_USER_TIMEZONE:-"Etc/UTC"}"
-	Preference_Wireless_ID="${_OEM_WIRELESS_ID:-"loader"}"
-	Preference_Wireless_Password="${_OEM_WIRELESS_PASSWORD:-"letmein1234"}"
-	Preference_Role="${_role:-"default"}"
-	Preference_CopySSHKey="${_OEM_COPY_SSH_KEY:-"NO"}"
-
-	system::log_item "Load saved preferences from the config file everriding the _branding global config or defaults for preseed file..."
-	[[ -f "${_config_file}" ]] && system::read_config "${_config_file}" || system::log_item "Failed to load config file: ${_config_file}"
-
-	# If OS Role is set (by function for auto install), then override the config file with the role:
-	[[ -n $_role ]] && Preference_Role="${_role}"
-
-	# If the user has requested to be asked for the preseed file, then ask them:
-	if [[ "$_ask" == "YES" ]]; then
-
-		system::log_item "'ask' is requested, requesting user input for the preseed file:"
-		preseed_choices=$(dialog --backtitle "$BRANDING" --title "RTD Preseed Creator" --mixedform "Enter your preferences in to the form below. Please note that the password fields do not show anything but will capture what you type in" 22 80 0 \
-			"DiskEncryption (YES/NO):" 1 1 "${Preference_DiskEncryption}" 1 40 40 0 0 \
-			"Disk Unlock Password (temp):" 2 1 "${Preference_Disk_Password}" 2 40 40 0 0 \
-			"Admin User Name:" 3 1 "${Preference_InitialUser}" 3 40 40 0 0 \
-			"Admin User Full Name:" 4 1 "${Preference_InitialUserFullName}" 4 40 40 0 0 \
-			"Admin User Initial UserGroup:" 5 1 "${Preference_InitialUserGroup}" 5 40 40 0 0 \
-			"Admin User Password (8 30 char):" 6 1 "${Preference_InitialUserPassword}" 6 40 128 0 0 \
-			"Preferred Keyboard Layout:" 7 1 "${Preference_InitialKeyboardLayout}" 7 40 40 0 0 \
-			"Preferred Language" 8 1 "${Preference_InitialLanguage}" 8 40 40 0 0 \
-			"Preferred Encoding" 9 1 "${Preference_InitialLanguageEncoding}" 9 40 40 0 0 \
-			"Initial Time Zone:" 10 1 "${Preference_InitialTimeZone}" 10 40 40 0 0 \
-			"Wireless Network SSID:" 11 1 "${Preference_Wireless_ID}" 11 40 40 0 0 \
-			"Wireless Network Password:" 12 1 "${Preference_Wireless_Password}" 12 40 40 0 0 \
-			"Role (Default, KVM, Minecraft):" 13 1 "${Preference_Role}" 13 40 40 0 0 \
-			"Copy you ssh public key to host?" 14 1 "${Preference_CopySSHKey}" 14 40 40 0 0 \
-			3>&1 1>&2 2>&3)
-		exit_status=$?
-
-		clear
-
-		case $exit_status in
-		0)
-			system::log_item "Save coices and continue..."
-			;;
-		1)
-			system::log_item "[Cancel] pressed; not updating or changing any configuration items..."
-			return 1
-			;;
-		255)
-			system::log_item "[ESC] pressed, exiting the dialog immediatley..."
-			return 1
-			;;
-		*)
-			system::log_item "[ERROR] Dialog closed or unexpected error."
-			rtd_oem_pause 1 "Dialog closed or unexpected error."
-			;;
-		esac
-
-		# Convert the dialog output to an array and asign the variables:
-		IFS=$'\n' read -r -d '' -a input_array <<<"$preseed_choices"
-		Preference_DiskEncryption=${input_array[0]}
-		Preference_Disk_Password=${input_array[1]}
-		Preference_InitialUser=${input_array[2]}
-		Preference_InitialUserFullName=${input_array[3]}
-		Preference_InitialUserGroup=${input_array[4]}
-		Preference_InitialUserPassword=${input_array[5]}
-		Preference_InitialKeyboardLayout=${input_array[6]}
-		Preference_InitialLanguage=${input_array[7]}
-		Preference_InitialLanguageEncoding=${input_array[8]}
-		Preference_InitialTimeZone=${input_array[9]}
-		Preference_Wireless_ID=${input_array[10]}
-		Preference_Wireless_Password=${input_array[11]}
-		Preference_Role=${input_array[12]}
-		Preference_CopySSHKey=${input_array[13]}
-
-		# Encrypt the user/admin password before saving & for use in the preseed file
-		# If the password is already encrypted, then skip this step:
-		if [[ ${#Preference_InitialUserPassword} -ge 30 ]]; then
-			system::log_item "Password appears to be encrypted already so skipping encryption..."
-		else
-			system::log_item "Password appears to be clear text, encrypting password..."
-			Preference_InitialUserPassword=$(printf "%s" "$Preference_InitialUserPassword" | mkpasswd -s -m sha-512)
-			if system::update_config "$_config_file" "Preference_InitialUserPassword" "${Preference_InitialUserPassword}"; then
-				system::log_item "Stored encrypted password in user preferences: $_config_file"
-			else
-				system::log_item "[ERROR] Failed to store encrypted password in user preferences: $_config_file"
-			fi
-		fi
-
-		system::log_item "Save as defaults and continue..."
-		write_information "Saving preferences to: $_config_file"
-
-		system::update_config "$_config_file" \
-			"Preference_DiskEncryption" "${Preference_DiskEncryption}" \
-			"Preference_Disk_Password" "${Preference_Disk_Password}" \
-			"Preference_InitialUser" "${Preference_InitialUser}" \
-			"Preference_InitialUserFullName" "${Preference_InitialUserFullName}" \
-			"Preference_InitialUserGroup" "${Preference_InitialUserGroup}" \
-			"Preference_InitialKeyboardLayout" "${Preference_InitialKeyboardLayout}" \
-			"Preference_InitialLanguage" "${Preference_InitialLanguage}" \
-			"Preference_InitialLanguageEncoding" "${Preference_InitialLanguageEncoding}" \
-			"Preference_InitialTimeZone" "${Preference_InitialTimeZone}" \
-			"Preference_Wireless_ID" "${Preference_Wireless_ID}" \
-			"Preference_Wireless_Password" "${Preference_Wireless_Password}" \
-			"Preference_Role" "${Preference_Role}" \
-			"Preference_CopySSHKey" "${Preference_CopySSHKey}"
-
-		return $?
-	else
-		write_information "Prompting for VM settings is not requested: ${_role} ${_task} automatically using defaults or parameter instructions..."
-		return 0
-	fi
-
-}
 
 
 system::install_missing_commands() {
@@ -5226,70 +5067,105 @@ oem::check_boot_splash_screen_enable() {
 	fi
 }
 
-rtd_oem_setup_brand_splash_screen() {
-	# Description: Function to brand the installer splash screen for the customized installer
-	# downloaded from a ginve vendor. This function expects a few simple peices of information:
-	# parameter 1: full path to image file to be branded.
-	# parameter 2: quoted text to be incerted.
+oem::setup_brand_splash_screen() {
+	# Function: oem::setup_brand_splash_screen
+	# Description:
+	#   Brands the installer splash screen for a customized installer downloaded from a given vendor.
+	#   It overlays specified text onto an image file, which is typically used in bootable ISO images.
 	#
-	# Globals:
-	# Arguments: None
-	# Outputs:
-	# Returns:
+	# Parameters:
+	#   $1 (optional): Full path to the image file to be branded.
+	#   $2 (optional): Quoted text to overlay on the image.
+	#
 	# Usage:
-	# rtd_oem_setup_brand_splash_screen [string] [string]
+	#   oem::setup_brand_splash_screen [image_file_to_brand] [text_to_brand_with]
 	#
-	# [string]: /path/to/imagefile.png, "text to brand image with"
+	# Examples:
+	#   oem::setup_brand_splash_screen
+	#   oem::setup_brand_splash_screen /tmp/splash.png "Welcome to the Custom Installer!"
 	#
-	# rtd_oem_setup_brand_splash_screen /tmp/splash.png "Hi! I am a lable!"
-	#
-	# End of Documentation
+	# Note:
+	#   - If parameters are not provided, default values are used.
+	#   - Requires ImageMagick to be installed.
 
-	system::validate_parameters ${*}
+	# Validate input parameters using a custom function.
+	# This function should check if required parameters are provided.
+	system::validate_parameters "${@}"
+
+	# Initialize variables for image file and branding text.
+	image_file_to_brand="${1:-}"
+	text_to_brand_with="${2:-}"
+
+	# Parse command-line arguments for additional options.
 	while [[ $# -gt 0 ]]; do
 		case $1 in
 		--target-iso)
+			# Set the target ISO file path.
 			target_iso="$2"
 			shift 2
 			;;
 		--iso-source-dir)
+			# Set the source directory for the ISO files.
 			iso_source_dir="$2"
 			shift 2
 			;;
 		*)
+			# Handle unknown options.
 			write_error "Unknown option: $1"
 			shift
 			;;
 		esac
 	done
 
-	system::log_item "🔯 Ensure that imagemagik is installed so images can be manipulated."
+	# Log the action of ensuring ImageMagick is installed.
+	system::log_item "🔯 Ensure that ImageMagick is installed so images can be manipulated."
+
+	# Check if ImageMagick is installed; required for image manipulation.
 	check_dependencies imagemagick
 
-	# Default locations and splash screens based on debian and ubuntu, meaning this function will assume you are
-	# making an ubuntu or debian boot iso as this is generally what this function was written to do. However these values
-	# can be overridden by passing the 2 parameters to this script.
+	# Determine the default image file to brand if not provided.
+	# Uses splash.png from common directories if no image is specified.
 	: "${image_file_to_brand:="$(
-		if [ -f $tmp_disc_dir/splash.png ]; then
-			echo "$tmp_disc_dir/splash.png"
-		elif [ -f $tmp_disc_dir/isolinux/splash.png ]; then
-			echo "$tmp_disc_dir/isolinux/splash.png"
+		if [ -f "$tmp_disc_dir/splash.png" ]; then
+		echo "$tmp_disc_dir/splash.png"
+		elif [ -f "$tmp_disc_dir/isolinux/splash.png" ]; then
+		echo "$tmp_disc_dir/isolinux/splash.png"
 		fi
-	)" }"
+	)"}"
+
+	# Set the default text to brand with if not provided.
 	: "${text_to_brand_with:="RunTime Data OEM Install: $PREFERENCE"}"
 
-	write_status "found: $image_file_to_brand"
-	write_status "branding with: $text_to_brand_with "
+	# Log the image file found and the text to be used for branding.
+	write_status "Found image: $image_file_to_brand"
+	write_status "Branding with text: $text_to_brand_with"
 
-	if [ -f $image_file_to_brand ]; then
-		convert $image_file_to_brand -gravity north -stroke '#000C' -strokewidth 3 -annotate 0 "$text_to_brand_with" -stroke none -strokewidth 3 -fill white -annotate 0 " $text_to_brand_with " edit-out.png
-		rm $image_file_to_brand
-		mv edit-out.png $image_file_to_brand || write_error "Image [ $image_file_to_brand ] NOT branded!  "
+	# Check if the image file exists before proceeding.
+	if [ -f "$image_file_to_brand" ]; then
+		# Use ImageMagick's convert command to overlay text onto the image.
+		convert "$image_file_to_brand" \                      # Input image file.
+		-gravity north \                                  # Position text at the top center.
+		-stroke '#000C' -strokewidth 3 \                  # Apply a semi-transparent black stroke to the text.
+		-annotate 0 "$text_to_brand_with" \               # Annotate image with stroked text.
+		-stroke none -strokewidth 3 -fill white \         # Remove stroke, set text fill color to white.
+		-annotate 0 "$text_to_brand_with" \               # Annotate image with filled text.
+		edit-out.png                                      # Output the edited image to a temporary file.
+
+		# Remove the original image file.
+		rm "$image_file_to_brand"
+
+		# Rename the edited image to the original image file name.
+		mv edit-out.png "$image_file_to_brand" || write_error "Image [ $image_file_to_brand ] NOT branded!"
+	else
+		# Log an error if the image file does not exist.
+		write_error "Image file $image_file_to_brand not found!"
 	fi
 
+	# Clean up by unsetting temporary variables.
 	unset image_file_to_brand
 	unset text_to_brand_with
 }
+
 
 generate_report_disk_space_used_by_directory() {
 	# Description: Function to generate a report for folders' disk space use.
@@ -6090,55 +5966,6 @@ rtd_oem_kde_set_wallpaper() {
 	kwriteconfig5 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key Image "file://$full_image_path"
 }
 
-rtd_oem_setup_brand_splash_screen() {
-	# Description: Function to brand the installer splash screen for the customized installer
-	# downloaded from a ginve vendor. This function expects a few simple peices of information:
-	# parameter 1: full path to image file to be branded.
-	# parameter 2: quoted text to be incerted.
-	#
-	# Globals:
-	# Arguments: None
-	# Outputs:
-	# Returns:
-	# Usage:
-	# rtd_oem_setup_brand_splash_screen [string] [string]
-	#
-	# [string]: /path/to/imagefile.png, "text to brand image with"
-	#
-	# rtd_oem_setup_brand_splash_screen /tmp/splash.png "Hi! I am a lable!"
-	#
-	# End of Documentation
-
-	image_file_to_brand=$1
-	text_to_brand_with=$2
-
-	# Ensure that imagemagik is installed so images can be manipulated.
-	check_dependencies imagemagick
-
-	# Default locations and splash screens based on debian and ubuntu, meaning this function will assume you are
-	# making an ubuntu or debian boot iso as this is generally what this function was written to do. However these values
-	# can be overridden by passing the 2 parameters to this script.
-	: "${image_file_to_brand:="$(
-		if [ -f $tmp_disc_dir/splash.png ]; then
-			echo "$tmp_disc_dir/splash.png"
-		elif [ -f $tmp_disc_dir/isolinux/splash.png ]; then
-			echo "$tmp_disc_dir/isolinux/splash.png"
-		elif [ -f $tmp_disc_dir/isolinux/splash.png ]; then
-			echo "$tmp_disc_dir/isolinux/splash.png"
-		fi
-	)" }"
-	: "${text_to_brand_with:="$(echo " RunTime Data OEM Install: $PREFERENCE")" }"
-
-	echo -e $GREEN "found: $image_file_to_brand" $ENDCOLOR
-	echo -e $GREEN "branding with: $text_to_brand_with " $ENDCOLOR
-
-	if [ -f $image_file_to_brand ]; then
-		convert $image_file_to_brand -gravity north -stroke '#000C' -strokewidth 3 -annotate 0 "$text_to_brand_with" -stroke none -strokewidth 3 -fill white -annotate 0 " $text_to_brand_with " edit-out.png
-		rm $image_file_to_brand
-		mv edit-out.png $image_file_to_brand || write_error "Image [ $image_file_to_brand ] NOT branded!  "
-	fi
-}
-
 
 create_physical_media_from_iso() {
 	# Description:
@@ -6747,7 +6574,7 @@ rtd_oem_ubuntu_auto_install_iso_builder() {
 	fi
 	write_status "Modifying startup instructions...  "
 	for f in splash.pcx splash.png; do
-		rtd_oem_setup_brand_splash_screen $auto/isolinux/$f
+		oem::setup_brand_splash_screen $auto/isolinux/$f
 	done
 	pushd ./$auto/isolinux/
 	find splash.pcx | cpio -ov >>bootlogo
@@ -7597,7 +7424,66 @@ tool::up_2_date() {
 	fi
 }
 
+tool::test_iso_boot_media() {
+	# Description: Function to test a created ISO file by booting it in a temporary VM using QEMU.
+	# This function requires one argument or one variable (iso_test) to be set; since it needs
+	# to now what media to test.
+	#
+	# QEMU is a free and open-source emulator and virtualizer that
+	# can perform hardware virtualization. QEMU is a hosted virtual machine monitor: it emulates
+	# the machine's processor through dynamic binary translation and provides a set of different
+	# hardware and device models for the machine, enabling it to run a variety of
+	# guest operating systems.
+	#
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	#
+	# tool::test_iso_boot_media /path/to/media
+	# 	OR
+	# iso_test=/path/to/media
+	# tool::test_iso_boot_media
+	#
+	# End of Documentation
+	iso_test="${1}"
+	if [[ -z "${iso_test}" ]]; then
+		dialog::display_error "${FUNCNAME[0]}: requires one argument (ISO file to test). Please read ${_LOGFILE} for more information."
+		return 1
+	else
+		system::log_item "Testing ${iso_test}..."
+		if ($RTD_GUI --title "BOOT Media Testing" --yesno "\n Would you like to test your boot media ${iso_test} to see if it works?" 10 80); then
+			clear
+			write_information "TESTING ${iso_test}."
+			if ! hash qemu-system-x86_64; then check_dependencies qemu-system-x86_64; fi
+			: "${bin_qemu_img:=$(type -P qemu-img)}"
+			: "${bin_qemu_system_x86_64:=$(type -P qemu-system-x86_64)}"
+			: "${put_qcow_file_here_when_done:="/home/$SUDO_USER/Virtual-HDs"}"
+			: "${qcow2_file:="${put_qcow_file_here_when_done}/$(basename "$iso_test" .iso).qcow2"}"
 
+			system::log_item "executing command: ${bin_qemu_img} create -f qcow2 ${qcow2_file} 10G"
+
+			[[ -f ${qcow2_file} ]] && rm -f "${qcow2_file}"
+			if ${bin_qemu_img} create -f qcow2 "${qcow2_file}" 10G 2>&1 | tee -a "${_LOGFILE}"; then
+				write_information "Created QCOW2 file: ${qcow2_file}"
+			else
+				write_error "Failed to create QCOW2 file: ${qcow2_file}"
+			fi
+
+			system::log_item "Executing command: ${bin_qemu_system_x86_64} -smp 2 -enable-kvm -m 4G --cdrom ${iso_test} ${qcow2_file}"
+			if ${bin_qemu_system_x86_64} -smp 2 -enable-kvm -m 4G --cdrom "${iso_test}" "${qcow2_file}" 2>&1 | tee -a "${_LOGFILE}"; then
+				write_information "Successfully tested ${iso_test}."
+			else
+				write_error "Failed to test ${iso_test}."
+			fi
+		else
+			clear
+			dialog::display_notice "User selected No, exit status was $?."
+			system::log_item "User selected No, exit status was $?."
+		fi
+	fi
+}
 
 ################################################################################################
 #     ........         ..........         ........
@@ -9435,7 +9321,7 @@ rtd_oem_release_upgrade() {
 
 	ensure_admin
 	local interactive=$1
-	local distro=$(hostnamectl | grep -Eo 'Ubuntu|Pop!_OS|Debian|SUSE|fedora|TUXEDO|Zorin')
+	local distro=$(hostnamectl | grep -Eo 'Ubuntu|Pop!_OS|Debian|SUSE|fedora|TUXEDO|Zorin'|head -1)
 
 	case $distro in
 	"Ubuntu" | "Pop!_OS" | "TUXEDO|Zorin")
@@ -10768,68 +10654,253 @@ kvm::util::read_distro_options() {
 
 }
 
-test_iso_boot_media() {
-	# Description: Function to test a created ISO file by booting it in a temporary VM using QEMU.
-	# This function requires one argument or one variable (iso_test) to be set; since it needs
-	# to now what media to test.
+kvm::get_vm_config_preferences() {
+	# Description: Retrieves VM configuration values from a configuration file or defaults.
 	#
-	# QEMU is a free and open-source emulator and virtualizer that
-	# can perform hardware virtualization. QEMU is a hosted virtual machine monitor: it emulates
-	# the machine's processor through dynamic binary translation and provides a set of different
-	# hardware and device models for the machine, enabling it to run a variety of
-	# guest operating systems.
+	# This function loads VM configuration values from a specified configuration file or uses
+	# default values if the configuration file is not found. It can also prompt the user to
+	# input these values interactively.
 	#
 	# Globals:
-	# Arguments: None
+	#	- _OEM_USER_VM_PREFERENCES: Path to the user VM preferences file.
+	#	- _TLA: Three-letter acronym for the project.
+	# Arguments:
+	#	- --ask (optional): Prompts the user to input configuration values interactively.
 	# Outputs:
+	#	- Configuration values loaded into variables.
 	# Returns:
-	# Usage:
+	#	- 0 on success.
+	#	- 1 on error or user cancellation.
 	#
-	# test_iso_boot_media /path/to/media
-	# 	OR
-	# iso_test=/path/to/media
-	# test_iso_boot_media
+	# Usage:
+	#	kvm::get_vm_config_preferences
+	#	kvm::get_vm_config_preferences --ask
+	#
+	# Example:
+	#	kvm::get_vm_config_preferences
+	#	kvm::get_vm_config_preferences --ask
+	#
+	# Notes:
+	#	- The function uses a configuration file to load saved preferences or defaults to predefined values.
+	#	- If the --ask flag is provided, it will prompt the user to input configuration values interactively using dialog.
+	#	- Configuration values are logged and saved for troubleshooting and reuse.
 	#
 	# End of Documentation
-	iso_test="${1}"
-	if [[ -z "${iso_test}" ]]; then
-		dialog::display_error "${FUNCNAME[0]}: requires one argument (ISO file to test). Please read ${_LOGFILE} for more information."
-		return 1
+
+	local _config_file=${_OEM_USER_VM_PREFERENCES:-"/home/${SUDO_USER}/.config/${_TLA,,}/build_defaults.inf"}
+	if [[ "$1" == "--ask" ]]; then
+		local _ask="YES"
 	else
-		system::log_item "Testing ${iso_test}..."
-		if ($RTD_GUI --title "BOOT Media Testing" --yesno "\n Would you like to test your boot media ${iso_test} to see if it works?" 10 80); then
-			clear
-			write_information "TESTING ${iso_test}."
-			if ! hash qemu-system-x86_64; then check_dependencies qemu-system-x86_64; fi
-			: "${bin_qemu_img:=$(type -P qemu-img)}"
-			: "${bin_qemu_system_x86_64:=$(type -P qemu-system-x86_64)}"
-			: "${put_qcow_file_here_when_done:="/home/$SUDO_USER/Virtual-HDs"}"
-			: "${qcow2_file:="${put_qcow_file_here_when_done}/$(basename "$iso_test" .iso).qcow2"}"
+		local _ask="NO"
+	fi
 
-			system::log_item "executing command: ${bin_qemu_img} create -f qcow2 ${qcow2_file} 10G"
+	system::log_item "Loading Global Config if available otherwise use defaults..."
+	Preference_DiskEncryption="${_ENCRYPT_DISK:-"YES"}"
+	Preference_Disk_Password="${_TEMP_DISK_PASSWORD:-"letmein1234"}"
+	Preference_InitialUser="${_OEM_USER:-"tangarora"}"
+	Preference_InitialUserFullName="${_OEM_USER_FULLNAME:-"RTD User"}"
+	Preference_InitialUserGroup="${_OEM_USER_GROUP:-"sudo"}"
+	Preference_InitialUserPassword="${_OEM_USER_PASSWORD:-"letmein1234"}"
+	Preference_InitialKeyboardLayout="${_OEM_USER_KEYBOARD_LAYOUT:-"us"}"
+	Preference_InitialLanguage="${_OEM_USER_LANGUAGE:-"en_US"}"
+	Preference_InitialLanguageEncoding="${_OEM_USER_LANGUAGE:-"UTF8"}"
+	Preference_InitialTimeZone="${_OEM_USER_TIMEZONE:-"Etc/UTC"}"
+	Preference_Wireless_ID="${_OEM_WIRELESS_ID:-"loader"}"
+	Preference_Wireless_Password="${_OEM_WIRELESS_PASSWORD:-"letmein1234"}"
+	Preference_Role="${_role:-"default"}"
+	Preference_CopySSHKey="${_OEM_COPY_SSH_KEY:-"NO"}"
 
-			[[ -f ${qcow2_file} ]] && rm -f "${qcow2_file}"
-			if ${bin_qemu_img} create -f qcow2 "${qcow2_file}" 10G 2>&1 | tee -a "${_LOGFILE}"; then
-				write_information "Created QCOW2 file: ${qcow2_file}"
-			else
-				write_error "Failed to create QCOW2 file: ${qcow2_file}"
-			fi
+	system::log_item "Load saved preferences from the config file everriding the _branding global config or defaults for preseed file..."
+	[[ -f "${_config_file}" ]] && system::read_config "${_config_file}" || system::log_item "Failed to load config file: ${_config_file}"
 
-			system::log_item "Executing command: ${bin_qemu_system_x86_64} -smp 2 -enable-kvm -m 4G --cdrom ${iso_test} ${qcow2_file}"
-			if ${bin_qemu_system_x86_64} -smp 2 -enable-kvm -m 4G --cdrom "${iso_test}" "${qcow2_file}" 2>&1 | tee -a "${_LOGFILE}"; then
-				write_information "Successfully tested ${iso_test}."
-			else
-				write_error "Failed to test ${iso_test}."
-			fi
+	# If OS Role is set (by function for auto install), then override the config file with the role:
+	[[ -n $_role ]] && Preference_Role="${_role}"
+
+	# If the user has requested to be asked for the preseed file, then ask them:
+	if [[ "$_ask" == "YES" ]]; then
+
+		system::log_item "'ask' is requested, requesting user input for the preseed file:"
+		preseed_choices=$(dialog --backtitle "$BRANDING" --title "RTD Preseed Creator" --mixedform "Enter your preferences in to the form below. Please note that the password fields do not show anything but will capture what you type in" 22 80 0 \
+			"DiskEncryption (YES/NO):" 1 1 "${Preference_DiskEncryption}" 1 40 40 0 0 \
+			"Disk Unlock Password (temp):" 2 1 "${Preference_Disk_Password}" 2 40 40 0 0 \
+			"Admin User Name:" 3 1 "${Preference_InitialUser}" 3 40 40 0 0 \
+			"Admin User Full Name:" 4 1 "${Preference_InitialUserFullName}" 4 40 40 0 0 \
+			"Admin User Initial UserGroup:" 5 1 "${Preference_InitialUserGroup}" 5 40 40 0 0 \
+			"Admin User Password (8 30 char):" 6 1 "${Preference_InitialUserPassword}" 6 40 128 0 0 \
+			"Preferred Keyboard Layout:" 7 1 "${Preference_InitialKeyboardLayout}" 7 40 40 0 0 \
+			"Preferred Language" 8 1 "${Preference_InitialLanguage}" 8 40 40 0 0 \
+			"Preferred Encoding" 9 1 "${Preference_InitialLanguageEncoding}" 9 40 40 0 0 \
+			"Initial Time Zone:" 10 1 "${Preference_InitialTimeZone}" 10 40 40 0 0 \
+			"Wireless Network SSID:" 11 1 "${Preference_Wireless_ID}" 11 40 40 0 0 \
+			"Wireless Network Password:" 12 1 "${Preference_Wireless_Password}" 12 40 40 0 0 \
+			"Role (Default, KVM, Minecraft):" 13 1 "${Preference_Role}" 13 40 40 0 0 \
+			"Copy you ssh public key to host?" 14 1 "${Preference_CopySSHKey}" 14 40 40 0 0 \
+			3>&1 1>&2 2>&3)
+		exit_status=$?
+
+		clear
+
+		case $exit_status in
+		0)
+			system::log_item "Save coices and continue..."
+			;;
+		1)
+			system::log_item "[Cancel] pressed; not updating or changing any configuration items..."
+			return 1
+			;;
+		255)
+			system::log_item "[ESC] pressed, exiting the dialog immediatley..."
+			return 1
+			;;
+		*)
+			system::log_item "[ERROR] Dialog closed or unexpected error."
+			rtd_oem_pause 1 "Dialog closed or unexpected error."
+			;;
+		esac
+
+		# Convert the dialog output to an array and asign the variables:
+		IFS=$'\n' read -r -d '' -a input_array <<<"$preseed_choices"
+		Preference_DiskEncryption=${input_array[0]}
+		Preference_Disk_Password=${input_array[1]}
+		Preference_InitialUser=${input_array[2]}
+		Preference_InitialUserFullName=${input_array[3]}
+		Preference_InitialUserGroup=${input_array[4]}
+		Preference_InitialUserPassword=${input_array[5]}
+		Preference_InitialKeyboardLayout=${input_array[6]}
+		Preference_InitialLanguage=${input_array[7]}
+		Preference_InitialLanguageEncoding=${input_array[8]}
+		Preference_InitialTimeZone=${input_array[9]}
+		Preference_Wireless_ID=${input_array[10]}
+		Preference_Wireless_Password=${input_array[11]}
+		Preference_Role=${input_array[12]}
+		Preference_CopySSHKey=${input_array[13]}
+
+		# Encrypt the user/admin password before saving & for use in the preseed file
+		# If the password is already encrypted, then skip this step:
+		if [[ ${#Preference_InitialUserPassword} -ge 30 ]]; then
+			system::log_item "Password appears to be encrypted already so skipping encryption..."
 		else
-			clear
-			dialog::display_notice "User selected No, exit status was $?."
-			system::log_item "User selected No, exit status was $?."
+			system::log_item "Password appears to be clear text, encrypting password..."
+			Preference_InitialUserPassword=$(printf "%s" "$Preference_InitialUserPassword" | mkpasswd -s -m sha-512)
+			if system::update_config "$_config_file" "Preference_InitialUserPassword" "${Preference_InitialUserPassword}"; then
+				system::log_item "Stored encrypted password in user preferences: $_config_file"
+			else
+				system::log_item "[ERROR] Failed to store encrypted password in user preferences: $_config_file"
+			fi
 		fi
+
+		system::log_item "Save as defaults and continue..."
+		write_information "Saving preferences to: $_config_file"
+
+		system::update_config "$_config_file" \
+			"Preference_DiskEncryption" "${Preference_DiskEncryption}" \
+			"Preference_Disk_Password" "${Preference_Disk_Password}" \
+			"Preference_InitialUser" "${Preference_InitialUser}" \
+			"Preference_InitialUserFullName" "${Preference_InitialUserFullName}" \
+			"Preference_InitialUserGroup" "${Preference_InitialUserGroup}" \
+			"Preference_InitialKeyboardLayout" "${Preference_InitialKeyboardLayout}" \
+			"Preference_InitialLanguage" "${Preference_InitialLanguage}" \
+			"Preference_InitialLanguageEncoding" "${Preference_InitialLanguageEncoding}" \
+			"Preference_InitialTimeZone" "${Preference_InitialTimeZone}" \
+			"Preference_Wireless_ID" "${Preference_Wireless_ID}" \
+			"Preference_Wireless_Password" "${Preference_Wireless_Password}" \
+			"Preference_Role" "${Preference_Role}" \
+			"Preference_CopySSHKey" "${Preference_CopySSHKey}"
+
+		return $?
+	else
+		write_information "Prompting for VM settings is not requested: ${_role} ${_task} automatically using defaults or parameter instructions..."
+		return 0
+	fi
+
+}
+
+kvm::get_zorin_iso() {
+	# Description: Downloads the latest Zorin OS ISO file for KVM if not already present.
+	#
+	# This function checks the Zorin OS mirror for the latest directory and the highest version number file
+	# within that directory. If the file does not already exist in /var/lib/libvirt/boot, it downloads the file.
+	#
+	# Globals:
+	#	- None
+	# Arguments:
+	#	- Version prefix to filter the ISO files (default: Core).
+	# Outputs:
+	#	- The path to the ISO file.
+	# Returns:
+	#	- 0 on success.
+	#	- 1 if no directories or files are found, or if the download fails.
+	#
+	# Usage:
+	#	kvm::get_zorin_iso [version_prefix]
+	#
+	# Example:
+	#	kvm::get_zorin_iso
+	#	kvm::get_zorin_iso Education
+	#
+	# Notes:
+	#	- This function uses curl to fetch directory and file listings from the Zorin OS mirror.
+	#	- The downloaded file is saved to /var/lib/libvirt/boot.
+	#	- The function logs progress and errors using system::log_item.
+	#
+	# End of Documentation
+
+	get_latest_directory() {
+		curl -s https://mirror.zetup.net/zorinos/ | grep -oP 'href="\K[0-9]+(?=/)' | sort -n | tail -1
+	}
+
+	get_highest_version_file() {
+		local directory=$1
+		local version_prefix=${2:-Core}
+
+		curl -s https://mirror.zetup.net/zorinos/$directory/ | grep -oP 'Zorin-OS-[0-9.]+-'$version_prefix'-[0-9a-zA-Z-]+\.iso' | sort -V | tail -1
+	}
+
+	download_file() {
+		local directory=$1
+		local file=$2
+		local url="https://mirror.zetup.net/zorinos/$directory/$file"
+		local destination="/var/lib/libvirt/boot/$file"
+
+		system::log_item "Downloading $file to $destination..."
+		curl -o "$destination" "$url"
+		if [ $? -eq 0 ]; then
+			system::log_item "Download completed successfully."
+			echo $file_path
+			iso=$file_path
+		else
+			system::log_item "Download failed."
+			return 1
+		fi
+	}
+
+	latest_directory=$(get_latest_directory)
+	if [ -z "$latest_directory" ]; then
+		system::log_item "No directories found."
+		exit 1
+	fi
+
+	version_prefix=${1:-Core}
+	highest_version_file=$(get_highest_version_file $latest_directory $version_prefix)
+
+	if [ -z "$highest_version_file" ]; then
+		system::log_item "No files found for version prefix '$version_prefix' in directory '$latest_directory'."
+		exit 1
+	fi
+
+	file_path="/var/lib/libvirt/boot/$highest_version_file"
+
+	if [ -f "$file_path" ]; then
+		system::log_item "File already exists: $file_path"
+		echo $file_path
+		iso=$file_path
+	else
+		system::log_item "Latest version file: $highest_version_file"
+		download_file "$latest_directory" "$highest_version_file"
 	fi
 }
 
-make_kvm_virtual_machine_now_from_fedora_org() {
+kvm::make_vm_now_from_fedora_org() {
 	# Description: Function to create a Fedora KVM virtual michine disk and define a VM. This function should be
 	# used on a Qemu/KVM virtual host that the virtual guest is to be used on.
 	# NOTE: QCOW2 is a storage format for virtual .
@@ -10850,9 +10921,9 @@ make_kvm_virtual_machine_now_from_fedora_org() {
 	# Outputs: std err
 	# Returns:
 	# Usage:
-	# 	make_kvm_virtual_machine_now_from_fedora_org
+	# 	kvm::make_vm_now_from_fedora_org
 	# 			or
-	# 	make_kvm_virtual_machine_now_from_fedora_org -c 4 -m 4096 -d 100
+	# 	kvm::make_vm_now_from_fedora_org -c 4 -m 4096 -d 100
 	# End of Documentation
 
 	# Set default values for VM T-Shirts sizes...
@@ -10925,7 +10996,7 @@ make_kvm_virtual_machine_now_from_fedora_org() {
 	for i in _preseed_file vm_kernel vm_initrd _source_url _config _mirrorlist_url _os_version _summary_message distro; do unset $i; done
 }
 
-kvm::make_vm_template_now_from_redhat_com() {
+kvm::make_vm_now_from_redhat_com() {
 	# Description: Function to create a Alma Linux KVM virtual michine disk and define a VM. This function should be
 	# used on a Qemu/KVM virtual host that the virtual guest is to be used on.
 	# NOTE: QCOW2 is a storage format for virtual .
@@ -11017,7 +11088,7 @@ kvm::make_vm_template_now_from_redhat_com() {
 	for i in _preseed_file vm_kernel vm_initrd _source_url _config _mirrorlist_url _os_version distro; do unset $i; done
 }
 
-make_kvm_virtual_machine_now_from_opensuse_org() {
+kvm::make_vm_now_from_opensuse_org() {
 	# Description: Creates a SUSE KVM virtual machine disk and defines a VM. This function is intended to be
 	# used on a Qemu/KVM virtual host where the virtual guest will run.
 	#
@@ -11135,7 +11206,7 @@ make_kvm_virtual_machine_now_from_opensuse_org() {
 	for i in PRESEED_FILE vm_kernel vm_initrd source_url CONFIG distro; do unset $i; done
 }
 
-kvm::make_vm_template_now_from_debian_org() {
+kvm::make_vm_now_from_debian_org() {
 	# Description: Function to create a Debian KVM virtual michine disk and define a VM. This function should be
 	# used on a Qemu/KVM virtual host that the virtual guest is to be used on.
 	# NOTE: QCOW2 is a storage format for virtual .
@@ -11242,92 +11313,7 @@ kvm::make_vm_template_now_from_debian_org() {
 
 }
 
-kvm::get_zorin_iso() {
-	# Description: Downloads the latest Zorin OS ISO file for KVM if not already present.
-	#
-	# This function checks the Zorin OS mirror for the latest directory and the highest version number file
-	# within that directory. If the file does not already exist in /var/lib/libvirt/boot, it downloads the file.
-	#
-	# Globals:
-	#	- None
-	# Arguments:
-	#	- Version prefix to filter the ISO files (default: Core).
-	# Outputs:
-	#	- The path to the ISO file.
-	# Returns:
-	#	- 0 on success.
-	#	- 1 if no directories or files are found, or if the download fails.
-	#
-	# Usage:
-	#	kvm::get_zorin_iso [version_prefix]
-	#
-	# Example:
-	#	kvm::get_zorin_iso
-	#	kvm::get_zorin_iso Education
-	#
-	# Notes:
-	#	- This function uses curl to fetch directory and file listings from the Zorin OS mirror.
-	#	- The downloaded file is saved to /var/lib/libvirt/boot.
-	#	- The function logs progress and errors using system::log_item.
-	#
-	# End of Documentation
-
-	get_latest_directory() {
-		curl -s https://mirror.zetup.net/zorinos/ | grep -oP 'href="\K[0-9]+(?=/)' | sort -n | tail -1
-	}
-
-	get_highest_version_file() {
-		local directory=$1
-		local version_prefix=${2:-Core}
-
-		curl -s https://mirror.zetup.net/zorinos/$directory/ | grep -oP 'Zorin-OS-[0-9.]+-'$version_prefix'-[0-9a-zA-Z-]+\.iso' | sort -V | tail -1
-	}
-
-	download_file() {
-		local directory=$1
-		local file=$2
-		local url="https://mirror.zetup.net/zorinos/$directory/$file"
-		local destination="/var/lib/libvirt/boot/$file"
-
-		system::log_item "Downloading $file to $destination..."
-		curl -o "$destination" "$url"
-		if [ $? -eq 0 ]; then
-			system::log_item "Download completed successfully."
-			echo $file_path
-			iso=$file_path
-		else
-			system::log_item "Download failed."
-			return 1
-		fi
-	}
-
-	latest_directory=$(get_latest_directory)
-	if [ -z "$latest_directory" ]; then
-		system::log_item "No directories found."
-		exit 1
-	fi
-
-	version_prefix=${1:-Core}
-	highest_version_file=$(get_highest_version_file $latest_directory $version_prefix)
-
-	if [ -z "$highest_version_file" ]; then
-		system::log_item "No files found for version prefix '$version_prefix' in directory '$latest_directory'."
-		exit 1
-	fi
-
-	file_path="/var/lib/libvirt/boot/$highest_version_file"
-
-	if [ -f "$file_path" ]; then
-		system::log_item "File already exists: $file_path"
-		echo $file_path
-		iso=$file_path
-	else
-		system::log_item "Latest version file: $highest_version_file"
-		download_file "$latest_directory" "$highest_version_file"
-	fi
-}
-
-kvm::make_vm_template_now_from_zorin() {
+kvm::make_vm_now_from_zorin() {
 	# Description: Creates a KVM virtual machine template using a Zorin OS ISO.
 	#
 	# This function automates the creation of a KVM virtual machine template using a Zorin OS ISO file.
@@ -11354,10 +11340,10 @@ kvm::make_vm_template_now_from_zorin() {
 	#	- 1 on error.
 	#
 	# Usage:
-	#	kvm::make_vm_template_now_from_zorin [options]
+	#	kvm::make_vm_now_from_zorin [options]
 	#
 	# Example:
-	#	kvm::make_vm_template_now_from_zorin --role workstation --cpu 2 --mem 2048 --dsk 100
+	#	kvm::make_vm_now_from_zorin --role workstation --cpu 2 --mem 2048 --dsk 100
 	#
 	# Notes:
 	#	- This function relies on other utility functions and dependencies such as dependency::virtualization and kvm::get_zorin_iso.
@@ -11424,7 +11410,7 @@ kvm::make_vm_template_now_from_zorin() {
 	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 }
 
-kvm::make_vm_template_now_from_ubuntu_com() {
+kvm::make_vm_now_from_ubuntu_com() {
 	# Description:
 	# Automates the creation of a virtual machine (VM) template using Ubuntu as the base OS on a KVM host.
 	# This function is ideal for quickly setting up virtual environments with custom configurations.
@@ -11470,15 +11456,15 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	# Usage Examples:
 	# Example 1: Default VM Creation
 	# Creates a VM using default parameters:
-	# kvm::make_vm_template_now_from_ubuntu_com
+	# kvm::make_vm_now_from_ubuntu_com
 	#
 	# Example 2: Fully Customized VM
 	# Creates a VM with 8 GB RAM, 4 CPUs, 250 GB disk, using Ubuntu 20.04 LTS, Kubuntu flavor:
-	# kvm::make_vm_template_now_from_ubuntu_com --ram 8192 --cpus 4 --disk 250 --flavor ubuntu --version 20.04 --role desktop
+	# kvm::make_vm_now_from_ubuntu_com --ram 8192 --cpus 4 --disk 250 --flavor ubuntu --version 20.04 --role desktop
 	#
 	# Example 3: Interactive VM Setup
 	# Starts an interactive session to manually specify VM settings during creation:
-	# kvm::make_vm_template_now_from_ubuntu_com --ask YES
+	# kvm::make_vm_now_from_ubuntu_com --ask YES
 	#
 	# Detailed Steps:
 	# 1. Parameter Parsing: Parses and applies provided command-line arguments to override default settings.
@@ -11687,7 +11673,7 @@ kvm::make_vm_template_now_from_ubuntu_com() {
 	for i in _UserDesktopEnvironmentSelection _UserServerEnvironemtSelection PRESEED_FILE vm_kernel vm_initrd source_url _task _role _cpu _dsk _mem _tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig CloudConfigDir _summary_message _saveto; do unset $i; done
 }
 
-kvm::make_vm_template_now_from_microsoft() {
+kvm::make_vm_now_from_microsoft() {
 	# Description:
 	# Function to create a KVM virtual michine disk and define a VM. This function should be
 	# used on a Qemu/KVM virtual host that the virtual guest is to be used on. In the future
@@ -11698,7 +11684,7 @@ kvm::make_vm_template_now_from_microsoft() {
 	# Arguments: [ win11 | win10 | win8 | win7 ]
 	# Outputs: One VM running windows
 	# Returns:
-	# Usage: "kvm::make_vm_template_now_from_microsoft --winver target_winver"
+	# Usage: "kvm::make_vm_now_from_microsoft --winver target_winver"
 	#
 	#
 	# NOTE: QCOW2 is a storage format for virtual .
@@ -13170,7 +13156,7 @@ template::autounattend_xml() {
 	#
 	# End of Documentation
 	# Generate the autounattend file
-	system::get_vm_config
+	kvm::get_vm_config_preferences
 	: ${_TLA:="RTD"}
 
 	local target_file target_winver
@@ -13535,7 +13521,7 @@ template::AutoYast_xml() {
 	#
 	# Note:
 	#   Ensure that the output file path is correctly specified and that the function's global variables are properly set.
-	#   Most valuse are set in the system::get_vm_config function, but defould valuse are provided in the function.
+	#   Most valuse are set in the kvm::get_vm_config_preferences function, but defould valuse are provided in the function.
 	#
 	# End of Documentation
 
@@ -13708,7 +13694,7 @@ template::cloud_config() {
 	#   Preference_InitialKeyboardLayout - The keyboard layout to be used during installation.
 	#   Preference_InitialUser - The initial user account to be created on the VM.
 	#   Preference_InitialUserPassword - The password for the initial user account.
-	#   NOTE: these globals are set in the system::get_vm_config function that reads
+	#   NOTE: these globals are set in the kvm::get_vm_config_preferences function that reads
 	#   the personal configuration file for unattended VM bulds.
 	#
 	# Arguments:
@@ -15016,7 +15002,7 @@ list_loaded_internal_functions() {
 	elif [[ "$1" == "--yformat" ]]; then
 		functions_list=()
 		i=1
-		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep -v "recipe_" | grep -v "Single_Install"); do
+		for index in $(declare -F | awk '{print $NF}' | sort | grep -E -v "^_" | grep -v "recipe_" | grep -v "Single_Install"); do
 			Description=$(head -300 "$0" | grep "${index}" | head -1 | cut -f2 -d';' | sed 's/^ //g') # Trim leading spaces
 			# Add the elements to the array
 			functions_list+=("$i" "${index}" "${Description}")
@@ -15340,6 +15326,70 @@ eval_params() {
 		done
 		return
 		;;
+	--devhelp-test)
+#!/bin/bash
+
+# Ensure the documentation file exists
+DOC_FILE="/tmp/yad_doc.txt"
+echo "Documentation will appear here" > "$DOC_FILE"
+
+# Use sample functions_output directly
+functions_output=$(cat <<EOF
+#167:	write_status 
+#168:	write_warning 
+#169:	yad::display_cmd_output 
+#170:	yad::display_progressbar_pulsating 
+#171:	zenity::display_file 
+#172:	zenity::display_info 
+#173:	zenity::display_url 
+EOF
+)
+
+# Parse the functions and build the list for yad
+functions_list=""
+while IFS= read -r line; do
+    # Skip empty lines
+    [ -z "$line" ] && continue
+    # Extract number and function name
+    if [[ "$line" =~ ^#([0-9]+):[[:space:]]*(.+)$ ]]; then
+        number="${BASH_REMATCH[1]}"
+        function_name="${BASH_REMATCH[2]}"
+        # For now, use a placeholder description
+        description="Description for $function_name"
+        # Build the list in the required format
+        functions_list+="${number}|${function_name}|${description}\n"
+    fi
+done <<< "$functions_output"
+
+# Write the functions list to a temporary file
+echo -e "$functions_list" > /tmp/functions_list.txt
+
+# Start the main paned window
+yad --paned --key=$$ --orient=hor --title="Select a function to see its documentation" \
+    --width=800 --height=600 --splitter=300 --button="Quit:1" &
+
+PANED_PID=$!
+
+# Start the text-info pane
+yad --text-info --no-markup --wrap --filename="$DOC_FILE" \
+    --plug=$$ --tabnum=2 --margins=10 --no-buttons --editable &
+
+# Start the list pane and handle selection
+yad --list --separator="|" --column="Number" --column="Function" --column="Description" \
+    --print-column=2 --hide-column=1 \
+    --plug=$$ --tabnum=1 \
+    --filename=/tmp/functions_list.txt \
+    | while read -r selected_function; do
+        if [ -z "$selected_function" ]; then
+            continue
+        fi
+        # For testing, simply display the function name in the documentation pane
+        echo "Documentation for $selected_function" > "$DOC_FILE"
+    done
+
+wait $PANED_PID
+
+	;;
 	--devhelp-gtk)
 		while true; do
 			exec 3>&1

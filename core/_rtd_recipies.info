@@ -1309,6 +1309,24 @@ Single_Install_VirtualBox (){
 		elif hash dnf &>/dev/nul; then
 			write_information "Installing VirtualBox in a Red Hat based system if available..."
 			InstallSoftwareFromRepo VirtualBox
+			if wget -q https://www.virtualbox.org/download/oracle_vbox.asc -O- | rpm --import - ; then
+				write_information "Oracle public key imported successfully..."
+			else
+				write_error "Oracle public key import failed..."
+				return 1
+			fi
+
+			cat > /etc/yum.repos.d/virtualbox.repo <<-EOF
+			[VirtualBox]
+			name=Fedora $releasever - $basearch - VirtualBox
+			baseurl=http://download.virtualbox.org/virtualbox/rpm/fedora/$releasever/$basearch
+			enabled=1
+			gpgcheck=1
+			repo_gpgcheck=1
+			gpgkey=https://www.virtualbox.org/download/oracle_vbox.asc
+			EOF
+			dnf -y install @development-tools kernel-devel kernel-headers dkms -y
+			dnf -y install VirtualBox
 		elif hash zypper &>/dev/nul ; then
 			write_information "Installing virtualbox in a SUSE based system..."
 			for i in virtualbox virtualbox-dkms virtualbox-ext-pack virtualbox-guest-additions-iso
