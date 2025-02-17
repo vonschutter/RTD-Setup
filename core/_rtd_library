@@ -109,7 +109,7 @@ export RTD_VERSION="2.04"
 65    security::enable_firewall                          ;     Will turn on UFW and add the Allow SSH rule
 66    security::ensure_admin                             ;     Elevates privileges to admin - asks for password in the appropriate way
 67    security::scan_for_malware                         ;     Scans the system for malware
-68    set_colors                                         ;     Set colors for prompting on screen in human usable variables
+68    term::set_colors                                         ;     Set colors for prompting on screen in human usable variables
 69    set_gnome_ui_common_tweaks_for_user                ;     Set common UI usability tweaks
 70    set_gnome_ui_corporate_crisp_tweaks_for_user       ;     Set corporate/business friendly UI tweaks
 71    set_gnome_ui_mac_tweaks_for_user                   ;     Set MAC UI usability tweaks
@@ -477,8 +477,8 @@ dialog::copy_with_progress() {
 	# Globals:
 	#   - None
 	# Arguments:
-	#   - "$1": The path to the ISO file to be copied.
-	#   - "$2": The destination path where the ISO file will be copied.
+	#   - "$1": The path to the large file (ISO) file to be copied.
+	#   - "$2": The destination path where the large file (ISO) file will be copied.
 	#   - "$3": The mount point directory (used for display purposes).
 	# Outputs:
 	#   - Displays a dialog box with the copy progress.
@@ -2464,33 +2464,63 @@ system::generate_cloudconfig() {
 	# in the initial server setup for Ubuntu 14.04 guide in order to demonstrate.
 	#
 	# End of Documentation
+	
+	
+	# Initialize variables with defaults.
+	system::log_item "Called by: ${FUNCNAME[1]}"
+	system::log_item "Processing parameters: $*"
+	local cloud_config_dir="$CloudConfigDir"
+	local role="${_role:-server}"
+	local server_app="${_UserServerEnvironemtSelection:-ubuntu-server}"
+	local ask="${_ask}"
 
+	# Process parameters.
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--CloudConfigDir)
+			cloud_config_dir="$2"
+			system::log_item "cloud_config_dir set to: $cloud_config_dir"
+			shift 2
+			;;
+		--role)
+			role="$2"
+			system::log_item "role set to: $role"
+			shift 2
+			;;
+		--server-app)
+			server_app="$2"
+			system::log_item "server_app set to: $server_app"
+			shift 2
+			;;
+		--ask)
+			ask="$2"
+			system::log_item "ask set to: $ask"
+			shift 2
+			;;
+		--vmname | --VMName | --vm_name | --VmName | --vm-name | --VM-Name | --hostname | --HostName | --host-name | --Host-Name)
+			# The hostname of the VM to be created
+			local vm_name="$2"
+			system::log_item "vm_name set to: $vm_name"
+			# [[ "$vm_name" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,253}[a-zA-Z0-9])?$ ]] && [[ ${#vm_name} -le 255 ]] && system::log_item "$vm_name: Valid hostname" || system::log_item "$vm_name: Invalid hostname"
+			shift 2
+			;;
+		esac
+	done
 	# get default VM configurations options from the kvm::get_vm_config_preferences
 	kvm::get_vm_config_preferences
 	kvm::util::read_distro_options --distribution ubuntu "$@"
 
 	# Directory for cloud config files, if not set, create a temporary directory and use that.
-	local CloudConfigDir="${CloudConfigDir:=$(mktemp -d /tmp/CloudConfig.XXXXXX)}"
-	local _git_src_url="${GIT_RTD_SRC_URL:="https://github.com/${GIT_Profile:=vonschutter}/${_TLA^^}-Setup.git"}"
+	local cloud_config_dir="${cloud_config_dir:=$(mktemp -d /tmp/CloudConfig.XXXXXX)}"
 
-	touch ${CloudConfigDir}/meta-data
-	touch ${CloudConfigDir}/user-data
+	touch ${cloud_config_dir}/meta-data
+	touch ${cloud_config_dir}/user-data
 
-	# Parse the command line options overwriting the defaults or saved preferences
-	while [[ $# -gt 0 ]]; do
-		case "$1" in
-		--vmname | --VMName | --vm_name | --VmName | --vm-name | --VM-Name | --hostname | --HostName | --host-name | --Host-Name)
-			# The hostname of the VM to be created
-			local vm_name="$2"
-			[[ "$vm_name" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,253}[a-zA-Z0-9])?$ ]] && [[ ${#vm_name} -le 255 ]] && system::log_item "$vm_name: Valid hostname" || system::log_item "$vm_name: Invalid hostname"
-			shift # Remove argument name from processing
-			;;
-		*)
-			system::log_item "INFO: No known vm_name parameters provided. Parameter: $1"
-			;;
-		esac
-		shift # Remove argument value from processing
-	done
+	# Display parameter interpretation (or proceed with processing).
+	system::log_item "Cloud Configuration Directory: $cloud_config_dir"
+	system::log_item "Role: $role"
+	system::log_item "Server App: $server_app"
+	system::log_item "Ask: $ask"
 
 	# If the user has requested to copy their SSH key to the host, capture it and store in a
 	# var for use in the config file:
@@ -2500,39 +2530,39 @@ system::generate_cloudconfig() {
 
 	# Write out the user-data file
 	system::log_item "Writing out the user-data file..."
-	template::cloud_config --write "${CloudConfigDir}/user-data" || {
+	template::cloud_config --write "${cloud_config_dir}/user-data" --CloudConfigDir "${cloud_config_dir}" --role ${role} --server-app ${server_app} --ask ${ask} || {
 		system::log_item "Failed to write out the user-data file."
 		return 1
 	}
 
 	# Log configuration data for troupleshooting puropses
 	system::log_item "Configuration data supplied:
-	$(cat ${CloudConfigDir}/user-data)"
+	$(cat ${cloud_config_dir}/user-data)"
 
-	write_information "Generating Ubuntu autoinstall instruction media: ${CloudConfigDir}/CIDATA.iso"
+	write_information "Generating Ubuntu autoinstall instruction media: ${cloud_config_dir}/CIDATA.iso"
 	software::check_native_package_dependency genisoimage
 
 	# Generate the CIDATA.iso file
-	write_information "Generating: ${CloudConfigDir}/CIDATA.iso"
-	if genisoimage -output ${CloudConfigDir}/CIDATA.iso -volid cidata -joliet -rock -full-iso9660-filenames ${CloudConfigDir}/* &>>${_LOGFILE}; then
-		{ system::log_item "Generated: ${CloudConfigDir}/CIDATA.iso" success; }
+	write_information "Generating: ${cloud_config_dir}/CIDATA.iso"
+	if genisoimage -output ${cloud_config_dir}/CIDATA.iso -volid cidata -joliet -rock -full-iso9660-filenames ${cloud_config_dir}/* &>>${_LOGFILE}; then
+		{ system::log_item "Generated: ${cloud_config_dir}/CIDATA.iso" success; }
 	else
 		{
-			system::log_item "Failed to generate: ${CloudConfigDir}/CIDATA.iso"
+			system::log_item "Failed to generate: ${cloud_config_dir}/CIDATA.iso"
 			return 200
 		}
 	fi
 
 	# Secure the cloud config directory
 	write_information "Securing the cloud config directory..."
-	if chown $(stat -c "%U:%G" /var/lib/libvirt/qemu/) "${CloudConfigDir}"; then
-		if chmod $(stat -c "%a" /var/lib/libvirt/qemu/) "${CloudConfigDir}"; then
-			write_information "Changed ownership and permissions of ${CloudConfigDir} successfully"
+	if chown $(stat -c "%U:%G" /var/lib/libvirt/qemu/) "${cloud_config_dir}"; then
+		if chmod $(stat -c "%a" /var/lib/libvirt/qemu/) "${cloud_config_dir}"; then
+			write_information "Changed ownership and permissions of ${cloud_config_dir} successfully"
 		else
-			write_information "Failed to change permissions of ${CloudConfigDir} to $(stat -c "%a" /var/lib/libvirt/qemu/) "
+			write_information "Failed to change permissions of ${cloud_config_dir} to $(stat -c "%a" /var/lib/libvirt/qemu/) "
 		fi
 	else
-		write_error "Failed to change ownership of ${CloudConfigDir} to $(stat -c "%U:%G" /var/lib/libvirt/qemu/)"
+		write_error "Failed to change ownership of ${cloud_config_dir} to $(stat -c "%U:%G" /var/lib/libvirt/qemu/)"
 	fi
 	return 0
 }
@@ -6400,10 +6430,10 @@ system::get_ubuntu_media() {
 	# End of Documentation
 
 	# Initialize default values
-	permanent_download_dir="/var/lib/libvirt/boot"
-	flavor="ubuntu"
-	tgt_ubuntu_ver="20.04.2" # Default version, can be overridden by --version parameter
-	iso_type="server"        # Default to server, can be overridden by --type parameter
+	local permanent_download_dir="/var/lib/libvirt/boot"	# where to put the downloaded media
+	local media_type="server"				# Default to server, can be overridden by --media-type parameter
+	local tgt_ubuntu_ver="20.04.2"				# Default version, can be overridden by --version parameter
+
 
 	# Parse arguments
 	while [[ "$#" -gt 0 ]]; do
@@ -6417,15 +6447,6 @@ system::get_ubuntu_media() {
 				return 1
 			fi
 			;;
-		--flavor)
-			if [[ -n $2 && $2 != --* ]]; then
-				flavor="$2"
-				shift
-			else
-				system::log_item "Error: --flavor requires a non-empty argument."
-				return 1
-			fi
-			;;
 		--version)
 			if [[ -n $2 && $2 != --* ]]; then
 				tgt_ubuntu_ver="$2"
@@ -6435,9 +6456,9 @@ system::get_ubuntu_media() {
 				return 1
 			fi
 			;;
-		--type)
+		--media-type)
 			if [[ -n $2 && $2 != --* ]]; then
-				iso_type="$2"
+				media_type="$2"
 				shift
 			else
 				system::log_item "Error: --type requires a non-empty argument."
@@ -6452,37 +6473,21 @@ system::get_ubuntu_media() {
 		shift
 	done
 
-	# Validate flavor and type
-	case $flavor in
-	ubuntu)
-		case $iso_type in
-		server)
-			iso_filename="ubuntu-${tgt_ubuntu_ver}-live-server-amd64.iso"
-			ubuntu_iso_url="http://releases.ubuntu.com/${tgt_ubuntu_ver}/ubuntu-${tgt_ubuntu_ver}-live-server-amd64.iso"
-			;;
-		desktop)
-			iso_filename="ubuntu-${tgt_ubuntu_ver}-desktop-amd64.iso"
-			ubuntu_iso_url="http://releases.ubuntu.com/${tgt_ubuntu_ver}/ubuntu-${tgt_ubuntu_ver}-desktop-amd64.iso"
-			;;
-		*)
-			system::log_item "Invalid type specified. Valid options for Ubuntu are: server, desktop."
-			return 1
-			;;
-		esac
+	case $media_type in
+	server)
+		iso_filename="ubuntu-${tgt_ubuntu_ver}-live-server-amd64.iso"
+		ubuntu_iso_url="http://releases.ubuntu.com/${tgt_ubuntu_ver}/ubuntu-${tgt_ubuntu_ver}-live-server-amd64.iso"
 		;;
-	kubuntu)
-		iso_filename="kubuntu-${tgt_ubuntu_ver}-desktop-amd64.iso"
-		ubuntu_iso_url="http://cdimage.ubuntu.com/kubuntu/releases/${tgt_ubuntu_ver}/release/kubuntu-${tgt_ubuntu_ver}-desktop-amd64.iso"
-		;;
-	xubuntu)
-		iso_filename="xubuntu-${tgt_ubuntu_ver}-desktop-amd64.iso"
-		ubuntu_iso_url="http://cdimage.ubuntu.com/xubuntu/releases/${tgt_ubuntu_ver}/release/xubuntu-${tgt_ubuntu_ver}-desktop-amd64.iso"
+	desktop)
+		iso_filename="ubuntu-${tgt_ubuntu_ver}-desktop-amd64.iso"
+		ubuntu_iso_url="http://releases.ubuntu.com/${tgt_ubuntu_ver}/ubuntu-${tgt_ubuntu_ver}-desktop-amd64.iso"
 		;;
 	*)
-		system::log_item "Invalid flavor specified. Valid options are: ubuntu, kubuntu, xubuntu."
+		system::log_item "Invalid media type specified. Valid options for Ubuntu are: server, desktop."
 		return 1
 		;;
 	esac
+
 
 	# Ensure that the file is available for VM creation...
 	system::log_item "Checking if $iso_filename is already downloaded in $permanent_download_dir..."
@@ -6502,27 +6507,7 @@ system::get_ubuntu_media() {
 	export iso
 }
 
-# system::get_ubuntu_media()
-# {
-# 	permanent_download_dir=$1
-# 	if [[ -z $1 ]] ; then
-# 		{ system::log_item "no parameters provided, defaulting to default QEMU media location..."; permanent_download_dir=/var/lib/libvirt/boot ; }
-# 	fi
 
-# 	# Ensure that the file is available for VM creation...
-# 	write_status "Checking if $iso_filename already downloaded..."
-# 	iso=$(find "$permanent_download_dir" -name "$iso_filename")
-# 	if [ ! -e "$iso" ]; then
-# 		write_warning "$iso_filename is not in cache, downloading..."
-# 		wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
-# 		iso="$permanent_download_dir/$iso_filename"
-# 	else
-# 		write_information "💿 - $iso_filename already in cache, using it for greenfield creation..."
-# 	fi
-
-# 	system::log_item "Exporting ISO value: iso = $iso"
-# 	export iso
-# }
 
 rtd_oem_ubuntu_auto_install_iso_builder() {
 	# Description: Function to generate an edited ISO file from a folder.
@@ -10429,18 +10414,18 @@ kvm::util::read_distro_options() {
 			while [[ $# -gt 0 ]]; do
 				case "${1}" in
 				--CloudConfigDir | cloudconfigdir)
-					# where to save cloud config files to incerted into the VM
+					system::log_item "Save cloud config files to incerted into the VM: ${2}"
 					CloudConfigDir="$2"
 					shift 2
 					;;
 				--saveto | --location | --path | --dir | --directory | -p)
 					_saveto="$2"
-					write_host --cyan "📜 Directed to create preseed instructions file: ${_saveto}/preseed.cfg"
+					system::log_item "📜 Directed to create preseed instructions file: ${_saveto}/preseed.cfg"
 					shift 2
 					;;
 				--file | --preseed | --preseed_file | --preseed_cfg | --preseed_cfg_file | --preseed_file)
 					_preseed_file="$2"
-					write_host --cyan "📜 Directed to create preseed instructions file: ${_preseed_file}"
+					system::log_item "📜 Directed to create preseed instructions file: ${_preseed_file}"
 					shift 2
 					;;
 				--flavor | --Flavor | --FLAVOR | --flavour | --Flavour | --FLAVOUR)
@@ -10451,9 +10436,9 @@ kvm::util::read_distro_options() {
 				--desktop_environment | --DesktopEnvironment | --desktop-environment | --Desktop-Environment | --DE | --de)
 					if [[ $2 == "ubuntu-desktop" || $2 == "kubuntu-desktop" || $2 == "xubuntu-desktop" || $2 == "lubuntu-desktop" || $2 == "ubuntu-mate-desktop" || $2 == "ubuntu-budgie-desktop" || $2 == "cinnamon-desktop-environment" ]]; then
 						_UserDesktopEnvironmentSelection="${2}"
-						write_host --cyan "🖥️ Selecting desktop environment: ${_UserDesktopEnvironmentSelection}"
+						system::log_item "🖥️ Selecting desktop environment: ${_UserDesktopEnvironmentSelection}"
 					else
-						write_error "⛔ Unknown Desktop Environment: [${2}] ==> Use ubuntu-desktop, kubuntu-desktop, xubuntu-desktop, lubuntu-desktop, ubuntu-mate-desktop, ubuntu-budgie-desktop"
+						system::log_item "⛔ Unknown Desktop Environment: [${2}] ==> Use ubuntu-desktop, kubuntu-desktop, xubuntu-desktop, lubuntu-desktop, ubuntu-mate-desktop, ubuntu-budgie-desktop"
 						return 1
 					fi
 					shift 2
@@ -10461,16 +10446,26 @@ kvm::util::read_distro_options() {
 				--server-role | --Server-Role | --server_role | --ServerRole | --SR | --sr)
 					if [[ $2 == "ubuntu-server" || $2 == "server-desktop" || $2 == "minecraft" || $2 == "lamp-server" || $2 == "postfix" || $2 == "bind9" || $2 == "dnsmasq" || $2 == "dhcp-server" || $2 == "print-server" || $2 == "samba" ]]; then
 						_UserServerEnvironemtSelection="${2}"
-						write_status "🎭 Selecting server role: ${2}"
+						system::log_item "🎭 Selecting server role: ${2}"
 					else
-						write_error "⛔ Unknown server role selection: ${2} ==> Use open-ssh-server, server-desktop, lamp-server, postfix, bind9, dnsmasq, dhcp-server, print-server, samba"
+						system::log_item "⛔ Unknown server role selection: ${2} ==> Use open-ssh-server, server-desktop, lamp-server, postfix, bind9, dnsmasq, dhcp-server, print-server, samba"
+						return 1
+					fi
+					shift 2
+					;;
+				--server-app | --Server-Application | --server_application | --ServerApplications | --SA | --sa)
+					if [[ $2 == "ubuntu-desktop" || $2 == "kubuntu-desktop" || $2 == "xubuntu-desktop" || $2 == "lubuntu-desktop" || $2 == "ubuntu-mate-desktop" || $2 == "ubuntu-budgie-desktop" || $2 == "cinnamon-desktop-environment" ]]; then
+						server_app="${2}"
+						system::log_item "🖥️ Selecting server app: ${server_app}"
+					else
+						system::log_item "⛔ Unknown Desktop Environment: [${2}] ==> Use ubuntu-desktop, kubuntu-desktop, xubuntu-desktop, lubuntu-desktop, ubuntu-mate-desktop, ubuntu-budgie-desktop"
 						return 1
 					fi
 					shift 2
 					;;
 				--version | -v)
 					_tgt_ubuntu_ver="$2"
-					write_status "🐧 Ubuntu version requested: ${_tgt_ubuntu_ver}"
+					system::log_item "🐧 Ubuntu version requested: ${_tgt_ubuntu_ver}"
 					shift 2
 					return 0
 					;;
@@ -10945,7 +10940,7 @@ kvm::make_vm_now_from_fedora_org() {
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
 	: "${_DEFAULT_FEDORA_VER:="$(curl -s https://dl.fedoraproject.org/pub/fedora/linux/releases/ | grep -oP 'href="\K[0-9]+(?=/")' | sort -n | tail -1)"}"
 	: "${_os_version=$($RTD_GUI --title "🐧 Select Release Version of Fedora" --inputbox "Please pick an available OS version by entering it below. \
-	If you are not sure just let me choose for you... \n ${fedoralogo} " 25 110 "${_DEFAULT_FEDORA_VER:-"40"}" 3>&1 1>&2 2>&3)}"
+	If you are not sure just let me choose for you... Please NOTE: fedora is sort of a permanent beta and the anaconda installer may behave in unexpected ways. \n ${fedoralogo} " 25 110 "${_DEFAULT_FEDORA_VER:-"40"}" 3>&1 1>&2 2>&3)}"
 	case $? in
 	"$DIALOG_CANCEL") return ;;
 	"$DIALOG_ESC") return ;;
@@ -10973,7 +10968,7 @@ kvm::make_vm_now_from_fedora_org() {
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in Kickstart: ${_preseed_file} \n
 	🔧 - Using this source for the packages and files to download: \n
-	🌎 - ${_source_url%%/*pub*} \n
+	🌎 - ${_source_url} \n
 	🖥️ - Using the network: ${virt_net:=default} \n
 	🖥️ - Memory: ${_mem} \n
 	🖥️ - CPU's: ${_cpu} \n
@@ -10984,16 +10979,16 @@ kvm::make_vm_now_from_fedora_org() {
 		"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
 			--vcpus "${_cpu}" \
 			--memory "${_mem}" \
-			--network "${virt_net}" \
+			--network "${virt_net:=default}" \
 			--disk size="${_dsk}" \
-			--os-variant="fedora30" \
+			--os-variant="fedora40" \
 			--initrd-inject="${_preseed_file}" \
 			--location="${_source_url}" \
 			--extra-args "inst.ks=file:/$(basename $_preseed_file)" \
 			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 
-	for i in _preseed_file vm_kernel vm_initrd _source_url _config _mirrorlist_url _os_version _summary_message distro; do unset $i; done
+	unset _preseed_file vm_kernel vm_initrd _source_url _config _mirrorlist_url _os_version _summary_message distro _UserServerEnvironemtSelection _UserDesktopEnvironmentSelection _role _service
 }
 
 kvm::make_vm_now_from_redhat_com() {
@@ -11405,8 +11400,7 @@ kvm::make_vm_now_from_zorin() {
 		netcfg/get_hostname=${vm_name} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
 		localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 			--initrd-inject="${_saveto}/preseed.cfg" \
-			--initrd-inject="${_saveto}/ks.cfg" \
-			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
+			--initrd-inject="${_saveto}/ks.cfg"  || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 }
 
@@ -11524,11 +11518,11 @@ kvm::make_vm_now_from_ubuntu_com() {
 	system::get_tgt_ubuntu_version 
 
 	# Format the name of the VM to be created...
-	local vm_name="Template_${_flavor}_${_tgt_ubuntu_ver}_${_UserDesktopEnvironmentSelection}_${_UserServerEnvironemtSelection}_${_role}_$(date +%Y-%m-%d-%s)"
+	local vm_name="Template_${_role}_${_tgt_ubuntu_ver}_${_UserDesktopEnvironmentSelection}_${_UserServerEnvironemtSelection}_${_role}_$(date +%Y-%m-%d-%s)"
 
 	# ensure local media:          [/where/to/look/first]
-	system::get_ubuntu_media --dir ${permanent_download_dir} --flavor ${_flavor} --version ${_tgt_ubuntu_ver} --type ${_role}
-	: ${iso:="$permanent_download_dir/$iso_filename"}
+	# system::get_ubuntu_media --dir ${permanent_download_dir} --media-type ${_flavor} --version ${_tgt_ubuntu_ver} --type ${_role}
+	# : ${iso:="$permanent_download_dir/$iso_filename"}
 
 	# Prepare the summary message for the VM creation...
 	_summary_message="
@@ -11545,16 +11539,19 @@ kvm::make_vm_now_from_ubuntu_com() {
 	After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
 
 	# Check the version of Ubuntu and use the appropriate installer...
-	# Ubuntu is migration installers and methods, so we need to check the version and use the appropriate installer...
+	# Ubuntu changes the way installers work and the methods of how to instruct them,
+	# so we need to check the version and use the appropriate installer with the appropriate instructions (preseed, cloud-config etc.)...
 
 	case "${_role}" in
-	workstation | desktop | VDI)
+	workstation | desktop )
 		write_status "🖥️ 	- Using a desktop environment: ${_UserDesktopEnvironmentSelection}"
 		if [[ ${_tgt_ubuntu_ver::2} -lt 16 ]]; then
 
 			# for really old Ubuntu builds (less than 16) use the debian installer (d-i) and using DVD ISO but still PRESEED.cfg...
 			# Ubuntu 14* look for the kernel called vmlinuz.efi and initrd called initrd instead of vmlinuz and initrd.gz, so
 			# we use a different option to install the VM.
+			system::get_ubuntu_media --dir ${permanent_download_dir} --media-type desktop --version ${_tgt_ubuntu_ver} 
+			: ${iso:="$permanent_download_dir/$iso_filename"}
 			system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --desktop_environment ${_UserDesktopEnvironmentSelection} --ask ${_ask}
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: is less than 16, so using debian installer (d-i) and desktop media..."
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Running install options for debian installer (d-i)..."
@@ -11577,8 +11574,10 @@ kvm::make_vm_now_from_ubuntu_com() {
 
 		elif [[ ${_tgt_ubuntu_ver::2} -lt 23 ]]; then
 
-			system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --desktop_environment ${_UserDesktopEnvironmentSelection} --ask ${_ask}
 			# for interim Ubuntu builds (less than 23) use the debian installer (d-i) using DVD ISO but still PRESEED.cfg...
+			system::get_ubuntu_media --dir ${permanent_download_dir} --media-type desktop --version ${_tgt_ubuntu_ver} 
+			: ${iso:="$permanent_download_dir/$iso_filename"}
+			system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --desktop_environment ${_UserDesktopEnvironmentSelection} --ask ${_ask}
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: is less than 23, so using debian installer (d-i) and desktop media..."
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Running install options for debian installer (d-i)..."
 			{
@@ -11611,6 +11610,8 @@ kvm::make_vm_now_from_ubuntu_com() {
 
 			# For modern Ubuntu builds (greater than 24) use the cloud config and desktop media to build desktop...
 			# However, this seems to be half baked... Hope it actually works for you...
+			system::get_ubuntu_media --dir ${permanent_download_dir} --media-type desktop --version ${_tgt_ubuntu_ver} 
+			: ${iso:="$permanent_download_dir/$iso_filename"}
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using MODERN installer..."
 			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor ${_flavor:-"ubuntu"} --desktop_environment ${_UserDesktopEnvironmentSelection:="ubuntu-desktop"} --ask ${_ask}
 
@@ -11626,47 +11627,77 @@ kvm::make_vm_now_from_ubuntu_com() {
 					--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 					--extra-args "autoinstall" \
-					--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
+					--noautoconsole   || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 			} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 		fi
-		;;
+	;;
+	VDI )
+		if [[ ${_tgt_ubuntu_ver::2} -lt 22 ]]; then
+			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than less than 23, VDI build is deprecated. "
+			_summary_message="
+			NOTE: Building a VDI for Ubuntu versions less than 23 is deprecated \n
+			Press OK to return to the previous menu. \n"
+			dialog::display_summary_message "NOTICE!"
+			unset _tgt_ubuntu_ver _summary_message iso_filename CloudConfigDir iso vm_name 
+			return
+		else
+			system::get_ubuntu_media --dir ${permanent_download_dir} --media-type server --version ${_tgt_ubuntu_ver} 
+			: ${iso:="$permanent_download_dir/$iso_filename"}
+			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than 23, so using cloud config to build server..."
+			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using SERVER installer as requested..."
+			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --role ${_role:-"server"} --server-app ${server_app:-"ubuntu-server"} --ask ${_ask:-"YES"}
+					
+			{
+				"${bin_virt_install}" --name  ${vm_name:-"Ubuntu-Server-${_tgt_ubuntu_ver}-$(date +%Y-%m-%d-%s)"}  \
+				--vcpus "${_cpu}" \
+				--memory "${_mem}" \
+				--network "${virt_net}" \
+				--disk size="${_dsk}" \
+				--os-variant="ubuntu24.04" \
+				--video "virtio" --channel "spicevmc" \
+				--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
+				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
+				--extra-args "autoinstall reboot=acpi" \
+				--events on_reboot=restart,on_poweroff=destroy,on_crash=destroy 
+			} >> ${_LOGFILE} 2>&1 & disown
+			dialog::display_summary_message "NOTICE!"
+		fi
+	;;
 	server | Server | SERVER)
-		system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than 23, so using cloud config to build server..."
-		system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using SERVER installer as requested..."
-		system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor ${_flavor:-"ubuntu"} --server-role ${_UserServerEnvironemtSelection:="ubuntu-server"} --ask ${_ask} 
-		
-		local _virt_cmd="
-			${bin_virt_install} --name  ${vm_name:-"Ubuntu-Server-${_tgt_ubuntu_ver}-$(date +%Y-%m-%d-%s)"} 
-			--vcpus "${_cpu}" 
-			--memory "${_mem}" 
-			--network "${virt_net}" 
-			--disk size="${_dsk}" 
-			--os-variant="ubuntu24.04" 
-			--video "virtio" --channel "spicevmc" 
-			--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" 
-			--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" 
-			--extra-args "autoinstall" 
-			--noautoconsole"
 
-		# Log the VM launch command...
-		system::log_item "VM launch command issued:
-				${_virt_cmd}"
+		if [[ ${_tgt_ubuntu_ver::2} -lt 22 ]]; then
+			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than less than 23, VDI build is deprecated. "
+			_summary_message="
+			NOTE: Building a server for Ubuntu versions less than 22 is deprecated \n
+			they are just too old and un modern to be useful. \n
+			Press OK to return to the previous menu. \n"
+			dialog::display_summary_message "NOTICE!"
+			unset _tgt_ubuntu_ver _summary_message iso_filename CloudConfigDir iso vm_name 
+			return
+		else
+			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than 23, so using cloud config to build server..."
+			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using SERVER installer as requested..."
+			system::get_ubuntu_media --dir ${permanent_download_dir} --media-type server --version ${_tgt_ubuntu_ver} 
+			: ${iso:="$permanent_download_dir/$iso_filename"}
+			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --role ${_role:-"server"} --server-app ${server_app:-"ubuntu-server"} --ask ${_ask:-"YES"}
+					
+			{
+				"${bin_virt_install}" --name  ${vm_name:-"Ubuntu-Server-${_tgt_ubuntu_ver}-$(date +%Y-%m-%d-%s)"}  \
+				--vcpus "${_cpu}" \
+				--memory "${_mem}" \
+				--network "${virt_net}" \
+				--disk size="${_dsk}" \
+				--os-variant="ubuntu24.04" \
+				--video "virtio" --channel "spicevmc" \
+				--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
+				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
+				--extra-args "autoinstall reboot=acpi" \
+				--events on_reboot=restart,on_poweroff=destroy,on_crash=destroy 
+			} >> ${_LOGFILE} 2>&1 & disown
+			dialog::display_summary_message "NOTICE!"
+		fi
 
-		# Launch the VM and log the output...
-		{
-			"${bin_virt_install}" --name  ${vm_name:-"Ubuntu-Server-${_tgt_ubuntu_ver}-$(date +%Y-%m-%d-%s)"}  \
-			--vcpus "${_cpu}" \
-			--memory "${_mem}" \
-			--network "${virt_net}" \
-			--disk size="${_dsk}" \
-			--os-variant="ubuntu24.04" \
-			--video "virtio" --channel "spicevmc" \
-			--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
-			--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-			--extra-args "autoinstall" \
-			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-		} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
-		;;
+	;;
 	esac
 
 	# Clean up residual variables...
@@ -11853,11 +11884,12 @@ kvm::make_vm_now_from_microsoft() {
 			--cdrom "${WindowsMedia}" \
 			--disk "${WindowsInstructions}",device=floppy \
 			--livecd \
-			--tpm backend.type=emulator,backend.version=2.0,model=tpm-crb \
+			--features kvm_hidden=on,smm=on \
+			--tpm backend.type=emulator,backend.version=2.0,model=tpm-tis \
 			${uefi_option} \
 			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
-
+	#			--tpm backend.type=emulator,backend.version=2.0,model=tpm-crb \
 	rm -f "${PostTasks}" || system::log_item "Failed to remove ${PostTasks}..."
 	for i in WindowsInstructions CONFIG WindowsMedia AutoUnattend PostTasks target_winver mem_size uefi_option cpu_count disk_size preferred_video; do unset $i; done
 }
@@ -12847,7 +12879,10 @@ template::kickstart_cfg() {
 			zerombr
 			clearpart --all
 			autopart --nohome ${Preference_DiskEncryption_RH}
-			reboot
+			# reboot
+			# uncomment to debug installation
+			# %onerror --halt
+			# reboot --eject
 
 			%packages --retries 5 --timeout 20
 			${_UserDesktopEnvironmentSelection}
@@ -13719,23 +13754,66 @@ template::cloud_config() {
 	#
 	# End of Documentation
 
-	# make sure the output file is provided
-	if [[ -z ${2} ]]; then {
-		write_error "No output file provided, use: ${FUNCNAME[0]} --write </path/to/filename>"
-		return 1
-	}; fi
+	local vm_name user_data_file role server_app ask cloud_config_dir
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--CloudConfigDir)
+			cloud_config_dir="$2"
+			shift 2
+			;;
+		--write)
+			user_data_file="$2"
+			shift 2
+			;;
+		--role)
+			role="$2"
+			shift 2
+			;;
+		--server-app)
+			server_app="$2"
+			shift 2
+			;;
+		--ask)
+			ask="$2"
+			shift 2
+			;;
+		--vmname | --VMName | --vm_name | --VmName | --vm-name | --VM-Name | --hostname | --HostName | --host-name | --Host-Name)
+			# The hostname of the VM to be created
+			local vm_name="$2"
+			[[ "$vm_name" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,253}[a-zA-Z0-9])?$ ]] && [[ ${#vm_name} -le 255 ]] && system::log_item "$vm_name: Valid hostname" || system::log_item "$vm_name: Invalid hostname"
+			shift # Remove argument name from processing
+			;;
+		*)
+			system::log_item "Warnig: Unknown parameter '$1'"
+			;;
+		esac
+	done
+
+	# Display parameter interpretation (or proceed with processing).
+	system::log_item "Cloud Configuration Directory: $cloud_config_dir"
+	system::log_item "Role: $role"
+	system::log_item "Server App: $server_app"
+	system::log_item "Ask: $ask"
 
 	# -----------------------------------------------------------------------------------------
 	# Add COMMON section to the cloud config file based on preferences
 	# -----------------------------------------------------------------------------------------
 
-	cat >>${2} <<EOF
+	# $(if [[ -n "${_UserDesktopEnvironmentSelection}" ]]; then echo "- ${_UserDesktopEnvironmentSelection}"; fi)
+        # password: "${Preference_Disk_Password}"
+
+cat >>${user_data_file} <<EOF
 #cloud-config
+power_state:
+    delay: "now"
+    mode: reboot
+    message: "RTD: Installation complete, rebooting..."
+    timeout: 30
+    condition: true
 autoinstall:
     version: 1
-    shutdown: reboot
     timezone: geoip
-    shutdown: poweroff
     drivers:
         install: true
     ssh:
@@ -13753,166 +13831,293 @@ autoinstall:
         layout:
             name: lvm
             sizing-policy: all
-            # password: "${Preference_Disk_Password}"
+    packages:
+        - dialog
+        - git
+        - curl
+        - wget
+        - zip
+        - p7zip-full
+        - byobu
+        - vim
+        - neofetch
+        - jq
 EOF
-
 	# -----------------------------------------------------------------------------------------
 	# End COMMON section to the cloud config file
 	# -----------------------------------------------------------------------------------------
 
-	# -----------------------------------------------------------------------------------------
-	# Add CUSTOM section to the cloud config file based on the role of the VM
-	# -----------------------------------------------------------------------------------------
-	Preference_Role=${_UserServerEnvironemtSelection:-"ubuntu-server"}
-	case ${Preference_Role} in
-	ubuntu-desktop)
-		system::log_item "Generating cloud-config for the role: ubuntu-desktop"
-		# -----------------------------------------------------------------------------------------
-		cat >>${2} <<EOF
-    packages:
-        - dialog
-        - git
-        - curl
-        - wget
-        - zip
-        - p7zip-full
-        - byobu
-    late-commands:
-        - echo "******************* ${Preference_Role} Config ********************"
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${_git_src_url} /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
-EOF
-		;;
+if [[ $role == "server" ]]; then
+	case ${server_app} in
+
 	kubuntu-desktop)
-		system::log_item "Generating cloud-config for the role: kubuntu-desktop"
-		# -----------------------------------------------------------------------------------------
-		cat >>${2} <<EOF
-    source:
-        id: kubuntu-desktop
-    packages:
-        - dialog
-        - git
-        - curl
-        - wget
-        - zip
-        - p7zip-full
-        - byobu
+	system::log_item "Generating cloud-config for the role: kubuntu-desktop"
+	# -----------------------------------------------------------------------------------------
+
+cat >>${user_data_file} <<EOF
+        - sddm
+        - xterm
     late-commands:
-        - echo "******************* ${Preference_Role} Config ********************"
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${_git_src_url} /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
+        - echo "******************* ${server_app} Config ********************"
+        - mount --bind /dev  /target/dev
+        - mount --bind /proc /target/proc
+        - mount --bind /sys  /target/sys
+        - mount --bind /run  /target/run
+
+        # Install Kubuntu Desktop Environment
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get upgrade -y'
+        - curtin in-target --target=/target -- apt-get -y install kubuntu-desktop
+        - curtin in-target --target=/target -- apt install plymouth-theme-kubuntu-logo plymouth-theme-kubuntu-text plymouth-theme-spinner plymouth-x11 -y ; update-initramfs -u ; exit 0
+        - curtin in-target --target=/target -- sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' /etc/default/grub ; update-grub ; exit 0
+        - curtin in-target --target=/target -- update-grub ; exit 0
+        - curtin in-target --target=/target -- systemctl set-default graphical.target  ; exit 0
+        - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service ; exit 0
+
+        # Clone RTD Setup & Execute OEM Config
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd'
+        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh'
 EOF
-		;;
+	# -----------------------------------------------------------------------------------------
+	;;
+	ubuntu-desktop)
+	system::log_item "Generating cloud-config for the role: ubuntu-desktop"
+	# -----------------------------------------------------------------------------------------
+
+cat >>${user_data_file} <<EOF
+        - gdm3
+        - xserver-xorg
+        - xinit
+        - mesa-utils
+        - plymouth-theme-spinner
+        - plymouth-x11
+    late-commands:
+        - echo "******************* ${server_app} Config ********************"
+        - mount --bind /dev  /target/dev
+        - mount --bind /proc /target/proc
+        - mount --bind /sys  /target/sys
+        - mount --bind /run  /target/run
+
+        # Install Ubuntu Desktop Environment
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get upgrade -y'
+        - curtin in-target --target=/target -- apt-get -y install ubuntu-desktop
+        - curtin in-target --target=/target -- sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' /etc/default/grub ; update-grub ; exit 0
+        - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service ; exit 0
+
+        # Clone RTD Setup & Execute OEM Config
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd'
+        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh'
+EOF
+	# -----------------------------------------------------------------------------------------
+	;;
+	xubuntu-desktop)
+	system::log_item "Generating cloud-config for the role: xubuntu-desktop"
+	# -----------------------------------------------------------------------------------------
+
+cat >>${user_data_file} <<EOF
+        - lightdm
+    late-commands:
+        - echo "******************* ${server_app} Config ********************"
+        - mount --bind /dev  /target/dev
+        - mount --bind /proc /target/proc
+        - mount --bind /sys  /target/sys
+        - mount --bind /run  /target/run
+
+        # Install xubuntu-desktop
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get upgrade -y'
+        - curtin in-target --target=/target -- apt-get -y install xubuntu-desktop
+        - curtin in-target --target=/target -- apt install -y plymouth-theme-xubuntu-logo plymouth-theme-xubuntu-logo plymouth-theme-spinner plymouth-x11 ; update-initramfs -u ; exit 0
+        - curtin in-target --target=/target -- sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' /etc/default/grub ; update-grub ; exit 0
+        - curtin in-target --target=/target -- update-grub ; exit 0
+
+        # Enable and start spice-vdagent onlogin
+        - curtin in-target --target=/target -- apt-get -y install spice-vdagent qemu-guest-agent
+        - curtin in-target --target=/target -- systemctl enable spice-vdagentd
+
+        # Ensure spice-vdagent autostarts in user sessions
+        - curtin in-target --target=/target -- mkdir -p /etc/xdg/autostart
+        - curtin in-target --target=/target -- bash -c 'echo -e "[Desktop Entry]\nType=Application\nExec=/usr/bin/spice-vdagent\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\nName=Spice Agent" > /etc/xdg/autostart/spice-vdagent.desktop'
+
+        # Clone RTD Setup & Execute OEM Config
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd'
+        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh'
+EOF
+	# -----------------------------------------------------------------------------------------
+	;;
+	ubuntu-mate-desktop)
+	system::log_item "Generating cloud-config for ${2}"
+	# -----------------------------------------------------------------------------------------
+
+cat >>${user_data_file} <<EOF
+        - lightdm
+    late-commands:
+        - echo "******************* ${server_app} Config ********************"
+        - mount --bind /dev  /target/dev
+        - mount --bind /proc /target/proc
+        - mount --bind /sys  /target/sys
+        - mount --bind /run  /target/run
+
+        # Install Ubuntu MATE Desktop
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get upgrade -y'
+        - curtin in-target --target=/target -- /bin/bash -c "echo lightdm shared/default-x-display-manager select lightdm | debconf-set-selections"
+        - curtin in-target --target=/target -- apt-get -y install ubuntu-mate-desktop
+        - curtin in-target --target=/target -- apt-get -y install plymouth-theme-ubuntu-mate-logo plymouth-theme-ubuntu-mate-text plymouth-theme-spinner plymouth-x11 ; update-initramfs -u ; exit 0
+        - curtin in-target --target=/target -- sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' /etc/default/grub ; update-grub ; exit 0
+        - curtin in-target --target=/target -- update-grub ; exit 0
+        - curtin in-target --target=/target -- systemctl set-default graphical.target  ; exit 0
+        - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service ; exit 0
+
+        # Enable and start spice-vdagent onlogin
+        - curtin in-target --target=/target -- apt-get -y install spice-vdagent qemu-guest-agent
+        - curtin in-target --target=/target -- systemctl enable spice-vdagentd
+
+        # Ensure spice-vdagent autostarts in user sessions
+        - curtin in-target --target=/target -- mkdir -p /etc/xdg/autostart
+        - curtin in-target --target=/target -- bash -c 'echo -e "[Desktop Entry]\nType=Application\nExec=/usr/bin/spice-vdagent\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\nName=Spice Agent" > /etc/xdg/autostart/spice-vdagent.desktop'
+
+        # Clone RTD Setup & Execute OEM Config
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd'
+        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh'
+EOF
+	# -----------------------------------------------------------------------------------------
+	;;
+	lubuntu-desktop)
+	system::log_item "Generating cloud-config for ${2}"
+	# -----------------------------------------------------------------------------------------
+
+cat >>${user_data_file} <<EOF
+        - sddm
+    late-commands:
+        - echo "******************* ${server_app} Config ********************"
+        - mount --bind /dev  /target/dev
+        - mount --bind /proc /target/proc
+        - mount --bind /sys  /target/sys
+        - mount --bind /run  /target/run
+
+        # Install Lubuntu Desktop
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get upgrade -y'
+        - curtin in-target --target=/target -- apt-get -y install lubuntu-desktop
+        - curtin in-target --target=/target -- apt-get -y install plymouth-theme-lubuntu-logo plymouth-theme-lubuntu-text plymouth-theme-spinner plymouth-x11 ; update-initramfs -u ; exit 0
+        - curtin in-target --target=/target -- sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' /etc/default/grub ; update-grub ; exit 0
+        - curtin in-target --target=/target -- update-grub ; exit 0
+
+        # Enable and start spice-vdagent onlogin
+        - curtin in-target --target=/target -- apt-get -y install spice-vdagent qemu-guest-agent
+        - curtin in-target --target=/target -- systemctl enable spice-vdagentd
+
+        # Ensure spice-vdagent autostarts in user sessions
+        - curtin in-target --target=/target -- mkdir -p /etc/xdg/autostart
+        - curtin in-target --target=/target -- bash -c 'echo -e "[Desktop Entry]\nType=Application\nExec=/usr/bin/spice-vdagent\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\nName=Spice Agent" > /etc/xdg/autostart/spice-vdagent.desktop'
+
+        # Clone RTD Setup & Execute OEM Config
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd'
+        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh'
+EOF
+	# -----------------------------------------------------------------------------------------
+	;;
+	cinnamon-desktop-environment)
+	system::log_item "Generating cloud-config for ${2}"
+	# -----------------------------------------------------------------------------------------
+
+cat >>${user_data_file} <<EOF
+        - sddm
+    late-commands:
+        - echo "******************* ${server_app} Config ********************"
+        - mount --bind /dev  /target/dev
+        - mount --bind /proc /target/proc
+        - mount --bind /sys  /target/sys
+        - mount --bind /run  /target/run
+
+        # Install Cinnamon Desktop
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get upgrade -y'
+        - curtin in-target --target=/target -- apt-get -y install cinnamon-desktop-environment
+        - curtin in-target --target=/target -- apt-get -y install plymouth-theme-ubuntucinnamon-spinner plymouth-theme-spinner plymouth-x11 ; update-initramfs -u ; exit 0
+        - curtin in-target --target=/target -- sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' /etc/default/grub ; update-grub ; exit 0
+        - curtin in-target --target=/target -- update-grub ; exit 0
+
+        # Enable and start spice-vdagent onlogin
+        - curtin in-target --target=/target -- apt-get -y install spice-vdagent qemu-guest-agent
+        - curtin in-target --target=/target -- systemctl enable spice-vdagentd
+
+        # Ensure spice-vdagent autostarts in user sessions
+        - curtin in-target --target=/target -- mkdir -p /etc/xdg/autostart
+        - curtin in-target --target=/target -- bash -c 'echo -e "[Desktop Entry]\nType=Application\nExec=/usr/bin/spice-vdagent\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\nName=Spice Agent" > /etc/xdg/autostart/spice-vdagent.desktop'
+
+        # Clone RTD Setup & Execute OEM Config
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd'
+        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh'
+EOF
+	# -----------------------------------------------------------------------------------------
+	;;
 	ubuntu-server | ubuntu-server-minimal)
-		system::log_item "Generating cloud-config for ubuntu-server"
-		# -----------------------------------------------------------------------------------------
-		cat >>${2} <<EOF
-    packages:
-        - dialog
-        - git
-        - curl
-        - wget
-        - zip
-        - p7zip-full
-        - byobu
-        - dialog
-        - vim
-        - neofetch
+	system::log_item "Generating cloud-config for ubuntu-server"
+	# -----------------------------------------------------------------------------------------
+
+cat >>${user_data_file} <<EOF
+        - ubuntu-server
     late-commands:
-        - echo "******************* ${Preference_Role} Config ********************"
+        - echo "******************* ${server_app} Config ********************"
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${_git_src_url} /opt/rtd ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
 EOF
-		;;
+	# -----------------------------------------------------------------------------------------
+	;;
 	ssh-server)
-		system::log_item "Generating cloud-config for ubuntu-ssh-server"
-		# -----------------------------------------------------------------------------------------
-		cat >>${2} <<EOF
-    packages:
-        - dialog
-        - git
-        - curl
-        - wget
-        - zip
-        - p7zip-full
-        - byobu
-        - dialog
-        - vim
-        - neofetch
+	system::log_item "Generating cloud-config for ubuntu-ssh-server"
+	# -----------------------------------------------------------------------------------------
+
+cat >>${user_data_file} <<EOF
+        - ssh-server
     late-commands:
-        - echo "******************* ${Preference_Role} Config ********************"
+        - echo "******************* ${server_app} Config ********************"
+
+        # Clone RTD Setup & Execute OEM Config
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${_git_src_url} /opt/rtd ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
 EOF
-		;;
-	server-desktop)
-		system::log_item "Generating cloud-config for ${2}"
-		# -----------------------------------------------------------------------------------------
-		cat >>${2} <<EOF
-    packages:
-        - dialog
-        - git
-        - curl
-        - wget
-        - zip
-        - p7zip-full
-        - ansible
-        - byobu
-        - vim
-        - neofetch
-        $(if [[ -n "${_UserDesktopEnvironmentSelection}" ]]; then echo - ${_UserDesktopEnvironmentSelection}; fi)
-    late-commands:
-        - echo "******************* ${Preference_Role} Config ********************"
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${_git_src_url} /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
-EOF
-		;;
+	# -----------------------------------------------------------------------------------------
+	;;
 	ansible-server)
-		system::log_item "Generating cloud-config for ubuntu-ssh-server"
-		# -----------------------------------------------------------------------------------------
-		cat >>${2} <<EOF
-    packages:
-        - dialog
-        - git
-        - curl
-        - wget
-        - zip
-        - p7zip-full
+	system::log_item "Generating cloud-config for ubuntu-ssh-server"
+	# -----------------------------------------------------------------------------------------
+cat >>${user_data_file} <<EOF
         - ansible
-        - byobu
-        - dialog
-        - vim
-        - neofetch
     late-commands:
-        - echo "******************* ${Preference_Role} Config ********************"
+        - echo "******************* ${server_app} Config ********************"
+
+        # Clone RTD Setup & Execute OEM Config
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${_git_src_url} /opt/rtd ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
 EOF
-		;;
+	# -----------------------------------------------------------------------------------------
+	;;
 	minecraft)
-		system::log_item "Generating cloud-config for minecraft-server"
-		# -----------------------------------------------------------------------------------------
-		cat >>${2} <<EOF
-    packages:
-        - dialog
-        - git
-        - wget
-        - zip
-        - p7zip-full
-        - byobu
-        - vim
-        - neofetch
-    late-commands:
-        - echo "******************* ${Preference_Role} Config ********************"
+	system::log_item "Generating cloud-config for minecraft-server"
+	# -----------------------------------------------------------------------------------------
+cat >>${user_data_file} <<EOF
+     late-commands:
+        - echo "******************* ${server_app} Config ********************"
+
+        # Clone RTD Setup & Execute OEM Config
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${_git_src_url} /opt/rtd ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
+
+        # Setup Minecraft Server and autologin to the console and launch the server
         - mkdir -p /target/etc/systemd/system/getty@tty1.service.d
         - touch /target/etc/systemd/system/getty@tty1.service.d/override.conf
         - echo [Service] > /target/etc/systemd/system/getty@tty1.service.d/override.conf
@@ -13923,12 +14128,48 @@ EOF
         - echo "Please run rtd-minecraft-server to start the Minecraft Server!" >> /target/etc/update-motd.d/00-header
         - echo rtd-minecraft-server >> /target/etc/profile
 EOF
-		;;
+	# -----------------------------------------------------------------------------------------
+	;;
 	*)
-		system::log_item "Got: ${Preference_Role} No valid task selected, skipping late commands..."
-		;;
+	system::log_item "Got: ${server_app} No custom task selected, trying to install $server_app..."
+	system::log_item "Generating cloud-config for $server_app"
+	# -----------------------------------------------------------------------------------------
+
+cat >>${user_data_file} <<EOF
+        - ssh-server
+    late-commands:
+        - echo "******************* ${server_app} Config ********************"
+        - curtin in-target --target=/target -- apt-get install ${server_app:-"ssh-server"}
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
+EOF
+	# -----------------------------------------------------------------------------------------
+	;;
 	esac
 	# -----------------------------------------------------------------------------------------
+else
+	# -----------------------------------------------------------------------------------------
+	# Add CUSTOM section to the cloud config file based on the role of the VM
+	# -----------------------------------------------------------------------------------------
+
+	system::log_item "Generating cloud-config for the role: ubuntu-desktop"
+	# -----------------------------------------------------------------------------------------
+cat >>${user_data_file} <<EOF
+    late-commands:
+        - echo "******************* Ubuntu Desktop Config ********************"
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${_git_src_url} /opt/rtd ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
+EOF
+	# -----------------------------------------------------------------------------------------
+
+fi
+
+
+
+
+
 
 }
 
@@ -14417,13 +14658,13 @@ EOF
 #
 ##########################################################################################
 
-set_colors() {
+term::set_colors() {
 	# Description: Set colors for prompting on screen in human readable variables. These will be set globally
 	# and can be can be used by in echo statements to modify the color of the message.
 	# Examples:  $YELLOW, $RED, $ENDCOLOR (reset), $GREEN, $BLUE
 	# Usage:
 	#	Simply call this function by stating its name:
-	# 	set_colors
+	# 	term::set_colors
 	#
 	# Globals:
 	# Arguments: None
@@ -14750,7 +14991,7 @@ write_host() {
 	# Description:
 	# This is a simplified and consistent way to write output to the screen.
 	# This function will print a message to the standard out in a color specified.
-	# Specified colors can be colord defined in the function "set_colors"
+	# Specified colors can be colord defined in the function "term::set_colors"
 	# If no color option is specified this cunctio simply works like the echo command.
 	#
 	# Globals:
@@ -15109,7 +15350,7 @@ list_loaded_software_functions() {
 # library will simply be loaded in to memory.
 
 # Load base color sheme for use in the library...
-#set_colors
+term::set_colors
 
 # If $LOGFILE is not set, then set it to a default location...
 if [[ -z $_LOGFILE ]]; then
@@ -15176,7 +15417,6 @@ eval_params() {
 	case $1 in
 	--help | -?)
 		clear
-		set_colors
 		echo -e " 📚 ${UWhite}${0##*/} ${red}::${BICyan} RunTime Data Library HELP ${endcolor}${red}${UWhite}::${endcolor}
 
 		${blue}Usage${red}:${endcolor}
@@ -15327,67 +15567,66 @@ eval_params() {
 		return
 		;;
 	--devhelp-test)
-#!/bin/bash
 
-# Ensure the documentation file exists
-DOC_FILE="/tmp/yad_doc.txt"
-echo "Documentation will appear here" > "$DOC_FILE"
+		# Ensure the documentation file exists
+		DOC_FILE="/tmp/yad_doc.txt"
+		echo "Documentation will appear here" > "$DOC_FILE"
 
-# Use sample functions_output directly
-functions_output=$(cat <<EOF
-#167:	write_status 
-#168:	write_warning 
-#169:	yad::display_cmd_output 
-#170:	yad::display_progressbar_pulsating 
-#171:	zenity::display_file 
-#172:	zenity::display_info 
-#173:	zenity::display_url 
+		# Use sample functions_output directly
+		functions_output=$(cat <<EOF
+		#167:	write_status 
+		#168:	write_warning 
+		#169:	yad::display_cmd_output 
+		#170:	yad::display_progressbar_pulsating 
+		#171:	zenity::display_file 
+		#172:	zenity::display_info 
+		#173:	zenity::display_url 
 EOF
-)
+		)
 
-# Parse the functions and build the list for yad
-functions_list=""
-while IFS= read -r line; do
-    # Skip empty lines
-    [ -z "$line" ] && continue
-    # Extract number and function name
-    if [[ "$line" =~ ^#([0-9]+):[[:space:]]*(.+)$ ]]; then
-        number="${BASH_REMATCH[1]}"
-        function_name="${BASH_REMATCH[2]}"
-        # For now, use a placeholder description
-        description="Description for $function_name"
-        # Build the list in the required format
-        functions_list+="${number}|${function_name}|${description}\n"
-    fi
-done <<< "$functions_output"
+		# Parse the functions and build the list for yad
+		functions_list=""
+		while IFS= read -r line; do
+		# Skip empty lines
+		[ -z "$line" ] && continue
+		# Extract number and function name
+		if [[ "$line" =~ ^#([0-9]+):[[:space:]]*(.+)$ ]]; then
+			number="${BASH_REMATCH[1]}"
+			function_name="${BASH_REMATCH[2]}"
+			# For now, use a placeholder description
+			description="Description for $function_name"
+			# Build the list in the required format
+			functions_list+="${number}|${function_name}|${description}\n"
+		fi
+		done <<< "$functions_output"
 
-# Write the functions list to a temporary file
-echo -e "$functions_list" > /tmp/functions_list.txt
+		# Write the functions list to a temporary file
+		echo -e "$functions_list" > /tmp/functions_list.txt
 
-# Start the main paned window
-yad --paned --key=$$ --orient=hor --title="Select a function to see its documentation" \
-    --width=800 --height=600 --splitter=300 --button="Quit:1" &
+		# Start the main paned window
+		yad --paned --key=$$ --orient=hor --title="Select a function to see its documentation" \
+		--width=800 --height=600 --splitter=300 --button="Quit:1" &
 
-PANED_PID=$!
+		PANED_PID=$!
 
-# Start the text-info pane
-yad --text-info --no-markup --wrap --filename="$DOC_FILE" \
-    --plug=$$ --tabnum=2 --margins=10 --no-buttons --editable &
+		# Start the text-info pane
+		yad --text-info --no-markup --wrap --filename="$DOC_FILE" \
+		--plug=$$ --tabnum=2 --margins=10 --no-buttons --editable &
 
-# Start the list pane and handle selection
-yad --list --separator="|" --column="Number" --column="Function" --column="Description" \
-    --print-column=2 --hide-column=1 \
-    --plug=$$ --tabnum=1 \
-    --filename=/tmp/functions_list.txt \
-    | while read -r selected_function; do
-        if [ -z "$selected_function" ]; then
-            continue
-        fi
-        # For testing, simply display the function name in the documentation pane
-        echo "Documentation for $selected_function" > "$DOC_FILE"
-    done
+		# Start the list pane and handle selection
+		yad --list --separator="|" --column="Number" --column="Function" --column="Description" \
+		--print-column=2 --hide-column=1 \
+		--plug=$$ --tabnum=1 \
+		--filename=/tmp/functions_list.txt \
+		| while read -r selected_function; do
+			if [ -z "$selected_function" ]; then
+			continue
+			fi
+			# For testing, simply display the function name in the documentation pane
+			echo "Documentation for $selected_function" > "$DOC_FILE"
+		done
 
-wait $PANED_PID
+		wait $PANED_PID
 
 	;;
 	--devhelp-gtk)

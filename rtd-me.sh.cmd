@@ -153,7 +153,7 @@ _git_src_url=https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git
 if [[ "$OSTYPE" == *"linux"* ]]; then
 	{
 	printf "🌎 Linux OS Found: Attempting to get instructions for Linux: \n executing $0"
-
+	printf "📦 Verifying that the required software to continue is available and installing if not there..."
 	for d in git zip; do 
 		if ! command -v "$d" &>/dev/null; then
 			for pkgmgr in apt yum dnf zypper; do
