@@ -2469,9 +2469,11 @@ system::generate_cloudconfig() {
 	# Initialize variables with defaults.
 	system::log_item "Called by: ${FUNCNAME[1]}"
 	system::log_item "Processing parameters: $*"
+	local all_params=${*}
 	local cloud_config_dir="$CloudConfigDir"
-	local server_app="${_UserServerEnvironemtSelection:-ubuntu-server}"
+	local server_app="${_UserServerEnvironemtSelection:-"ubuntu-server"}"
 	local ask="${_ask}"
+	local role="${_role}"
 
 	# -----------------------------------------------------------------------------------------
 	# Collect required information from the parameters passed to the function.
@@ -2495,7 +2497,7 @@ system::generate_cloudconfig() {
 	# get default VM configurations options from the kvm::get_vm_config_preferences
 	# -----------------------------------------------------------------------------------------
 	# Ask the user for VM config options if required...
-	kvm::util::read_distro_options --distribution ubuntu "$@"
+	kvm::util::read_distro_options --distribution ubuntu ${all_params}
 
 	# -----------------------------------------------------------------------------------------
 	# Directory for cloud config files, if not set, create a temporary directory and use that.
@@ -2523,7 +2525,7 @@ system::generate_cloudconfig() {
 	# Write out the user-data file
 	# -----------------------------------------------------------------------------------------
 	system::log_item "Writing out the user-data file..."
-	template::cloud_config --write "${cloud_config_dir}/user-data" ${*} || {
+	template::cloud_config --write "${cloud_config_dir}/user-data" ${all_params} || {
 		system::log_item "Failed to write out the user-data file."
 		return 1
 	}
@@ -10206,6 +10208,7 @@ kvm::util::read_common_options() {
 
 	# Log the start of reading common options for KVM VM creation
 	system::log_item "Reading common options for KVM virtual machine creation..."
+	system::log_item "Parameters: $*"
 	ALL_PARAMS=("$@")
 
 	# Ensure that the parameters are in a valid format
@@ -10297,7 +10300,7 @@ kvm::util::read_common_options() {
 			;;
 		esac
 	done
-
+	return 0
 }
 
 kvm::util::read_distro_options() {
@@ -10318,6 +10321,7 @@ kvm::util::read_distro_options() {
 
 	# Log the start of reading distribution specific options for KVM VM creation
 	system::log_item "Reading distribution specific options for KVM virtual machine creation..."
+	system::log_item "Parameters: $*"
 	ALL_PARAMS=("$@")
 
 	# Ensure that the parameters are in a valid format
@@ -11503,8 +11507,9 @@ kvm::make_vm_now_from_ubuntu_com() {
 	# End of Documentation
 
 	# Set default values for VM T-Shirts sizes (may vary by OS)...
-	: ${_flavor="ubuntu"} # This is the default flavor of Ubuntu to use.
-	: ${_role:="server"}  # This is the default role of the Ubuntu VM to create.
+	: ${all_params=${*}}                                  # Save all parameters for later use.
+	: ${_flavor="ubuntu"}                                 # This is the default flavor of Ubuntu to use.
+	: ${_role:="server"}                                  # This is the default role of the Ubuntu VM to create.
 	#: ${_UserDesktopEnvironmentSelection:="ubuntu-desktop"} # This is the default task to perform on the Ubuntu VM.
 	#: ${_UserServerEnvironemtSelection:="ssh-server"} 	 # This is the default server role for the Ubuntu VM.
 	: ${_cpu:="${_cpu:=2}"}                               # This is the default number of CPUs to use.
@@ -11518,10 +11523,10 @@ kvm::make_vm_now_from_ubuntu_com() {
 	: ${_ask="NO"}                                        # This is the default for interactive mode for manual input during setup.
 
 	# Set default values for VM T-Shirts sizes...
-	kvm::util::read_common_options ${*}
+	kvm::util::read_common_options ${all_params}
 
 	# Set specific options for Debian...
-	kvm::util::read_distro_options --distro ubuntu ${*}
+	kvm::util::read_distro_options --distro ubuntu ${all_params}
 
 	# Check that virtualization is supported on the host
 	dependency::virtualization
@@ -11536,7 +11541,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 	fi
 
 	# Format the name of the VM to be created...
-	local vm_name="Template_Ubuntu_${_role}_${_tgt_ubuntu_ver}_${_UserDesktopEnvironmentSelection}${_UserServerEnvironemtSelection}${server_app}_$(date +%Y-%m-%d-%s)"
+	local vm_name="Template_Ubuntu_${server_app}${pre_config}${_role}_${_tgt_ubuntu_ver}_${_UserDesktopEnvironmentSelection}${_UserServerEnvironemtSelection}_$(date +%Y-%m-%d-%s)"
 
 	# ensure local media:          [/where/to/look/first]
 	# system::get_ubuntu_media --dir ${permanent_download_dir} --media-type ${_flavor} --version ${_tgt_ubuntu_ver} --type ${_role}
@@ -11570,7 +11575,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 			# we use a different option to install the VM.
 			system::get_ubuntu_media --dir ${permanent_download_dir} --media-type desktop --version ${_tgt_ubuntu_ver} 
 			: ${iso:="$permanent_download_dir/$iso_filename"}
-			system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --desktop_environment ${_UserDesktopEnvironmentSelection} --ask ${_ask}
+			system::make_preseed_cfg ${all_params}
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: is less than 16, so using debian installer (d-i) and desktop media..."
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Running install options for debian installer (d-i)..."
 			{
@@ -11595,7 +11600,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 			# for interim Ubuntu builds (less than 23) use the debian installer (d-i) using DVD ISO but still PRESEED.cfg...
 			system::get_ubuntu_media --dir ${permanent_download_dir} --media-type desktop --version ${_tgt_ubuntu_ver} 
 			: ${iso:="$permanent_download_dir/$iso_filename"}
-			system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --desktop_environment ${_UserDesktopEnvironmentSelection} --ask ${_ask}
+			system::make_preseed_cfg ${all_params}
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: is less than 23, so using debian installer (d-i) and desktop media..."
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Running install options for debian installer (d-i)..."
 			{
@@ -11631,7 +11636,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 			system::get_ubuntu_media --dir ${permanent_download_dir} --media-type desktop --version ${_tgt_ubuntu_ver} 
 			: ${iso:="$permanent_download_dir/$iso_filename"}
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using MODERN installer..."
-			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --flavor ${_flavor:-"ubuntu"} --desktop_environment ${_UserDesktopEnvironmentSelection:="ubuntu-desktop"} --ask ${_ask}
+			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" ${all_params}
 
 			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greated than 24, so using cloud config and desktop media to build desktop..."
 			{
@@ -11663,7 +11668,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 			: ${iso:="$permanent_download_dir/$iso_filename"}
 			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than 23, so using cloud config to build server..."
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using SERVER installer as requested..."
-			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --role ${_role:-"server"} --server-app ${server_app:-"ssh-server"} --ask ${_ask:-"YES"}
+			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" ${all_params}
 					
 			{
 				"${bin_virt_install}" --name  ${vm_name:-"Ubuntu-Server-${_tgt_ubuntu_ver}-$(date +%Y-%m-%d-%s)"}  \
@@ -11697,7 +11702,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using SERVER installer as requested..."
 			system::get_ubuntu_media --dir ${permanent_download_dir} --media-type server --version ${_tgt_ubuntu_ver} 
 			: ${iso:="$permanent_download_dir/$iso_filename"}
-			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" ${*}
+			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" ${all_params}
 					
 			{
 				"${bin_virt_install}" --name  ${vm_name:-"Ubuntu-Server-${_tgt_ubuntu_ver}-$(date +%Y-%m-%d-%s)"}  \
@@ -11719,7 +11724,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 	esac
 
 	# Clean up residual variables...
-	unset _UserDesktopEnvironmentSelection _UserServerEnvironemtSelection PRESEED_FILE vm_kernel vm_initrd source_url iso _task _role _cpu _dsk _mem _tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig CloudConfigDir _summary_message _saveto _ask _flavor _role _cpu _mem _dsk permanent_download_dir bin_virt_install virt_net 
+	unset _UserDesktopEnvironmentSelection _UserServerEnvironemtSelection PRESEED_FILE vm_kernel vm_initrd source_url iso _task _role _cpu _dsk _mem _tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig CloudConfigDir _summary_message _saveto _ask _flavor _role _cpu _mem _dsk permanent_download_dir bin_virt_install virt_net vm_name all_params server_app pre_config
 }
 
 kvm::make_vm_now_from_microsoft() {
@@ -13771,8 +13776,9 @@ template::cloud_config() {
 	#   Be very careful when editing this function, as it is sensitive to indentation and spacing.
 	#
 	# End of Documentation
-
-	local vm_name user_data_file role server_app ask cloud_config_dir
+	system::log_item "Called by: ${FUNCNAME[1]}"
+	system::log_item "Processing parameters: $*"
+	local vm_name user_data_file role server_app ask cloud_config_dir pre_config
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
@@ -13800,10 +13806,11 @@ template::cloud_config() {
 			# The hostname of the VM to be created
 			local vm_name="$2"
 			[[ "$vm_name" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,253}[a-zA-Z0-9])?$ ]] && [[ ${#vm_name} -le 255 ]] && system::log_item "$vm_name: Valid hostname" || system::log_item "$vm_name: Invalid hostname"
-			shift # Remove argument name from processing
+			shift 2 # Remove argument name from processing
 			;;
 		*)
 			system::log_item "Warnig: Unknown parameter '$1'"
+			shift 2
 			;;
 		esac
 	done
@@ -13811,8 +13818,7 @@ template::cloud_config() {
 	# Display parameter interpretation (or proceed with processing).
 	system::log_item "Cloud Configuration Directory: $cloud_config_dir"
 	system::log_item "Role: $role"
-	system::log_item "Server App: $server_app"
-	system::log_item "Ask: $ask"
+	system::log_item "Server App: ${server_app:-"None"}"
 	if [[ -n $pre_config ]] ; then { role=$pre_config ; system::log_item "Pre-Config: ${pre_config}" ; } ; fi
 	system::log_item "VM Name: $vm_name"
 
@@ -14162,10 +14168,9 @@ EOF
 	system::log_item "🖧 Please install the desiredd application MANUALLY"
 	# -----------------------------------------------------------------------------------------
 cat >>${user_data_file} <<EOF
-        - ssh-server
     late-commands:
         - echo "******************* ${server_app} Config ********************"
-        - curtin in-target --target=/target -- apt-get install ${server_app:-"ssh-server"}
+        - curtin in-target --target=/target -- apt-get install ${server_app:-"openssh-server"}
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
@@ -14175,6 +14180,7 @@ EOF
 	esac
 
 fi
+	return 0
 
 }
 
