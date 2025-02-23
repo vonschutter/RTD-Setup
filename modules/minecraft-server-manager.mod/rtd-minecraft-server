@@ -310,7 +310,21 @@ while true; do
 
     start_epoch=$(date +%s)
     echo Starting Minecraft server $MC_SERVER_NAME ....
-    ~/bin/java/bin/java -Xmx2048M -Xms2048M -jar $(dirname "$0")/server.jar noggui broadcast
+    JAVA_HOME_DIR="$HOME/bin/java/bin/java"
+    DEFAULT_JAVA="java"
+    SERVER_JAR="$(dirname "$0")/server.jar"
+
+    if [[ -x "$JAVA_HOME_DIR" ]]; then
+        JAVA_CMD="$JAVA_HOME_DIR"
+    elif command -v "$DEFAULT_JAVA" &>/dev/null; then
+        JAVA_CMD="$DEFAULT_JAVA"
+    else
+        printf "Error: No valid Java installation found.\n" >&2
+        exit 1
+    fi
+
+    exec "$JAVA_CMD" -Xmx2048M -Xms2048M -jar "$SERVER_JAR" noggui broadcast
+    # ~/bin/java/bin/java -Xmx2048M -Xms2048M -jar $(dirname "$0")/server.jar noggui broadcast
     # java -Xmx2048M -Xms2048M -jar $(dirname "$0")/server.jar noggui broadcast
     # Abort if the application exited too quickly
     duration=$(( $(date +%s) - $start_epoch ))

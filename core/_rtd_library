@@ -2470,11 +2470,13 @@ system::generate_cloudconfig() {
 	system::log_item "Called by: ${FUNCNAME[1]}"
 	system::log_item "Processing parameters: $*"
 	local cloud_config_dir="$CloudConfigDir"
-	local role="${_role:-server}"
 	local server_app="${_UserServerEnvironemtSelection:-ubuntu-server}"
 	local ask="${_ask}"
 
-	# Process parameters.
+	# -----------------------------------------------------------------------------------------
+	# Collect required information from the parameters passed to the function.
+	# -----------------------------------------------------------------------------------------
+
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 		--CloudConfigDir)
@@ -2482,37 +2484,23 @@ system::generate_cloudconfig() {
 			system::log_item "cloud_config_dir set to: $cloud_config_dir"
 			shift 2
 			;;
-		--role)
-			role="$2"
-			system::log_item "role set to: $role"
-			shift 2
-			;;
-		--server-app)
-			server_app="$2"
-			system::log_item "server_app set to: $server_app"
-			shift 2
-			;;
-		--ask)
-			ask="$2"
-			system::log_item "ask set to: $ask"
-			shift 2
-			;;
-		--vmname | --VMName | --vm_name | --VmName | --vm-name | --VM-Name | --hostname | --HostName | --host-name | --Host-Name)
-			# The hostname of the VM to be created
-			local vm_name="$2"
-			system::log_item "vm_name set to: $vm_name"
-			# [[ "$vm_name" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,253}[a-zA-Z0-9])?$ ]] && [[ ${#vm_name} -le 255 ]] && system::log_item "$vm_name: Valid hostname" || system::log_item "$vm_name: Invalid hostname"
+		*)
+			system::log_item "Skippinng option: $1"
 			shift 2
 			;;
 		esac
 	done
+
+	# -----------------------------------------------------------------------------------------
 	# get default VM configurations options from the kvm::get_vm_config_preferences
-	kvm::get_vm_config_preferences
+	# -----------------------------------------------------------------------------------------
+	# Ask the user for VM config options if required...
 	kvm::util::read_distro_options --distribution ubuntu "$@"
 
+	# -----------------------------------------------------------------------------------------
 	# Directory for cloud config files, if not set, create a temporary directory and use that.
+	# -----------------------------------------------------------------------------------------
 	local cloud_config_dir="${cloud_config_dir:=$(mktemp -d /tmp/CloudConfig.XXXXXX)}"
-
 	touch ${cloud_config_dir}/meta-data
 	touch ${cloud_config_dir}/user-data
 
@@ -2522,15 +2510,20 @@ system::generate_cloudconfig() {
 	system::log_item "Server App: $server_app"
 	system::log_item "Ask: $ask"
 
+	# -----------------------------------------------------------------------------------------
 	# If the user has requested to copy their SSH key to the host, capture it and store in a
-	# var for use in the config file:
+	# var for use in the config file. Preferences are pulled from the config file via 
+	# kvm::get_vm_config_preferences stored in environment variables. 
+	# -----------------------------------------------------------------------------------------
 	if [[ "${Preference_CopySSHKey}" == "yes" || "${Preference_CopySSHKey}" == "YES" ]]; then
 		local Preference_ssh_pub_key="$(cat /home/$SUDO_USER/.ssh/*.pub | head -1)"
 	fi
 
+	# -----------------------------------------------------------------------------------------
 	# Write out the user-data file
+	# -----------------------------------------------------------------------------------------
 	system::log_item "Writing out the user-data file..."
-	template::cloud_config --write "${cloud_config_dir}/user-data" --CloudConfigDir "${cloud_config_dir}" --role ${role} --server-app ${server_app} --ask ${ask} || {
+	template::cloud_config --write "${cloud_config_dir}/user-data" ${*} || {
 		system::log_item "Failed to write out the user-data file."
 		return 1
 	}
@@ -2542,7 +2535,9 @@ system::generate_cloudconfig() {
 	write_information "Generating Ubuntu autoinstall instruction media: ${cloud_config_dir}/CIDATA.iso"
 	software::check_native_package_dependency genisoimage
 
+	# -----------------------------------------------------------------------------------------
 	# Generate the CIDATA.iso file
+	# -----------------------------------------------------------------------------------------
 	write_information "Generating: ${cloud_config_dir}/CIDATA.iso"
 	if genisoimage -output ${cloud_config_dir}/CIDATA.iso -volid cidata -joliet -rock -full-iso9660-filenames ${cloud_config_dir}/* &>>${_LOGFILE}; then
 		{ system::log_item "Generated: ${cloud_config_dir}/CIDATA.iso" success; }
@@ -2553,7 +2548,9 @@ system::generate_cloudconfig() {
 		}
 	fi
 
+	# -----------------------------------------------------------------------------------------
 	# Secure the cloud config directory
+	# -----------------------------------------------------------------------------------------
 	write_information "Securing the cloud config directory..."
 	if chown $(stat -c "%U:%G" /var/lib/libvirt/qemu/) "${cloud_config_dir}"; then
 		if chmod $(stat -c "%a" /var/lib/libvirt/qemu/) "${cloud_config_dir}"; then
@@ -10343,7 +10340,7 @@ kvm::util::read_distro_options() {
 			shift 2
 			;;
 		*)
-			shift
+			shift 2
 			;;
 		esac
 	done
@@ -10404,6 +10401,11 @@ kvm::util::read_distro_options() {
 					write_status "🌐 Using URL: ${_repo_url}"
 					shift 2
 					;;
+				--pre-config | --preconfig | --pre-config | --preconfigure | --pre-configure | --pre-configuration | --preconfiguration)
+					pre_config="$2"
+					system::log_item "🔧 Pre-configuration requested: ${pre_config}"
+					shift 2
+					;;
 				*)
 					shift 2
 					;;
@@ -10454,13 +10456,8 @@ kvm::util::read_distro_options() {
 					shift 2
 					;;
 				--server-app | --Server-Application | --server_application | --ServerApplications | --SA | --sa)
-					if [[ $2 == "ubuntu-desktop" || $2 == "kubuntu-desktop" || $2 == "xubuntu-desktop" || $2 == "lubuntu-desktop" || $2 == "ubuntu-mate-desktop" || $2 == "ubuntu-budgie-desktop" || $2 == "cinnamon-desktop-environment" ]]; then
-						server_app="${2}"
-						system::log_item "🖥️ Selecting server app: ${server_app}"
-					else
-						system::log_item "⛔ Unknown Desktop Environment: [${2}] ==> Use ubuntu-desktop, kubuntu-desktop, xubuntu-desktop, lubuntu-desktop, ubuntu-mate-desktop, ubuntu-budgie-desktop"
-						return 1
-					fi
+					server_app="${2}"
+					system::log_item "🖥️ Selecting server app: ${server_app}"
 					shift 2
 					;;
 				--version | -v)
@@ -10469,9 +10466,14 @@ kvm::util::read_distro_options() {
 					shift 2
 					return 0
 					;;
+				--pre-config | --preconfig | --pre-config | --preconfigure | --pre-configure | --pre-configuration | --preconfiguration)
+					pre_config="$2"
+					system::log_item "🔧 Pre-configuration requested: ${pre_config}"
+					shift 2
+					;;
 				*)
 					system::log_item "Unknown option: $1 - ignoring..."
-					shift
+					shift 2
 					;;
 				esac
 			done
@@ -10507,6 +10509,11 @@ kvm::util::read_distro_options() {
 				--file | --preseed | --preseed_file | --preseed_cfg | --preseed_cfg_file | --preseed_file)
 					_preseed_file="$2"
 					write_host --cyan "📜 Directed to create preseed instructions file: ${_preseed_file}"
+					shift 2
+					;;
+				--pre-config | --preconfig | --pre-config | --preconfigure | --pre-configure | --pre-configuration | --preconfiguration)
+					pre_config="$2"
+					system::log_item "🔧 Pre-configuration requested: ${pre_config}"
 					shift 2
 					;;
 				*)
@@ -10581,6 +10588,11 @@ kvm::util::read_distro_options() {
 				--file)
 					_preseed_file="$2"
 					write_host --cyan "📜 Directed to create instructions file: ${_preseed_file}"
+					shift 2
+					;;
+				--pre-config | --preconfig | --pre-config | --preconfigure | --pre-configure | --pre-configuration | --preconfiguration)
+					pre_config="$2"
+					system::log_item "🔧 Pre-configuration requested: ${pre_config}"
 					shift 2
 					;;
 				*)
@@ -11517,8 +11529,14 @@ kvm::make_vm_now_from_ubuntu_com() {
 	# get the version of Ubuntu to use; sets variable _tgt_ubuntu_ver...
 	system::get_tgt_ubuntu_version 
 
+	if [[ "${_ask}" == "YES" ]]; then
+		kvm::get_vm_config_preferences --ask
+	else
+		kvm::get_vm_config_preferences
+	fi
+
 	# Format the name of the VM to be created...
-	local vm_name="Template_${_role}_${_tgt_ubuntu_ver}_${_UserDesktopEnvironmentSelection}_${_UserServerEnvironemtSelection}_${_role}_$(date +%Y-%m-%d-%s)"
+	local vm_name="Template_Ubuntu_${_role}_${_tgt_ubuntu_ver}_${_UserDesktopEnvironmentSelection}${_UserServerEnvironemtSelection}${server_app}_$(date +%Y-%m-%d-%s)"
 
 	# ensure local media:          [/where/to/look/first]
 	# system::get_ubuntu_media --dir ${permanent_download_dir} --media-type ${_flavor} --version ${_tgt_ubuntu_ver} --type ${_role}
@@ -11645,7 +11663,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 			: ${iso:="$permanent_download_dir/$iso_filename"}
 			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than 23, so using cloud config to build server..."
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using SERVER installer as requested..."
-			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --role ${_role:-"server"} --server-app ${server_app:-"ubuntu-server"} --ask ${_ask:-"YES"}
+			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --role ${_role:-"server"} --server-app ${server_app:-"ssh-server"} --ask ${_ask:-"YES"}
 					
 			{
 				"${bin_virt_install}" --name  ${vm_name:-"Ubuntu-Server-${_tgt_ubuntu_ver}-$(date +%Y-%m-%d-%s)"}  \
@@ -11672,14 +11690,14 @@ kvm::make_vm_now_from_ubuntu_com() {
 			they are just too old and un modern to be useful. \n
 			Press OK to return to the previous menu. \n"
 			dialog::display_summary_message "NOTICE!"
-			unset _tgt_ubuntu_ver _summary_message iso_filename CloudConfigDir iso vm_name 
+			unset _UserDesktopEnvironmentSelection _UserServerEnvironemtSelection PRESEED_FILE vm_kernel vm_initrd source_url iso _task _role _cpu _dsk _mem _tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig CloudConfigDir _summary_message _saveto _ask _flavor _role _cpu _mem _dsk permanent_download_dir bin_virt_install virt_net 
 			return
 		else
 			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than 23, so using cloud config to build server..."
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using SERVER installer as requested..."
 			system::get_ubuntu_media --dir ${permanent_download_dir} --media-type server --version ${_tgt_ubuntu_ver} 
 			: ${iso:="$permanent_download_dir/$iso_filename"}
-			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --role ${_role:-"server"} --server-app ${server_app:-"ubuntu-server"} --ask ${_ask:-"YES"}
+			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" ${*}
 					
 			{
 				"${bin_virt_install}" --name  ${vm_name:-"Ubuntu-Server-${_tgt_ubuntu_ver}-$(date +%Y-%m-%d-%s)"}  \
@@ -11694,14 +11712,14 @@ kvm::make_vm_now_from_ubuntu_com() {
 				--extra-args "autoinstall reboot=acpi" \
 				--events on_reboot=restart,on_poweroff=destroy,on_crash=destroy 
 			} >> ${_LOGFILE} 2>&1 & disown
+
 			dialog::display_summary_message "NOTICE!"
 		fi
-
 	;;
 	esac
 
 	# Clean up residual variables...
-	for i in _UserDesktopEnvironmentSelection _UserServerEnvironemtSelection PRESEED_FILE vm_kernel vm_initrd source_url _task _role _cpu _dsk _mem _tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig CloudConfigDir _summary_message _saveto; do unset $i; done
+	unset _UserDesktopEnvironmentSelection _UserServerEnvironemtSelection PRESEED_FILE vm_kernel vm_initrd source_url iso _task _role _cpu _dsk _mem _tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig CloudConfigDir _summary_message _saveto _ask _flavor _role _cpu _mem _dsk permanent_download_dir bin_virt_install virt_net 
 }
 
 kvm::make_vm_now_from_microsoft() {
@@ -13774,8 +13792,8 @@ template::cloud_config() {
 			server_app="$2"
 			shift 2
 			;;
-		--ask)
-			ask="$2"
+		--pre-config)
+			pre_config="$2"
 			shift 2
 			;;
 		--vmname | --VMName | --vm_name | --VmName | --vm-name | --VM-Name | --hostname | --HostName | --host-name | --Host-Name)
@@ -13795,6 +13813,8 @@ template::cloud_config() {
 	system::log_item "Role: $role"
 	system::log_item "Server App: $server_app"
 	system::log_item "Ask: $ask"
+	if [[ -n $pre_config ]] ; then { role=$pre_config ; system::log_item "Pre-Config: ${pre_config}" ; } ; fi
+	system::log_item "VM Name: $vm_name"
 
 	# -----------------------------------------------------------------------------------------
 	# Add COMMON section to the cloud config file based on preferences
@@ -13847,7 +13867,7 @@ EOF
 	# End COMMON section to the cloud config file
 	# -----------------------------------------------------------------------------------------
 
-if [[ $role == "server" ]]; then
+if [[ $role == "VDI" ]]; then
 	case ${server_app} in
 
 	kubuntu-desktop)
@@ -14060,12 +14080,23 @@ cat >>${user_data_file} <<EOF
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
-	ubuntu-server | ubuntu-server-minimal)
-	system::log_item "Generating cloud-config for ubuntu-server"
+esac
+
+elif [[ $role == "server" ]]; then
+	# -----------------------------------------------------------------------------------------
+	# Add SERVER section to the cloud config file based on preferences
+	# This will install a server application if selected along with standard ubuntu-server
+	# -----------------------------------------------------------------------------------------
+	case ${server_app} in
+
+	${server_app} )
+	system::log_item "📱 Got: ${server_app} Attempting to install $server_app..."
+	system::log_item "📱 Generating cloud-config for $server_app"
 	# -----------------------------------------------------------------------------------------
 
 cat >>${user_data_file} <<EOF
         - ubuntu-server
+        - ${server_app}
     late-commands:
         - echo "******************* ${server_app} Config ********************"
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
@@ -14074,47 +14105,42 @@ cat >>${user_data_file} <<EOF
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
-	ssh-server)
-	system::log_item "Generating cloud-config for ubuntu-ssh-server"
-	# -----------------------------------------------------------------------------------------
 
+	*)
+	system::log_item "〇 No server application selected, installing ubuntu-server"
+	system::log_item "🖧 Generating cloud-config for ubuntu-server"
+	# -----------------------------------------------------------------------------------------
 cat >>${user_data_file} <<EOF
         - ssh-server
     late-commands:
         - echo "******************* ${server_app} Config ********************"
-
-        # Clone RTD Setup & Execute OEM Config
+        - curtin in-target --target=/target -- apt-get install ${server_app:-"ssh-server"}
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
-	ansible-server)
-	system::log_item "Generating cloud-config for ubuntu-ssh-server"
-	# -----------------------------------------------------------------------------------------
-cat >>${user_data_file} <<EOF
-        - ansible
-    late-commands:
-        - echo "******************* ${server_app} Config ********************"
+	esac
 
-        # Clone RTD Setup & Execute OEM Config
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${_git_src_url} /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
-EOF
+
+
 	# -----------------------------------------------------------------------------------------
-	;;
+else
+	case ${role} in
 	minecraft)
-	system::log_item "Generating cloud-config for minecraft-server"
+	system::log_item "⛏️ Generating cloud-config for minecraft-server"
 	# -----------------------------------------------------------------------------------------
 cat >>${user_data_file} <<EOF
-     late-commands:
-        - echo "******************* ${server_app} Config ********************"
+        - ubuntu-server
+        - byobu
+        - default-jre
+    late-commands:
+        - echo "******************* ${role} Config ********************"
 
         # Clone RTD Setup & Execute OEM Config
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${_git_src_url} /opt/rtd ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
 
         # Setup Minecraft Server and autologin to the console and launch the server
@@ -14131,10 +14157,10 @@ EOF
 	# -----------------------------------------------------------------------------------------
 	;;
 	*)
-	system::log_item "Got: ${server_app} No custom task selected, trying to install $server_app..."
-	system::log_item "Generating cloud-config for $server_app"
+	system::log_item "〇 No CUSTOM server application selected, installing ubuntu-server"
+	system::log_item "🖧 Generating cloud-config for generic ubuntu-server"
+	system::log_item "🖧 Please install the desiredd application MANUALLY"
 	# -----------------------------------------------------------------------------------------
-
 cat >>${user_data_file} <<EOF
         - ssh-server
     late-commands:
@@ -14147,29 +14173,8 @@ EOF
 	# -----------------------------------------------------------------------------------------
 	;;
 	esac
-	# -----------------------------------------------------------------------------------------
-else
-	# -----------------------------------------------------------------------------------------
-	# Add CUSTOM section to the cloud config file based on the role of the VM
-	# -----------------------------------------------------------------------------------------
-
-	system::log_item "Generating cloud-config for the role: ubuntu-desktop"
-	# -----------------------------------------------------------------------------------------
-cat >>${user_data_file} <<EOF
-    late-commands:
-        - echo "******************* Ubuntu Desktop Config ********************"
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${_git_src_url} /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
-EOF
-	# -----------------------------------------------------------------------------------------
 
 fi
-
-
-
-
-
 
 }
 
