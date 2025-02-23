@@ -2411,59 +2411,66 @@ system::make_preseed_cfg() {
 }
 
 system::generate_cloudconfig() {
-	# Description: Generates a cloud config file for deploying servers.
+	# Description:
+	#   Generates a cloud-config and meta-data ISO (CIDATA.iso) for automated Ubuntu deployments
+	#   within KVM or other cloud-init-enabled environments. The function manages:
+	#   - Creating a YAML user-data file (via template::cloud_config).
+	#   - Embedding meta-data and user-data into an ISO image (using genisoimage).
+	#   - Handling optional SSH key injection, user-defined directories, and role-specific configs.
 	#
-	# This function generates a cloud config file for use in deploying servers. It supports various
-	# options to customize the configuration, including setting the directory for cloud config files,
-	# specifying the role of the VM, and setting the VM name.
+	# Key Features:
+	#   - Supports cloud-init processes by packaging meta-data and user-data into a single ISO.
+	#   - Integrates with broader VM configuration scripts and environment variables.
+	#   - Logs key steps and handles basic error reporting (e.g., missing genisoimage).
+	#
+	# Prerequisites:
+	#   - Must be run in an environment where supporting functions are loaded:
+	#     (e.g., kvm::util::read_distro_options, template::cloud_config, system::log_item, etc.).
+	#   - The genisoimage package must be installed.
+	#   - Adequate permissions to write to the specified cloud config directory and ISO file.
 	#
 	# Globals:
-	#	- GIT_RTD_SRC_URL: The Git repository URL for RTD source.
-	#	- GIT_Profile: The Git profile name.
-	#	- _TLA: The three-letter acronym for the project.
+	#   GIT_RTD_SRC_URL       : Git repository URL for RTD source (if relevant).
+	#   GIT_Profile           : Git profile name (if relevant).
+	#   _TLA                  : Three-letter acronym for the project.
+	#   Preference_CopySSHKey : Flag to decide whether to embed local SSH keys.
+	#   _ask, _role, _LOGFILE : Other environment variables used in the process.
+	#
 	# Arguments:
-	#	- --CloudConfigDir <directory>: Directory to save cloud config files.
-	#	- --flavor <ubuntu-flavor>: Role of the VM (e.g., ubuntu-desktop, ubuntu-server).
-	#	- --vmname <hostname>: Hostname of the VM to be created.
+	#   --CloudConfigDir <directory> : Destination directory for generated cloud-config files
+	#                                  and the resulting ISO (default: temporary folder).
+	#   --flavor <ubuntu-flavor>     : Role of the VM (e.g., ubuntu-server or ubuntu-desktop).
+	#   --vmname <hostname>          : Hostname for the target VM.
+	#
 	# Outputs:
-	#	- Cloud config files in the specified directory.
-	# Returns:
-	#	- 0 on success.
-	#	- 1 on error.
+	#   - CIDATA.iso  : ISO image containing user-data and meta-data for cloud-init.
+	#   - meta-data   : Basic instance information for cloud-init.
+	#   - user-data   : YAML configuration for automated Ubuntu installations.
+	#
+	# Return Codes:
+	#   - 0 : Successful execution.
+	#   - 1 : Failure to write user-data file.
+	#   - 200 : Failure to generate the CIDATA.iso.
+	#
 	# Usage:
-	#	system::generate_cloudconfig [--CloudConfigDir <directory>] [--flavor <ubuntu-flavor>] [--vmname <hostname>]
+	#   system::generate_cloudconfig [--CloudConfigDir <directory>] \
+	#       [--flavor <ubuntu-flavor>] [--vmname <hostname>]
 	#
 	# Example:
-	#	system::generate_cloudconfig --CloudConfigDir /tmp/cloudconfig --flavor ubuntu-server --vmname myvm
+	#   system::generate_cloudconfig --CloudConfigDir /tmp/cloudconfig \
+	#       --flavor ubuntu-server --vmname my-server
 	#
 	# Notes:
-	#	- This function uses the DigitalOcean metadata service to configure servers before login.
-	#	- Cloud config scripts are YAML formatted files that provide simple, readable methods for setting up common configuration items.
-	#	- The function supports various Ubuntu flavors and can include SSH keys in the configuration.
-	#	- Generates an ISO file with the cloud config data for use in deploying VMs.
-	#
-	# Background:
-	# With the introduction of the DigitalOcean metadata service, it is possible to start configuring your
-	# servers before you even log in. In short, the metadata service is an HTTP location that your server
-	# can access during the boot process.
-	#
-	# The metadata location will contain basic data about the server’s configuration and environment,
-	# such as network addresses, hostname, etc. During the initial setup, these values can be pulled
-	# down by a program called cloud-init to help configure essential services.
-	#
-	# The most powerful feature is that you can pass a script to the metadata service when you create a
-	# server using a field called user-data. This will be run during the initial boot process and is very
-	# flexible, allowing you to accomplish whatever you can script.
-	#
-	# The most common type of script to pass in is called a cloud-config script. This is a
-	# YAML formatted file that provides simple, readable methods of setting up common configuration
-	# items by declaration. It also has the ability to run arbitrary commands for other tasks.
-	#
-	# In this guide, we will get familiar with the DigitalOcean metadata service and cloud-config
-	# files by trying out a simple example. We will be recreating some of the steps outlined
-	# in the initial server setup for Ubuntu 14.04 guide in order to demonstrate.
+	#   - This function is part of a larger VM provisioning workflow. It typically runs before
+	#     calling the VM creation step (e.g., virt-install) so the generated ISO can be attached
+	#     as a cloud-init CD-ROM.
+	#   - Cloud-init uses user-data and meta-data for initial setup tasks: user accounts,
+	#     SSH keys, package installs, etc.
+	#   - Ownership and permissions on the cloud-config directory and files are adjusted to
+	#     match the libvirt/qemu user for secure read access during VM startup.
 	#
 	# End of Documentation
+
 	
 	
 	# Initialize variables with defaults.
@@ -11422,70 +11429,74 @@ kvm::make_vm_now_from_zorin() {
 
 kvm::make_vm_now_from_ubuntu_com() {
 	# Description:
-	# Automates the creation of a virtual machine (VM) template using Ubuntu as the base OS on a KVM host.
-	# This function is ideal for quickly setting up virtual environments with custom configurations.
-	# This function should be used on a Qemu/KVM virtual host that the virtual guest is to be used on.
-	# NOTE: QCOW2 is a storage format for virtual machine disk images.
-	# QCOW stands for QEMU copy on write. The QCOW2 format decouples the physical storage
-	# layer from the virtual layer by adding a mapping between logical and physical blocks.
-	# NOTE2: Kernel-based Virtual Machine (KVM) is an open source virtualization technology built into Linux®.
-	# Specifically, KVM lets you turn Linux into a hypervisor that allows a host machine to run multiple,
-	# isolated virtual environments called guests or virtual machines (VMs). KVM is part of Linux.
-	# For complete info: https://www.redhat.com/en/topics/virtualization/what-is-KVM
+	#   Automates the creation of a KVM-based Ubuntu VM, ideal for quickly setting up virtual
+	#   environments with customizable configurations. This function should be run on the Qemu/KVM host
+	#   intended to run the VM.
+	#
+	# About QCOW2 (QEMU Copy-On-Write v2):
+	#   - A disk image format that provides snapshot support and dynamic allocation.
+	#   - Decouples physical storage from the virtual storage layer, using logical-to-physical block mapping.
+	#
+	# About KVM (Kernel-based Virtual Machine):
+	#   - An open-source virtualization technology built into the Linux kernel.
+	#   - Turns the Linux host into a hypervisor to run isolated guest VMs.
+	#   - Further reference: https://www.redhat.com/en/topics/virtualization/what-is-KVM
 	#
 	# Prerequisites:
-	# - Must be run on a Qemu/KVM host with QEMU and KVM installed and configured.
-	# - Internet access is required for downloading the Ubuntu ISO file.
-	#   Alternatively, the ISO file can be downloaded manually and placed in a specified location.
-	#   The default location is /var/lib/libvirt/boot/.
-	# - The virt-install tool must be available on the system.
-	# - The function should be run with sudo or as the root user.
-	#
-	# Notes on QCOW2:
-	# - QCOW2 (QEMU Copy On Write version 2) is used for VM disks. It offers features like snapshot support and dynamic disk size allocation.
-	#
-	# Notes on KVM:
-	# - Kernel-based Virtual Machine (KVM) is a Linux kernel module that allows the kernel to function as a hypervisor.
-	# - More details on KVM: https://www.redhat.com/en/topics/virtualization/what-is-KVM
+	#   - Must run on a Linux host with QEMU + KVM installed and working.
+	#   - Requires internet access to download the Ubuntu ISO, unless manually placed in
+	#     /var/lib/libvirt/boot/ or a user-specified path.
+	#   - The 'virt-install' tool must be installed.
+	#   - Run as root or via sudo.
 	#
 	# Parameters:
-	# --ram <value>           : Sets the VM's RAM in megabytes (default: 2048 MB).
-	# --cpus <value>          : Sets the number of CPU cores (default: 2).
-	# --disk <value>          : Sets the disk size in gigabytes (default: 100 GB).
-	# --flavor <value>        : Specifies the Ubuntu flavor (default: 'ubuntu').
-	# --role <value>          : Specifies the VM's role (e.g., desktop, server) (default: 'server').
-	# --version <value>       : Specifies the Ubuntu version; uses the latest LTS if not specified.
-	# --location <value>      : Override the default location for downloading or accessing the ISO.
-	# --ask <value>           : Enables interactive mode for manual input during setup (default: 'NO').
-	# --desktop_environment   : Specifies the desktop environment for desktop VMs.
-	# --server_role           : Specifies the server role for server VMs.
-	#
-	# Defaults:
-	# The function uses predefined defaults which can be overridden by specifying parameters.
+	#   --ram <MB>                : VM RAM size in MB (default: 2048).
+	#   --cpus <count>            : Number of CPU cores (default: 2).
+	#   --disk <GB>               : Disk size in GB (default: 100).
+	#   --flavor <name>           : Ubuntu flavor (default: 'ubuntu').
+	#   --role <type>             : VM role, e.g. 'desktop' or 'server' (default: 'server').
+	#   --version <UbuntuVer>     : Ubuntu version (defaults to latest LTS if unspecified).
+	#   --location <path>         : Alternate location for ISO files (default: /var/lib/libvirt/boot/).
+	#   --ask <YES|NO>            : Interactive mode for manual VM settings (default: 'NO').
+	#   --desktop_environment     : Desktop environment package(s) for a desktop VM.
+	#   --server_role             : Server role package(s) for a server VM.
+	#   --pre-config              : Pre-configured VM configured for a specific role like "minecraft".
 	#
 	# Usage Examples:
-	# Example 1: Default VM Creation
-	# Creates a VM using default parameters:
-	# kvm::make_vm_now_from_ubuntu_com
+	#   1) Default VM creation with 2 CPU, 2GB RAM, 100GB disk:
+	#        kvm::make_vm_now_from_ubuntu_com
 	#
-	# Example 2: Fully Customized VM
-	# Creates a VM with 8 GB RAM, 4 CPUs, 250 GB disk, using Ubuntu 20.04 LTS, Kubuntu flavor:
-	# kvm::make_vm_now_from_ubuntu_com --ram 8192 --cpus 4 --disk 250 --flavor ubuntu --version 20.04 --role desktop
+	#   2) Customized VM (e.g., 8GB RAM, 4 CPUs, 250GB disk, Ubuntu 20.04 Desktop):
+	#        kvm::make_vm_now_from_ubuntu_com --ram 8192 --cpus 4 --disk 250 \
+	#            --flavor ubuntu --version 20.04 --role desktop
 	#
-	# Example 3: Interactive VM Setup
-	# Starts an interactive session to manually specify VM settings during creation:
-	# kvm::make_vm_now_from_ubuntu_com --ask YES
+	#   3) Interactive VM setup:
+	#        kvm::make_vm_now_from_ubuntu_com --ask YES
 	#
-	# Detailed Steps:
-	# 1. Parameter Parsing: Parses and applies provided command-line arguments to override default settings.
-	# 2. Dependency Check: Verifies all required software and dependencies are installed.
-	# 3. ISO Retrieval: Downloads or locates the specified Ubuntu ISO, depending on version and flavor.
-	# 4. VM Configuration: Sets up the VM according to the specified parameters including network and storage.
-	# 5. Installation Process: Initiates the installation of the Ubuntu OS on the VM using the virt-install tool.
-	# 6. Logging and Cleanup: Logs the setup process and cleans up any temporary files created during the installation.
+	# Process Overview:
+	#   1) Parameter Parsing     : Reads CLI arguments, overriding defaults where applicable.
+	#   2) Dependency Check      : Ensures required virtualization tools are present.
+	#   3) ISO Retrieval         : Downloads or locates the Ubuntu ISO.
+	#   4) VM Configuration      : Sets up CPU, RAM, disk, network, and OS variant settings.
+	#   5) Installation          : Invokes 'virt-install' to install Ubuntu automatically (via preseed.cfg or autoinstall.yaml).
+	#   6) Logging & Cleanup     : Logs the process and removes temporary working files.
 	#
 	# Error Handling:
-	# Implements error checks at each step to ensure any issues are addressed, such as missing dependencies or download errors.
+	#   - Performs checks at key steps (e.g., missing tools, download failure).
+	#   - Logs and notifies the user of any issues.
+	#
+	# Additional Notes:
+	#   - This function is part of a broader VM management system, relying on certain utilities and patterns
+	#     (e.g. kvm::util::read_common_options, system::get_ubuntu_media, etc.).
+	#   - Different Ubuntu releases require different installation methods:
+	#       < 16.x → Preseed with Debian Installer
+	#       16.x–22.x → Preseed (debian-installer) for older releases
+	#       ≥ 22.x → Autoinstall (cloud-config)
+	#   - Canonical frequently modifies installation methods, so results may vary on less tested versions.
+	#
+	# Globals:
+	#   ${ubuntu_flavor}, ${_role}, ${_task}, ${_cpu}, ${_mem}, ${_dsk}, ${permanent_download_dir},
+	#   ${_saveto}, ${CloudConfigDir}, ${bin_virt_install}, ${virt_net}, and others set dynamically.
 	#
 	#
 	# Notes
@@ -11503,7 +11514,6 @@ kvm::make_vm_now_from_ubuntu_com() {
 	#     automatic installations are created per the Ubuntu documentation, and you may experience issues
 	#     with the preseed.cfg file or the autoinstall.yaml file anyway as the documentation appears incomplete.
 	#
-	# Globals: ${ubuntu_flavor} ${_role} ${_task} ${_cpu} ${_mem} ${_dsk} ${permanent_download_dir} ${_saveto} ${CloudConfigDir} ${bin_virt_install} ${virt_net}
 	# End of Documentation
 
 	# Set default values for VM T-Shirts sizes (may vary by OS)...
@@ -11591,9 +11601,9 @@ kvm::make_vm_now_from_ubuntu_com() {
 					netcfg/get_hostname=${vm_name} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
 					localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 					--initrd-inject="${_saveto}/preseed.cfg" \
-					--initrd-inject="${_saveto}/ks.cfg" \
-					--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-			} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+					--initrd-inject="${_saveto}/ks.cfg" 
+			} >> ${_LOGFILE} 2>&1 & disown
+			dialog::display_summary_message "NOTICE!"
 
 		elif [[ ${_tgt_ubuntu_ver::2} -lt 23 ]]; then
 
@@ -11616,9 +11626,9 @@ kvm::make_vm_now_from_ubuntu_com() {
 					netcfg/get_hostname=RTD-VDI console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
 					localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 					--initrd-inject="${_saveto}/preseed.cfg" \
-					--initrd-inject="${_saveto}/ks.cfg" \
-					--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-			} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+					--initrd-inject="${_saveto}/ks.cfg" 
+			} >> ${_LOGFILE} 2>&1 & disown
+			dialog::display_summary_message "NOTICE!"
 
 		elif [[ ${_tgt_ubuntu_ver::2} -ge 23 && ${_tgt_ubuntu_ver::2} -lt 24 ]]; then
 
@@ -11649,9 +11659,9 @@ kvm::make_vm_now_from_ubuntu_com() {
 					--video "virtio" --channel "spicevmc" \
 					--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-					--extra-args "autoinstall" \
-					--noautoconsole   || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-			} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+					--extra-args "autoinstall" 
+			} >> ${_LOGFILE} 2>&1 & disown
+			dialog::display_summary_message "NOTICE!"
 		fi
 	;;
 	VDI )
@@ -11695,7 +11705,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 			they are just too old and un modern to be useful. \n
 			Press OK to return to the previous menu. \n"
 			dialog::display_summary_message "NOTICE!"
-			unset _UserDesktopEnvironmentSelection _UserServerEnvironemtSelection PRESEED_FILE vm_kernel vm_initrd source_url iso _task _role _cpu _dsk _mem _tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig CloudConfigDir _summary_message _saveto _ask _flavor _role _cpu _mem _dsk permanent_download_dir bin_virt_install virt_net 
+			unset _UserDesktopEnvironmentSelection _UserServerEnvironemtSelection PRESEED_FILE vm_kernel vm_initrd source_url iso _task _role _cpu _dsk _mem _tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig CloudConfigDir _summary_message _saveto _ask _flavor _role _cpu _mem _dsk permanent_download_dir bin_virt_install virt_net vm_name all_params server_app pre_config
 			return
 		else
 			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than 23, so using cloud config to build server..."
@@ -13743,37 +13753,55 @@ template::AutoYast_xml() {
 
 template::cloud_config() {
 	# Description:
-	#   Generates a cloud-config file for an Ubuntu VM, tailored to specific roles like desktop,
-	#   server, or specialized setups like Minecraft server. gerally this function is not called
-	#   directly, but is used by other functions to generate the cloud-config file.
+	#   Appends specialized cloud-config YAML to an existing user-data file for an Ubuntu VM.
+	#   The content is dynamically generated based on the VM's intended role (desktop flavor,
+	#   server variant, or custom deployments such as Minecraft).
 	#
-	# Globals:
-	#   Preference_ssh_pub_key - The SSH public key to be authorized for the VM.
-	#   Preference_InitialKeyboardLayout - The keyboard layout to be used during installation.
-	#   Preference_InitialUser - The initial user account to be created on the VM.
-	#   Preference_InitialUserPassword - The password for the initial user account.
-	#   NOTE: these globals are set in the kvm::get_vm_config_preferences function that reads
-	#   the personal configuration file for unattended VM bulds.
+	# Key Features:
+	#   - Uses autoinstall directives (via curtin late-commands) to install additional packages.
+	#   - Embeds user credentials, SSH key data, and initial configurations.
+	#   - References external resources (e.g., GIT_RTD_SRC_URL) for OEM or post-install scripts.
+	#   - Highly sensitive to YAML indentation and spacing (be cautious with modifications).
 	#
-	# Arguments:
-	#   $1 - The name of the VM.
-	#   $2 - The path to the output file where the cloud-config will be saved.
+	# Globals (set elsewhere, e.g., kvm::get_vm_config_preferences):
+	#   Preference_ssh_pub_key          : SSH public key for initial user.
+	#   Preference_InitialKeyboardLayout: Default keyboard layout.
+	#   Preference_InitialUser          : Username for the initial account.
+	#   Preference_InitialUserPassword  : Password for the initial account.
+	#   GIT_RTD_SRC_URL                : Git repository URL for RTD setup scripts.
+	#
+	# Arguments (provided as CLI flags):
+	#   --vmname <string>        : Hostname/VM name (validated for standard DNS rules).
+	#   --CloudConfigDir <path>  : Directory used by cloud-config generation.
+	#   --write <output_file>    : Where the YAML content is appended (required).
+	#   --role <role_string>     : VM role (e.g., 'VDI', 'server', 'minecraft').
+	#   --server-app <app_name>  : Specific server package/flavor to install (e.g., 'kubuntu-desktop').
+	#   --pre-config <string>    : Overrides the role with a pre-config option if provided.
 	#
 	# Outputs:
-	#   - Writes a cloud-config file to the specified output path.
+	#   - Appends the generated YAML directives to the specified user-data file.
 	#
 	# Returns:
-	#   0 - If the cloud-config file was successfully generated.
-	#   1 - If no output file is provided, or if an error occurs during the generation process.
+	#   - 0 : Success (cloud-config directives appended successfully).
+	#   - 1 : Invalid or missing output file, or an error during content generation.
 	#
 	# Usage:
-	#   template::cloud_config <vm_name> <output_file>
+	#   template::cloud_config --vmname myVM --write /path/to/user-data --role VDI \
+	#       --server-app ubuntu-desktop
 	#
 	# Example:
-	#   template::cloud_config myvm /path/to/cloud-config.yaml
+	#   template::cloud_config \
+	#       --vmname my-server \
+	#       --write /tmp/cloud-init/user-data \
+	#       --role server \
+	#       --server-app apache2
 	#
-	# Note:
-	#   Be very careful when editing this function, as it is sensitive to indentation and spacing.
+	# Notes:
+	#   - Typically invoked by higher-level functions (e.g., system::generate_cloudconfig).
+	#   - YAML indentation is crucial. Ensure changes maintain valid YAML structure.
+	#   - The function appends different sections of late-commands and package lists depending
+	#     on the requested role/server-app combination.
+	#   - Cloud-init autoinstall runs these commands during or immediately after installation.
 	#
 	# End of Documentation
 	system::log_item "Called by: ${FUNCNAME[1]}"
