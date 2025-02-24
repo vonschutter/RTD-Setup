@@ -1092,7 +1092,6 @@ dependency::command_exists() {
 	#	- Uses `zenity` for GUI prompts if available.
 	#	- Prompts the user to install missing commands and attempts to install them
 	#	  using `system::install_missing_commands`.
-	#	- Stores the user's response in a temporary file to avoid repeated prompts within the same session.
 	#	- The `--auto` flag suppresses prompts and automatically installs missing commands.
 	#
 	# End of Documentation
@@ -2834,7 +2833,8 @@ system::install_missing_commands() {
 	# Description: Installs missing commands based on the distribution type.
 	#
 	# This function checks if specified commands are available on the system and installs them if they are missing.
-	# It supports Debian, Ubuntu, Fedora, RHEL, openSUSE, and SUSE distributions.
+	# It supports Debian, Ubuntu, Fedora, RHEL, openSUSE, and SUSE distributions. 
+	# The function relies on the `command-not-found` package for Debian-based systems to suggest missing packages.
 	#
 	# Globals:
 	#	- None
@@ -2875,6 +2875,14 @@ system::install_missing_commands() {
 				# Attempt to execute the command to trigger 'command-not-found'
 				# and capture its output
 				local install_info
+				if ! command -v command_not_found_handle ; then 
+					write_warning "command_not_found_handle not found. Attempting to install command-not-found package..."
+					software::add_native_package command-not-found || { 
+						write_error "Unable to install command-not-found package, unable to determine package name from command"
+						write_error "Please determine the name of the required package to satify the $cmd dependency, and use the software::add_native_package to install the missing package instead"
+						return 1 
+						}
+				fi
 				install_info=$(command_not_found_handle "$cmd" &> outfile ; tail -1 outfile | awk '{print $4}' ; rm outfile &>/dev/null ; ) 
 				write_information "Extract the package suggestion ($install_info)"
 				# Extract the package suggestion
@@ -2905,6 +2913,14 @@ system::install_missing_commands() {
 				# Attempt to execute the command to trigger 'command-not-found'
 				# and capture its output
 				local install_info
+				if ! command -v command_not_found_handle ; then 
+					write_warning "command_not_found_handle not found. Attempting to install command-not-found package..."
+					software::add_native_package command-not-found || { 
+						write_error "Unable to install command-not-found package, unable to determine package name from command"
+						write_error "Please determine the name of the required package to satify the $cmd dependency, and use the software::add_native_package to install the missing package instead"
+						return 1 
+						}
+				fi
 				install_info=$(command_not_found_handle "$cmd" &> outfile ; tail -1 outfile | awk '{print $4}' ; rm outfile &>/dev/null ; ) 
 				write_information "Extract the package suggestion ($install_info)"
 				# Extract the package suggestion
