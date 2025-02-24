@@ -1106,56 +1106,65 @@ dependency::command_exists() {
 	fi
 
 	# List of required commands from input
-	required_commands=($@)
+	local required_commands=("$@")
 
 	# Function to check if a command is available
 	command_exists() {
-		command -v "$1" >/dev/null 2>&1
+		command -v "$1" &>/dev/null
 	}
 
-	# Check each command and collect the missing ones
-	missing_commands=()
-	for cmd in ${required_commands[*]}; do
-		if ! command_exists $cmd; then
-			missing_commands+=("$cmd")
+	# Collect any missing commands
+	local missing_commands=()
+	for cmd in "${required_commands[@]}"; do
+		if ! command_exists "$cmd"; then
+		missing_commands+=("$cmd")
 		fi
 	done
 
-	if [ ${#missing_commands[@]} -eq 0 ]; then
+	# If none are missing, we’re good
+	if [[ ${#missing_commands[@]} -eq 0 ]]; then
 		return 0
-	else
-		local response_file="/tmp/missing_commands_response"
+	fi
 
-		if [[ $_auto_mode -eq 1 ]]; then
-			response="yes"
-		elif [[ -f "$response_file" ]]; then
-			response=$(cat "$response_file")
-		else
-			local _session=$(system::detect_session)
-			if [[ "$_session" == "TTY" || "$_session" == "SSH" ]]; then
-				read -p "${#missing_commands[@]} command(s) are missing: ${missing_commands[*]}. Do you want to install them? [y/N]: " response
-				echo "$response" >"$response_file"
-			elif [[ "$_session" == "GUI" || "$_session" == "WAYLAND" ]]; then
-				response=$(zenity --question --text="${#missing_commands[@]} command(s) are missing: ${missing_commands[*]}. Do you want to install them?")
-				echo "$response" >"$response_file"
-			else
-				read -p "${#missing_commands[@]} command(s) are missing: ${missing_commands[*]}. Do you want to install them? [y/N]: " response
-				echo "$response" >"$response_file"
-			fi
-		fi
+	# If in auto mode, just install them (no prompt)
+	if [[ $_auto_mode -eq 1 ]]; then
+		write_status "Installing missing commands: ${missing_commands[*]}"
+		system::install_missing_commands "${missing_commands[@]}"
+		return $?
+	fi
 
-		if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-			# Ensure the user has sudo privileges before installation
-			system::install_missing_commands "${missing_commands[*]}"
-			local install_status=$?
-			rm -f "$response_file" # Clean up the response file
-			return $install_status
-		else
+	# Otherwise, prompt the user once
+	local session_type
+	session_type=$(system::detect_session)
+
+	local prompt_text="${#missing_commands[@]} command(s) missing: ${missing_commands[*]}.\nInstall now? [y/N]: "
+	local user_response=""
+
+	# Use zenity if in GUI/Wayland (and if `zenity` is available)
+	if [[ "$session_type" =~ ^(GUI|WAYLAND)$ ]] && command -v zenity &>/dev/null; then
+		if ! zenity --question \
+			--title="Missing Commands" \
+			--text="The following commands are missing: ${missing_commands[*]}. \nInstall now?"; then
 			write_error "Required command(s) not found: ${missing_commands[*]}"
-			rm -f "$response_file" # Clean up the response file
+			return 1
+		fi
+	else
+		# TTY / SSH or fallback
+		read -r -p "$(echo -e "$prompt_text")" user_response
+		# Convert to lowercase
+		user_response="${user_response,,}"
+
+		if [[ "$user_response" != "y" && "$user_response" != "yes" ]]; then
+			write_error "Required command(s) not found: ${missing_commands[*]}"
 			return 1
 		fi
 	fi
+
+	# Attempt install, return based on success/failure
+	system::install_missing_commands "${missing_commands[@]}"
+	return $?
+
+
 }
 
 
@@ -2861,28 +2870,61 @@ system::install_missing_commands() {
 	for cmd in ${*}; do
 		case "$distro" in
 		debian)
-			# Debian and Ubuntu
 			write_information "Check if the command ($cmd) exists"
 			if ! command -v "$cmd" &>/dev/null; then
 				# Attempt to execute the command to trigger 'command-not-found'
 				# and capture its output
 				local install_info
-				install_info=$(apt-cache search --names-only "$cmd" | awk '{print $1}' | head -n1)
+				install_info=$(command_not_found_handle "$cmd" &> outfile ; tail -1 outfile | awk '{print $4}' ; rm outfile &>/dev/null ; ) 
 				write_information "Extract the package suggestion ($install_info)"
 				# Extract the package suggestion
 				local pkg
 				pkg="$install_info"
 				if [ -n "$pkg" ]; then
 					write_status "Installing '$cmd' using package '$pkg'..."
-					software::add_native_package "$pkg"
-				else
-					write_error "Package for command '$cmd' not found. Trying snap..."
-					install_info=$(snap find "$cmd" 2>&1)
-					pkg=$(echo "$install_info" | head -n2 | tail -1 | cut -f1 -d' ')
-					if [ -n "$pkg" ]; then
-						write_status "Installing '$cmd' using snap package '$pkg'..."
-						software::from_snapcraft.io "$pkg"
+					if software::add_native_package "$pkg" ; then
+						write_status "Installed '$cmd' using package '$pkg'..."
+					else
+						write_warning "Package for command '$cmd' not found. Trying snap..."
+						command -v snap &>/dev/null || software::ensure_snap_package_managment || { write_error "Unable to install missing command $cmd" ; return 1 ; }
+						install_info=$(snap find "$cmd" 2>&1)
+						pkg=$(echo "$install_info" | head -n2 | tail -1 | cut -f1 -d' ')
+						if [ -n "$pkg" ]; then
+							write_status "Installing '$cmd' using snap package '$pkg'..."
+							software::from_snapcraft.io "$pkg"
+						fi
 					fi
+
+
+				fi
+			fi
+			;;
+		ubuntu)
+			write_information "Check if the command ($cmd) exists"
+			if ! command -v "$cmd" &>/dev/null; then
+				# Attempt to execute the command to trigger 'command-not-found'
+				# and capture its output
+				local install_info
+				install_info=$(command_not_found_handle "$cmd" &> outfile ; tail -1 outfile | awk '{print $4}' ; rm outfile &>/dev/null ; ) 
+				write_information "Extract the package suggestion ($install_info)"
+				# Extract the package suggestion
+				local pkg
+				pkg="$install_info"
+				if [ -n "$pkg" ]; then
+					write_status "Installing '$cmd' using package '$pkg'..."
+					if software::add_native_package "$pkg" ; then
+						write_status "Installed '$cmd' using package '$pkg'..."
+					else
+						write_warning "Package for command '$cmd' not found. Trying snap..."
+						install_info=$(snap find "$cmd" 2>&1)
+						pkg=$(echo "$install_info" | head -n2 | tail -1 | cut -f1 -d' ')
+						if [ -n "$pkg" ]; then
+							write_status "Installing '$cmd' using snap package '$pkg'..."
+							software::from_snapcraft.io "$pkg"
+						fi
+					fi
+
+
 				fi
 			fi
 			;;
@@ -2913,7 +2955,7 @@ system::install_missing_commands() {
 			;;
 		*)
 			write_error "Unsupported distribution: $distro"
-			exit 1
+			return 1
 			;;
 		esac
 	done
@@ -7614,7 +7656,7 @@ security::scan_for_malware() {
 	# other systems use whiptail for the terminal to show menus and dialogs.
 
 	if ! type clamscan; then
-		check_dependencies clamscan && exit
+		software::check_native_package_dependency clamscan || return 1
 	fi
 
 	write_host --purple "
@@ -9222,7 +9264,7 @@ software::check_native_package_dependency() {
 	# EXAMPLE: software::check_native_package_dependency snapd
 	#
 	# End of documentation
-	[[ "${EUID}" -eq 0 ]] || ensure_admin
+	[[ "${EUID}" -eq 0 ]] || security::ensure_admin
 
 	write_status "📦 Checking for script dependency ${1} and install if not there..."
 
