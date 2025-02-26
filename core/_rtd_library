@@ -10551,11 +10551,11 @@ kvm::util::read_distro_options() {
 			while [[ $# -gt 0 ]]; do
 				case "${1}" in
 				--desktop_environment | --DE)
-					if [[ $2 == "gnome-desktop" || $2 == "kde-desktop" || $2 == "lxde-desktop" || $2 == "xfce-desktop" || $2 == "mate-desktop" || $2 == "cinnamon-desktop" ]]; then
+					if [[ $2 == "gnome-desktop" || $2 == "standard" || $2 == "kde-desktop" || $2 == "lxde-desktop" || $2 == "xfce-desktop" || $2 == "mate-desktop" || $2 == "cinnamon-desktop" ]]; then
 						_UserDesktopEnvironmentSelection="${2}"
 						write_host --cyan "🖥️ Selecting desktop environment: ${_UserDesktopEnvironmentSelection}"
 					else
-						write_error "⛔ Unknown Desktop Environment: $2 ==> Use gnome-desktop, kde-desktop, lxde-desktop, xfce-desktop, mate-desktop, cinnamon-desktop"
+						write_error "⛔ Unknown Desktop Environment: $2 ==> Use standard, gnome-desktop, kde-desktop, lxde-desktop, xfce-desktop, mate-desktop, cinnamon-desktop"
 						return 1
 					fi
 					shift 2
@@ -10583,6 +10583,12 @@ kvm::util::read_distro_options() {
 				--pre-config | --preconfig | --pre-config | --preconfigure | --pre-configure | --pre-configuration | --preconfiguration)
 					pre_config="$2"
 					system::log_item "🔧 Pre-configuration requested: ${pre_config}"
+					shift 2
+					;;
+				--pkg_list | --pkglist | --pkg-list | --package_list | --package-list | --package_list)
+					_pkg_list="$2"
+					system::log_item "📦 Package list requested: ${_pkg_list}"
+					pkgsel_include_string="d-i pkgsel/include string ${_pkg_list}"
 					shift 2
 					;;
 				*)
@@ -10890,6 +10896,106 @@ kvm::get_vm_config_preferences() {
 	fi
 
 }
+
+kvm::get_kali_iso() {
+	# Description:
+	#   Fetches the newest Kali Linux installer ISO (64-bit) from cdimage.kali.org
+	#   and stores it under /var/lib/libvirt/boot/. If the newest ISO already exists,
+	#   the function skips downloading. Otherwise, it downloads the ISO and prints
+	#   the local file path.
+	#
+	# Usage:
+	#   kvm::get_kali_iso
+	#
+	# Dependencies:
+	#   - curl
+	#   - wget
+	#   - system::log_item function (for logging)
+	#
+	# Globals:
+	#   - None directly changed, but reads/writes to the file system at:
+	#       /var/lib/libvirt/boot/
+	#
+	# Outputs:
+	#   - Echos the path to the downloaded ISO on success.
+	#   - Logs progress and errors via system::log_item.
+	#
+	# Returns:
+	#   - 0 if successful or if ISO already exists
+	#   - 1 if the script cannot find or download the ISO
+	#
+	# Notes:
+	#   - Parses the top-level Kali “cdimage” directory to find the newest release folder
+	#     (e.g. kali-2024.4/) and then looks for the “installer-amd64.iso” file inside.
+	#   - Uses version-aware sorting (sort -rV) to pick the highest release number.
+	#   - If successful, the ISO file path is written to stdout.
+	#   - Make sure you have the needed permissions to write to /var/lib/libvirt/boot/.
+	#
+	# Example:
+	#   if kvm::get_kali_iso; then
+	#       echo "Kali ISO is ready at $(< someTempFile )"
+	#   else
+	#       echo "Failed to get the Kali ISO"
+	#   fi
+	# End of documentation
+	local BASE_URL="https://cdimage.kali.org"
+
+	system::log_item "Finding the newest Kali release directory..."
+	# 1) Grab all directories named "kali-YYYY.X/", sort them descending, pick the first
+	local LATEST_DIR
+	LATEST_DIR="$(curl -s "$BASE_URL" \
+	| grep -Eo 'kali-[0-9]{4}\.[0-9]+/' \
+	| sort -rV \
+	| head -n 1 )"
+
+	if [[ -z "$LATEST_DIR" ]]; then
+		system::log_item  "Could not find a matching release directory on $BASE_URL" >&2
+		return 1
+	fi
+
+	# Construct the subdirectory URL (e.g. https://cdimage.kali.org/kali-2024.4/)
+	local RELEASE_URL="${BASE_URL}/${LATEST_DIR}"
+
+	system::log_item "Newest directory is: $RELEASE_URL"
+	system::log_item  "Looking for the installer ISO..."
+
+	# 2) From that directory, find "kali-linux-YYYY.X-installer-amd64.iso", pick the newest
+	local LATEST_ISO
+	LATEST_ISO="$(curl -s "$RELEASE_URL" \
+	| grep -Eo 'kali-linux-[0-9]{4}\.[0-9]+-installer-amd64\.iso' \
+	| sort -rV \
+	| head -n 1 )"
+
+	if [[ -z "$LATEST_ISO" ]]; then
+		system::log_item  "Could not find an installer ISO in $RELEASE_URL" >&2
+		return 1
+	fi
+
+	# Final download URL (e.g. https://cdimage.kali.org/kali-2024.4/kali-linux-2024.4-installer-amd64.iso)
+	local ISO_URL="${RELEASE_URL}${LATEST_ISO}"
+	local DEST="/var/lib/libvirt/boot/${LATEST_ISO}"
+
+	# 3) Check if the file already exists locally
+	if [[ -f "$DEST" ]]; then
+		system::log_item  "The latest Kali ISO already exists at: $DEST"
+		system::log_item  "Skipping download."
+		iso=$DEST
+		write_information "$iso"
+		return 0
+	else
+		# 4) Download if missing
+		system::log_item  "Downloading $ISO_URL -> $DEST"
+		wget -q --show-progress -O "$DEST" "$ISO_URL" || {
+			system::log_item  "Failed to download $ISO_URL" >&2
+			return 1
+		}
+	fi
+	iso=$DEST
+	write_information "$iso"
+	return 0
+
+}
+
 
 kvm::get_zorin_iso() {
 	# Description: Downloads the latest Zorin OS ISO file for KVM if not already present.
@@ -11388,6 +11494,101 @@ kvm::make_vm_now_from_debian_org() {
 	for i in PRESEED_FILE vm_kernel vm_initrd source_url ui_diplay_style vm_name vm_usecase distro; do unset $i; done
 
 }
+
+kvm::make_vm_now_from_kali_org() {
+	# Description: Function to create a Debian KVM virtual michine disk and define a VM. This function should be
+	# used on a Qemu/KVM virtual host that the virtual guest is to be used on.
+	# NOTE: QCOW2 is a storage format for virtual .
+	# machine disk images QCOW stands for QEMU copy on write. The QCOW2 format decouples the physical storage
+	# layer from the virtual layer by adding a mapping between logical and physical blocks.
+	# NOTE2: Kernel-based Virtual Machine (KVM) is an open source virtualization technology built into Linux®.
+	# Specifically, KVM lets you turn Linux into a hypervisor that allows a host machine to run multiple,
+	# isolated virtual environments called guests or virtual machines (VMs). KVM is part of Linux.
+	# For complete info: https://www.redhat.com/en/topics/virtualization/what-is-KVM
+	#
+	# Use the check_dependencies function to make sure the needed software is available.
+	# Usage: Either simply call this function to use the defaults or:
+	# Call this function with "function" "RAM_SIZE" "DISK_SIZE" "DISK_FORMAT" "DISK_FILE"
+	# Omitting any of the arguments will us the default instead.
+	#
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	# End of Documentation
+
+	# Set default values for VM T-Shirts sizes...
+	: ${_cpu="${_cpu:-2}"}
+	: ${_mem="${_mem:-2048}"}
+	: ${_dsk="${_dsk:-100}"}
+	: ${_role:="desktop"}
+	: ${_task:="ssh-server"}
+
+	# Set default values for VM T-Shirts sizes...
+	kvm::util::read_common_options ${*}
+
+	# Set specific options for Debian...
+	kvm::util::read_distro_options --distribution debian ${*}
+
+	# Check that virtualization is supported on the host
+	dependency::virtualization
+
+	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet, and set variables.
+	: "${bin_virt_install:=$(type -p virt-install)}"
+
+	# Set the default source URL for the Debian version if not already set... and add some options depending on the role.
+
+	write_status "🖥️ 	- Using a desktop environment: ${_UserDesktopEnvironmentSelection}"
+	: "${ui_diplay_style="theme=dark"}"
+	: "${vm_usecase="VDI"}"
+	
+	write_status "🔎 	- Discovering the install media to use and download if not present..."
+	# Ensure that the Kali ISO is available... the path will be stored in the variable "iso".
+	if kvm::get_kali_iso; then
+		write_status "Kali ISO is ready at $(< someTempFile )"
+	else
+		write_error "Failed to get the Kali ISO"
+	fi
+
+	wrtite_status "🔎 	- Using the Kali ISO: ${iso}"
+	local vm_name="Template_kali_${vm_usecase}_$(date +%Y-%m-%d-%H-%M)"
+	system::make_preseed_cfg --role "${_role}" --desktop_environment "standard" --saveto "$(mktemp -d)" --package-list "curl git kali-linux-default kali-desktop-xfce" --ask YES
+	write_status "🔎 	- Discovering what the appropriate VM net interface is (default or br'0 - n')"
+	: ${virt_net="$(system::find_vm_bridge)"}
+	write_status "🔎	- Using network (${virt_net})"
+
+	_summary_message="
+	The virtual machine (${vm_name}) \n
+	📋 - Using the instructions in: ${_preseed_file} \n
+	🔧 - Using this source for the packages and files to download: \n
+	🌎 - ${iso} \n
+	🖥️ - Using the network: ${virt_net:=default} \n
+	🖥️ - Memory: ${_mem} \n
+	🖥️ - CPU's: ${_cpu} \n
+	🖥️ - Disk Size: ${_dsk} \n
+
+	NOTE: You may connecct to the VM and see the progress at IP: $(hostname -I) \n
+	      After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
+
+	write_status "🔧 - Creating the VM..."
+	{
+		"${bin_virt_install}" --name "${vm_name}" \
+			--vcpus "${_cpu}" \
+			--memory "${_mem}" \
+			--network "${virt_net}" \
+			--disk size="${_dsk}" \
+			--location="${iso},kernel=install.amd/gtk/vmlinuz,initrd=install.amd/gtk/initrd.gz" \
+			--os-variant="debian12" \
+			--video "virtio" --channel "spicevmc" \
+			--initrd-inject="${PRESEED_FILE}" \
+			--extra-args "ks=file:/$(basename $PRESEED_FILE) " || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
+	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+
+	for i in PRESEED_FILE vm_kernel vm_initrd source_url ui_diplay_style vm_name vm_usecase distro; do unset $i; done
+
+}
+
 
 kvm::make_vm_now_from_zorin() {
 	# Description: Creates a KVM virtual machine template using a Zorin OS ISO.
@@ -12541,11 +12742,22 @@ template::preseed_cfg::main() {
 		# The "OEM" line below ist to make it simple to replace the
 		# line with a relevant chice of debian role using "sed" or similar.
 		tasksel tasksel/first multiselect ${_task}
-		#d-i pkgsel/include string ${_task} dialog p7zip-full
-
+		# d-i pkgsel/include string ${_task}  
+		${pkgsel_include_string}
+		
 		# Valid choices for pkgsel/upgrade are: safe-upgrade full-upgrade none
 		d-i pkgsel/upgrade select none
 		d-i pkgsel/update-policy select unattended-upgrades
+
+		# Random other questions that may need to be answered during install
+		console-setup console-setup/charmap47 select UTF-8
+		samba-common samba-common/dhcp boolean false
+		macchanger macchanger/automatically_run boolean false
+		kismet-capture-common kismet-capture-common/install-users string 
+		kismet-capture-common kismet-capture-common/install-setuid boolean true
+		wireshark-common wireshark-common/install-setuid boolean true
+		sslh sslh/inetd_or_standalone select standalone
+		atftpd atftpd/use_inetd boolean false
 
 		# By default, the system’s locate database will be updated after the
 		# installer has finished installing most packages. This may take a while, so
@@ -12610,7 +12822,7 @@ template::preseed_cfg::auto_disk_layout() {
 		# - home:   separate /home partition
 		# - multi:  separate /home, /var, and /tmp partitions
 
-		$(if [ "${Preference_DiskEncryption}" = "YES" ] || [ "${Preference_DiskEncryption}" = "yes" ]; then
+		$( if [ "${Preference_DiskEncryption}" = "YES" ] || [ "${Preference_DiskEncryption}" = "yes" ]; then
 			echo "
 			d-i partman-auto/method string crypto
 			d-i partman-crypto/passphrase password ${Preference_Disk_Password}
@@ -12647,7 +12859,7 @@ template::preseed_cfg::auto_disk_layout() {
 			ubiquity partman-md/device_remove_md boolean true
 			ubiquity partman-auto/choose_recipe select atomic
 			"
-		fi)
+		fi )
 
 	EOF
 }
@@ -14252,7 +14464,7 @@ EOF
 	*)
 	system::log_item "〇 No CUSTOM server application selected, installing ubuntu-server"
 	system::log_item "🖧 Generating cloud-config for generic ubuntu-server"
-	system::log_item "🖧 Please install the desiredd application MANUALLY"
+	system::log_item "🖧 Please install the desired application MANUALLY"
 	# -----------------------------------------------------------------------------------------
 cat >>${user_data_file} <<EOF
     late-commands:
