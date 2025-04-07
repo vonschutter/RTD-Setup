@@ -154,7 +154,7 @@ export RTD_VERSION="2.04"
 110   system::check_file_limits                          ;       check and display the current usage of file descriptors against the set limits
 111   system::check_required_variables                   ;       Check that all required variables are set
 112   system::cleanup_and_finish                         ;       Cleans and clears variables and temp files used by the media creations functions
-113   system_config::tune_system_power_profile           ;       Tune the system power profile based on detected Laptop or PC or VM
+113   system::tune_system_power_profile           ;       Tune the system power profile based on detected Laptop or PC or VM
 114   system::create_iso_image_debian                    ;       Creates a Debian iso image
 115   system::create_physical_media_from_ubuntu_iso      ;       Create physical media thumb drive from an Ubuntu ISO file
 116   system::create_swapfile                            ;       Create a new swapfile
@@ -4547,7 +4547,7 @@ system::create_swapfile() {
 	fi
 }
 
-system_config::tune_system_power_profile() {
+system::tune_system_power_profile() {
 	# Description: Tuned is a Linux feature that monitors a system and optimizes its performance
 	# under certain workloads. Tuned uses profiles to do this. A profile is a set of rules that
 	# defines certain system parameters such as disk settings, kernel parameters, network
@@ -7633,52 +7633,100 @@ security::enable_firewall() {
 	#   security::enable_firewall 25565
 
 	security::ensure_admin
-
-	local port; port="${1:-25565}"
+	local port
+	
+	case "$1" in
+		--minecraft | -mc)
+			write_status "Using default Minecraft port: 25565 and 4445"
+			minecraft=1
+			shift 2
+			;;
+		--port | -p)
+			if [[ "$2" =~ ^[0-9]+$ ]]; then
+				write_status "Using custom port: $2"
+				port="$2"
+				shift
+			else
+				write_error "Invalid argument: $2. Must be an integer between 1 and 65535."
+				return 1
+			fi
+			;;
+	esac
 
 	if ! [[ "$port" =~ ^[0-9]+$ ]] || (( port < 1 || port > 65535 )); then
-		printf "Invalid port: %s. Must be an integer between 1 and 65535.\n" "$port" >&2
+		write_warning "Invalid port: %s. Must be an integer between 1 and 65535 - $port"
 		return 1
 	fi
 
-	write_warning "Configuring Firewall..."
+	write_status "Configuring Firewall..."
 
 	if command -v ufw >/dev/null 2>&1; then
 		write_status "Using UFW to configure firewall rules..."
 
 		if ! ufw status | grep -q 'Status: active'; then
 			if ! ufw --force enable; then
-				printf "Failed to enable UFW.\n" >&2
+				write_error "Failed to enable UFW. "
 				return 1
 			fi
 		fi
 
 		ufw default deny incoming || return 1
 		ufw default allow outgoing || return 1
+
+		# Allow SSH connections always so that you do not get locked out of a remote system
 		ufw allow ssh || return 1
-		ufw allow "$port" || return 1
-		ufw allow 4445 || return 1
+
+		if [[ -n $port ]] ; then
+			ufw allow "$port" || return 1
+		fi 
+
+		if [[ $minecraft -eq 1 ]]; then
+			ufw allow 25565 || return 1
+			ufw allow 4445 || return 1
+		fi
 		ufw reload || return 1
 
 	elif command -v firewall-cmd >/dev/null 2>&1; then
 		write_status "Using firewalld to configure firewall rules..."
 
 		if ! firewall-cmd --state | grep -q running; then
-			printf "firewalld is not running.\n" >&2
-			return 1
+			write_warning "firewalld is not running."
+			if ! systemctl start firewalld; then
+				write_error "Failed to start firewalld."
+				return 1
+			fi
 		fi
+
+		firewall-cmd --set-default-zone=public || return 1
+		firewall-cmd --permanent --zone=public --set-target=DROP || return 1
 
 		if ! firewall-cmd --permanent --zone=public --add-service=ssh; then
 			firewall-cmd --permanent --zone=public --add-port=22/tcp || return 1
+			write_status "Added SSH service to firewall rules."
+		else
+			write_status "SSH service already exists in firewall rules."
 		fi
 
-		firewall-cmd --permanent --zone=public --add-port="${port}"/tcp || return 1
-		firewall-cmd --permanent --zone=public --add-port=4445/tcp || return 1
-		firewall-cmd --reload || return 1
+		if [[ -n $port ]]; then
+			firewall-cmd --permanent --zone=public --add-port="${port}"/tcp || return 1
+			write_status "Added custom port (${port}) to firewall rules." 
+		fi
 
+		if [[ $minecraft -eq 1 ]]; then
+			firewall-cmd --permanent --zone=public --add-port=25565/tcp || return 1
+			firewall-cmd --permanent --zone=public --add-port=4445/tcp || return 1
+			write_status "Added Minecraft ports to firewall rules."
+		fi
+
+		if ! firewall-cmd --reload ; then
+			write_error "Failed to reload firewalld."
+			return 1
+		fi
+		firewall-cmd --list-all || return 1
+		write_status "Firewall rules applied successfully."
 	else
-		printf "No recognized firewall tool (ufw or firewalld) found on the system.\n" >&2
-		printf "Please configure the firewall and SSH access manually.\n" >&2
+		write_error "No recognized firewall tool (ufw or firewalld) found on the system."
+		write_error "Please configure the firewall and SSH access manually."
 		return 1
 	fi
 }
@@ -7701,7 +7749,7 @@ security::check_if_password_pOwned() {
 		echo "Hash prefix: ${sha1:0:5}"
 		echo "Hash suffix: ${sha1:5:35}"
 		query_result=$(curl https://api.pwnedpasswords.com/range/${sha1:0:5} 2>/dev/null | grep "$(echo "${sha1:5:35}" | tr '[:lower:]' '[:upper:]')")
-		printf "Your password appeared %d times for sale in the Darknet per the P0wned online database...." "${query_result#*:}" 2>/dev/null
+		write_status "Your password appeared %d times for sale in the Darknet per the P0wned online database...." "${query_result#*:}" 2>/dev/null
 		unset pass_str
 	)
 	dialog::display_result "Password P0wned Status"

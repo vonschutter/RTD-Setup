@@ -882,7 +882,7 @@ recipe_Bundle:_1_Install_OEM_Themes_and_Tweaks (){
 	# -------------------------------------------------------------------------------------------------------#
 	# Add dependencies to used in this bundle.
 	recipe_Bundle:_Compression_Tools
-	enable_firewall
+	security::enable_firewall --minecraft
 	# -------------------------------------------------------------------------------------------------------#
 
 
@@ -905,7 +905,7 @@ recipe_Bundle:_1_Install_OEM_Themes_and_Tweaks (){
 	oem::check_boot_splash_screen_enable /root/original-ks.cfg
 
 	#Tune to virtual machine guest or tune according to hardware type::
-	system_config::tune_system_power_profile
+	system::tune_system_power_profile
 
 	# -------------------------------------------------------------------------------------------------------#
 
@@ -934,6 +934,12 @@ recipe_Bundle:_1_Install_OEM_Themes_and_Tweaks (){
 		software::check_native_package_dependency sassc
 		software::check_native_package_dependency gettext
 
+		# For critical extensions try to install from package manager first
+		# software::add_native_package "dash-to-dock"
+		# software::add_native_package "dash-to-panel"
+		software::add_native_package "gnome-shell-extension-manager"
+		software::add_native_package "gnome-extensions-app"
+
 		# Install the wanted shell extensions that can be found in the distributions repository
 		# 	615:	appindicator		307:  	dash-to-dock
 		# 	517: 	caffeine		1160: 	dash-to-pannel
@@ -946,14 +952,6 @@ recipe_Bundle:_1_Install_OEM_Themes_and_Tweaks (){
 		# 	97: 	Coverflow Alt-Tab
 		# 	3628: 	ArcMenu
 		# 	8: 	Places Status Indicator
-
-		# For critical extensions try to install from package manager first
-		# software::add_native_package "dash-to-dock"
-		# software::add_native_package "dash-to-panel"
-		software::add_native_package "gnome-shell-extension-manager"
-		software::add_native_package "gnome-extensions-app"
-
-		# For the rest, use the gnome extension installer...
 		software::add_gnome_extensions 615 307 517 1160 1319 6 19 7 906 1852 97 3628 8
 
 		# -------------------------------------------------------------------------------------------------------
@@ -988,6 +986,7 @@ recipe_Bundle:_1_Install_OEM_Themes_and_Tweaks (){
 			set_gnome_ui_common_tweaks_for_user
 		EOF
 		system::run_command_in_gnome_user_session /bin/bash ${tempfile}
+		rm -f ${tempfile}
 
 		# -------------------------------------------------------------------------------------------------------
 		# [Task 5.5] copy configuration elements so that NEW users also get the tweaks:
@@ -1030,7 +1029,7 @@ recipe_Bundle:_1_Install_OEM_Themes_and_Tweaks (){
 		fi
 		sudo -H -E -u $SUDO_USER  bash -c "source /opt/rtd/core/_rtd_library ; rtd_oem_kde_set_wallpaper ${_WALLPAPER_DIR}/Wayland.jpg"
 		# for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
-		sudo -E -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c '/usr/bin/lookandfeeltool -a RTD-Win11-Dark --resetLayout'
+		# sudo -E -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c '/usr/bin/lookandfeeltool -a RTD-Win11-Dark --resetLayout'
 	fi
 }
 
