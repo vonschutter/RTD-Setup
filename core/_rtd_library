@@ -4922,6 +4922,152 @@ oem::rtd_reset_default_environment_config() {
 }
 
 
+oem::distro_release_upgrade() {
+	# Description:
+	#   Attempts an OS release upgrade on Ubuntu, Pop!_OS, Debian, SUSE, or Fedora.
+	#   Respects "interactive" mode to prompt user.
+	#
+	# Globals:
+	#   _LOGFILE, RTD_GUI, ERRMSG
+	#
+	# Arguments:
+	#   [interactive] — optional; pauses if unsupported distro or confirmation required
+	#
+	# Returns:
+	#   0 on successful upgrade, 1 on error or unsupported distro
+	#
+	# Usage:
+	#   oem::distro_release_upgrade [--interactive]
+	#   oem::distro_release_upgrade --interactive
+	#
+	# End of documentation
+
+	ensure_admin
+
+	local interactive distro_id distro_name current_version latest_version releasever
+
+	case $1 in
+		--interactive) interactive="interactive" ;;
+		*) interactive="" ;;
+	esac
+
+	if [[ -r /etc/os-release ]]; then
+		distro_id=$(grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
+		distro_name=$(grep '^NAME=' /etc/os-release | cut -d= -f2 | tr -d '"')
+	else
+		write_error "Unable to detect Linux distribution."
+		return 1
+	fi
+
+	case "$distro_id" in
+		ubuntu | pop | tuxedo | zorin)
+			write_warning "This may take some time. Please be patient."
+
+			apt clean && apt update -m
+			dpkg --configure -a
+			apt install -f
+			apt dist-upgrade -y
+			apt autoremove --purge -y
+
+			if ! command -v do-release-upgrade &>/dev/null; then
+				write_status "Installing 'do-release-upgrade' support tools..."
+				software::add_native_package update-manager-core || return 1
+			fi
+
+			if [[ "$interactive" == "interactive" ]]; then
+				$RTD_GUI --title "$distro_name Upgrade" \
+					--yesno "Proceed with upgrading $distro_name to the next release?" 8 78
+				case $? in
+					0) do-release-upgrade | tee -a "$_LOGFILE" ;;
+					1 | 255) return 1 ;;
+				esac
+			else
+				do-release-upgrade --quiet | tee -a "$_LOGFILE"
+			fi
+			;;
+
+		debian)
+			write_warning "Debian does not support automatic upgrades between major releases."
+			if [[ "$interactive" == "interactive" ]]; then
+				$RTD_GUI --title "Debian Upgrade" \
+					--yesno "Would you like to attempt a manual upgrade to the next release?" 10 78
+				case $? in
+					0)
+						current_version=$(grep VERSION= /etc/os-release | grep -oP '[0-9]{1,2}')
+						sed -i "s/$(lsb_release -cs)/testing/g" /etc/apt/sources.list
+						apt update && apt upgrade -y && apt full-upgrade -y
+						write_status "Manual upgrade to Debian testing branch attempted."
+						;;
+					*) return 1 ;;
+				esac
+			fi
+			return 1
+			;;
+
+		suse* | opensuse*)
+			if ! command -v zypper &>/dev/null; then
+				write_error "Zypper not found. Cannot proceed with SUSE upgrade."
+				return 1
+			fi
+
+			current_version=$(grep VERSION_ID /etc/os-release | cut -d'"' -f2)
+			latest_version=$(curl -s https://download.opensuse.org/distribution/openSUSE-current/iso/ | grep -Eo '1[5-9]\.[0-9]|20\.[0-9]+' | sort -V | tail -n1)
+
+			write_status "Current SUSE version: $current_version"
+			write_status "Latest available SUSE version: $latest_version"
+
+			if [[ "$current_version" != "$latest_version" ]]; then
+				write_warning "Upgrade to $latest_version will begin. This may take time."
+				zypper modifyrepo --enable repo-update
+				zypper refresh
+				zypper --releasever="$latest_version" dup --force-resolution | tee -a "$_LOGFILE"
+				[[ "$interactive" == "interactive" ]] && read -rp "$ERRMSG Press ENTER to reboot:"
+				reboot
+			else
+				write_information "System is already running latest SUSE version."
+			fi
+			;;
+
+		fedora)
+			if ! command -v dnf &>/dev/null; then
+				write_error "DNF not found. Cannot proceed with Fedora upgrade."
+				return 1
+			fi
+
+			current_version=$(rpm -E %fedora)
+			latest_version=$(curl -s https://dl.fedoraproject.org/pub/fedora/linux/releases/ | grep -Eo 'href="[0-9]+/' | grep -Eo '[0-9]+' | sort -V | tail -n1)
+
+			if [[ "$interactive" == "interactive" ]]; then
+				releasever=$($RTD_GUI --title "Fedora Upgrade" \
+					--inputbox "Enter Fedora version to upgrade to (Latest: $latest_version, Current: $current_version)" 10 78 "$latest_version" 3>&1 1>&2 2>&3)
+			else
+				releasever="$latest_version"
+			fi
+
+			if [[ ! "$releasever" =~ ^[0-9]+$ ]]; then
+				write_error "Invalid release version input."
+				return 1
+			fi
+
+			dnf clean all
+			dnf upgrade --refresh -y
+			dnf install -y dnf-plugin-system-upgrade
+			dnf system-upgrade download --refresh --releasever="$releasever" | tee -a "$_LOGFILE"
+			[[ "$interactive" == "interactive" ]] && read -rp "$ERRMSG Press ENTER to reboot and begin upgrade:"
+			dnf system-upgrade reboot
+			;;
+
+		*)
+			system::log_item "Unsupported distribution for automated upgrade: $distro_name"
+			[[ "$interactive" == "interactive" ]] && read -rp "Unsupported distribution. Press [ENTER] to continue..."
+			return 1
+			;;
+	esac
+
+	return 0
+}
+
+
 github::clone_repo_user() {
 	# Description:
 	# Function to CLONE all github.com repositories for a specified user.
@@ -10262,281 +10408,6 @@ rtd_ppa_checker() {
 	done
 }
 
-rtd_oem_release_upgrade() {
-	# Description: Function to attempt to perform a release upgade on several Linux distributions.
-	# Supported distributions are: Ubuntu, Pop! OS, Debian, SUSE, and fedora.
-	# This function does not require any arguments but will respect "interactive". The "interactive"
-	# parameter will force the function to pause if a supported distribution is not found.
-	# It will check for a supported distribution and attempt the upgrade if possible.
-	# If a supported distribution is not detected the function will do nothing.
-	#
-	# Globals:
-	# Arguments: None
-	# Outputs:
-	# Returns:
-	# Usage:  (in a script):
-	#  rtd_oem_release_upgrade [ string ]
-	#
-	# [ string ] : interactive
-	#
-	# End of Documentation
-
-	ensure_admin
-	local interactive=$1
-	local distro=$(hostnamectl | grep -Eo 'Ubuntu|Pop!_OS|Debian|SUSE|fedora|TUXEDO|Zorin'|head -1)
-
-	case $distro in
-	"Ubuntu" | "Pop!_OS" | "TUXEDO|Zorin")
-		# Common update steps for Ubuntu and derivativres
-		write_warning "This may take some time, please be patient!"
-		apt clean && apt update -m
-		dpkg --configure -a
-		apt install -f
-		apt dist-upgrade
-		apt autoremove --purge
-		if [[ "$interactive" == "interactive" ]]; then
-			$RTD_GUI --title "$distro Distribution Upgrade Confirmation" --yesno "Please confirm that you want to upgrade to the next version of $distro. This may take some time, please be patient!" 8 78
-			case $? in
-			0) do-release-upgrade | tee -a ${_LOGFILE} ;;
-			1 | 255) return 1 ;;
-			esac
-		else
-			do-release-upgrade --quiet | tee -a ${_LOGFILE}
-		fi
-		;;
-	"Debian")
-		write_error "Debian does not provide an upgrade tool between major releases. Please use the manual upgrade method."
-		return 1
-		;;
-	"SUSE")
-		# SUSE upgrade steps
-		if current_version=$(cat /etc/os-release | grep VERSION_ID | cut -d '"' -f2); then
-			write_status "Current SUSE version: $current_version"
-		else
-			write_error "unable to query /etc/os-release for current version of SUSE! "
-			return 1
-		fi
-
-		if latest_version=$(curl -s https://download.opensuse.org/distribution/openSUSE-current/iso/ | grep -Eo '1[5-9]\.[0-9]|20\.[0-9]+' | sort -V | tail -n1); then
-			write_status "Latest SUSE version: $latest_version"
-		else
-			write_error "unable to query opensuse.org for latest version of SUSE! Check access to internet and try again."
-			return 1
-		fi
-
-		if [ "$(printf '%s\n' "$current_version" "$latest_version" | sort -V | head -n1)" != "$current_version" ]; then
-			write_status "A newer version of SUSE is available: $latest_version"
-			write_warning "This REALLY may take some time, please be patient!"
-			write_information "These are the current repositories:"
-			{
-				zypper repos --uri
-				zypper modifyrepo --enable repo-update
-				zypper repos --uri
-				zypper refresh
-			} | tee -a ${_LOGFILE}
-
-			write_status "Checking if it is possible to upgrade to ${SUSE_VER}"
-			if zypper --releasever="${SUSE_VER}" lr -u; then
-				zypper --releasever="${SUSE_VER}" ref
-				write_status "Attempting upgrade of system now..."
-				zypper --releasever="${SUSE_VER}" dup --force-resolution
-				wait
-				[[ "$interactive" == "interactive" ]] && read -p "$ERRMSG: Press  [ ENTER ] to REBOOT:"
-				reboot
-			else
-				write_error "It is not possible to upgrade to Open Suse ${SUSE_VER} since there does not appear to be a release server available for ${SUSE_VER}"
-				[[ "$interactive" == "interactive" ]] && read -p "$ERRMSG: Press  [ ENTER ] to continue:"
-			fi
-		else
-			write_information "You are using the latest version of SUSE: $current_version"
-		fi
-		;;
-	"fedora")
-		# Fedora upgrade steps
-		if [[ "$interactive" == "interactive" ]]; then
-			latest_version=$(curl -s https://dl.fedoraproject.org/pub/fedora/linux/releases/ | cut -d' ' -f5 | grep -Eo '[0-9][5-9]' | sort -V | tail -n1)
-			releasever=$($RTD_GUI --title "Fedora Distribution Upgrade Confirmation" \
-				--inputbox "Please enter the Fedora version you want to upgrade to. Latest version is . Current version: $latest_version $(hostnamectl | grep -oP '(?<=Operating System: Fedora\s)\d+')\nOnly numbers are valid." 10 78 3>&1 1>&2 2>&3)
-		else
-			releasever=$(curl -s https://dl.fedoraproject.org/pub/fedora/linux/releases/ | cut -d' ' -f5 | grep -Eo '[0-9][5-9]' | sort -V | tail -n1)
-		fi
-
-		# Validate input
-		if [[ ! $releasever =~ ^[0-9]+$ ]]; then
-			write_error "Invalid version number. Upgrade aborted."
-			return 1
-		fi
-
-		# Upgrade process
-		write_status "Starting upgrade process for Fedora. This may take some time."
-		{
-			dnf clean all
-			dnf upgrade --refresh -y
-			dnf install dnf-plugin-system-upgrade -y
-			if ! dnf system-upgrade download --refresh --releasever="${releasever}"; then
-				write_error "Failed to download system upgrade packages."
-				return 1
-			fi
-		} | tee -a ${_LOGFILE}
-
-		# Confirmation for reboot
-		if [[ "$interactive" == "interactive" ]]; then
-			read -p "$ERRMSG: Press [ ENTER ] to REBOOT and install the upgrade:"
-		fi
-
-		# Rebooting to apply upgrade
-		dnf system-upgrade reboot
-		return $?
-		;;
-	*)
-		system::log_item "This distribution is not supported for release upgrade."
-		[[ "$interactive" == "interactive" ]] && read -p "This distribution is not supported. Press [Enter] key to return to menu."
-		return 1
-		;;
-	esac
-	return
-
-}
-
-
-oem::distro_release_upgrade() {
-	# Description:
-	#   Attempts an OS release upgrade on Ubuntu, Pop!_OS, Debian, SUSE, or Fedora.
-	#   Respects "interactive" mode to prompt user.
-	#
-	# Globals:
-	#   _LOGFILE, RTD_GUI, ERRMSG
-	#
-	# Arguments:
-	#   [interactive] — optional; pauses if unsupported distro or confirmation required
-	#
-	# Returns:
-	#   0 on successful upgrade, 1 on error or unsupported distro
-
-	ensure_admin
-
-	local interactive distro_id distro_name current_version latest_version releasever
-
-	case $1 in
-		--interactive) interactive="interactive" ;;
-		*) interactive="" ;;
-	esac
-
-	if [[ -r /etc/os-release ]]; then
-		distro_id=$(grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
-		distro_name=$(grep '^NAME=' /etc/os-release | cut -d= -f2 | tr -d '"')
-	else
-		write_error "Unable to detect Linux distribution."
-		return 1
-	fi
-
-	case "$distro_id" in
-		ubuntu | pop | tuxedo | zorin)
-			write_warning "This may take some time. Please be patient."
-
-			apt clean && apt update -m
-			dpkg --configure -a
-			apt install -f
-			apt dist-upgrade -y
-			apt autoremove --purge -y
-
-			if ! command -v do-release-upgrade &>/dev/null; then
-				write_status "Installing 'do-release-upgrade' support tools..."
-				software::add_native_package update-manager-core || return 1
-			fi
-
-			if [[ "$interactive" == "interactive" ]]; then
-				$RTD_GUI --title "$distro_name Upgrade" \
-					--yesno "Proceed with upgrading $distro_name to the next release?" 8 78
-				case $? in
-					0) do-release-upgrade | tee -a "$_LOGFILE" ;;
-					1 | 255) return 1 ;;
-				esac
-			else
-				do-release-upgrade --quiet | tee -a "$_LOGFILE"
-			fi
-			;;
-
-		debian)
-			write_warning "Debian does not support automatic upgrades between major releases."
-			if [[ "$interactive" == "interactive" ]]; then
-				$RTD_GUI --title "Debian Upgrade" \
-					--yesno "Would you like to attempt a manual upgrade to the next release?" 10 78
-				case $? in
-					0)
-						current_version=$(grep VERSION= /etc/os-release | grep -oP '[0-9]{1,2}')
-						sed -i "s/$(lsb_release -cs)/testing/g" /etc/apt/sources.list
-						apt update && apt upgrade -y && apt full-upgrade -y
-						write_status "Manual upgrade to Debian testing branch attempted."
-						;;
-					*) return 1 ;;
-				esac
-			fi
-			return 1
-			;;
-
-		suse* | opensuse*)
-			if ! command -v zypper &>/dev/null; then
-				write_error "Zypper not found. Cannot proceed with SUSE upgrade."
-				return 1
-			fi
-
-			current_version=$(grep VERSION_ID /etc/os-release | cut -d'"' -f2)
-			latest_version=$(curl -s https://download.opensuse.org/distribution/openSUSE-current/iso/ | grep -Eo '1[5-9]\.[0-9]|20\.[0-9]+' | sort -V | tail -n1)
-
-			write_status "Current SUSE version: $current_version"
-			write_status "Latest available SUSE version: $latest_version"
-
-			if [[ "$current_version" != "$latest_version" ]]; then
-				write_warning "Upgrade to $latest_version will begin. This may take time."
-				zypper modifyrepo --enable repo-update
-				zypper refresh
-				zypper --releasever="$latest_version" dup --force-resolution | tee -a "$_LOGFILE"
-				[[ "$interactive" == "interactive" ]] && read -rp "$ERRMSG Press ENTER to reboot:"
-				reboot
-			else
-				write_information "System is already running latest SUSE version."
-			fi
-			;;
-
-		fedora)
-			if ! command -v dnf &>/dev/null; then
-				write_error "DNF not found. Cannot proceed with Fedora upgrade."
-				return 1
-			fi
-
-			current_version=$(rpm -E %fedora)
-			latest_version=$(curl -s https://dl.fedoraproject.org/pub/fedora/linux/releases/ | grep -Eo 'href="[0-9]+/' | grep -Eo '[0-9]+' | sort -V | tail -n1)
-
-			if [[ "$interactive" == "interactive" ]]; then
-				releasever=$($RTD_GUI --title "Fedora Upgrade" \
-					--inputbox "Enter Fedora version to upgrade to (Latest: $latest_version, Current: $current_version)" 10 78 "$latest_version" 3>&1 1>&2 2>&3)
-			else
-				releasever="$latest_version"
-			fi
-
-			if [[ ! "$releasever" =~ ^[0-9]+$ ]]; then
-				write_error "Invalid release version input."
-				return 1
-			fi
-
-			dnf clean all
-			dnf upgrade --refresh -y
-			dnf install -y dnf-plugin-system-upgrade
-			dnf system-upgrade download --refresh --releasever="$releasever" | tee -a "$_LOGFILE"
-			[[ "$interactive" == "interactive" ]] && read -rp "$ERRMSG Press ENTER to reboot and begin upgrade:"
-			dnf system-upgrade reboot
-			;;
-
-		*)
-			system::log_item "Unsupported distribution for automated upgrade: $distro_name"
-			[[ "$interactive" == "interactive" ]] && read -rp "Unsupported distribution. Press [ENTER] to continue..."
-			return 1
-			;;
-	esac
-
-	return 0
-}
 
 rtd_oem_remove_non_western_latin_fonts() {
 	# Description:  a simple function to remove known
