@@ -2998,7 +2998,8 @@ system::install_missing_commands() {
 			local pkg
 			pkg=$(dnf provides */$cmd | grep ' : ' | head -n1 | cut -d' ' -f1)
 			if [[ -n "$pkg" ]]; then
-				dnf install -y "$pkg"
+				software::add_native_package "$pkg"
+				write_status "Installed '$cmd' using package $pkg"
 			fi
 			;;
 		suse)
@@ -3007,9 +3008,11 @@ system::install_missing_commands() {
 				cnf_output=$(cnf "$cmd" 2>&1)
 				if [[ $cnf_output == *"can be found in following package"* ]]; then
 					# Extracting package name
-					pkg=$(echo "$cnf_output" | grep "^\s*\*" | awk '{print $2}')
+					pkg=$(echo "$cnf_output" | grep -F 'sudo zypper install' | awk '{print $4}')
 					if [[ -n "$pkg" ]]; then
-						zypper install -y "$pkg"
+						software::add_native_package "$pkg"
+						write_status "Installed '$cmd' using package '$pkg'."
+						return 0
 					else
 						write_error "Package for command '$cmd' not found."
 					fi
@@ -7325,19 +7328,8 @@ tool::compress_all_items_here() {
 	#
 	# End of documentation
 
-	if hash 7z; then
-		write_information "7z is present, good..."
-	else
-		write_error "the 7z (7 zip) program was not found"
-		for i in p7zip-full 7za; do
-			for i in dnf zypper apt-get; do
-				write_warning "Installing software requires elevated priviladges!"
-				write_status "Peare enter password beloow (if not cached):"
-				sudo $i install -y p7zip-full
-			done
-			exit 0
-		done
-	fi
+
+	dependency::command_exists 7z
 
 	if [[ ! "$1" == "--noprompt" ]]; then
 		if hash dialog 2>/dev/null; then
@@ -7417,6 +7409,9 @@ tool::compress_provided_items() {
 	# Arguments:	No parameters required for basic function (user will be prompted).
 	#
 	# End of documentation
+	
+	dependency::command_exists 7z
+
 	list="$*"
 	if echo "${@}" | grep "--encrypt"; then
 		passtoken=$(dialog --title "${Title:="$(basename $0)"}" \
@@ -7519,6 +7514,8 @@ tool::recompress_all_items_in_folder() {
 	#
 	# End of documentation
 
+	dependency::command_exists 7z
+
 	local tgt_format="${1:-"7z"}"
 
 	case $tgt_format in
@@ -7602,6 +7599,8 @@ tool::recompress_provided_items() {
 	#             temporary directories for the recompression process, which are cleaned up after use.
 	#
 	# End of documentation
+
+	dependency::command_exists 7z
 
 	local files=($1)      # The list of files to be recompressed, supports wildcards or specific filenames
 	local tgt_format="$2" # The target format for recompression
