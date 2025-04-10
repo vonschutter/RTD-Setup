@@ -718,23 +718,18 @@ recipe_Bundle:_Install_Top_Curated_Games_for_Linux () {
 
 recipe_Bundle:_3_Install_System_Admin_Tools () {
 	# System Admin Tools (nmap synaptic ssh gparted sshfs htop iftop nethogs glances)...
+	# System Admin tools for managing and monitoring your system.
+	# NOTE: the "$1" after the package-name is if you want to trap the --remove option for
+	# Bundle removals. This is optional.
 
-	# NOT REMOVABLE. Bundle contains downloaded software from sites. 
-	# Loop through each item in this list of software and perform an install
-	# using the relevant packaging system.
 	AdminToolsAppList="nmap synaptic ssh sshfs htop iftop nethogs glances bmon btop \
-		vim vim-scripts variety diodon polari filezilla tilix dialog byobu bleachbit"
+		vim vim-scripts variety diodon polari filezilla dialog byobu bleachbit gparted"
 
 	for i in ${AdminToolsAppList}
 	do
 		software::add_native_package $i
 	done
-
-	# Installs Java, needed for cross platform software like Minecraft and others
-	# software::add_native_package default-jre
-
-	# Teamviewer remote admin		
-	Single_Install_Remote_Desktop_by_Team_Viewer			
+	
 }
 
 
@@ -869,6 +864,35 @@ recipe_Bundle:_Clean:_Remove_non_western_latin_fonts (){
 }
 
 
+recipe_Bundle:_Advanced_Terminals() {
+	# Advanced terminal apps (htop, glances, bmon, btop, nethogs, iftop)...
+	# This bundle is not removable. It contains downloaded software from sites. 
+	# Loop through each item in this list of software and perform an install
+	# using the relevant packaging system.
+
+	distribution_type=$(system::distribution_type)
+
+	case $distribution_type in
+		"ubuntu" | "debian")
+			wget -qO- https://releases.warp.dev/linux/keys/warp.asc | gpg --dearmor > warpdotdev.gpg
+			sudo install -D -o root -g root -m 644 warpdotdev.gpg /etc/apt/keyrings/warpdotdev.gpg
+			sudo sh -c 'echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/warpdotdev.gpg] https://releases.warp.dev/linux/deb stable main" > /etc/apt/sources.list.d/warpdotdev.list'
+			rm warpdotdev.gpg
+			software::update_system_txt
+			software::add_native_package warp-cli
+			software::add_native_package warp-cli-daemon
+			software::add_native_package warp-cli-qt
+			software::add_native_package warp-cli-qt-daemon
+		;;
+		*)
+			write_error "No supported software management found, assuming unsupported distribution..."
+			exit 1
+	esac
+
+	software::add_native_package tilix
+
+}
+
 
 recipe_Bundle:_1_Install_OEM_Themes_and_Tweaks (){
 	# Configuration, tweaks, and settings for a better user experience (KDE or Gnome).
@@ -878,33 +902,13 @@ recipe_Bundle:_1_Install_OEM_Themes_and_Tweaks (){
 	This will also include some UI configuration and settings to improve usability,
 	and the look and feel based on what a user may be used to."
 
-	# [Task 1] Set basic locations files belonging to RTD Power Tools
 	# -------------------------------------------------------------------------------------------------------#
-	# Add dependencies to used in this bundle.
 	recipe_Bundle:_Compression_Tools
 	security::enable_firewall --minecraft
-	# -------------------------------------------------------------------------------------------------------#
-
-
-	# [Task 2] Set basic locations files belonging to RTD Power Tools
-	# -------------------------------------------------------------------------------------------------------#
-	# Add launchers for some OEM apps (Internal function).
 	oem::rtd_tools_make_launchers
-	# -------------------------------------------------------------------------------------------------------#
-
-	# [Task 3] Configure Desktop software managers depending on desktop used
-	# -------------------------------------------------------------------------------------------------------#
 	software::ensure_software_store_available
-
-	# -------------------------------------------------------------------------------------------------------#
-
-	# [Task 4] Configure relevant power management
-	# -------------------------------------------------------------------------------------------------------#
-	# If this system was built using the RTD process and is debian based, use instructions in said file.
 	oem::check_boot_splash_screen_enable /opt/rtd/preseed.cfg
 	oem::check_boot_splash_screen_enable /root/original-ks.cfg
-
-	#Tune to virtual machine guest or tune according to hardware type::
 	system::tune_system_power_profile
 
 	# -------------------------------------------------------------------------------------------------------#
@@ -915,68 +919,47 @@ recipe_Bundle:_1_Install_OEM_Themes_and_Tweaks (){
 	# Apply tweaks to the UI based on desktop active
 	if  ps -e |grep "gnome-shell"; then
 
-		# [Task 5.2] Add extensions:
+		# [Task 5.1] Add extensions:
 		# -------------------------------------------------------------------------------------------------------
 		# To fully support themes and customixzations the Gnome environment requires extensions and
 		# theme modules "engines" that change the look and feel of buttons and widgets. Also, additional
 		# software is needed to change from one them to another.
 
 		write_information "Adding UI themes..."
+		write_information "Fonud the gnome UI on this system! Adding OEM customizations..."
 		# Special case for Fedora: Add the gnome UI tweak tool...
-		if cat /etc/os-release |grep "Fedora" ; then
+
+		_DISTRO=$(system::distribution_type)
+		case $_DISTRO in
+			"fedora")
 			# Enable the extra repositories in fedora to get access to the espected software.
 			software::check_native_package_dependency "fedora-workstation-repositories"
-		fi
-		software::check_native_package_dependency gnome-tweaks
+		esac
 
-		write_information "--- Optimizig look and feel of the desktop for productivity and aestetics..."
+		software::check_native_package_dependency gnome-tweaks
 		software::check_native_package_dependency make
 		software::check_native_package_dependency sassc
 		software::check_native_package_dependency gettext
 
-		# For critical extensions try to install from package manager first
-		# software::add_native_package "dash-to-dock"
-		# software::add_native_package "dash-to-panel"
+		# For critical important extensions try to install from package manager first
+		software::check_native_package_dependency "dash-to-dock"
+		software::check_native_package_dependency "dash-to-panel"
 		software::add_native_package "gnome-shell-extension-manager"
 		software::add_native_package "gnome-extensions-app"
 
 		# Install the wanted shell extensions that can be found in the distributions repository
 		# 	615:	appindicator		307:  	dash-to-dock
 		# 	517: 	caffeine		1160: 	dash-to-pannel
-		# 	1319: 	gsconnect
-		# 	6: 	application-menu
-		# 	19: 	user-themes
-		# 	7: 	removable-drive-menu
+		# 	1319: 	gsconnect		8: 	Places Status Indicator
+		# 	6: 	application-menu	3628: 	ArcMenu
+		# 	19: 	user-themes		97: 	Coverflow Alt-Tab
+		# 	7: 	removable-drive-menu	1852: 	GameMode
 		# 	906: 	Sound Input/Output Chooser
-		# 	1852: 	GameMode
-		# 	97: 	Coverflow Alt-Tab
-		# 	3628: 	ArcMenu
-		# 	8: 	Places Status Indicator
 		software::add_gnome_extensions 615 307 517 1160 1319 6 19 7 906 1852 97 3628 8
 
-		# -------------------------------------------------------------------------------------------------------
-
-
-		# [Task 5.3] Add cusom themes for gnome and snap:
-		# -------------------------------------------------------------------------------------------------------
-		# Installing dependencies for themes. If the package name was the same there would not
-		# need for this extra checking, but different distributions have different
-		# names for the same software. Therefore there is a need to check based on what
-		# distro package managemnt is installed. This is easier and likely accurate in most cases.
-		# Pop, Ubuntu, Kubuntu, and Debian all use deb packages and name the packages consistently for ex.
-		# This will ensure that the sofware is installed so the themes look good...
-		# Install hemes (Light and Dark) and more...
 		write_information "Adding UI themes..."
 		source ${_THEME_DIR}/plus-themes.sh || write_error "There was a problem installing themes... "
 		software::add_native_package arc-theme || write_error "There was a problem installing Arc-themes... "
-
-		# -------------------------------------------------------------------------------------------------------
-
-
-		# -------------------------------------------------------------------------------------------------------
-		# [Task 5.1] Configure Wallpapers for OEM look and feel.
-		# -------------------------------------------------------------------------------------------------------
-		write_information "Fonud the gnome UI on this system! Adding OEM customizations..."
 
 		tempfile=$( mktemp )
 		chmod 777 ${tempfile}
@@ -988,14 +971,6 @@ recipe_Bundle:_1_Install_OEM_Themes_and_Tweaks (){
 		system::run_command_in_gnome_user_session /bin/bash ${tempfile}
 		rm -f ${tempfile}
 
-		# -------------------------------------------------------------------------------------------------------
-		# [Task 5.5] copy configuration elements so that NEW users also get the tweaks:
-		# -------------------------------------------------------------------------------------------------------
-		# If the system that this is run on was built using an unattended build it is reasonable to
-		# assume that the UI customizations should be implemented such that all new users will get
-		# the OEM tweaks to the UI. If this task sequence is run on a system by a user on a system not
-		# built by the unattended OEM process, then these changes sould only be implemented for the user
-		# running this task.
 		if [[ -e /opt/${_TLA,,} ]] ; then
 			write_information "This system was built by an OEM process: copying tweaks for all new users..."
 			mkdir -p /etc/skel/.config
@@ -1009,7 +984,7 @@ recipe_Bundle:_1_Install_OEM_Themes_and_Tweaks (){
 
 
 	if  ps -e |grep "plasmashell" ; then
-
+		# -------------------------------------------------------------------------------------------------------
 		write_information "Detected KDE UI!"
 		if [[ -e ${_THEME_DIR}/plus-themes.sh ]] ; then 
 			bash ${_THEME_DIR}/plus-themes.sh || write_error "There was a problem installing themes... "
@@ -1030,6 +1005,7 @@ recipe_Bundle:_1_Install_OEM_Themes_and_Tweaks (){
 		sudo -H -E -u $SUDO_USER  bash -c "source /opt/rtd/core/_rtd_library ; rtd_oem_kde_set_wallpaper ${_WALLPAPER_DIR}/Wayland.jpg"
 		# for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
 		# sudo -E -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c '/usr/bin/lookandfeeltool -a RTD-Win11-Dark --resetLayout'
+		# -------------------------------------------------------------------------------------------------------
 	fi
 }
 
