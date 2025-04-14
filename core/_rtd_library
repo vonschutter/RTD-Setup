@@ -351,6 +351,8 @@ _OEM_dependencies="_branding.info _locations.info _rtd_recipies.info"
 #
 ################################################################################################
 
+
+
 dialog::check_menu_availability() {
 	# Description: First discover what menu system is installed. Some systems use "dialog" and
 	# other systems use whiptail for the terminal to show menus and dialogs.
@@ -1004,15 +1006,147 @@ term::animate_while_command() {
 	# End of Documentation
 
 	if [[ -z ${1} ]]; then
-		write_error "Specifying a command to wait for is required! "
+		write_error "Specifying a command to wait for is required!"
 		return 1
 	else
-		term::start_animation "${@}"
-		"${@}" &>/dev/null
-		term::stop_animation
+		term::start_animation "$@"
+
+		# Run the command in the background and get its PID
+		"${@}" &>/dev/null &
+		CMD_PID=$!
+
+		# Wait for the command to complete
+		wait $CMD_PID
+		RET_CODE=$?
+
+		term::stop_animation $RET_CODE
+		return $RET_CODE
 	fi
 
 }
+
+
+term::start_animation() {
+	# Description:
+	# A simple function to display and animation during a silent acton
+	#
+	# Globals:
+	# Arguments:
+	# Outputs: Standard out
+	# Returns:
+	# Usage:
+	# term::start_animation "Display text"
+	# term::stop_animation
+	#
+	# End of documentation
+	cmd_while="${@}"
+
+	if [[ -z ${cmd_while} ]]; then
+		write_error "Specifying a command to wait for is required!"
+		return 1
+	fi
+	
+	# make some decent display terminal graphics...
+	setterm -cursor off
+	export ANIM_PID="0"
+	local PAD="${green}---------------------------------------------------------"
+
+	LINE="$(printf "%s %s" "${magenta}${cmd_while}" " $PAD" | cut -c 1-${#PAD}) :  "
+
+	anim=(
+		"${LINE} ${blue}•${green}•${red}•${magenta}•    ${ENDCOLOR}"
+		"${LINE}  ${green}•${red}•${magenta}•${blue}•   ${ENDCOLOR}"
+		"${LINE}   ${red}•${magenta}•${blue}•${green}•  ${ENDCOLOR}"
+		"${LINE}    ${magenta}•${blue}•${green}•${red}• ${ENDCOLOR}"
+		"${LINE}     ${blue}•${green}•${red}•${magenta}•${ENDCOLOR}"
+	)
+	(
+		while true; do
+			for i in {0..4}; do
+				printf "\r\033[2K ${anim[i]}"
+				sleep 0.1
+			done
+
+			for i in {4..0}; do
+				printf "\r\033[2K ${anim[i]}"
+				sleep 0.1
+			done
+		done
+	) &
+
+	export ANIM_PID="${!}"
+}
+
+term::stop_animation() {
+	# Description:
+	# A simple function to STOP display and animation during a silent acton
+	#
+	# Globals:
+	# Arguments:
+	# Outputs: Standard out
+	# Returns:
+	# Usage:
+	# term::stop_animation
+	#
+	# End of documentation
+	if [[ -n "$ANIM_PID" ]] && kill -0 "$ANIM_PID" 2>/dev/null; then
+		kill "$ANIM_PID"
+		wait "$ANIM_PID" 2>/dev/null
+	fi
+
+	if [[ $RET_CODE == 0 ]]; then
+		printf "\r\033[2K ${LINE} [ \xE2\x9C\x94 ] ${GREEN} OK! ${ENDCOLOR} \n"
+	else
+		printf "\r\033[2K ${LINE} [ ! ] ${RED} FAILED! ${ENDCOLOR}  \n"
+	fi
+
+	unset LINE
+	setterm -cursor on 2>/dev/null
+}
+
+term::task_exec_list_output() {
+	# DESCRIPTION:
+	#   Executes a given command while displaying a formatted status line
+	#   in the terminal and logging output to the current log file ($_LOGFILE).
+	#   Provides visual feedback with terminal graphics to indicate success or failure.
+	#
+	#   Intended to be used for clear visual execution tracking in scripts.
+	#
+	# USAGE:
+	#   term::task_exec_list_output <command> [args...]
+	#
+	# PARAMETERS:
+	#   $@ - The full command to execute (can include arguments).
+	#
+	# OUTPUTS:
+	#   - Prints a truncated command summary with an "Executing ..." message.
+	#   - Shows a success checkmark (✔ OK) in green or a failure mark (FAILED) in red.
+	#   - Appends full command output (stdout and stderr) to $_LOGFILE.
+	#
+	# LOGGING:
+	#   - Logs the function call and parameters via system::log_item.
+	#
+	# EXAMPLE:
+	#   term::task_exec_list_output ls -lh /tmp
+	#
+	# DEPENDENCIES:
+	#   - system::log_item
+	#   - Global vars: $_LOGFILE, $GREEN, $RED, $ENDCOLOR
+	#
+	# RETURNS:
+	#   - Returns the exit status of the executed command.
+	#
+	# NOTE:
+	# End of documentation
+
+	local logfile=$(system::determine_logfile)
+
+	system::log_item "Running ${FUNCNAME[0]} requested by ${FUNCNAME[1]} with parameters $*"
+	echo -ne "Executing $LINE:"\  &
+	term::animate_while_command "$@"
+
+}
+
 
 ################################################################################################
 #              ________________________________________________
@@ -2868,6 +3002,9 @@ system::install_missing_commands() {
 	#	- For Debian-based systems, it also attempts to install commands via snap if not available in apt.
 	#
 	# End of Documentation
+
+	system::log_item "Called by: ${FUNCNAME[1]}"
+	system::log_item "Processing parameters: $*"
 	if [ "$#" -eq 0 ]; then
 		write_error "No command specified to find and install."
 		return 1
@@ -2879,7 +3016,7 @@ system::install_missing_commands() {
 
 	for cmd in ${*}; do
 		case "$distro" in
-		debian)
+		ubuntu | debian )
 			local pkg install_info snap_info 
 
 			if command -v "$cmd" >/dev/null 2>&1; then
@@ -2887,18 +3024,23 @@ system::install_missing_commands() {
 				return 0
 			fi
 			
-			if ! command -v command_not_found_handle ; then 
-				write_warning "command_not_found_handle not found. Attempting to install command-not-found package..."
-				software::add_native_package command-not-found || { 
-					write_error "Unable to install command-not-found package, unable to determine package name from command"
-					write_error "Please determine the name of the required package to satify the $cmd dependency, and use the software::add_native_package to install the missing package instead"
-					return 1 
-					}
+			if [[ -n "$cmd" ]]; then
+				pkg="$cmd"
+				write_status "Trying first APT package '$pkg' for command '$cmd'"
+				if software::add_native_package "$pkg"; then
+					write_status "Installed '$cmd' using package '$pkg'."
+					return 0
+				fi
+			else
+				write_warning "No deb package found matching the name of the command '$cmd'. Trying alternatives..."
 			fi
+			
 			write_warning "Command '$cmd' not found. Attempting to determine the providing package..."
 
-			# Try to extract APT suggestion (safe shell fallback)
-			install_info="$(command_not_found_handle "$cmd" 2>&1 | grep -i "apt" | awk '{print $3}' | head -n1)"
+
+			wrrite_status "Trying to extract APT suggestion for the missing command: $cmd..."
+
+			install_info="$(software::determine_package_name_from_cmd "$cmd")"
 
 			if [[ -n "$install_info" ]]; then
 				pkg="$install_info"
@@ -2935,65 +3077,8 @@ system::install_missing_commands() {
 
 			write_error "Unable to resolve or install the required command: '$cmd'"
 			return 1
-			;;
-		ubuntu)
-			local pkg install_info snap_info 
-
-			if command -v "$cmd" >/dev/null 2>&1; then
-				write_status "Command '$cmd' is already available."
-				return 0
-			fi
-
-			if ! command -v command_not_found_handle ; then 
-				write_warning "command_not_found_handle not found. Attempting to install command-not-found package..."
-				software::add_native_package command-not-found || { 
-					write_error "Unable to install command-not-found package, unable to determine package name from command"
-					write_error "Please determine the name of the required package to satify the $cmd dependency, and use the software::add_native_package to install the missing package instead"
-					return 1 
-					}
-			fi
-			write_warning "Command '$cmd' not found. Attempting to determine the providing package..."
-
-			# Try to extract APT suggestion (safe shell fallback)
-			install_info="$(command_not_found_handle "$cmd" 2>&1 | grep -i "apt" | awk '{print $3}' | head -n1)"
-
-			if [[ -n "$install_info" ]]; then
-				pkg="$install_info"
-				write_status "APT suggests installing '$pkg' for command '$cmd'"
-				if software::add_native_package "$pkg"; then
-					write_status "Installed '$cmd' using package '$pkg'."
-					return 0
-				else
-					write_warning "APT package '$pkg' failed to install."
-				fi
-			else
-				write_warning "No APT package suggestion found for '$cmd'."
-			fi
-
-			# Try finding a Snap package as fallback
-			if command -v snap >/dev/null 2>&1; then
-				write_status "Searching Snap Store for '$cmd'..."
-				if snap_info=$(snap find "$cmd" 2>/dev/null | awk 'NR==2 {print $1}'); then
-					if [[ -n "$snap_info" ]]; then
-						write_status "Snap suggests package '$snap_info' for '$cmd'"
-						if software::from_snapcraft.io "$snap_info"; then
-							write_status "Installed '$cmd' using Snap package '$snap_info'."
-							return 0
-						else
-							write_error "Snap package '$snap_info' failed to install."
-						fi
-					else
-						write_warning "No relevant Snap packages found for '$cmd'."
-					fi
-				fi
-			else
-				write_warning "Snap is not installed or not available. Skipping Snap search."
-			fi
-
-			write_error "Unable to resolve or install the required command: '$cmd'"
-			return 1
-			;;
-		redhat)
+		;;
+		redhat )
 			# Fedora and RHEL
 			local pkg
 			pkg=$(dnf provides */$cmd | grep ' : ' | head -n1 | cut -d' ' -f1)
@@ -3001,8 +3086,8 @@ system::install_missing_commands() {
 				software::add_native_package "$pkg"
 				write_status "Installed '$cmd' using package $pkg"
 			fi
-			;;
-		suse)
+		;;
+		suse )
 			# openSUSE / SUSE
 			for cmd in "${missing_commands[@]}"; do
 				cnf_output=$(cnf "$cmd" 2>&1)
@@ -3020,11 +3105,11 @@ system::install_missing_commands() {
 					write_error "Command '$cmd' not found in cnf database."
 				fi
 			done
-			;;
-		*)
+		;;
+		* )
 			write_error "Unsupported distribution: $distro"
 			return 1
-			;;
+		;;
 		esac
 	done
 }
@@ -9736,6 +9821,59 @@ InstallSoftwareFromRepo() {
 	fi
 }
 
+software::determine_package_name_from_cmd() {
+	# Description: Function to determine the package name from the command line.
+	# This function is used to determine the package name from the command line
+	# and is used in the software::add_native_package function.
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage: software::determine_package_name_from_cmd
+	# End of documentation
+	local cmd="$1"
+	local pkg_name distro logfile
+
+	if [[ -z "$cmd" ]]; then
+		write_error "No command provided to determine package name."
+		return 1
+	fi
+
+	distro=$(system::distribution_type)
+	logfile=$(system::determine_logfile)
+
+	system::log_item "Checking for command-not-found package so that package name may be determined..."
+
+	if ! command -v command_not_found_handle ; then 
+		write_warning "command_not_found_handle not found. Attempting to install command-not-found package..."
+		software::add_native_package command-not-found || { 
+			write_error "Unable to install command-not-found package, unable to determine package name from command"
+			write_error "Please determine the name of the required package to satify the $cmd dependency, and use the software::add_native_package to install the missing package instead"
+			return 1 
+			}
+	fi
+
+	case "$distro" in
+		"ubuntu" | "debian")
+			pkg_name="$(command_not_found_handle "$cmd" 2>&1 | grep -i "apt" | awk '{print $3}' | head -n1)" &>>$logfile
+			;;
+		"fedora" | "centos" | "rhel")
+			pkg_name="$(command_not_found_handle "$cmd" 2>&1 | grep -i "dnf" | awk '{print $3}' | head -n1)" &>>$logfile
+			;;
+		"suse")
+			pkg_name="$(command_not_found_handle "$cmd" 2>&1 | grep -i "zypper" | awk '{print $3}' | head -n1)" &>>$logfile
+			;;
+		*)
+			write_error "Unsupported distribution: $distro"
+			return 1
+			;;
+	esac
+
+	system::log_item "Package name for command '$cmd' is '$pkg_name'"
+	echo "$pkg_name"
+}
+
+
 software::add_native_package() {
 	# Description:
 	# add global install command for portability and convenience. This function
@@ -9781,40 +9919,52 @@ software::add_native_package() {
 	#   software::add_native_package curl git htop
 	# End of documentation
 
+	# Setup localized variables...
 	local pkgmgr install_cmd
 	local -a packages failed_packages
 	local pkg
+	
+	# Log the function call and arguments for support...
+	system::log_item "Called by ${FUNCNAME[0]} with arguments: $*"
+	system::log_item "Adding native package(s): $*"
 
+	# Check required dependencies and usage...
+	if [[ -z "${package_name}" ]]; then
+		write_error "No package name provided to install..."
+		return 1
+	fi
+
+	dependency::os_linux || {
+		write_error "This function is only supported on Linux systems."
+		return 1
+	}
+
+	if command -v pkcon >/dev/null 2>&1; then
+		pkgmgr="PKCON"
+		install_cmd="pkcon install -y"
+	elif command -v zypper >/dev/null 2>&1; then
+		pkgmgr="ZYPPER"
+		install_cmd="sudo zypper install -y"
+	elif command -v apt-get >/dev/null 2>&1; then
+		pkgmgr="APT"
+		install_cmd="sudo apt-get -y install"
+	elif command -v dnf >/dev/null 2>&1; then
+		pkgmgr="DNF"
+		install_cmd="sudo dnf -y install"
+	else
+		write_error "No supported package manager found on this system."
+		return 1
+	fi
+
+	write_status "Detected package manager: ${pkgmgr}"
+
+	# store the package names in an array
 	mapfile -t packages < <(printf '%s\n' "$@" | xargs -n1 | grep -Ev '^\s*$')
 
 	if [[ ${#packages[@]} -eq 0 ]]; then
 		write_error "No package names provided for installation."
 		return 1
 	fi
-
-	if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-		if command -v apt-get >/dev/null 2>&1; then
-			pkgmgr="APT"
-			install_cmd="sudo apt-get -y install"
-		elif command -v dnf >/dev/null 2>&1; then
-			pkgmgr="DNF"
-			install_cmd="sudo dnf -y install"
-		elif command -v zypper >/dev/null 2>&1; then
-			pkgmgr="ZYPPER"
-			install_cmd="sudo zypper install -y"
-		elif command -v pkcon >/dev/null 2>&1; then
-			pkgmgr="PKCON"
-			install_cmd="pkcon install -y"
-		else
-			write_error "No supported package manager found on this system."
-			return 1
-		fi
-	else
-		write_error "Unsupported OS: $OSTYPE"
-		return 1
-	fi
-
-	write_status "Detected package manager: ${pkgmgr}"
 
 	for pkg in "${packages[@]}"; do
 		if [[ -z "$pkg" ]]; then
@@ -9832,84 +9982,14 @@ software::add_native_package() {
 	done
 
 	if [[ ${#failed_packages[@]} -gt 0 ]]; then
-		printf "\nSome packages failed to install:\n" >&2
+		write_error "Some packages failed to install:"
 		for pkg in "${failed_packages[@]}"; do
-			printf "  - %s\n" "$pkg" >&2
+			write_error "  - $pkg"
 		done
 		return 1
 	fi
 
 	return 0
-	# local package_names="${*}"
-
-	# for package_name in ${package_names}; do
-	# 	if [[ -z "${package_name}" ]]; then
-	# 		write_error "No package name provided to install..."
-	# 		return 1
-	# 	fi
-	# 	if [[ $(echo $OSTYPE | grep "linux") ]]; then
-
-	# 		if hash zypper 2>/dev/null; then
-	# 			write_status "📦 Installing ${package_name} using ZYPPER:"
-	# 			sudo zypper install -y ${package_name} || {
-	# 				write_error "Failed to install ${package_name} using ZYPPER"
-	# 				return 1
-	# 			}
-	# 			{
-	# 				write_information "The software package ${package_name} has been installed sucessfully..."
-	# 				return 0
-	# 			}
-
-	# 		elif hash apt-get 2>/dev/null; then
-	# 			write_status "📦 Installing ${package_name} using DEB:"
-	# 			sudo apt-get -y install ${package_name} || {
-	# 				write_error "Failed to install ${package_name} using DEB"
-	# 				return 1
-	# 			}
-	# 			{
-	# 				write_information "The software package ${package_name} has been installed sucessfully..."
-	# 				return 0
-	# 			}
-	# 		elif hash dnf 2>/dev/null; then
-	# 			write_status "📦 Installing ${package_name} using DNF:"
-	# 			sudo dnf -y install ${package_name} || {
-	# 				write_error "Failed to install ${package_name} using DNF"
-	# 				return 1
-	# 			}
-	# 			{
-	# 				write_information "The software package ${package_name} has been installed sucessfully..."
-	# 				return 0
-	# 			}
-	# 		elif hash pkcon 2>/dev/null; then
-	# 			write_status "📦 Installing ${package_name} using Package Kit:"
-	# 			pkcon install -y ${package_name} || {
-	# 				write_error "Failed to install ${package_name} using Package Kit"
-	# 				return 1
-	# 			}
-	# 			{
-	# 				write_information "The software package ${package_name} has been installed sucessfully..."
-	# 				return 0
-	# 			}
-	# 		else
-	# 			write_error "This system does not seem to have a software managment system"
-	# 			return 1
-	# 		fi
-
-	# 	elif [[ "$OSTYPE" == "darwin"* ]]; then
-	# 		write_error "Mac OSX is currently not supported..."
-	# 	elif [[ "$OSTYPE" == "cygwin" ]]; then
-	# 		write_error "CYGWIN is currently unsupported..."
-	# 	elif [[ "$OSTYPE" == "msys" ]]; then
-	# 		write_error "Lightweight shell is currently unsupported... "
-	# 	elif [[ "$OSTYPE" == "freebsd"* ]]; then
-	# 		write_error "Free BSD is currently unsupported... "
-	# 	else
-	# 		echo "I have no Idea what this system is"
-	# 		export _INSTCMD="Whatever!"
-	# 		return 1
-	# 	fi
-	# 	return $?
-	# done
 }
 
 software::native_management_availability_check() {
@@ -10530,6 +10610,72 @@ software::remove_native_software_package() {
 	fi
 }
 
+
+system::determine_logfile() {
+	# Description:
+	#   Determines the path to a log file for the current script based on:
+	#     1) A globally set variable (_LOGFILE).
+	#     2) If _LOGFILE is not set, defaults to either:
+	#        - ~/.config/rtd/logs/<scriptname>.log if non-root user
+	#        - /var/log/<tla>/<scriptname>.log if running as root
+	#          (or uses a custom location if _LOG_DIR is defined).
+	#   'tla' is derived from the first three letters of the script name.
+	#
+	# USAGE:
+	#   system::determine_logfile
+	#     Called with no arguments; outputs the determined log file path.
+	#
+	# OUTPUTS:
+	#   Writes the full log file path to stdout.
+	#
+	# RETURNS:
+	#   0 on success (the path is always determined).
+	#
+	# NOTES:
+	#   - Respects _LOGFILE if already set.
+	#
+	# EXAMPLE CALL:
+	#   logfile=$(system::determine_logfile)
+	#   echo "Log file is: $logfile"
+	#   # Now you can use $logfile in your script for logging purposes.
+	#
+	#   - This function is useful for scripts that need to log their output
+	#     consistently, regardless of where they are run or who runs them.
+	#   - It helps in maintaining a clean logging structure, especially when
+	#     scripts are run by different users or in different environments.
+	#   - The log file will be named after the script, making it easy to identify
+	#     which log belongs to which script.
+	#   - The log file will be located in a user-specific directory if the script
+	#     is run by a non-root user, or in a system-wide directory if run by root.
+	#   - The function is designed to be portable and should work across different
+	#     Linux distributions and environments.
+	#   - The function is intended to be used in scripts that are part of a larger
+	#     system or application, where consistent logging is important for
+	#     debugging and monitoring purposes.
+	#   
+	# End of documentation
+
+	local scriptname=$(basename "${BASH_SOURCE[0]}")
+	local tla=${_TLA} ; if [[ -z "$tla" ]]; then tla=$(echo "${scriptname}" | cut -c 1-3); fi
+	local logfile
+	local log_dir
+
+	if [[ -z $_LOGFILE ]]; then
+		# Determine the log directory based on the user ID
+		if [[ $EUID -ne 0 ]]; then
+			log_dir="${HOME}/.config/${tla}/logs"
+		else
+			log_dir=${_LOG_DIR:-"/var/log/${tla,,}"}
+		fi
+
+		logfile="${log_dir}/${scriptname}.log"
+	else
+		logfile="${_LOGFILE}"
+	fi
+
+	echo "$logfile"
+}
+
 system::log_item() {
 	# Description:
 	# The purpose of this function is to consistently write script output to the right log file.
@@ -10560,28 +10706,7 @@ system::log_item() {
 	#
 	# End of documentation
 
-	if [[ -z $_LOGFILE ]]; then
-		# If log file not set globally, set it to defaults for this function a.k.a. script name
-		local scriptname=$(basename "${BASH_SOURCE[0]}")
-		local tla=${scriptname:0:3}
-
-		if [[ $EUID -ne 0 ]]; then
-			local log_dir="${HOME}/.config/rtd/logs"
-		else
-			local log_dir=${_LOG_DIR:-"/var/log/${tla,,}"}
-		fi
-
-		if ! mkdir -p "$log_dir"; then
-			printf "Error: could not create log directory %s\n" "$log_dir" >&2
-			return 1
-		fi
-
-		local logfile="${log_dir}/${scriptname}.log"
-	else
-		local logfile="${_LOGFILE}"
-	fi
-
-	touch "$logfile"
+	local logfile=$(system::determine_logfile)
 	local date="$(date '+%Y/%m/%d %H:%M')"
 
 	# Format the log item based on the calling function for clear reading
@@ -10625,7 +10750,11 @@ system::log_item() {
 	echo -e "${log_prefix} ${log_icon} : ${log_type} : ${log_message}" >>"$logfile"
 }
 
-rtd_update_system() {
+rtd_update_system () {
+	software::update_system
+}
+
+software::update_system() {
 	# Description:
 	# System update function. The purpose of this function is to update installed software from
 	# distribution reopositories and the newer self contained universal software stores like
@@ -10645,51 +10774,41 @@ rtd_update_system() {
 	# Usage: rtd_update_system
 	# End of documentation
 	#ensure_admin
-	PUBLICATION="$BRANDING Update Manager for Linux"
-	VERSION="1.14 (built in)"
+	PUBLICATION="Update Manager for Linux"
+	VERSION="1.15 (built in)"
 	DIALOGRC="~/.config/rtd/dialogrc"
 	_LOGFILE="${_LOGFILE:-$0.log}"
 
-	write_status "${PUBLICATION}: Version ${VERSION}"
-	write_status "------------------------------------------------------------------"
+	write_host --cyan "${PUBLICATION}: Version ${VERSION}"
+	write_host --cyan "------------------------------------------------------------------"
 
-	write_host --cyan "I am updating software from all channels I can find on the system."
-	write_host --cyan "I will update via the native package manager as well as newer formats"
-	write_host --cyan "like snap and flatpak ..."
+	write_host --yellow "I am updating software from all channels I can find on the system."
+	write_host --yellow "I will update via the native package manager as well as newer formats"
+	write_host --yellow "like snap and flatpak ..."
+	write_host --cyan "------------------------------------------------------------------"
 	echo -e " \n"
 
-	rtd_software_task() {
-		system::log_item "running rtd_software_task with parameters $*"
-		# make some decent display terminal graphics...
-		PAD="----------------------------------------------"
-		LINE=$(printf "%s %s" "$@" "$PAD" | cut -c 1-${#PAD})
-		echo -ne "Executing $LINE:"\  &
-		"$@" >>"$_LOGFILE" 2>&1 && printf "%b%-6s%b [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR   \n" || printf "%b%-6s%b [ ! ] ${RED} FAILED $ENDCOLOR  \n"
-		# write_status "Executing ${LINE}:"\ & "$@" >>"${_LOGFILE}" 2>&1 && printf "%b%-6s%b [ \xE2\x9C\x94 ] OK!  \n" ||printf "%b%-6s%b [ ! ] FAILED  \n"
-
-	}
-
 	if hash dnf 2>/dev/null; then
-		rtd_software_task dnf -y upgrade
+		term::task_exec_list_output dnf -y upgrade
 	elif hash zypper 2>/dev/null; then
-		rtd_software_task zypper up -y
+		term::task_exec_list_output zypper up -y
 	elif hash apt 2>/dev/null; then
-		rtd_software_task apt-get update
+		term::task_exec_list_output apt-get update
 		UPGRADABLE=$(LANG=C apt-get upgrade -s | grep -P '^\d+ upgraded' | cut -d" " -f1)
 		if [ "$UPGRADABLE" -eq 0 ]; then
 			write_information "$UPGRADABLE packages that need updates; Skipping update task... "
 		else
 			write_information "There are $UPGRADABLE packages that need updates..."
-			rtd_software_task dpkg --configure -a
-			rtd_software_task apt-get upgrade -y
-			rtd_software_task apt-get full-upgrade -y
-			rtd_software_task apt-get --purge autoremove -y
-			rtd_software_task apt-get clean
+			term::task_exec_list_output dpkg --configure -a
+			term::task_exec_list_output apt-get upgrade -y
+			term::task_exec_list_output apt-get full-upgrade -y
+			term::task_exec_list_output apt-get --purge autoremove -y
+			term::task_exec_list_output apt-get clean
 		fi
 	elif hash pkcon 2>/dev/null; then
-		rtd_software_task pkcon -y refresh
-		rtd_software_task pkcon get-updates
-		rtd_software_task pkcon -y update --autoremove
+		term::task_exec_list_output pkcon -y refresh
+		term::task_exec_list_output pkcon get-updates
+		term::task_exec_list_output pkcon -y update --autoremove
 	else
 		write_error "This system does not seem to have a software managment system"
 		return 1
@@ -10697,15 +10816,15 @@ rtd_update_system() {
 
 	write_status "updating snaps if snap is present on the system..."
 	if hash snap 2>/dev/null; then
-		rtd_software_task snap refresh
+		term::task_exec_list_output snap refresh
 	else
 		write_warning "--- snap software is not present on this system... skipping..."
 	fi
 
 	write_status "updating flatpaks if flatpak is present on system..."
 	if hash flatpak 2>/dev/null; then
-		rtd_software_task flatpak update --user --noninteractive -y
-		rtd_software_task flatpak update --system --noninteractive -y
+		term::task_exec_list_output flatpak update --user --noninteractive -y
+		term::task_exec_list_output flatpak update --system --noninteractive -y
 	else
 		write_warning "--- flatpak software is not present on this system... skipping..."
 	fi
@@ -16080,59 +16199,6 @@ term::set_colors() {
 	)
 
 	echo -e " 🎨 $yellow * $darkyellow * $red * $darkred * $green * $darkgreen * $blue * $darkblue * $cyan * $darkcyan * $gray * $darkgray * $purple * $darkpurple * $endcolor"
-}
-
-term::start_animation() {
-	# Description:
-	# A simple function to display and animation during a silent acton
-	#
-	# Globals:
-	# Arguments:
-	# Outputs: Standard out
-	# Returns:
-	# Usage:
-	# term::start_animation "Display text"
-	# term::stop_animation
-	#
-	# End of documentation
-
-	setterm -cursor off
-	export ANIM_PID="0"
-	PAD="---------------------------------------------------------"
-	LINE=$(printf "%s %s" "${@}" "$PAD" | cut -c 1-${#PAD})
-	(
-		while true; do
-			for i in {0..4}; do
-				printf "$LINE  \r\033[2K ${anim[i]}"
-				sleep 0.1
-			done
-
-			for i in {4..0}; do
-				printf "\r\033[2K $LINE  ${anim[i]}"
-				sleep 0.1
-			done
-		done
-	) &
-
-	export ANIM_PID="${!}"
-}
-
-term::stop_animation() {
-	# Description:
-	# A simple function to STOP display and animation during a silent acton
-	#
-	# Globals:
-	# Arguments:
-	# Outputs: Standard out
-	# Returns:
-	# Usage:
-	# term::stop_animation
-	#
-	# End of documentation
-	[[ -e "/proc/${ANIM_PID}" ]] && kill -SIGPIPE "${ANIM_PID}"
-	printf "${erace_line}$LINE [ \xE2\x9C\x94 ] $GREEN OK!$ENDCOLOR \n"
-	unset LINE
-	setterm -cursor on
 }
 
 rtd_oem_pause() {
