@@ -9924,21 +9924,20 @@ software::add_native_package() {
 	local -a packages failed_packages
 	local pkg
 	
+	# store the package names in an array
+	mapfile -t packages < <(printf '%s\n' "$@" | xargs -n1 | grep -Ev '^\s*$')
+	
 	# Log the function call and arguments for support...
-	system::log_item "Called by ${FUNCNAME[0]} with arguments: $*"
-	system::log_item "Adding native package(s): $*"
+	system::log_item "Called by ${FUNCNAME[0]} with arguments: ${packages[*]}"
+	system::log_item "Adding native package(s): ${packages[*]}"
 
 	# Check required dependencies and usage...
-	if [[ -z "${package_name}" ]]; then
-		write_error "No package name provided to install..."
-		return 1
-	fi
-
 	dependency::os_linux || {
 		write_error "This function is only supported on Linux systems."
 		return 1
 	}
 
+	# Check for package manager availability...
 	if command -v pkcon >/dev/null 2>&1; then
 		pkgmgr="PKCON"
 		install_cmd="pkcon install -y"
@@ -9958,14 +9957,14 @@ software::add_native_package() {
 
 	write_status "Detected package manager: ${pkgmgr}"
 
-	# store the package names in an array
-	mapfile -t packages < <(printf '%s\n' "$@" | xargs -n1 | grep -Ev '^\s*$')
 
+	# Check if any package names were provided
 	if [[ ${#packages[@]} -eq 0 ]]; then
 		write_error "No package names provided for installation."
 		return 1
 	fi
 
+	# Iterate over each package name and attempt installation
 	for pkg in "${packages[@]}"; do
 		if [[ -z "$pkg" ]]; then
 			continue
