@@ -1251,15 +1251,10 @@ dependency::command_exists() {
 	# List of required commands from input
 	local required_commands=("$@")
 
-	# Function to check if a command is available
-	dependency::command_exists::check_command() {
-		command -v "$1" &>/dev/null
-	}
-
 	# Collect any missing commands
 	local missing_commands=()
 	for cmd in "${required_commands[@]}"; do
-		if ! dependency::command_exists::check_command "$cmd"; then
+		if ! command -v "$cmd" &>/dev/null ; then
 		missing_commands+=("$cmd")
 		fi
 	done
