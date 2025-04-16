@@ -54,7 +54,7 @@ if [[ $EUID -eq 0 ]] ; then
 else
 	_LOG_DIR="${HOME}/.log/${_TLA,,}"
 fi
-: ${_LOGFILE:="${_LOG_DIR}/$(basename $0)-$(date +%Y-%m-%d-%H%M%S).log"}
+: ${_LOGFILE:="${_LOG_DIR}/$(basename $0)-$(date +%Y-%m-%d).log"}
 
 
 
@@ -168,17 +168,17 @@ system::ExecStart () {
 				exec 3>&-
 
 				case $exit_status in
-					1) system::log_item "$(basename $0) was told to [QUIT]" & clear && echo [QUIT] && exit ;;
-					255) system::log_item "$(basename $0) user pressed [ESC]" & clear && echo [ESC] && exit ;;
+					1) system::log_item "$(basename $0) was told to [QUIT]" & echo [QUIT] && exit ;;
+					255) system::log_item "$(basename $0) user pressed [ESC]" & echo [ESC] && exit ;;
 				esac
 	
 				case "$selection" in
-					"Add Bundles to this computer" ) software::display_bundle_install_choices_gtk  ;;
-					"Remove Bundles from this computer" ) software::display_bundle_removal_choices_gtk  ;;
+					"Add Bundles to this computer" ) software::display_bundle_install_choices_gtk --yad ;;
+					"Remove Bundles from this computer" ) software::display_bundle_removal_choices_gtk --yad ;;
 					"Information abount this tool" ) zenity::display_info "$_ABOUT"  ;;
 					* )
 					# Trap unknown exit code...
-					exit
+					return 1
 					;;
 				esac
 			done
@@ -250,5 +250,5 @@ case ${1} in
 		zenity::display_url "/opt/rtd/README.md" ;;
 	* ) 
 		system::log_item "Starting the OEM Bundle Manager"
-		system::ExecStart | tee -a ${_LOGFILE} ;;
+		system::ExecStart 2>&1 | tee -a "${_LOGFILE}" ;;
 esac

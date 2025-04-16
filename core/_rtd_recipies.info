@@ -75,7 +75,7 @@
 # 	- Use flathub.com first for GUI applications for performance and control (flatseal)
 #	- Use Snapcraft.io for non GUI apps, as these apps are better implemented and no GUI performance issues
 #	- Use Stapcraft or falthub depending on if the original developer provides the app in that format
-#	- Use the distro version if you need deep desktop integration, and latest version is not important
+#	- Use the distro native version if you need deep desktop integration, and latest version is not important
 #	- Avoid the distro version if different distributions name their packages differently between eachother
 #	- Prefer any contained version of an app for easier managment and support (no library issues)
 # 	- Follow the path of availability: Contained > Native > vendor site > AppImage in that order
@@ -158,7 +158,7 @@
 #
 #    system tag          name
 #         |                |
-# "recipe_Bundle:_""descriptive_name" () {
+# "recipe:_""descriptive_name" () {
 # 			# function documentaton (shows on the menu)...
 # 			# Echo to terminal using built in functions with color:
 # 			write_error		: Prints an error message to terminal in RED
@@ -211,7 +211,7 @@
 # NOTE: you may copy the rtd repository and update its contents. You redirect everything
 #       by specifying the github user.
 GIT_Profile=${GIT_Profile:-vonschutter}
-bundle_prefix="recipe_Bundle:_"
+bundle_prefix="recipe:_"
 
 
 
@@ -232,8 +232,8 @@ bundle_prefix="recipe_Bundle:_"
 # multiple single installs (functions that install a single piece of software).
 
 
-recipe_Bundle:_Internet_Browsing_Private () {
-	# Brave, Vivaldi, and Chromium browsers and other internet tools with a focus on security and privacy
+recipe:_Internet_Browsing_Private () {
+	# Brave, Vivaldi, and Chromium browsers and KeePassXC password manager
 
 	# Brave secure browser, vendor provided Snap.
 	# If you prefer the downloaded version directly from Brave, uncomment the below line.
@@ -244,14 +244,50 @@ recipe_Bundle:_Internet_Browsing_Private () {
 	# faster, and more stable way to experience the web. 
 	software::from_flathub.org com.github.Eloston.UngoogledChromium $1
 
-	# App for secure encrypted password management
-	software::from_flathub.org org.keepassxc.KeePassXC $1  	
+	# Tor Browser Launcher is intended to make the Tor Browser Bundle (TBB) easier to maintain 
+	# and use for GNU/Linux users. It downloads the same TBB from torproject.org that everyone 
+	# else uses, and it doesn't alter it in any way. But it does make it much more usable, and 
+	# it makes the task of keeping it up-to-date more secure.
+	software::from_flathub.org org.torproject.torbrowser-launcher $1
+
+	# The Mullvad browser is a privacy-focused web browser based on Firefox.
+	# Mullvad Browser is a free, open-source web browser that is designed to be
+	# used with Mullvad VPN. It is based on Firefox and is designed to be
+	# privacy-friendly, with features such as built-in ad-blocking, tracking
+	# protection, and a focus on security. Mullvad Browser is available for
+	# Windows, macOS, and Linux.
+	distribution_type=$(system::distribution_type)
+
+	case ${distribution_type} in
+		"ubuntu" | "debian" )
+			software::check_native_package_dependency curl
+			curl -fsSLo /usr/share/keyrings/mullvad-keyring.asc https://repository.mullvad.net/deb/mullvad-keyring.asc
+			echo "deb [signed-by=/usr/share/keyrings/mullvad-keyring.asc arch=$( dpkg --print-architecture )] https://repository.mullvad.net/deb/stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/mullvad.list
+			software::up_2_date
+			software::add_native_package mullvad-browser
+		;;
+		"fedora" | "redhat" )
+			software::check_native_package_dependency dnf-utils
+			dnf config-manager addrepo --from-repofile=https://repository.mullvad.net/rpm/stable/mullvad.repo
+			dnf config-manager --add-repo https://repository.mullvad.net/rpm/stable/mullvad.repo
+			software::up_2_date
+			software::add_native_package mullvad-browser
+		;;
+		"suse" )
+			write_warning "NOTE: This wrapper is not verified by, affiliated with, or supported by Mullvad VPN AB."
+			write_warning "NOTE: Installing the flathub version of Mullvad browser."
+			software::from_flathub.org net.mullvad.MullvadBrowser $1
+		;;
+		* )
+			write_error "Mullvad browser is not supported in this distribution ( ${distribution_type} ) : skipping..."
+		;;
+	esac
 }
 
 
 
-recipe_Bundle:_Internet_Browsing_Corporate () {
-	# Browsers and tools (Google Chrome, Microsoft Edge)
+recipe:_Internet_Browsing_Corporate () {
+	# Google Chrome, Microsoft Edge, and Vivaldi browsers
 
 	# Google Chrome is a browser that combines a minimal design with sophisticated 
 	# technology to make the web faster, safer, and easier.
@@ -263,46 +299,57 @@ recipe_Bundle:_Internet_Browsing_Corporate () {
 	# WARNING: may attempt to ttrack everything about you!
 	software::from_flathub.org com.microsoft.Edge $1
 
+	# Opera is a fast and secure browser with built-in ad blocker, battery saver,
+	# free VPN, social messengers, and more.
+	# WARNING: may attempt to ttrack everything about you!
+	software::from_flathub.org com.opera.Opera $1
+
 	# The Vivaldi browser, not available in snap, or flatpak, nor in repo. 			
-	Single_Install_Vivaldi_Browser
+	write_information "Installing Vivaldi Browser directly from vendor repo..."
+	if cat "/etc/os-release" | grep "debian" ; then
+		apt -y install wget gnupg2 software-properties-common
+		wget -qO- https://repo.vivaldi.com/archive/linux_signing_key.pub | sudo apt-key add -
+		echo 'deb https://repo.vivaldi.com/archive/deb/ stable main' | sudo tee /etc/apt/sources.list.d/vivaldi.list
+		apt update
+		software::add_native_package vivaldi-stable
+		return $?
+	elif cat "/etc/os-release" | grep "fedora" ; then
+		software::add_native_package dnf-utils
+		dnf config-manager --add-repo https://repo.vivaldi.com/archive/vivaldi-fedora.repo
+		software::add_native_package vivaldi-stable
+		return $?
+	elif  cat "/etc/os-release" | grep "suse" ; then
+		zypper --gpg-auto-import-keys addrepo --refresh https://repo.vivaldi.com/archive/vivaldi-suse.repo
+		software::add_native_package vivaldi-stable
+		return $?
+	else
+		write_error "Neither debian, fedora, or suse base distros could be found; NOT installing vivaldi."
+		return 1
+	fi
 }
 
 
-recipe_Bundle:_Virtualization_Desktop_Software () {
-	# Virtualizaton tools (virt-manager, qemu-kvm, Virtualbox), and others
+recipe:_Virtualization_Desktop_Software () {
+	# Virtualizaton tools (virt-manager, qemu-kvm)
 	# NOTE: hypervisors are installed using ropositories own versions, or downloaded
 	# Directly from the vendors web page.
 
-	# VirtualBox is a powerful x86 and AMD64/Intel64 virtualization product for enterprise as well as
-	# home use. Not only is VirtualBox an extremely feature rich, high performance product for enterprise
-	# customers, it is also the only professional solution that is freely available as Open Source Software
-	# under the terms of the GNU General Public License (GPL) version 2. See "About VirtualBox" for an introduction.
-	# Presently, VirtualBox runs on Windows, Linux, Macintosh, and Solaris hosts and supports a large number
-	# of guest operating systems including but not limited to Windows (NT 4.0, 2000, XP, Server 2003, Vista, Windows 7,
-	# Windows 8, Windows 10), DOS/Windows 3.x, Linux (2.4, 2.6, 3.x and 4.x), Solaris and OpenSolaris, OS/2, and OpenBSD.
-	# VirtualBox is being actively developed with frequent releases and has an ever growing list of features,
-	# supported guest operating systems and platforms it runs on. VirtualBox is a community effort backed by a
-	# dedicated company: everyone is encouraged to contribute while Oracle ensures the product always meets professional
-	# quality criteria. VirtualBox is not provided as a Snap or Flatpak, and must silently be installed with some logic
-	# using the distribution speciffic package manager.
-	Single_Install_VirtualBox
-
 	# Qemu-KVM GUI for managing virtual machines locally and remote		 
-	software::add_native_package virt-manager
+	software::add_native_package virt-manager $1
 
 	# Very efficient hypervisor for running virtual machines
-	software::add_native_package qemu-kvm
+	software::add_native_package qemu-kvm $1
 }
 
 
 
-recipe_Bundle:_CLOUD_Management_Options () {
+recipe:_CLOUD_Management_Options () {
 	# Tools to manage cloud environments like GCP, Azure, AWS
 	# NOTE: the "$1" after the package-name is if you want to trap the --remove option for 
 	# Bundle removals. This is optional.
 
 	# Azure Cloud
-	software::from_snapcraft.io powershell $1  		# PowerShell is an automation and configuration management platform. 
+	software::from_snapcraft.io powershell $1 		# PowerShell is an automation and configuration management platform. 
 	software::from_snapcraft.io azure-cli $1 		# Azure CLI 2.0, our next generation multi-platform command line experience for Azure.
 	software::from_snapcraft.io storage-explorer $1		# Upload, download, and manage Azure blobs, files, queues, and tables.
 
@@ -324,7 +371,7 @@ recipe_Bundle:_CLOUD_Management_Options () {
 
 
 
-recipe_Bundle:_3D_Printing_Options () {
+recipe:_3D_Printing_Options () {
 	# 3D Printing tools (Prusa, Cura slicers, and CAD, and 3D editing) for supporting and working with 3D-Printing
 	# NOTE: the "$1" after the package-name is if you want to trap the --remove option for 
 	# Bundle removals. This is optional.
@@ -350,7 +397,7 @@ recipe_Bundle:_3D_Printing_Options () {
 }
 
 
-recipe_Bundle:_CAD_Software_Options () {
+recipe:_Office:_CAD_Software_Options () {
 	# CAD Sofware (Blender, FreeCAD, OpenSCAD, LeoCAD, Sweet Home 3D)
 	# NOTE: the "$1" after the package-name is if you want to trap the --remove option for 
 	# Bundle removals. This is optional.
@@ -380,11 +427,7 @@ recipe_Bundle:_CAD_Software_Options () {
 }
 
 
-
-
-
-
-recipe_Bundle:_Office_Tools_Options () {
+recipe:_Office:_Standard_Apps () {
 	# Office apps like: Onlyoffice, Teams, Draw.io, Joplin notes, Mailspring, Keepass, and more
 	# NOTE: the "$1" after the package-name is if you want to trap the --remove option for 
 	# Bundle removals. This is optional.
@@ -398,9 +441,6 @@ recipe_Bundle:_Office_Tools_Options () {
 	# Best simple note app for sharing and collaboration on notes	
 	software::from_snapcraft.io simplenote $1		
 
-	# App for secure encrypted password management
-	software::from_flathub.org org.keepassxc.KeePassXC  $1
-
 	# Excellent simple to use and streamlines office bundle
 	software::from_flathub.org org.onlyoffice.desktopeditors  $1
 
@@ -413,7 +453,7 @@ recipe_Bundle:_Office_Tools_Options () {
 
 
 
-recipe_Bundle:_Media_Streaming_Software () {
+recipe:_Media_Streaming_Software () {
 	# Streaming apps (Spotify, Stremio, Vocal, and Cozy audiobook reader)...
 	
 	# Install Steaming apps from the Snap store:  
@@ -454,7 +494,7 @@ recipe_Bundle:_Media_Streaming_Software () {
 
 
 
-recipe_Bundle:_Media_Streaming_Servers () {
+recipe:_Media_Streaming_Servers () {
 	# Streaming service (Plex Media Server)...
 
 	# To install the server part on another computer please follow the instructions on the 
@@ -464,7 +504,7 @@ recipe_Bundle:_Media_Streaming_Servers () {
 
 
 
-recipe_Bundle:_Media_Players () {
+recipe:_Media_Players () {
 	# Media Player Apps (VLC, Cozy Audio Book PLayer, Tauon Music Player)
 
 	# Tauon Music Box is a modern, comfortable and streamlined music player for the playback of 
@@ -489,7 +529,7 @@ recipe_Bundle:_Media_Players () {
 
 
 
-recipe_Bundle:_Audio_Editing_Options () {
+recipe:_Media:_Audio_Editing_Options () {
 	# Audio Tools Bundle including Music Brainz Picard, Audacity, Musescore...
 
 
@@ -516,7 +556,7 @@ recipe_Bundle:_Audio_Editing_Options () {
 }
 
 
-recipe_Bundle:_Video_Editing_Options () {
+recipe:_Video_Editing_Options () {
 	# Video editing apps; Vidcutter, Handbrake, Matroska-tools, Kdenlive, Shotcut, OBS, OpenShot
 	# Install handbrake DVD/BlueRay ripper video converter
 	# Video analysis tools
@@ -572,7 +612,7 @@ recipe_Bundle:_Video_Editing_Options () {
 
 
 
-recipe_Bundle:_Developer_Software () {
+recipe:_Developer_Software () {
 	# For creating code: (VSCode, GitKraken, Neo VIM, Helix) and more..
 
 	# Git and build essentials (compiler) is available in the distribution
@@ -609,7 +649,7 @@ recipe_Bundle:_Developer_Software () {
 }
 
 
-recipe_Bundle:_Compression_Tools () {
+recipe:_ADM:_Compression_Tools () {
 	# Compression Toolset (zip, 7zip rar etc.)...
 
 	# - 7-Zip is a free and open-source file archiver, a utility used to place groups 
@@ -647,7 +687,7 @@ recipe_Bundle:_Compression_Tools () {
 
 
 
-recipe_Bundle:_Top_Curated_Games_for_Linux () {
+recipe:_Top_Curated_Games_for_Linux () {
 	# Top rated Games: Steam platform, and Minecraft, OpenaArena, 0AD, SuperTuxCart etc.
 
 	# 0 A.D. is a real-time strategy (RTS) game of ancient warfare.
@@ -716,7 +756,7 @@ recipe_Bundle:_Top_Curated_Games_for_Linux () {
 
 
 
-recipe_Bundle:_3_System_Admin_Tools () {
+recipe:_3_System_Admin_Tools () {
 	# System Admin Tools (nmap synaptic ssh gparted sshfs htop iftop nethogs glances)...
 	# System Admin tools for managing and monitoring your system.
 	# NOTE: the "$1" after the package-name is if you want to trap the --remove option for
@@ -735,7 +775,7 @@ recipe_Bundle:_3_System_Admin_Tools () {
 
 
 
-recipe_Bundle:_Linux_Subsystem_for_Windows (){
+recipe:_ADM:_Linux_Subsystem_for_Windows (){
 	# Run windows programs! includes wine, DOS, and Acrobat reader, Notepad++, and more...
 
 	# Wine runtime environment for windows apps.	
@@ -760,7 +800,7 @@ recipe_Bundle:_Linux_Subsystem_for_Windows (){
 
 
 
-recipe_Bundle:_Digital_Art_and_Imaging_Options () {
+recipe:_Digital_Art_and_Imaging_Options () {
 	# Createive art software; Krita, GIMP, Inkscape, Flameshot, Upscayl, Photoscape
 
 	# It is perfect for sketching and painting, and presents an end–to–end solution for creating 
@@ -787,18 +827,18 @@ recipe_Bundle:_Digital_Art_and_Imaging_Options () {
 
 
 
-recipe_Bundle:_2_OEM_Restricted_Fonts () {
+recipe:_2_OEM_Restricted_Fonts () {
 	# Install Legacy TruType standard font pack an more...
 	# wget "https://www.dropbox.com/s/y16d8wpb45yebv8/True_Type_Font_Pack.7z" -P /opt/rtd/cache/
 	# mkdir -p /usr/share/fonts/truetype/oem
 	# This bundle depends on teh compressions tools bundle...
-	recipe_Bundle:_Compression_Tools
+	recipe:_Compression_Tools
 	bash $(find /opt -name plus-themes.sh) --fonts
 }
 
 
 
-recipe_Bundle:_Secure_Communication_Options () {
+recipe:_SEC:_Secure_Communication_Options () {
 	# Secure communications software: Signal, Telegram, Electron mail
 	# This software is end to end encrypted
 	# and generally does not share keys with the vendor. Also, these apps are confined on the desktop
@@ -819,7 +859,7 @@ recipe_Bundle:_Secure_Communication_Options () {
 
 
 
-recipe_Bundle:_Social_Collaboration_and_Communicaiton () {
+recipe:_Office:_Social_Collaboration_and_Communicaiton () {
 	# This bundle includes social media communications software: Discord, Skype
 	# for privacy, but may be encrypted. This software is often useful for legacy reasons
 	# or used for gaming.
@@ -832,39 +872,39 @@ recipe_Bundle:_Social_Collaboration_and_Communicaiton () {
 	software::from_snapcraft.io skype $1	
 
 	# Send free messages and make free calls to other Viber users on any device and network, in any country!
-	software::from_flathub.com com.viber.Viber $1	
+	software::from_flathub.com com.viber.Viber $1
 }
 
 
 
-recipe_Bundle:_CLOUD_Storage_Options () {
-	# This bundle includes software needed to access and use cloud storage.
-	# The mega client is a secure way to store content online and very price
-	# effective. Dropbox is widely used as well, but the company may have full access
-	# to your content and Dropox must comply with US governemnt access requests. This
-	# includes the 5 eyes english speaking intelligence agencies cooperation and information
-	# sharing.
-	# 
 
-	# Secure cloud storage (vendor does not have access to crypto keys)
-	Single_Install_MEGA.nz_Encrypted_Cloud_Storage	megasync	
-
-	# Common cloud storage (vendor has access to crypto keys)
-	Single_Install_Dropbox_Corporate_Cloud_Storage			
-}
-
-
-recipe_Bundle:_Clean:_Remove_non_western_latin_fonts () {
+recipe:_Clean:_Remove_non_western_latin_fonts () {
 	# Declutter the font manager by removing non-western fonts
 	# By default distros includes wierd fonts not used in the west.
 	rtd_oem_remove_non_western_latin_fonts
 
-	# -------------------------------------------------------------------------------------------------------#
+
 
 }
-recipe_Bundle:_network_security () {
+recipe:_SEC:_Password_Management () {
+	# Password management software (Bitwarden, KeePassXC)...
+	# Loop through each item in this list of software and perform an install
+	# using the relevant packaging system.
+	software::from_flathub.org org.keepassxc.KeePassXC $1
+	software::from_flathub.org org.bitwarden.desktop $1
+
+}
+recipe:_SEC:_Secure_Storage () {
+	# Secure storage software (Cryptomator, VeraCrypt)...
+	# Loop through each item in this list of software and perform an install
+	# using the relevant packaging system.
+	software::from_flathub.org org.cryptomator.Cryptomator $1
+	software::from_flathub.org com.veracrypt.VeraCrypt $1
+}
+
+
+recipe:_SEC:_network_security () {
 	# Network security tools (Wireshark, nmap, tcpdump, iperf3, netcat, aircrack-ng)...
-	# This bundle is not removable. It contains downloaded software from sites. 
 	# Loop through each item in this list of software and perform an install
 	# using the relevant packaging system.
 	software::add_native_package wireshark $1
@@ -875,9 +915,8 @@ recipe_Bundle:_network_security () {
 	software::add_native_package aircrack-ng $1
 }
 
-recipe_Bundle:_Proton_Suite () {
+recipe:_SEC:_Proton_Suite_of_Ecrypted_Services () {
 	# Proton suite of software (ProtonVPN, ProtonMail Bridge, ProtonDrive)...
-	# This bundle is not removable simply. It contains downloaded software from sites. 
 	# Loop through each item in this list of software and perform an install
 	# using the relevant packaging system.
 
@@ -899,7 +938,7 @@ recipe_Bundle:_Proton_Suite () {
 	esac
 }
 
-recipe_Bundle:_VPN_Software () {
+recipe:_SEC:_VPN_Software () {
 	# VPN software (Wireguard, OpenVPN, Mullvad-vpn)...
 	# This bundle is not removable. It contains downloaded software from sites. 
 	# Loop through each item in this list of software and perform an install
@@ -911,9 +950,8 @@ recipe_Bundle:_VPN_Software () {
 		"ubuntu" | "debian" )
 			software::add_native_package wireguard
 			software::add_native_package openvpn
-			# Download the Mullvad signing key
+			software::check_native_package_dependency curl
 			curl -fsSLo /usr/share/keyrings/mullvad-keyring.asc https://repository.mullvad.net/deb/mullvad-keyring.asc
-			# Add the Mullvad repository server to apt
 			echo "deb [signed-by=/usr/share/keyrings/mullvad-keyring.asc arch=$( dpkg --print-architecture )] https://repository.mullvad.net/deb/stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/mullvad.list
 			software::up_2_date
 			software::add_native_package mullvad-vpn
@@ -938,7 +976,7 @@ recipe_Bundle:_VPN_Software () {
 	esac
 }
 
-recipe_Bundle:_Advanced_Terminals () {
+recipe:_ADM:_Advanced_Terminals () {
 	# Advanced terminal apps (Warp AI Terminal, Tilix)...
 	# This bundle is not removable. It contains downloaded software from sites. 
 	# Loop through each item in this list of software and perform an install
@@ -967,7 +1005,7 @@ recipe_Bundle:_Advanced_Terminals () {
 }
 
 
-recipe_Bundle:_1_OEM_Themes_and_Tweaks () {
+recipe:_1_OEM_Themes_and_Tweaks () {
 	# Configuration, tweaks, and settings for a better user experience (KDE or Gnome).
 	write_status "Applying OEM Configuration...
 	This bundle includes all OEM speciffic setting and configurations for desktops.
@@ -976,7 +1014,7 @@ recipe_Bundle:_1_OEM_Themes_and_Tweaks () {
 	and the look and feel based on what a user may be used to."
 
 	# -------------------------------------------------------------------------------------------------------#
-	recipe_Bundle:_Compression_Tools
+	recipe:_ADM:_Compression_Tools
 	security::enable_firewall --minecraft
 	oem::rtd_tools_make_launchers
 	software::ensure_software_store_available
@@ -1084,105 +1122,11 @@ recipe_Bundle:_1_OEM_Themes_and_Tweaks () {
 
 
 
-
-
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::	 ____  _             _        ___           _        _ _      ::::::::::::::::::::::
-#::::::::::::::	/ ___|(_)_ __   __ _| | ___  |_ _|_ __  ___| |_ __ _| | |___  ::::::::::::::::::::::
-#::::::::::::::	\___ \| | '_ \ / _` | |/ _ \  | || '_ \/ __| __/ _` | | / __| ::::::::::::::::::::::
-#::::::::::::::	 ___) | | | | | (_| | |  __/  | || | | \__ \ || (_| | | \__ \ ::::::::::::::::::::::
-#::::::::::::::	|____/|_|_| |_|\__, |_|\___| |___|_| |_|___/\__\__,_|_|_|___/ ::::::::::::::::::::::
-#::::::::::::::	               |___/                                          ::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-# This is the hall of shame for vendors that have not made software avaiable in the distribution 
-# repositories, or as a Snap or a flatpak. We need to do some advanced contortions to get the software! 
-
-
-
-
-
-Single_Install_Brave_Browser () {
-	# This function will add the vendor maintained repository and install the software
-	# using the distribution speciffic installers.
-	write_information "Installing Brave Browser directly from vendor repo..."
-	if cat "/etc/os-release" | grep "debian" ; then
-		check_dependencies apt-transport-https
-		check_dependencies curl
-		check_dependencies gnupg
-		curl -s https://brave-browser-apt-release.s3.brave.com/brave-core.asc | apt-key --keyring /etc/apt/trusted.gpg.d/brave-browser-release.gpg add -
-		echo "deb [arch=amd64] https://brave-browser-apt-release.s3.brave.com/ stable main" | tee /etc/apt/sources.list.d/brave-browser-release.list
-		apt update
-		InstallSoftwareFromRepo brave-browser
-		return $?
-	elif cat "/etc/os-release" | grep "fedora" ; then
-		check_dependencies dnf-plugins-core
-		dnf config-manager --add-repo https://brave-browser-rpm-release.s3.brave.com/x86_64/
-		rpm --import https://brave-browser-rpm-release.s3.brave.com/brave-core.asc
-		InstallSoftwareFromRepo brave-browser
-		return $?
-	elif  cat "/etc/os-release" | grep "suse" ; then
-		check_dependencies curl
-		rpm --import https://brave-browser-rpm-release.s3.brave.com/brave-core.asc
-		zypper addrepo https://brave-browser-rpm-release.s3.brave.com/x86_64/ brave-browser
-		InstallSoftwareFromRepo brave-browser
-		return $?
-	else
-		# Try for any distro using apt... SUSE has a shortcut for a simple apt, wich will mess this up if checked first...
-		if hash apt-get ; then
-			apt install -y apt-transport-https curl gnupg
-			curl -s https://brave-browser-apt-release.s3.brave.com/brave-core.asc | apt-key --keyring /etc/apt/trusted.gpg.d/brave-browser-release.gpg add -
-			echo "deb [arch=amd64] https://brave-browser-apt-release.s3.brave.com/ stable main" | tee /etc/apt/sources.list.d/brave-browser-release.list
-			apt update
-			apt install brave-browser -y
-			return $?
-		else
-			write_error "Neither debian, fedora, or suse base distros could be found; NOT installing brave."
-			return 1
-		fi
-	fi
-}
-
-
-
-Single_Install_Vivaldi_Browser (){
-	# # This function uses the RTD function "dl" to download a distribution speciffic package directly
-	# # from the vendors website. It will work until the vendor removes the exact file...
-
-	write_information "Installing Brave Browser directly from vendor repo..."
-	if cat "/etc/os-release" | grep "debian" ; then
-		apt -y install wget gnupg2 software-properties-common
-		wget -qO- https://repo.vivaldi.com/archive/linux_signing_key.pub | sudo apt-key add -
-		echo 'deb https://repo.vivaldi.com/archive/deb/ stable main' | sudo tee /etc/apt/sources.list.d/vivaldi.list
-		apt update
-		InstallSoftwareFromRepo vivaldi-stable
-		return $?
-	elif cat "/etc/os-release" | grep "fedora" ; then
-		InstallSoftwareFromRepo dnf-utils
-		dnf config-manager --add-repo https://repo.vivaldi.com/archive/vivaldi-fedora.repo
-		InstallSoftwareFromRepo vivaldi-stable
-		return $?
-	elif  cat "/etc/os-release" | grep "suse" ; then
-		zypper --gpg-auto-import-keys addrepo --refresh https://repo.vivaldi.com/archive/vivaldi-suse.repo
-		InstallSoftwareFromRepo vivaldi-stable
-		return $?
-	else
-		write_error "Neither debian, fedora, or suse base distros could be found; NOT installing vivaldi."
-		return 1
-	fi
-}
-
-
-
-
-
-
-
-
-
-
-Single_Install_Remote_Desktop_by_Team_Viewer (){
-	#Teamviewer
+recipe:_RDP:_Team_Viewer_Remote_Desktop_by () {
+	# Teamviewer remote desktop software that allows you to connect to other computers
+	# and control them remotely. It is often used for remote support, online meetings, and
+	# collaboration. TeamViewer is available for Windows, macOS, Linux, and mobile platforms.
+	# TeamViewer is a proprietary software, and it requires a license for commercial use.
 	write_status  "Installing Teamviewer..."
 
 	# Download either a deb or an rpm depending on what package format this system supports.
@@ -1198,24 +1142,43 @@ Single_Install_Remote_Desktop_by_Team_Viewer (){
 	fi
 }
 
+recipe:_RDP:_Remmina_Remote_Desktop () {
+	# Remmina is a remote desktop client that supports multiple protocols, including RDP, VNC, SSH, and SPICE.
+	# It is designed for Linux and other Unix-like operating systems. Remmina is open-source software and is
+	# available for free. It is often used by system administrators and IT professionals for remote access
+	# to servers and workstations.
+	write_status "Installing Remmina remote desktop... "
+	software::add_native_package remmina
+	software::add_native_package remmina-plugin-rdp
+	software::add_native_package remmina-plugin-vnc
+	write_status "Installing Remmina remote desktop extras... "
+	software::add_native_package remmina-plugin-secret
+	software::add_native_package remmina-plugin-spice
+	software::add_native_package remmina-plugin-telepathy
+}
+
+recipe:_RDP:_Chrome_Remote_Desktop () {
+	# Chrome Remote Desktop is a remote access service that allows users to remotely control their computers
+	# using the Google Chrome web browser. It is available as a Chrome extension and can be used on various
+	# operating systems, including Windows, macOS, Linux, and Chrome OS. Chrome Remote Desktop is free to use
+	# and provides a simple way to access your computer from anywhere with an internet connection.
+	write_status "Installing Chrome remote desktop... "
+	software::from_flathub.org com.google.ChromeRemoteDesktop $1
+}
 
 
+recipe:_RDP:_Anydesk_Remote_Desktop () {
+	# Anydesk is a remote desktop software that allows users to connect to and control remote computers.
+	# It is designed for remote support, online collaboration, and remote access to computers from anywhere.
+	# Anydesk is available for various platforms, including Windows, macOS, Linux, Android, and iOS.
 
-
-
-Single_Install_Remote_Desktop_by_Anydesk () {
 	write_status "Installing Anydesk remote desktop... "
 	software::from_flathub.org com.anydesk.Anydesk   
 }
 
 
-
-
-
-
-
-Single_Install_MEGA.nz_Encrypted_Cloud_Storage (){
-	# Special case for installing MEGA nz file sync utility (better than Drop Box)...
+recipe:_CLOUD:_MEGA_Cloud_Storage () {
+	# MEGA nz Private Cloud Storage (better than Drop Box)...
 	write_status "Installing MEGA nz file crypto sync utility..."
 
 	# Reset & clear variables in case of incomplete cleanup...
@@ -1266,12 +1229,8 @@ Single_Install_MEGA.nz_Encrypted_Cloud_Storage (){
 
 
 
-
-
-
-
-Single_Install_Dropbox_Corporate_Cloud_Storage (){
-	# Install Dropbox
+recipe:_CLOUD:_Dropbox_Cloud_Storage (){
+	# File hosting service that offers cloud storage
 	write_status "Installing Dropbox Cloud Storage Sync..."
 	if hash apt &>/dev/nul; then
 		write_warning "Please NOTE that Doropox only supports Ubuntu"
@@ -1290,12 +1249,7 @@ Single_Install_Dropbox_Corporate_Cloud_Storage (){
 
 
 
-
-
-
-
-
-Single_Install_Citrix_App (){
+recipe:_RDP:_Citrix_App (){
 	# Install Citrix Workspace
 	write_status "Installing Citrix Workspace..."
 	if hash apt &>/dev/nul; then
@@ -1318,16 +1272,21 @@ Single_Install_Citrix_App (){
 
 
 
-
-
-
-
-
-
-Single_Install_VirtualBox (){
-	# Install Virtual Box from Oracle. However avoid installing it in a VM, as tis usecase may be counterproductive.
+ recipe:_Virtualization:_VirtualBox () {
+	# Oracle Virtual Box desktop virtualization software. 
 	# NOTE:
-
+	# VirtualBox is a powerful x86 and AMD64/Intel64 virtualization product for enterprise as well as
+	# home use. Not only is VirtualBox an extremely feature rich, high performance product for enterprise
+	# customers, it is also the only professional solution that is freely available as Open Source Software
+	# under the terms of the GNU General Public License (GPL) version 2. See "About VirtualBox" for an introduction.
+	# Presently, VirtualBox runs on Windows, Linux, Macintosh, and Solaris hosts and supports a large number
+	# of guest operating systems including but not limited to Windows (NT 4.0, 2000, XP, Server 2003, Vista, Windows 7,
+	# Windows 8, Windows 10), DOS/Windows 3.x, Linux (2.4, 2.6, 3.x and 4.x), Solaris and OpenSolaris, OS/2, and OpenBSD.
+	# VirtualBox is being actively developed with frequent releases and has an ever growing list of features,
+	# supported guest operating systems and platforms it runs on. VirtualBox is a community effort backed by a
+	# dedicated company: everyone is encouraged to contribute while Oracle ensures the product always meets professional
+	# quality criteria. VirtualBox is not provided as a Snap or Flatpak, and must silently be installed with some logic
+	# using the distribution speciffic package manager.
 	#
 	check_dependencies virt-what
 

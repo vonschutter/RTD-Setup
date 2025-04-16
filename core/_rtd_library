@@ -351,7 +351,31 @@ _OEM_dependencies="_branding.info _locations.info _rtd_recipies.info"
 #
 ################################################################################################
 
+display_gui() {
+	# Description: Displays a GUI dialog box with the given message.
+	#
+	# This function uses the 'dialog' command to display a GUI dialog box with the provided message.
+	# The dialog box is displayed in a terminal window, and the user can interact with it.
+	#
+	# Globals:
+	#   - RTD_GUI
+	# Arguments:
+	#   - "message": The message to be displayed in the dialog box.
+	# Outputs:
+	#   - Displays a GUI dialog box with the provided message.
+	# Returns:
+	#   - 0 on success, ESC on user cancellation.
+	#
+	# Usage:
+	#   display_gui "Hello, World!"
+	#
+	# End of Documentation
+	if [ -z "${RTD_GUI}" ]; then
+		dialog::check_menu_availability
+	fi
 
+	
+}
 
 dialog::check_menu_availability() {
 	# Description: First discover what menu system is installed. Some systems use "dialog" and
@@ -10873,6 +10897,27 @@ software::display_bundle_install_choices_gtk() {
 	#
 	#
 	# End of documentation
+	local DisplayGUI="zenity"
+	system::log_item "Called by ${FUNCNAME[1]} with the following arguments: $*"
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--zenity )
+			DisplayGUI="zenity"
+			system::log_item "GUI requested: ${DisplayGUI}"
+			shift
+			;;
+		--yad )
+			DisplayGUI="yad"
+			system::log_item "GUI requested: ${DisplayGUI}"
+			shift
+			;;
+		* )
+			system::log_item "GUI DEFAULT: ${DisplayGUI}"
+			shift
+			;;
+		esac
+	done
 
 	while true; do
 		exec 3>&1
@@ -10880,7 +10925,7 @@ software::display_bundle_install_choices_gtk() {
 		local IFS_SAV=$IFS
 		local IFS=$(echo -en "\n\b")
 
-		selection=$(zenity --list --title="${FUNCNAME[1]}: Select Task" --cancel-label="Go Back" --checklist \
+		selection=$(${DisplayGUI} --list --title="${FUNCNAME[1]}: Select Task" --cancel-label="Go Back" --checklist \
 			--text=" Select a Software Bundle below that you want to add to this computer: \n NOTE: only bundles that are not yet installed are shown. \n" \
 			--height=600 --width=980 \
 			--print-column=2 --column="Selected" --column="Bundle" --column="Description" \
@@ -10890,8 +10935,8 @@ software::display_bundle_install_choices_gtk() {
 		exec 3>&-
 
 		case $exit_status in
-		1) clear && echo [Cancel] && break ;;
-		255) clear && echo [ESC] && return ;;
+			1) echo [Cancel] && break ;;
+			255) echo [ESC] && return ;;
 		esac
 
 		case "${selection}" in
@@ -10904,11 +10949,14 @@ software::display_bundle_install_choices_gtk() {
 			run_bundle_install() {
 				selection_list=(${selection})
 				total_count=${#selection_list[@]}
+				system::log_item "Installing Software Prodictivity Bundle(s): ${selection}"
 				for i in ${selection}; do
+					system::log_item $( [[ -n "$i" ]] &&  echo "Installing Software Prodictivity Bundle: ${i}" || echo "No Software Prodictivity Bundle selected for install" )
 					current_bundle="${i}"
 					((_count = _count + 1))
 					echo "# Installing bundle ${_count} of ${total_count}: ${current_bundle}..."
-					if recipe_Bundle:_${current_bundle} &>/dev/null; then
+					local current_bundle_full_name=${bundle_prefix:-"recipe:_"}${current_bundle}
+					if ${current_bundle_full_name} &>/dev/null; then
 						echo "${current_bundle}" >>${completed_bundles_list}
 						system::log_item "Progress so far: $((100 * ${_count} / ${total_count}))% of bundles installed."
 					else
@@ -10919,7 +10967,7 @@ software::display_bundle_install_choices_gtk() {
 					echo $((100 * ${_count} / ${total_count}))
 				done
 			}
-			run_bundle_install | zenity --progress --no-cancel --auto-close \
+			run_bundle_install | ${DisplayGUI} --progress --no-cancel --auto-close \
 				--title="Installing Software Prodictivity Bundles" \
 				--text="Please wait for the bundle installs to complete..." \
 				--percentage=10 --height=200 --width=600
@@ -10928,7 +10976,7 @@ software::display_bundle_install_choices_gtk() {
 			_diff=$((${_count} - ${_done}))
 			completed_bundles="$(tail -${_diff} ${completed_bundles_list})"
 
-			zenity --info --timeout 120 \
+			${DisplayGUI} --info --timeout 120 \
 				--title "Bundles Installed: ${_count} Bundles Previously Installed: ${_done}" \
 				--text="The following Software bundles have been installed: \n \n ${completed_bundles} \n \n Previouly installed bundles: \n \n ${previously_completed_bundles}" \
 				--height=600 \
@@ -10938,7 +10986,7 @@ software::display_bundle_install_choices_gtk() {
 			;;
 		*)
 			# Trap unknown conditions so as to not do harm
-			exit
+			return
 			;;
 		esac
 	done
@@ -10962,12 +11010,34 @@ software::display_bundle_removal_choices_gtk() {
 	#
 	# End of documentation
 
+	local DisplayGUI="zenity"
+	system::log_item "Called by ${FUNCNAME[1]} with the following arguments: $*"
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--zenity )
+			DisplayGUI="zenity"
+			system::log_item "GUI requested: ${DisplayGUI}"
+			shift
+			;;
+		--yad )
+			DisplayGUI="yad"
+			system::log_item "GUI requested: ${DisplayGUI}"
+			shift
+			;;
+		* )
+			system::log_item "GUI DEFAULT: ${DisplayGUI}"
+			shift
+			;;
+		esac
+	done
+
 	while true; do
 		exec 3>&1
 		DisplayList=$(software::list_bundles --zformat-removable)
 		IFS_SAV=$IFS
 		IFS=$(echo -en "\n\b")
-		selection=$(zenity --list --title="${FUNCNAME[1]}: Select Task" --cancel-label="Go Back" --checklist \
+		selection=$(${DisplayGUI} --list --title="${FUNCNAME[1]}: Select Task" --cancel-label="Go Back" --checklist \
 			--text=" Select a Software Bundle below that you want to REMOVE from this computer: \n \n" \
 			--height=600 --width=980 \
 			--print-column=2 --column="Selected" --column="Bundle" --column="Description" --separator=" " ${DisplayList})
@@ -10976,8 +11046,8 @@ software::display_bundle_removal_choices_gtk() {
 		exec 3>&-
 
 		case $exit_status in
-		1) clear && echo [Cancel] && return ;;
-		255) clear && echo [ESC] && return ;;
+			1) echo [Cancel] && return ;;
+			255) echo [ESC] && return ;;
 		esac
 
 		case "${selection}" in
@@ -10989,22 +11059,25 @@ software::display_bundle_removal_choices_gtk() {
 			total_count=${#selection_list[@]}
 			removed_bundle_list="$(mktemp)"
 			run_bundle_uninstall() {
+				system::log_item "Removing Software Prodictivity Bundle(s): ${selection}"
 				for i in ${selection}; do
+					system::log_item "Removing Software Prodictivity Bundles: ${i}"
 					current_bundle="${i}"
 					((c = c + 1))
 					echo "# Removing bundle ${c} of ${total_count}: ${current_bundle}..."
-					recipe_Bundle:_${i} --remove
+					local current_bundle_full_name=${bundle_prefix:-"recipe:_"}${current_bundle}
+					${current_bundle_full_name} --remove
 					sed -i "/${current_bundle}/d" "${completed_bundles_list}"
 					echo ${current_bundle} >>"${removed_bundle_list}"
 					echo $((100 * ${c} / ${total_count}))
 				done
 			}
-			run_bundle_uninstall | zenity --progress --no-cancel --auto-close \
+			run_bundle_uninstall | ${DisplayGUI} --progress --no-cancel --auto-close \
 				--title="Removing Software Prodictivity Bundles" \
 				--text="Please wait for the bundle removals to complete..." \
 				--percentage=10 --height=200 --width=600
 
-			zenity --info \
+			${DisplayGUI} --info \
 				--timeout 120 \
 				--title "Bundles Removed: $c " \
 				--text="The following Software bundles have been REMOVED: \n \n $(cat ${removed_bundle_list}) " \
@@ -11013,11 +11086,11 @@ software::display_bundle_removal_choices_gtk() {
 			;;
 		*)
 			# Trap unknown conditions so as to not do harm
-			exit
+			return
 			;;
 		esac
 
-		for i in DisplayList selection_list total_count current_bundle removed_bundle_list; do unset ${i}; done
+		for i in DisplayList selection_list total_count current_bundle current_bundle_full_name removed_bundle_list; do unset ${i}; done
 	done
 	return
 }
@@ -16582,12 +16655,12 @@ software::list_bundles() {
 	case "$1" in
 	--zformat-installable)
 		# List software bundles for use with zenity
-		for _bundle in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep "recipe_" | grep -v "Single_Install"); do
+		for _bundle in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep "${bundle_prefix}" | grep -v "Single_Install"); do
 			# Build each line to be displayed in the bundle installer...
 			Description=$(grep -A 1 "$_bundle ()" "${_OEM_DIR}/core/${_rtd_recipies_info}" | tail -1)
 			Description="${Description/"# "/": "}"
 			Description="${Description/"	"/""}"
-			cat ${completed_bundles_list} | grep "${_bundle/recipe_Bundle:_/}" &>/dev/null || echo -en "true \n ${_bundle/recipe_Bundle:_/} \n ${Description} \n"
+			cat ${completed_bundles_list} | grep "${_bundle/recipe:_/}" &>/dev/null || echo -en "true \n ${_bundle/recipe:_/} \n ${Description} \n"
 		done
 		;;
 	--zformat-removable)
@@ -16595,7 +16668,7 @@ software::list_bundles() {
 		completed_bundles_list="$(cat ${completed_bundles_list})"
 		for _installed_bundle in ${completed_bundles_list}; do
 			# Build each line to be displayed in the bundle installer...
-			Description=$(grep -A 1 "recipe_Bundle:_$_installed_bundle ()" "${_OEM_DIR}/core/${_rtd_recipies_info}" | tail -1)
+			Description=$(grep -A 1 "recipe:_$_installed_bundle ()" "${_OEM_DIR}/core/${_rtd_recipies_info}" | tail -1)
 			Description="${Description/"# "/": "}"
 			Description="${Description/"	"/""}"
 			echo -e "true \n ${_installed_bundle} \n ${Description} \n"
@@ -16604,7 +16677,7 @@ software::list_bundles() {
 	*)
 		# Default list format
 		i=1
-		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep "recipe_" | grep -v "Single_Install"); do
+		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep ${bundle_prefix:-"recipe_"} | grep -v "Single_Install"); do
 			echo "$index #$i"
 			((i = i + 1))
 		done
