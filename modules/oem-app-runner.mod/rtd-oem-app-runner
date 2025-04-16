@@ -121,8 +121,17 @@ oem::run_payload ()
 			chmod +x "${2}"/"${1}"
 			if file "${2}"/"${1}" | grep "Windows" ; then
 				if hash wine ; then 
-					wine "${2}"/"${1}" &>> ${_LOGFILE}
-					return
+					(
+					if ! wine "${2}"/"${1}" &>/dev/null ; then
+						system::log_item "Failed to run ${1} using WINE default, trying to reset WINE prefix"
+						rm -r "${HOME}/.wine" 
+						wine "${2}"/"${1}" && system::log_item "Application ${1} launched successfully." || system::log_item "Application ${1} failed to run."
+						return
+					else
+						system::log_item "Application ${1} launched successfully."
+						return
+					fi
+					) &>> ${_LOGFILE} || rtd_oem_pause 1
 				else
 					dialog --backtitle "RTD Power Tools" \
 					--title "Something Went Wrong" \
@@ -136,7 +145,7 @@ oem::run_payload ()
 					response=$?
 					
 					case $response in
-						0) ensure_admin ; check_dependencies wine ;;
+						0) security::ensure_admin ; software::check_native_package_dependency wine ;;
 						1) return ;;
 						255) echo "[ESC] key pressed.";;
 					esac
