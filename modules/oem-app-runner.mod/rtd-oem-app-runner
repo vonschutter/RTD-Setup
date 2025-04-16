@@ -120,18 +120,9 @@ oem::run_payload ()
 			7z x "${_APPS_DIR}/${1}.7z" -aoa -o"${2}" 
 			chmod +x "${2}"/"${1}"
 			if file "${2}"/"${1}" | grep "Windows" ; then
+				(
 				if hash wine ; then 
-					(
-					if ! wine "${2}"/"${1}" &>/dev/null ; then
-						system::log_item "Failed to run ${1} using WINE default, trying to reset WINE prefix"
-						rm -r "${HOME}/.wine" 
-						wine "${2}"/"${1}" && system::log_item "Application ${1} launched successfully." || system::log_item "Application ${1} failed to run."
-						return
-					else
-						system::log_item "Application ${1} launched successfully."
-						return
-					fi
-					) &>> ${_LOGFILE} || rtd_oem_pause 1
+					wine "${2}"/"${1}" 
 				else
 					dialog --backtitle "RTD Power Tools" \
 					--title "Something Went Wrong" \
@@ -150,6 +141,7 @@ oem::run_payload ()
 						255) echo "[ESC] key pressed.";;
 					esac
 				fi
+				) &>> ${_LOGFILE} || rtd_oem_pause 1
 			else
 				system::log_item "Attempting to run application ${1}"
 				system::log_item "Discovery location $(find ${2} -name ${1})"
