@@ -115,7 +115,9 @@ oem::run_payload ()
 {
 	if [[ -r "${_APPS_DIR}/${1}.7z" ]] ; then 
 		if [[ "$(md5sum "${_APPS_DIR}/${1}.7z" |awk '{print $1;}')" == "$(cat "${_CORE_DIR}/sigs/${1}.sig" |awk '{print $1;}')" ]] ; then
-			7z x "${_APPS_DIR}/${1}.7z" -aoa -o"${2}" &>/dev/null
+			system::log_item "App validated sucessfully using OEM sig: Running OEM application ${1}"
+			system::log_item "Unpacking application ${1} to ${2}"
+			7z x "${_APPS_DIR}/${1}.7z" -aoa -o"${2}" 
 			chmod +x "${2}"/"${1}"
 			if file "${2}"/"${1}" | grep "Windows" ; then
 				if hash wine ; then 
@@ -140,10 +142,35 @@ oem::run_payload ()
 					esac
 				fi
 			else
-				system::log_item "Running application ${1}/${2}"
+				system::log_item "Attempting to run application ${1}"
+				system::log_item "Discovery location $(find ${2} -name ${1})"
 				(
-				pushd ${2} 
-				./${1} 
+
+				# Try to enter directory ${2}/${1} or ${2} if it fails in case someone placed the files in a sub folder...
+				if pushd "${2}/${1}" ; then 
+					system::log_item "Changed directory to ${2}/${1} successfully"
+				else
+					system::log_item "Failed to change directory to ${2}/${1} trying to run from ${2}"
+					if pushd "${2}" ; then 
+						system::log_item "Changed directory to ${2} successfully"
+					else
+						system::log_item "Failed to change directory to ${2}"
+						system::log_item "PWD: $(pwd)"
+					fi
+				fi
+
+				if chmod +x ./${1} ; then 
+					if ./${1} ; then 
+						write_information "Application ${1} launched successfully."
+					else
+						write_error "Application ${1} failed to run."
+						system::log_item "PWD: $(pwd)"
+					fi
+				else
+					system::log_item "Failed to set executable bit on ${2}/${1}"
+					system::log_item "PWD: $(pwd)"
+				fi
+
 				popd 
 				) &>> ${_LOGFILE} || rtd_oem_pause 1
 			fi

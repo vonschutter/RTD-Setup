@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #				-	RTD System System Managment Bootstrap Script      -
 #
 #::::::::::::::::::::::::::::::::::::::::::::: HEADER DO NOT REMOVE :::::::::::::::::::::::::::::::::::::::::::::::::::::
