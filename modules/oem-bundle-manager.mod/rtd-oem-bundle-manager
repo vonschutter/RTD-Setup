@@ -46,13 +46,16 @@
 # export _ERRLOGFILE=
 # export _LOGFILE=
 # export _TLA=
+
+
+
 : ${_SCRIPTNAME=$(basename $0)}
 : ${_TLA=${_SCRIPTNAME:0:3}}
 : ${_GIT_PROFILE:=vonschutter}
 if [[ $EUID -eq 0 ]] ; then
 	_LOG_DIR="/var/log/${_TLA,,}"
 else
-	_LOG_DIR="${HOME}/.log/${_TLA,,}"
+	_LOG_DIR="${HOME}/.config/${_TLA,,}/log"
 fi
 : ${_LOGFILE:="${_LOG_DIR}/$(basename $0)-$(date +%Y-%m-%d).log"}
 
@@ -91,6 +94,12 @@ to get a truly useful system. Then Bundle Manager lets you install software by t
   succeed tather than fail and installing dependencies when you need them.
 '
 
+_INFO_TXT="'
+<span font='16' foreground='red'>Add or remove bundles on this system</span> \n
+NOTE: The OEM Bundle Manager, depending on your choices, may download vendor 
+packages, or containes applications such as snap apps, or flatpak apps, 
+or even download software from a vendors web site, as well as install 
+fonts and wallpapeers etc. \n '"
 
 
 
@@ -149,47 +158,113 @@ system::ExecStart () {
 		write_warning "The file /etc/pam.d/sudo does not apear to exist. "
 	fi
 
-	if [ "$UID" -eq 0 ]; then
-		if hash zenity &>/dev/null ; then
-			while true; do
-				exec 3>&1
-				selection=$(zenity --cancel-label=QUIT  --list \
-					"Add Bundles to this computer" \
-					"Remove Bundles from this computer" \
-					"Information abount this tool" \
-					--column="Select What you Want To Do:" --text='
-					<span font="16" foreground="red">Add or remove bundles on this system</span> \n
-					NOTE: The OEM Bundle Manager, depending on your choices, may download vendor 
-					packages, or containes applications such as snap apps, or flatpak apps, 
-					or even download software from a vendors web site, as well as install 
-					fonts and wallpapeers etc. \n ' \
-					--title="OEM Bundle Manager" --height=450 --width=640 )
-				exit_status=$?
-				exec 3>&-
-
-				case $exit_status in
-					1) system::log_item "$(basename $0) was told to [QUIT]" & echo [QUIT] && exit ;;
-					255) system::log_item "$(basename $0) user pressed [ESC]" & echo [ESC] && exit ;;
-				esac
+	if ! [ "$UID" -eq 0 ]; then
+		write_error "This script needs administrative access..."
+		return 1
+	fi
 	
-				case "$selection" in
-					"Add Bundles to this computer" ) software::display_bundle_install_choices_gtk --yad ;;
-					"Remove Bundles from this computer" ) software::display_bundle_removal_choices_gtk --yad ;;
-					"Information abount this tool" ) zenity::display_info "$_ABOUT"  ;;
-					* )
-					# Trap unknown exit code...
-					return 1
-					;;
-				esac
-			done
+	# Ensure that users chooice of GUI is available, if not, install it, and if not possible then use zenity
+	if hash yad &>/dev/null ; then
+		DisplayGUI="${DisplayGUI:-"yad"}"
+		system::log_item "$(basename $0) using [yad] for GUI"
+	elif hash zenity &>/dev/null ; then
+		DisplayGUI="zenity"
+		system::log_item "$(basename $0) using [zenity] for GUI"
+	else
+		write_error "Neither [yad] or [zenity] are available to display menus"
+		if software::add_native_package "zenity" "yad" ; then
+			system::log_item "$(basename $0) installed [yad] or [zenity] for GUI: Please re-run this script"
+			if hash yad &>/dev/null ; then
+				DisplayGUI="yad"
+				system::log_item "$(basename $0) using [yad] for GUI"
+			elif hash zenity &>/dev/null ; then
+				DisplayGUI="zenity"
+				system::log_item "$(basename $0) using [zenity] for GUI"
+			else
+				write_error "Failed to install [yad] or [zenity] for GUI"
+				return 1
+			fi
 		else
-			check_dependencies zenity || (
-				write_error "zenity is not available to display menus"
-				exit 1
-				)
+			write_error "Failed to install [yad] or [zenity] for GUI"
+			return 1
 		fi
+		
 	fi
 
+	if [[ $DisplayGUI == "zenity" ]]; then
+		while true; do
+			exec 3>&1
+			selection=$(zenity --cancel-label=QUIT  --list \
+				"Add Bundles to this computer" \
+				"Remove Bundles from this computer" \
+				"Information abount this tool" \
+				--column="Select What you Want To Do:" --text="$_INFO_TXT" \
+				--title="OEM Bundle Manager" --height=450 --width=640 )
+			exit_status=$?
+			exec 3>&-
+
+			system::log_item "$(basename $0) user selected: $selection"
+
+			case ${exit_status} in
+				1) system::log_item "$(basename $0) was told to [QUIT]" & echo [QUIT] && exit 
+				;;
+				255) system::log_item "$(basename $0) user pressed [ESC]" & echo [ESC] && exit 
+				;;
+			esac
+
+			case "$selection" in
+				"Add Bundles to this computer" ) 
+					software::display_bundle_install_choices_gtk --zenity 
+				;;
+				"Remove Bundles from this computer" ) 
+					software::display_bundle_removal_choices_gtk --zenity 
+				;;
+				"Information abount this tool" ) 
+					zenity::display_info "$_ABOUT"  
+				;;
+				* )
+					return 1
+					;;
+			esac
+		done
+	else [[ $DisplayGUI == "yad" ]];
+		while true; do
+			exec 3>&1
+			selection=$(yad --cancel-label=QUIT  --list \
+				"Add Bundles to this computer" \
+				"Remove Bundles from this computer" \
+				"Information abount this tool" \
+				--column="Select What you Want To Do:" --text="$_INFO_TXT" \
+				--title="OEM Bundle Manager" --height=450 --width=640 )
+			exit_status=$?
+			exec 3>&-
+
+			system::log_item "$(basename $0) user selected: $selection"
+
+			case ${exit_status} in
+				1) system::log_item "$(basename $0) was told to [QUIT]" & echo [QUIT] && exit 
+				;;
+				255) system::log_item "$(basename $0) user pressed [ESC]" & echo [ESC] && exit 
+				;;
+			esac
+
+			case "$selection" in
+				"Add Bundles to this computer|" ) 
+					software::display_bundle_install_choices_gtk --yad 
+				;;
+				"Remove Bundles from this computer|" ) 
+					software::display_bundle_removal_choices_gtk --yad 
+				;;
+				"Information abount this tool|" ) 
+					zenity::display_info "$_ABOUT"  
+				;;
+				* )
+				# Trap unknown exit code...
+				return 1
+				;;
+			esac
+		done
+	fi
 }
 
 
@@ -233,22 +308,86 @@ system::ExecStart::help ()
 
 dependency::file "_rtd_library" || { echo "📚 Failed to find _rtd_library"; exit 1; }
 
-case ${1} in
-	--help )
-		system::log_item "Displaying help message" 
-		system::ExecStart::help  
-	;;
-	--about )
-		system::log_item "Displaying about message"
-		zenity::display_info "$_ABOUT"
-	;;
-	--more-help ) 
-		system::log_item "Displaying more help online"
-		zenity::display_url "https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/blob/main/modules/RTD-OEM-bundle-manager/README.md" ;;
-	--rtd )
-		system::log_item "Displaying RTD README"
-		zenity::display_url "/opt/rtd/README.md" ;;
-	* ) 
+main ()
+{
+	DisplayGUI="zenity"
+	run="yes"
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--display-gui )
+			DisplayGUI="$2"
+			system::log_item "GUI requested: ${DisplayGUI}"
+			shift 2
+			;;
+		--timeout )
+			# Set the timeout for the menu
+			# This is not yet implemented
+			timeout="$2"
+			system::log_item "Timeout set to: ${timeout}"
+			shift 2
+			;;
+		--help )
+			system::log_item "Displaying help message" 
+			system::ExecStart::help
+			run="no" 
+			shift
+			;;
+		--about )
+			system::log_item "Displaying about message"
+			case "$DisplayGUI" in
+			"yad" )
+				yad::display_info "$_ABOUT"
+				;;
+			"zenity" )
+				zenity::display_info "$_ABOUT"
+				;;
+			esac
+			run="no"
+			shift
+			;;
+		--more-help ) 
+			system::log_item "Displaying more help online"
+			if [[ EUID -eq 0 ]] ; then
+				system::log_item "Running as root, using sudo to open browser"
+				sudo -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/$(id -u $SUDO_USER)" xdg-open  "https://github.com/${_GIT_PROFILE}/RTD-Setup/blob/main/modules/oem-bundle-manager.mod/README.md" 
+			else
+				system::log_item "Running as user, using xdg-open to open browser"
+				xdg-open  "https://github.com/${_GIT_PROFILE}/RTD-Setup/blob/main/modules/oem-bundle-manager.mod/README.md" 
+
+			fi
+			run="no"
+			shift
+			;;
+		--rtd )
+			system::log_item "Displaying RTD README"
+			case "$DisplayGUI" in
+			"yad" )
+				yad::display_file "/opt/rtd/README.md" 
+				;;
+			"zenity" )
+				zenity::display_file "/opt/rtd/README.md" 
+				;;
+			esac
+			run="no"
+			shift
+			;;
+		* )
+			# If no options are specified, we will use the default GUI
+			DisplayGUI="zenity"
+			system::log_item "No GUI specified, using default: ${DisplayGUI}"
+			shift
+			;;
+		esac
+	done
+
+	if [[ $run == "no" ]] ; then
+		system::log_item "Exiting script"
+		exit 0
+	else
+		system::log_item "Running script"
 		system::log_item "Starting the OEM Bundle Manager"
-		system::ExecStart 2>&1 | tee -a "${_LOGFILE}" ;;
-esac
+		system::ExecStart 2>&1 | tee -a "${_LOGFILE}"
+	fi
+}
+main "$@" 	 	

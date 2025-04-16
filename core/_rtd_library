@@ -933,6 +933,40 @@ zenity::display_info() {
 	zenity --info --text --title="${_TITLE:="Notice"}: $selection" --text="$_text" --ellipsize --height=600 --width=800 2>/dev/null
 }
 
+yad::display_info() {
+	# Description: Displays an information notice using a Zenity info box.
+	# This function provides a convenient way to display a message to an end user in a GUI.
+	#
+	# Globals:
+	#   - $_TITLE (optional): Sets the title of the Zenity info box.
+	#   - $selection (optional): Additional text to include in the title.
+	# Arguments:
+	#   - "$*": The message string to be displayed in the Zenity info box.
+	# Outputs:
+	#   - Displays the specified message in a Zenity info box.
+	# Returns:
+	#   - None
+	#
+	# Usage:
+	#   zenity::display_info "The message that you want to display"
+	#
+	# Example:
+	#   zenity::display_info "This is an important notice for the user."
+	#
+	# Dependencies:
+	#   - zenity: To display the message in a Zenity info box.
+	#
+	# Notes:
+	#   - If the Zenity utility is not found, the function checks for dependencies and returns 1 if they are not met.
+	#   - The info box is customizable using the global variables $_TITLE and $selection.
+	#
+	# End of Documentation
+
+	_text="${*}"
+	hash yad &>/dev/null || check_dependencies yad &>/dev/null || return 1
+	yad --info --text --title="${_TITLE:="Notice"}: $selection" --text="$_text" --ellipsize --height=600 --width=800 2>/dev/null
+}
+
 zenity::display_url() {
 	# Description: Displays the content of a URL in a GUI using Zenity.
 	# This function makes it easy and convenient to display web content to an end user in a nice way.
@@ -961,9 +995,51 @@ zenity::display_url() {
 	#
 	# End of Documentation
 
-	_url="${*}"
-	hash zenity &>/dev/null || check_dependencies zenity &>/dev/null || return 1
-	zenity --text-info --html --title="${_TITLE:="$_url"}:" --url="$_url" --width=800 --height=600 &>/dev/null
+	local _url="${*}"
+	hash zenity &>/dev/null || software::check_native_package_dependency zenity &>/dev/null || return 1
+	hash wget &>/dev/null || software::check_native_package_dependency wget &>/dev/null || return 1
+	local tmp_folder=$(mktemp -d)
+	wget -q "${_url}" -O "${tmp_folder}/file.md" &>/dev/null
+	yad::display_file "${tmp_folder}/file.md" 
+	#&>/dev/null
+}
+
+yad::display_url() {
+	# Description: Displays the content of a URL in a GUI using Zenity.
+	# This function makes it easy and convenient to display web content to an end user in a nice way.
+	# To use this function, simply call it passing the URL as an argument.
+	#
+	# Globals:
+	#	$_TITLE (optional): Sets the title of the Zenity window.
+	# Arguments:
+	#	["URL"]: The URL whose content will be displayed.
+	# Outputs:
+	#	- Formatted HTML message in a Zenity window.
+	# Returns:
+	#	- None
+	#
+	# Usage:
+	#	zenity::display_url "https://www.someplace.com/index.html"
+	#
+	# Example:
+	#	zenity::display_url "https://www.example.com"
+	#
+	# Dependencies:
+	#	- zenity: To display the URL content in a Zenity window.
+	#
+	# Notes:
+	#	- If the Zenity utility is not found, the function checks for dependencies and returns 1 if they are not met.
+	#
+	# End of Documentation
+
+	local _url="${*}"
+	hash yad &>/dev/null || software::check_native_package_dependency yad &>/dev/null || return 1
+	hash wget &>/dev/null || software::check_native_package_dependency wget &>/dev/null || return 1
+	local tmp_folder=$(mktemp -d)
+	wget -q "${_url}" -O "${tmp_folder}/yad.md" &>/dev/null
+	yad::display_file "${tmp_folder}/yad.md" 
+	#&>/dev/null
+	unset _url
 }
 
 zenity::display_file() {
@@ -995,8 +1071,45 @@ zenity::display_file() {
 	# End of Documentation
 
 	_filename="${*}"
-	hash zenity &>/dev/null || check_dependencies zenity &>/dev/null || return 1
-	zenity --text-info --title="${_TITLE:="$_filename"}:" --filename="$_filename" --width=800 --height=600 &>/dev/null
+	hash zenity &>/dev/null || software::check_native_package_dependency zenity &>/dev/null || return 1
+	hash pandoc &>/dev/null || software::check_native_package_dependency pandoc &>/dev/null || return 1
+	zenity --text-info --title="${_TITLE:="$_filename"}:" --filename=<(pandoc -s $_filename -t plain) --width=800 --height=600 
+	#&>/dev/null
+
+}
+
+yad::display_file() {
+	# Description: Displays the content of a text file in a Zenity window.
+	# This function makes it easy and convenient to display text content to an end user in a GUI.
+	# To use this function, simply call it passing the file path as an argument.
+	#
+	# Globals:
+	#	$_TITLE (optional): Sets the title of the Zenity window.
+	# Arguments:
+	#	["/path/to/file.txt"]: The path to the text file to be displayed.
+	# Outputs:
+	#	- Displays the content of the specified text file in a Zenity window.
+	# Returns:
+	#	- None
+	#
+	# Usage:
+	#	zenity::display_file "/path/to/file.txt"
+	#
+	# Example:
+	#	zenity::display_file "/path/to/file.txt"
+	#
+	# Dependencies:
+	#	- zenity: To display the text file content in a Zenity window.
+	#
+	# Notes:
+	#	- If the Zenity utility is not found, the function checks for dependencies and returns 1 if they are not met.
+	#
+	# End of Documentation
+
+	_filename="${*}"
+	hash yad &>/dev/null || software::check_native_package_dependency yad &>/dev/null || return 1
+	hash pandoc &>/dev/null || software::check_native_package_dependency pandoc &>/dev/null || return 1
+	yad --text-info --title="${_TITLE:="$_filename"}:" --filename=<(pandoc -s $_filename -t plain) --wrap --width=800 --height=600 &>/dev/null
 
 }
 
