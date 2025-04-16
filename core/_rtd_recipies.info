@@ -780,6 +780,13 @@ recipe:_ADM:_Linux_Subsystem_for_Windows (){
 
 	# Wine runtime environment for windows apps.	
 	software::add_native_package wine
+	software::add_native_package winetricks
+	distribution_type=$(system::distribution_type)
+	case ${distribution_type} in
+		"ubuntu" | "debian" )
+			apt-get -y dpkg --add-architecture i386 && apt-get update && apt-get -y install wine32:i386
+		;;
+	esac
 	
 	# A DOS virtual environment!				
 	software::from_snapcraft.io dosbox-x $1
