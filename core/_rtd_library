@@ -10008,31 +10008,14 @@ software::determine_package_name_from_cmd() {
 
 software::add_native_package() {
 	# Description:
-	# add global install command for portability and convenience. This function
+	# Installs one or more native packages individually using the system's package manager.
+	# Supports apt, dnf, zypper, and pkcon. Logs any failures while allowing others to proceed.
+	# This is a global install command for portability and convenience. This function
 	# allows for scripts to add software across many systems.
 	# Primarily for Linux: this function will look for the common package managers
 	# apt (all debina and ubuntu based distributions), dnf (RedHat, Fedora, Mandriva, and others)
-	# zypper (SuSE and Open SUSE). If neither of those package manages are available many systems
-	# use package kit; and this will be registered as an sinstall option.
-	#
-	# Globals:
-	# Arguments: package_name
-	# Outputs:
-	# Returns:
-	# Usage: "software::add_native_package <package_name> <package_name> <...n>"
-	#
-	#
-	# Return Codes:
-	#
-	# A return code of "1" will be returned the function was not able install the package.
-	# A return code of "0" will be returned if the package was installed successfully.
-	# A return code of "2" will be returned if the package was not found in the system.
-	# A return code of "3" will be returned if the package manager was not found on the system.
-	# A return code of "4" will be returned if the package manager was not able to install the package.
-
-	# Description:
-	#   Installs one or more native packages individually using the system's package manager.
-	#   Supports apt, dnf, zypper, and pkcon. Logs any failures while allowing others to proceed.
+	# zypper (SuSE and Open SUSE) or alternatively pkcon (PackageKit) which is a wrapper for
+	# the package manager. 	
 	#
 	# Globals:
 	#   None
@@ -10051,25 +10034,20 @@ software::add_native_package() {
 	#   software::add_native_package curl git htop
 	# End of documentation
 
-	# Setup localized variables...
-	local pkgmgr install_cmd
-	local -a packages failed_packages
-	local pkg
-	
-	# store the package names in an array
-	mapfile -t packages < <(printf '%s\n' "$@" | xargs -n1 | grep -Ev '^\s*$')
-	
-	# Log the function call and arguments for support...
-	system::log_item "Called by ${FUNCNAME[0]} with arguments: ${packages[*]}"
-	system::log_item "Adding native package(s): ${packages[*]}"
 
-	# Check required dependencies and usage...
+	local pkgmgr install_cmd
+	local -a raw_packages packages filtered_packages failed_packages
+	local pkg
+
+	mapfile -t raw_packages < <(printf '%s\n' "$@" | xargs -n1 | grep -Ev '^\s*$')
+	system::log_item "Called by ${FUNCNAME[0]} with arguments: ${raw_packages[*]}"
+	system::log_item "Filtering already installed native package(s): ${raw_packages[*]}"
+
 	dependency::os_linux || {
 		write_error "This function is only supported on Linux systems."
 		return 1
 	}
 
-	# Check for package manager availability...
 	if command -v pkcon >/dev/null 2>&1; then
 		pkgmgr="PKCON"
 		install_cmd="pkcon install -y"
@@ -10084,21 +10062,42 @@ software::add_native_package() {
 		install_cmd="sudo dnf -y install"
 	else
 		write_error "No supported package manager found on this system."
-		return 1
+		return 3
 	fi
 
 	write_status "Detected package manager: ${pkgmgr}"
 
-
-	# Check if any package names were provided
-	if [[ ${#packages[@]} -eq 0 ]]; then
+	if [[ ${#raw_packages[@]} -eq 0 ]]; then
 		write_error "No package names provided for installation."
 		return 1
 	fi
 
-	# Iterate over each package name and attempt installation
-	for pkg in "${packages[@]}"; do
+	for pkg in "${raw_packages[@]}"; do
 		if [[ -z "$pkg" ]]; then
+			continue
+		fi
+
+		if software::is_native_package_installed "$pkg"; then
+			write_information "Package '$pkg' is already installed. Skipping."
+			continue
+		fi
+
+		filtered_packages+=("$pkg")
+	done
+
+	if [[ ${#filtered_packages[@]} -eq 0 ]]; then
+		write_information "All packages already installed. Nothing to do."
+		return 0
+	fi
+
+	for pkg in "${filtered_packages[@]}"; do
+		if [[ -z "$pkg" ]]; then
+			continue
+		fi
+
+		if ! software::is_native_package_available "$pkg"; then
+			write_error "Package '$pkg' is not available in the repositories."
+			failed_packages+=("$pkg")
 			continue
 		fi
 
