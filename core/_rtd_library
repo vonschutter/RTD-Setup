@@ -5890,31 +5890,24 @@ generate_report_disk_space_used_by_directory() {
 	rm $store
 }
 
-set_gnome_ui_common_tweaks_for_user() {
+gnome::set_tilix_ui_tweaks_for_user() {
 	# Description:
-	# Configure Gnome for OEM look and feel. This is completely as desired.
+	# Configure Tilix for OEM look and feel. This is completely as desired.
 	# This function takes no arguments. Simply call it to make the changes.
-	# Howerver, this function must be called as the user it should apply to.
-	# if it is called in a script with "sudo" priviledges, it will make chages to
-	# the look and feel for the "root" user.
 	#
-	# To run this function as the user who started a script with sudo script content
-	# could be echoed out ot a temporary file and executed as follows
-	# sudo -H -u $SUDO_USER DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u "$SUDO_USER")/bus temporary_script.sh > /dev/null 2>&1
-	# or alternatively by calling the function "system::run_command_in_gnome_user_session /path/to/temorary_script.sh".
 	# Globals:
 	# Arguments: None
 	# Outputs:
 	# Returns:
 	# Usage:
-	#
-	# USAGE:
-	#
-	# set_gnome_ui_common_tweaks_for_user
-	#
 	# End of documentation
 
-	write_status "📐 Seting common OEM tweaks..."
+	write_status "📐 Setting common Tilix tweaks..."
+	gsettings set com.gexperts.Tilix.Settings theme-variant 'dark'
+	gsettings set com.gexperts.Tilix.Settings font 'SauceCodePro Nerd Font 12'
+	gsettings set com.gexperts.Tilix.Settings use-system-font false
+	gsettings set com.gexperts.Tilix.Settings bold-is-bright true
+	
 	# Terminal and Tilix Dark Theme
 	GNOME_TERMINAL_PROFILE=$(gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}')
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-transparent-background true
@@ -5933,125 +5926,6 @@ set_gnome_ui_common_tweaks_for_user() {
 		gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ bold-is-bright true
 
 	fi
-
-	# Better Font Smoothing
-	gsettings set org.gnome.settings-daemon.plugins.xsettings antialiasing 'rgba'
-
-	# Usability Improvements
-	gsettings set org.gnome.desktop.peripherals.mouse accel-profile 'adaptive'
-	gsettings set org.gnome.desktop.sound allow-volume-above-100-percent true
-	gsettings set org.gnome.desktop.calendar show-weekdate true
-	gsettings set org.gnome.desktop.wm.preferences resize-with-right-button true
-	gsettings set org.gnome.desktop.wm.preferences button-layout 'appmenu:minimize,maximize,close'
-	gsettings set org.gnome.shell.overrides workspaces-only-on-primary false
-
-	# This indexer is nice, but can be detrimental for laptop users battery life
-	gsettings set org.freedesktop.Tracker.Miner.Files index-on-battery false
-	gsettings set org.freedesktop.Tracker.Miner.Files index-on-battery-first-time false
-	gsettings set org.freedesktop.Tracker.Miner.Files throttle 15
-
-	# Configure Dash to Dock
-	gsettings set org.gnome.shell.extensions.dash-to-dock click-action 'minimize'
-	gsettings set org.gnome.shell.extensions.dash-to-dock dock-position 'BOTTOM'
-	gsettings set org.gnome.shell.extensions.dash-to-dock apply-custom-theme false
-	gsettings set org.gnome.shell.extensions.dash-to-dock custom-background-color false
-	gsettings set org.gnome.shell.extensions.dash-to-dock custom-theme-customize-running-dots true
-	gsettings set org.gnome.shell.extensions.dash-to-dock custom-theme-running-dots-color '#729fcf'
-	gsettings set org.gnome.shell.extensions.dash-to-dock custom-theme-shrink true
-	gsettings set org.gnome.shell.extensions.dash-to-dock dock-fixed false
-	gsettings set org.gnome.shell.extensions.dash-to-dock extend-height true
-	gsettings set org.gnome.shell.extensions.dash-to-dock force-straight-corner false
-	gsettings set org.gnome.shell.extensions.dash-to-dock icon-size-fixed true
-	gsettings set org.gnome.shell.extensions.dash-to-dock intellihide-mode 'ALL_WINDOWS'
-	gsettings set org.gnome.shell.extensions.dash-to-dock isolate-workspaces true
-	gsettings set org.gnome.shell.extensions.dash-to-dock show-apps-at-top true
-	gsettings set org.gnome.shell.extensions.dash-to-dock unity-backlit-items false
-	gsettings set org.gnome.shell.extensions.dash-to-dock transparency-mode 'FIXED'
-	gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'SEGMENTED'
-	gsettings set org.gnome.shell.extensions.dash-to-dock background-opacity 0.70000000000000000
-	gsettings set org.gnome.shell.extensions.dash-to-dock extend-height false
-
-	# Configure dash-to-panel
-	temporary_script=$(mktemp)
-	chmod 777 ${temporary_script}
-	cat >${temporary_script} <<-'EOF_D2P'
-		[org/gnome/shell/extensions/dash-to-panel]
-		appicon-margin=4
-		appicon-padding=4
-		available-monitors=[0]
-		dot-color-1='#5294e2'
-		dot-color-2='#5294e2'
-		dot-color-3='#5294e2'
-		dot-color-4='#5294e2'
-		dot-color-dominant=false
-		dot-color-override=true
-		dot-color-unfocused-1='#5294e2'
-		dot-color-unfocused-2='#5294e2'
-		dot-color-unfocused-3='#5294e2'
-		dot-color-unfocused-4='#5294e2'
-		dot-color-unfocused-different=false
-		dot-style-focused='METRO'
-		dot-style-unfocused='SEGMENTED'
-		focus-highlight-color='#eeeeee'
-		focus-highlight-dominant=true
-		force-check-update=true
-		group-apps=true
-		hotkeys-overlay-combo='TEMPORARILY'
-		isolate-monitors=false
-		isolate-workspaces=false
-		panel-element-positions='{"0":[{"element":"showAppsButton","visible":true,"position":"stackedTL"},{"element":"activitiesButton","visible":false,"position":"stackedTL"},{"element":"leftBox","visible":true,"position":"stackedTL"},{"element":"taskbar","visible":true,"position":"stackedTL"},{"element":"centerBox","visible":true,"position":"stackedBR"},{"element":"rightBox","visible":true,"position":"stackedBR"},{"element":"dateMenu","visible":true,"position":"stackedBR"},{"element":"systemMenu","visible":true,"position":"stackedBR"},{"element":"desktopButton","visible":false,"position":"stackedBR"}]}'
-		secondarymenu-contains-showdetails=true
-		show-appmenu=false
-		show-favorites=true
-		show-favorites-all-monitors=false
-		stockgs-keep-dash=false
-		stockgs-keep-top-panel=false
-		trans-use-custom-bg=false
-		trans-use-custom-opacity=true
-		tray-size=0
-	EOF_D2P
-	dconf load / <${temporary_script} && rm ${temporary_script}
-
-	# Nautilus (File Manager) Usability
-	gsettings set org.gnome.nautilus.icon-view default-zoom-level 'standard'
-	gsettings set org.gnome.nautilus.preferences executable-text-activation 'ask'
-	gsettings set org.gtk.Settings.FileChooser sort-directories-first true
-	gsettings set org.gnome.nautilus.list-view use-tree-view true
-	gsettings set org.gnome.nautilus.list-view default-zoom-level 'small'
-
-	# Set the GNOME Shell Apps Dashboard sort app in categories based on the FreeDesktop standard.
-	gsettings set org.gnome.desktop.app-folders folder-children "['accessories', 'chrome-apps', 'games', 'graphics', 'internet', 'office', 'programming', 'science', 'sound---video', 'system-tools', 'universal-access', 'wine', 'OEM', '3D-Printing', 'Cloud']"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/accessories/ name "Accessories"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/accessories/ categories "['Utility']"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/chrome-apps/ name "Chrome Apps"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/chrome-apps/ categories "['chrome-apps']"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/games/ name "Games"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/games/ categories "['Game']"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/graphics/ name "Graphics"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/graphics/ categories "['Graphics']"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/internet/ name "Internet"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/internet/ categories "['Network', 'WebBrowser', 'Email']"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/office/ name "Office"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/office/ categories "['Office']"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/programming/ name "Programming"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/programming/ categories "['Development']"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/science/ name "Science"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/science/ categories "['Science']"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/sound---video/ name "Sound & Video"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/sound---video/ categories "['AudioVideo', 'Audio', 'Video']"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/system-tools/ name "System Tools"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/system-tools/ categories "['System', 'Settings']"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/universal-access/ name "Universal Access"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/universal-access/ categories "['Accessibility']"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/wine/ name "Wine"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/wine/ categories "['Wine', 'X-Wine', 'Wine-Programs-Accessories']"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/OEM/ name "OEM"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/OEM/ categories "['OEM']"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/3D-Printing/ name "3D-Printing"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/3D-Printing/ categories "['3D-Printing', 'CAD', '3D', '3DGraphics']"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/Cloud/ name "Cloud"
-	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/Cloud/ categories "['Cloud-Management', 'Cloud', 'aws', 'azure', 'gcp']"
-
 	# Add Tilix configuration and shell definitions
 	mkdir -p ~/.config/rtd
 	cat >~/.config/rtd/gconf-tilix-settings.ini <<-'EOF_TLX'
@@ -6135,6 +6009,229 @@ set_gnome_ui_common_tweaks_for_user() {
 	EOF_TLX
 	dconf load / <~/.config/rtd/gconf-tilix-settings.ini
 }
+
+gnome::set_power_configuraton_for_user() {
+	# Description:
+	# Configure power settings for OEM look and feel. This is completely as desired.
+	# This function takes no arguments. Simply call it to make the changes.
+	#
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	#
+	# USAGE:
+	#
+	# set_power_configuraton_for_user
+	#
+	# End of documentation
+
+	write_status "📐 Setting common power configuration..."
+	gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout 0
+	gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
+	gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-timeout 0
+	gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing'
+	# This indexer is nice, but can be detrimental for laptop users battery life
+	gsettings set org.freedesktop.Tracker.Miner.Files index-on-battery false
+	gsettings set org.freedesktop.Tracker.Miner.Files index-on-battery-first-time false
+	gsettings set org.freedesktop.Tracker.Miner.Files throttle 15
+	write_status "Setting common GNOME UI tweaks..."
+	gsettings set org.gnome.desktop.interface show-battery-percentage true
+	gsettings set org.gnome.desktop.interface clock-show-date true
+	gsettings set org.gnome.desktop.interface clock-show-seconds true
+	gsettings set org.gnome.desktop.interface enable-hot-corners true
+}
+
+gnome::set_better_font_smoothing_for_user() {
+	# Description:
+	# Configure font smoothing for OEM look and feel. This is completely as desired.
+	# This function takes no arguments. Simply call it to make the changes.
+	#
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	#
+	# USAGE:
+	#
+	# set_better_font_smoothing_for_user
+	#
+	# End of documentation
+
+	write_status "📐 Setting common font smoothing..."
+	gsettings set org.gnome.settings-daemon.plugins.xsettings hinting 'slight'
+	gsettings set org.gnome.settings-daemon.plugins.xsettings antialiasing 'rgba'
+	gsettings set org.gnome.settings-daemon.plugins.xsettings rgba-order 'rgb'
+}
+
+gnome::set_better_usability_for_user() {
+	# Usability Improvements
+	gsettings set org.gnome.desktop.peripherals.mouse accel-profile 'adaptive'
+	gsettings set org.gnome.desktop.sound allow-volume-above-100-percent true
+	gsettings set org.gnome.desktop.calendar show-weekdate true
+	gsettings set org.gnome.desktop.wm.preferences resize-with-right-button true
+	gsettings set org.gnome.desktop.wm.preferences button-layout 'appmenu:minimize,maximize,close'
+	gsettings set org.gnome.shell.overrides workspaces-only-on-primary false
+}
+
+gnome::configure_dash_to_dock() {
+	# Configure Dash to Dock
+	gsettings set org.gnome.shell.extensions.dash-to-dock click-action 'minimize'
+	gsettings set org.gnome.shell.extensions.dash-to-dock dock-position 'BOTTOM'
+	gsettings set org.gnome.shell.extensions.dash-to-dock apply-custom-theme false
+	gsettings set org.gnome.shell.extensions.dash-to-dock custom-background-color false
+	gsettings set org.gnome.shell.extensions.dash-to-dock custom-theme-customize-running-dots true
+	gsettings set org.gnome.shell.extensions.dash-to-dock custom-theme-running-dots-color '#729fcf'
+	gsettings set org.gnome.shell.extensions.dash-to-dock custom-theme-shrink true
+	gsettings set org.gnome.shell.extensions.dash-to-dock dock-fixed false
+	gsettings set org.gnome.shell.extensions.dash-to-dock extend-height true
+	gsettings set org.gnome.shell.extensions.dash-to-dock force-straight-corner false
+	gsettings set org.gnome.shell.extensions.dash-to-dock icon-size-fixed true
+	gsettings set org.gnome.shell.extensions.dash-to-dock intellihide-mode 'ALL_WINDOWS'
+	gsettings set org.gnome.shell.extensions.dash-to-dock isolate-workspaces true
+	gsettings set org.gnome.shell.extensions.dash-to-dock show-apps-at-top true
+	gsettings set org.gnome.shell.extensions.dash-to-dock unity-backlit-items false
+	gsettings set org.gnome.shell.extensions.dash-to-dock transparency-mode 'FIXED'
+	gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'SEGMENTED'
+	gsettings set org.gnome.shell.extensions.dash-to-dock background-opacity 0.70000000000000000
+	gsettings set org.gnome.shell.extensions.dash-to-dock extend-height false
+
+
+}
+
+gnome::configure_dash_to_panel() {
+	# Configure Dash to Panel
+	gsettings set org.gnome.shell.extensions.dash-to-panel click-action 'minimize'
+	gsettings set org.gnome.shell.extensions.dash-to-panel dash-max-icon-size 32
+
+	# Configure dash-to-panel
+	temporary_script=$(mktemp)
+	chmod 777 ${temporary_script}
+	cat >${temporary_script} <<-'EOF_D2P'
+		[org/gnome/shell/extensions/dash-to-panel]
+		appicon-margin=4
+		appicon-padding=4
+		available-monitors=[0]
+		dot-color-1='#5294e2'
+		dot-color-2='#5294e2'
+		dot-color-3='#5294e2'
+		dot-color-4='#5294e2'
+		dot-color-dominant=false
+		dot-color-override=true
+		dot-color-unfocused-1='#5294e2'
+		dot-color-unfocused-2='#5294e2'
+		dot-color-unfocused-3='#5294e2'
+		dot-color-unfocused-4='#5294e2'
+		dot-color-unfocused-different=false
+		dot-style-focused='METRO'
+		dot-style-unfocused='SEGMENTED'
+		focus-highlight-color='#eeeeee'
+		focus-highlight-dominant=true
+		force-check-update=true
+		group-apps=true
+		hotkeys-overlay-combo='TEMPORARILY'
+		isolate-monitors=false
+		isolate-workspaces=false
+		panel-element-positions='{"0":[{"element":"showAppsButton","visible":true,"position":"stackedTL"},{"element":"activitiesButton","visible":false,"position":"stackedTL"},{"element":"leftBox","visible":true,"position":"stackedTL"},{"element":"taskbar","visible":true,"position":"stackedTL"},{"element":"centerBox","visible":true,"position":"stackedBR"},{"element":"rightBox","visible":true,"position":"stackedBR"},{"element":"dateMenu","visible":true,"position":"stackedBR"},{"element":"systemMenu","visible":true,"position":"stackedBR"},{"element":"desktopButton","visible":false,"position":"stackedBR"}]}'
+		secondarymenu-contains-showdetails=true
+		show-appmenu=false
+		show-favorites=true
+		show-favorites-all-monitors=false
+		stockgs-keep-dash=false
+		stockgs-keep-top-panel=false
+		trans-use-custom-bg=false
+		trans-use-custom-opacity=true
+		tray-size=0
+	EOF_D2P
+	dconf load / <${temporary_script} && rm ${temporary_script}
+}
+
+gnome::configure_nautilus() {
+	# Nautilus (File Manager) Usability
+	gsettings set org.gnome.nautilus.icon-view default-zoom-level 'standard'
+	gsettings set org.gnome.nautilus.preferences executable-text-activation 'ask'
+	gsettings set org.gtk.Settings.FileChooser sort-directories-first true
+	gsettings set org.gnome.nautilus.list-view use-tree-view true
+	gsettings set org.gnome.nautilus.list-view default-zoom-level 'small'
+}
+
+
+gnome::organize_overlay_menu() {
+	# Set the GNOME Shell Apps Dashboard sort app in categories based on the FreeDesktop standard.
+	gsettings set org.gnome.desktop.app-folders folder-children "['accessories', 'chrome-apps', 'games', 'graphics', 'internet', 'office', 'programming', 'science', 'sound---video', 'system-tools', 'universal-access', 'wine', 'OEM', '3D-Printing', 'Cloud']"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/accessories/ name "Accessories"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/accessories/ categories "['Utility']"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/chrome-apps/ name "Chrome Apps"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/chrome-apps/ categories "['chrome-apps']"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/games/ name "Games"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/games/ categories "['Game']"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/graphics/ name "Graphics"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/graphics/ categories "['Graphics']"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/internet/ name "Internet"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/internet/ categories "['Network', 'WebBrowser', 'Email']"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/office/ name "Office"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/office/ categories "['Office']"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/programming/ name "Programming"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/programming/ categories "['Development']"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/science/ name "Science"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/science/ categories "['Science']"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/sound---video/ name "Sound & Video"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/sound---video/ categories "['AudioVideo', 'Audio', 'Video']"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/system-tools/ name "System Tools"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/system-tools/ categories "['System', 'Settings']"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/universal-access/ name "Universal Access"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/universal-access/ categories "['Accessibility']"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/wine/ name "Wine"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/wine/ categories "['Wine', 'X-Wine', 'Wine-Programs-Accessories']"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/OEM/ name "OEM"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/OEM/ categories "['OEM']"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/3D-Printing/ name "3D-Printing"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/3D-Printing/ categories "['3D-Printing', 'CAD', '3D', '3DGraphics']"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/Cloud/ name "Cloud"
+	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/Cloud/ categories "['Cloud-Management', 'Cloud', 'aws', 'azure', 'gcp']"
+}
+
+set_gnome_ui_common_tweaks_for_user() {
+	gnome::set_gnome_ui_tweaks_for_user
+}
+
+gnome::set_gnome_ui_tweaks_for_user() {
+	# Description:
+	# Configure Gnome for OEM look and feel. This is completely as desired.
+	# This function takes no arguments. Simply call it to make the changes.
+	# Howerver, this function must be called as the user it should apply to.
+	# if it is called in a script with "sudo" priviledges, it will make chages to
+	# the look and feel for the "root" user.
+	#
+	# To run this function as the user who started a script with sudo script content
+	# could be echoed out ot a temporary file and executed as follows
+	# sudo -H -u $SUDO_USER DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u "$SUDO_USER")/bus temporary_script.sh > /dev/null 2>&1
+	# or alternatively by calling the function "system::run_command_in_gnome_user_session /path/to/temorary_script.sh".
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	#
+	# USAGE:
+	#
+	# set_gnome_ui_common_tweaks_for_user
+	#
+	# End of documentation
+
+	write_status "📐 Seting common OEM tweaks..."
+	gnome::set_tilix_ui_tweaks_for_user
+	gnome::set_power_configuraton_for_user
+	gnome::set_better_font_smoothing_for_user
+	gnome::set_better_usability_for_user
+	gnome::configure_dash_to_dock
+	gnome::configure_dash_to_panel
+	gnome::configure_nautilus
+	gnome::organize_overlay_menu
+}
+
 
 set_gnome_ui_tweak_no_media_error() {
 	# Description:  Function to handle missing media when attempting to set UI look to
@@ -15627,9 +15724,9 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get upgrade -y'
         - curtin in-target --target=/target -- apt-get -y install ubuntu-desktop
-        - curtin in-target --target=/target -- dpkg --add-architecture i386 && apt-get update && apt-get -y install wine32:i386
+        - curtin in-target --target=/target -- /bin/bash -c 'plymouth-set-default-theme spinner -R || true' 
         - curtin in-target --target=/target -- sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' /etc/default/grub ; update-grub ; exit 0
-        - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service ; exit 0
+        - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service || true
 
         # Clone RTD Setup & Execute OEM Config
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd'
