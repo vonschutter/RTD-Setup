@@ -3246,6 +3246,180 @@ system::install_missing_commands() {
 	done
 }
 
+system::keyboard_set_layout() {
+	# Description:
+	#   Configure and persist keyboard layout for both GUI and TTY across major Linux distributions.
+	#   Supports Debian, RedHat, Fedora, SUSE, Mandriva, Gentoo, Slackware.
+	#   Allows interactive layout selection or non-interactive application.
+	#
+	# Globals:
+	#   None
+	#
+	# Arguments:
+	#   --keyboard-layout <layout>   Non-interactive mode, set specific layout (e.g., us, de, fr)
+	#   --interactive                Interactive mode using dialog to select layout
+	#
+	# Returns:
+	#   0 if successful, 1 on error
+	#
+	# Dependencies:
+	#   dialog, sed, localectl, udevadm, dpkg-reconfigure/setupcon (on Debian-based)
+	#
+	# Example:
+	#   system::keyboard_set_layout --keyboard-layout us
+	#   system::keyboard_set_layout --interactive
+	#
+	# End of Documentation
+	local layout distro interactive valid_layouts selected layout_list
+	local -a args
+	args=("$@")
+
+	system::log_item "Called by: ${FUNCNAME[1]}"
+	system::log_item "Processing parameters: $*"
+	if [ "$#" -eq 0 ]; then
+		write_error "No keyboard layout specified. Use --keyboard-layout <layout> or --interactive."
+		return 1
+	fi
+
+
+	if ! dependency::os_linux; then
+		write_error "This function is only supported on Linux systems."
+		return 1
+	fi
+
+	if ! command -v localectl >/dev/null || ! command -v udevadm >/dev/null; then
+		write_error "Required tools (localectl, udevadm) are missing."
+		return 1
+	fi
+
+	if ! distro=$(system::distribution_type); then
+		write_error "Unable to determine system distribution type."
+		return 1
+	fi
+
+	if [[ "${args[*]}" =~ --interactive ]]; then
+
+		if ! command -v dialog >/dev/null; then
+			software::add_native_package dialog
+			if ! command -v dialog >/dev/null; then
+				write_error "Dialog is not installed. Please install it to use interactive mode."
+				return 1
+			fi
+		fi
+
+		if ! layout_list=$(localectl list-x11-keymap-layouts 2>/dev/null); then
+			dialog::display_error "Unable to fetch available keyboard layouts."
+			return 1
+		fi
+
+		mapfile -t valid_layouts < <(printf '%s\n' "$layout_list" | grep -E '^[a-z]{2,4}$' | sort -u)
+
+		local dialog_opts=()
+		for layout in "${valid_layouts[@]}"; do
+			dialog_opts+=("$layout" "" off)
+		done
+
+		if ! selected=$(dialog --stdout --radiolist "Choose a keyboard layout" 20 60 15 "${dialog_opts[@]}"); then
+			dialog::display_notice "No layout selected. Aborting."
+			clear
+			return 1
+		fi
+
+		layout="$selected"
+		clear
+	else
+		for ((i = 0; i < ${#args[@]}; i++)); do
+			if [[ "${args[$i]}" == "--keyboard-layout" && -n "${args[$((i + 1))]}" ]]; then
+				layout="${args[$((i + 1))]}"
+				break
+			fi
+		done
+
+		if [[ -z "$layout" ]]; then
+			write_error "Usage: keyboard::set_layout --keyboard-layout <code> or --interactive"
+			return 1
+		fi
+
+		if ! layout_list=$(localectl list-x11-keymap-layouts 2>/dev/null); then
+			write_error "Unable to fetch available keyboard layouts."
+			return 1
+		fi
+
+		if ! printf '%s\n' "$layout_list" | grep -q -x "$layout"; then
+			write_error "Invalid keyboard layout: '$layout'"
+			return 1
+		fi
+	fi
+
+	write_status "Applying keyboard layout '$layout' for distribution: $distro"
+
+	case "$distro" in
+		debian)
+			if ! command -v dpkg-reconfigure >/dev/null || ! command -v setupcon >/dev/null; then
+				write_error "Missing required Debian tools (dpkg-reconfigure, setupcon)."
+				return 1
+			fi
+
+			if ! sudo sed -i "s/^XKBLAYOUT=.*/XKBLAYOUT=\"$layout\"/" /etc/default/keyboard; then
+				write_error "Failed to update /etc/default/keyboard"
+				return 1
+			fi
+
+			if ! sudo dpkg-reconfigure -f noninteractive keyboard-configuration; then
+				write_error "Failed to reconfigure keyboard-configuration"
+				return 1
+			fi
+
+			if ! sudo setupcon; then
+				write_error "setupcon failed"
+				return 1
+			fi
+			;;
+
+		redhat|fedora|suse|mandriva|gentoo|slackware)
+			if ! sudo localectl set-keymap "$layout" || ! sudo localectl set-x11-keymap "$layout"; then
+				write_error "Failed to apply keyboard layout using localectl on $distro."
+				return 1
+			fi
+			;;
+
+		*)
+			write_error "Unsupported or unknown distribution: '$distro'"
+			return 1
+			;;
+	esac
+
+	if ! sudo mkdir -p /etc/X11/xorg.conf.d; then
+		write_error "Failed to create /etc/X11/xorg.conf.d"
+		return 1
+	fi
+
+	if ! sudo tee /etc/X11/xorg.conf.d/00-keyboard.conf >/dev/null <<-EOF
+		Section "InputClass"
+		Identifier "system-keyboard"
+		MatchIsKeyboard "on"
+		Option "XkbLayout" "$layout"
+		EndSection
+		EOF
+	then
+		write_error "Failed to write X11 keyboard config"
+		return 1
+	fi
+
+	if ! sudo udevadm trigger --subsystem-match=input --action=change; then
+		write_error "udevadm trigger failed"
+		return 1
+	fi
+
+	write_information "✅ Keyboard layout successfully set to '$layout'"
+	dialog::display_result "Keyboard Layout Updated" "Keyboard layout has been set to: $layout"
+
+	return 0
+}
+
+
+
+
 system::check_file_limits() {
 	# Description:
 	#
