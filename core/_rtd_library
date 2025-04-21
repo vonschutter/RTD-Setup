@@ -6069,7 +6069,7 @@ gnome::set_better_font_smoothing_for_user() {
 gnome::set_better_usability_for_user() {
 	# Usability Improvements
 	gsettings set org.gnome.desktop.peripherals.mouse accel-profile 'adaptive'
-	gsettings set org.gnome.desktop.sound allow-volume-above-100-percent true
+	gsettings set org.gnome.desktop.sound allow-volume-above-100-percent false
 	gsettings set org.gnome.desktop.calendar show-weekdate true
 	gsettings set org.gnome.desktop.wm.preferences resize-with-right-button true
 	gsettings set org.gnome.desktop.wm.preferences button-layout 'appmenu:minimize,maximize,close'
@@ -6223,11 +6223,11 @@ gnome::set_gnome_ui_tweaks_for_user() {
 
 	write_status "📐 Seting common OEM tweaks..."
 	gnome::set_tilix_ui_tweaks_for_user
-	gnome::set_power_configuraton_for_user
-	gnome::set_better_font_smoothing_for_user
+	#gnome::set_power_configuraton_for_user
+	#gnome::set_better_font_smoothing_for_user
 	gnome::set_better_usability_for_user
-	gnome::configure_dash_to_dock
-	gnome::configure_dash_to_panel
+	#gnome::configure_dash_to_dock
+	#gnome::configure_dash_to_panel
 	gnome::configure_nautilus
 	gnome::organize_overlay_menu
 }
@@ -6998,17 +6998,6 @@ util::add_iso_to_ventoy() {
 		write_warning "📁 Ventoy directory not found (!) creating it now: $mount_point/$rtd_ventoy_dir"
 		mkdir -p "$mount_point/$rtd_ventoy_dir" || system::log_item "Failed to create: $mount_point/$rtd_ventoy_dir"
 	fi
-
-	# Copy the ISO file to the Ventoy drive
-	# if cp "$iso_file" "$mount_point/$rtd_ventoy_dir"; then
-	# 	dialog::display_notice "✅💿📥 Successfully added ISO to Ventoy drive: $iso_file Boot from the Ventoy drive on another computer to access the new ISO."
-	# else
-	# 	dialog::display_error "❌💿📥 Failed to copy ISO to Ventoy drive: $iso_file"
-	# 	if $mounted_by_script; then
-	# 		{ umount "$mount_point" ; } && { rmdir "$mount_point" ; }
-	# 	fi
-	# 	return 1
-	# fi
 
 	# Define your variables
 	destination="$mount_point/$rtd_ventoy_dir/$(basename "$iso_file")"
@@ -11641,6 +11630,118 @@ rtd_setup_choices_server() {
 	done
 }
 
+ubuntu::get_latest_release_version() {
+	# Description:
+	#   Retrieves the latest available Ubuntu release version from the official archive.
+	#   This function scans the Ubuntu archive index, detects release codenames,
+	#   and extracts the highest valid version number from the corresponding Release files.
+	#
+	# Globals:
+	#   None
+	#
+	# Arguments:
+	#   None
+	#
+	# Outputs:
+	#   STDOUT: Latest Ubuntu release version in format YY.MM
+	#   STDERR: Errors encountered during retrieval or parsing
+	#
+	# Returns:
+	#   0 if the latest version is successfully determined
+	#   1 if an error occurs during HTTP requests, parsing, or no version found
+	#
+	# Dependencies:
+	#   curl, grep, sort, tail, mktemp
+	#
+	# Usage:
+	#   latest_version=$(ubuntu::get_latest_release_version) || printf "Failed to retrieve latest Ubuntu version.\n"
+	#
+	# End of Documentation
+
+	local url="https://archive.ubuntu.com/ubuntu/dists/"
+	local latest_version=""
+	local http_code
+	local error_occurred=0
+	local version
+
+	# --- Step 1: Fetch the main directory listing ---
+	system::log_item "Fetching directory listing from $url..."
+	local temp_output=$(mktemp) 
+
+	# Use curl to get content and HTTP status code
+	# -s: silent, -L: follow redirects, -w: write out format, -o: output to file
+	http_code=$(curl --connect-timeout 10 -sL -w "%{http_code}" -o "$temp_output" "$url")
+	local dir_listing=$(<"$temp_output")
+	rm "$temp_output"
+
+	# Check if curl succeeded
+	if [[ "$http_code" -ne 200 ]]; then
+		system::log_item "Error: Failed to fetch directory listing from $url (HTTP code: $http_code)" 
+		return 1
+	fi
+	if [[ -z "$dir_listing" ]]; then
+		system::log_item "Error: Fetched empty directory listing from $url" 
+		return 1
+	fi
+
+	# --- Step 2: Extract potential codenames, check Release files, find latest version ---
+	system::log_item "Scanning potential distribution codenames..." 
+	latest_version=$( \
+		echo "$dir_listing" | \
+		# Extract potential codenames: sequences of lowercase letters within href ending with /
+		grep -oP '<a href="\K[a-z]+(?=/")' | \
+		# Filter out known non-release directories explicitly (optional but good practice)
+		grep -Ev '^(devel|internal|preseed|project|ubuntu-installer|icons|indices|ls-lR|tools)$' | \
+		sort -u | \
+		while IFS= read -r codename; do
+		# For each potential codename, construct URL to its 'Release' file
+		local release_url="${url}${codename}/Release"
+		local release_info
+		local release_http_code
+		local release_temp_output=$(mktemp)
+
+		# Attempt to fetch the Release file content, use a shorter timeout
+		release_http_code=$(curl --connect-timeout 5 -sL -w "%{http_code}" -o "$release_temp_output" "$release_url")
+		release_info=$(<"$release_temp_output")
+		rm "$release_temp_output"
+
+		# Only process if the fetch was successful (HTTP 200) and content exists
+		if [[ "$release_http_code" -eq 200 && -n "$release_info" ]]; then
+			# Extract the version number (looking for lines like 'Version: 22.04')
+
+			version=$(echo "$release_info" | grep -oP '^Version:\s*\K[0-9]+\.[0-9]+')
+
+			# Check if we got a valid version number in YY.MM format
+			if [[ "$version" =~ ^[0-9]{2}\.[0-9]{2}$ ]]; then
+			echo "$version" # Output valid versions for later sorting
+			fi
+		else
+			# Optional: Report skipped codenames due to errors
+			# echo "Skipping '$codename': Could not fetch or parse Release file (HTTP: $release_http_code)" >&2
+			: # Do nothing, just continue loop
+		fi
+		done | \
+		# Sort the extracted versions using version sort (handles YY.MM correctly)
+		sort -V | \
+		# Get the last line, which should be the highest version
+		tail -n 1 \
+	)
+
+	# --- Step 3: Output the result or error ---
+	if [[ -n "$latest_version" ]]; then
+		system::log_item "Latest identified Ubuntu version: $latest_version" 
+		echo "$latest_version" # Actual version to stdout
+		return 0
+	else
+		system::log_item "Error: Could not determine the latest Ubuntu version after scanning." 
+		# Check if the initial directory fetch worked but no versions were parsed
+		if [[ "$http_code" -eq 200 ]]; then
+			system::log_item "Possible reasons: No valid 'Release' files found, parsing logic failed, or network issues checking individual releases." >&2
+		fi
+		return 1
+	fi
+}
+
 ###########################################################################################
 #
 # -----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----
@@ -14662,8 +14763,9 @@ template::kickstart_cfg() {
 			# Generated by: system::generate_ks_cfg_file by RTD Power Tools
 			# Choosing mode (graphical|text|cmdline [--non-interactive])
 			graphical
-			url --mirrorlist=""https://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f${_DEFAULT_FEDORA_VER}&arch=x86_64" --cost=0"
-			#url --url "${_repo_url}"
+			# url --mirrorlist=""https://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f${_DEFAULT_FEDORA_VER}&arch=x86_64" --cost=0"
+			# url --url "${_repo_url}"
+			url --url "https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Everything/x86_64/os/"
 			firstboot --disable
 			keyboard --vckeymap=${Preference_InitialKeyboardLayout} --xlayouts="${Preference_InitialKeyboardLayout}"
 			lang en_US.UTF-8
