@@ -510,7 +510,7 @@ show_manage_vm_gui () {
 		1 )
 			if hash virsh ; then
 				result=$(virsh list --all )
-				display_result "Virtual Machines on this system:"
+				dialog::display_result "Virtual Machines on this system:"
 			else
 				echo KVM Virtualization is not installed on this machine.
 			fi
@@ -698,11 +698,11 @@ show_deploy_VDI_VM_now_menu ()
 			echo "Program terminated by user..."
 		;;
 		1 )
-			kvm::make_vm_now_from_ubuntu_com --role VDI --server-app ubuntu-desktop --ask YES --tshirt-size medium
+			kvm::make_vm_now_from_ubuntu_com --role VDI --server-app ubuntu-desktop --ask YES --tshirt-size medium 
 			cleanup_and_finish nomessage
 		;;
 		2 )
-			kvm::make_vm_now_from_ubuntu_com --role VDI --server-app kubuntu-desktop --ask YES --tshirt-size medium
+			kvm::make_vm_now_from_ubuntu_com --role VDI --server-app kubuntu-desktop --ask YES --tshirt-size medium 
 			cleanup_and_finish nomessage
 		;;
 		3 )
@@ -848,24 +848,24 @@ show_view_informaion_about_this_system () {
 		2 )
 			result=$(hostnamectl)
 			: ${result:="No system information found..."}
-			display_result "OS Information:"
+			dialog::display_result "OS Information:"
 		;;
 		3 )
 			result=$(system::get_Windows_Product_Key)
 			: ${result:="No Windows product key found..."}
-			display_result "Windows Product Key:"
+			dialog::display_result "Windows Product Key:"
 		;;
 		4 )
 			result=$(df -h -x squashfs -x tmpfs)
 			$RTD_GUI --backtitle "$BRANDING" --title "System Storage Space" --msgbox "$result" 20 100
 		;;
 		5 )
-			generate_report_disk_space_used_by_directory /home
-			display_result "Home Space Utilization (All Users)"
+			system::generate_report_disk_space_used_by_directory /home
+			dialog::display_result "Home Space Utilization (All Users)"
 		;;
 		6 )
-			generate_report_disk_space_used_by_directory /
-			display_result "Total Space Utilization root directory:"
+			system::generate_report_disk_space_used_by_directory /
+			dialog::display_result "Total Space Utilization root directory:"
 		;;
 		7 )
 			check_dependencies lm-sensors
@@ -873,11 +873,11 @@ show_view_informaion_about_this_system () {
 			check_dependencies hddtemp
 			sudo sensors-detect --auto
 			result="$( sensors )"
-			display_result "System Temperature Information"
+			dialog::display_result "System Temperature Information"
 		;;
 		8 )
 			result="$( lscpu )"
-			display_result "System CPU Information on $HOSTNAME:"
+			dialog::display_result "System CPU Information on $HOSTNAME:"
 		;;
 		9 )
 			${RTD_GUI:-dialog} --backtitle "$BRANDING" --colors --no-collapse --title "\Z1 Local PCI devices on $HOSTNAME:" --msgbox "$(lspci)" ${HEIGHT:-"20"} 0
@@ -891,7 +891,7 @@ show_view_informaion_about_this_system () {
 			check_dependencies curl &>/dev/null
 			check_dependencies dnsutils &>/dev/null
 			result=$( curl ipinfo.io/$(curl myip.dnsomatic.com))
-			display_result "This systems location on the Internet"
+			dialog::display_result "This systems location on the Internet"
 		;;
 		12 )
 			check_dependencies curl
@@ -1035,13 +1035,13 @@ show_manage_software_gui () {
 			dist_info="$(hostnamectl)"
 			if echo $dist_info |grep ".*buntu" &>/dev/null ; then
 				result="$(rtd_ppa_checker)"
-				display_result "Packages Installed from Personal Package Archives"
+				dialog::display_result "Packages Installed from Personal Package Archives"
 			elif echo $dist_info |grep "Pop!_OS" 2>/dev/null ; then
 				result="$(rtd_ppa_checker)"
-				display_result "Packages Installed from Personal Package Archives"
+				dialog::display_result "Packages Installed from Personal Package Archives"
 			else
 				result="Non Ubuntu based distributions do not Support the use of Personal Package Archives \n Press [ OK ] to return to the prevous menu."
-				display_result "Functionality Not Supported"
+				dialog::display_result "Functionality Not Supported"
 			fi
 		;;
 		3 )
@@ -1052,7 +1052,7 @@ show_manage_software_gui () {
 				rtd_ppa_checker --delete | $RTD_GUI --programbox "Personal Package Archive Check:" $HEIGHT $WIDTH
 			else
 				result="Non Ubuntu based distributions do not Support the use of Personal Package Archives \n Press [ OK ] to return to the prevous menu."
-				display_result "Functionality Not Supported"
+				dialog::display_result "Functionality Not Supported"
 			fi
 		;;
 		4 )
@@ -1293,7 +1293,7 @@ case $1 in
 		if [[ "$TERM" == screen* ]]; then
 			rtd_oem_check_inet_access
 			dependency::file _rtd_library &>/dev/null
-			ensure_admin
+			security::ensure_admin
 			if [ "$UID" -eq 0 ]; then
 				check_menu_availability
 				show_notice_on_fist_run
@@ -1306,7 +1306,7 @@ case $1 in
 			else
 				rtd_oem_check_inet_access
 				dependency::file _rtd_library &>/dev/null
-				ensure_admin
+				security::ensure_admin
 				if [ "$UID" -eq 0 ]; then
 					check_dependencies byobu && echo -e "$RED" "A critical component needed for this script to work properly was attempted to be added... Attempting to run the script again"
 					su -c "$0 $*" "$SUDO_USER"

@@ -64,9 +64,9 @@ export RTD_VERSION="2.04"
 20    dialog::prompt_yes_no                              ;       Prompt the user for a yes or no answer in a dialog box
 21    display_software_installation_choices_gtk          ;       Show software installation options defined in recipe file (external)
 22    ensure_admin                                       ;       Elevates privileges to admin root for the whole script asks for password
-23    err_no_menu_system_found                           ;       Function to handle what to do if it is not possible to currently display menus in a terminal
+23    term::err_no_menu_system_found                           ;       Function to handle what to do if it is not possible to currently display menus in a terminal
 24    eval_params                                        ;       Function to evaluate parameters passed to a script (internal, not for use in other scripts)
-25    generate_report_disk_space_used_by_directory       ;       Generate a disk usage report
+25    system::generate_report_disk_space_used_by_directory       ;       Generate a disk usage report
 26    github::clone_repo_user                            ;       Clone all repositories for a given user at github.com
 27    github::list_all_user_repositories                 ;       List all repositories for a given user
 28    InstallSoftwareFromRepo                            ;       Installs a package from a repository supports SUSE, Fedora, Cent OS, Ubuntu Debian etc.
@@ -154,7 +154,7 @@ export RTD_VERSION="2.04"
 110   system::check_file_limits                          ;       check and display the current usage of file descriptors against the set limits
 111   system::check_required_variables                   ;       Check that all required variables are set
 112   system::cleanup_and_finish                         ;       Cleans and clears variables and temp files used by the media creations functions
-113   system::tune_system_power_profile           ;       Tune the system power profile based on detected Laptop or PC or VM
+113   system::tune_system_power_profile                  ;       Tune the system power profile based on detected Laptop or PC or VM
 114   system::create_iso_image_debian                    ;       Creates a Debian iso image
 115   system::create_physical_media_from_ubuntu_iso      ;       Create physical media thumb drive from an Ubuntu ISO file
 116   system::create_swapfile                            ;       Create a new swapfile
@@ -168,8 +168,8 @@ export RTD_VERSION="2.04"
 124   system::generate_autoyast_file                     ;       Generate an autoyast file for SUSE
 125   system::generate_cloudconfig                       ;       Function to generate a cloud config file for use in deploying servers
 126   system::generate_ks_cfg_file                       ;       Creates a kickstart file for fedora
-127   system::get_tgt_ubuntu_version                     ;       Get the target version of Ubuntu to download (latest or propt user for selection)
-128   system::get_ubuntu_media                           ;       Get the Ubuntu media (ISO) for the target version (detected or selected)
+127   ubuntu::get_target_version                         ;       Get the target version of Ubuntu to download (latest or propt user for selection)
+128   ubuntu::download_iso                               ;       Get the Ubuntu media (ISO) for the target version (detected or selected)
 129   system::get_Windows_Product_Key                    ;       Retrieves a Microsoft Windows product key if it is stored in BIOS (common for OEM)
 130   system::install_missing_commands                   ;       Install missing commands on the system
 131   system::io_on_notify_wait                          ;       Wait for a disk change and then execute a command
@@ -405,12 +405,12 @@ dialog::check_menu_availability() {
 			--yesno "Please NOTE that we are using WHIPTAIL as a terminal menu system, which is missing several features compared to the default: DIALOG menu system. There are a few reasons we may be using WHIPTAIL instead: I was forced to use it or it is the only terminal menu system available... If you continue with the current WHIPTAIL some things might not work. \n \n May I please try to install the dialog system in stead? . \n  " \
 			20 90); then
 			RTD_GUI=dialog
-			err_no_menu_system_found
+			term::err_no_menu_system_found
 		else
 			echo "User selected No, exit status was $?."
 		fi
 	else
-		err_no_menu_system_found dialog && return 1 || exit 1
+		term::err_no_menu_system_found dialog && return 1 || exit 1
 	fi
 }
 
@@ -1284,6 +1284,43 @@ term::task_exec_list_output() {
 
 }
 
+term::err_no_menu_system_found() {
+	# Description: Function to handle the error condition if a manu system is not found on the system.
+	# On occasion it may be neede to display dialog boxes and selection menus even in a terminal.
+	# for these cases; dialog, whiptail (newt), or zenity may be needed.
+	# This function will attempt to install the desired menu system and if it cannot or the user
+	# opts out it will error and exit the script.
+	#
+	# Globals: RTD_GUI
+	# Arguments: None
+	# Outputs: Interactive
+	# Returns: default exit status of the last command run.
+	# Usage:
+	# term::err_no_menu_system_found
+	# End of documentation
+
+	write_error " ______________________________________________________________________ \n There is eiter no way to display menus on this system or you have told me \n to install the default  menu system! \n This is required to display the administrative menus... \n \n     ¯\_( ͡👁️ ͜ʖ ͡👁️)_/¯ \n ______________________________________________________________________ \n"
+	write_warning "May I attepmpt to install this ability to your system? \a "
+	read -p "Add software: (y/n)?" choice
+	case "$choice" in
+	y | Y)
+		: "${RTD_GUI:=$1}"
+		for i in dnf yum zypper apt-get; do
+			if hash $i 2>/dev/null; then
+				$i install $RTD_GUI -y
+				if $? eq 0; then
+					echo -e $YELLOW"$RTD_GUI installed... exporting..."
+					RTD_GUI="dialog --clear"
+					export RTD_GUI
+					return 0
+				fi
+			fi
+		done
+		;;
+	n | N) err_no_menu_system_available ;;
+	*) read -p "Invalid Selection" && term::err_no_menu_system_found || exit 1 ;;
+	esac
+}
 
 ################################################################################################
 #              ________________________________________________
@@ -3781,7 +3818,7 @@ system::remove_old_kernel() {
 
 	if echo "$OSTYPE" | grep -q "linux" &>/dev/null; then
 		# these tests focus on the latest versions of the distros evaluated...
-		ensure_admin
+		security::ensure_admin
 		if hash apt-get &>/dev/null; then
 			dialog::display_notice "🧩 ${FUNCNAME[0]}: An apt based system has been found... proceeding... "
 			if [[ $? -eq 0 ]]; then
@@ -4275,6 +4312,46 @@ system::read_config() {
 			system::log_item "📖 Read key-value pair: $key=$value"
 		fi
 	done <"$config_file"
+}
+
+system::generate_report_disk_space_used_by_directory() {
+	# Description: Function to generate a report for folders' disk space use.
+	# This function requres one argument; what root folder to analyse the directories in.
+	# This functio will return a report contained in the variable $return that may then be used.
+	# Globals:
+	# Arguments: None
+	# Outputs:
+	# Returns:
+	# Usage:
+	# Example:
+	# system::generate_report_disk_space_used_by_directory /home
+	#
+	# This will generate a report on the disk space per directory in the /home folder.
+	#
+	# End of documentation
+
+	DIRS=$(ls $1)
+	store=/$tmp/out.ct
+	$RTD_GUI --backtitle "$BRANDING" --title "📋 Generating report for: $1" --gauge "Calculating disk space: this may take some time" $HEIGHT $WIDTH < <(
+		echo "Storage Utilization Report:" >>$store
+		echo "______________________________" >>$store
+		n=$(ls $1 | wc -l)
+		i=0
+		for f in $DIRS; do
+			du -cksh $1/$f 2>/dev/null | grep -v total >>$store
+			PCT=$((100 * (++i) / n))
+			cat <<-EOF
+				XXX
+				$PCT
+				Completed calculation for: "$f"...
+				XXX
+			EOF
+			sleep 1
+		done
+	)
+	total=$(echo ----- >>$store && du -cksh $1 2>/dev/null | grep total >>$store) | $RTD_GUI --backtitle "$BRANDING" --title "Completing report..." --progressbox "Working..." $HEIGHT $WIDTH
+	result="$(cat $store)"
+	rm $store
 }
 
 system::toggle_oem_auto_login() {
@@ -5136,6 +5213,47 @@ system::rtd_oem_find_live_release() {
 	esac
 }
 
+system::validate_parameters() {
+	# Description: Function to validate that all parameters match the pattern --option "value".
+	# Globals: None
+	# Arguments: $@ - The parameters to validate.
+	# Outputs: Error messages for any invalid parameters.
+	# Returns: 0 if all parameters are valid, 1 if any invalid parameters are found.
+	# Usage: validate_parameters "$@"
+	# End of documentation
+
+	# Log the start of parameter validation
+	system::log_item "Validating parameter format..."
+	system::log_item "Parameters: $*"
+	# Initialize an index to iterate through the parameters
+	local index=0
+
+	# Iterate through the parameters
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--*)
+			# Check if the next parameter is provided and is not another option
+			if [[ -z "$2" || "$2" == --* ]]; then
+				write_error "⛔ Invalid parameter format: '$1' must be followed by a value."
+				return 1
+			fi
+			# Log the valid parameter and its value
+			system::log_item "Valid parameter format: '$1' with value: '$2'"
+			shift 2
+			;;
+		*)
+			write_error "⛔ Unexpected parameter format: '$1'. Expected an option starting with '--'."
+			return 1
+			;;
+		esac
+		index=$((index + 1))
+	done
+
+	# Log the successful validation of parameters
+	system::log_item "All $index parameter pairs are valid."
+	return 0
+}
+
 system::cleanup_and_finish() {
 	# Description: Function to remove all temporary file locations left over from building
 	# the new netinstall ISO etc. and clean  up some variables...
@@ -5186,43 +5304,7 @@ system::cleanup_and_finish() {
 	return
 }
 
-err_no_menu_system_found() {
-	# Description: Function to handle the error condition if a manu system is not found on the system.
-	# On occasion it may be neede to display dialog boxes and selection menus even in a terminal.
-	# for these cases; dialog, whiptail (newt), or zenity may be needed.
-	# This function will attempt to install the desired menu system and if it cannot or the user
-	# opts out it will error and exit the script.
-	#
-	# Globals: RTD_GUI
-	# Arguments: None
-	# Outputs: Interactive
-	# Returns: default exit status of the last command run.
-	# Usage:
-	# err_no_menu_system_found
-	# End of documentation
 
-	write_error " ______________________________________________________________________ \n There is eiter no way to display menus on this system or you have told me \n to install the default  menu system! \n This is required to display the administrative menus... \n \n     ¯\_( ͡👁️ ͜ʖ ͡👁️)_/¯ \n ______________________________________________________________________ \n"
-	write_warning "May I attepmpt to install this ability to your system? \a "
-	read -p "Add software: (y/n)?" choice
-	case "$choice" in
-	y | Y)
-		: "${RTD_GUI:=$1}"
-		for i in dnf yum zypper apt-get; do
-			if hash $i 2>/dev/null; then
-				$i install $RTD_GUI -y
-				if $? eq 0; then
-					echo -e $YELLOW"$RTD_GUI installed... exporting..."
-					RTD_GUI="dialog --clear"
-					export RTD_GUI
-					return 0
-				fi
-			fi
-		done
-		;;
-	n | N) err_no_menu_system_available ;;
-	*) read -p "Invalid Selection" && err_no_menu_system_found || exit 1 ;;
-	esac
-}
 
 oem::rtd_reset_default_environment_config() {
 	# Description:
@@ -5336,7 +5418,7 @@ oem::distro_release_upgrade() {
 	#
 	# End of documentation
 
-	ensure_admin
+	security::ensure_admin
 
 	local interactive distro_id distro_name current_version latest_version releasever
 
@@ -5602,6 +5684,198 @@ oem::register_all_tools() {
 }
 
 
+# oem::rtd_tools_make_launchers() {
+# 	# Description: Function that creates a default set of launchers for the Linux GUI menu system.
+# 	#
+# 	# Globals:
+# 	# The tools (scripts) located in {_OEM_DIR}/*/ are expected as launchers are created for these.
+# 	# ${_MODS_DIR}
+# 	#
+# 	# Arguments: None accepted
+# 	# Outputs: Launcherc created in /usr/share/applications/
+# 	# Returns: Default exit status of the last command run.
+# 	# Usage: oem::rtd_tool_make_launchers
+# 	#
+# 	# End of documentation
+
+# 	if [[ ! $UID -eq 0 ]]; then
+# 		write_error "This function requires elevated privileges. Please elevate privileges prior to calling this function."
+# 		return 1
+# 	else
+# 		write_information "Creating ${_TLA} launchers..."
+# 		# Add launchers for some OEM apps.
+# 		cat >/usr/share/applications/rtd.desktop <<-EOF
+# 			[Desktop Entry]
+# 			Version=2.0
+# 			Name=RTD
+# 			Comment=RTD Simple System Support Tool
+# 			Exec=${_MODS_DIR}/simple-support-tool.mod/rtd-simple-support-tool
+# 			Path=${_MODS_DIR}/simple-support-tool.mod
+# 			Icon=${_MODS_DIR}/simple-support-tool.mod/Media_files/sys2.ico
+# 			Terminal=true
+# 			Type=Application
+# 			Categories=OEM;
+# 		EOF
+
+# 		cat >/usr/share/applications/rtd-user-bakup.desktop <<-EOF
+# 			[Desktop Entry]
+# 			Version=2.0
+# 			Name=RTD-Backup
+# 			Comment=RTD User home Backup Tool
+# 			Exec=${_MODS_DIR}/system-user-backup.mod/rtd-oem-backup-linux-config
+# 			Path=${_MODS_DIR}/system-user-backup.mod
+# 			Icon=${_MODS_DIR}/system-user-backup.mod/Media_files/sys0.ico
+# 			Terminal=true
+# 			Type=Application
+# 			Categories=OEM;
+# 		EOF
+
+# 		cat >/usr/share/applications/rtd-nordvpn.desktop <<-EOF
+# 			[Desktop Entry]
+# 			Version=2.0
+# 			Name=RTD-NordVPN
+# 			Comment=Nord VPN Termnal GUI
+# 			Exec=${_MODS_DIR}/nordvpn-manager.mod/rtd-nordvpn
+# 			Path=${_MODS_DIR}/nordvpn-manager.mod
+# 			Icon=${_MODS_DIR}/nordvpn-manager.mod/Media_files/sys3.ico
+# 			Terminal=true
+# 			Type=Application
+# 			Categories=OEM;
+# 		EOF
+
+# 		cat >/usr/share/applications/rtd-minercraft-server.desktop <<-EOF
+# 			[Desktop Entry]
+# 			Version=2.0
+# 			Name=Minecraft-Server
+# 			Comment=Automatically download and start a Minecraft Server here now!
+# 			Exec=${_MODS_DIR}/minecraft-server-manager.mod/rtd-minecraft-server
+# 			Path=${_MODS_DIR}/minecraft-server-manager.mod
+# 			Icon=${_MODS_DIR}/minecraft-server-manager.mod/Media_files/sys5.ico
+# 			Terminal=true
+# 			Type=Application
+# 			Categories=OEM;
+# 		EOF
+
+# 		cat >/usr/share/applications/rtd-switch-desktop.desktop <<-EOF
+# 			[Desktop Entry]
+# 			Version=2.0
+# 			Name=RTD UI Look Changer
+# 			Comment=Change the overall look and feel of your desktop (be more like Windows or MAC)
+# 			Exec=${_MODS_DIR}/rtd-desktop-look-switcher.mod/rtd-desktop-look-switcher
+# 			Path=${_MODS_DIR}/rtd-desktop-look-switcher.mod
+# 			Icon=${_MODS_DIR}/rtd-desktop-look-switcher.mod/Media_files/sys7.ico
+# 			Terminal=false
+# 			Type=Application
+# 			Categories=OEM;
+# 		EOF
+
+# 		cat >/usr/share/applications/rtd-software-bundle-manager.desktop <<-EOF
+# 			[Desktop Entry]
+# 			Version=2.0
+# 			Name=RTD Software Bundle Manager
+# 			Comment=Add and remove bundles of software by task to your computer.
+# 			Exec=${_MODS_DIR}/oem-bundle-manager/rtd-oem-bundle-manager
+# 			Path=${_MODS_DIR}/oem-bundle-manager
+# 			Icon=${_MODS_DIR}/oem-bundle-manager/image/software.ico
+# 			Terminal=false
+# 			Type=Application
+# 			Categories=OEM;
+# 		EOF
+
+# 		cat >/usr/share/applications/rtd-hardware-information.desktop <<-EOF
+# 			[Desktop Entry]
+# 			Version=2.0
+# 			Name=RTD Hardware Information Viewer
+# 			Comment=Add and remove bundles of software by task to your computer.
+# 			Exec=${_MODS_DIR}/system-hardware-information/rtd-system-hardware-information
+# 			Path=${_MODS_DIR}/system-hardware-information
+# 			Icon=${_MODS_DIR}/system-hardware-information/image/system-information-icon-3.png
+# 			Terminal=false
+# 			Type=Application
+# 			Categories=OEM;
+# 		EOF
+
+# 		cat >/usr/share/applications/rtd-app-runner.desktop <<-EOF
+# 			[Desktop Entry]
+# 			Version=2.0
+# 			Name=RTD OEM Special App Runner
+# 			Comment=Run Specialized OEM Applications safely and reliably.
+# 			Exec=${_MODS_DIR}/oem-app-runner/rtd-oem-app-runner
+# 			Path=${_MODS_DIR}/oem-app-runner
+# 			Icon=${_MODS_DIR}/oem-app-runner/image/App-launcher.jpg
+# 			Terminal=true
+# 			Type=Application
+# 			Categories=OEM;
+# 		EOF
+# 	fi
+# }
+
+
+
+oem::create_single_launcher() {
+	# Description: Function to create a single .desktop file for an application.
+	# This function is used to create a launcher for the RTD tools.
+	# It takes various parameters to customize the launcher.
+	# Globals:
+	# 	- _MODS_DIR: The base directory where the modules are located.
+	# Arguments:
+	# 	1: Filename base (e.g., "rtd", "rtd-user-bakup")
+	# 	2: Name field (e.g., "RTD", "RTD-Backup")
+	# 	3: Comment field
+	# 	4: Module directory name (e.g., "simple-support-tool.mod")
+	# 	5: Executable script name (relative to module dir)
+	# 	6: Icon path (relative to module dir)
+	# 	7: Terminal bool ("true" or "false")
+	# Outputs:
+	# 	- Creates a .desktop file in /usr/share/applications/
+	# 	- Sets the appropriate permissions on the .desktop file
+	# Returns:
+	# 	- 0 on success
+	# 	- 1 on failure
+	# Usage: oem::create_single_launcher <file_base> <name> <comment> <mod_dir_name> <script_name> <icon_path> <terminal_bool>
+	# End of documentation
+
+	local -r file_base="$1"
+	local -r name="$2"
+	local -r comment="$3"
+	local -r mod_dir_name="$4"
+	local -r script_name="$5"
+	local -r icon_path="$6"
+	local -r terminal_bool="$7"
+	local -r output_dir="/usr/share/applications"
+	local output_file="${output_dir}/${file_base}.desktop"
+	local exec_path="${_MODS_DIR}/${mod_dir_name}/${script_name}"
+	local module_path="${_MODS_DIR}/${mod_dir_name}"
+	local icon_full_path="${_MODS_DIR}/${mod_dir_name}/${icon_path}"
+
+	# Basic validation of inputs
+	if [[ ! -x "${exec_path}" ]]; then
+		 write_warning "Executable not found or not executable: ${exec_path} for ${file_base}.desktop"
+	fi
+	if [[ ! -f "${icon_full_path}" ]]; then
+		 write_warning "Icon file not found: ${icon_full_path} for ${file_base}.desktop"
+	fi
+
+	# Use printf for potentially safer handling than cat << EOF if variables might contain surprises,
+	# but cat is often more readable for simple heredocs. Sticking with cat for now.
+	# Ensure the directory exists and is writable (checked in the main function)
+	cat >"${output_file}" <<-EOF || { write_error "Failed to create ${output_file}"; return 1; }
+		[Desktop Entry]
+		Version=1.0
+		Name=${name}
+		Comment=${comment}
+		Exec=${exec_path}
+		Path=${module_path}
+		Icon=${icon_full_path}
+		Terminal=${terminal_bool}
+		Type=Application
+		Categories=OEM;RTD; # Added RTD Category for potential grouping
+	EOF
+	
+	chmod 644 "${output_file}" || { write_error "Failed to set permissions on ${output_file}"; return 1; }
+	return 0
+}
+
 oem::rtd_tools_make_launchers() {
 	# Description: Function that creates a default set of launchers for the Linux GUI menu system.
 	#
@@ -5609,122 +5883,73 @@ oem::rtd_tools_make_launchers() {
 	# The tools (scripts) located in {_OEM_DIR}/*/ are expected as launchers are created for these.
 	# ${_MODS_DIR}
 	#
+	# Function will use the launchers defined in the _locations file if it exists.
+	# If not, it will use the default launchers defined in the function.
+	# 
+	#
 	# Arguments: None accepted
 	# Outputs: Launcherc created in /usr/share/applications/
 	# Returns: Default exit status of the last command run.
 	# Usage: oem::rtd_tool_make_launchers
-	#
 	# End of documentation
 
-	if [[ ! $UID -eq 0 ]]; then
-		write_error "This function requires elevated privileges. Please elevate privileges prior to calling this function."
+	security::ensure_admin
+
+	local -r output_dir="/usr/share/applications"
+	if [[ ! -d "${output_dir}" ]]; then
+		write_error "Target directory does not exist: ${output_dir}"
 		return 1
+	fi
+	if [[ ! -w "${output_dir}" ]]; then
+		write_error "Target directory is not writable: ${output_dir}"
+		return 1
+	fi
+
+	# Check if _MODS_DIR is set and is a directory
+	if [[ -z "${_MODS_DIR}" || ! -d "${_MODS_DIR}" ]]; then
+		write_error "_MODS_DIR variable is not set or not a valid directory."
+		return 1
+	fi
+
+	# Use $_TLA if defined, otherwise default text
+	local tla_name="${_TLA:-RTD}"
+	write_information "Creating ${tla_name} launchers in ${output_dir}..."
+
+	# Define launcher data:
+	# Format: file_base|Name|Comment|module_dir|script_name|icon_path|Terminal(true/false)
+	local default_launcher_data
+	default_launcher_data=$(cat <<-EOF
+		rtd|RTD|RTD Simple System Support Tool|simple-support-tool.mod|rtd-simple-support-tool|Media_files/sys2.ico|true
+		rtd-user-bakup|RTD-Backup|RTD User home Backup Tool|system-user-backup.mod|rtd-oem-backup-linux-config|Media_files/sys0.ico|true
+		rtd-nordvpn|RTD-NordVPN|Nord VPN Terminal GUI|nordvpn-manager.mod|rtd-nordvpn|Media_files/sys3.ico|true
+		rtd-minercraft-server|Minecraft-Server|Automatically download and start a Minecraft Server here now!|minecraft-server-manager.mod|rtd-minecraft-server|Media_files/sys5.ico|true
+		rtd-switch-desktop|RTD UI Look Changer|Change the overall look and feel of your desktop (be more like Windows or MAC)|rtd-desktop-look-switcher.mod|rtd-desktop-look-switcher|Media_files/sys7.ico|false
+		rtd-software-bundle-manager|RTD Software Bundle Manager|Add and remove bundles of software by task to your computer.|oem-bundle-manager|rtd-oem-bundle-manager|image/software.ico|false
+		rtd-hardware-information|RTD Hardware Information Viewer|View detailed hardware information about this computer.|system-hardware-information|rtd-system-hardware-information|image/system-information-icon-3.png|false
+		rtd-app-runner|RTD OEM Special App Runner|Run Specialized OEM Applications safely and reliably.|oem-app-runner|rtd-oem-app-runner|image/App-launcher.jpg|true
+	EOF
+	)
+
+	local file_base name comment mod_dir_name script_name icon_path terminal_bool
+	local all_successful=true # Track overall success
+
+	# Process the data using process substitution for reliability with IFS
+	while IFS='|' read -r file_base name comment mod_dir_name script_name icon_path terminal_bool; do
+		# Skip empty lines potentially introduced by heredoc handling
+		[[ -z "$file_base" ]] && continue
+
+		if ! oem::create_single_launcher "$file_base" "$name" "$comment" "$mod_dir_name" "$script_name" "$icon_path" "$terminal_bool"; then
+			# oem::create_single_launcher function already logged the error
+			all_successful=false
+		fi
+	done <<< "${LAUNCHER_DATA:-"$default_launcher_data"}" # Use here-string
+
+	if [[ "$all_successful" == "true" ]]; then
+		write_information "${tla_name} launchers created successfully."
+		return 0
 	else
-		write_information "Creating ${_TLA} launchers..."
-		# Add launchers for some OEM apps.
-		cat >/usr/share/applications/rtd.desktop <<-EOF
-			[Desktop Entry]
-			Version=2.0
-			Name=RTD
-			Comment=RTD Simple System Support Tool
-			Exec=${_MODS_DIR}/simple-support-tool.mod/rtd-simple-support-tool
-			Path=${_MODS_DIR}/simple-support-tool.mod
-			Icon=${_MODS_DIR}/simple-support-tool.mod/Media_files/sys2.ico
-			Terminal=true
-			Type=Application
-			Categories=OEM;
-		EOF
-
-		cat >/usr/share/applications/rtd-user-bakup.desktop <<-EOF
-			[Desktop Entry]
-			Version=2.0
-			Name=RTD-Backup
-			Comment=RTD User home Backup Tool
-			Exec=${_MODS_DIR}/system-user-backup.mod/rtd-oem-backup-linux-config
-			Path=${_MODS_DIR}/system-user-backup.mod
-			Icon=${_MODS_DIR}/system-user-backup.mod/Media_files/sys0.ico
-			Terminal=true
-			Type=Application
-			Categories=OEM;
-		EOF
-
-		cat >/usr/share/applications/rtd-nordvpn.desktop <<-EOF
-			[Desktop Entry]
-			Version=2.0
-			Name=RTD-NordVPN
-			Comment=Nord VPN Termnal GUI
-			Exec=${_MODS_DIR}/nordvpn-manager.mod/rtd-nordvpn
-			Path=${_MODS_DIR}/nordvpn-manager.mod
-			Icon=${_MODS_DIR}/nordvpn-manager.mod/Media_files/sys3.ico
-			Terminal=true
-			Type=Application
-			Categories=OEM;
-		EOF
-
-		cat >/usr/share/applications/rtd-minercraft-server.desktop <<-EOF
-			[Desktop Entry]
-			Version=2.0
-			Name=Minecraft-Server
-			Comment=Automatically download and start a Minecraft Server here now!
-			Exec=${_MODS_DIR}/minecraft-server-manager.mod/rtd-minecraft-server
-			Path=${_MODS_DIR}/minecraft-server-manager.mod
-			Icon=${_MODS_DIR}/minecraft-server-manager.mod/Media_files/sys5.ico
-			Terminal=true
-			Type=Application
-			Categories=OEM;
-		EOF
-
-		cat >/usr/share/applications/rtd-switch-desktop.desktop <<-EOF
-			[Desktop Entry]
-			Version=2.0
-			Name=RTD UI Look Changer
-			Comment=Change the overall look and feel of your desktop (be more like Windows or MAC)
-			Exec=${_MODS_DIR}/rtd-desktop-look-switcher.mod/rtd-desktop-look-switcher
-			Path=${_MODS_DIR}/rtd-desktop-look-switcher.mod
-			Icon=${_MODS_DIR}/rtd-desktop-look-switcher.mod/Media_files/sys7.ico
-			Terminal=false
-			Type=Application
-			Categories=OEM;
-		EOF
-
-		cat >/usr/share/applications/rtd-software-bundle-manager.desktop <<-EOF
-			[Desktop Entry]
-			Version=2.0
-			Name=RTD Software Bundle Manager
-			Comment=Add and remove bundles of software by task to your computer.
-			Exec=${_MODS_DIR}/oem-bundle-manager/rtd-oem-bundle-manager
-			Path=${_MODS_DIR}/oem-bundle-manager
-			Icon=${_MODS_DIR}/oem-bundle-manager/image/software.ico
-			Terminal=false
-			Type=Application
-			Categories=OEM;
-		EOF
-
-		cat >/usr/share/applications/rtd-hardware-information.desktop <<-EOF
-			[Desktop Entry]
-			Version=2.0
-			Name=RTD Hardware Information Viewer
-			Comment=Add and remove bundles of software by task to your computer.
-			Exec=${_MODS_DIR}/system-hardware-information/rtd-system-hardware-information
-			Path=${_MODS_DIR}/system-hardware-information
-			Icon=${_MODS_DIR}/system-hardware-information/image/system-information-icon-3.png
-			Terminal=false
-			Type=Application
-			Categories=OEM;
-		EOF
-
-		cat >/usr/share/applications/rtd-app-runner.desktop <<-EOF
-			[Desktop Entry]
-			Version=2.0
-			Name=RTD OEM Special App Runner
-			Comment=Run Specialized OEM Applications safely and reliably.
-			Exec=${_MODS_DIR}/oem-app-runner/rtd-oem-app-runner
-			Path=${_MODS_DIR}/oem-app-runner
-			Icon=${_MODS_DIR}/oem-app-runner/image/App-launcher.jpg
-			Terminal=true
-			Type=Application
-			Categories=OEM;
-		EOF
+		write_error "One or more ${tla_name} launchers failed to create. Please check logs."
+		return 1 # Indicate partial or total failure
 	fi
 }
 
@@ -5741,10 +5966,9 @@ oem::check_boot_splash_screen_enable() {
 	if [[ -n "$1" ]]; then
 		if [[ -r "$1" ]]; then
 			if cat $1 | grep -i "desktop"; then
-				check_dependencies splash
+				software::check_native_package_dependency splash
 				echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"' >>/etc/default/grub
 				update-grub
-
 			fi
 		fi
 	fi
@@ -5847,47 +6071,6 @@ oem::setup_brand_splash_screen() {
 	# Clean up by unsetting temporary variables.
 	unset image_file_to_brand
 	unset text_to_brand_with
-}
-
-
-generate_report_disk_space_used_by_directory() {
-	# Description: Function to generate a report for folders' disk space use.
-	# This function requres one argument; what root folder to analyse the directories in.
-	# This functio will return a report contained in the variable $return that may then be used.
-	# Globals:
-	# Arguments: None
-	# Outputs:
-	# Returns:
-	# Usage:
-	# Example:
-	# generate_report_disk_space_used_by_directory /home
-	#
-	# This will generate a report on the disk space per directory in the /home folder.
-	#
-	# End of documentation
-
-	DIRS=$(ls $1)
-	store=/$tmp/out.ct
-	$RTD_GUI --backtitle "$BRANDING" --title "📋 Generating report for: $1" --gauge "Calculating disk space: this may take some time" $HEIGHT $WIDTH < <(
-		echo "Storage Utilization Report:" >>$store
-		echo "______________________________" >>$store
-		n=$(ls $1 | wc -l)
-		i=0
-		for f in $DIRS; do
-			du -cksh $1/$f 2>/dev/null | grep -v total >>$store
-			PCT=$((100 * (++i) / n))
-			cat <<-EOF
-				XXX
-				$PCT
-				Completed calculation for: "$f"...
-				XXX
-			EOF
-			sleep 1
-		done
-	)
-	total=$(echo ----- >>$store && du -cksh $1 2>/dev/null | grep total >>$store) | $RTD_GUI --backtitle "$BRANDING" --title "Completing report..." --progressbox "Working..." $HEIGHT $WIDTH
-	result="$(cat $store)"
-	rm $store
 }
 
 gnome::set_tilix_ui_tweaks_for_user() {
@@ -6230,6 +6413,110 @@ gnome::set_gnome_ui_tweaks_for_user() {
 	#gnome::configure_dash_to_panel
 	gnome::configure_nautilus
 	gnome::organize_overlay_menu
+	gnome::set_basic_extensions_enabled
+}
+
+gnome::set_basic_extensions_enabled() {
+	# Description: Function to set basic extensions enabled for the current user,
+	#              adapting the list based on the detected Linux distribution type.
+	#              Sets window button layout and enables a predefined list of extensions.
+	#              IMPORTANT: This function must be run as the regular user, NOT as root.
+	#              It enables extensions by name but does NOT install them. Ensure the
+	#              target extensions are installed beforehand.
+	#
+	# Usage:
+	#   gnome::set_basic_extensions_enabled
+	#
+	# Globals: None
+	# Arguments: None
+	# Outputs: Status/Error messages via write_status/write_error
+	# Returns: 0 if all gsettings commands succeed, 1 otherwise.
+	# Dependencies: gsettings (runtime), system::distribution_type (runtime)
+	# End of documentation
+
+	if [[ $UID -eq 0 ]]; then
+		write_error "This function must be run as the regular user, not as root."
+		write_error "gsettings modifies the current user's desktop configuration."
+		return 1
+	fi
+
+	if ! command -v gsettings &> /dev/null; then
+		write_error "Required command 'gsettings' not found in PATH."
+		return 1
+	fi
+
+	# --- Determine Distribution ---
+	local distro_type
+	distro_type=$(system::distribution_type)
+	write_status "Detected distribution type: ${distro_type:-"Unknown"}"
+	write_status "📐 Applying basic GNOME settings and enabling extensions..."
+
+	local all_successful=true # Track overall success
+
+	# 4. Set window button layout (Common)
+	write_status "Setting window button layout..."
+	if ! gsettings set org.gnome.desktop.wm.preferences button-layout 'close,maximize,minimize:appmenu'; then
+		write_error "Failed to set 'button-layout'."
+		all_successful=false
+	fi
+
+	# 5. Ensure user extensions are generally enabled (Common)
+	write_status "Ensuring user extensions are enabled globally..."
+	if ! gsettings set org.gnome.shell disable-user-extensions false; then
+		write_error "Failed to set 'disable-user-extensions' to false."
+		all_successful=false
+	fi
+
+	# 6. Define the list of extensions based on distribution
+	#    NOTE: These extensions MUST be installed separately for this to have effect!
+	local extensions_to_enable=(
+		'user-theme@gnome-shell-extensions.gcampax.github.com'
+		'caffeine@patapon.info'
+		'TopIcons@phocean.net' # Older tray icon support
+		'trayIconsReloaded@selfmade.pl' # Newer tray icon support
+		'apps-menu@gnome-shell-extensions.gcampax.github.com'
+	)
+
+	# Add distribution-specific extensions
+	case "$distro_type" in
+		ubuntu|pop|mint|zorin|elementary) # Add other Ubuntu derivatives if needed
+			write_status "Adding Ubuntu-specific extensions..."
+			extensions_to_enable+=(
+				'tiling-assistant@ubuntu.com'
+				'ubuntu-appindicators@ubuntu.com'
+			)
+			;;
+		fedora|debian|arch|manjaro|*) # Default for others
+			write_status "Adding non-Ubuntu extensions (e.g., gTile)..."
+			# Using gTile as a common tiling alternative
+			extensions_to_enable+=('gTile@vibou')
+			# No specific appindicator replacement needed if trayIconsReloaded is present
+			;;
+	esac
+
+	# 7. Format the final list for gsettings
+	local gsettings_list_format
+	gsettings_list_format=$(printf "'%s'," "${extensions_to_enable[@]}")
+	gsettings_list_format="[${gsettings_list_format%,}]" # Remove trailing comma, add brackets
+
+	# 8. Apply the enabled extensions list
+	write_status "Enabling specific extensions for '${distro_type}' (ensure they are installed):"
+	printf "  %s\n" "${extensions_to_enable[@]}" # List them in the status output
+
+	if ! gsettings set org.gnome.shell enabled-extensions "${gsettings_list_format}"; then
+		write_error "Failed to set 'enabled-extensions'."
+		write_error "Ensure all listed extensions are installed and names are correct."
+		all_successful=false
+	fi
+
+	# --- Final Status ---
+	if [[ "$all_successful" == "true" ]]; then
+		write_status "✅ Basic GNOME extensions configuration applied successfully for ${distro_type}."
+		return 0
+	else
+		write_error "❌ One or more GNOME settings failed to apply for ${distro_type}."
+		return 1
+	fi
 }
 
 
@@ -6786,7 +7073,7 @@ create_physical_media_from_iso() {
 	: ${Title="OS Media Manger"}
 
 	if [ ! "$UID" -eq 0 ]; then
-		ensure_admin
+		security::ensure_admin
 	fi
 
 	if [[ -z "$1" ]]; then
@@ -7032,220 +7319,6 @@ util::add_iso_to_ventoy() {
 
 
 
-system::get_tgt_ubuntu_version() {
-	# Determine available versions of Ubuntu to offer...
-	system::log_item "🔎 Retreive list of available $ubuntu_flavor $_role versions..."
-	declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
-	declare -a all_normal_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+)/ && print "$1\n"' | sort -Vu))
-	dist_logo="${ubuntulogo}"
-
-	# Check if a version of Ubuntu was specified, otherwise make sure it is (default to latest LTS)...
-	if [[ -z ${_tgt_ubuntu_ver} ]]; then
-		write_information "🐧 - No version of Ubuntu specified as a parameter..."
-		case ${_ask} in
-		"yes" | "YES" | "Yes" | "y" | "Y")
-			write_information "🐧 - Requested to ask for Ubuntu version; prompting for version of Ubuntu to use..."
-			extra_option="Manually_specify"
-
-			# Display a menu to choose an Ubuntu version, including an option for manual entry
-			_tgt_ubuntu_ver=$($RTD_GUI --colors --title "Select Release Version of $ubuntu_flavor $_role" --menu "\n \Z1\n$dist_logo\Zn \n 👍 Please pick an available \Z1$ubuntu_flavor\Zn version from the list below or choose to manually specify a version. Long Term Support (LTS) Versions to choose from are as follows:\n\n " 35 90 $((${#all_lts_versions[@]} + 1)) \
-				$(for i in "${!all_lts_versions[@]}"; do echo "${all_lts_versions[$i]}" "$i"; done) "$extra_option" "$((${#all_lts_versions[@]} + 1))" 3>&1 1>&2 2>&3)
-			dialog_status=$?
-
-			# Handle the user's menu selection or cancellation based on the captured status
-			case $dialog_status in
-			$DIALOG_CANCEL)
-				echo "Dialog was cancelled. ($dialog_status)"
-				write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
-				_tgt_ubuntu_ver=${all_lts_versions[-1]}
-				return 
-				;;
-			$DIALOG_ESC)
-				echo "Dialog was escaped. ($dialog_status)"
-				write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
-				_tgt_ubuntu_ver=${all_lts_versions[-1]}
-				return 
-				;;
-			esac
-
-			# Check if the user chose to manually specify a version
-			if [[ "${_tgt_ubuntu_ver}" == "${extra_option}" ]]; then
-				_tgt_ubuntu_ver=$($RTD_GUI --colors --title "Manual Version Input" --inputbox "\nPlease enter the desired Ubuntu version (e.g., 22.10):" 10 60 3>&1 1>&2 2>&3)
-
-				# Capture and handle the exit status of the input dialog
-				case $? in
-				$DIALOG_CANCEL)
-					echo "Input was cancelled. ($dialog_status)"
-					write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
-					_tgt_ubuntu_ver=${all_lts_versions[-1]}
-					return 
-					;;
-				$DIALOG_ESC)
-					echo "Input was escaped. ($dialog_status)"
-					write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
-					_tgt_ubuntu_ver=${all_lts_versions[-1]}
-					return 
-					;;
-				esac
-			fi
-
-			clear
-			;;
-		"no" | "NO" | "No" | "n" | "N")
-			write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
-			_tgt_ubuntu_ver=${all_lts_versions[-1]}
-			;;
-		esac
-	fi
-
-	# Validate Ubuntu LTS version selections against available versions (manual selection may have occurred)...
-	for lts_version in "${all_lts_versions[@]}"; do
-		if [[ "${lts_version}" == "${_tgt_ubuntu_ver}" ]]; then
-			local _selection_is_valid="yes"
-			write_information "🐧 - The version of Ubuntu selected is valid: ${_tgt_ubuntu_ver}"
-		fi
-	done
-
-	# Validate Ubuntu normal version selections against available versions (manual selection may have occurred)...
-	for normal_version in "${all_normal_versions[@]}"; do
-		if [[ "${normal_version}" == "${_tgt_ubuntu_ver}" ]]; then
-			local _selection_is_valid="yes"
-			write_information "🐧 - The version of Ubuntu selected is valid: ${_tgt_ubuntu_ver}"
-		fi
-	done
-
-	if [[ "${_selection_is_valid}" != "yes" ]]; then
-		write_error "⛔ - The version of Ubuntu selected [${_tgt_ubuntu_ver}] is not valid. Please select a valid version list. Alternatively, you may let me choose for you..."
-		read -p "Press [ENTER] to continue..."
-		return 1
-	fi
-
-	# Return the version number selected
-	_tgt_ubuntu_ver=${_tgt_ubuntu_ver:-${all_lts_versions[-1]}}
-
-	system::log_item "Exporting selection: $tgt_ubuntu_ver"
-	export tgt_ubuntu_ver
-
-}
-
-system::get_ubuntu_media() {
-	# Description: Downloads the specified Ubuntu ISO (Desktop or Server) based on the provided flavor, version, and type.
-	#
-	# This function allows you to download various Ubuntu ISOs, including Ubuntu Desktop, Ubuntu Server,
-	# Kubuntu, and Xubuntu. You can specify the directory to save the ISO, the flavor of Ubuntu,
-	# the version, and whether you want the Desktop or Server ISO.
-	#
-	# Globals:
-	#   None
-	#
-	# Arguments:
-	#   --dir [directory]: The directory where the ISO should be saved. Defaults to /var/lib/libvirt/boot.
-	#   --flavor [ubuntu|kubuntu|xubuntu]: The flavor of Ubuntu to download. Defaults to 'ubuntu'.
-	#   --version [version]: The version of Ubuntu to download (e.g., 20.04.2). Defaults to 20.04.2.
-	#   --type [server|desktop]: The type of Ubuntu ISO to download. Valid only for Ubuntu flavor. Defaults to 'server'.
-	#
-	# Outputs:
-	#   - Downloads the specified ISO to the specified directory.
-	#   - Logs status messages regarding the progress and success of the download.
-	#
-	# Returns:
-	#   - 0 on success.
-	#   - 1 on error (e.g., invalid arguments, failure to download ISO).
-	#
-	# Usage:
-	#   system::get_ubuntu_media --dir /path/to/save --flavor ubuntu --version 22.04.1 --type desktop
-	#
-	# Example:
-	#   To download the Ubuntu 22.04.1 Desktop ISO to /var/lib/libvirt/boot:
-	#   system::get_ubuntu_media --dir /var/lib/libvirt/boot --flavor ubuntu --version 22.04.1 --type desktop
-	#
-	# Details:
-	#   - The function constructs the appropriate ISO filename and download URL based on the provided
-	#     flavor, version, and type.
-	#   - If the ISO is already present in the specified directory, the function logs a message and
-	#     skips the download.
-	#   - The downloaded ISO path is exported as the variable 'iso' for use in other scripts or commands.
-	#
-	# End of Documentation
-
-	# Initialize default values
-	local permanent_download_dir="/var/lib/libvirt/boot"	# where to put the downloaded media
-	local media_type="server"				# Default to server, can be overridden by --media-type parameter
-	local tgt_ubuntu_ver="20.04.2"				# Default version, can be overridden by --version parameter
-
-
-	# Parse arguments
-	while [[ "$#" -gt 0 ]]; do
-		case $1 in
-		--dir)
-			if [[ -n $2 && $2 != --* ]]; then
-				permanent_download_dir="$2"
-				shift
-			else
-				system::log_item "Error: --dir requires a non-empty argument."
-				return 1
-			fi
-			;;
-		--version)
-			if [[ -n $2 && $2 != --* ]]; then
-				tgt_ubuntu_ver="$2"
-				shift
-			else
-				system::log_item "Error: --version requires a non-empty argument."
-				return 1
-			fi
-			;;
-		--media-type)
-			if [[ -n $2 && $2 != --* ]]; then
-				media_type="$2"
-				shift
-			else
-				system::log_item "Error: --type requires a non-empty argument."
-				return 1
-			fi
-			;;
-		*)
-			system::log_item "Unknown parameter passed: $1"
-			return 1
-			;;
-		esac
-		shift
-	done
-
-	case $media_type in
-	server)
-		iso_filename="ubuntu-${tgt_ubuntu_ver}-live-server-amd64.iso"
-		ubuntu_iso_url="http://releases.ubuntu.com/${tgt_ubuntu_ver}/ubuntu-${tgt_ubuntu_ver}-live-server-amd64.iso"
-		;;
-	desktop)
-		iso_filename="ubuntu-${tgt_ubuntu_ver}-desktop-amd64.iso"
-		ubuntu_iso_url="http://releases.ubuntu.com/${tgt_ubuntu_ver}/ubuntu-${tgt_ubuntu_ver}-desktop-amd64.iso"
-		;;
-	*)
-		system::log_item "Invalid media type specified. Valid options for Ubuntu are: server, desktop."
-		return 1
-		;;
-	esac
-
-
-	# Ensure that the file is available for VM creation...
-	system::log_item "Checking if $iso_filename is already downloaded in $permanent_download_dir..."
-	iso=$(find "$permanent_download_dir" -name "$iso_filename")
-	if [[ ! -e "$iso" ]]; then
-		system::log_item "$iso_filename is not in cache, downloading..."
-		wget -nc "$ubuntu_iso_url" -P "$permanent_download_dir" || {
-			system::log_item "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
-			return 1
-		}
-		iso="$permanent_download_dir/$iso_filename"
-	else
-		system::log_item "💿 - $iso_filename already in cache, using it for greenfield creation..."
-	fi
-
-	system::log_item "Exporting ISO value: iso = $iso"
-	export iso
-}
-
 
 
 rtd_oem_ubuntu_auto_install_iso_builder() {
@@ -7279,10 +7352,10 @@ rtd_oem_ubuntu_auto_install_iso_builder() {
 	system::prepare_environment_for_iso_creation
 
 	write_information "Retreive list of available Ubuntu versions..."
-	system::get_tgt_ubuntu_version
+	ubuntu::get_target_version
 
 	if [[ "$HOME" == "/root" ]]; then HOME=/home/$SUDO_USER; fi
-	system::get_ubuntu_media --dir $HOME/Virtual-DVDs/Downloaded --flavor ubuntu --version 22.04.1 --type desktop
+	ubuntu::download_iso --dir $HOME/Virtual-DVDs/Downloaded --flavor ubuntu --version 22.04.1 --type desktop
 
 	mnt="${tmp_disc_dir:=$(mktemp -d)}"
 	tmp_disc_dir=$mnt
@@ -8125,7 +8198,7 @@ tool::up_2_date() {
 	# Returns: 0/1/3 where 1/0 = sucess/fail and 3 = package manager NOT found
 	# Usage: tool::up_2_date
 	# End of documentation
-	ensure_admin
+	security::ensure_admin
 	write_status "Running up2date function:"
 
 	if hash pkcon 2>/dev/null; then
@@ -9157,19 +9230,6 @@ security::install_AIDE() {
 	write_information "[INFO] AIDE installation and configuration completed successfully."
 }
 
-
-ensure_admin() {
-	# Description: See security::ensure_admin
-	# End of documentation
-	security::ensure_admin
-}
-
-system::ensure_admin() {
-	# Description: See security::ensure_admin
-	# End of documentation
-	security::ensure_admin
-}
-
 security::ensure_admin() {
 	# Description: Ensures the script is executed with administrative (root) privileges, allowing 
 	# it to perform system-wide settings or configurations that require elevated access.
@@ -9378,7 +9438,7 @@ software::package_kit::add_package() {
 	# Usage: Call the function with one arguments matching then name of the package you need to install.
 	#
 	# End of documentation
-	ensure_admin
+	security::ensure_admin
 	: ${_LOGFILE:="/var/log/rtd/$(basename "$0".log)"}
 
 	if pkcon resolve "${1}" --filter installed | grep "${1}" &>/dev/null; then
@@ -9413,7 +9473,7 @@ software::package_kit::remove_package() {
 	# be an RPM or deb string, or even snap or flatpak. A preference order between package system and
 	# snap or flatpak use.
 	# End of documentation
-	ensure_admin
+	security::ensure_admin
 	: ${_LOGFILE:="/var/log/rtd/$(basename "$0".log)"}
 
 	(
@@ -9547,7 +9607,7 @@ software::ensure_flatpak_package_managment() {
 				export PATH=$PATH:/var/lib/flatpak/exports/bin
 			else
 				write_warning "flathub remote is not present... adding now... "
-				ensure_admin
+				security::ensure_admin
 				flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || write_error "Failed to add flatpak repo!"
 				export PATH=$PATH:/var/lib/flatpak/exports/bin
 			fi
@@ -9555,12 +9615,12 @@ software::ensure_flatpak_package_managment() {
 			if flatpak list | grep com.github.tchx84.Flatseal &>/dev/null; then
 				write_status "flatseal security management is also present..."
 			else
-				ensure_admin
+				security::ensure_admin
 				write_status "flatseal security manager not found, adding now..."
 				flatpak install flathub com.github.tchx84.Flatseal --noninteractive -y
 			fi
 		else
-			ensure_admin
+			security::ensure_admin
 			write_information "Ensuring Flatpak software distribution system is available..."
 			if check_dependencies flatpak; then
 				flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || write_error "Failed to add flatpak repo!"
@@ -9572,7 +9632,7 @@ software::ensure_flatpak_package_managment() {
 			if flatpak list | grep com.github.tchx84.Flatseal &>/dev/null; then
 				write_status "flatseal security management is also present..."
 			else
-				ensure_admin
+				security::ensure_admin
 				write_status "flatseal security manager not found, adding now..."
 				flatpak install flathub com.github.tchx84.Flatseal --noninteractive -y
 			fi
@@ -9616,7 +9676,7 @@ software::update_system_txt() {
 	# Returns:
 	# Usage: software::update_system_txt
 	# End of documentation
-	ensure_admin
+	security::ensure_admin
 	PUBLICATION="$BRANDING Update Manager for Linux"
 	VERSION="1.14 (built in)"
 	DIALOGRC="~/.config/rtd/dialogrc"
@@ -9691,7 +9751,7 @@ software::update_system_txt() {
 	)
 
 	SNAPS:
-	$(snap changes)
+	$(snap changes) 
 
 	FLATPAKS:
 	$(
@@ -9701,7 +9761,7 @@ software::update_system_txt() {
 }
 
 software::update_all_ui() {
-	ensure_admin
+	security::ensure_admin
 	local TERMUITXT="nocolor"
 	local PUBLICATION="$BRANDING Update Manager for Linux"
 	local VERSION="1.15 (built in with dialog)"
@@ -10484,7 +10544,7 @@ software::ensure_snap_package_managment() {
 		else
 			if hostnamectl | grep "SUSE" 2>/dev/null; then
 				system::log_item "Special case for suse..."
-				ensure_admin
+				security::ensure_admin
 				if hostnamectl | grep -i "tumbleweed"; then
 					local _repo=$(echo https://download.opensuse.org/repositories/system:/snappy/openSUSE_Tumbleweed snappy)
 					system::log_item "Detected OpenSUSE Timbleweed. Adding repo: ${_repo}"
@@ -10798,7 +10858,7 @@ software::check_native_package_dependency() {
 	# Arguments: None
 	# Dependencies: [package manager]
 	# Function Dependencies: (other functions)
-	# ensure_admin, write_status, write_information, write_warning, write_error, is_software_package_installed,
+	# security::ensure_admin, write_status, write_information, write_warning, write_error, is_software_package_installed,
 	# InstallSoftwareFromRepo
 	#
 	# Outputs:
@@ -10894,7 +10954,7 @@ rtd_oem_remove_non_western_latin_fonts() {
 	#
 	# The function will not return any sucess or failure codes. It will do its best and exit.
 	# End of documentation
-	ensure_admin
+	security::ensure_admin
 	font_list="fonts-kacst fonts-kacst-one fonts-khmeros-core fonts-lklug-sinhala fonts-lohit-guru fonts-guru fonts-nanum fonts-noto-cjk fonts-takao-pgothic fonts-tibetan-machine fonts-guru-extra \
 		fonts-lao fonts-sil-padauk fonts-sil-abyssinica fonts-tlwg-* fonts-beng fonts-beng-extra fonts-deva fonts-deva-extra fonts-gubbi fonts-gujr fonts-gujr-extra fonts-kalapi fonts-knda \
 		fonts-lohit-* fonts-orya* fonts-pagul fonts-sahadeva fonts-samyak-* fonts-sarai fonts-smc fonts-smc-* fonts-taml fonts-telu fonts-telu-extra"
@@ -10953,7 +11013,7 @@ software::remove_native_software_package() {
 	local package_name="$1" # Assuming a single package for safety and clarity
 
 	system::log_item "Requested to remove package $package_name"
-	ensure_admin
+	security::ensure_admin
 
 	# Detect package manager
 	if hash dnf 2>/dev/null; then
@@ -11163,7 +11223,8 @@ software::update_system() {
 	# Returns:
 	# Usage: rtd_update_system
 	# End of documentation
-	#ensure_admin
+	
+	security::ensure_admin
 	PUBLICATION="Update Manager for Linux"
 	VERSION="1.15 (built in)"
 	DIALOGRC="~/.config/rtd/dialogrc"
@@ -11630,11 +11691,340 @@ rtd_setup_choices_server() {
 	done
 }
 
+fedora::get_fedora_netinst_iso_url() {
+	# Description:
+	#
+	# Retrieves the full download URL for the Fedora "Everything" NetInstall ISO
+	# for a specific version and x86_64 architecture.
+	#
+	# This function validates the version format, constructs the expected download
+	# directory URL, fetches the directory listing using curl, extracts the
+	# latest NetInstall ISO filename, and prepends the directory URL to create
+	# the full download link.
+	#
+	# Globals:
+	#   None
+	#
+	# Arguments:
+	#   --version <version>  Required. The Fedora release version number (e.g., 40).
+	#
+	# Outputs:
+	#   STDOUT: Full URL to the latest Fedora Everything NetInstall ISO for the
+	#           specified version if found.
+	#   STDERR: Error messages, warnings, and informational logs (via system::log_item).
+	#
+	# Returns:
+	#   0: If the URL was successfully found and printed to STDOUT.
+	#   1: If any error occurred (e.g., invalid arguments, failed download, ISO not found).
+	#
+	# Dependencies:
+	#   curl, grep, sort, awk, mktemp
+	#
+	# Usage Example:
+	#   local latest_ver
+	#   latest_ver=$(fedora::get_latest_release_version) # Assuming this function exists
+	#   local iso_url
+	#   if ! iso_url=$(fedora::get_fedora_netinst_iso_url --version "${latest_ver}"); then
+	#     printf "ERROR: Failed to get Fedora %s netinstall ISO URL.\n" "${latest_ver}" >&2
+	#     # Handle error appropriately
+	#   fi
+	#   printf "Latest ISO URL: %s\n" "${iso_url}"
+	# End of Documentation
+
+	local version=""
+	local -r base_url="https://download.fedoraproject.org/pub/fedora/linux/releases"
+	local iso_page_url=""
+	local temp_output="" # Initialize for trap safety
+	local http_code=""
+	local iso_page_content=""
+	local iso_filename=""
+	local iso_full_url=""
+
+	while [[ $# -gt 0 ]]; do
+		local arg="$1"
+		case "${arg}" in
+			--version)
+				if [[ -z "${2-}" ]]; then # Check if $2 exists
+					system::log_item "ERROR: --version flag requires an argument."
+					return 1
+				fi
+				version="$2"
+				shift # past argument
+				shift # past value
+				;;
+			*)
+				# Unknown option
+				system::log_item "ERROR: Unknown argument: ${arg}"
+				system::log_item "Usage: ${FUNCNAME[0]} --version <version_number>" 
+				return 1
+				;;
+		esac
+	done
+
+	if [[ -z "${version}" ]]; then
+		system::log_item "ERROR: Missing required argument: --version"
+		system::log_item "Usage: ${FUNCNAME[0]} --version <version_number>" 
+		return 1
+	fi
+
+	if [[ ! "${version}" =~ ^[0-9]+$ ]]; then
+		system::log_item "ERROR: Invalid version format: '${version}'. Must be a number."
+		return 1
+	fi
+
+	iso_page_url="${base_url}/${version}/Everything/x86_64/iso/"
+
+	temp_output=$(mktemp) || {
+		system::log_item "ERROR: Failed to create temporary file."
+		return 1
+	}
+	trap 'rm -f -- "$temp_output"' EXIT INT TERM HUP &>/dev/null # Ensure cleanup on exit
+
+	system::log_item "INFO: Fetching Fedora ISO directory index: ${iso_page_url}"
+	http_code=$(curl --connect-timeout 10 -sL -w "%{http_code}" -o "${temp_output}" "${iso_page_url}")
+	local curl_exit_code=$? 
+
+	if [[ ${curl_exit_code} -ne 0 ]]; then
+		system::log_item "ERROR: curl command failed with exit code ${curl_exit_code} while fetching ${iso_page_url}"
+		return 1
+	fi
+
+	if [[ "${http_code}" -ne 200 ]]; then
+		system::log_item "ERROR: Failed to access ISO directory. HTTP status: ${http_code}. URL: ${iso_page_url}"
+		return 1
+	fi
+
+	iso_page_content=$(<"${temp_output}")
+	rm -f -- "${temp_output}" &>/dev/null 
+	trap - EXIT INT TERM HUP   &>/dev/null # Remove the trap
+
+	if [[ -z "${iso_page_content}" ]]; then
+		system::log_item "ERROR: ISO directory listing was empty. URL: ${iso_page_url}"
+		return 1
+	fi
+
+	iso_filename=$(
+		echo "${iso_page_content}" | \
+		grep -Eo "Fedora-Everything-netinst-x86_64-${version}-[0-9.]+\.iso" | \
+		sort -V | \
+		tail -n 1
+	)
+
+	if [[ -z "${iso_filename}" ]]; then
+		system::log_item "ERROR: Could not find NetInstall ISO filename for version ${version} matching pattern in ${iso_page_url}."
+		return 1
+	fi
+
+	iso_full_url="${iso_page_url}${iso_filename}"
+	system::log_item "INFO: Found Fedora NetInstall ISO URL: ${iso_full_url}"
+	echo "${iso_full_url}"
+	return 0 
+}
+
+fedora::get_latest_release_version() {
+	# Description:
+	#   Retrieves the latest available Fedora release version from the official Fedora project.
+	#   This function scans the Fedora mirror directory listing and determines the latest
+	#   numerical release version by parsing subdirectory names.
+	#
+	# Globals:
+	#   None
+	#
+	# Arguments:
+	#   None
+	#
+	# Outputs:
+	#   STDOUT: Latest Fedora release version (e.g., 40, 41, 42)
+	#   STDERR: Errors encountered during retrieval or parsing
+	#
+	# Returns:
+	#   0 if the latest version is successfully determined
+	#   1 if an error occurs during HTTP requests, parsing, or no version found
+	#
+	# Dependencies:
+	#   curl, grep, sort, tail, mktemp
+	#
+	# Usage:
+	#   latest_version=$(fedora::get_latest_release_version) || printf "Failed to retrieve latest Fedora version.\n"
+	#
+	# End of Documentation:
+
+	local url="https://download.fedoraproject.org/pub/fedora/linux/releases/"
+	local http_code
+	local dir_listing
+	local latest_version
+	local temp_output
+
+	system::log_item "Fetching directory listing from $url..."
+	temp_output=$(mktemp)
+
+	http_code=$(curl --connect-timeout 10 -sL -w "%{http_code}" -o "$temp_output" "$url")
+	dir_listing=$(<"$temp_output")
+	rm "$temp_output" &>/dev/null
+
+	if [[ "$http_code" -ne 200 ]]; then
+		system::log_item "Error: Failed to fetch Fedora release directory (HTTP code: $http_code)"
+		return 1
+	fi
+
+	if [[ -z "$dir_listing" ]]; then
+		system::log_item "Error: Empty directory listing retrieved from $url"
+		return 1
+	fi
+
+	latest_version=$(
+		echo "$dir_listing" | \
+		grep -oP '<a href="\K[0-9]+(?=/")' | \
+		sort -n | \
+		tail -n 1
+	)
+
+	if [[ -n "$latest_version" ]]; then
+		system::log_item "Latest identified Fedora version: $latest_version"
+		printf "%s\n" "$latest_version"
+		return 0
+	else
+		system::log_item "Error: Could not determine the latest Fedora version from parsed data."
+		return 1
+	fi
+}
+
+
+ubuntu::get_target_version() {
+	# Description:
+	#   Interactively or non-interactively determine which Ubuntu version to use for installation.
+	#   Fetches and parses all available LTS and regular Ubuntu versions from releases.ubuntu.com,
+	#   provides a dialog menu (if _ask=yes) for user selection, and validates the chosen version.
+	#
+	# Globals:
+	#   _tgt_ubuntu_ver     - (input/output) Target Ubuntu version (used and/or updated by this function)
+	#   _ask                - Flag indicating whether to prompt the user interactively
+	#   ubuntu_flavor       - Ubuntu flavor label for display
+	#   _role               - Role label (desktop/server/etc.) for display
+	#   ubuntulogo          - ASCII or text logo used in the dialog box
+	#   RTD_GUI             - Path to GUI wrapper (e.g., whiptail/dialog wrapper)
+	#   DIALOG_CANCEL       - Exit code when user cancels dialog
+	#   DIALOG_ESC          - Exit code when user escapes dialog
+	#
+	# Arguments:
+	#   None
+	#
+	# Outputs:
+	#   STDOUT: Dialog and informational messages
+	#   STDERR: Errors
+	#
+	# Returns:
+	#   0 if version is chosen and valid
+	#   1 if version is invalid, canceled, or selection failed
+	#
+	# Dependencies:
+	#   wget, perl, dialog/whiptail
+	#
+	# Usage:
+	#   ubuntu::get_target_version
+	#   printf "Selected version: %s\n" "$tgt_ubuntu_ver"
+	#
+	# End of Documentation:
+	# Determine available versions of Ubuntu to offer...
+	system::log_item "🔎 Retreive list of available $ubuntu_flavor $_role versions..."
+	declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
+	declare -a all_normal_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+)/ && print "$1\n"' | sort -Vu))
+	dist_logo="${ubuntulogo}"
+
+	# Check if a version of Ubuntu was specified, otherwise make sure it is (default to latest LTS)...
+	if [[ -z ${_tgt_ubuntu_ver} ]]; then
+		write_information "🐧 - No version of Ubuntu specified as a parameter..."
+		case ${_ask} in
+		"yes" | "YES" | "Yes" | "y" | "Y")
+			write_information "🐧 - Requested to ask for Ubuntu version; prompting for version of Ubuntu to use..."
+			extra_option="Manually_specify"
+
+			# Display a menu to choose an Ubuntu version, including an option for manual entry
+			_tgt_ubuntu_ver=$($RTD_GUI --colors --title "Select Release Version of $ubuntu_flavor $_role" --menu "\n \Z1\n$dist_logo\Zn \n 👍 Please pick an available \Z1$ubuntu_flavor\Zn version from the list below or choose to manually specify a version. Long Term Support (LTS) Versions to choose from are as follows:\n\n " 35 90 $((${#all_lts_versions[@]} + 1)) \
+				$(for i in "${!all_lts_versions[@]}"; do echo "${all_lts_versions[$i]}" "$i"; done) "$extra_option" "$((${#all_lts_versions[@]} + 1))" 3>&1 1>&2 2>&3)
+			dialog_status=$?
+
+			# Handle the user's menu selection or cancellation based on the captured status
+			case $dialog_status in
+			$DIALOG_CANCEL)
+				echo "Dialog was cancelled. ($dialog_status)"
+				write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
+				_tgt_ubuntu_ver=${all_lts_versions[-1]}
+				return 1
+				;;
+			$DIALOG_ESC)
+				echo "Dialog was escaped. ($dialog_status)"
+				write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
+				_tgt_ubuntu_ver=${all_lts_versions[-1]}
+				return 1
+				;;
+			esac
+
+			# Check if the user chose to manually specify a version
+			if [[ "${_tgt_ubuntu_ver}" == "${extra_option}" ]]; then
+				_tgt_ubuntu_ver=$($RTD_GUI --colors --title "Manual Version Input" --inputbox "\nPlease enter the desired Ubuntu version (e.g., 22.10):" 10 60 3>&1 1>&2 2>&3)
+
+				# Capture and handle the exit status of the input dialog
+				case $? in
+				$DIALOG_CANCEL)
+					echo "Input was cancelled. ($dialog_status)"
+					write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
+					_tgt_ubuntu_ver=${all_lts_versions[-1]}
+					return 1
+					;;
+				$DIALOG_ESC)
+					echo "Input was escaped. ($dialog_status)"
+					write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
+					_tgt_ubuntu_ver=${all_lts_versions[-1]}
+					return 1
+					;;
+				esac
+			fi
+
+			clear
+			;;
+		"no" | "NO" | "No" | "n" | "N")
+			write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
+			_tgt_ubuntu_ver=${all_lts_versions[-1]}
+			;;
+		esac
+	fi
+
+	# Validate Ubuntu LTS version selections against available versions (manual selection may have occurred)...
+	for lts_version in "${all_lts_versions[@]}"; do
+		if [[ "${lts_version}" == "${_tgt_ubuntu_ver}" ]]; then
+			local _selection_is_valid="yes"
+			write_information "🐧 - The version of Ubuntu selected is valid: ${_tgt_ubuntu_ver}"
+		fi
+	done
+
+	# Validate Ubuntu normal version selections against available versions (manual selection may have occurred)...
+	for normal_version in "${all_normal_versions[@]}"; do
+		if [[ "${normal_version}" == "${_tgt_ubuntu_ver}" ]]; then
+			local _selection_is_valid="yes"
+			write_information "🐧 - The version of Ubuntu selected is valid: ${_tgt_ubuntu_ver}"
+		fi
+	done
+
+	if [[ "${_selection_is_valid}" != "yes" ]]; then
+		write_error "⛔ - The version of Ubuntu selected [${_tgt_ubuntu_ver}] is not valid. Please select a valid version list. Alternatively, you may let me choose for you..."
+		read -p "Press [ENTER] to continue..."
+		return 1
+	fi
+
+	# Return the version number selected
+	_tgt_ubuntu_ver=${_tgt_ubuntu_ver:-${all_lts_versions[-1]}}
+
+	system::log_item "Exporting selection: $tgt_ubuntu_ver"
+	export tgt_ubuntu_ver
+
+}
+
 ubuntu::get_latest_release_version() {
 	# Description:
 	#   Retrieves the latest available Ubuntu release version from the official archive.
-	#   This function scans the Ubuntu archive index, detects release codenames,
-	#   and extracts the highest valid version number from the corresponding Release files.
+	#   This function scans the Ubuntu archive index, detects release version numbers,
+	#   and extracts the highest valid version number using LTS and regular versions.
 	#
 	# Globals:
 	#   None
@@ -11651,96 +12041,177 @@ ubuntu::get_latest_release_version() {
 	#   1 if an error occurs during HTTP requests, parsing, or no version found
 	#
 	# Dependencies:
-	#   curl, grep, sort, tail, mktemp
+	#   wget, perl, sort, tail
 	#
 	# Usage:
 	#   latest_version=$(ubuntu::get_latest_release_version) || printf "Failed to retrieve latest Ubuntu version.\n"
 	#
 	# End of Documentation
 
-	local url="https://archive.ubuntu.com/ubuntu/dists/"
+	local url="https://releases.ubuntu.com"
 	local latest_version=""
-	local http_code
-	local error_occurred=0
-	local version
+	local output
+	local -a all_lts_versions
+	local -a all_normal_versions
+	local -a all_versions
 
-	# --- Step 1: Fetch the main directory listing ---
-	system::log_item "Fetching directory listing from $url..."
-	local temp_output=$(mktemp) 
+	dependency::command_exists wget perl sort tail
 
-	# Use curl to get content and HTTP status code
-	# -s: silent, -L: follow redirects, -w: write out format, -o: output to file
-	http_code=$(curl --connect-timeout 10 -sL -w "%{http_code}" -o "$temp_output" "$url")
-	local dir_listing=$(<"$temp_output")
-	rm "$temp_output"
-
-	# Check if curl succeeded
-	if [[ "$http_code" -ne 200 ]]; then
-		system::log_item "Error: Failed to fetch directory listing from $url (HTTP code: $http_code)" 
-		return 1
-	fi
-	if [[ -z "$dir_listing" ]]; then
-		system::log_item "Error: Fetched empty directory listing from $url" 
+	if ! output=$(wget -q -O- "$url"); then
+		system::log_item "ERROR: Failed to retrieve directory listing from $url"
 		return 1
 	fi
 
-	# --- Step 2: Extract potential codenames, check Release files, find latest version ---
-	system::log_item "Scanning potential distribution codenames..." 
-	latest_version=$( \
-		echo "$dir_listing" | \
-		# Extract potential codenames: sequences of lowercase letters within href ending with /
-		grep -oP '<a href="\K[a-z]+(?=/")' | \
-		# Filter out known non-release directories explicitly (optional but good practice)
-		grep -Ev '^(devel|internal|preseed|project|ubuntu-installer|icons|indices|ls-lR|tools)$' | \
-		sort -u | \
-		while IFS= read -r codename; do
-		# For each potential codename, construct URL to its 'Release' file
-		local release_url="${url}${codename}/Release"
-		local release_info
-		local release_http_code
-		local release_temp_output=$(mktemp)
+	mapfile -t all_lts_versions < <(printf '%s\n' "$output" | perl -ne '/Ubuntu (\d+\.\d+\.\d+)/ && print "$1\n"' | sort -Vu)
+	mapfile -t all_normal_versions < <(printf '%s\n' "$output" | perl -ne '/Ubuntu (\d+\.\d+)/ && print "$1\n"' | sort -Vu)
 
-		# Attempt to fetch the Release file content, use a shorter timeout
-		release_http_code=$(curl --connect-timeout 5 -sL -w "%{http_code}" -o "$release_temp_output" "$release_url")
-		release_info=$(<"$release_temp_output")
-		rm "$release_temp_output"
+	all_versions=("${all_lts_versions[@]}" "${all_normal_versions[@]}")
 
-		# Only process if the fetch was successful (HTTP 200) and content exists
-		if [[ "$release_http_code" -eq 200 && -n "$release_info" ]]; then
-			# Extract the version number (looking for lines like 'Version: 22.04')
+	if [[ ${#all_versions[@]} -eq 0 ]]; then
+		system::log_item "ERROR: No versions found in the Ubuntu archive."
+		return 1
+	fi
 
-			version=$(echo "$release_info" | grep -oP '^Version:\s*\K[0-9]+\.[0-9]+')
+	latest_version=$(printf '%s\n' "${all_versions[@]}" | sort -V | tail -n 1)
 
-			# Check if we got a valid version number in YY.MM format
-			if [[ "$version" =~ ^[0-9]{2}\.[0-9]{2}$ ]]; then
-			echo "$version" # Output valid versions for later sorting
-			fi
-		else
-			# Optional: Report skipped codenames due to errors
-			# echo "Skipping '$codename': Could not fetch or parse Release file (HTTP: $release_http_code)" >&2
-			: # Do nothing, just continue loop
+	if [[ -z "$latest_version" ]]; then
+		system::log_item "ERROR: No valid version found in the Ubuntu archive."
+		return 1
+	fi
+
+	if [[ "$latest_version" =~ ^([0-9]{2})\.([0-9]{2}) ]]; then
+		local year="${BASH_REMATCH[1]}"
+		local month="${BASH_REMATCH[2]}"
+		if (( month > 12 )); then
+			system::log_item "ERROR: Invalid month detected in version: $latest_version"
+			return 1
 		fi
-		done | \
-		# Sort the extracted versions using version sort (handles YY.MM correctly)
-		sort -V | \
-		# Get the last line, which should be the highest version
-		tail -n 1 \
-	)
-
-	# --- Step 3: Output the result or error ---
-	if [[ -n "$latest_version" ]]; then
-		system::log_item "Latest identified Ubuntu version: $latest_version" 
-		echo "$latest_version" # Actual version to stdout
+		printf '%s.%s\n' "$year" "$month"
 		return 0
 	else
-		system::log_item "Error: Could not determine the latest Ubuntu version after scanning." 
-		# Check if the initial directory fetch worked but no versions were parsed
-		if [[ "$http_code" -eq 200 ]]; then
-			system::log_item "Possible reasons: No valid 'Release' files found, parsing logic failed, or network issues checking individual releases." >&2
-		fi
+		system::log_item "ERROR: Failed to parse the latest version: $latest_version"
 		return 1
 	fi
 }
+
+ubuntu::download_iso() {
+	# Description: Downloads the specified Ubuntu ISO (Desktop or Server) based on the provided flavor, version, and type.
+	#
+	# This function allows you to download various Ubuntu ISOs, including Ubuntu Desktop, Ubuntu Server,
+	# Kubuntu, and Xubuntu. You can specify the directory to save the ISO, the flavor of Ubuntu,
+	# the version, and whether you want the Desktop or Server ISO.
+	#
+	# Globals:
+	#   None
+	#
+	# Arguments:
+	#   --dir [directory]: The directory where the ISO should be saved. Defaults to /var/lib/libvirt/boot.
+	#   --flavor [ubuntu|kubuntu|xubuntu]: The flavor of Ubuntu to download. Defaults to 'ubuntu'.
+	#   --version [version]: The version of Ubuntu to download (e.g., 20.04.2). Defaults to 20.04.2.
+	#   --type [server|desktop]: The type of Ubuntu ISO to download. Valid only for Ubuntu flavor. Defaults to 'server'.
+	#
+	# Outputs:
+	#   - Downloads the specified ISO to the specified directory.
+	#   - Logs status messages regarding the progress and success of the download.
+	#
+	# Returns:
+	#   - 0 on success.
+	#   - 1 on error (e.g., invalid arguments, failure to download ISO).
+	#
+	# Usage:
+	#   ubuntu::download_iso --dir /path/to/save --flavor ubuntu --version 22.04.1 --type desktop
+	#
+	# Example:
+	#   To download the Ubuntu 22.04.1 Desktop ISO to /var/lib/libvirt/boot:
+	#   ubuntu::download_iso --dir /var/lib/libvirt/boot --flavor ubuntu --version 22.04.1 --type desktop
+	#
+	# Details:
+	#   - The function constructs the appropriate ISO filename and download URL based on the provided
+	#     flavor, version, and type.
+	#   - If the ISO is already present in the specified directory, the function logs a message and
+	#     skips the download.
+	#   - The downloaded ISO path is exported as the variable 'iso' for use in other scripts or commands.
+	#
+	# End of Documentation
+
+	# Initialize default values
+	local permanent_download_dir="/var/lib/libvirt/boot"	# where to put the downloaded media
+	local media_type="server"				# Default to server, can be overridden by --media-type parameter
+	local tgt_ubuntu_ver="20.04.2"				# Default version, can be overridden by --version parameter
+
+
+	# Parse arguments
+	while [[ "$#" -gt 0 ]]; do
+		case $1 in
+		--dir)
+			if [[ -n $2 && $2 != --* ]]; then
+				permanent_download_dir="$2"
+				shift
+			else
+				system::log_item "Error: --dir requires a non-empty argument."
+				return 1
+			fi
+			;;
+		--version)
+			if [[ -n $2 && $2 != --* ]]; then
+				tgt_ubuntu_ver="$2"
+				shift
+			else
+				system::log_item "Error: --version requires a non-empty argument."
+				return 1
+			fi
+			;;
+		--media-type)
+			if [[ -n $2 && $2 != --* ]]; then
+				media_type="$2"
+				shift
+			else
+				system::log_item "Error: --type requires a non-empty argument."
+				return 1
+			fi
+			;;
+		*)
+			system::log_item "Unknown parameter passed: $1"
+			return 1
+			;;
+		esac
+		shift
+	done
+
+	case $media_type in
+	server)
+		iso_filename="ubuntu-${tgt_ubuntu_ver}-live-server-amd64.iso"
+		ubuntu_iso_url="http://releases.ubuntu.com/${tgt_ubuntu_ver}/ubuntu-${tgt_ubuntu_ver}-live-server-amd64.iso"
+		;;
+	desktop)
+		iso_filename="ubuntu-${tgt_ubuntu_ver}-desktop-amd64.iso"
+		ubuntu_iso_url="http://releases.ubuntu.com/${tgt_ubuntu_ver}/ubuntu-${tgt_ubuntu_ver}-desktop-amd64.iso"
+		;;
+	*)
+		system::log_item "Invalid media type specified. Valid options for Ubuntu are: server, desktop."
+		return 1
+		;;
+	esac
+
+
+	# Ensure that the file is available for VM creation...
+	system::log_item "Checking if $iso_filename is already downloaded in $permanent_download_dir..."
+	iso=$(find "$permanent_download_dir" -name "$iso_filename")
+	if [[ ! -e "$iso" ]]; then
+		system::log_item "$iso_filename is not in cache, downloading..."
+		wget -nc "$ubuntu_iso_url" -P "$permanent_download_dir" || {
+			system::log_item "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
+			return 1
+		}
+		iso="$permanent_download_dir/$iso_filename"
+	else
+		system::log_item "💿 - $iso_filename already in cache, using it for greenfield creation..."
+	fi
+
+	system::log_item "Exporting ISO value: iso = $iso"
+	export iso
+}
+
 
 ###########################################################################################
 #
@@ -11808,46 +12279,6 @@ ubuntu::get_latest_release_version() {
 #                                           "Y88P"
 ###########################################################################################
 
-system::validate_parameters() {
-	# Description: Function to validate that all parameters match the pattern --option "value".
-	# Globals: None
-	# Arguments: $@ - The parameters to validate.
-	# Outputs: Error messages for any invalid parameters.
-	# Returns: 0 if all parameters are valid, 1 if any invalid parameters are found.
-	# Usage: validate_parameters "$@"
-	# End of documentation
-
-	# Log the start of parameter validation
-	system::log_item "Validating parameter format..."
-	system::log_item "Parameters: $*"
-	# Initialize an index to iterate through the parameters
-	local index=0
-
-	# Iterate through the parameters
-	while [[ $# -gt 0 ]]; do
-		case "$1" in
-		--*)
-			# Check if the next parameter is provided and is not another option
-			if [[ -z "$2" || "$2" == --* ]]; then
-				write_error "⛔ Invalid parameter format: '$1' must be followed by a value."
-				return 1
-			fi
-			# Log the valid parameter and its value
-			system::log_item "Valid parameter format: '$1' with value: '$2'"
-			shift 2
-			;;
-		*)
-			write_error "⛔ Unexpected parameter format: '$1'. Expected an option starting with '--'."
-			return 1
-			;;
-		esac
-		index=$((index + 1))
-	done
-
-	# Log the successful validation of parameters
-	system::log_item "All $index parameter pairs are valid."
-	return 0
-}
 
 kvm::util::read_common_options() {
 	# Description: Function to read common options for KVM virtual machine creation. This function processes
@@ -12589,7 +13020,6 @@ kvm::get_kali_iso() {
 
 }
 
-
 kvm::get_zorin_iso() {
 	# Description: Downloads the latest Zorin OS ISO file for KVM if not already present.
 	#
@@ -12764,7 +13194,7 @@ kvm::make_vm_now_from_fedora_org() {
 			--os-variant="fedora40" \
 			--initrd-inject="${_preseed_file}" \
 			--location="${_source_url}" \
-			--extra-args "inst.ks=file:/$(basename $_preseed_file)" \
+			--extra-args "inst.ks=file:/$(basename $_preseed_file) inst.repo=https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Everything/x86_64/os/" \
 			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 
@@ -12856,7 +13286,7 @@ kvm::make_vm_now_from_redhat_com() {
 			--os-variant="fedora30" \
 			--initrd-inject="${_preseed_file}" \
 			--location="${_source_url}" \
-			--extra-args "inst.ks=file:/$(basename $_preseed_file)" \
+			--extra-args "inst.ks=file:/$(basename $_preseed_file) inst.stage2=https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Everything/x86_64/os/images/install.img" \
 			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 
@@ -13010,6 +13440,7 @@ kvm::make_vm_now_from_debian_org() {
 	: ${_dsk="${_dsk:-100}"}
 	: ${_role:="desktop"}
 	: ${_task:="ssh-server"}
+	: ${ui_diplay_style:="theme=light"}
 
 	# Set default values for VM T-Shirts sizes...
 	kvm::util::read_common_options ${*}
@@ -13029,7 +13460,7 @@ kvm::make_vm_now_from_debian_org() {
 		write_status "🖥️ 	- Using a desktop environment: ${_UserDesktopEnvironmentSelection}"
 		: "${vm_kernel="${_DEBIAN_FRONTEND_GTK_KERNEL}"}"
 		: "${vm_initrd="${_DEBIAN_FRONTEND_GTK_INITRD}"}"
-		: "${ui_diplay_style="theme=dark"}"
+		: "${ui_diplay_style:="theme=dark"}"
 		: "${vm_usecase="VDI"}"
 		local vm_name="Template_Debian_${vm_usecase}_${_UserDesktopEnvironmentSelection}_$(date +%Y-%m-%d-%H-%M)"
 		write_status "🖥️ 	- Using Variables: \n ${vm_kernel}, \n ${vm_initrd}"
@@ -13039,7 +13470,7 @@ kvm::make_vm_now_from_debian_org() {
 		write_status "🖥️ 	- Using a environment: ${_role}"
 		: "${vm_kernel="${_DEBIAN_FRONTEND_DEFAULT_KERNEL}"}"
 		: "${vm_initrd="${_DEBIAN_FRONTEND_DEFAULT_INITRD}"}"
-		: "${ui_diplay_style="theme=light"}"
+		: "${ui_diplay_style:="theme=light"}"
 		: "${vm_usecase="Server"}"
 		local vm_name="Template_Debian_${_task}_$(date +%Y-%m-%d-%H-%M)"
 		write_status "🖥️ 	- Using Variables: \n ${vm_kernel}, \n ${vm_initrd}"
@@ -13339,7 +13770,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 	#
 	# Additional Notes:
 	#   - This function is part of a broader VM management system, relying on certain utilities and patterns
-	#     (e.g. kvm::util::read_common_options, system::get_ubuntu_media, etc.).
+	#     (e.g. kvm::util::read_common_options, ubuntu::download_iso, etc.).
 	#   - Different Ubuntu releases require different installation methods:
 	#       < 16.x → Preseed with Debian Installer
 	#       16.x–22.x → Preseed (debian-installer) for older releases
@@ -13394,7 +13825,15 @@ kvm::make_vm_now_from_ubuntu_com() {
 	dependency::virtualization
 
 	# get the version of Ubuntu to use; sets variable _tgt_ubuntu_ver...
-	system::get_tgt_ubuntu_version 
+	if [[ -z "${_tgt_ubuntu_ver}" ]]; then
+		if ubuntu::get_target_version ; then 
+			write_status "🔎 	- Using the Ubuntu version as requested: ${_tgt_ubuntu_ver}"
+		else
+			write_status "💥 - User pressed [ESC] or [Cancel] not selecting a version..." 
+			write_status "💥 - Press [ENTER] to select default version of Ubuntu (Latest LTS release)"
+			return 1
+		fi
+	fi
 
 	if [[ "${_ask}" == "YES" ]]; then
 		kvm::get_vm_config_preferences --ask
@@ -13403,11 +13842,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 	fi
 
 	# Format the name of the VM to be created...
-	local vm_name="Template_Ubuntu_${server_app}${pre_config}${_role}_${_tgt_ubuntu_ver}_${_UserDesktopEnvironmentSelection}${_UserServerEnvironemtSelection}_$(date +%Y-%m-%d-%s)"
-
-	# ensure local media:          [/where/to/look/first]
-	# system::get_ubuntu_media --dir ${permanent_download_dir} --media-type ${_flavor} --version ${_tgt_ubuntu_ver} --type ${_role}
-	# : ${iso:="$permanent_download_dir/$iso_filename"}
+	local vm_name="Template_${server_app}${pre_config}${_role}_${_tgt_ubuntu_ver}_${_UserDesktopEnvironmentSelection}${_UserServerEnvironemtSelection}_$(date +%Y-%m-%d-%s)"
 
 	# Prepare the summary message for the VM creation...
 	_summary_message="
@@ -13424,9 +13859,6 @@ kvm::make_vm_now_from_ubuntu_com() {
 	After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
 
 	# Check the version of Ubuntu and use the appropriate installer...
-	# Ubuntu changes the way installers work and the methods of how to instruct them,
-	# so we need to check the version and use the appropriate installer with the appropriate instructions (preseed, cloud-config etc.)...
-
 	case "${_role}" in
 	workstation | desktop )
 		write_status "🖥️ 	- Using a desktop environment: ${_UserDesktopEnvironmentSelection}"
@@ -13435,7 +13867,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 			# for really old Ubuntu builds (less than 16) use the debian installer (d-i) and using DVD ISO but still PRESEED.cfg...
 			# Ubuntu 14* look for the kernel called vmlinuz.efi and initrd called initrd instead of vmlinuz and initrd.gz, so
 			# we use a different option to install the VM.
-			system::get_ubuntu_media --dir ${permanent_download_dir} --media-type desktop --version ${_tgt_ubuntu_ver} 
+			ubuntu::download_iso --dir ${permanent_download_dir} --media-type desktop --version ${_tgt_ubuntu_ver} 
 			: ${iso:="$permanent_download_dir/$iso_filename"}
 			system::make_preseed_cfg ${all_params}
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: is less than 16, so using debian installer (d-i) and desktop media..."
@@ -13460,7 +13892,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 		elif [[ ${_tgt_ubuntu_ver::2} -lt 23 ]]; then
 
 			# for interim Ubuntu builds (less than 23) use the debian installer (d-i) using DVD ISO but still PRESEED.cfg...
-			system::get_ubuntu_media --dir ${permanent_download_dir} --media-type desktop --version ${_tgt_ubuntu_ver} 
+			ubuntu::download_iso --dir ${permanent_download_dir} --media-type desktop --version ${_tgt_ubuntu_ver} 
 			: ${iso:="$permanent_download_dir/$iso_filename"}
 			system::make_preseed_cfg ${all_params}
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: is less than 23, so using debian installer (d-i) and desktop media..."
@@ -13495,7 +13927,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 
 			# For modern Ubuntu builds (greater than 24) use the cloud config and desktop media to build desktop...
 			# However, this seems to be half baked... Hope it actually works for you...
-			system::get_ubuntu_media --dir ${permanent_download_dir} --media-type desktop --version ${_tgt_ubuntu_ver} 
+			ubuntu::download_iso --dir ${permanent_download_dir} --media-type desktop --version ${_tgt_ubuntu_ver} 
 			: ${iso:="$permanent_download_dir/$iso_filename"}
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using MODERN installer..."
 			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" ${all_params}
@@ -13526,7 +13958,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 			unset _tgt_ubuntu_ver _summary_message iso_filename CloudConfigDir iso vm_name 
 			return
 		else
-			system::get_ubuntu_media --dir ${permanent_download_dir} --media-type server --version ${_tgt_ubuntu_ver} 
+			ubuntu::download_iso --dir ${permanent_download_dir} --media-type server --version ${_tgt_ubuntu_ver} 
 			: ${iso:="$permanent_download_dir/$iso_filename"}
 			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than 23, so using cloud config to build server..."
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using SERVER installer as requested..."
@@ -13562,7 +13994,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 		else
 			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than 23, so using cloud config to build server..."
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using SERVER installer as requested..."
-			system::get_ubuntu_media --dir ${permanent_download_dir} --media-type server --version ${_tgt_ubuntu_ver} 
+			ubuntu::download_iso --dir ${permanent_download_dir} --media-type server --version ${_tgt_ubuntu_ver} 
 			: ${iso:="$permanent_download_dir/$iso_filename"}
 			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" ${all_params}
 					
@@ -14764,8 +15196,9 @@ template::kickstart_cfg() {
 			# Choosing mode (graphical|text|cmdline [--non-interactive])
 			graphical
 			# url --install --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f${_DEFAULT_FEDORA_VER}&arch=x86_64" 
-			url --url "${_repo_url}"
-			# url --url "https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Everything/x86_64/os/"
+			# inst.repo="${_repo_url}"
+			url --url "https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Everything/x86_64/os/"
+			#inst.repo="https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Everything/x86_64/os/"
 			firstboot --disable
 			keyboard --vckeymap=${Preference_InitialKeyboardLayout} --xlayouts="${Preference_InitialKeyboardLayout}"
 			lang en_US.UTF-8
@@ -15825,7 +16258,7 @@ cat >>${user_data_file} <<EOF
         # Install Ubuntu Desktop Environment
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get upgrade -y'
-        - curtin in-target --target=/target -- apt-get -y install ubuntu-desktop
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install ubuntu-desktop'
         - curtin in-target --target=/target -- /bin/bash -c 'plymouth-set-default-theme spinner -R || true' 
         - curtin in-target --target=/target -- sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' /etc/default/grub ; update-grub ; exit 0
         - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service || true
