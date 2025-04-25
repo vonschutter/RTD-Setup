@@ -6475,14 +6475,6 @@ gnome::set_basic_extensions_enabled() {
 
 	local all_successful=true # Track overall success
 
-	# 4. Set window button layout (Common)
-	write_status "Setting window button layout..."
-	if ! gsettings set org.gnome.desktop.wm.preferences button-layout 'close,maximize,minimize:appmenu'; then
-		write_error "Failed to set 'button-layout'."
-		all_successful=false
-	fi
-
-	# 5. Ensure user extensions are generally enabled (Common)
 	write_status "Ensuring user extensions are enabled globally..."
 	if ! gsettings set org.gnome.shell disable-user-extensions false; then
 		write_error "Failed to set 'disable-user-extensions' to false."
@@ -6494,36 +6486,38 @@ gnome::set_basic_extensions_enabled() {
 	local extensions_to_enable=(
 		'user-theme@gnome-shell-extensions.gcampax.github.com'
 		'caffeine@patapon.info'
-		'TopIcons@phocean.net' # Older tray icon support
-		'trayIconsReloaded@selfmade.pl' # Newer tray icon support
 		'apps-menu@gnome-shell-extensions.gcampax.github.com'
 	)
 
 	# Add distribution-specific extensions
 	case "$distro_type" in
-		ubuntu|pop|mint|zorin|elementary) # Add other Ubuntu derivatives if needed
+		ubuntu|pop|mint|zorin|elementary) 
 			write_status "Adding Ubuntu-specific extensions..."
 			extensions_to_enable+=(
 				'tiling-assistant@ubuntu.com'
 				'ubuntu-appindicators@ubuntu.com'
 			)
 			;;
-		fedora|debian|arch|manjaro|*) # Default for others
+		*) 
 			write_status "Adding non-Ubuntu extensions (e.g., gTile)..."
 			# Using gTile as a common tiling alternative
-			extensions_to_enable+=('gTile@vibou')
-			# No specific appindicator replacement needed if trayIconsReloaded is present
+			extensions_to_enable+=(
+				'gTile@vibou'
+				'TopIcons@phocean.net'
+				'trayIconsReloaded@selfmade.pl'
+				'desktop-icons@csoriano'
+			)
 			;;
 	esac
 
-	# 7. Format the final list for gsettings
+	# Format the final list for gsettings
 	local gsettings_list_format
 	gsettings_list_format=$(printf "'%s'," "${extensions_to_enable[@]}")
 	gsettings_list_format="[${gsettings_list_format%,}]" # Remove trailing comma, add brackets
 
-	# 8. Apply the enabled extensions list
+	# Apply the enabled extensions list
 	write_status "Enabling specific extensions for '${distro_type}' (ensure they are installed):"
-	printf "  %s\n" "${extensions_to_enable[@]}" # List them in the status output
+	printf "  %s\n" "${extensions_to_enable[@]}" 
 
 	if ! gsettings set org.gnome.shell enabled-extensions "${gsettings_list_format}"; then
 		write_error "Failed to set 'enabled-extensions'."
@@ -6531,7 +6525,6 @@ gnome::set_basic_extensions_enabled() {
 		all_successful=false
 	fi
 
-	# --- Final Status ---
 	if [[ "$all_successful" == "true" ]]; then
 		write_status "✅ Basic GNOME extensions configuration applied successfully for ${distro_type}."
 		return 0
