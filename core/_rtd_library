@@ -9691,7 +9691,6 @@ software::update_system_txt() {
 	(
 		if hash pkcon &>/dev/null; then
 			pkcon -y refresh
-			pkcon get-updates
 			pkcon -y update --autoremove
 		elif hash dnf &>/dev/null; then
 			dnf -y upgrade
@@ -9719,6 +9718,7 @@ software::update_system_txt() {
 
 	write_status "updating snaps if snap is present on the system..."
 	if hash snap 2>/dev/null; then
+		write_status "Updating user installed snaps... "
 		snap refresh
 	else
 		write_warning "--- snap software is not present on this system... skipping..."
@@ -9726,16 +9726,17 @@ software::update_system_txt() {
 
 	write_status "updating flatpaks if flatpak is present on system..."
 	if hash flatpak 2>/dev/null; then
+		write_status "Updating user installed flatpaks... "
 		flatpak update --user -y
+		write_status "Updating system installed flatpaks... "
 		flatpak update --system -y
-
 	else
 		write_warning "--- flatpak software is not present on this system... skipping..."
 	fi
+	write_information "All updates have been processed.\n"
 
 	echo "
 
-	$(write_information "All updates have been processed.\n")
 	📦 NATIVE PACKAGES:
 	$(
 		TODAY=$(date +%Y-%m-%d)
@@ -9754,6 +9755,12 @@ software::update_system_txt() {
 	$(snap changes) 
 
 	📦 FLATPAKS:
+	$(
+		flatpak history --system --since=1d
+		flatpak history --user --since=1d
+	)
+	
+	📦 FLATPAKS (USER PRIVATE):
 	$(
 		flatpak history --system --since=1d
 		flatpak history --user --since=1d
