@@ -9686,8 +9686,7 @@ software::update_system_txt() {
 	write_status "------------------------------------------------------------------"
 
 	write_host --cyan "I am updating software from all channels I can find on the system."
-	write_host --cyan "I will update via the native package manager as well as newer formats"
-	write_host --cyan "like snap and flatpak ..."
+
 	echo -e " \n"
 	(
 		if hash pkcon &>/dev/null; then
@@ -9703,9 +9702,9 @@ software::update_system_txt() {
 			apt-get update
 			UPGRADABLE=$(LANG=C apt-get upgrade -s | grep -P '^\d+ upgraded' | cut -d" " -f1)
 			if [ "$UPGRADABLE" -eq 0 ]; then
-				write_information "$UPGRADABLE packages that need updates; Skipping update task... "
+				write_information "📦 $UPGRADABLE packages that need updates; Skipping update task... "
 			else
-				write_information "There are $UPGRADABLE packages that need updates..."
+				write_information "📦 There are $UPGRADABLE packages that need updates..."
 				dpkg --configure -a
 				apt-get upgrade -y
 				apt-get full-upgrade -y
@@ -9713,7 +9712,7 @@ software::update_system_txt() {
 				apt-get clean
 			fi
 		else
-			write_error "This system does not seem to have a software managment system"
+			write_error "❌ This system does not seem to have a software managment system"
 			return 1
 		fi
 	) #| tee -a "$_LOGFILE"
@@ -9774,31 +9773,31 @@ software::update_all_ui() {
 		(
 			if hash zypper 2>/dev/null; then
 				zypper up -y
-				write_information "Update task complete."
+				write_information "📦 Update task complete."
 			elif hash apt 2>/dev/null; then
 				apt-get update
 				UPGRADABLE=$(LANG=C apt-get upgrade -s | grep -P '^\d+ upgraded' | cut -d" " -f1)
 				if [ "$UPGRADABLE" -eq 0 ]; then
-					write_information "$UPGRADABLE packages that need updates; Skipping update task... "
+					write_information "📦 $UPGRADABLE packages that need updates; Skipping update task... "
 				else
-					write_information "There are $UPGRADABLE packages that need updates..."
+					write_information "📦 There are $UPGRADABLE packages that need updates..."
 					dpkg --configure -a
 					apt-get upgrade -y
 					apt-get full-upgrade -y
 					apt-get --purge autoremove -y
 					apt-get clean
 				fi
-				write_information "Update task complete."
+				write_information "📦 Update task complete."
 			elif hash dnf 2>/dev/null; then
 				dnf -y upgrade
-				write_information "Update task complete."
+				write_information "📦 Update task complete."
 			elif hash pkcon 2>/dev/null; then
 				pkcon -y refresh
 				pkcon get-updates
 				pkcon -y update --autoremove
-				write_information "Update task complete."
+				write_information "📦 Update task complete."
 			else
-				write_error "This system does not seem to have a software managment system"
+				write_error "❌ This system does not seem to have a software managment system"
 				return 1
 			fi
 		) | tee -a "$_LOGFILE" | $dialog_ui --backtitle "\Zb$PUBLICATION             $VERSION\ZB" --progressbox "Updating all natively installed software..." 25 120
@@ -17186,7 +17185,7 @@ term::set_colors() {
 		"    ${blue}•${green}•${red}•${magenta}•"
 	)
 
-	echo -e " 🎨 $yellow * $darkyellow * $red * $darkred * $green * $darkgreen * $blue * $darkblue * $cyan * $darkcyan * $gray * $darkgray * $purple * $darkpurple * $endcolor"
+	echo -e "🎨 $yellow * $darkyellow * $red * $darkred * $green * $darkgreen * $blue * $darkblue * $cyan * $darkcyan * $gray * $darkgray * $purple * $darkpurple * $endcolor"
 }
 
 rtd_oem_pause() {
@@ -17364,7 +17363,7 @@ write_host() {
 	)" ;;
 	*) local _text="$1" ;;
 	esac
-	[[ -z "${_text}" ]] && local _text="${color} 💻 $2 $(tput sgr0)"
+	[[ -z "${_text}" ]] && local _text="${color}🗣  $2 $(tput sgr0)"
 	echo -e "${_text} "
 
 	# Tell the loging function to log the message requested...
@@ -17682,7 +17681,7 @@ dependency::file _branding.info && system::log_item "✅ _branding.info Loaded w
 dependency::file _locations.info && system::log_item "✅ _locations.info Loaded without errors..." || system::log_item "👾 _locations.info Loaded with errors..."
 dependency::file _rtd_recipies.info && system::log_item "✅ _rtd_recipies.info Loaded without errors..." || system::log_item "👾 _rtd_recipies.info Loaded with errors..."
 
-write_host --green " 📚 RTD Power Library $RTD_VERSION loaded OK"
+write_status "📚 RTD Power Library $RTD_VERSION loaded OK"
 export RTDFUNCTIONS="${RTD_VERSION}"
 
 # log variables for support reasons...
