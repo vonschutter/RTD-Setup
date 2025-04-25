@@ -520,7 +520,7 @@ show_manage_vm_gui () {
 		;;
 		3)
 			echo "VM Status on This HOST: Press [Q] to quit."
-			check_dependencies virt-top
+			software::check_native_package_dependency virt-top
 			virt-top
 		;;
 		4 )
@@ -840,7 +840,7 @@ show_view_informaion_about_this_system () {
 			echo "Program terminated by user..."
 		;;
 		1 )
-			check_dependencies neofetch || (rtd_oem_pause 1 ; return ) && clear
+			software::check_native_package_dependency neofetch || (rtd_oem_pause 1 ; return ) && clear
 			neofetch --memory_display barinfo
 			ip -br addr
 			read -p "Press [Enter] key to return to the main menu: "
@@ -868,9 +868,9 @@ show_view_informaion_about_this_system () {
 			dialog::display_result "Total Space Utilization root directory:"
 		;;
 		7 )
-			check_dependencies lm-sensors
+			software::check_native_package_dependency lm-sensors
 			sudo /etc/init.d/kmod start
-			check_dependencies hddtemp
+			software::check_native_package_dependency hddtemp
 			sudo sensors-detect --auto
 			result="$( sensors )"
 			dialog::display_result "System Temperature Information"
@@ -888,13 +888,13 @@ show_view_informaion_about_this_system () {
 			clear
 		;;
 		11 )
-			check_dependencies curl &>/dev/null
-			check_dependencies dnsutils &>/dev/null
+			software::check_native_package_dependency curl &>/dev/null
+			software::check_native_package_dependency dnsutils &>/dev/null
 			result=$( curl ipinfo.io/$(curl myip.dnsomatic.com))
 			dialog::display_result "This systems location on the Internet"
 		;;
 		12 )
-			check_dependencies curl
+			software::check_native_package_dependency curl
 			write_host "Your local weather is"
 			curl http://wttr.in
 			read -p "Press [Enter] key to return to the main menu: "
@@ -943,7 +943,7 @@ show_monitor_informaion_about_this_system () {
 		1 )
 			_RUN="bashtop"
 			if ! hash "${_RUN}" ; then
-				check_dependencies ${_RUN} || read -p "Press [Enter] key to return to the main menu: " && ${_RUN}
+				software::check_native_package_dependency ${_RUN} || read -p "Press [Enter] key to return to the main menu: " && ${_RUN}
 			else
 				${_RUN}
 			fi
@@ -951,7 +951,7 @@ show_monitor_informaion_about_this_system () {
 		2 )
 			_RUN="nethogs"
 			if ! hash "${_RUN}" ; then
-				check_dependencies ${_RUN} || read -p "Press [Enter] key to return to the main menu: " && ${_RUN}
+				software::check_native_package_dependency ${_RUN} || read -p "Press [Enter] key to return to the main menu: " && ${_RUN}
 			else
 				${_RUN}
 			fi
@@ -959,7 +959,7 @@ show_monitor_informaion_about_this_system () {
 		3 )
 			_RUN="glances"
 			if ! hash "${_RUN}" ; then
-				check_dependencies ${_RUN} || read -p "Press [Enter] key to return to the main menu: " && ${_RUN}
+				software::check_native_package_dependency ${_RUN} || read -p "Press [Enter] key to return to the main menu: " && ${_RUN}
 			else
 				${_RUN}
 			fi
@@ -967,7 +967,7 @@ show_monitor_informaion_about_this_system () {
 		4 )
 			_RUN="bmon"
 			if ! hash "${_RUN}" ; then
-				check_dependencies ${_RUN} || read -p "Press [Enter] key to return to the main menu: " && ${_RUN}
+				software::check_native_package_dependency ${_RUN} || read -p "Press [Enter] key to return to the main menu: " && ${_RUN}
 			else
 				${_RUN}
 			fi
@@ -1308,7 +1308,7 @@ case $1 in
 				dependency::file _rtd_library &>/dev/null
 				security::ensure_admin
 				if [ "$UID" -eq 0 ]; then
-					check_dependencies byobu && echo -e "$RED" "A critical component needed for this script to work properly was attempted to be added... Attempting to run the script again"
+					software::check_native_package_dependency byobu && echo -e "$RED" "A critical component needed for this script to work properly was attempted to be added... Attempting to run the script again"
 					su -c "$0 $*" "$SUDO_USER"
 					clear
 				fi

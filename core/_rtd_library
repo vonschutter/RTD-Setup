@@ -43,7 +43,7 @@ export RTD_VERSION="2.04"
 	Functions defined in this library:
 
 1     add_gnome3_favorite_app                            ;       Adds a new favorite app to the gnome favorites bar
-2     check_dependencies                                 ;       Checks that software requirements are met so scripts do not fail
+2     software::check_native_package_dependency                                 ;       Checks that software requirements are met so scripts do not fail
 3     create_physical_media_from_iso                     ;       Create physical media thumb drive from an ISO file
 4     dependency::check_hardware_virtualization_support  ;       Check if hardware virtualization is supported
 5     dependency::check_if_running_in_vm                 ;       Check if the script is running in a virtual machine
@@ -588,7 +588,7 @@ dialog::display_notice() {
 	system::log_item "checking for dialog..."
 	if ! hash "${RTD_GUI:-dialog}" &>/dev/null; then
 		system::log_item "${RTD_GUI:-dialog} not found..."
-		check_dependencies "${RTD_GUI:-dialog}" &>/dev/null || return 1
+		software::check_native_package_dependency "${RTD_GUI:-dialog}" &>/dev/null || return 1
 	else
 		system::log_item "${RTD_GUI:-dialog} found..."
 	fi
@@ -627,7 +627,7 @@ dialog::display_error() {
 	system::log_item "checking for dialog..."
 	if ! hash "${RTD_GUI:-dialog}" &>/dev/null; then
 		system::log_item "${RTD_GUI:-dialog} not found..."
-		check_dependencies "${RTD_GUI:-dialog}" &>/dev/null || return 1
+		software::check_native_package_dependency "${RTD_GUI:-dialog}" &>/dev/null || return 1
 	else
 		system::log_item "${RTD_GUI:-dialog} found..."
 	fi
@@ -660,7 +660,7 @@ dialog::display_summary_message() {
 
 	if ! hash dialog &>/dev/null; then
 		system::log_item "dialog not found..."
-		check_dependencies dialog &>/dev/null || return 1
+		software::check_native_package_dependency dialog &>/dev/null || return 1
 	else
 		system::log_item "dialog found..."
 	fi
@@ -711,7 +711,7 @@ dialog::display_result() {
 	system::log_item "checking for dialog..."
 	if ! hash "${RTD_GUI:-dialog}" &>/dev/null; then
 		system::log_item "${RTD_GUI:-dialog} not found..."
-		check_dependencies "${RTD_GUI:-dialog}" &>/dev/null || return 1
+		software::check_native_package_dependency "${RTD_GUI:-dialog}" &>/dev/null || return 1
 	else
 		system::log_item "${RTD_GUI:-dialog} found..."
 	fi
@@ -786,7 +786,7 @@ dialog::prompt_yes_no() {
 	system::log_item "Checking for dialog..."
 	if ! hash "${RTD_GUI:-dialog}" &>/dev/null; then
 		system::log_item "${RTD_GUI:-dialog} not found..."
-		check_dependencies "${RTD_GUI:-dialog}" &>/dev/null || return 1
+		software::check_native_package_dependency "${RTD_GUI:-dialog}" &>/dev/null || return 1
 	else
 		system::log_item "${RTD_GUI:-dialog} found..."
 	fi
@@ -838,7 +838,7 @@ yad::display_cmd_output() {
 	system::log_item "checking for diayadog..."
 	if ! hash "yad" &>/dev/null; then
 		system::log_item "yad not found..."
-		check_dependencies "yad" &>/dev/null || return 1
+		software::check_native_package_dependency "yad" &>/dev/null || return 1
 	else
 		system::log_item "yad found..."
 	fi
@@ -890,7 +890,7 @@ yad::display_progressbar_pulsating() {
 	system::log_item "checking for yad..."
 	if ! hash "yad" &>/dev/null; then
 		system::log_item "yad not found..."
-		check_dependencies "yad" &>/dev/null || return 1
+		software::check_native_package_dependency "yad" &>/dev/null || return 1
 	else
 		system::log_item "yad found..."
 	fi
@@ -929,7 +929,7 @@ zenity::display_info() {
 	# End of Documentation
 
 	_text="${*}"
-	hash zenity &>/dev/null || check_dependencies zenity &>/dev/null || return 1
+	hash zenity &>/dev/null || software::check_native_package_dependency zenity &>/dev/null || return 1
 	zenity --info --text --title="${_TITLE:="Notice"}: $selection" --text="$_text" --ellipsize --height=600 --width=800 2>/dev/null
 }
 
@@ -963,7 +963,7 @@ yad::display_info() {
 	# End of Documentation
 
 	_text="${*}"
-	hash yad &>/dev/null || check_dependencies yad &>/dev/null || return 1
+	hash yad &>/dev/null || software::check_native_package_dependency yad &>/dev/null || return 1
 	yad --info --text --title="${_TITLE:="Notice"}: $selection" --text="$_text" --ellipsize --height=600 --width=800 2>/dev/null
 }
 
@@ -2192,7 +2192,7 @@ system::prepare_environment_for_iso_creation() {
 				: "${isohdpfx_bin:=$(locate isohdpfx.bin | head -n 1)}"
 				write_information "Found: $isohdpfx_bin"
 			else
-				check_dependencies plocate && (
+				software::check_native_package_dependency plocate && (
 					write_warning "Updating file location DB, this may take a long time if there are a lot of files on the system..."
 					updatedb
 				)
@@ -4029,7 +4029,7 @@ system::io_on_notify_wait() {
 	# Usage: system::io_on_notify_wait rsync -avt . host:/remote/dir ...
 	# End of documentation
 
-	check_dependencies inotify-tools
+	software::check_native_package_dependency inotify-tools
 	EVENTS="CREATE,CLOSE_WRITE,DELETE,MODIFY,MOVED_FROM,MOVED_TO"
 
 	if [ -z "$1" ]; then
@@ -5071,7 +5071,7 @@ system::tune_system_power_profile() {
 	# Usage: simply call function in a script
 	# End of documentation
 
-	check_dependencies tuned
+	software::check_native_package_dependency tuned
 	systemctl enable --now tuned
 	tuned-adm profile balanced
 
@@ -5080,8 +5080,8 @@ system::tune_system_power_profile() {
 	*) unset _print ;;
 	esac
 
-	check_dependencies virt-what
-	check_dependencies laptop-detect
+	software::check_native_package_dependency virt-what
+	software::check_native_package_dependency laptop-detect
 	if virt-what; then
 		"${_print}" write_information "${FUNCNAME[0]}: This is likely not running in a virtual machine."
 		if laptop-detect; then
@@ -6028,7 +6028,7 @@ oem::setup_brand_splash_screen() {
 	system::log_item "🔯 Ensure that ImageMagick is installed so images can be manipulated."
 
 	# Check if ImageMagick is installed; required for image manipulation.
-	check_dependencies imagemagick
+	software::check_native_package_dependency imagemagick
 
 	# Determine the default image file to brand if not provided.
 	# Uses splash.png from common directories if no image is specified.
@@ -7439,7 +7439,7 @@ rtd_oem_ubuntu_auto_install_iso_builder() {
 	rm -rf $mnt $auto
 
 	if ($RTD_GUI --title "Media ready" --yesno "Created $auto.iso Would you like to test the new image?." 0 0); then
-		check_dependencies qemu-kvm
+		software::check_native_package_dependency qemu-kvm
 		qemu-img create -f qcow2 "$put_qcow_file_here_when_done/$auto.qcow2" 10G
 		qemu-system-x86_64 -smp 2 -enable-kvm -m 4G --cdrom "$target_iso" "$put_qcow_file_here_when_done/$auto.qcow2"
 	else
@@ -8249,7 +8249,7 @@ tool::test_iso_boot_media() {
 		if ($RTD_GUI --title "BOOT Media Testing" --yesno "\n Would you like to test your boot media ${iso_test} to see if it works?" 10 80); then
 			clear
 			write_information "TESTING ${iso_test}."
-			if ! hash qemu-system-x86_64; then check_dependencies qemu-system-x86_64; fi
+			if ! hash qemu-system-x86_64; then software::check_native_package_dependency qemu-system-x86_64; fi
 			: "${bin_qemu_img:=$(type -P qemu-img)}"
 			: "${bin_qemu_system_x86_64:=$(type -P qemu-system-x86_64)}"
 			: "${put_qcow_file_here_when_done:="/home/$SUDO_USER/Virtual-HDs"}"
@@ -9494,7 +9494,7 @@ software::package_kit::remove_package() {
 software::ensure_software_store_available() {
 	# Description: Function to ensure that flatpak is installed and flathup enabled.
 	# Globals: none
-	# Dependencies: [distro pakcage managment] [function: check_dependencies] [Internet access]
+	# Dependencies: [distro pakcage managment] [function: software::check_native_package_dependency] [Internet access]
 	# Arguments: None
 	# Outputs:
 	# Returns: Standard return codes 1/0
@@ -9521,30 +9521,30 @@ software::ensure_software_store_available() {
 	plasma)
 		# If we find any plasma session then install the plasma store addons...
 		write_information "${FUNCNAME[0]}: plasma on anything..".
-		check_dependencies plasma-discover
-		check_dependencies plasma-discover-backend-flatpak
-		check_dependencies plasma-discover-backend-snap
+		software::check_native_package_dependency plasma-discover
+		software::check_native_package_dependency plasma-discover-backend-flatpak
+		software::check_native_package_dependency plasma-discover-backend-snap
 		;;
 	"/usr/share/xsessions/default")
 		# Special case for suse again...
 		if cat /usr/share/xsessions/default.desktop | grep "Plasma"; then
 			write_information "${FUNCNAME[0]}: kde on suse"
-			check_dependencies plasma-discover
-			check_dependencies plasma-discover-backend-flatpak
-			check_dependencies plasma-discover-backend-snap
+			software::check_native_package_dependency plasma-discover
+			software::check_native_package_dependency plasma-discover-backend-flatpak
+			software::check_native_package_dependency plasma-discover-backend-snap
 		else
 			write_information "${FUNCNAME[0]}: gnome on suse"
-			check_dependencies gnome-software
-			check_dependencies gnome-software-plugin-flatpak
-			check_dependencies gnome-software-plugin-snap
+			software::check_native_package_dependency gnome-software
+			software::check_native_package_dependency gnome-software-plugin-flatpak
+			software::check_native_package_dependency gnome-software-plugin-snap
 		fi
 		;;
 	*)
 		# in any other case, install the gnome versions of store and plugins...
 		write_information "${FUNCNAME[0]}: case = *"
-		check_dependencies gnome-software
-		check_dependencies gnome-software-plugin-flatpak
-		check_dependencies gnome-software-plugin-snap
+		software::check_native_package_dependency gnome-software
+		software::check_native_package_dependency gnome-software-plugin-flatpak
+		software::check_native_package_dependency gnome-software-plugin-snap
 		;;
 	esac
 
@@ -9553,7 +9553,7 @@ software::ensure_software_store_available() {
 software::ensure_flatpak_package_managment() {
 	# Description: Function to ensure that flatpak is installed and flathup enabled.
 	# Globals: none
-	# Dependencies: [distro pakcage managment] [function: check_dependencies] [Internet access]
+	# Dependencies: [distro pakcage managment] [function: software::check_native_package_dependency] [Internet access]
 	# Arguments: None
 	# Outputs:
 	# Returns: Standard return codes 1/0
@@ -9622,7 +9622,7 @@ software::ensure_flatpak_package_managment() {
 		else
 			security::ensure_admin
 			write_information "Ensuring Flatpak software distribution system is available..."
-			if check_dependencies flatpak; then
+			if software::check_native_package_dependency flatpak; then
 				flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || write_error "Failed to add flatpak repo!"
 				export PATH=$PATH:/var/lib/flatpak/exports/bin
 			else
@@ -9690,12 +9690,16 @@ software::update_system_txt() {
 	write_host --cyan "like snap and flatpak ..."
 	echo -e " \n"
 	(
-		if hash dnf 2>/dev/null; then
+		if hash pkcon &>/dev/null; then
+			pkcon -y refresh
+			pkcon get-updates
+			pkcon -y update --autoremove
+		elif hash dnf &>/dev/null; then
 			dnf -y upgrade
 		elif hash zypper 2>/dev/null; then
 			zypper up -y
 			zypper dup -y --auto-agree-with-licenses --allow-vendor-change
-		elif hash apt 2>/dev/null; then
+		elif hash apt &>/dev/null; then
 			apt-get update
 			UPGRADABLE=$(LANG=C apt-get upgrade -s | grep -P '^\d+ upgraded' | cut -d" " -f1)
 			if [ "$UPGRADABLE" -eq 0 ]; then
@@ -9708,15 +9712,11 @@ software::update_system_txt() {
 				apt-get --purge autoremove -y
 				apt-get clean
 			fi
-		elif hash pkcon 2>/dev/null; then
-			pkcon -y refresh
-			pkcon get-updates
-			pkcon -y update --autoremove
 		else
 			write_error "This system does not seem to have a software managment system"
 			return 1
 		fi
-	) | tee -a "$_LOGFILE"
+	) #| tee -a "$_LOGFILE"
 
 	write_status "updating snaps if snap is present on the system..."
 	if hash snap 2>/dev/null; then
@@ -9736,27 +9736,28 @@ software::update_system_txt() {
 
 	echo "
 
-	$(write_information "All updates have been processed.")
-	NATIVE PACKAGES:
+	$(write_information "All updates have been processed.\n")
+	📦 NATIVE PACKAGES:
 	$(
+		TODAY=$(date +%Y-%m-%d)
 		if hash apt; then
-			cat /var/log/dpkg.log | grep "\ upgrade\ "
+			zgrep "^${TODAY}.* upgrade " /var/log/dpkg.log /var/log/dpkg.log.1
 		elif hash dnf; then
-			cat /var/log/dnf.log | grep "\ upgrade\ "
+			sudo zgrep "^${TODAY}.* Upgraded: " /var/log/dnf.log* /var/log/dnf.rpm.log* 
 		elif hash zypper; then
-			for i in $(cat /var/log/zypp/history | grep '|install|' | cut -f3 -d'|'); do echo -n "* $i "; done
+			cat /var/log/zypp/history | grep "patch" |grep "${TODAY}" 
 		elif hash pkcon; then
 			pkcon get-updates
 		fi
 	)
 
-	SNAPS:
+	📦 SNAPS:
 	$(snap changes) 
 
-	FLATPAKS:
+	📦 FLATPAKS:
 	$(
-		flatpak history --system --since=1h
-		flatpak history --user --since=1h
+		flatpak history --system --since=1d
+		flatpak history --user --since=1d
 	)" | tee -a "$LOGFILE"
 }
 
@@ -9887,7 +9888,7 @@ software::update_all_ui() {
 software::from_flathub.org() {
 	# Description: Function to simplify and streamline the installation and removal of flatpaks.
 	# Globals: none
-	# Dependencies: [distro pakage managment] [function: check_dependencies] [Internet access]
+	# Dependencies: [distro pakage managment] [function: software::check_native_package_dependency] [Internet access]
 	# Arguments:
 	# -- Default action is to add software title matching passed parameter.
 	# -- An optioin "--remove" may be passed to atempt removal of the software title.
@@ -9985,7 +9986,7 @@ software::from_flathub.org() {
 software::from_snapcraft.io() {
 	# Description: Function to ensure that snap is installed.
 	# Globals: none
-	# Dependencies: [distro pakcage managment] [function: check_dependencies] [Internet access]
+	# Dependencies: [distro pakcage managment] [function: software::check_native_package_dependency] [Internet access]
 	# Arguments: None
 	# Outputs: stdout
 	# Returns: Standard return codes 1/0
@@ -10126,7 +10127,7 @@ software::ensure_restricted_codecs() {
 	# End of documentation
 	write_status "Install all the required multimedia codecs..."
 	for i in libdvdcss2 ffmpeg; do
-		check_ependencies $i || write_error "Failed to install restricted codecs..."
+		software::check_native_package_dependency $i || write_error "Failed to install restricted codecs..."
 	done
 }
 
@@ -10138,7 +10139,7 @@ software::vendor_download_and_install() {
 	# Arguments: URL to rpm or deb file and possibly some other formats of distributions that use package kit.
 	# Outputs:
 	# Depends:
-	#           - Functions; write_error, check_dependencies
+	#           - Functions; write_error, software::check_native_package_dependency
 	#           - Software: wget, pkcon
 	# Returns: 0/1
 	# Usage:
@@ -10152,7 +10153,7 @@ software::vendor_download_and_install() {
 	echo "${FUNCNAME[0]}: getting package ${download_url}..."
 	if hash wget; then
 		fetch_file
-	elif check_dependencies wget; then
+	elif software::check_native_package_dependency wget; then
 		fetch_file
 	else
 		write_error "Unable to download requested file:  ${download_url}..."
@@ -10166,7 +10167,7 @@ software::vendor_download_and_install() {
 		pkcon install-local -y ${_OEM_DIR}/cache/"$(basename "${download_url}")"
 		return $?
 	else
-		check_dependencies packagekit-tools
+		software::check_native_package_dependency packagekit-tools
 		pkcon install-local -y ${_OEM_DIR}/cache/"$(basename "${download_url}")"
 		return $?
 	fi
@@ -10484,7 +10485,7 @@ software::native_management_availability_check() {
 software::ensure_snap_package_managment() {
 	# Description: Function to ensure that snap is installed.
 	# Globals: none
-	# Dependencies: [distro pakcage managment] [function: check_dependencies] [Internet access]
+	# Dependencies: [distro pakcage managment] [function: software::check_native_package_dependency] [Internet access]
 	# Arguments: None
 	# Outputs: stdout
 	# Returns: Standard return codes 1/0
@@ -10562,7 +10563,7 @@ software::ensure_snap_package_managment() {
 					write_error "Failed to update snap repository!"
 					return 1
 				)
-				check_dependencies snapd || (
+				software::check_native_package_dependency snapd || (
 					write_error "Failed to satisfy dependecy SNAP!"
 					return 1
 				)
@@ -10577,7 +10578,7 @@ software::ensure_snap_package_managment() {
 			else
 				# For distributions that do not need to add a repository to install snap
 				# But would need to install it from their standard reopsitory....
-				if check_dependencies snapd; then
+				if software::check_native_package_dependency snapd; then
 					systemctl enable snapd
 					systemctl start snapd
 					echo snapd is $(systemctl is-active snapd) || return 1
@@ -10832,16 +10833,6 @@ software::add_gnome_extensions() {
 	return $install_status
 }
 
-check_dependencies() {
-	# Description:
-	# Function to maintain backward compatibility with the check_dependencies function.
-	# This function will take a parameter that is expected to match the name of the package.
-	# The function will then pass it to the software::check_native_package_dependency function.
-	#
-	# End of documentation
-	software::check_native_package_dependency ${*} && return 0 || return 1
-
-}
 
 software::check_native_package_dependency() {
 	# Description:
@@ -11558,7 +11549,7 @@ rtd_server_setup_choices_services() {
 			if java --version; then
 				echo "java of some version is present. I respect your choice... and will try to run! --- OK!"
 			else
-				check_dependencies default-jre
+				software::check_native_package_dependency default-jre
 			fi
 
 			if cat /home/$SUDO_USER/minecraft-server | grep SLS; then
@@ -13116,7 +13107,7 @@ kvm::make_vm_now_from_fedora_org() {
 	# isolated virtual environments called guests or virtual machines (VMs). KVM is part of Linux.
 	# For complete info: https://www.redhat.com/en/topics/virtualization/what-is-KVM
 	# set -e
-	# Use the check_dependencies function to make sure the needed software is available.
+	# Use the software::check_native_package_dependency function to make sure the needed software is available.
 	# Usage: Either simply call this function to use the defaults or:
 	# Call this function with "function" "RAM_SIZE" "DISK_SIZE" "DISK_FORMAT" "DISK_FILE"
 	# Omitting any of the arguments will us the default instead.
@@ -13212,7 +13203,7 @@ kvm::make_vm_now_from_redhat_com() {
 	# isolated virtual environments called guests or virtual machines (VMs). KVM is part of Linux.
 	# For complete info: https://www.redhat.com/en/topics/virtualization/what-is-KVM
 	# set -e
-	# Use the check_dependencies function to make sure the needed software is available.
+	# Use the software::check_native_package_dependency function to make sure the needed software is available.
 	# Usage: Either simply call this function to use the defaults or:
 	# Call this function with "function" "RAM_SIZE" "DISK_SIZE" "DISK_FORMAT" "DISK_FILE"
 	# Omitting any of the arguments will us the default instead.
@@ -13304,7 +13295,7 @@ kvm::make_vm_now_from_opensuse_org() {
 	# a host machine to run multiple, isolated virtual environments called guests or virtual machines (VMs).
 	# For more information: https://www.redhat.com/en/topics/virtualization/what-is-KVM
 	#
-	# Use the check_dependencies function to ensure the required software is available.
+	# Use the software::check_native_package_dependency function to ensure the required software is available.
 	#
 	# Usage:
 	#   - Call this function with no arguments to use default values.
@@ -13422,7 +13413,7 @@ kvm::make_vm_now_from_debian_org() {
 	# isolated virtual environments called guests or virtual machines (VMs). KVM is part of Linux.
 	# For complete info: https://www.redhat.com/en/topics/virtualization/what-is-KVM
 	#
-	# Use the check_dependencies function to make sure the needed software is available.
+	# Use the software::check_native_package_dependency function to make sure the needed software is available.
 	# Usage: Either simply call this function to use the defaults or:
 	# Call this function with "function" "RAM_SIZE" "DISK_SIZE" "DISK_FORMAT" "DISK_FILE"
 	# Omitting any of the arguments will us the default instead.
@@ -13530,7 +13521,7 @@ kvm::make_vm_now_from_kali_org() {
 	# isolated virtual environments called guests or virtual machines (VMs). KVM is part of Linux.
 	# For complete info: https://www.redhat.com/en/topics/virtualization/what-is-KVM
 	#
-	# Use the check_dependencies function to make sure the needed software is available.
+	# Use the software::check_native_package_dependency function to make sure the needed software is available.
 	# Usage: Either simply call this function to use the defaults or:
 	# Call this function with "function" "RAM_SIZE" "DISK_SIZE" "DISK_FORMAT" "DISK_FILE"
 	# Omitting any of the arguments will us the default instead.
@@ -14043,7 +14034,7 @@ kvm::make_vm_now_from_microsoft() {
 	# isolated virtual environments called guests or virtual machines (VMs). KVM is part of Linux.
 	# For complete info: https://www.redhat.com/en/topics/virtualization/what-is-KVM
 	# set -e
-	# Use the check_dependencies function to make sure the needed software is available.
+	# Use the software::check_native_package_dependency function to make sure the needed software is available.
 	# Usage: Either simply call this function to use the defaults or:
 	# Call this function with "function" "RAM_SIZE" "DISK_SIZE" "DISK_FORMAT" "DISK_FILE"
 	# Omitting any of the arguments will us the default instead.
@@ -14121,7 +14112,7 @@ kvm::make_vm_now_from_microsoft() {
 		write_information "Generate Windows Instruction media requested..."
 
 		# Ensure mkfs.msdos is available
-		if ! hash mkfs.msdos && ! check_dependencies dosfstools; then
+		if ! hash mkfs.msdos && ! software::check_native_package_dependency dosfstools; then
 			write_error "Failed to install or find dosfstools. mkfs.msdos required to create the floppy disk."
 			rtd_oem_pause 1 "Install will not be fully automatic: Please press [ENTER] to continue..."
 		fi
@@ -14150,7 +14141,7 @@ kvm::make_vm_now_from_microsoft() {
 		fi
 
 		# Ensure mcopy is available
-		if ! hash mcopy && ! check_dependencies mtools; then
+		if ! hash mcopy && ! software::check_native_package_dependency mtools; then
 			write_warning "No mcopy found in mtools (unable to install?) to copy the post-install script to the floppy disk..."
 			rtd_oem_pause 1 "Install will not be fully automatic: Please press [ENTER] to continue..."
 		fi
@@ -14433,11 +14424,11 @@ kvm::backup_all_running_vm() {
 # 		fi
 # 	else
 # 		if ($RTD_GUI --title "NOTICE!" --yesno "KVM Virtualization is not installed on this machine. May I attempt to install it for you on this machine?" $HEIGHT $WIDTH); then
-# 			check_dependencies qemu-kvm || (
+# 			software::check_native_package_dependency qemu-kvm || (
 # 				whiptail --title "ERROR!" --msgbox "KVM install failed!" $HEIGHT $WIDTH &
 # 				show_manage_vm_gui
 # 			) && whiptail --title "Notice!" --msgbox "KVM installation completed!"
-# 			check_dependencies virt-goodies || (
+# 			software::check_native_package_dependency virt-goodies || (
 # 				whiptail --title "ERROR!" --msgbox "Virt Goodies install failed!" $HEIGHT $WIDTH &
 # 				show_manage_vm_gui
 # 			) && whiptail --title "Notice!" --msgbox "Virt Goodies installation completed!"
@@ -16576,7 +16567,7 @@ MINECRAFT_JAR=server.jar
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #
 
-function check_dependencies (){
+function software::check_native_package_dependency (){
 	# Simple function to check if software is available and take action
 	# if it is not. Software name must match command to envoke it.
 	#---------------------------------------------------------------
@@ -16674,7 +16665,7 @@ function check_java (){
 		echo Java is not present where expected... will now download:
 		wget https://download.oracle.com/java/20/latest/jdk-20_linux-x64_bin.tar.gz
 		mkdir ~/bin/java && tar xzvf jdk-20_linux-x64_bin.tar.gz --directory ~/bin/java/ --strip 1
-		#check_dependencies default-jre
+		#software::check_native_package_dependency default-jre
 	fi
 }
 
@@ -16919,7 +16910,7 @@ eula=true
 # iff they are not, attempt to install them.
 for i in byobu speedometer htop python3 dialog
 do
-	check_dependencies $i
+	software::check_native_package_dependency $i
 done
 
 if echo "$@" | grep "update" ;then

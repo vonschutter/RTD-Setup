@@ -71,7 +71,75 @@ if [ "$1" == "setup" ]; then
 fi
 
 
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
+
+main ()
+{
+		# Check if the script is being run as root
+		if [[ $EUID -ne 0 ]]; then
+			echo -e $YELLOW"This script needs administrative access..." $ENDCOLOR
+			exec sudo -E SUDO_USER=$USER /bin/bash "${0}" "$*" || rtd_oem_pause 1
+		else
+			echo -e $GREEN"Administrative access granted..." $ENDCOLOR
+		fi
+
+		# Check if the RTD library is loaded
+		check_rtd_library || rtd_oem_pause 1 "$0: $* Failed to load RTD Library!"
+
+	# Execute the fist instruction passed to this script...
+	if [ ! -z $INSTRUCTION ]; then
+		become_root "$1"
+		log_item The instruction $INSTRUCTION was given...
+		check_rtd_library
+		$INSTRUCTION
+		exit
+	else
+		if [[ ! -z "$1" ]]; then
+			echo "Request: $1"
+		fi
+		
+	fi
+
+
+	# Updating software managed by distribution speciffic software manager...
+	# Unless help was requested. 
+
+	case "$1" in
+		--help)
+			script::help
+			exit 0
+			;;
+		--noui)
+			become_root "$1" 	|| rtd_oem_pause 1 "$0: $* Failed to elevate privileges!"
+			check_rtd_library 	|| rtd_oem_pause 1 "$0: $* Failed to load RTD Library!"
+			write_status "Updating installed software text display only..."
+			software::update_system_txt 
+			;;
+		*)
+			distro_type=$(system::distribution_type)
+			case $distro_type in
+				"debian" | "ubuntu" | "linuxmint" | "raspbian" | "pop" | "kali" | "kubuntu" | "elementary" | "zorin" | "mxlinux" | "Lubuntu" |  ubuntu*)
+					become_root "$1" 	|| rtd_oem_pause 1 "$0: $* Failed to elevate privileges!"
+					check_rtd_library	|| rtd_oem_pause 1 "$0: $* Failed to load RTD Library!"
+					write_status "🌀 Found deb based distro, updating installed software..."
+					write_status "💻 Using txt only as deb cannot be forced not to ask any questions"
+					software::update_system_txt
+					;;
+				*)
+					become_root "$1" 	|| rtd_oem_pause 1 "$0: $* Failed to elevate privileges!"
+					check_rtd_library	|| rtd_oem_pause 1 "$0: $* Failed to load RTD Library!"
+					write_status "🐧 Updating installed software..."
+					software::update_all_ui 
+					;;
+			esac
+			;;
+	esac
+}
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -102,14 +170,6 @@ check_rtd_library ()
 	fi
 
 	write_host --cyan "Libraries loaded"
-	write_status "Paths registered:
-	- Root directory of tools: 		_OEM_DIR="${scriptdir%/*}"
-	- Caching and download folder: 		_CACHE_DIR="${_OEM_DIR}/cache"
-	- Location of 3rd party apps:		_APP_DIR="${_OEM_DIR}/apps"
-	- Location of extension modules:	_MODS_DIR="${_OEM_DIR}/modules"
-	- Root tools folder: 			_CORE_DIR="${_OEM_DIR}/core"
-	- Location of log files:		_LOG_DIR=/var/log/${_TLA,,}
-	"
 }
 
 
@@ -182,9 +242,9 @@ config_me ()
 
 setup_me ()
 {
-	check_dependencies flatpak
+	software::check_native_package_dependency flatpak
 	flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-	check_dependencies  snapd
+	software::check_native_package_dependency  snapd
 }
 
 
@@ -201,44 +261,4 @@ become_root ()
 	fi
 }
 
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Script Executive                ::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-
-
-# Execute the fist instruction passed to this script...
-if [ ! -z $INSTRUCTION ]; then
-	become_root "$1"
-	log_item The instruction $INSTRUCTION was given...
-	check_rtd_library
-	$INSTRUCTION
-	exit
-else
-	if [[ ! -z "$1" ]]; then
-		echo "Request: $1"
-	fi
-	
-fi
-
-
-
-# Updating software managed by distribution speciffic software manager...
-# Unless help was requested. 
-if [[ "$1" == "--help" ]] ; then
-	script::help
-elif [[ "$1" == "--noui" ]] ; then
-	echo  "${LOGFILE}"
-	become_root "$1" 	|| rtd_oem_pause 1 "$0: $* Failed to elevate privileges!"
-	check_rtd_library 	|| rtd_oem_pause 1 "$0: $* Failed to load RTD Library!"
-	write_status "Updating installed software text display only..."
-	write_status  "${LOGFILE}"
-	software::update_system_txt "${LOGFILE}"
-else 
-	become_root "$1" 	|| rtd_oem_pause 1 "$0: $* Failed to elevate privileges!"
-	check_rtd_library	|| rtd_oem_pause 1 "$0: $* Failed to load RTD Library!"
-	write_status "Updating installed software..."
-	software::update_all_ui  "${LOGFILE}"
-fi
+main "$@"

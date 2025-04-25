@@ -140,7 +140,7 @@ system::perform_powertools_update_linux ()
 			case $choice in
 				1)
 					write_information "Attempting to get the latest RTD tools..."
-					hash git &>> ${_logfile} || check_dependencies git
+					hash git &>> ${_logfile} || software::check_native_package_dependency git
 				
 					if git clone --depth=1 "${_git_src_url}" "/opt/${_tla,,}.tmp" ; then
 						write_information "Powertools successfully retrieved..."
@@ -252,7 +252,7 @@ if [[ ${UID} -eq 0 ]] ; then
 	# Execute only in the case of elevated privileges:
 	oem_launch_me () {
 		echo "$(date) executing $0"
-		for i in ${_software_dependencies} ; do hash "${i}" || check_dependencies ${i} ; done
+		for i in ${_software_dependencies} ; do hash "${i}" || software::check_native_package_dependency ${i} ; done
 		case ${autoconfirm} in
 		--autoconfirm )
 			clear && do_update
