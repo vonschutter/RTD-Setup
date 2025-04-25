@@ -16234,6 +16234,7 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get upgrade -y'
         - curtin in-target --target=/target -- apt-get -y install kubuntu-desktop
+        - curtin in-target --target=/target -- /bin/bash -c 'snap install firefox'
         - curtin in-target --target=/target -- dpkg --add-architecture i386 && apt-get update && apt-get -y install wine32:i386
         - curtin in-target --target=/target -- apt install plymouth-theme-kubuntu-logo plymouth-theme-kubuntu-text plymouth-theme-spinner plymouth-x11 -y ; update-initramfs -u ; exit 0
         - curtin in-target --target=/target -- sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' /etc/default/grub ; update-grub ; exit 0
@@ -16258,8 +16259,6 @@ cat >>${user_data_file} <<EOF
         - xinit
         - mesa-utils
         - wine
-        - plymouth-theme-spinner
-        - plymouth-x11
     late-commands:
         - echo "******************* ${server_app} Config ********************"
         - mount --bind /dev  /target/dev
@@ -16270,9 +16269,11 @@ cat >>${user_data_file} <<EOF
         # Install Ubuntu Desktop Environment
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get upgrade -y'
-        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install ubuntu-desktop'
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install ubuntu-desktop plymouth plymouth-theme-spinner plymouth-label'
+        - curtin in-target --target=/target -- /bin/bash -c 'snap install firefox'
         - curtin in-target --target=/target -- /bin/bash -c 'plymouth-set-default-theme spinner -R || true' 
-        - curtin in-target --target=/target -- sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' /etc/default/grub ; update-grub ; exit 0
+        - curtin in-target --target=/target -- /bin/bash -c 'sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash\"/" /etc/default/grub'
+        - curtin in-target --target=/target -- /bin/bash -c 'update-grub'
         - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service || true
 
         # Clone RTD Setup & Execute OEM Config
@@ -17691,7 +17692,7 @@ if [[ $sourced -eq 0 ]]; then
 	if [[ "$(basename $0)" == "bash" ]]; then
 		write_host --cyan "Script is sourced from bash in a terminal: $0 $*"
 	else
-		write_host --cyan "Script is being sourced from a script: $(basename $0) : |${FUNCNAME[3]}|${FUNCNAME[2]}|${FUNCNAME[1]}|${FUNCNAME[0]}|${FUNCNAME[-1]}: $*"
+		write_host --cyan "Script is being sourced from a script: $(basename $0) : |${FUNCNAME[3]}: $*"
 	fi
 else
 	write_host --yellow "Library is run directly as an executable! This does nothing by itself."
