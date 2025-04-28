@@ -171,7 +171,6 @@ dependency_rtd_library ()
 
 oem_linux_config ()
 {
-	
 	if [[ ! $UID -eq 0 ]]; then
 		echo -e "🛡️ This script needs administrative access..."
 		# Relaunch script in priviledged mode...
@@ -183,17 +182,18 @@ oem_linux_config ()
 			write_information "📚 _rtd_library is already loaded..."
 		fi
 
+		system::wait_for_internet_availability
+
 		for i in $_requirements ; do 
 			software::check_native_package_dependency $i
 		done
-		
-		system::wait_for_internet_availability
+
 		oem::rtd_reset_default_environment_config
 
 		if [[ -z "$(ps aux |grep X |grep -v grep)" ]]; then
 			echo "No X server at \$DISPLAY [$DISPLAY]"
 			if ! hash dialog &>/dev/null ; then software::check_native_package_dependency dialog || exit 1 ; fi
-			rtd_setup_choices_server
+			oem::setup_choices_server
 		else
 			if ! hash zenity &>/dev/null ; then  software::check_native_package_dependency zenity || exit 1 ; fi
 			if ! hash yad &>/dev/null  ; then software::check_native_package_dependency yad || write_warning "YAD is not installed. Some features will not be available." ; fi
