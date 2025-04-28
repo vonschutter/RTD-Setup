@@ -3988,7 +3988,7 @@ system::wait_for_internet_availability() {
 		test_ips=("8.8.8.8" "1.1.1.1")
 	fi
 
-	local -i max_attempts=10
+	local -i max_attempts=5
 	local -i attempt=1
 	local ip
 
@@ -4003,32 +4003,33 @@ system::wait_for_internet_availability() {
 	for ip in "${test_ips[@]}"; do
 		attempt=1
 		while ((attempt <= max_attempts)); do
-		if ping -c 1 -W 1 "$ip" &>/dev/null; then
-			write_status "🌐 Internet ping access confirmed to IP: $ip"
+			if ping -c 1 -W 1 "$ip" &>/dev/null; then
+				write_status "🌐 Internet ping access confirmed to IP: $ip"
 
-			# Attempt to fetch the external IP address
-			local response
-			response=$(curl -s --connect-timeout 5 https://httpbin.org/ip)
-			
-			if [[ $? -eq 0 ]]; then
-			RTD_INTERNET_IP=$(echo "$response" | jq -r '.origin' 2>/dev/null)
+				# Attempt to fetch the external IP address
+				local response
+				response=$(curl -s --connect-timeout 10 https://httpbin.org/ip)
+				
+				if [[ $? -eq 0 ]]; then
+					RTD_INTERNET_IP=$(echo "$response" | jq -r '.origin' 2>/dev/null)
 
-			if [[ -n "$RTD_INTERNET_IP" ]]; then
-				write_status "🌐 Internet access confirmed through IP: $RTD_INTERNET_IP"
-				export RTD_INTERNET_IP
-				return 0
+					if [[ -n "$RTD_INTERNET_IP" ]]; then
+						write_status "🌐 Internet access confirmed through IP: $RTD_INTERNET_IP"
+						export RTD_INTERNET_IP
+						return 0
+					else
+						write_status "❗📶 Could not parse external IP address. Check: jq availability or response format."
+					fi
+				else
+					write_status "❗📶 Failed to fetch external IP using curl. Retrying..."
+				fi
+				break
 			else
-				write_status "❗📶 Could not parse external IP address. Check: jq availability or response format."
+				write_status "📶 Attempt $attempt of $max_attempts failed to reach $ip"
 			fi
-			else
-			write_status "❗📶 Failed to fetch external IP using curl. Retrying..."
-			fi
-		else
-			write_status "📶 Attempt $attempt of $max_attempts failed to reach $ip"
-		fi
 
-		((attempt++))
-		sleep 10
+			((attempt++))
+			sleep 10
 		done
 	done
 
@@ -16490,7 +16491,6 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get upgrade -y'
         - curtin in-target --target=/target -- apt-get -y install kubuntu-desktop
         - curtin in-target --target=/target -- /bin/bash -c 'snap install firefox'
-        - curtin in-target --target=/target -- dpkg --add-architecture i386 && apt-get update && apt-get -y install wine32:i386
         - curtin in-target --target=/target -- apt install plymouth-theme-kubuntu-logo plymouth-theme-kubuntu-text plymouth-theme-spinner plymouth-x11 -y ; update-initramfs -u ; exit 0
         - curtin in-target --target=/target -- sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' /etc/default/grub ; update-grub ; exit 0
         - curtin in-target --target=/target -- update-grub ; exit 0
@@ -16522,7 +16522,6 @@ cat >>${user_data_file} <<EOF
 
         # Install Ubuntu Desktop Environment
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
-        - curtin in-target --target=/target -- /bin/bash -c 'apt-get upgrade -y'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install ubuntu-desktop'
         - curtin in-target --target=/target -- /bin/bash -c 'snap install firefox'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install plymouth-theme-ubuntu-text plymouth-theme-spinner plymouth-x11'
@@ -16535,6 +16534,16 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd'
         - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd'
         - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh'
+
+        # Enable and start spice-vdagent onlogin
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /dev || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /cdrom || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /proc || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /sys || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /run || true'
+        - umount -l /target || true
+        - umount -l /cdrom || true
+        - shutdown -h now || true
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
