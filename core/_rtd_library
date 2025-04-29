@@ -3971,72 +3971,168 @@ system::get_Windows_Product_Key() {
 	echo "${WinKey}"
 }
 
-
 system::wait_for_internet_availability() {
 	# Description: Waits for an active internet connection before proceeding.
+	#              Pings test IPs and verifies HTTP connectivity by fetching the external IP.
 	# Globals:
 	#   _OEM_TEST_IPS: Optional, space-separated list of IPs for connectivity testing.
+	#   RTD_INTERNET_IP: Exported variable containing the external IP on success.
 	# Arguments: None
-	# Outputs: Status messages regarding connectivity.
-	# Returns: 0 if internet is available, 1 otherwise.
+	# Outputs: Status messages via write_status/write_error.
+	# Returns: 0 if internet is available and external IP is fetched, 1 otherwise.
+	# Dependencies: ping, curl, jq
 
-	# Array of IPs for testing internet connectivity (can be set globally)
+	# --- Configuration ---
+	local -r max_attempts=5
+	local -r ping_timeout_s=1   # Timeout for each ping packet
+	local -r curl_connect_timeout_s=5 # Timeout for establishing curl connection
+	local -r curl_max_time_s=10 # Max total time for curl operation
+	local -r sleep_duration_s=5 # Sleep time between failed attempts
+
+	# --- Dependency Check ---
+	dependency::command_exists ping curl jq || {
+		write_error "Missing dependencies: ping, curl, or jq."
+		return 1
+	}
+
+	# --- Setup Test IPs ---
 	local -a test_ips
-	if [[ -n "$_OEM_TEST_IPS" ]]; then
-		IFS=' ' read -r -a test_ips <<<"$_OEM_TEST_IPS"
+	# Prefer global _OEM_TEST_IPS if set and not empty
+	if [[ -n "${_OEM_TEST_IPS}" ]]; then
+		# Use read without IFS=' ' to handle potential multiple spaces robustly
+		read -r -a test_ips <<< "$_OEM_TEST_IPS"
 	else
-		test_ips=("8.8.8.8" "1.1.1.1")
+		# Default IPs
+		test_ips=("8.8.8.8" "1.1.1.1" "9.9.9.9") # Google, Cloudflare, Quad9
 	fi
 
-	local -i max_attempts=5
+	# Ensure array is not empty
+	if [[ ${#test_ips[@]} -eq 0 ]]; then
+		write_error "No test IPs provided or configured."
+		return 1
+	fi
+
+	# --- Main Loop ---
+	write_status "🌐 Checking for internet connectivity (max ${max_attempts} attempts)..."
 	local -i attempt=1
-	local ip
+	while (( attempt <= max_attempts )); do
+		write_status "--> Attempt ${attempt}/${max_attempts}:"
 
-	# Print status message
-	write_status "🌐 Checking for internet connectivity..."
+		# Select IP for this attempt (cycle through the list)
+		local ip_index=$(( (attempt - 1) % ${#test_ips[@]} ))
+		local current_ip="${test_ips[$ip_index]}"
 
-	# Check for dependencies
-	dependency::command_exists curl || { write_error "Missing dependency: curl"; return 1; }
-	dependency::command_exists jq || { write_error "Missing dependency: jq"; return 1; }
+		# 1. Ping Check
+		write_status "  Pinging ${current_ip}..."
+		if ping -c 1 -W "$ping_timeout_s" "$current_ip" &>/dev/null; then
+			write_status "  Ping to ${current_ip} successful."
 
-	# Iterate through each IP and attempt to establish connectivity
-	for ip in "${test_ips[@]}"; do
-		attempt=1
-		while ((attempt <= max_attempts)); do
-			if ping -c 1 -W 1 "$ip" &>/dev/null; then
-				write_status "🌐 Internet ping access confirmed to IP: $ip"
+			# 2. HTTP/S Check (only if ping worked)
+			write_status "  Fetching external IP via HTTPS..."
+			local response
+			local curl_exit_code
+			# Fetch external IP; capture exit code separately
+			response=$(curl -s --connect-timeout "$curl_connect_timeout_s" --max-time "$curl_max_time_s" https://httpbin.org/ip)
+			curl_exit_code=$?
 
-				# Attempt to fetch the external IP address
-				local response
-				response=$(curl -s --connect-timeout 10 https://httpbin.org/ip)
-				
-				if [[ $? -eq 0 ]]; then
-					RTD_INTERNET_IP=$(echo "$response" | jq -r '.origin' 2>/dev/null)
+			if [[ $curl_exit_code -eq 0 ]]; then
+				# 3. Parse Check (only if curl worked)
+				# Use a temporary var to avoid exporting partial/bad results
+				local external_ip
+				external_ip=$(echo "$response" | jq -r '.origin' 2>/dev/null)
 
-					if [[ -n "$RTD_INTERNET_IP" ]]; then
-						write_status "🌐 Internet access confirmed through IP: $RTD_INTERNET_IP"
-						export RTD_INTERNET_IP
-						return 0
-					else
-						write_status "❗📶 Could not parse external IP address. Check: jq availability or response format."
-					fi
+				if [[ -n "$external_ip" ]]; then
+					# SUCCESS!
+					export RTD_INTERNET_IP="$external_ip"
+					write_status "✅ Internet access confirmed. External IP: ${RTD_INTERNET_IP}"
+					return 0
 				else
-					write_status "❗📶 Failed to fetch external IP using curl. Retrying..."
+					write_status "  ❌ Failed to parse external IP from response (jq or format issue)."
 				fi
-				break
 			else
-				write_status "📶 Attempt $attempt of $max_attempts failed to reach $ip"
+				write_status "  ❌ Failed to fetch external IP via curl (Exit code: ${curl_exit_code})."
 			fi
+		else
+			write_status "  ❌ Ping to ${current_ip} failed."
+		fi
 
-			((attempt++))
-			sleep 10
-		done
+		# If we reach here, this attempt failed.
+		write_status "<-- Attempt ${attempt} failed."
+
+		# Sleep before next attempt, unless it was the last one
+		if (( attempt < max_attempts )); then
+			write_status "    Waiting ${sleep_duration_s}s..."
+			sleep "$sleep_duration_s"
+		fi
+		((attempt++))
 	done
 
-	# Error message if all attempts fail
-	write_error "❗📶 Unable to confirm internet access after $max_attempts attempts on each tested IP."
+	# All attempts failed
+	write_error "❌ Failed to confirm internet connectivity after ${max_attempts} attempts."
+	unset RTD_INTERNET_IP # Ensure variable is unset on failure
 	return 1
 }
+
+# system::wait_for_internet_availability() {
+# 	# Description: Waits for an active internet connection before proceeding.
+# 	# Globals:
+# 	#   _OEM_TEST_IPS: Optional, space-separated list of IPs for connectivity testing.
+# 	# Arguments: None
+# 	# Outputs: Status messages regarding connectivity.
+# 	# Returns: 0 if internet is available, 1 otherwise.
+
+# 	# Array of IPs for testing internet connectivity (can be set globally)
+# 	local -a test_ips
+# 	if [[ -n "$_OEM_TEST_IPS" ]]; then
+# 		IFS=' ' read -r -a test_ips <<<"$_OEM_TEST_IPS"
+# 	else
+# 		test_ips=("8.8.8.8" "1.1.1.1")
+# 	fi
+
+# 	local -i max_attempts=5
+# 	local -i attempt=1
+# 	local ip
+
+# 	# Print status message
+# 	write_status "🌐 Checking for internet connectivity..."
+
+# 	# Check for dependencies
+# 	dependency::command_exists curl || { write_error "Missing dependency: curl"; return 1; }
+# 	dependency::command_exists jq || { write_error "Missing dependency: jq"; return 1; }
+
+# 	# Iterate through each IP and attempt to establish connectivity
+# 	for ip in "${test_ips[@]}"; do
+# 		attempt=1
+# 		while ((attempt <= max_attempts)); do
+# 			if ping -c 1 -W 1 "$ip" &>/dev/null; then
+# 				write_status "🌐 Internet ping access confirmed to IP: $ip"
+
+# 				# Attempt to fetch the external IP address
+# 				local response				
+# 				if response=$(curl -s --connect-timeout 10 https://httpbin.org/ip) ; then
+
+# 					RTD_INTERNET_IP=$(echo "$response" | jq -r '.origin' 2>/dev/null)
+# 					if [[ -n "$RTD_INTERNET_IP" ]]; then
+# 						write_status "🌐 Internet access confirmed through external IP: $RTD_INTERNET_IP"
+# 						export RTD_INTERNET_IP
+# 						return 0
+# 					else
+# 						write_status "❗📶 Could not parse external IP address. Check: jq availability or response format."
+# 					fi
+# 				else
+# 					write_status "❗📶 Failed to fetch external IP using curl. Retrying..."
+# 				fi
+# 				break
+# 			else
+# 				write_status "📶 Attempt $attempt of $max_attempts failed to reach $ip"
+# 			fi
+# 			((attempt++))
+# 			sleep 10
+# 		done
+# 	done
+
+# 	return 1
+# }
 
 
 system::io_on_notify_wait() {
