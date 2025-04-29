@@ -188,16 +188,16 @@ oem_linux_config ()
 			software::check_native_package_dependency $i
 		done
 
-		oem::rtd_reset_default_environment_config
-
 		if [[ -z "$(ps aux |grep X |grep -v grep)" ]]; then
 			echo "No X server at \$DISPLAY [$DISPLAY]"
 			if ! hash dialog &>/dev/null ; then software::check_native_package_dependency dialog || exit 1 ; fi
+			oem::rtd_reset_default_environment_config
 			oem::setup_choices_server
 		else
 			if ! hash zenity &>/dev/null ; then  software::check_native_package_dependency zenity || exit 1 ; fi
 			if ! hash yad &>/dev/null  ; then software::check_native_package_dependency yad || write_warning "YAD is not installed. Some features will not be available." ; fi
-
+			ubuntu::set_plymouth_theme
+			
 			if [[ -e ${_THEME_DIR}/plus-themes.sh ]] ; then
 				write_information "🔮 Found plus-themes.sh in ${_THEME_DIR}"
 			else
@@ -206,6 +206,7 @@ oem_linux_config ()
 			fi
 			
 			bash ${_MODS_DIR}/oem-bundle-manager.mod/rtd-oem-bundle-manager 
+			oem::rtd_reset_default_environment_config
 			complete_setup
 		fi
 	fi
