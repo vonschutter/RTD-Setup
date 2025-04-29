@@ -16501,6 +16501,18 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd'
         - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd'
         - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh'
+
+        # Force unmounting of the target and other filesystems
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /dev || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /cdrom || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /proc || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /sys || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /run || true'
+        - umount -l /target || true
+        - umount -l /cdrom || true
+        - eject /dev/sr0 || true
+        - eject /dev/sr1 || true
+        - shutdown -h now || true
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -16525,9 +16537,9 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install ubuntu-desktop'
         - curtin in-target --target=/target -- /bin/bash -c 'snap install firefox'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install plymouth-theme-ubuntu-text plymouth-theme-spinner plymouth-x11'
-        # - curtin in-target --target=/target -- /bin/bash -c 'plymouth-set-default-theme spinner -R || true' 
-        # - curtin in-target --target=/target -- /bin/bash -c 'sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash\"/" /etc/default/grub'
-        # - curtin in-target --target=/target -- /bin/bash -c 'update-grub'
+        - curtin in-target --target=/target -- /bin/bash -c 'plymouth-set-default-theme spinner -R || true' 
+        - curtin in-target --target=/target -- /bin/bash -c 'sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash\"/" /etc/default/grub'
+        - curtin in-target --target=/target -- /bin/bash -c 'update-grub'
         - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service || true
 
         # Clone RTD Setup & Execute OEM Config
@@ -16535,7 +16547,7 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd'
         - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh'
 
-        # Enable and start spice-vdagent onlogin
+        # Force unmounting of the target and other filesystems
         - curtin in-target --target=/target -- /bin/bash -c 'umount -l /dev || true'
         - curtin in-target --target=/target -- /bin/bash -c 'umount -l /cdrom || true'
         - curtin in-target --target=/target -- /bin/bash -c 'umount -l /proc || true'
@@ -16543,6 +16555,8 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'umount -l /run || true'
         - umount -l /target || true
         - umount -l /cdrom || true
+        - eject /dev/sr0 || true
+        - eject /dev/sr1 || true
         - shutdown -h now || true
 EOF
 	# -----------------------------------------------------------------------------------------

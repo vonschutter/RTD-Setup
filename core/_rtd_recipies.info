@@ -329,7 +329,7 @@ recipe:_Internet_Browsing_Corporate () {
 }
 
 
-recipe:_Virtualization_Desktop_Software () {
+recipe:_Virtualization:_Desktop_Software () {
 	# Virtualizaton tools (virt-manager, qemu-kvm)
 	# NOTE: hypervisors are installed using ropositories own versions, or downloaded
 	# Directly from the vendors web page.
@@ -371,7 +371,7 @@ recipe:_CLOUD:_Management_Options () {
 
 
 
-recipe:_3D_Printing_Options () {
+recipe:_Office:_3D_Printing () {
 	# 3D Printing tools (Prusa, Cura slicers, and CAD, and 3D editing) for supporting and working with 3D-Printing
 	# NOTE: the "$1" after the package-name is if you want to trap the --remove option for 
 	# Bundle removals. This is optional.
@@ -453,7 +453,7 @@ recipe:_Office:_Standard_Apps () {
 
 
 
-recipe:_Media_Streaming_Software () {
+recipe:_Media:_Streaming_Apps () {
 	# Streaming apps (Spotify, Stremio, Vocal, and Cozy audiobook reader)...
 	
 	# Install Steaming apps from the Snap store:  
@@ -494,7 +494,7 @@ recipe:_Media_Streaming_Software () {
 
 
 
-recipe:_Media_Streaming_Servers () {
+recipe:_Media:_Streaming_Servers () {
 	# Streaming service (Plex Media Server)...
 
 	# To install the server part on another computer please follow the instructions on the 
@@ -504,7 +504,7 @@ recipe:_Media_Streaming_Servers () {
 
 
 
-recipe:_Media_Players () {
+recipe:_Media:_Players () {
 	# Media Player Apps (VLC, Cozy Audio Book PLayer, Tauon Music Player)
 
 	# Tauon Music Box is a modern, comfortable and streamlined music player for the playback of 
@@ -556,7 +556,7 @@ recipe:_Media:_Audio_Editing_Options () {
 }
 
 
-recipe:_Video_Editing_Options () {
+recipe:_Media:_Video_Editing () {
 	# Video editing apps; Vidcutter, Handbrake, Matroska-tools, Kdenlive, Shotcut, OBS, OpenShot
 	# Install handbrake DVD/BlueRay ripper video converter
 	# Video analysis tools
@@ -612,7 +612,7 @@ recipe:_Video_Editing_Options () {
 
 
 
-recipe:_Developer_Software () {
+recipe:_Office:_Developer_Software () {
 	# For creating code: (VSCode, GitKraken, Neo VIM, Helix) and more..
 
 	# Git and build essentials (compiler) is available in the distribution
@@ -821,7 +821,7 @@ recipe:_ADM:_Linux_Subsystem_for_Windows (){
 
 
 
-recipe:_Digital_Art_and_Imaging_Options () {
+recipe:_Media:_Digital_Art_and_Imaging () {
 	# Createive art software; Krita, GIMP, Inkscape, Flameshot, Upscayl, Photoscape
 
 	# It is perfect for sketching and painting, and presents an end–to–end solution for creating 
@@ -848,7 +848,7 @@ recipe:_Digital_Art_and_Imaging_Options () {
 
 
 
-recipe:_2_OEM_Restricted_Fonts () {
+recipe:_OEM:_Restricted_Fonts () {
 	# Install Legacy TruType standard font pack an more...
 	# wget "https://www.dropbox.com/s/y16d8wpb45yebv8/True_Type_Font_Pack.7z" -P /opt/rtd/cache/
 	# mkdir -p /usr/share/fonts/truetype/oem
@@ -856,7 +856,6 @@ recipe:_2_OEM_Restricted_Fonts () {
 	recipe:_Compression_Tools
 	bash $(find /opt -name plus-themes.sh) --fonts
 }
-
 
 
 recipe:_SEC:_Secure_Communication_Options () {
@@ -878,8 +877,6 @@ recipe:_SEC:_Secure_Communication_Options () {
 }
 
 
-
-
 recipe:_Office:_Social_Collaboration_and_Communicaiton () {
 	# This bundle includes social media communications software: Discord, Skype
 	# for privacy, but may be encrypted. This software is often useful for legacy reasons
@@ -897,16 +894,12 @@ recipe:_Office:_Social_Collaboration_and_Communicaiton () {
 }
 
 
-
-
 recipe:_Clean:_Remove_non_western_latin_fonts () {
 	# Declutter the font manager by removing non-western fonts
 	# By default distros includes wierd fonts not used in the west.
 	rtd_oem_remove_non_western_latin_fonts
-
-
-
 }
+
 recipe:_SEC:_Password_Management () {
 	# Password management software (Bitwarden, KeePassXC)...
 	# Loop through each item in this list of software and perform an install
@@ -915,6 +908,7 @@ recipe:_SEC:_Password_Management () {
 	software::from_flathub.org org.bitwarden.desktop $1
 
 }
+
 recipe:_SEC:_Secure_Storage () {
 	# Secure storage software (Cryptomator, VeraCrypt)...
 	# Loop through each item in this list of software and perform an install
@@ -922,7 +916,6 @@ recipe:_SEC:_Secure_Storage () {
 	software::from_flathub.org org.cryptomator.Cryptomator $1
 	software::from_flathub.org com.veracrypt.VeraCrypt $1
 }
-
 
 recipe:_SEC:_network_security () {
 	# Network security tools (Wireshark, nmap, tcpdump, iperf3, netcat, aircrack-ng)...
@@ -998,7 +991,14 @@ recipe:_SEC:_VPN_Software () {
 }
 
 recipe:_ADM:_Advanced_Terminals () {
-	# Advanced terminal apps (Warp AI Terminal, Tilix)...
+	# Advanced terminal apps (Wave AI Terminal, Tilix)...
+
+	software::add_native_package tilix $1
+	software::from_snapcraft.io waveterm $1
+}
+
+recipe:_ADM:_Wave_Terminal () {
+	# Advanced PROPRIETARY! terminal app (Warp AI Terminal )...
 	# This bundle is not removable. It contains downloaded software from sites. 
 	# Loop through each item in this list of software and perform an install
 	# using the relevant packaging system.
@@ -1021,12 +1021,9 @@ recipe:_ADM:_Advanced_Terminals () {
 			write_error "Warp is not supported on the detected distribution ( ${distribution_type} )..."
 			exit 1
 	esac
-
-	software::add_native_package tilix
 }
 
-
-recipe:_1_OEM_Themes_and_Tweaks () {
+recipe:_OEM:_Themes_and_Tweaks () {
 	# Configuration, tweaks, and settings for a better user experience (KDE or Gnome).
 	write_status "Applying OEM Configuration...
 	This bundle includes all OEM speciffic setting and configurations for desktops.
