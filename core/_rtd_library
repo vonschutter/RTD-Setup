@@ -3981,6 +3981,8 @@ system::wait_for_internet_availability() {
 	# Outputs: Status messages via write_status/write_error.
 	# Returns: 0 if internet is available and external IP is fetched, 1 otherwise.
 	# Dependencies: ping, curl, jq
+	# Example: system::wait_for_internet_availability
+	# End of documentation
 
 	# --- Configuration ---
 	local -r max_attempts=5
@@ -3995,14 +3997,11 @@ system::wait_for_internet_availability() {
 		return 1
 	}
 
-	# --- Setup Test IPs ---
+-
 	local -a test_ips
-	# Prefer global _OEM_TEST_IPS if set and not empty
 	if [[ -n "${_OEM_TEST_IPS}" ]]; then
-		# Use read without IFS=' ' to handle potential multiple spaces robustly
 		read -r -a test_ips <<< "$_OEM_TEST_IPS"
 	else
-		# Default IPs
 		test_ips=("8.8.8.8" "1.1.1.1" "9.9.9.9") # Google, Cloudflare, Quad9
 	fi
 
@@ -4031,18 +4030,14 @@ system::wait_for_internet_availability() {
 			write_status "  Fetching external IP via HTTPS..."
 			local response
 			local curl_exit_code
-			# Fetch external IP; capture exit code separately
 			response=$(curl -s --connect-timeout "$curl_connect_timeout_s" --max-time "$curl_max_time_s" https://httpbin.org/ip)
 			curl_exit_code=$?
 
 			if [[ $curl_exit_code -eq 0 ]]; then
-				# 3. Parse Check (only if curl worked)
-				# Use a temporary var to avoid exporting partial/bad results
 				local external_ip
 				external_ip=$(echo "$response" | jq -r '.origin' 2>/dev/null)
 
 				if [[ -n "$external_ip" ]]; then
-					# SUCCESS!
 					export RTD_INTERNET_IP="$external_ip"
 					write_status "✅ Internet access confirmed. External IP: ${RTD_INTERNET_IP}"
 					return 0
@@ -4056,7 +4051,6 @@ system::wait_for_internet_availability() {
 			write_status "  ❌ Ping to ${current_ip} failed."
 		fi
 
-		# If we reach here, this attempt failed.
 		write_status "<-- Attempt ${attempt} failed."
 
 		# Sleep before next attempt, unless it was the last one
@@ -4069,7 +4063,7 @@ system::wait_for_internet_availability() {
 
 	# All attempts failed
 	write_error "❌ Failed to confirm internet connectivity after ${max_attempts} attempts."
-	unset RTD_INTERNET_IP # Ensure variable is unset on failure
+	unset RTD_INTERNET_IP 
 	return 1
 }
 
