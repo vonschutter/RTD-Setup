@@ -3997,7 +3997,6 @@ system::wait_for_internet_availability() {
 		return 1
 	}
 
--
 	local -a test_ips
 	if [[ -n "${_OEM_TEST_IPS}" ]]; then
 		read -r -a test_ips <<< "$_OEM_TEST_IPS"
@@ -4066,68 +4065,6 @@ system::wait_for_internet_availability() {
 	unset RTD_INTERNET_IP 
 	return 1
 }
-
-# system::wait_for_internet_availability() {
-# 	# Description: Waits for an active internet connection before proceeding.
-# 	# Globals:
-# 	#   _OEM_TEST_IPS: Optional, space-separated list of IPs for connectivity testing.
-# 	# Arguments: None
-# 	# Outputs: Status messages regarding connectivity.
-# 	# Returns: 0 if internet is available, 1 otherwise.
-
-# 	# Array of IPs for testing internet connectivity (can be set globally)
-# 	local -a test_ips
-# 	if [[ -n "$_OEM_TEST_IPS" ]]; then
-# 		IFS=' ' read -r -a test_ips <<<"$_OEM_TEST_IPS"
-# 	else
-# 		test_ips=("8.8.8.8" "1.1.1.1")
-# 	fi
-
-# 	local -i max_attempts=5
-# 	local -i attempt=1
-# 	local ip
-
-# 	# Print status message
-# 	write_status "🌐 Checking for internet connectivity..."
-
-# 	# Check for dependencies
-# 	dependency::command_exists curl || { write_error "Missing dependency: curl"; return 1; }
-# 	dependency::command_exists jq || { write_error "Missing dependency: jq"; return 1; }
-
-# 	# Iterate through each IP and attempt to establish connectivity
-# 	for ip in "${test_ips[@]}"; do
-# 		attempt=1
-# 		while ((attempt <= max_attempts)); do
-# 			if ping -c 1 -W 1 "$ip" &>/dev/null; then
-# 				write_status "🌐 Internet ping access confirmed to IP: $ip"
-
-# 				# Attempt to fetch the external IP address
-# 				local response				
-# 				if response=$(curl -s --connect-timeout 10 https://httpbin.org/ip) ; then
-
-# 					RTD_INTERNET_IP=$(echo "$response" | jq -r '.origin' 2>/dev/null)
-# 					if [[ -n "$RTD_INTERNET_IP" ]]; then
-# 						write_status "🌐 Internet access confirmed through external IP: $RTD_INTERNET_IP"
-# 						export RTD_INTERNET_IP
-# 						return 0
-# 					else
-# 						write_status "❗📶 Could not parse external IP address. Check: jq availability or response format."
-# 					fi
-# 				else
-# 					write_status "❗📶 Failed to fetch external IP using curl. Retrying..."
-# 				fi
-# 				break
-# 			else
-# 				write_status "📶 Attempt $attempt of $max_attempts failed to reach $ip"
-# 			fi
-# 			((attempt++))
-# 			sleep 10
-# 		done
-# 	done
-
-# 	return 1
-# }
-
 
 system::io_on_notify_wait() {
 	# Description: Function that, when called, will wait for a disk change
@@ -4238,7 +4175,7 @@ system::display_spinner() {
 		esac
 	}
 
-	function start_spinner {
+	function _start_spinner () {
 		# $1 : msg to display
 		_spinner "start" "${1}" &
 		# set global spinner pid
@@ -4246,20 +4183,19 @@ system::display_spinner() {
 		disown
 	}
 
-	function stop_spinner {
+	function _stop_spinner () {
 		# $1 : command exit status
 		_spinner "stop" $1 $_sp_pid
 		unset _sp_pid
 	}
 
 	if [[ "$1" == "start" ]]; then
-		start_spinner $2
+		_start_spinner $2
 	elif [[ "$1" == "stop" ]]; then
-		stop_spinner $2
+		_stop_spinner $2
 	else
 		write_error "invalid argument, try {start/stop}"
 	fi
-
 }
 
 system::add_or_remove_login_script() {
@@ -12318,7 +12254,7 @@ ubuntu::set_plymouth_theme() {
 		# Check for standard Ubuntu (GNOME) last as others might build upon it
 		spin_name="Ubuntu (GNOME)"
 		target_theme="ubuntu-logo"
-		theme_package="plymouth-theme-ubuntu-logo"
+		theme_package="plymouth-theme-ubuntu-text"
 	else
 		write_status "Could not detect a specific Ubuntu spin meta-package. Using fallback theme."
 		# Keep default target_theme="spinner"
@@ -12346,24 +12282,21 @@ ubuntu::set_plymouth_theme() {
 	local update_initramfs_needed=false
 
 	if [[ -f "$plymouth_conf" ]]; then
-		# Extract current theme (safer than parsing potentially complex files)
-		current_theme=$(plymouth-query --get-theme-name || echo "unknown")
-		# Fallback parsing if query fails
-		# current_theme=$(awk -F= '/^Theme=/{gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2; exit}' "$plymouth_conf")
+		current_theme=$(awk -F= '/^Theme=/{gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2; exit}' "$plymouth_conf")
 	else
 		write_warning "${plymouth_conf} not found. Assuming default theme."
 		current_theme="unknown" # Force update if file doesn't exist
 	fi
+
 	write_status "Current Plymouth theme: ${current_theme}"
 
 	if [[ "$current_theme" != "$target_theme" ]]; then
 		write_status "Current theme differs from target. Setting theme to '${target_theme}'..."
 		write_status "Backing up ${plymouth_conf}..."
-		cp "${plymouth_conf}" "${plymouth_conf}.bak.$(date +%F_%T)" || { write_error "Backup failed"; return 1; }
+		cp "${plymouth_conf}" "${plymouth_conf}.bak.$(date +%F_%T)" 
 		echo "[Daemon]" > "$plymouth_conf" # Ensure section exists or overwrite simply
 		echo "Theme=$target_theme" >> "$plymouth_conf"
 		echo "ShowDelay=0" >> "$plymouth_conf" # Optional common setting
-
 		write_status "Theme configuration updated. Marking initramfs for update."
 		update_initramfs_needed=true
 	else
@@ -16811,8 +16744,8 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'snap install firefox'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install plymouth-theme-ubuntu-text plymouth-theme-spinner plymouth-x11'
         # - curtin in-target --target=/target -- /bin/bash -c 'echo "Theme=plymouth-theme-spinner" | tee /etc/plymouth/plymouth.conf > /dev/null && update-initramfs -u || true' 
-        # - curtin in-target --target=/target -- /bin/bash -c 'sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash\"/" /etc/default/grub'
-        # - curtin in-target --target=/target -- /bin/bash -c 'update-grub'
+        - curtin in-target --target=/target -- /bin/bash -c 'sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash\"/" /etc/default/grub'
+        - curtin in-target --target=/target -- /bin/bash -c 'update-grub'
         - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service || true
 
         # Clone RTD Setup & Execute OEM Config
