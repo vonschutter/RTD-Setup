@@ -196,7 +196,7 @@ oem_linux_config ()
 		else
 			if ! hash zenity &>/dev/null ; then  software::check_native_package_dependency zenity || exit 1 ; fi
 			if ! hash yad &>/dev/null  ; then software::check_native_package_dependency yad || write_warning "YAD is not installed. Some features will not be available." ; fi
-			ubuntu::set_plymouth_theme
+			ubuntu::enable_plymouth_theme
 			
 			if [[ -e ${_THEME_DIR}/plus-themes.sh ]] ; then
 				write_information "🔮 Found plus-themes.sh in ${_THEME_DIR}"
@@ -206,8 +206,9 @@ oem_linux_config ()
 			fi
 			
 			bash ${_MODS_DIR}/oem-bundle-manager.mod/rtd-oem-bundle-manager 
-			oem::rtd_reset_default_environment_config
+			
 			complete_setup
+			oem::rtd_reset_default_environment_config
 		fi
 	fi
 }

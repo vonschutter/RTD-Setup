@@ -12186,7 +12186,7 @@ fedora::get_latest_release_version() {
 }
 
 
-ubuntu::set_plymouth_theme() {
+ubuntu::enable_plymouth_theme() {
 	# Description: Detects the Ubuntu spin (flavor) and ensures the appropriate
 	#              Plymouth theme is configured and that GRUB includes 'splash'.
 	#              Only makes changes if the current configuration doesn't match.
@@ -12198,14 +12198,6 @@ ubuntu::set_plymouth_theme() {
 	# Dependencies: plymouth, plymouth-themes, initramfs-tools, grub2-common, dpkg, sed, sudo privileges.
 	# Usage: Call this function as root or with sudo. It will automatically detect the spin and set the theme.
 	# Example: ubuntu::set_plymouth_theme
-	# Note: This function is designed for Ubuntu and its derivatives. It checks for the presence of
-	#       specific desktop meta-packages to determine the spin. If none are found, it defaults to 'spinner'.
-	#       It also verifies that the target theme package is installed before applying changes.
-	#       The function will not make any changes if the current theme is already set to the target theme.
-	#       It also ensures that the GRUB configuration includes 'splash' for a graphical boot.
-	#       The function will exit with an error if the target theme package is not installed.
-	#       It will also check for the presence of essential commands before proceeding.
-	#       The function will not modify the system if it is not running on Ubuntu or a derivative.
 	# End of documentation
 
 	# --- Pre-flight Checks ---
@@ -12224,127 +12216,14 @@ ubuntu::set_plymouth_theme() {
 		return 1
 	}
 
-	# --- Determine Spin and Target Theme ---
-	local target_theme="spinner" # Default/Fallback theme
-	local spin_name="Generic Ubuntu"
-	local theme_package=""
-
-	# Use dpkg-query to check for desktop meta-packages
-	if dpkg-query -W -f='${Status}' kubuntu-desktop 2>/dev/null | grep -q "install ok installed"; then
-		spin_name="Kubuntu"
-		target_theme="kubuntu-logo" # Or kubuntu-text if preferred
-		theme_package="plymouth-theme-kubuntu-logo"
-	elif dpkg-query -W -f='${Status}' lubuntu-desktop 2>/dev/null | grep -q "install ok installed"; then
-		spin_name="Lubuntu"
-		target_theme="lubuntu-logo"
-		theme_package="plymouth-theme-lubuntu-logo"
-	elif dpkg-query -W -f='${Status}' xubuntu-desktop 2>/dev/null | grep -q "install ok installed"; then
-		spin_name="Xubuntu"
-		target_theme="xubuntu-logo"
-		theme_package="plymouth-theme-xubuntu-logo"
-	elif dpkg-query -W -f='${Status}' ubuntu-mate-desktop 2>/dev/null | grep -q "install ok installed"; then
-		spin_name="Ubuntu MATE"
-		target_theme="ubuntu-mate-logo"
-		theme_package="plymouth-theme-ubuntu-mate-logo"
-	elif dpkg-query -W -f='${Status}' ubuntu-budgie-desktop 2>/dev/null | grep -q "install ok installed"; then
-		spin_name="Ubuntu Budgie"
-		target_theme="ubuntu-budgie-logo"
-		theme_package="plymouth-theme-ubuntu-budgie-logo"
-	elif dpkg-query -W -f='${Status}' ubuntu-desktop 2>/dev/null | grep -q "install ok installed"; then
-		# Check for standard Ubuntu (GNOME) last as others might build upon it
-		spin_name="Ubuntu (GNOME)"
-		target_theme="ubuntu-logo"
-		theme_package="plymouth-theme-ubuntu-text"
-	else
-		write_status "Could not detect a specific Ubuntu spin meta-package. Using fallback theme."
-		# Keep default target_theme="spinner"
-		theme_package="plymouth-theme-spinner" # Ensure the fallback package exists
-	fi
-	write_status "Detected spin: ${spin_name}. Target Plymouth theme: ${target_theme}"
-
 	# Verify the target theme package is actually installed
-	if ! dpkg-query -W -f='${Status}' "$theme_package" 2>/dev/null | grep -q "install ok installed"; then
-		write_warning "Target theme package '${theme_package}' for '${target_theme}' is not installed."
-		write_status "Falling back to 'spinner' theme."
-		target_theme="spinner"
-		theme_package="plymouth-theme-spinner"
-		# Double-check fallback package installation
-		if ! dpkg-query -W -f='${Status}' "$theme_package" 2>/dev/null | grep -q "install ok installed"; then
-			 write_error "Fallback theme package '${theme_package}' is also not installed. Cannot set theme."
-			 return 1
-		fi
-	fi
+	if command plymouth ; then
+		sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash\"/" /etc/default/grub
 
-
-	# --- Check and Update Plymouth Theme ---
-	local plymouth_conf="/etc/plymouth/plymouthd.conf" # Note 'plymouthd.conf', not 'plymouth.conf' for the daemon
-	local current_theme=""
-	local update_initramfs_needed=false
-
-	if [[ -f "$plymouth_conf" ]]; then
-		current_theme=$(awk -F= '/^Theme=/{gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2; exit}' "$plymouth_conf")
-	else
-		write_warning "${plymouth_conf} not found. Assuming default theme."
-		current_theme="unknown" # Force update if file doesn't exist
-	fi
-
-	write_status "Current Plymouth theme: ${current_theme}"
-
-	if [[ "$current_theme" != "$target_theme" ]]; then
-		write_status "Current theme differs from target. Setting theme to '${target_theme}'..."
-		write_status "Backing up ${plymouth_conf}..."
-		cp "${plymouth_conf}" "${plymouth_conf}.bak.$(date +%F_%T)" 
-		echo "[Daemon]" > "$plymouth_conf" # Ensure section exists or overwrite simply
-		echo "Theme=$target_theme" >> "$plymouth_conf"
-		echo "ShowDelay=0" >> "$plymouth_conf" # Optional common setting
-		write_status "Theme configuration updated. Marking initramfs for update."
-		update_initramfs_needed=true
-	else
-		write_status "Current Plymouth theme is already set correctly. No changes needed."
-	fi
-
-	# --- Check and Update GRUB Configuration ---
-	local grub_conf="/etc/default/grub"
-	local update_grub_needed=false
-	local current_cmdline=""
-
-	if [[ ! -f "$grub_conf" ]]; then
-		write_error "GRUB default configuration file not found: ${grub_conf}"
-		return 1 # Cannot proceed without GRUB config
-	fi
-
-	# Get the current cmdline, handling potential comments or missing lines
-	current_cmdline=$(grep '^[[:space:]]*GRUB_CMDLINE_LINUX_DEFAULT=' "$grub_conf" | head -n 1 | cut -d= -f2-)
-
-	write_status "Checking GRUB command line for 'splash'..."
-	# Check if 'splash' exists as a whole word within the value string
-	if grep -q '^[[:space:]]*GRUB_CMDLINE_LINUX_DEFAULT=.*\bsplash\b.*' "$grub_conf"; then
-		write_status "'splash' option already present in GRUB_CMDLINE_LINUX_DEFAULT."
-	else
-		write_status "'splash' option not found. Adding it to GRUB configuration..."
-		write_status "Backing up ${grub_conf}..."
-		# sed -i.bak creates a backup file
-		if ! sed -i.bak '/^[[:space:]]*GRUB_CMDLINE_LINUX_DEFAULT=/s/"$/ splash"/' "$grub_conf"; then
-			write_error "Failed to add 'splash' option to ${grub_conf} using sed."
-			# Attempt to restore backup? For now, just error out.
-			return 1
-		fi
-		write_status "GRUB configuration updated. Marking GRUB for update."
-		update_grub_needed=true
-	fi
-
-	# --- Apply System Updates if Needed ---
-	local overall_success=true
-
-	if [[ "$update_initramfs_needed" == "true" ]]; then
-		write_status "Updating initramfs..."
 		if ! update-initramfs -u; then
 			write_warning "update-initramfs -u finished with a non-zero exit code. Check output."
 		fi
-	fi
 
-	if [[ "$update_grub_needed" == "true" ]]; then
-		write_status "Updating GRUB configuration..."
 		if ! update-grub; then
 			# Check alternative command if update-grub fails (e.g., UEFI systems)
 			if ! grub-mkconfig -o /boot/grub/grub.cfg; then
@@ -12352,6 +12231,7 @@ ubuntu::set_plymouth_theme() {
 				overall_success=false
 			else
 				write_status "'grub-mkconfig' successful."
+				local overall_success=true
 			fi
 		fi
 	fi
@@ -12361,7 +12241,7 @@ ubuntu::set_plymouth_theme() {
 		write_status "✅ Plymouth theme and GRUB configuration verified/updated successfully."
 		return 0
 	else
-		write_error "❌ One or more steps failed during Plymouth/GRUB configuration."
+		write_error "❌ One or more steps failed during Plymouth/GRUB configuration or plymouth may not be installed..."
 		return 1
 	fi
 }
@@ -16742,10 +16622,9 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install ubuntu-desktop'
         - curtin in-target --target=/target -- /bin/bash -c 'snap install firefox'
-        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install plymouth-theme-ubuntu-text plymouth-theme-spinner plymouth-x11'
-        # - curtin in-target --target=/target -- /bin/bash -c 'echo "Theme=plymouth-theme-spinner" | tee /etc/plymouth/plymouth.conf > /dev/null && update-initramfs -u || true' 
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install plymouth-theme-ubuntu-text plymouth-theme-spinner plymouth'
         - curtin in-target --target=/target -- /bin/bash -c 'sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash\"/" /etc/default/grub'
-        - curtin in-target --target=/target -- /bin/bash -c 'update-grub'
+        # - curtin in-target --target=/target -- /bin/bash -c 'update-grub'
         - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service || true
 
         # Clone RTD Setup & Execute OEM Config
