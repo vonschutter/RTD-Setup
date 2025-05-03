@@ -11657,7 +11657,7 @@ software::display_bundle_install_choices_gtk() {
 		local IFS_SAV=$IFS
 		local IFS=$(echo -en "\n\b")
 
-		selection=$(${DisplayGUI} --list --title="${FUNCNAME[1]}: Select Task" --cancel-label="Go Back" --checklist \
+		selection=$(${DisplayGUI} --list --title="Select Software" --cancel-label="Go Back" --checklist \
 			--text=" Select a Software Bundle below that you want to add to this computer: \n NOTE: only bundles that are not yet installed are shown. \n" \
 			--height=600 --width=980 \
 			--print-column=2 --column="Selected" --column="Bundle" --column="Description" \
@@ -17958,6 +17958,9 @@ software::list_bundles() {
 	# Usage: software::list_bundles [] [--zformat-installable | --zformat-removable]
 	# End of documentation
 
+	local true_false Description 
+	local ${completed_bundles_list:="/etc/${_TLA:-"rtd"}/completed_bundles.inf"}
+
 	if [[ ! -f ${completed_bundles_list} ]]; then
 		mkdir -p ${completed_bundles_list%/*}
 		touch ${completed_bundles_list}
@@ -17968,10 +17971,12 @@ software::list_bundles() {
 		# List software bundles for use with zenity
 		for _bundle in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep "${bundle_prefix}" | grep -v "Single_Install"); do
 			# Build each line to be displayed in the bundle installer...
-			Description=$(grep -A 1 "$_bundle ()" "${_OEM_DIR}/core/${_rtd_recipies_info}" | tail -1)
+			true_false="$(grep -A 2 "$_bundle ()" "${_OEM_DIR}/core/${_rtd_recipies_info}" )"
+			true_false="$(echo $true_false | grep "DEFAULT=TRUE"  &>/dev/null && echo "true" || echo "false")"
+			Description="$(grep -A 1 "$_bundle ()" "${_OEM_DIR}/core/${_rtd_recipies_info}" | tail -1)"
 			Description="${Description/"# "/": "}"
 			Description="${Description/"	"/""}"
-			cat ${completed_bundles_list} | grep "${_bundle/recipe:_/}" &>/dev/null || echo -en "true \n ${_bundle/recipe:_/} \n ${Description} \n"
+			cat ${completed_bundles_list} | grep "${_bundle/recipe:_/}" &>/dev/null || echo -en "${true_false}\n ${_bundle/recipe:_/}\n ${Description}\n"
 		done
 		;;
 	--zformat-removable)
@@ -17982,7 +17987,7 @@ software::list_bundles() {
 			Description=$(grep -A 1 "recipe:_$_installed_bundle ()" "${_OEM_DIR}/core/${_rtd_recipies_info}" | tail -1)
 			Description="${Description/"# "/": "}"
 			Description="${Description/"	"/""}"
-			echo -e "true \n ${_installed_bundle} \n ${Description} \n"
+			echo -e "false\n ${_installed_bundle}\n ${Description}\n"
 		done
 		;;
 	*)

@@ -52,6 +52,7 @@
 : ${_SCRIPTNAME=$(basename $0)}
 : ${_TLA=${_SCRIPTNAME:0:3}}
 : ${_GIT_PROFILE:=vonschutter}
+
 if [[ $EUID -eq 0 ]] ; then
 	_LOG_DIR="/var/log/${_TLA,,}"
 else
@@ -214,10 +215,10 @@ system::ExecStart () {
 
 			case "$selection" in
 				"Add Bundles to this computer" ) 
-					software::display_bundle_install_choices_gtk --zenity 
+					software::display_bundle_install_choices_gtk --zenity
 				;;
 				"Remove Bundles from this computer" ) 
-					software::display_bundle_removal_choices_gtk --zenity 
+					software::display_bundle_removal_choices_gtk --zenity
 				;;
 				"Information abount this tool" ) 
 					zenity::display_info "$_ABOUT"  
@@ -310,7 +311,7 @@ dependency::file "_rtd_library" || { echo "📚 Failed to find _rtd_library"; ex
 
 main ()
 {
-	DisplayGUI="yad"
+	DisplayGUI="zenity"
 	run="yes"
 
 	while [[ $# -gt 0 ]]; do

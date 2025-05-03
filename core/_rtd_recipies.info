@@ -233,8 +233,8 @@ bundle_prefix="recipe:_"
 
 
 recipe:_Internet_Browsing_Private () {
-	# Brave, Vivaldi, and Chromium browsers and KeePassXC password manager
-
+	# Brave, Mullvad, and Chromium browsers 
+	# DEFAULT=TRUE
 	# Brave secure browser, vendor provided Snap.
 	# If you prefer the downloaded version directly from Brave, uncomment the below line.
 	# Single_Install_Brave_Browser
@@ -287,7 +287,7 @@ recipe:_Internet_Browsing_Private () {
 
 
 recipe:_Internet_Browsing_Corporate () {
-	# Google Chrome, Microsoft Edge, and Vivaldi browsers
+	# Waring! Use at you own risk. Google Chrome, Microsoft Edge, and Vivaldi browsers
 
 	# Google Chrome is a browser that combines a minimal design with sophisticated 
 	# technology to make the web faster, safer, and easier.
@@ -429,6 +429,7 @@ recipe:_Office:_CAD_Software_Options () {
 
 recipe:_Office:_Standard_Apps () {
 	# Office apps like: Onlyoffice, Teams, Draw.io, Joplin notes, Mailspring, Keepass, and more
+	# DEFAULT=TRUE
 	# NOTE: the "$1" after the package-name is if you want to trap the --remove option for 
 	# Bundle removals. This is optional.
 
@@ -455,7 +456,7 @@ recipe:_Office:_Standard_Apps () {
 
 recipe:_Media:_Streaming_Apps () {
 	# Streaming apps (Spotify, Stremio, Vocal, and Cozy audiobook reader)...
-	
+	# DEFAULT=TRUE
 	# Install Steaming apps from the Snap store:  
 	# Red is a neat, simple yet feature rich, privacy focused YouTube Player and Downloader
 	# Red is not available as a Flatpak as of yet.
@@ -506,7 +507,7 @@ recipe:_Media:_Streaming_Servers () {
 
 recipe:_Media:_Players () {
 	# Media Player Apps (VLC, Cozy Audio Book PLayer, Tauon Music Player)
-
+	# DEFAULT=TRUE
 	# Tauon Music Box is a modern, comfortable and streamlined music player for the playback of 
 	# your music collection. Packed with features while maintaining simplicity. Use drag and 
 	# drop for easy file importing and playlist management. Groups albums by folder and allows 
@@ -614,7 +615,7 @@ recipe:_Media:_Video_Editing () {
 
 recipe:_Office:_Developer_Software () {
 	# For creating code: (VSCode, GitKraken, Neo VIM, Helix) and more..
-
+	# DEFAULT=TRUE
 	# Git and build essentials (compiler) is available in the distribution
 	# repository
 	software::add_native_package build-essential
@@ -651,7 +652,7 @@ recipe:_Office:_Developer_Software () {
 
 recipe:_ADM:_Compression_Tools () {
 	# Compression Toolset (zip, 7zip rar etc.)...
-
+	# DEFAULT=TRUE
 	# - 7-Zip is a free and open-source file archiver, a utility used to place groups 
 	# of files within compressed containers known as "archives". It is developed by 
 	# Igor Pavlov and was first released in 1999. 7-Zip has its own archive format 
@@ -664,6 +665,9 @@ recipe:_ADM:_Compression_Tools () {
 	# A ZIP file may contain one or more files or directories that may have 
 	# been compressed. The ZIP file format permits a number of compression 
 	# algorithms, though DEFLATE is the most common.
+
+	software::from_flathub.org io.github.peazip.PeaZip $1
+
 	
 	if hash dnf &>/dev/nul ; then 
 		write_information "Fedora based software management found, assuming fedora based distribution..."
@@ -755,6 +759,7 @@ recipe:_Top_Curated_Games_for_Linux () {
 
 recipe:_ADM:_System_Admin_Tools () {
 	# (MisssonCenter, Disk Analyser, Backup, Hex Edit, Kate, nmap synaptic ssh gparted sshfs htop iftop nethogs glances)
+	# DEFAULT=TRUE
 	# System Admin tools for managing and monitoring your system.
 	# NOTE: the "$1" after the package-name is if you want to trap the --remove option for
 	# Bundle removals. This is optional.
@@ -786,6 +791,7 @@ recipe:_ADM:_System_Admin_Tools () {
 
 recipe:_ADM:_Linux_Subsystem_for_Windows (){
 	# Run windows programs! includes wine, DOS, and Acrobat reader, Notepad++, and more...
+	# DEFAULT=TRUE
 
 	# Wine runtime environment for windows apps.	
 	software::add_native_package wine
@@ -818,6 +824,7 @@ recipe:_ADM:_Linux_Subsystem_for_Windows (){
 
 recipe:_Media:_Digital_Art_and_Imaging () {
 	# Createive art software; Krita, GIMP, Inkscape, Flameshot, Upscayl, Photoscape
+	# DEFAULT=TRUE
 
 	# It is perfect for sketching and painting, and presents an end–to–end solution for creating 
 	# digital painting files from scratch by masters.
@@ -845,6 +852,7 @@ recipe:_Media:_Digital_Art_and_Imaging () {
 
 recipe:_OEM:_Restricted_Fonts () {
 	# Install Legacy TruType standard font pack an more...
+	# Default=TRUE
 	# wget "https://www.dropbox.com/s/y16d8wpb45yebv8/True_Type_Font_Pack.7z" -P /opt/rtd/cache/
 	# mkdir -p /usr/share/fonts/truetype/oem
 	# This bundle depends on teh compressions tools bundle...
@@ -855,6 +863,7 @@ recipe:_OEM:_Restricted_Fonts () {
 
 recipe:_SEC:_Secure_Communication_Options () {
 	# Secure communications software: Signal, Telegram, Electron mail
+	# DEFAULT=TRUE
 	# This software is end to end encrypted
 	# and generally does not share keys with the vendor. Also, these apps are confined on the desktop
 	# meaning that they cannot access the wich is not granted explicitly.
@@ -871,6 +880,24 @@ recipe:_SEC:_Secure_Communication_Options () {
 	software::from_snapcraft.io electron-mail $1
 }
 
+recipe:_Office:_AI_Tools() {
+	# AI tools for creating and editing text, images, and video
+	# DEFAULT=TRUE
+	# NOTE: the "$1" after the package-name is if you want to trap the --remove option for 
+	# Bundle removals. This is optional.
+
+	# ChatGPT client for Linux
+	software::from_flathub.org com.github.rafaelmardojai.ChatGPT $1
+
+	# Stable Diffusion is a latent text-to-image diffusion model capable of generating photo-realistic images given any text input.
+	software::from_flathub.org com.nvidia.stable-diffusion-webui $1
+
+	# Alpaca Private AI Chatbot
+	software::from_flathub.org com.jeffser.Alpaca $1
+
+	# PyGPT is a Python wrapper for the OpenAI GPT-3 API. It allows you to easily interact with the GPT-3 model and generate text.
+	software::software::from_snapcraft.io pygpt $1
+}
 
 recipe:_Office:_Social_Collaboration_and_Communicaiton () {
 	# This bundle includes social media communications software: Discord, Skype
@@ -889,14 +916,16 @@ recipe:_Office:_Social_Collaboration_and_Communicaiton () {
 }
 
 
-recipe:_Clean:_Remove_non_western_latin_fonts () {
+recipe:_OEM:_Remove_non_western_latin_fonts () {
 	# Declutter the font manager by removing non-western fonts
+	# Default=TRUE
 	# By default distros includes wierd fonts not used in the west.
 	rtd_oem_remove_non_western_latin_fonts
 }
 
 recipe:_SEC:_Password_Management () {
 	# Password management software (Bitwarden, KeePassXC)...
+	# DEFAULT=TRUE
 	# Loop through each item in this list of software and perform an install
 	# using the relevant packaging system.
 	software::from_flathub.org org.keepassxc.KeePassXC $1
@@ -926,6 +955,7 @@ recipe:_SEC:_network_security () {
 
 recipe:_SEC:_Proton_Suite_of_Ecrypted_Services () {
 	# Proton suite of software (ProtonVPN, ProtonMail Bridge, ProtonDrive)...
+	# DEFAULT=TRUE
 	# Loop through each item in this list of software and perform an install
 	# using the relevant packaging system.
 
@@ -949,6 +979,7 @@ recipe:_SEC:_Proton_Suite_of_Ecrypted_Services () {
 
 recipe:_SEC:_VPN_Software () {
 	# VPN software (Wireguard, OpenVPN, Mullvad-vpn)...
+	# DEFAULT=TRUE
 	# This bundle is not removable. It contains downloaded software from sites. 
 	# Loop through each item in this list of software and perform an install
 	# using the relevant packaging system.
@@ -987,12 +1018,13 @@ recipe:_SEC:_VPN_Software () {
 
 recipe:_ADM:_Advanced_Terminals () {
 	# Advanced terminal apps (Wave AI Terminal, Tilix)...
+	# DEFAULT=TRUE
 
 	software::add_native_package tilix $1
 	software::from_snapcraft.io waveterm $1
 }
 
-recipe:_ADM:_Wave_Terminal () {
+recipe:_ADM:_Warp_Terminal () {
 	# Advanced PROPRIETARY! terminal app (Warp AI Terminal )...
 	# This bundle is not removable. It contains downloaded software from sites. 
 	# Loop through each item in this list of software and perform an install
@@ -1020,6 +1052,7 @@ recipe:_ADM:_Wave_Terminal () {
 
 recipe:_OEM:_Themes_and_Tweaks () {
 	# Configuration, tweaks, and settings for a better user experience (KDE or Gnome).
+	# DEFAULT=TRUE
 	write_status "Applying OEM Configuration...
 	This bundle includes all OEM speciffic setting and configurations for desktops.
 	This may include some basic application seen as, well, basic, and shold always be there.
@@ -1193,6 +1226,7 @@ recipe:_RDP:_Anydesk_Remote_Desktop () {
 
 recipe:_RDP:_RustDesk_Remote_Desktop () {
 	# RustDesk is a remote desktop software that allows users to connect to and control remote computers.
+	# DEFAULT=TRUE
 	# It is designed for remote support, online collaboration, and remote access to computers from anywhere.
 	# RustDesk is available for various platforms, including Windows, macOS, Linux, Android, and iOS.
 
@@ -1203,6 +1237,7 @@ recipe:_RDP:_RustDesk_Remote_Desktop () {
 
 recipe:_CLOUD:_MEGA_Cloud_Storage () {
 	# MEGA nz Private Cloud Storage (better than Drop Box)...
+	# DEFAULT=TRUE
 	write_status "Installing MEGA nz file crypto sync utility..."
 
 	# Reset & clear variables in case of incomplete cleanup...
