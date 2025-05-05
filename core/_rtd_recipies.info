@@ -799,7 +799,9 @@ recipe:_ADM:_Linux_Subsystem_for_Windows (){
 	distribution_type=$(system::distribution_type)
 	case ${distribution_type} in
 		"ubuntu" | "debian" )
-			apt-get -y dpkg --add-architecture i386 && apt-get update && apt-get -y install wine32:i386
+			apt-get -y dpkg --add-architecture i386 && apt-get update && apt-get -y install wine32:i386 || {
+				write_error "Failed to install 32-bit Wine support. Please check your system. Wine tries to install 32-bit support by default."
+			}
 		;;
 	esac
 	
@@ -880,7 +882,7 @@ recipe:_SEC:_Secure_Communication_Options () {
 	software::from_snapcraft.io electron-mail $1
 }
 
-recipe:_Office:_AI_Tools() {
+recipe:_Office:_AI_Tools () {
 	# AI tools for creating and editing text, images, and video
 	# DEFAULT=TRUE
 	# NOTE: the "$1" after the package-name is if you want to trap the --remove option for 
