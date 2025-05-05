@@ -8500,18 +8500,25 @@ tool::up_2_date() {
 	# Returns: 0/1/3 where 1/0 = sucess/fail and 3 = package manager NOT found
 	# Usage: tool::up_2_date
 	# End of documentation
+
 	security::ensure_admin
 	write_status "Running up2date function:"
 
 	if hash pkcon 2>/dev/null; then
-		pkcon update -y
+		write_status "Using PackageKit to update system."
+		pkcon refresh --noninteractive
+		pkcon update --noninteractive --autoremove
 	elif hash yum 2>/dev/null; then
+		write_status "Using YUM to update system."
 		yum update -y
 	elif hash apt 2>/dev/null; then
+		write_status "Using APT to update system."
 		apt-get update
 		apt-get upgrade -y
 		apt-get autoremove -y
 	elif hash zypper 2>/dev/null; then
+		write_status "Using Zypper to update system."
+		zypper --terse --color --table-style=6 refresh
 		zypper --terse --color --table-style=6 list-updates
 		zypper --terse --color --table-style=6 update -y
 	else

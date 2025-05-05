@@ -1243,34 +1243,37 @@ recipe:_CLOUD:_MEGA_Cloud_Storage () {
 	# Reset & clear variables in case of incomplete cleanup...
 	FILE2GET=
 	URL=
+	distro_type=$(system::distribution_type)
 	fetch_mega_file ()
 	{
 		product=$1
-		if hostnamectl | grep -i "Debian" ; then
-			# Grab the debian name and version and format it like Mega does their download URL...
-			URL="https://mega.nz/linux/repo/Debian_$(hostnamectl |grep -i Debian |cut -f5 -d' ')/amd64/${product}-Debian_$(hostnamectl |grep -i Debian |cut -f5 -d' ')_amd64.deb"
-			write_information "Downloading ${product} from: ${URL}"			
-		elif hostnamectl | grep -i "Ubuntu" ; then
-			# Grab the Ubuntu name and version and format it like Mega does their download URL...
-			URL="https://mega.nz/linux/repo/xUbuntu_$(hostnamectl |grep -i Ubuntu |cut -f4 -d' ')/amd64/${product}-xUbuntu_$(hostnamectl |grep -i Ubuntu |cut -f4 -d' ')_amd64.deb"
-			write_information "Downloading ${product} from: ${URL}"			
-		elif hostnamectl | grep -i "openSUSE" ; then
+		case distro_type in
+			"ubuntu" | "pop" | "linuxmint" )
+				# Grab the Ubuntu name and version and format it like Mega does their download URL...
+				URL="https://mega.nz/linux/repo/xUbuntu_$(hostnamectl |grep -i Ubuntu |cut -f4 -d' ')/amd64/${product}-xUbuntu_$(hostnamectl |grep -i Ubuntu |cut -f4 -d' ')_amd64.deb"
+				write_information "Downloading ${product} from: ${URL}"			
+			;;
+			"debian" )
+				URL="https://mega.nz/linux/repo/Debian_$(hostnamectl |grep -i Debian |cut -f5 -d' ')/amd64/${product}-Debian_$(hostnamectl |grep -i Debian |cut -f5 -d' ')_amd64.deb"
+				write_information "Downloading ${product} from: ${URL}"
+			;;
+			"suse" | "opensuse")
 			# Grab the SUSE name and version and format it like Mega does their download URL...
-			TGT=$(hostnamectl | awk -F ': ' '/Operating System:/ {gsub(/ /, "_", $2); print $2}')
-			URL="https://mega.nz/linux/repo/${TGT}/x86_64/${product}-${TGT}.x86_64.rpm"
-			write_information "Downloading ${product} from: ${URL}"
-		elif hostnamectl | grep -i "Fedora" ; then
-			# Grab the Fedora name and version and format it like Mega does their download URL...
-			TGT="$(hostnamectl |grep -i Fedora |cut -f7 -d' ')_$(hostnamectl |grep -i Fedora |cut -f9 -d' ')"
-			URL="https://mega.nz/linux/repo/${TGT}/x86_64/${product}-${TGT}.x86_64.rpm"
-			write_information "Downloading ${product} from: ${URL}"
-		else
-			write_error "I am not sure how to find the Mega sync download for $( hostnamectl |grep "Operating") "
-			write_error "Please try to download it manually and instrtall it from the website:"
-			write_error "https://mega.nz/sync"
-
-		fi
-
+				TGT=$(hostnamectl | awk -F ': ' '/Operating System:/ {gsub(/ /, "_", $2); print $2}')
+				URL="https://mega.nz/linux/repo/${TGT}/x86_64/${product}-${TGT}.x86_64.rpm"
+				write_information "Downloading ${product} from: ${URL}"
+			;;
+			"fedora" | "redhat")
+				# Grab the Fedora name and version and format it like Mega does their download URL...
+				TGT="$(hostnamectl |grep -i Fedora |cut -f7 -d' ')_$(hostnamectl |grep -i Fedora |cut -f9 -d' ')"
+				URL="https://mega.nz/linux/repo/${TGT}/x86_64/${product}-${TGT}.x86_64.rpm"
+				write_information "Downloading ${product} from: ${URL}"
+			;;
+			*)
+				write_error "I am not sure how to find the Mega sync download for $( hostnamectl |grep "Operating") "
+				write_error "Please try to download it manually and instrtall it from the website:"
+				write_error "https://mega.nz/sync"
+		esac
 		# If a known distributio was found and URL set, use "software::vendor_download_and_install" function to install app...
 		if [[ -n "${URL}" ]] && software::vendor_download_and_install ${URL}; then
 			write_information "MEGA software installed successfully..."
