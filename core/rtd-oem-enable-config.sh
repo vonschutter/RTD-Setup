@@ -197,8 +197,7 @@ if ! grep -q "Do not argue with an idiot" "$RTD_WISDOM_QUOTES_PATH"; then
     # Overwrite to ensure consistency if the file was only touched or had old content
     printf '%s\n' "$KENS_QUOTES" > "$RTD_WISDOM_QUOTES_PATH" || {
         system::log_item "ERROR: Failed to write quotes to ${RTD_WISDOM_QUOTES_PATH}";
-        exit 1;
-    }
+     }
 else
     system::log_item "Wisdom quotes file already populated."
 fi
@@ -307,12 +306,11 @@ configure_motd
 # --- TTY Login Banner (/etc/issue) ---
 readonly ISSUE_FILE="/etc/issue"
 # Ensure _OEM_TTY_LOGIN_BANNER is defined, possibly by the library or earlier in script
-if [[ -n "${_OEM_TTY_LOGIN_BANNER:-}" ]]; then
+if [[ -n "${_OEM_TTY_LOGIN_BANNER}" ]]; then
     system::log_item "Setting TTY login banner in ${ISSUE_FILE}..."
     # If /etc/issue is a symlink (common on some systems to point to a dynamic issue file),
     # removing and replacing it might be necessary if we want a static banner.
     # However, if it's dynamic for a reason, overwriting might break things.
-    # For now, follow original script's intent but with a check.
     if [[ -L "$ISSUE_FILE" ]]; then
         system::log_item "INFO: ${ISSUE_FILE} is a symlink. Removing it to set a static banner."
         rm -f "$ISSUE_FILE" || { system::log_item "ERROR: Failed to remove symlink ${ISSUE_FILE}"; }
