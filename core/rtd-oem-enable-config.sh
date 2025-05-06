@@ -47,7 +47,7 @@
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 # --- Strict Mode & Early Exit on Error ---
-set -euo pipefail # Exit on error, unset variable, or pipe failure
+# set -euo pipefail # Exit on error, unset variable, or pipe failure
 
 # --- Essential Sanity Checks ---
 if [[ $EUID -ne 0 ]]; then
@@ -306,7 +306,7 @@ configure_motd
 # --- TTY Login Banner (/etc/issue) ---
 readonly ISSUE_FILE="/etc/issue"
 # Ensure _OEM_TTY_LOGIN_BANNER is defined, possibly by the library or earlier in script
-if [[ -n "${_OEM_TTY_LOGIN_BANNER}" ]]; then
+if [[ -n "${_OEM_TTY_LOGIN_BANNER:-}" ]]; then
     system::log_item "Setting TTY login banner in ${ISSUE_FILE}..."
     # If /etc/issue is a symlink (common on some systems to point to a dynamic issue file),
     # removing and replacing it might be necessary if we want a static banner.
