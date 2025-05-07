@@ -5054,6 +5054,8 @@ system::toggle_oem_auto_elevated_privilege() {
 	# Usage:
 	#   system::toggle_oem_auto_elevated_privilege [--enable|--disable]
 
+	security::ensure_admin 
+
 	: ${_OEM_USER:="${SUDO_USER}"}
 	local sudoers_file="/etc/sudoers.d/99_sudo_include_file"
 
@@ -5070,7 +5072,7 @@ system::toggle_oem_auto_elevated_privilege() {
 	--enable | -e)
 		write_status "🚧 Enabling passwordless sudo for user: ${_OEM_USER}"
 		# Ensure passwordless sudo is not already set for the user
-		if ! sudo grep -q "^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" "${sudoers_file}" 2>/dev/null; then
+		if ! grep -q "^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" "${sudoers_file}" 2>/dev/null; then
 			# Add passwordless sudo entry
 			write_information "🚧 Adding passwordless sudo for user: ${_OEM_USER}"
 			echo "${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" | sudo EDITOR='tee -a' visudo -f "${sudoers_file}"
@@ -5081,10 +5083,10 @@ system::toggle_oem_auto_elevated_privilege() {
 	--disable | -d)
 		write_status "🚧 Disabling passwordless sudo for user: ${_OEM_USER}"
 		# Check if passwordless sudo is set for the user and remove it
-		if sudo grep -q "^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" "${sudoers_file}" 2>/dev/null; then
+		if grep -q "^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" "${sudoers_file}" 2>/dev/null; then
 			# Remove passwordless sudo entry
 			write_information "🚧 Removing passwordless sudo for user: ${_OEM_USER}"
-			sudo sed -i "/^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL/d" "${sudoers_file}"
+			sed -i "/^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL/d" "${sudoers_file}"
 		else
 			write_information "✅ Passwordless sudo already disabled for user: ${_OEM_USER}"
 		fi
@@ -5098,7 +5100,7 @@ system::toggle_oem_auto_elevated_privilege() {
 	# Validate sudoers file syntax
 	if [[ -f "${sudoers_file}" ]]; then
 		write_information "🚧 Validating sudoers file syntax..."
-		if ! sudo visudo -cf "${sudoers_file}" &>/dev/null; then
+		if ! visudo -cf "${sudoers_file}" &>/dev/null; then
 			write_error "⛔ Error: Syntax error in sudoers file."
 		else
 			write_information "🏆 Sudoers file syntax is valid."
