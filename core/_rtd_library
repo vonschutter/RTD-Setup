@@ -7043,6 +7043,24 @@ system::_enable_service() {
 	[[ "$success" == "true" ]] && return 0 || return 1
 }
 
+system::ensure_directory_exists() {
+	# Description: Function to ensure a directory exists, creating it if necessary.
+	# This function checks if the specified directory exists, and if not, attempts to create it.
+	# It provides feedback on the status of the directory creation and handles errors gracefully.
+	# Globals: None
+	# Arguments: $1 - Directory path to ensure (e.g., "/path/to/directory")
+	# Outputs: Status/Error messages via write_status/write_error
+	# Returns: 0 on success, 1 on failure.
+	# Usage: ensure_directory_exists <directory_path>
+	# End of documentation
+	local dir_path="$1"
+	if ! mkdir -p "$dir_path"; then
+		system::log_item "ERROR: Failed to create directory '${dir_path}'." 
+		return 1
+	fi
+	system::log_item "Directory ensured: ${dir_path}"
+	return 0
+}
 
 system::_disable_service() {
 	# Description: Function to disable and stop a systemd service.

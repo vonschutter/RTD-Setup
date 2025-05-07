@@ -799,7 +799,7 @@ recipe:_ADM:_Linux_Subsystem_for_Windows (){
 	distribution_type=$(system::distribution_type)
 	case ${distribution_type} in
 		"ubuntu" | "debian" )
-			apt-get -y dpkg --add-architecture i386 && apt-get update && apt-get -y install wine32:i386 || {
+			dpkg --add-architecture i386 && apt-get update && apt-get -y install wine32:i386 || {
 				write_error "Failed to install 32-bit Wine support. Please check your system. Wine tries to install 32-bit support by default."
 			}
 		;;
@@ -986,14 +986,13 @@ recipe:_SEC:_VPN_Software () {
 	# Loop through each item in this list of software and perform an install
 	# using the relevant packaging system.
 
-			software::add_native_package wireguard
-			software::add_native_package openvpn
+	software::add_native_package wireguard
+	software::add_native_package openvpn
 
 	distribution_type=$(system::distribution_type)
 
 	case ${distribution_type} in
 		"ubuntu" | "debian" )
-
 			software::check_native_package_dependency curl
 			curl -fsSLo /usr/share/keyrings/mullvad-keyring.asc https://repository.mullvad.net/deb/mullvad-keyring.asc
 			echo "deb [signed-by=/usr/share/keyrings/mullvad-keyring.asc arch=$( dpkg --print-architecture )] https://repository.mullvad.net/deb/stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/mullvad.list
