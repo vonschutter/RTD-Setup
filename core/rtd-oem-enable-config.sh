@@ -38,7 +38,7 @@
 set -euo pipefail # Exit on error, unset variable, or pipe failure
 
 # --- Essential Sanity Checks ---
-if [[ $EUID -ne 0 ]]; then { echo "⛔ This script must be run as root" ; exit 1; } ; fi
+if [[ $EUID -ne 0 ]]; then { echo "💥 This script must be run as root" ; exit 1; } ; fi
 
 
 # --- Global Configuration Variables (Consider moving to a config file or env vars) ---
@@ -56,17 +56,22 @@ readonly LIBRARY_PATH="${CORE_DIR}/_rtd_library"
 readonly FAILLOG_PATH="${BASE_DIR}/faillog.log"
 
 # --- Load Core Library ---
-if [[ ! -f "$LIBRARY_PATH" ]]; then
-    echo "⛔ CRITICAL ERROR: Required library not found at '${LIBRARY_PATH}'." >&2
-    echo "⛔ $(date '+%Y-%m-%d %H:%M:%S') CRITICAL ERROR: Library '${LIBRARY_PATH}' not found." >> "$FAILLOG_PATH" 2>/dev/null || true
-    exit 1
+if [ -z "${RTDFUNCTIONS}" ]; then
+	if [[ ! -f "$LIBRARY_PATH" ]]; then
+		echo "💥 CRITICAL ERROR: Required library not found at '${LIBRARY_PATH}'." >&2
+		echo "💥 $(date '+%Y-%m-%d %H:%M:%S') CRITICAL ERROR: Library '${LIBRARY_PATH}' not found." >> "$FAILLOG_PATH" 2>/dev/null || true
+		exit 1
+	fi
+
+	source "$LIBRARY_PATH" || {
+		echo "💥 CRITICAL ERROR: Failed to source library '${LIBRARY_PATH}'." >&2
+		echo "💥 $(date '+%Y-%m-%d %H:%M:%S') CRITICAL ERROR: Failed to source library '${LIBRARY_PATH}'." >> "$FAILLOG_PATH" 2>/dev/null || true
+		exit 1
+	}
+else
+	write_information "📚 _rtd_library is already loaded..."
 fi
 
-source "$LIBRARY_PATH" || {
-    echo "⛔ CRITICAL ERROR: Failed to source library '${LIBRARY_PATH}'." >&2
-    echo "⛔ $(date '+%Y-%m-%d %H:%M:%S') CRITICAL ERROR: Failed to source library '${LIBRARY_PATH}'." >> "$FAILLOG_PATH" 2>/dev/null || true
-    exit 1
-}
 
 # --- Script Settings & Global Variables for Library ---
 # These might be set by the library, but explicit declaration can be good.

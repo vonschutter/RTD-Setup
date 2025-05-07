@@ -206,9 +206,8 @@ oem_linux_config ()
 			fi
 			
 			bash ${_MODS_DIR}/oem-bundle-manager.mod/rtd-oem-bundle-manager 
-			
-			complete_setup
 			oem::rtd_reset_default_environment_config
+			complete_setup
 		fi
 	fi
 }
