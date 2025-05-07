@@ -4390,93 +4390,93 @@ system::display_spinner() {
 }
 
 system::add_or_remove_login_script() {
-	# Description: Sets up or removes a .desktop launcher to run a script at login.
+	# Description:
+	#   Adds, removes, or toggles a .desktop launcher to execute a script at login.
+	#
 	# Arguments:
-	#   1. Path to the script to be executed.
-	#   2. Optional: Path to the .desktop launcher (default: /etc/xdg/autostart/oem-run.desktop).
+	#   $1 - Action: --add, --remove, or blank (toggle)
+	#   $2 - Absolute path to script to run
+	#   $3 - Optional: Path to .desktop launcher (default: /etc/xdg/autostart/oem-run.desktop)
 	#
 	# Usage:
-	#   system::add_or_remove_login_script <path>
-	#
-	# This function is responsible for adding or removing the execution of a script on login.
-	# It takes two parameters: the path to the script and an optional file path for the autostart desktop entry.
-	# If the script is not found, an error message is displayed and the function returns 1.
-	# If the "--remove" option is specified, the function removes the autostart desktop entry file if it exists.
-	# If the "--add" option is specified, the function creates or updates the autostart desktop entry file with the script path.
-	# If no option is specified, the function checks if the autostart desktop entry file exists.
-	# If it exists, the function removes it. If it doesn't exist, the function creates it with the script path.
-	# The function returns 0 on success and 1 on failure.
-	#
-	# Example:
-	#   system::add_or_remove_login_script --remove /etc/xdg/autostart/oem-run.desktop
-	#   system::add_or_remove_login_script --remove
 	#   system::add_or_remove_login_script --add /path/to/script.sh
+	#   system::add_or_remove_login_script --remove /etc/xdg/autostart/oem-run.desktop
+	#   system::add_or_remove_login_script --remove /path/to/script.sh /etc/xdg/autostart/custom.desktop
+	#   system::add_or_remove_login_script <toggle> /path/to/script.sh
 	#
-	# End of documentation
+	# Returns:
+	#   0 on success, 1 on failure
+
+	local action="$1"
 	local script_path="$2"
 	local file_path="${3:-"/etc/xdg/autostart/oem-run.desktop"}"
 
-	system::log_item "📜 Toggling execution on login of (${script_path}) as requested by ${FUNCNAME[1]}"
-
-	if [[ ! -f "${script_path}" ]]; then
+	if [[ -z "$script_path" || ! -f "$script_path" ]]; then
 		write_error "🚫 Script not found: ${script_path}"
 		return 1
 	fi
 
-	case "$1" in
-	--remove)
-		if [[ -e "$file_path" ]]; then
-			write_information "🗑️ Removing execution on login of (${file_path})"
-			if ! sudo rm "${file_path}"; then
-				write_error "🚫 Failed to remove file: ${file_path}"
-				return 1
-			fi
+	system::log_item "📜 Action [$action] on login script (${script_path}), target: ${file_path}"
+
+	_create_autostart_file() {
+		local exec_line
+		if command -v xterm >/dev/null 2>&1; then
+			exec_line='/usr/bin/xterm -fa "Monospace" -fs 10 -e "sudo -E '"$script_path"'"'
+			write_information "📜 Creating autostart entry using xterm"
 		else
-			write_error "🗑️ File already removed: ${file_path}"
-			return 0
+			exec_line='sudo -E '"$script_path"
+			write_information "📜 Creating autostart entry using default terminal"
 		fi
-		;;
-	--add)
-		if hash xterm 2>/dev/null; then
-			write_information "📜 Adding execution on login of (${script_path}) with xterm"
-			if ! printf '[Desktop Entry]\nType=Application\nExec=/usr/bin/xterm -fa 'Monospace' -fs 10 -e "sudo -E %s"\nTerminal=false\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" >/dev/null; then
-				write_error "🚫 Failed to create file: ${file_path}"
-				return 1
-			fi
-		else
-			write_information "📜 Adding execution on login of (${script_path}) in default term"
-			if ! printf '[Desktop Entry]\nType=Application\nExec=sudo -E %s\nTerminal=true\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" >/dev/null; then
-				write_error "🚫 Failed to create file: ${file_path}"
-				return 1
-			fi
+
+		if ! sudo tee "$file_path" > /dev/null <<-EOF
+			[Desktop Entry]
+			Type=Application
+			Exec=$exec_line
+			Terminal=false
+			Hidden=false
+			X-GNOME-Autostart-enabled=true
+			Name=OEM Run
+			Comment=OEM Setup
+			EOF
+		then
+			write_error "🚫 Failed to create autostart entry: ${file_path}"
+			return 1
 		fi
-		;;
-	*)
-		write_information "📜 Toggeling execution on login of (${script_path})"
+	}
+
+	_remove_autostart_file() {
 		if [[ -e "$file_path" ]]; then
-			write_information "🗑️ Removing execution on login of (${file_path})"
-			if ! sudo rm "${file_path}"; then
-				write_error "Failed to remove file: ${file_path}"
+			write_information "🗑️ Removing autostart entry: ${file_path}"
+			if ! sudo rm -f "$file_path"; then
+				write_error "🚫 Failed to remove autostart file: ${file_path}"
 				return 1
 			fi
 		else
-			if hash xterm 2>/dev/null; then
-				write_information "📜 Adding execution on login of (${script_path})"
-				if ! printf '[Desktop Entry]\nType=Application\nExec=xterm -e "sudo -E %s"\nTerminal=false\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" >/dev/null; then
-					write_error "🚫 Failed to create file: ${file_path}"
-					return 1
-				fi
+			write_status "ℹ️ Autostart entry already removed: ${file_path}"
+		fi
+	}
+
+	case "$action" in
+		--remove)
+			_remove_autostart_file || return 1
+			;;
+		--add)
+			_create_autostart_file || return 1
+			;;
+		*)
+			if [[ -e "$file_path" ]]; then
+				write_status "📜 Toggling OFF login script"
+				_remove_autostart_file || return 1
 			else
-				write_information "📜 Adding execution on login of (${script_path})"
-				if ! printf '[Desktop Entry]\nType=Application\nExec=sudo -E %s\nTerminal=true\nHidden=false\nX-GNOME-Autostart-enabled=true\nName=OEM Run\nComment=OEM Setup\n' "$script_path" | sudo tee "$file_path" >/dev/null; then
-					write_error "🚫 Failed to create file: ${file_path}"
-					return 1
-				fi
+				write_status "📜 Toggling ON login script"
+				_create_autostart_file || return 1
 			fi
-		fi
-		;;
+			;;
 	esac
+
+	return 0
 }
+
 
 system::update_config() {
 	# Description: This function updates a configuration file with key-value pairs.
