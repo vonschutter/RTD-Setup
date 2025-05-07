@@ -289,7 +289,7 @@ tty_login_banner() {
 }
 
 
-
+main "$@"
 
 
 
