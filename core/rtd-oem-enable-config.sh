@@ -56,7 +56,7 @@ readonly LIBRARY_PATH="${CORE_DIR}/_rtd_library"
 readonly FAILLOG_PATH="${BASE_DIR}/faillog.log"
 
 # --- Load Core Library ---
-if [ -z "${RTDFUNCTIONS}" ]; then
+if [ -z "${RTDFUNCTIONS:-}" ]; then
 	if [[ ! -f "$LIBRARY_PATH" ]]; then
 		echo "💥 CRITICAL ERROR: Required library not found at '${LIBRARY_PATH}'." >&2
 		echo "💥 $(date '+%Y-%m-%d %H:%M:%S') CRITICAL ERROR: Library '${LIBRARY_PATH}' not found." >> "$FAILLOG_PATH" 2>/dev/null || true
