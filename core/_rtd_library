@@ -4423,10 +4423,10 @@ system::add_or_remove_login_script() {
 	_create_autostart_file() {
 		local exec_line
 		if command -v xterm >/dev/null 2>&1; then
-			exec_line='/usr/bin/xterm -fa "Monospace" -fs 10 -e "sudo -E '"$script_path"'"'
+			exec_line="/usr/bin/xterm -fa 'Monospace' -fs 10 -e \"sudo -E bash -c '\"$script_path\"'\""
 			write_information "📜 Creating autostart entry using xterm"
 		else
-			exec_line='sudo -E '"$script_path"
+			exec_line="sudo -E bash -c '\"$script_path\"'"
 			write_information "📜 Creating autostart entry using default terminal"
 		fi
 
@@ -4434,7 +4434,7 @@ system::add_or_remove_login_script() {
 			[Desktop Entry]
 			Type=Application
 			Exec=$exec_line
-			Terminal=false
+			Terminal=true
 			Hidden=false
 			X-GNOME-Autostart-enabled=true
 			Name=OEM Run
