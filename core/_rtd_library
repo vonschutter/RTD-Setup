@@ -4411,6 +4411,8 @@ system::add_or_remove_login_script() {
 	local script_path="$2"
 	local file_path="${3:-"/etc/xdg/autostart/oem-run.desktop"}"
 
+	security::ensure_admin
+
 	if [[ -z "$script_path" || ! -f "$script_path" ]]; then
 		write_error "🚫 Script not found: ${script_path}"
 		return 1
@@ -4428,7 +4430,7 @@ system::add_or_remove_login_script() {
 			write_information "📜 Creating autostart entry using default terminal"
 		fi
 
-		if ! sudo tee "$file_path" <<-EOF
+		if ! tee "$file_path" <<-EOF
 			[Desktop Entry]
 			Type=Application
 			Exec=$exec_line
@@ -4447,7 +4449,7 @@ system::add_or_remove_login_script() {
 	_remove_autostart_file() {
 		if [[ -e "$file_path" ]]; then
 			write_information "🗑️ Removing autostart entry: ${file_path}"
-			if ! sudo rm -f "$file_path"; then
+			if ! rm -f "$file_path"; then
 				write_error "🚫 Failed to remove autostart file: ${file_path}"
 				return 1
 			fi
