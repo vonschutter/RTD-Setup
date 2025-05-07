@@ -2559,41 +2559,228 @@ system::detect_session() {
 
 	echo "${_SESSION_TYPE}"
 	return 0
-
 }
 
-system::rtd_oem_check_inet_access() {
-	# Description: Function to verrify internet availabiltiy.
-	# The funciton will pause for 10 seconds by default, and will accept
-	# an integer to indicate a non-decault time to pause.
+network::check_inet_access() {
+	# Description:
+	#   Verifies internet connectivity by pinging known public IPs.
+	#   Supports an optional wait prompt in interactive mode if connectivity is unavailable.
+	#
 	# Globals:
-	# Arguments: None
+	#   _OEM_TEST_IPS - Optional space-separated list of IPs to ping. Defaults to 8.8.8.8, 1.1.1.1, 9.9.9.9.
+	#
+	# Arguments:
+	#   [--interactive] [WAIT_SECONDS]
+	#     --interactive   Enables interactive prompt if internet is not available.
+	#     WAIT_SECONDS    Optional: Time to wait before continuing. Default is 10 seconds.
+	#
 	# Outputs:
+	#   STDOUT: Status messages about internet connectivity.
+	#
 	# Returns:
+	#   0 if internet access is available
+	#   1 if no internet access is detected
+	#
 	# Usage:
-	# system::rtd_oem_check_inet_access [ integer ]
+	#   network::check_inet_access
+	#   network::check_inet_access --interactive
+	#   network::check_inet_access --interactive 60
+	#
+	# Notes:
+	#   If --interactive is used without a second argument, it waits indefinitely for user input.
+	#   If a timeout is provided, it waits the specified number of seconds then continues.
+	#   The function will return 0 if internet access is available, otherwise it returns 1.
+	#
+	# End of Documentation
+
+	local test_ips="${_OEM_TEST_IPS:-"8.8.8.8 1.1.1.1 9.9.9.9"}"
+	local wait_time
+
+	case "$1" in
+		--interactive)
+			wait_time="$2"
+			for ip in $test_ips; do
+				if ping -c 1 "$ip" &>/dev/null; then
+					write_status "✅ Internet access is available."
+					return 0
+				else
+					write_error "❌ No internet access detected."
+					if [[ -n "$wait_time" ]]; then
+						read -t "$wait_time" -p "NOTICE! No internet access. Press [ENTER] to continue or [CTRL+C] to abort. Continuing in $wait_time seconds... "
+					else
+						read -p "NOTICE! No internet access. Press [ENTER] to continue or [CTRL+C] to abort. "
+					fi
+					return 1
+				fi
+			done
+			;;
+		*)
+			if ping -c 1 8.8.8.8 &>/dev/null; then
+				system::log_item "✅ Internet access is available."
+				return 0
+			else
+				system::log_item "❌ No internet access detected."
+				return 1
+			fi
+			;;
+	esac
+}
+
+
+network::whats_my_ipinfo() {
+	# Description:
+	#   Attempts to retrieve public IP and geolocation data using multiple external services.
+	#   Automatically installs curl if missing. Supports optional timeout for error prompt.
+	#
+	# Globals:
+	#   None
+	#
+	# Arguments:
+	#   --timeout <seconds>  Optional: timeout in seconds to wait on failure prompt.
+	#
+	# Outputs:
+	#   STDOUT: IP and geolocation info from the first responsive service.
+	#
+	# Returns:
+	#   0 if geolocation data was retrieved successfully
+	#   1 if all services failed or curl is missing/unavailable
+	#
+	# Usage:
+	#   network::whats_my_ipinfo
+	#   network::whats_my_ipinfo --timeout 10
 	#
 	# Example:
-	# system::rtd_oem_check_inet_access 60
+	#   - Get IP info and print to console immediatley:
+	#     network::whats_my_ipinfo
 	#
-	# If an argument is omitted system::rtd_oem_check_inet_access will wait indefinitley
-	# for input.
+	#   - Get IP info and display in a dialog box:
+	#     dialog::display_result "IP Info" "$(network::whats_my_ipinfo)"
+	#   
+	#   - Get IP info and store in a variable and print to console later:
+	#     result=$(network::whats_my_ipinfo)
+	#     printf "%s\n" "$result"
 	#
-	# End of documentation
-	_ARG=$1
-	if ! hash curl &>/dev/null; then
-		read -t 10 -p "N O T I C E ! --
-		Could not check for internet connectivity...
-		Please install (curl) web crawler/downloader.
-		Press [ENTER] to continue and [CTRL] + [C] to exit! Continuing in 10 seconds..."
-	else
-		if [[ -z "$_ARG" ]]; then
-			curl ipinfo.io &>/dev/null || (read -p "N O T I C E ! -- NO INTERNET ACCESS: This script may require access to the internet to work properly! Press [ENTER] to continue and [CTRL] + [C] to exit!  ")
-		else
-			curl ipinfo.io &>/dev/null || (read -t ${1:-10} -p "N O T I C E ! -- NO INTERNET ACCESS: This script may require access to the internet to work properly! Press [ENTER] to continue and [CTRL] + [C] to exit!  Continuing in ${1:-10} seconds...")
-		fi
+	#   - Get IP info with a timeout of 5 seconds
+	#     network::whats_my_ipinfo --timeout 5
+	#
+	# Notes:
+	#   - The function will try multiple services in order until one succeeds.
+	#   - If curl is not installed, it will attempt to install it using software::add_native_package.
+	#   - If all services fail, it will prompt the user to continue or abort.
+	#   - The timeout option allows the user to specify a wait time before continuing.
+	#   - The function will return 0 if successful, otherwise it returns 1.
+	#
+	# End of Documentation
+
+	local timeout service url response
+	local -a ipinfo_services=(
+		"https://ipinfo.io"
+		"https://ifconfig.co/json"
+		"https://api.myip.com"
+		"https://ipapi.co/json"
+		"https://ipwho.is"
+	)
+
+	if [[ "$1" == "--timeout" && -n "$2" ]]; then
+		timeout="$2"
 	fi
+
+	if ! command -v curl >/dev/null 2>&1; then
+		system::log_item "🚫 curl not found, attempting to install..."
+		if ! software::add_native_package curl; then
+			system::log_item "❌ Failed to install curl. Please install it manually."
+			return 1
+		fi
+		clear
+	fi
+
+	for url in "${ipinfo_services[@]}"; do
+		system::log_item "🌐 Trying geolocation service: $url"
+		if response=$(curl -s --connect-timeout 5 "$url") && [[ -n "$response" ]]; then
+			system::log_item "✅ Retrieved IP and geolocation data from $url"
+			printf '%s\n' "$response"
+			return 0
+		else
+			system::log_item "⚠️ Failed to retrieve data from $url"
+		fi
+	done
+
+	system::log_item "❌ All geolocation services failed."
+
+	if [[ -n "$timeout" ]]; then
+		read -t "$timeout" -p $"NOTICE! No internet access.\nThis script may require internet to function properly.\nPress [ENTER] to continue or [CTRL+C] to abort. Continuing in $timeout seconds...\n"
+	else
+		read -p $'\nNOTICE! No internet access.\nThis script may require internet to function properly.\nPress [ENTER] to continue or [CTRL+C] to abort.\n'
+	fi
+
+	return 1
 }
+
+
+
+network::whats_my_external_ip() {
+	# Description:
+	#   Retrieves the system's external IP address using multiple fallback services.
+	#   Automatically installs curl if missing (via software::add_native_package).
+	#
+	# Globals:
+	#   None
+	#
+	# Arguments:
+	#   None
+	#
+	# Outputs:
+	#   STDOUT: External IP address
+	#   STDERR: Error messages and status logs via system::log_item
+	#
+	# Returns:
+	#   0 if external IP was retrieved successfully
+	#   1 if curl could not be installed or all lookups failed
+	#
+	# Usage:
+	#   network::whats_my_external_ip
+	#
+	# Example:
+	#   ip=$(network::whats_my_external_ip)
+
+	local _my_ip="unknown"
+	local url
+	local -a fallback_urls=(
+		"https://myip.dnsomatic.com"
+		"https://ipinfo.io/ip"
+		"https://api.ipify.org"
+		"https://checkip.amazonaws.com"
+		"https://icanhazip.com"
+		"https://ifconfig.co"
+		"https://api64.ipify.org"
+		"https://myexternalip.com/raw"
+	)
+
+	if ! command -v curl >/dev/null 2>&1; then
+		system::log_item "🚫 curl not found, attempting to install..."
+		if ! software::add_native_package curl; then
+			system::log_item "❌ Failed to install curl. Please install it manually."
+			return 1
+		fi
+		system::log_item "✅ curl installed successfully."
+	fi
+
+	system::log_item "🌐 Attempting to retrieve external IP address..."
+
+	for url in "${fallback_urls[@]}"; do
+		if _my_ip=$(curl -s --connect-timeout 5 "$url"); then
+			if [[ "$_my_ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+				system::log_item "✅ External IP address retrieved from $url: $_my_ip"
+				printf '%s\n' "$_my_ip"
+				return 0
+			fi
+		fi
+	done
+
+	system::log_item "❌ All IP services failed to provide a valid external IP address."
+	return 1
+}
+
 
 system::preseed_to_ubuntu_ks_cfg() {
 	# Description: Generates a preseed section [Ubuntu only] (ks.cfg).
@@ -5045,8 +5232,8 @@ system::create_swapfile() {
 	#
 	# End of documentation
 
-	SWAP_SIZE=$1
-	SWAP_PATH=$2
+	SWAP_SIZE="$1"
+	SWAP_PATH="$2"
 
 	: "${SWAP_SIZE:=4G}"
 	: "${SWAP_PATH:="/swapfile-${RANDOM}"}"
@@ -5054,23 +5241,23 @@ system::create_swapfile() {
 	write_information "Swap Size: ${SWAP_SIZE}"
 	write_information "File Path: ${SWAP_PATH}"
 
-	usage_mesage() {
-		write_host --blue "
-		Usage: $0 {size}
-		Example: $0 4G
+	system::create_swapfile::usage_mesage() {
+		write_host --cyan "
+		Usage: ${FUNCNAME[1]} {size} {path}
+		Example: ${FUNCNAME[1]} 4G
 		(Default path: /swapfile)
-		Usage with optional path: $0 {size} {path}"
+		Usage with optional path: ${FUNCNAME[1]} {size} {path}"
 	}
 
 	if [[ -z "${SWAP_SIZE}" ]]; then
 		# If we are not given any size to make the swaptfile... well...
 		write_error "Please tell me what size swap file to make!"
-		usage_mesage
+		system::create_swapfile::usage_mesage
 		exit 1
 	elif [[ ! "${SWAP_SIZE:0:1}" -ge "1" ]]; then
 		# Fail if the argument is not a numer
 		write_error "The size for swap file must be a number!"
-		usage_mesage
+		system::create_swapfile::usage_mesage
 		exit 1
 	else
 		if [[ -e ${SWAP_PATH} ]]; then
@@ -7064,44 +7251,113 @@ system::ensure_directory_exists() {
 }
 
 system::_disable_service() {
-	# Description: Function to disable and stop a systemd service.
-	# This function checks if the service is active and enabled, then stops and disables it.
-	# It provides feedback on the status of the service and handles errors gracefully.
-	# Globals: None
-	# Arguments: $1 - Service name (e.g., "NetworkManager")
-	# Outputs: Status/Error messages via write_status/write_error
-	# Returns: 0 on success, 1 on failure.
-	# Usage: system::_disable_service <service_name>
-	# End of documentation
+	# Description:
+	#   Disables and stops a service across multiple init systems (systemd, SysVinit, OpenRC).
+	#
+	# Arguments:
+	#   $1 - Service name (e.g., "NetworkManager")
+	#
+	# Outputs:
+	#   STDOUT: Status messages
+	#   STDERR: Error messages
+	#
+	# Returns:
+	#   0 on success, 1 on any failure
 
 	local service_name="$1"
 	local success=true
-	write_status "Ensuring service '${service_name}' is disabled and stopped..."
+	local init_system
 
-	# Stop first
-	if systemctl is-active --quiet "${service_name}"; then
-		write_status "Stopping ${service_name}..."
-		if ! sudo systemctl stop "${service_name}"; then
-			write_error "Failed to stop ${service_name}."
-			# Continue to disable anyway
-			success=false
-		fi
-	else
-		write_status "${service_name} is not active."
+	if [[ -z "$service_name" ]]; then
+		write_error "No service name provided... nothing to do!"
+		return 1
 	fi
 
-	# Then disable
-	if systemctl is-enabled --quiet "${service_name}"; then
-		write_status "Disabling ${service_name}..."
-		if ! sudo systemctl disable "${service_name}"; then
-			write_error "Failed to disable ${service_name}."
-			success=false
-		fi
+	if command -v systemctl >/dev/null 2>&1; then
+		init_system="systemd"
+	elif [[ -d /etc/init.d ]] && command -v service >/dev/null 2>&1; then
+		init_system="sysvinit"
+	elif command -v rc-service >/dev/null 2>&1; then
+		init_system="openrc"
 	else
-		write_status "${service_name} is not enabled."
+		write_error "No supported init system detected."
+		return 1
 	fi
+
+	write_status "Detected init system: $init_system"
+	write_status "🔧 Disabling and stopping service: ${service_name}"
+
+	case "$init_system" in
+		systemd)
+			if systemctl is-active --quiet "$service_name"; then
+				write_status "Stopping ${service_name} via systemctl..."
+				if ! sudo systemctl stop "$service_name"; then
+					write_error "Failed to stop ${service_name}."
+					success=false
+				fi
+			else
+				write_status "${service_name} is not currently active."
+			fi
+
+			if systemctl is-enabled --quiet "$service_name"; then
+				write_status "Disabling ${service_name} via systemctl..."
+				if ! sudo systemctl disable "$service_name"; then
+					write_error "Failed to disable ${service_name}."
+					success=false
+				fi
+			else
+				write_status "${service_name} is already disabled."
+			fi
+
+			if ! sudo systemctl daemon-reexec || ! sudo systemctl daemon-reload; then
+				write_error "Failed to reload systemd."
+				success=false
+			fi
+			;;
+
+		sysvinit)
+			if service "$service_name" status >/dev/null 2>&1; then
+				write_status "Stopping ${service_name} via service..."
+				if ! sudo service "$service_name" stop; then
+					write_error "Failed to stop ${service_name}."
+					success=false
+				fi
+			else
+				write_status "${service_name} is not currently active."
+			fi
+
+			if update-rc.d -f "$service_name" remove >/dev/null 2>&1; then
+				write_status "Disabled ${service_name} via update-rc.d"
+			else
+				write_error "Failed to disable ${service_name} with update-rc.d"
+				success=false
+			fi
+			;;
+
+		openrc)
+			if rc-service "$service_name" status >/dev/null 2>&1; then
+				write_status "Stopping ${service_name} via rc-service..."
+				if ! sudo rc-service "$service_name" stop; then
+					write_error "Failed to stop ${service_name}."
+					success=false
+				fi
+			else
+				write_status "${service_name} is not currently active."
+			fi
+
+			if rc-update del "$service_name" default >/dev/null 2>&1; then
+				write_status "Removed ${service_name} from default runlevel via rc-update"
+			else
+				write_error "Failed to remove ${service_name} from runlevels"
+				success=false
+			fi
+			;;
+	esac
+
 	[[ "$success" == "true" ]] && return 0 || return 1
 }
+
+
 
 
 system::_turn_on_gui_network_management() {
