@@ -35,7 +35,7 @@
 # 2 - To see useful documentation on each function in this library: "bash _rtd_library --devhelp or --devhelp-gtk"
 
 # --- Strict Mode & Early Exit on Error ---
-set -euo pipefail # Exit on error, unset variable, or pipe failure
+# set -euo pipefail # Exit on error, unset variable, or pipe failure
 
 # --- Essential Sanity Checks ---
 if [[ $EUID -ne 0 ]]; then { echo "💥 This script must be run as root" ; exit 1; } ; fi
