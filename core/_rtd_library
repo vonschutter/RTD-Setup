@@ -4938,7 +4938,7 @@ system::toggle_oem_auto_login() {
 	local _config_file="/etc/systemd/system/getty@tty1.service.d/override.conf"
 	local _config_dir="/etc/systemd/system/getty@tty1.service.d"
 	if [[ ! -f "${_config_dir}" ]]; then
-	
+
 		case "${_flip:-}" in
 		off)
 			write_status "⛔ TTY: toggeling auto login off... ********"
@@ -5033,6 +5033,9 @@ system::set_oem_elevated_privilege_gui() {
 		write_status "🚧 Enabling GUI elevated privileges..."
 
 		# Ensure the commands are idempotent: don't add lines if they already exist
+		if [[ ! -f "${user_bashrc}" ]]; then
+			touch "${user_bashrc}"
+		fi
 		grep -qxF 'xhost local:root' "${user_bashrc}" || echo "xhost local:root" >>"${user_bashrc}"
 		grep -qxF "export XAUTHORITY=/home/${_OEM_USER:-"tangarora"}/.Xauthority" "${root_bashrc}" || echo "export XAUTHORITY=/home/${_OEM_USER:-"tangarora"}/.Xauthority" >>"${root_bashrc}"
 
@@ -5041,7 +5044,10 @@ system::set_oem_elevated_privilege_gui() {
 		;;
 	--disable | -d)
 		write_status "🚧 Disabling GUI elevated privileges..."
-
+		if [[ ! -f "${user_bashrc}" ]]; then
+			write_error "⛔ Error: ${user_bashrc} does not exist."
+			return 1
+		fi
 		# Use sed to remove the specific lines added during the enable step
 		sed -i '/xhost local:root/d' "${user_bashrc}"
 		sed -i "/export XAUTHORITY=\/home\/${_OEM_USER:-"tangarora"}\/.Xauthority/d" "${root_bashrc}"
