@@ -4419,6 +4419,7 @@ system::add_or_remove_login_script() {
 	local action="$1"
 	local script_path="$2"
 	local file_path="${3:-"/etc/xdg/autostart/oem-run.desktop"}"
+	local log_file=${_LOGFILE:-"/tmp/${FUNCNAME[0]}.log"}
 
 	security::ensure_admin
 
@@ -4435,7 +4436,7 @@ system::add_or_remove_login_script() {
 			exec_line="/usr/bin/xterm -fa 'Monospace' -fs 10 -e \"sudo -E bash -c '\"$script_path\"'\""
 			write_information "📜 Creating autostart entry using xterm"
 		else
-			exec_line="/usr/bin/xterm -fa 'Monospace' -fs 10 -e \"sudo -E bash -c '\"$script_path\"'\""
+			exec_line="/usr/bin/xterm -fa Monospace -fs 10 -e \"sudo -E bash -c \"$script_path\"\""
 
 			#exec_line="pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY bash -c '\"$script_path\"'"
 			write_information "📜 Creating autostart entry using default terminal"
@@ -4445,7 +4446,7 @@ system::add_or_remove_login_script() {
 			[Desktop Entry]
 			Type=Application
 			Exec=$exec_line
-			Terminal=true
+			Terminal=false
 			Hidden=false
 			X-GNOME-Autostart-enabled=true
 			Name=OEM Run
@@ -4455,6 +4456,25 @@ system::add_or_remove_login_script() {
 			write_error "🚫 Failed to create autostart entry: ${file_path}"
 			return 1
 		fi
+
+		if [[ -e "$file_path" ]]; then
+			write_information "✅ Autostart entry created: ${file_path}"
+		else
+			write_error "🚫 Failed to create autostart entry: ${file_path}"
+			return 1
+		fi
+
+		if  command -v desktop-file-validate >/dev/null 2>&1; then
+			write_information "📜 Validating autostart entry: ${file_path}"
+			if ! desktop-file-validate ${file_path}  &>> "${log_file}" ; then
+				write_error "🚫 Failed to validate autostart entry: ${file_path}"
+				return 1
+			fi
+		else
+			write_warning "🚫 desktop-file-validate not found, skipping validation."
+		fi
+
+
 	}
 
 	_remove_autostart_file() {
