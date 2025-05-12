@@ -5682,16 +5682,16 @@ oem::rtd_reset_default_environment_config() {
 	# End of documentation
 
 	# Ensure _OEM_DIR is defined
-	if [[ -z "${_OEM_DIR}" ]]; then
-		write_error "📁 Error: _OEM_DIR is not set."
+	if [[ -d "${_OEM_DIR:-"/opt/rtd"}" ]]; then
+		write_error "📁 Error: ${_OEM_DIR:-"/opt/rtd"} does not exitst: nothing to do!"
 		return 1
 	fi
 
-	mkdir -p "${_OEM_DIR}/cache/"
+	mkdir -p "${_OEM_DIR:-"/opt/rtd"}/cache/"
 
 	# Backup and remove custom sudoers file
 	if [[ -f /etc/sudoers.d/99_sudo_include_file ]]; then
-		mv /etc/sudoers.d/99_sudo_include_file "${_OEM_DIR}/cache/"
+		mv /etc/sudoers.d/99_sudo_include_file "${_OEM_DIR:-"/opt/rtd"}/cache/"
 		write_status "📄 Custom sudoers file has been backed up and removed."
 	else
 		write_error "📄 No custom sudoers file found to remove."
@@ -5699,7 +5699,7 @@ oem::rtd_reset_default_environment_config() {
 
 	# Backup the current .bashrc for SUDO_USER
 	if [[ -n "${SUDO_USER}" && -f "/home/${SUDO_USER}/.bashrc" ]]; then
-		cp "/home/${SUDO_USER}/.bashrc" "${_OEM_DIR}/cache/bashrc"
+		cp "/home/${SUDO_USER}/.bashrc" "${_OEM_DIR:-"/opt/rtd"}/cache/bashrc"
 		write_status "🔑 User .bashrc has been backed up."
 
 		# Remove 'xhost local:root' if it exists in the real .bashrc or its symlink target
@@ -6012,13 +6012,28 @@ oem::register_all_tools() {
 			write_status "Creating links to $d"
 			for f in $d/${_TLA,,}*; do
 				write_status "Processing: ${f}"
-				chmod +x "${f}"
-				ln -f -s "${f}" -t /bin/
+				if [[ ! -f "${f}" ]]; then
+					write_error "File ${f} does not exist!"
+					continue
+				else 
+					write_status "Linking app ${f} exists."
+					ln -f -s "${f}" -t /bin/
+					continue
+				fi
+				if [[ ! -x "${f}" ]]; then
+					write_status "File ${f} is not executable: setting executable bit"
+					if chmod +x "${f}" ; then
+						write_status "Set executable bit for ${f} successfully"
+					else
+						write_error "Failed to set executable bit for ${f}"
+					fi
+					continue
+				fi
 			done
 		done
-		write_status "Creating links to ${_OEM_DIR}/core/*.sh"
-		chmod +x "${_OEM_DIR}"/core/*.sh
-		ln -f -s "${_OEM_DIR}"/core/*.sh -t /bin/
+		write_status "Creating links to ${_OEM_DIR:-"/opt/rtd"}/core/*.sh"
+		chmod +x "${_OEM_DIR:-"/opt/rtd"}"/core/*.sh
+		ln -f -s "${_OEM_DIR:-"/opt/rtd"}"/core/*.sh -t /bin/
 		return
 	else
 		write_error "Location variables not set!"
@@ -6926,7 +6941,7 @@ set_gnome_ui_mac_tweaks_for_user() {
 			gsettings set org.gnome.desktop.interface icon-theme 'WhiteSur-dark'
 			gsettings set org.gnome.shell.extensions.user-theme name "WhiteSur-Dark"
 
-			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR} -name MojaveNight.jpg)
+			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name MojaveNight.jpg)
 
 			#gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ theme-variant 'dark'
 		else
@@ -6939,7 +6954,7 @@ set_gnome_ui_mac_tweaks_for_user() {
 			gsettings set org.gnome.desktop.interface icon-theme 'WhiteSur'
 			gsettings set org.gnome.shell.extensions.user-theme name "WhiteSur-Light"
 
-			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR} -name MojaveDay.jpg)
+			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name MojaveDay.jpg)
 
 			#gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ theme-variant 'light'
 		else
@@ -7048,7 +7063,7 @@ set_gnome_ui_win10_tweaks_for_user() {
 	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ bold-is-bright true
 
 	# Set wallpaper
-	gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR} -name Redmond.png)
+	gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name Redmond.png)
 
 	# Restore Keyboard Layout (reset by gnome)
 	# gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
@@ -7086,7 +7101,7 @@ set_gnome_ui_corporate_crisp_tweaks_for_user() {
 		if [[ -d /usr/share/themes/Arc-Dark ]]; then
 			gsettings set org.gnome.desktop.interface gtk-theme 'Arc-Dark'
 			gsettings set org.gnome.shell.extensions.user-theme name "Arc-Dark"
-			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR} -name RTD_Wallpapers_HQ_Public_Domain_019.jpg)
+			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name RTD_Wallpapers_HQ_Public_Domain_019.jpg)
 		else
 			set_gnome_ui_tweak_no_media_error
 		fi
@@ -7095,7 +7110,7 @@ set_gnome_ui_corporate_crisp_tweaks_for_user() {
 		if [[ -d /usr/share/themes/Arc ]]; then
 			gsettings set org.gnome.desktop.interface gtk-theme 'Arc'
 			gsettings set org.gnome.shell.extensions.user-theme name "Arc"
-			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR} -name RTD_Wallpapers_HQ_Public_Domain_020.jpg)
+			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name RTD_Wallpapers_HQ_Public_Domain_020.jpg)
 		else
 			set_gnome_ui_tweak_no_media_error
 		fi
@@ -7166,7 +7181,7 @@ set_gnome_ui_moca_tweaks_for_user() {
 	if [[ -d /usr/share/themes/vimix-dark-doder ]]; then
 		gsettings set org.gnome.desktop.interface gtk-theme 'vimix-dark-doder'
 		gsettings set org.gnome.shell.extensions.user-theme name "vimix-dark-doder"
-		gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR} -name Chocolate_brown_wallpaper.jpg)
+		gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name Chocolate_brown_wallpaper.jpg)
 	else
 		set_gnome_ui_tweak_no_media_error
 	fi
@@ -10840,7 +10855,7 @@ software::vendor_download_and_install() {
 	# End of documentation
 
 	download_url="$1"
-	fetch_file() { wget -P ${_OEM_DIR}/cache "${download_url}"; }
+	fetch_file() { wget -P ${_OEM_DIR:-"/opt/rtd"}/cache "${download_url}"; }
 
 	echo "${FUNCNAME[0]}: getting package ${download_url}..."
 	if hash wget; then
@@ -10856,11 +10871,11 @@ software::vendor_download_and_install() {
 
 	echo "${FUNCNAME[0]}: Installing package $(basename ${download_url}) ..."
 	if hash pkcon; then
-		pkcon install-local -y ${_OEM_DIR}/cache/"$(basename "${download_url}")"
+		pkcon install-local -y ${_OEM_DIR:-"/opt/rtd"}/cache/"$(basename "${download_url}")"
 		return $?
 	else
 		software::check_native_package_dependency packagekit-tools
-		pkcon install-local -y ${_OEM_DIR}/cache/"$(basename "${download_url}")"
+		pkcon install-local -y ${_OEM_DIR:-"/opt/rtd"}/cache/"$(basename "${download_url}")"
 		return $?
 	fi
 }
@@ -15747,12 +15762,12 @@ template::preseed_cfg::late_command() {
 			# C.4.12. Addon Tasks for Minecraft Server
 			# --------------------------------------------------- #
 			${_d_i_post_statment_ubunto_or_deb} \
-			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
+			in-target /bin/bash /${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ; \
 			in-target mkdir -p /root/.ssh ; \
 			in-target mkdir -p /home/${Preference_InitialUser}/.ssh ; \
 			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /root/.ssh/authorized_keys" ; \
 			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /home/${Preference_InitialUser}/.ssh/authorized_keys" ; \
-			cp /*.cfg /target/opt/rtd/ ; cp /task.sh /home/${Preference_InitialUser}/minecraft.server ;\
+			cp /*.cfg /target/${_OEM_DIR:-"/opt/rtd"}/ ; cp /task.sh /home/${Preference_InitialUser}/minecraft.server ;\
 			in-target echo "bash /home/${Preference_InitialUser}/minecraft.server" >> /home/${Preference_InitialUser}/.bashrc ; \
 			umount -l /media || echo "Empty"; \
 			eject || true; \
@@ -15779,14 +15794,14 @@ template::preseed_cfg::late_command() {
 			${_d_i_post_statment_ubunto_or_deb} \
 			in-target apt-get -y install qemu-system libvirt-daemon-system ; \
 			in-target apt-get -y install git ; \
-			in-target git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
-			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
-			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
+			in-target git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} ; \
+			in-target /usr/bin/chmod 755 ${_OEM_DIR:-"/opt/rtd"}/${_OEM_DIR:-"/opt/rtd"}/* ; \
+			in-target /bin/bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ; \
 			in-target mkdir -p /root/.ssh ; \
 			in-target mkdir -p /home/${Preference_InitialUser}/.ssh ; \
 			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /root/.ssh/authorized_keys" ; \
 			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /home/${Preference_InitialUser}/.ssh/authorized_keys" ; \
-			cp /*.cfg /target/opt/rtd/ ; \
+			cp /*.cfg /target/${_OEM_DIR:-"/opt/rtd"}/ ; \
 			umount -l /media || echo "Empty" ; \
 			eject || true; \
 			echo "------  initial Setup Complete!  ------"
@@ -15816,15 +15831,15 @@ template::preseed_cfg::late_command() {
 			in-target apt-get -y install neofetch ; \
 			in-target /bin/sh -c echo "LC_ALL=${Preference_InitialLanguage}.UTF-8" >> /etc/default/locale ; \
 			in-target locale-gen en_US.UTF-8; in-target update-locale LANG=en_US.UTF-8; \
-			in-target /usr/bin/git clone --depth=1 https://github.com/vonschutter/RTD-Setup.git /opt/rtd ; \
-			in-target /usr/bin/chmod 755 /opt/rtd/core/rtd* ; \
-			in-target /bin/bash /opt/rtd/core/rtd-oem-enable-config.sh ; \
+			in-target /usr/bin/git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} ; \
+			in-target /usr/bin/chmod 755 ${_OEM_DIR:-"/opt/rtd"}/core/rtd* ; \
+			in-target /bin/bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ; \
 			in-target mkdir -p /root/.ssh ; \
 			in-target mkdir -p /home/${Preference_InitialUser}/.ssh ; \
 			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /root/.ssh/authorized_keys" ; \
 			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /home/${Preference_InitialUser}/.ssh/authorized_keys" ; \
 			in-target /bin/sh -c "chown -R ${Preference_InitialUser} /home/${Preference_InitialUser}/.ssh"  ; \
-			cp /*.cfg /target/opt/rtd/ ; \
+			cp /*.cfg /target/${_OEM_DIR:-"/opt/rtd"}/ ; \
 			umount -l /media || echo "Empty" ; \
 			eject || true; \
 			echo "------  initial Setup Complete!  ------"
@@ -15924,9 +15939,9 @@ template::kickstart_cfg() {
 
 			# Post-installation Script
 			%post --interpreter=/bin/bash
-			git clone --depth 1 https://github.com/vonschutter/RTD-Setup.git /opt/rtd
-			chmod 755 /opt/rtd/core/rtd-oem-enable-config.sh
-			bash /opt/rtd/core/rtd-oem-enable-config.sh
+			git clone --depth 1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}
+			chmod 755 ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
+			bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
 			systemctl enable sshd
 			%end
 		KS_EOF
@@ -15974,9 +15989,9 @@ template::kickstart_cfg() {
 
 			# Post-installation Script
 			%post --interpreter=/bin/bash
-			git clone --depth 1 https://github.com/vonschutter/RTD-Setup.git /opt/rtd
-			chmod 755 /opt/rtd/core/rtd-oem-enable-config.sh
-			bash /opt/rtd/core/rtd-oem-enable-config.sh
+			git clone --depth 1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}
+			chmod 755 ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
+			bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
 			systemctl enable sshd
 			%end
 		KS_EOF
@@ -16757,10 +16772,10 @@ template::AutoYast_xml() {
 			<script>
 			<source><![CDATA[
 		#!/bin/bash
-		git clone https://github.com/vonschutter/RTD-Setup.git /opt/rtd
-		chmod 755 /opt/rtd/core/rtd-oem-enable-config.sh
-		/opt/rtd/core/rtd-oem-enable-config.sh
-		cp *.xml /opt/rtd/
+		git clone ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}
+		chmod 755 ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
+		${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
+		cp *.xml ${_OEM_DIR:-"/opt/rtd"}/
 		sudo zypper ar -cfp 90 ${_SUSE_PACKMAN_LEAP} packman
 		zypper --gpg-auto-import-keys refresh
 		# zypper dup --from packman -y --force-resolution
@@ -16976,9 +16991,9 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service ; exit 0
 
         # Clone RTD Setup & Execute OEM Config
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd'
-        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh'
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"}'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}'
+        - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
 
         # Force unmounting of the target and other filesystems
         - curtin in-target --target=/target -- /bin/bash -c 'umount -l /dev || true'
@@ -17021,9 +17036,9 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service || true
 
         # Clone RTD Setup & Execute OEM Config
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd'
-        - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..5}; do git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd && break || { echo "Attempt $i failed"; sleep 10; }; done'
-        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh'
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"}'
+        - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..5}; do git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} && break || { echo "Attempt $i failed"; sleep 10; }; done'
+        - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
 
         # Force unmounting of the target and other filesystems
         - curtin in-target --target=/target -- /bin/bash -c 'umount -l /dev || true'
@@ -17072,9 +17087,9 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- bash -c 'echo -e "[Desktop Entry]\nType=Application\nExec=/usr/bin/spice-vdagent\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\nName=Spice Agent" > /etc/xdg/autostart/spice-vdagent.desktop'
 
         # Clone RTD Setup & Execute OEM Config
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd'
-        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh'
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"}'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}'
+        - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -17114,9 +17129,9 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- bash -c 'echo -e "[Desktop Entry]\nType=Application\nExec=/usr/bin/spice-vdagent\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\nName=Spice Agent" > /etc/xdg/autostart/spice-vdagent.desktop'
 
         # Clone RTD Setup & Execute OEM Config
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd'
-        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh'
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"}'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}'
+        - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -17153,9 +17168,9 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- bash -c 'echo -e "[Desktop Entry]\nType=Application\nExec=/usr/bin/spice-vdagent\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\nName=Spice Agent" > /etc/xdg/autostart/spice-vdagent.desktop'
 
         # Clone RTD Setup & Execute OEM Config
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd'
-        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh'
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"}'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}'
+        - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -17192,9 +17207,9 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- bash -c 'echo -e "[Desktop Entry]\nType=Application\nExec=/usr/bin/spice-vdagent\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\nName=Spice Agent" > /etc/xdg/autostart/spice-vdagent.desktop'
 
         # Clone RTD Setup & Execute OEM Config
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd'
-        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh'
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"}'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}'
+        - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -17217,9 +17232,9 @@ cat >>${user_data_file} <<EOF
         - ${server_app}
     late-commands:
         - echo "******************* ${server_app} Config ********************"
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ; exit 0'
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -17233,9 +17248,9 @@ cat >>${user_data_file} <<EOF
     late-commands:
         - echo "******************* ${server_app} Default Config ********************"
         - curtin in-target --target=/target -- apt-get install ${server_app:-"ssh-server"}
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ; exit 0'
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -17257,9 +17272,9 @@ cat >>${user_data_file} <<EOF
         - echo "******************* ${role} Config ********************"
 
         # Clone RTD Setup & Execute OEM Config
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ; exit 0'
 
         # Setup Minecraft Server and autologin to the console and launch the server
         - mkdir -p /target/etc/systemd/system/getty@tty1.service.d
@@ -17283,9 +17298,9 @@ cat >>${user_data_file} <<EOF
     late-commands:
         - echo "******************* ${server_app} Config ********************"
         - curtin in-target --target=/target -- apt-get install ${server_app:-"openssh-server"}
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} /opt/rtd ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c '/opt/rtd/core/rtd-oem-enable-config.sh ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ; exit 0'
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -18358,9 +18373,9 @@ software::list_bundles() {
 		# List software bundles for use with zenity
 		for _bundle in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep "${bundle_prefix}" | grep -v "Single_Install"); do
 			# Build each line to be displayed in the bundle installer...
-			true_false="$(grep -A 2 "$_bundle ()" "${_OEM_DIR}/core/${_rtd_recipies_info}" )"
+			true_false="$(grep -A 2 "$_bundle ()" "${_OEM_DIR:-"/opt/rtd"}/core/${_rtd_recipies_info}" )"
 			true_false="$(echo $true_false | grep "DEFAULT=TRUE"  &>/dev/null && echo "true" || echo "false")"
-			Description="$(grep -A 1 "$_bundle ()" "${_OEM_DIR}/core/${_rtd_recipies_info}" | tail -1)"
+			Description="$(grep -A 1 "$_bundle ()" "${_OEM_DIR:-"/opt/rtd"}/core/${_rtd_recipies_info}" | tail -1)"
 			Description="${Description/"# "/": "}"
 			Description="${Description/"	"/""}"
 			cat ${completed_bundles_list} | grep "${_bundle/recipe:_/}" &>/dev/null || echo -en "${true_false}\n ${_bundle/recipe:_/}\n ${Description}\n"
@@ -18371,7 +18386,7 @@ software::list_bundles() {
 		completed_bundles_list="$(cat ${completed_bundles_list})"
 		for _installed_bundle in ${completed_bundles_list}; do
 			# Build each line to be displayed in the bundle installer...
-			Description=$(grep -A 1 "recipe:_$_installed_bundle ()" "${_OEM_DIR}/core/${_rtd_recipies_info}" | tail -1)
+			Description=$(grep -A 1 "recipe:_$_installed_bundle ()" "${_OEM_DIR:-"/opt/rtd"}/core/${_rtd_recipies_info}" | tail -1)
 			Description="${Description/"# "/": "}"
 			Description="${Description/"	"/""}"
 			echo -e "false\n ${_installed_bundle}\n ${Description}\n"
