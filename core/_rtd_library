@@ -4436,9 +4436,8 @@ system::add_or_remove_login_script() {
 			exec_line="/usr/bin/xterm -fa Monospace -iconic -fs 10 -e \"sudo -E bash -c \"$script_path\"\""
 			write_information "📜 Creating autostart entry using xterm"
 		else
+			software::add_native_package xterm
 			exec_line="/usr/bin/xterm -fa Monospace -iconic -fs 10 -e \"sudo -E bash -c \"$script_path\"\""
-
-			#exec_line="pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY bash -c '\"$script_path\"'"
 			write_information "📜 Creating autostart entry using default terminal"
 		fi
 
@@ -16967,7 +16966,9 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get upgrade -y'
         - curtin in-target --target=/target -- apt-get -y install kubuntu-desktop
-        - curtin in-target --target=/target -- /bin/bash -c 'snap install firefox'
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install snapd || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'systemctl start snapd.service ; systemctl enable snapd.service || true'
+        - curtin in-target --target=/target -- /bin/bash -c '/usr/bin/snap install firefox || true'
         - curtin in-target --target=/target -- apt install plymouth-theme-kubuntu-logo plymouth-theme-kubuntu-text plymouth-theme-spinner plymouth-x11 -y ; update-initramfs -u ; exit 0
         - curtin in-target --target=/target -- sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' /etc/default/grub ; update-grub ; exit 0
         - curtin in-target --target=/target -- update-grub ; exit 0
@@ -17013,10 +17014,10 @@ cat >>${user_data_file} <<EOF
         # Install Ubuntu Desktop Environment
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install ubuntu-desktop-minimal'
-        - curtin in-target --target=/target -- /bin/bash -c 'snap install firefox'
-        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install plymouth-theme-ubuntu-text plymouth-theme-spinner plymouth'
-        # - curtin in-target --target=/target -- /bin/bash -c 'sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash\"/" /etc/default/grub'
-        # - curtin in-target --target=/target -- /bin/bash -c 'update-grub'
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install snapd || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'systemctl start snapd.service ; systemctl enable snapd.service || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install firefox || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install plymouth-theme-ubuntu-text plymouth-theme-spinner plymouth || true'
         - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service || true
 
         # Clone RTD Setup & Execute OEM Config
@@ -17030,11 +17031,11 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'umount -l /proc || true'
         - curtin in-target --target=/target -- /bin/bash -c 'umount -l /sys || true'
         - curtin in-target --target=/target -- /bin/bash -c 'umount -l /run || true'
-        - umount -l /target || true
         - umount -l /cdrom || true
+        - eject /dev/cdrom || true
+        - eject /dev/disk/by-label/cidata || true
         - eject /dev/sr0 || true
         - eject /dev/sr1 || true
-        - shutdown -h now || true
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -18149,8 +18150,7 @@ write_host() {
 	echo -e "${_text} "
 
 	# Tell the loging function to log the message requested...
-	system::log_item "${FUNCNAME[0]}: 💻 ${FUNCNAME[1]}: ${_text}"
-
+	system::log_item "${FUNCNAME[0]}       : 💻 ${FUNCNAME[1]}: ${_text}"
 }
 
 write_error() {
@@ -18180,8 +18180,7 @@ write_error() {
 	fi
 
 	# Tell the loging function to log the message requested...
-	[ -n "${text}" ] && system::log_item "${FUNCNAME[0]}: 💥 ${FUNCNAME[1]}: ${text}"
-
+	[ -n "${text}" ] && system::log_item "${FUNCNAME[0]}      : 💥 ${FUNCNAME[1]}: ${text}"
 }
 
 write_warning() {
@@ -18208,8 +18207,7 @@ write_warning() {
 	fi
 
 	# Tell the loging function to log the message requested...
-	[ -n "${text}" ] && system::log_item "${FUNCNAME[0]}: ⚠ ${FUNCNAME[1]}: ${text}"
-
+	[ -n "${text}" ] && system::log_item "${FUNCNAME[0]}    : ⚠ ${FUNCNAME[1]}: ${text}"
 }
 
 write_status() {
@@ -18236,8 +18234,7 @@ write_status() {
 	fi
 
 	# Tell the loging function to log the message requested...
-	[ -n "${text}" ] && system::log_item "${FUNCNAME[0]}: ✓ ${FUNCNAME[1]}: ${text}"
-
+	[ -n "${text}" ] && system::log_item "${FUNCNAME[0]}     : ✓ ${FUNCNAME[1]}: ${text}"
 }
 
 write_information() {
@@ -18265,7 +18262,6 @@ write_information() {
 
 	# Tell the loging function to log the message requested...
 	system::log_item "${FUNCNAME[0]}: ℹ ${FUNCNAME[1]}: ${text}"
-
 }
 
 list_loaded_internal_functions() {
