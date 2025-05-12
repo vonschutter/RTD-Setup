@@ -17061,7 +17061,7 @@ EOF
 cat >>${user_data_file} <<EOF
         - lightdm
         - wine
-	- xterm
+        - xterm
     late-commands:
         - echo "******************* ${server_app} Config ********************"
         - mount --bind /dev  /target/dev
@@ -17075,8 +17075,6 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- apt-get -y install xubuntu-desktop
         - curtin in-target --target=/target -- dpkg --add-architecture i386 && apt-get update && apt-get -y install wine32:i386
         - curtin in-target --target=/target -- apt install -y plymouth-theme-xubuntu-logo plymouth-theme-xubuntu-logo plymouth-theme-spinner plymouth-x11 ; update-initramfs -u ; exit 0
-        - curtin in-target --target=/target -- sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' /etc/default/grub ; update-grub ; exit 0
-        - curtin in-target --target=/target -- update-grub ; exit 0
 
         # Enable and start spice-vdagent onlogin
         - curtin in-target --target=/target -- apt-get -y install spice-vdagent qemu-guest-agent
@@ -17088,8 +17086,20 @@ cat >>${user_data_file} <<EOF
 
         # Clone RTD Setup & Execute OEM Config
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"}'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}'
+        - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..5}; do git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} && break || { echo "Attempt $i failed"; sleep 10; }; done'
         - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
+
+        # Force unmounting of the target and other filesystems
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /dev || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /cdrom || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /proc || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /sys || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /run || true'
+        - umount -l /cdrom || true
+        - eject /dev/cdrom || true
+        - eject /dev/disk/by-label/cidata || true
+        - eject /dev/sr0 || true
+        - eject /dev/sr1 || true
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -17113,10 +17123,7 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get upgrade -y'
         - curtin in-target --target=/target -- /bin/bash -c "echo lightdm shared/default-x-display-manager select lightdm | debconf-set-selections"
         - curtin in-target --target=/target -- apt-get -y install ubuntu-mate-desktop
-        - curtin in-target --target=/target -- dpkg --add-architecture i386 && apt-get update && apt-get -y install wine32:i386
         - curtin in-target --target=/target -- apt-get -y install plymouth-theme-ubuntu-mate-logo plymouth-theme-ubuntu-mate-text plymouth-theme-spinner plymouth-x11 ; update-initramfs -u ; exit 0
-        - curtin in-target --target=/target -- sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' /etc/default/grub ; update-grub ; exit 0
-        - curtin in-target --target=/target -- update-grub ; exit 0
         - curtin in-target --target=/target -- systemctl set-default graphical.target  ; exit 0
         - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service ; exit 0
 
@@ -17130,8 +17137,20 @@ cat >>${user_data_file} <<EOF
 
         # Clone RTD Setup & Execute OEM Config
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"}'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}'
+        - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..5}; do git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} && break || { echo "Attempt $i failed"; sleep 10; }; done'
         - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
+
+        # Force unmounting of the target and other filesystems
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /dev || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /cdrom || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /proc || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /sys || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /run || true'
+        - umount -l /cdrom || true
+        - eject /dev/cdrom || true
+        - eject /dev/disk/by-label/cidata || true
+        - eject /dev/sr0 || true
+        - eject /dev/sr1 || true
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -17154,11 +17173,8 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get upgrade -y'
         - curtin in-target --target=/target -- apt-get -y install lubuntu-desktop
-        - curtin in-target --target=/target -- dpkg --add-architecture i386 && apt-get update && apt-get -y install wine32:i386
         - curtin in-target --target=/target -- apt-get -y install plymouth-theme-lubuntu-logo plymouth-theme-lubuntu-text plymouth-theme-spinner plymouth-x11 ; update-initramfs -u ; exit 0
-        - curtin in-target --target=/target -- sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' /etc/default/grub ; update-grub ; exit 0
-        - curtin in-target --target=/target -- update-grub ; exit 0
-
+ 
         # Enable and start spice-vdagent onlogin
         - curtin in-target --target=/target -- apt-get -y install spice-vdagent qemu-guest-agent
         - curtin in-target --target=/target -- systemctl enable spice-vdagentd
@@ -17169,8 +17185,20 @@ cat >>${user_data_file} <<EOF
 
         # Clone RTD Setup & Execute OEM Config
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"}'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}'
+        - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..5}; do git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} && break || { echo "Attempt $i failed"; sleep 10; }; done'
         - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
+
+        # Force unmounting of the target and other filesystems
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /dev || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /cdrom || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /proc || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /sys || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /run || true'
+        - umount -l /cdrom || true
+        - eject /dev/cdrom || true
+        - eject /dev/disk/by-label/cidata || true
+        - eject /dev/sr0 || true
+        - eject /dev/sr1 || true
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -17193,10 +17221,7 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get upgrade -y'
         - curtin in-target --target=/target -- apt-get -y install cinnamon-desktop-environment
-        - curtin in-target --target=/target -- dpkg --add-architecture i386 && apt-get update && apt-get -y install wine32:i386
         - curtin in-target --target=/target -- apt-get -y install plymouth-theme-ubuntucinnamon-spinner plymouth-theme-spinner plymouth-x11 ; update-initramfs -u ; exit 0
-        - curtin in-target --target=/target -- sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' /etc/default/grub ; update-grub ; exit 0
-        - curtin in-target --target=/target -- update-grub ; exit 0
 
         # Enable and start spice-vdagent onlogin
         - curtin in-target --target=/target -- apt-get -y install spice-vdagent qemu-guest-agent
@@ -17208,8 +17233,20 @@ cat >>${user_data_file} <<EOF
 
         # Clone RTD Setup & Execute OEM Config
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"}'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}'
+        - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..5}; do git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} && break || { echo "Attempt $i failed"; sleep 10; }; done'
         - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
+
+        # Force unmounting of the target and other filesystems
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /dev || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /cdrom || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /proc || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /sys || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /run || true'
+        - umount -l /cdrom || true
+        - eject /dev/cdrom || true
+        - eject /dev/disk/by-label/cidata || true
+        - eject /dev/sr0 || true
+        - eject /dev/sr1 || true
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
