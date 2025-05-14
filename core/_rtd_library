@@ -11076,10 +11076,8 @@ software::add_native_package() {
 		return 1
 	}
 
-	if command -v pkcon >/dev/null 2>&1; then
-		pkgmgr="PKCON"
-		install_cmd="pkcon install -y"
-	elif command -v zypper >/dev/null 2>&1; then
+
+	if command -v zypper >/dev/null 2>&1; then
 		pkgmgr="ZYPPER"
 		install_cmd="sudo zypper install -y"
 	elif command -v apt-get >/dev/null 2>&1; then
@@ -11088,6 +11086,9 @@ software::add_native_package() {
 	elif command -v dnf >/dev/null 2>&1; then
 		pkgmgr="DNF"
 		install_cmd="sudo dnf -y install"
+        elif command -v pkcon >/dev/null 2>&1; then
+		pkgmgr="PKCON"
+		install_cmd="pkcon install -y"
 	else
 		write_error "No supported package manager found on this system."
 		return 3
@@ -13863,6 +13864,65 @@ kvm::get_zorin_iso() {
 	fi
 }
 
+kvm::create_expanding_vm_hardisk() {
+	# Description:
+	#   Creates a non-preallocated, dynamically expanding qcow2 disk image for a VM.
+	#   Logs all actions and returns the full path of the disk image created.
+	#
+	# Globals:
+	#   _LOGFILE - Path to the log file used for system logging.
+	#
+	# Arguments:
+	#   $1 - Full VM name (used to name the disk file).
+	#   $2 - Disk size in GB (integer only).
+	#   $3 - Optional: target directory (default: /var/lib/libvirt/images).
+	#
+	# Outputs:
+	#   STDOUT: Full path of created disk image.
+	#   STDERR: Error messages.
+	#
+	# Returns:
+	#   0 on success, 1 on failure.
+
+	local vm_name="$1"
+	local disk_size_gb="$2"
+	local target_dir="${3:-/var/lib/libvirt/images}"
+	local disk_path
+
+	if [[ -z "$vm_name" || -z "$disk_size_gb" ]]; then
+		printf "Usage: kvm::create_expanding_vm_hardisk <vm_name> <size_gb> [target_dir]\n" >&2
+		return 1
+	fi
+
+	if ! command -v qemu-img >/dev/null; then
+		printf "❌ qemu-img not found. Please install qemu-utils.\n" >&2
+		return 1
+	fi
+
+	if [[ ! "$disk_size_gb" =~ ^[0-9]+$ ]]; then
+		printf "❌ Disk size must be an integer (GB).\n" >&2
+		return 1
+	fi
+
+	mkdir -p "$target_dir" || {
+		printf "❌ Failed to create target directory: %s\n" "$target_dir" >&2
+		return 1
+	}
+
+	disk_path="${target_dir}/${vm_name}.qcow2"
+
+	system::log_item "🖴 Creating dynamic qcow2 disk at: $disk_path (${disk_size_gb}G)..."
+	if ! qemu-img create -f qcow2 -o preallocation=off "$disk_path" "${disk_size_gb}G" >> "${_LOGFILE}" 2>&1; then
+		system::log_item "❌ Failed to create disk image: $disk_path"
+		return 1
+	fi
+
+	system::log_item "✅ Disk image created: $disk_path"
+	printf '%s\n' "$disk_path"
+	return 0
+}
+
+
 kvm::make_vm_now_from_fedora_org() {
 	# Description: Function to create a Fedora KVM virtual michine disk and define a VM. This function should be
 	# used on a Qemu/KVM virtual host that the virtual guest is to be used on.
@@ -14600,7 +14660,12 @@ kvm::make_vm_now_from_ubuntu_com() {
 	fi
 
 	# Format the name of the VM to be created...
-	local vm_name="Template_${server_app}${pre_config}${_role}_${_tgt_ubuntu_ver}_${_UserDesktopEnvironmentSelection}${_UserServerEnvironemtSelection}_$(date +%Y-%m-%d-%s)"
+	local vm_name="Template_${server_app}_${_role}_${_tgt_ubuntu_ver}__$(date +%Y-%m-%d-%s)"
+
+	disk_path=$(kvm::create_expanding_vm_hardisk "$vm_name" "$_dsk") || {
+		write_error "❌ Failed to create VM disk image. Aborting VM creation."
+		return 1
+	}
 
 	# Prepare the summary message for the VM creation...
 	_summary_message="
@@ -14635,7 +14700,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 					--vcpus "${_cpu}" \
 					--memory "${_mem}" \
 					--network "${virt_net}" \
-					--disk size="${_dsk}" \
+					--disk path="${disk_path},format=qcow2" \
 					--os-variant="ubuntu${_tgt_ubuntu_ver::5}" \
 					--video "qxl" --channel "spicevmc" \
 					--location="${iso},kernel=casper/vmlinuz.efi,initrd=casper/initrd" \
@@ -14660,7 +14725,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 					--vcpus "${_cpu}" \
 					--memory "${_mem}" \
 					--network "${virt_net}" \
-					--disk size="${_dsk}" \
+					--disk path="${disk_path},format=qcow2" \
 					--os-variant="ubuntu${_tgt_ubuntu_ver::5}" \
 					--video "virtio" --channel "spicevmc" \
 					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
@@ -14696,7 +14761,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 					--vcpus "${_cpu}" \
 					--memory "${_mem}" \
 					--network "${virt_net}" \
-					--disk size="${_dsk}" \
+					--disk path="${disk_path},format=qcow2" \
 					--os-variant="ubuntu24.04" \
 					--video "virtio" --channel "spicevmc" \
 					--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
@@ -14727,7 +14792,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 				--vcpus "${_cpu}" \
 				--memory "${_mem}" \
 				--network "${virt_net}" \
-				--disk size="${_dsk}" \
+				--disk path="${disk_path},format=qcow2" \
 				--os-variant="ubuntu24.04" \
 				--video "virtio" --channel "spicevmc" \
 				--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
@@ -14755,13 +14820,13 @@ kvm::make_vm_now_from_ubuntu_com() {
 			ubuntu::download_iso --dir ${permanent_download_dir} --media-type server --version ${_tgt_ubuntu_ver} 
 			: ${iso:="$permanent_download_dir/$iso_filename"}
 			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" ${all_params}
-					
+		
 			{
 				"${bin_virt_install}" --name  ${vm_name:-"Ubuntu-Server-${_tgt_ubuntu_ver}-$(date +%Y-%m-%d-%s)"}  \
 				--vcpus "${_cpu}" \
 				--memory "${_mem}" \
 				--network "${virt_net}" \
-				--disk size="${_dsk}" \
+				--disk path="${disk_path},format=qcow2" \
 				--os-variant="ubuntu24.04" \
 				--video "virtio" --channel "spicevmc" \
 				--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
@@ -14776,7 +14841,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 	esac
 
 	# Clean up residual variables...
-	unset _UserDesktopEnvironmentSelection _UserServerEnvironemtSelection PRESEED_FILE vm_kernel vm_initrd source_url iso _task _role _cpu _dsk _mem _tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig CloudConfigDir _summary_message _saveto _ask _flavor _role _cpu _mem _dsk permanent_download_dir bin_virt_install virt_net vm_name all_params server_app pre_config
+	unset disk_path _UserDesktopEnvironmentSelection _UserServerEnvironemtSelection PRESEED_FILE vm_kernel vm_initrd source_url iso _task _role _cpu _dsk _mem _tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig CloudConfigDir _summary_message _saveto _ask _flavor _role _cpu _mem _dsk permanent_download_dir bin_virt_install virt_net vm_name all_params server_app pre_config
 }
 
 kvm::make_vm_now_from_microsoft() {
@@ -14817,7 +14882,7 @@ kvm::make_vm_now_from_microsoft() {
 	: ${_dsk="${_dsk:-100}"}
 	: ${target_winver="${target_winver:-"win10"}"}
 	: ${BIN_VIRT_INSTALL:="$(type -p virt-install)"}
-	: ${CONFIG:="Workstation"}
+	: ${CONFIG:="VDI"}
 	: ${WindowsInstructions:="/var/lib/libvirt/boot/win$(date +%Y-%m-%d-%H-%M-%S-%s).img"}
 	: ${virt_net="$(system::find_vm_bridge)"}
 	: ${_saveto="$(mktemp -d /tmp/WinConfig.XXXXXX)"}
@@ -16861,7 +16926,7 @@ template::cloud_config() {
 	# End of Documentation
 	system::log_item "Called by: ${FUNCNAME[1]}"
 	system::log_item "Processing parameters: $*"
-	local vm_name user_data_file role server_app ask cloud_config_dir pre_config
+	local vm_name user_data_file role server_app ask cloud_config_dir pre_config common_vdi_config common_server_config common_cleanup_config
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
@@ -16905,12 +16970,53 @@ template::cloud_config() {
 	if [[ -n $pre_config ]] ; then { role=$pre_config ; system::log_item "Pre-Config: ${pre_config}" ; } ; fi
 	system::log_item "VM Name: $vm_name"
 
-	# -----------------------------------------------------------------------------------------
-	# Add COMMON section to the cloud config file based on preferences
-	# -----------------------------------------------------------------------------------------
+# Define common installation tasks for manageable code
+common_vdi_pre_config=$(cat <<EOF
+        - echo '******************* Common VDI Pre-Config ********************'
 
-	# $(if [[ -n "${_UserDesktopEnvironmentSelection}" ]]; then echo "- ${_UserDesktopEnvironmentSelection}"; fi)
-        # password: "${Preference_Disk_Password}"
+        # Set up the target for installation
+        - mount --bind /dev  /target/dev
+        - mount --bind /proc /target/proc
+        - mount --bind /sys  /target/sys
+        - mount --bind /run  /target/run
+
+        # Update software sources and upgrade packages
+        - curtin in-target --target=/target -- bash -c 'apt-get update -y && apt-get upgrade -y ; exit 0'
+EOF
+)
+
+
+# Define common cleanup tasks for manageable code
+common_vdi_post_config=$(cat <<EOF
+        - echo '******************* Common VDI Post-Config ********************'
+
+        # Final setup and installation of GUI software:
+
+        # Enable and start spice-vdagent onlogin
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install spice-vdagent qemu-guest-agent ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'systemctl enable spice-vdagentd ; exit 0'
+
+        # Ensure spice-vdagent autostarts in user sessions
+        - curtin in-target --target=/target -- mkdir -p /etc/xdg/autostart
+        - curtin in-target --target=/target -- bash -c 'echo -e "[Desktop Entry]\nType=Application\nExec=/usr/bin/spice-vdagent\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\nName=Spice Agent" > /etc/xdg/autostart/spice-vdagent.desktop'
+
+        # Clone RTD Setup & Execute OEM Config
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"}'
+        - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..5}; do git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} && break || { echo "Clone failed, trying again..." ; rm -r ${_OEM_DIR:-"/opt/rtd"}/* ; sleep 10; }; done'
+        - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
+
+        # Force unmounting of the target and other filesystems
+        # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /dev || true'
+        # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /cdrom || true'
+        # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /proc || true'
+        # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /sys || true'
+        # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /run || true'
+        # - umount -l /cdrom || true
+        # - eject --force /dev/sr0 || true
+        # - eject --force /dev/sr1 || true
+EOF
+)
+
 
 cat >>${user_data_file} <<EOF
 #cloud-config
@@ -16966,46 +17072,15 @@ if [[ $role == "VDI" ]]; then
 	# -----------------------------------------------------------------------------------------
 
 cat >>${user_data_file} <<EOF
-        - sddm
-        - xterm
-        - wine
-        - xterm
     late-commands:
-        - echo "******************* ${server_app} Config ********************"
-        - mount --bind /dev  /target/dev
-        - mount --bind /proc /target/proc
-        - mount --bind /sys  /target/sys
-        - mount --bind /run  /target/run
+${common_vdi_pre_config}
 
         # Install Kubuntu Desktop Environment
-        - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
-        - curtin in-target --target=/target -- /bin/bash -c 'apt-get upgrade -y'
-        - curtin in-target --target=/target -- apt-get -y install kubuntu-desktop
-        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install snapd || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'systemctl start snapd.service ; systemctl enable snapd.service || true'
-        - curtin in-target --target=/target -- /bin/bash -c '/usr/bin/snap install firefox || true'
-        - curtin in-target --target=/target -- apt install plymouth-theme-kubuntu-logo plymouth-theme-kubuntu-text plymouth-theme-spinner plymouth-x11 -y ; update-initramfs -u ; exit 0
-        - curtin in-target --target=/target -- sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' /etc/default/grub ; update-grub ; exit 0
-        - curtin in-target --target=/target -- update-grub ; exit 0
-        - curtin in-target --target=/target -- systemctl set-default graphical.target  ; exit 0
-        - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service ; exit 0
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install kubuntu-desktop'
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install plymouth-theme-kubuntu-logo plymouth-theme-kubuntu-text plymouth-theme-spinner && update-initramfs -u ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'systemctl set-default graphical.target ; exit 0'
 
-        # Clone RTD Setup & Execute OEM Config
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"}'
-        - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}'
-        - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
-
-        # Force unmounting of the target and other filesystems
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /dev || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /cdrom || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /proc || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /sys || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /run || true'
-        - umount -l /target || true
-        - umount -l /cdrom || true
-        - eject /dev/sr0 || true
-        - eject /dev/sr1 || true
-        - shutdown -h now || true
+${common_vdi_post_config}
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -17110,8 +17185,6 @@ cat >>${user_data_file} <<EOF
         - lightdm
         - wine
         - xterm
-        - yad
-        - zeinity
     late-commands:
         - echo "******************* ${server_app} Config ********************"
         - mount --bind /dev  /target/dev
@@ -17173,12 +17246,12 @@ cat >>${user_data_file} <<EOF
         # Install Lubuntu Desktop
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get upgrade -y'
-        - curtin in-target --target=/target -- apt-get -y install lubuntu-desktop
-        - curtin in-target --target=/target -- apt-get -y install plymouth-theme-lubuntu-logo plymouth-theme-lubuntu-text plymouth-theme-spinner plymouth-x11 ; update-initramfs -u ; exit 0
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install lubuntu-desktop'
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install plymouth-theme-lubuntu-logo plymouth-theme-lubuntu-text ; update-initramfs -u ; || true'
  
         # Enable and start spice-vdagent onlogin
-        - curtin in-target --target=/target -- apt-get -y install spice-vdagent qemu-guest-agent
-        - curtin in-target --target=/target -- systemctl enable spice-vdagentd
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install spice-vdagent qemu-guest-agent'
+        - curtin in-target --target=/target -- /bin/bash -c 'systemctl enable spice-vdagentd'
 
         # Ensure spice-vdagent autostarts in user sessions
         - curtin in-target --target=/target -- mkdir -p /etc/xdg/autostart
@@ -17221,12 +17294,12 @@ cat >>${user_data_file} <<EOF
         # Install Cinnamon Desktop
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get upgrade -y'
-        - curtin in-target --target=/target -- apt-get -y install cinnamon-desktop-environment
-        - curtin in-target --target=/target -- apt-get -y install plymouth-theme-ubuntucinnamon-spinner plymouth-theme-spinner plymouth-x11 ; update-initramfs -u ; exit 0
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install cinnamon-desktop-environment'
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install plymouth-theme-ubuntucinnamon-spinner ; update-initramfs -u ; exit 0'
 
         # Enable and start spice-vdagent onlogin
-        - curtin in-target --target=/target -- apt-get -y install spice-vdagent qemu-guest-agent
-        - curtin in-target --target=/target -- systemctl enable spice-vdagentd
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install spice-vdagent qemu-guest-agent'
+        - curtin in-target --target=/target -- /bin/bash -c 'systemctl enable spice-vdagentd'
 
         # Ensure spice-vdagent autostarts in user sessions
         - curtin in-target --target=/target -- mkdir -p /etc/xdg/autostart
