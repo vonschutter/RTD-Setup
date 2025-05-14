@@ -17095,11 +17095,7 @@ cat >>${user_data_file} <<EOF
         - wine
         - xterm
     late-commands:
-        - echo "******************* ${server_app} Config ********************"
-        - mount --bind /dev  /target/dev
-        - mount --bind /proc /target/proc
-        - mount --bind /sys  /target/sys
-        - mount --bind /run  /target/run
+${common_vdi_pre_config}
 
         # Install Ubuntu Desktop Environment
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
@@ -17110,22 +17106,7 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install plymouth-theme-ubuntu-text plymouth-theme-spinner plymouth || true'
         - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service || true
 
-        # Clone RTD Setup & Execute OEM Config
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"}'
-        - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..5}; do git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} && break || { echo "Attempt $i failed"; sleep 10; }; done'
-        - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
-
-        # Force unmounting of the target and other filesystems
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /dev || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /cdrom || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /proc || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /sys || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /run || true'
-        - umount -l /cdrom || true
-        - eject /dev/cdrom || true
-        - eject /dev/disk/by-label/cidata || true
-        - eject /dev/sr0 || true
-        - eject /dev/sr1 || true
+${common_vdi_post_config}
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -17138,11 +17119,7 @@ cat >>${user_data_file} <<EOF
         - wine
         - xterm
     late-commands:
-        - echo "******************* ${server_app} Config ********************"
-        - mount --bind /dev  /target/dev
-        - mount --bind /proc /target/proc
-        - mount --bind /sys  /target/sys
-        - mount --bind /run  /target/run
+${common_vdi_pre_config}
 
         # Install xubuntu-desktop
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
@@ -17150,30 +17127,7 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- apt-get -y install xubuntu-desktop
         - curtin in-target --target=/target -- apt install -y plymouth-theme-xubuntu-logo plymouth-theme-xubuntu-logo plymouth-theme-spinner plymouth-x11 ; update-initramfs -u ; exit 0
 
-        # Enable and start spice-vdagent onlogin
-        - curtin in-target --target=/target -- apt-get -y install spice-vdagent qemu-guest-agent
-        - curtin in-target --target=/target -- systemctl enable spice-vdagentd
-
-        # Ensure spice-vdagent autostarts in user sessions
-        - curtin in-target --target=/target -- mkdir -p /etc/xdg/autostart
-        - curtin in-target --target=/target -- bash -c 'echo -e "[Desktop Entry]\nType=Application\nExec=/usr/bin/spice-vdagent\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\nName=Spice Agent" > /etc/xdg/autostart/spice-vdagent.desktop'
-
-        # Clone RTD Setup & Execute OEM Config
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"}'
-        - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..5}; do git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} && break || { echo "Attempt $i failed"; sleep 10; }; done'
-        - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
-
-        # Force unmounting of the target and other filesystems
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /dev || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /cdrom || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /proc || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /sys || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /run || true'
-        - umount -l /cdrom || true
-        - eject /dev/cdrom || true
-        - eject /dev/disk/by-label/cidata || true
-        - eject /dev/sr0 || true
-        - eject /dev/sr1 || true
+${common_vdi_post_config}
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -17186,11 +17140,7 @@ cat >>${user_data_file} <<EOF
         - wine
         - xterm
     late-commands:
-        - echo "******************* ${server_app} Config ********************"
-        - mount --bind /dev  /target/dev
-        - mount --bind /proc /target/proc
-        - mount --bind /sys  /target/sys
-        - mount --bind /run  /target/run
+${common_vdi_pre_config}
 
         # Install Ubuntu MATE Desktop
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
@@ -17201,30 +17151,7 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- systemctl set-default graphical.target  ; exit 0
         - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service ; exit 0
 
-        # Enable and start spice-vdagent onlogin
-        - curtin in-target --target=/target -- apt-get -y install spice-vdagent qemu-guest-agent
-        - curtin in-target --target=/target -- systemctl enable spice-vdagentd
-
-        # Ensure spice-vdagent autostarts in user sessions
-        - curtin in-target --target=/target -- mkdir -p /etc/xdg/autostart
-        - curtin in-target --target=/target -- bash -c 'echo -e "[Desktop Entry]\nType=Application\nExec=/usr/bin/spice-vdagent\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\nName=Spice Agent" > /etc/xdg/autostart/spice-vdagent.desktop'
-
-        # Clone RTD Setup & Execute OEM Config
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"}'
-        - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..5}; do git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} && break || { echo "Attempt $i failed"; sleep 10; }; done'
-        - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
-
-        # Force unmounting of the target and other filesystems
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /dev || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /cdrom || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /proc || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /sys || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /run || true'
-        - umount -l /cdrom || true
-        - eject /dev/cdrom || true
-        - eject /dev/disk/by-label/cidata || true
-        - eject /dev/sr0 || true
-        - eject /dev/sr1 || true
+${common_vdi_post_config}
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -17237,11 +17164,7 @@ cat >>${user_data_file} <<EOF
         - wine
         - xterm
     late-commands:
-        - echo "******************* ${server_app} Config ********************"
-        - mount --bind /dev  /target/dev
-        - mount --bind /proc /target/proc
-        - mount --bind /sys  /target/sys
-        - mount --bind /run  /target/run
+${common_vdi_pre_config}
 
         # Install Lubuntu Desktop
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
@@ -17249,30 +17172,7 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install lubuntu-desktop'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install plymouth-theme-lubuntu-logo plymouth-theme-lubuntu-text ; update-initramfs -u ; || true'
  
-        # Enable and start spice-vdagent onlogin
-        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install spice-vdagent qemu-guest-agent'
-        - curtin in-target --target=/target -- /bin/bash -c 'systemctl enable spice-vdagentd'
-
-        # Ensure spice-vdagent autostarts in user sessions
-        - curtin in-target --target=/target -- mkdir -p /etc/xdg/autostart
-        - curtin in-target --target=/target -- bash -c 'echo -e "[Desktop Entry]\nType=Application\nExec=/usr/bin/spice-vdagent\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\nName=Spice Agent" > /etc/xdg/autostart/spice-vdagent.desktop'
-
-        # Clone RTD Setup & Execute OEM Config
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"}'
-        - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..5}; do git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} && break || { echo "Attempt $i failed"; sleep 10; }; done'
-        - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
-
-        # Force unmounting of the target and other filesystems
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /dev || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /cdrom || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /proc || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /sys || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /run || true'
-        - umount -l /cdrom || true
-        - eject /dev/cdrom || true
-        - eject /dev/disk/by-label/cidata || true
-        - eject /dev/sr0 || true
-        - eject /dev/sr1 || true
+${common_vdi_post_config}
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -17285,11 +17185,7 @@ cat >>${user_data_file} <<EOF
         - wine
         - xterm
     late-commands:
-        - echo "******************* ${server_app} Config ********************"
-        - mount --bind /dev  /target/dev
-        - mount --bind /proc /target/proc
-        - mount --bind /sys  /target/sys
-        - mount --bind /run  /target/run
+${common_vdi_pre_config}
 
         # Install Cinnamon Desktop
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
@@ -17297,30 +17193,7 @@ cat >>${user_data_file} <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install cinnamon-desktop-environment'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install plymouth-theme-ubuntucinnamon-spinner ; update-initramfs -u ; exit 0'
 
-        # Enable and start spice-vdagent onlogin
-        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install spice-vdagent qemu-guest-agent'
-        - curtin in-target --target=/target -- /bin/bash -c 'systemctl enable spice-vdagentd'
-
-        # Ensure spice-vdagent autostarts in user sessions
-        - curtin in-target --target=/target -- mkdir -p /etc/xdg/autostart
-        - curtin in-target --target=/target -- bash -c 'echo -e "[Desktop Entry]\nType=Application\nExec=/usr/bin/spice-vdagent\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\nName=Spice Agent" > /etc/xdg/autostart/spice-vdagent.desktop'
-
-        # Clone RTD Setup & Execute OEM Config
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"}'
-        - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..5}; do git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} && break || { echo "Attempt $i failed"; sleep 10; }; done'
-        - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
-
-        # Force unmounting of the target and other filesystems
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /dev || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /cdrom || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /proc || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /sys || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /run || true'
-        - umount -l /cdrom || true
-        - eject /dev/cdrom || true
-        - eject /dev/disk/by-label/cidata || true
-        - eject /dev/sr0 || true
-        - eject /dev/sr1 || true
+${common_vdi_post_config}
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
