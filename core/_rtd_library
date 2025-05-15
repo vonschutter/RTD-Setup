@@ -4687,316 +4687,464 @@ system::generate_report_disk_space_used_by_directory() {
 	rm $store
 }
 
+# system::toggle_oem_auto_login() {
+# 	# Description: Function to toggle auto login for admin purposes.
+# 	#
+# 	# This function toggles automatic login for various display managers. It is designed to enable or disable
+# 	# auto-login for administrative purposes, such as performing interactive administrative logins and
+# 	# running configuration scripts. This function supports a range of popular display managers and
+# 	# applies SUSE-specific configurations when necessary.
+# 	#
+# 	# Globals:
+# 	# None. The function does not depend on or modify any global variables.
+# 	#
+# 	# Arguments:
+# 	# None. The function does not take any arguments.
+# 	#
+# 	# Outputs:
+# 	# The function outputs status messages, warnings, and error information using the write_status,
+# 	# write_warning, write_information, and write_error functions. These messages indicate the actions
+# 	# being taken (e.g., enabling or disabling auto-login) and any issues encountered.
+# 	#
+# 	# Returns:
+# 	# None. The function does not return a value.
+# 	#
+# 	# Usage:
+# 	#
+# 	# Call toggle_oem_auto_login without any arguments to toggle the auto-login feature. For example:
+# 	#
+# 	# toggle_oem_auto_login
+# 	#
+# 	# This will enable auto-login if it is currently disabled, or disable it if it is currently enabled.
+# 	#
+# 	# Function Behavior:
+# 	#
+# 	#     It proceeds to check for the
+# 	#     presence of configuration files for LightDM, SDDM, GDM3, and GDM. For each display manager found,
+# 	#     the function toggles the auto-login setting. If auto-login is enabled, it will disable it, and vice versa.
+# 	#     In the case of SUSE, the function modifies the SUSE-specific display manager file in /etc/sysconfig/
+# 	#     instead of the individual display manager configuration files.
+# 	#     The function also handles toggling auto-login for terminal environments (TTY) without a graphical user interface.
+# 	#
+# 	# Special Notes:
+# 	#
+# 	#     This function should be used with caution as enabling auto-login can have security implications.
+# 	#     It is particularly useful for scenarios like OEM setup or automatic template generation for KVM.
+# 	#     The function assumes that the current user has the necessary permissions to modify system configuration files.
+# 	#
+# 	# Implementation Details:
+# 	#
+# 	#     The function uses conditional checks to determine the presence of various display manager configuration files.
+# 	#     Backup files with the suffix .rtd-bak are used to preserve the original configuration before making changes.
+# 	#
+# 	# End of documentation
+
+# 	case $1 in
+# 	--help | -h)
+# 		write_information "usage : sysetm::toggle_oem_auto_login [--enable|--disable]"
+# 		return
+# 		;;
+# 	--enable | -e)
+# 		write_status "🚧 Enabling auto login as requested by - ${FUNCNAME[1]}"
+# 		local _flip=on
+# 		;;
+# 	--disable | -d)
+# 		write_status "🚧 Disabling auto login as requested by ${FUNCNAME[1]}"
+# 		local _flip=off
+# 		;;
+# 	*)
+# 		write_status "🚧 Toggling auto login..."
+# 		;;
+# 	esac
+
+# 	# Create a backup directory if it does not exist
+# 	mkdir -p /etc/${_TLA,,}/backup
+# 	local _backup_dir="/etc/${_TLA,,}/backup"
+
+# 	# Toggle auto login for Light DM if present (Old Ubuntu, Mint?, Budgie? etc.)
+# 	if [[ -f /etc/lightdm/lightdm.conf ]]; then
+# 		local _config_file="/etc/lightdm/lightdm.conf"
+# 		case $_flip in
+# 		off)
+# 			write_status "⛔ LightDM: toggeling auto login off... *******"
+# 			if rm ${_config_file} && mv ${_backup_dir}/${_config_file##*/}.rtd-bak ${_config_file}; then
+# 				write_status "💾 Restored previous configuration..."
+# 			else
+# 				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
+# 			fi
+# 			;;
+# 		on)
+# 			write_status "✅ LightDM: toggeling auto login on... *******"
+# 			cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak
+# 			cat >${_config_file} <<-OEM_LXDM_LOGIN_OPTION
+# 				# This configuration file was created by RTD Setup.
+# 				# You may safely replace this file with the original backed up:
+# 				# ${_backup_dir}/${_config_file##*/}.rtd-bak
+# 				# If this file is not there, then it was not there to begin with
+# 				# and you can delete this file.
+# 				[SeatDefaults]
+# 				autologin-user=${_OEM_USER:-"tangarora"}
+# 				autologin-user-timeout=0
+# 			OEM_LXDM_LOGIN_OPTION
+# 			;;
+# 		esac
+# 		local toggle=done
+# 	fi
+
+# 	# Toggle auto login for SDDM if present (Kubuntu, SUSE, KDE Based DE's)
+# 	if [[ -f /etc/sddm.conf ]]; then
+# 		local _config_file="/etc/sddm.conf"
+# 		case $_flip in
+# 		off)
+# 			write_status "⛔ SDDM: toggeling auto login off... *******"
+# 			if rm ${_config_file} && mv ${_backup_dir}/${_config_file##*/}.rtd-bak ${_config_file}; then
+# 				write_status "💾 Restored previous configuration..."
+# 			else
+# 				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
+# 			fi
+# 			;;
+# 		on)
+# 			write_status "✅ SDDM: toggeling auto login on... *******"
+# 			cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak
+# 			cat >${_config_file} <<-OEM_SDDM_LOGIN_OPTION
+# 				# This configuration file was created by RTD Setup.
+# 				# You may safely replace this file with the original backed up:
+# 				# ${_backup_dir}/${_config_file##*/}.rtd-bak
+# 				# If this file is not there, then it was not there to begin with
+# 				# and you can delete this file.
+# 				[Autologin]
+# 				User=${_OEM_USER:-"tangarora"}
+# 				Session=plasma.desktop
+# 			OEM_SDDM_LOGIN_OPTION
+# 			;;
+# 		esac
+# 		local toggle=done
+# 	fi
+
+# 	# Toggle auto login for GDM3 if present (Ubuntu, default etc.)
+# 	if [[ -f /etc/gdm3/custom.conf ]]; then
+# 		local _config_file="/etc/gdm3/custom.conf"
+# 		case $_flip in
+# 		off)
+# 			write_status "⛔ GDM3: toggeling auto login off... *******"
+# 			if rm ${_config_file} && mv ${_backup_dir}/${_config_file##*/}.rtd-bak ${_config_file}; then
+# 				write_status "💾 Restored previous configuration..."
+# 			else
+# 				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
+# 			fi
+# 			;;
+# 		on)
+# 			write_status "✅ GDM3: toggeling auto login on... *******"
+# 			cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak
+# 			cat >${_config_file} <<-OEM_GDM3_LOGIN_OPTION
+# 				# This configuration file was created by RTD Setup.
+# 				# You may safely replace this file with the original backed up:
+# 				# ${_backup_dir}/${_config_file##*/}.rtd-bak
+# 				# If this file is not there, then it was not there to begin with
+# 				# and you can delete this file.
+# 				[daemon]
+# 				AutomaticLoginEnable=True
+# 				AutomaticLogin=${_OEM_USER:-"tangarora"}
+# 			OEM_GDM3_LOGIN_OPTION
+# 			;;
+# 		esac
+# 		local toggle=done
+# 	fi
+
+# 	# Toggle auto login for GDM3 if present (Debian and others...)
+# 	if [[ -f /etc/gdm3/daemon.conf ]]; then
+# 		local _config_file="/etc/gdm3/daemon.conf"
+# 		case $_flip in
+# 		off)
+# 			write_status "⛔ GDM3: toggeling auto login off... *******"
+# 			if rm ${_config_file} && mv ${_backup_dir}/${_config_file##*/}.rtd-bak ${_config_file}; then
+# 				write_status "💾 Restored previous configuration..."
+# 			else
+# 				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
+# 			fi
+# 			;;
+# 		on)
+# 			write_status "✅ GDM3: toggeling auto login on... *******"
+# 			cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak
+# 			cat >${_config_file} <<-OEM_GDM3_LOGIN_OPTION
+# 				# This configuration file was created by RTD Setup.
+# 				# You may safely replace this file with the original backed up:
+# 				# ${_backup_dir}/${_config_file##*/}.rtd-bak
+# 				# If this file is not there, then it was not there to begin with
+# 				# and you can delete this file.
+# 				[daemon]
+# 				AutomaticLoginEnable=True
+# 				AutomaticLogin=${_OEM_USER:-"tangarora"}
+# 			OEM_GDM3_LOGIN_OPTION
+# 			;;
+# 		esac
+# 		local toggle=done
+# 	fi
+
+# 	# Toggle auto login for GDM per gnome standard (Fedora et. al.)
+# 	if [[ -f /etc/gdm/custom.conf ]]; then
+# 		local _config_file="/etc/gdm/custom.conf"
+# 		case $_flip in
+# 		off)
+# 			write_status "⛔ GDM: toggeling auto login off... *******"
+# 			if rm ${_config_file} && mv ${_backup_dir}/${_config_file##*/}.rtd-bak ${_config_file}; then
+# 				write_status "💾 Restored previous configuration..."
+# 			else
+# 				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
+# 			fi
+# 			;;
+# 		on)
+# 			write_status "✅ GDM: toggeling auto login on... *******"
+# 			cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak
+# 			cat >${_config_file} <<-OEM_GDM_LOGIN_OPTION
+# 				# This configuration file was created by RTD Setup.
+# 				# You may safely replace this file with the original backed up:
+# 				# ${_backup_dir}/${_config_file##*/}.rtd-bak
+# 				# If this file is not there, then it was not there to begin with
+# 				# and you can delete this file.
+# 				# GDM configuration storage
+
+# 				[daemon]
+# 				WaylandEnable=false
+# 				AutomaticLoginEnable=True
+# 				AutomaticLogin=${_OEM_USER:-"tangarora"}
+
+# 				[security]
+
+# 				[xdmcp]
+
+# 				[chooser]
+
+# 				[debug]
+# 			OEM_GDM_LOGIN_OPTION
+# 			;;
+# 		esac
+# 		local toggle=done
+# 	fi
+
+# 	# Special case for SUSE...
+# 	if [[ -e /etc/sysconfig/displaymanager ]]; then
+# 		local _config_file="/etc/sysconfig/displaymanager"
+
+# 		case $_flip in
+# 		off)
+# 			write_status "⛔ SUSE: toggling auto login off... *******"
+# 			if rm ${_config_file} && mv ${_backup_dir}/${_config_file##*/}.rtd-bak ${_config_file}; then
+# 				write_status "💾 Restored previous configuration..."
+# 			else
+# 				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
+# 			fi
+# 			;;
+# 		on)
+# 			write_status "✅ SUSE: toggling auto login on... *******"
+
+# 			if grep -q 'DISPLAYMANAGER_AUTOLOGIN="${_OEM_USER:-"tangarora"}"' ${_config_file} && grep -q 'DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"' ${_config_file}; then
+# 				echo "auto login is already enabled"
+# 				# Another quirk of SUSE is that sddm.conf is there but not used, it does prevent autologin from working tough...
+# 				mv /etc/sddm.conf ${_backup_dir}/sddm.conf.rtd-bak
+# 			else
+# 				# Another quirk of SUSE is that sddm.conf is there but not used, it does prevent autologin from working tough...
+# 				mv /etc/sddm.conf ${_backup_dir}/sddm.conf.rtd-bak
+# 				cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak || write_error "❗💾 Could not backup: ${_config_file}! "
+# 				sed -i 's/DISPLAYMANAGER_AUTOLOGIN=""/DISPLAYMANAGER_AUTOLOGIN="${_OEM_USER:-"tangarora"}"/' ${_config_file} || write_error "❗📄 Could not write to file: ${_config_file}!"
+# 				sed -i 's/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="no"/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"/' ${_config_file} || write_error "❗📄 Could not write to file: ${_config_file}!"
+# 			fi
+# 			;;
+# 		esac
+
+# 		local toggle=done
+# 	fi
+
+# 	# Toggle auto login for Terminal target env. (no GUI).
+# 	local _config_file="/etc/systemd/system/getty@tty1.service.d/override.conf"
+# 	local _config_dir="/etc/systemd/system/getty@tty1.service.d"
+# 	if [[ ! -f "${_config_dir}" ]]; then
+
+# 		case "${_flip:-}" in
+# 		off)
+# 			write_status "⛔ TTY: toggeling auto login off... ********"
+# 			if rm "${_config_file}" && mv "${_backup_dir}/${_config_file##*/}.rtd-bak" "${_config_file}"; then
+# 				write_status "💾 Restored previous configuration..."
+# 			else
+# 				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
+# 			fi
+# 			;;
+# 		on)
+# 			write_status "✅ TTY: toggeling auto login on... ********"
+# 			mkdir -p ${_config_file%/*}
+
+# 			cat >"${_config_file}" <<-OEM_TTY_LOGIN_OPTION
+# 				[Service]
+# 				ExecStart=
+# 				ExecStart=-/sbin/agetty --noissue --autologin ${_OEM_USER:-"tangarora"} %I \$TERM
+# 				Type=idle
+# 			OEM_TTY_LOGIN_OPTION
+# 			;;
+# 		esac
+# 	fi
+
+# 	if [[ -z $toggle ]]; then
+# 		write_error "❗🚫 No display manager found to toggle auto login!"
+# 		write_error "trying sddm, lightdm, gdm3, gdm, and suse..."
+# 		local _config_file="/etc/sddm.conf"
+# 		cat >${_config_file} <<-OEM_SDDM_LOGIN_OPTION
+# 			# This configuration file was created by RTD Setup.
+# 			[Autologin]
+# 			User=${_OEM_USER:-"tangarora"}
+# 			Session=plasma.desktop
+# 		OEM_SDDM_LOGIN_OPTION
+# 		unset toggle
+# 		return 0
+# 	fi
+# }
+
 system::toggle_oem_auto_login() {
-	# Description: Function to toggle auto login for admin purposes.
-	#
-	# This function toggles automatic login for various display managers. It is designed to enable or disable
-	# auto-login for administrative purposes, such as performing interactive administrative logins and
-	# running configuration scripts. This function supports a range of popular display managers and
-	# applies SUSE-specific configurations when necessary.
+	# Description:
+	#   Toggles auto-login for major display managers and TTY on Debian, Ubuntu, Fedora, SUSE-based distros.
 	#
 	# Globals:
-	# None. The function does not depend on or modify any global variables.
-	#
-	# Arguments:
-	# None. The function does not take any arguments.
-	#
-	# Outputs:
-	# The function outputs status messages, warnings, and error information using the write_status,
-	# write_warning, write_information, and write_error functions. These messages indicate the actions
-	# being taken (e.g., enabling or disabling auto-login) and any issues encountered.
-	#
-	# Returns:
-	# None. The function does not return a value.
+	#   _OEM_USER - Username to auto-login (default: tangarora)
+	#   _TLA - Optional namespace for RTD backups
 	#
 	# Usage:
+	#   system::toggle_oem_auto_login --enable|--disable
+	#   system::toggle_oem_auto_login
 	#
-	# Call toggle_oem_auto_login without any arguments to toggle the auto-login feature. For example:
-	#
-	# toggle_oem_auto_login
-	#
-	# This will enable auto-login if it is currently disabled, or disable it if it is currently enabled.
-	#
-	# Function Behavior:
-	#
-	#     It proceeds to check for the
-	#     presence of configuration files for LightDM, SDDM, GDM3, and GDM. For each display manager found,
-	#     the function toggles the auto-login setting. If auto-login is enabled, it will disable it, and vice versa.
-	#     In the case of SUSE, the function modifies the SUSE-specific display manager file in /etc/sysconfig/
-	#     instead of the individual display manager configuration files.
-	#     The function also handles toggling auto-login for terminal environments (TTY) without a graphical user interface.
-	#
-	# Special Notes:
-	#
-	#     This function should be used with caution as enabling auto-login can have security implications.
-	#     It is particularly useful for scenarios like OEM setup or automatic template generation for KVM.
-	#     The function assumes that the current user has the necessary permissions to modify system configuration files.
-	#
-	# Implementation Details:
-	#
-	#     The function uses conditional checks to determine the presence of various display manager configuration files.
-	#     Backup files with the suffix .rtd-bak are used to preserve the original configuration before making changes.
-	#
-	# End of documentation
+	# Dependencies:
+	#   Requires root privileges to modify DM and systemd configs.
 
-	case $1 in
-	--help | -h)
-		write_information "usage : sysetm::toggle_oem_auto_login [--enable|--disable]"
-		return
-		;;
-	--enable | -e)
-		write_status "🚧 Enabling auto login as requested by - ${FUNCNAME[1]}"
-		local _flip=on
-		;;
-	--disable | -d)
-		write_status "🚧 Disabling auto login as requested by ${FUNCNAME[1]}"
-		local _flip=off
-		;;
-	*)
-		write_status "🚧 Toggling auto login..."
-		;;
+	local _flip
+	case "$1" in
+		--help|-h)
+			write_information "Usage: system::toggle_oem_auto_login [--enable|--disable]"
+			return 0
+			;;
+		--enable|-e)
+			_flip="on"
+			write_status "🔒 Enabling auto-login..."
+			;;
+		--disable|-d)
+			_flip="off"
+			write_status "🔒 Disabling auto-login..."
+			;;
+		*)
+			_flip="toggle"
+			write_status "🔁 Toggling auto-login..."
+			;;
 	esac
 
-	# Create a backup directory if it does not exist
-	mkdir -p /etc/${_TLA,,}/backup
+	local user="${_OEM_USER:-tangarora}"
 	local _backup_dir="/etc/${_TLA,,}/backup"
+	mkdir -p "$_backup_dir"
 
-	# Toggle auto login for Light DM if present (Old Ubuntu, Mint?, Budgie? etc.)
-	if [[ -f /etc/lightdm/lightdm.conf ]]; then
-		local _config_file="/etc/lightdm/lightdm.conf"
-		case $_flip in
-		off)
-			write_status "⛔ LightDM: toggeling auto login off... *******"
-			if rm ${_config_file} && mv ${_backup_dir}/${_config_file##*/}.rtd-bak ${_config_file}; then
-				write_status "💾 Restored previous configuration..."
+	local toggle=
+
+	__toggle_dm_autologin() {
+		local name="$1"
+		local file="$2"
+		local content="$3"
+		local fallback="$4"
+
+		if [[ ! -f "$file" ]]; then return 1; fi
+
+		local backup_file="${_backup_dir}/${file##*/}.rtd-bak"
+
+		if [[ "$_flip" == "off" ]]; then
+			write_status "⛔ $name: disabling auto-login..."
+			if [[ -f "$backup_file" ]]; then
+				mv -f "$backup_file" "$file" || write_error "❌ Failed to restore backup for $name"
 			else
-				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
+				rm -f "$file" || write_warning "⚠️  Could not remove $file"
 			fi
-			;;
-		on)
-			write_status "✅ LightDM: toggeling auto login on... *******"
-			cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak
-			cat >${_config_file} <<-OEM_LXDM_LOGIN_OPTION
-				# This configuration file was created by RTD Setup.
-				# You may safely replace this file with the original backed up:
-				# ${_backup_dir}/${_config_file##*/}.rtd-bak
-				# If this file is not there, then it was not there to begin with
-				# and you can delete this file.
-				[SeatDefaults]
-				autologin-user=${_OEM_USER:-"tangarora"}
-				autologin-user-timeout=0
-			OEM_LXDM_LOGIN_OPTION
-			;;
-		esac
-		local toggle=done
-	fi
+		else
+			write_status "✅ $name: enabling auto-login..."
+			cp -f "$file" "$backup_file" 2>/dev/null || true
+			printf "%s\n" "$content" > "$file"
+		fi
 
-	# Toggle auto login for SDDM if present (Kubuntu, SUSE, KDE Based DE's)
-	if [[ -f /etc/sddm.conf ]]; then
-		local _config_file="/etc/sddm.conf"
-		case $_flip in
-		off)
-			write_status "⛔ SDDM: toggeling auto login off... *******"
-			if rm ${_config_file} && mv ${_backup_dir}/${_config_file##*/}.rtd-bak ${_config_file}; then
-				write_status "💾 Restored previous configuration..."
-			else
-				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
-			fi
-			;;
-		on)
-			write_status "✅ SDDM: toggeling auto login on... *******"
-			cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak
-			cat >${_config_file} <<-OEM_SDDM_LOGIN_OPTION
-				# This configuration file was created by RTD Setup.
-				# You may safely replace this file with the original backed up:
-				# ${_backup_dir}/${_config_file##*/}.rtd-bak
-				# If this file is not there, then it was not there to begin with
-				# and you can delete this file.
-				[Autologin]
-				User=${_OEM_USER:-"tangarora"}
-				Session=plasma.desktop
-			OEM_SDDM_LOGIN_OPTION
-			;;
-		esac
-		local toggle=done
-	fi
-
-	# Toggle auto login for GDM3 if present (Ubuntu, default etc.)
-	if [[ -f /etc/gdm3/custom.conf ]]; then
-		local _config_file="/etc/gdm3/custom.conf"
-		case $_flip in
-		off)
-			write_status "⛔ GDM3: toggeling auto login off... *******"
-			if rm ${_config_file} && mv ${_backup_dir}/${_config_file##*/}.rtd-bak ${_config_file}; then
-				write_status "💾 Restored previous configuration..."
-			else
-				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
-			fi
-			;;
-		on)
-			write_status "✅ GDM3: toggeling auto login on... *******"
-			cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak
-			cat >${_config_file} <<-OEM_GDM3_LOGIN_OPTION
-				# This configuration file was created by RTD Setup.
-				# You may safely replace this file with the original backed up:
-				# ${_backup_dir}/${_config_file##*/}.rtd-bak
-				# If this file is not there, then it was not there to begin with
-				# and you can delete this file.
-				[daemon]
-				AutomaticLoginEnable=True
-				AutomaticLogin=${_OEM_USER:-"tangarora"}
-			OEM_GDM3_LOGIN_OPTION
-			;;
-		esac
-		local toggle=done
-	fi
-
-	# Toggle auto login for GDM3 if present (Debian and others...)
-	if [[ -f /etc/gdm3/daemon.conf ]]; then
-		local _config_file="/etc/gdm3/daemon.conf"
-		case $_flip in
-		off)
-			write_status "⛔ GDM3: toggeling auto login off... *******"
-			if rm ${_config_file} && mv ${_backup_dir}/${_config_file##*/}.rtd-bak ${_config_file}; then
-				write_status "💾 Restored previous configuration..."
-			else
-				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
-			fi
-			;;
-		on)
-			write_status "✅ GDM3: toggeling auto login on... *******"
-			cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak
-			cat >${_config_file} <<-OEM_GDM3_LOGIN_OPTION
-				# This configuration file was created by RTD Setup.
-				# You may safely replace this file with the original backed up:
-				# ${_backup_dir}/${_config_file##*/}.rtd-bak
-				# If this file is not there, then it was not there to begin with
-				# and you can delete this file.
-				[daemon]
-				AutomaticLoginEnable=True
-				AutomaticLogin=${_OEM_USER:-"tangarora"}
-			OEM_GDM3_LOGIN_OPTION
-			;;
-		esac
-		local toggle=done
-	fi
-
-	# Toggle auto login for GDM per gnome standard (Fedora et. al.)
-	if [[ -f /etc/gdm/custom.conf ]]; then
-		local _config_file="/etc/gdm/custom.conf"
-		case $_flip in
-		off)
-			write_status "⛔ GDM: toggeling auto login off... *******"
-			if rm ${_config_file} && mv ${_backup_dir}/${_config_file##*/}.rtd-bak ${_config_file}; then
-				write_status "💾 Restored previous configuration..."
-			else
-				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
-			fi
-			;;
-		on)
-			write_status "✅ GDM: toggeling auto login on... *******"
-			cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak
-			cat >${_config_file} <<-OEM_GDM_LOGIN_OPTION
-				# This configuration file was created by RTD Setup.
-				# You may safely replace this file with the original backed up:
-				# ${_backup_dir}/${_config_file##*/}.rtd-bak
-				# If this file is not there, then it was not there to begin with
-				# and you can delete this file.
-				# GDM configuration storage
-
-				[daemon]
-				WaylandEnable=false
-				AutomaticLoginEnable=True
-				AutomaticLogin=${_OEM_USER:-"tangarora"}
-
-				[security]
-
-				[xdmcp]
-
-				[chooser]
-
-				[debug]
-			OEM_GDM_LOGIN_OPTION
-			;;
-		esac
-		local toggle=done
-	fi
-
-	# Special case for SUSE...
-	if [[ -e /etc/sysconfig/displaymanager ]]; then
-		local _config_file="/etc/sysconfig/displaymanager"
-
-		case $_flip in
-		off)
-			write_status "⛔ SUSE: toggling auto login off... *******"
-			if rm ${_config_file} && mv ${_backup_dir}/${_config_file##*/}.rtd-bak ${_config_file}; then
-				write_status "💾 Restored previous configuration..."
-			else
-				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
-			fi
-			;;
-		on)
-			write_status "✅ SUSE: toggling auto login on... *******"
-
-			if grep -q 'DISPLAYMANAGER_AUTOLOGIN="${_OEM_USER:-"tangarora"}"' ${_config_file} && grep -q 'DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"' ${_config_file}; then
-				echo "auto login is already enabled"
-				# Another quirk of SUSE is that sddm.conf is there but not used, it does prevent autologin from working tough...
-				mv /etc/sddm.conf ${_backup_dir}/sddm.conf.rtd-bak
-			else
-				# Another quirk of SUSE is that sddm.conf is there but not used, it does prevent autologin from working tough...
-				mv /etc/sddm.conf ${_backup_dir}/sddm.conf.rtd-bak
-				cp ${_config_file} ${_backup_dir}/${_config_file##*/}.rtd-bak || write_error "❗💾 Could not backup: ${_config_file}! "
-				sed -i 's/DISPLAYMANAGER_AUTOLOGIN=""/DISPLAYMANAGER_AUTOLOGIN="${_OEM_USER:-"tangarora"}"/' ${_config_file} || write_error "❗📄 Could not write to file: ${_config_file}!"
-				sed -i 's/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="no"/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"/' ${_config_file} || write_error "❗📄 Could not write to file: ${_config_file}!"
-			fi
-			;;
-		esac
-
-		local toggle=done
-	fi
-
-	# Toggle auto login for Terminal target env. (no GUI).
-	local _config_file="/etc/systemd/system/getty@tty1.service.d/override.conf"
-	local _config_dir="/etc/systemd/system/getty@tty1.service.d"
-	if [[ ! -f "${_config_dir}" ]]; then
-
-		case "${_flip:-}" in
-		off)
-			write_status "⛔ TTY: toggeling auto login off... ********"
-			if rm "${_config_file}" && mv "${_backup_dir}/${_config_file##*/}.rtd-bak" "${_config_file}"; then
-				write_status "💾 Restored previous configuration..."
-			else
-				write_error "❗💾 Could not restore old config: ${_config_file}! Perhaps a backup was not done?"
-			fi
-			;;
-		on)
-			write_status "✅ TTY: toggeling auto login on... ********"
-			mkdir -p ${_config_file%/*}
-
-			cat >"${_config_file}" <<-OEM_TTY_LOGIN_OPTION
-				[Service]
-				ExecStart=
-				ExecStart=-/sbin/agetty --noissue --autologin ${_OEM_USER:-"tangarora"} %I \$TERM
-				Type=idle
-			OEM_TTY_LOGIN_OPTION
-			;;
-		esac
-	fi
-
-	if [[ -z $toggle ]]; then
-		write_error "❗🚫 No display manager found to toggle auto login!"
-		write_error "trying sddm, lightdm, gdm3, gdm, and suse..."
-		local _config_file="/etc/sddm.conf"
-		cat >${_config_file} <<-OEM_SDDM_LOGIN_OPTION
-			# This configuration file was created by RTD Setup.
-			[Autologin]
-			User=${_OEM_USER:-"tangarora"}
-			Session=plasma.desktop
-		OEM_SDDM_LOGIN_OPTION
-		unset toggle
+		toggle=1
 		return 0
+	}
+
+	__toggle_dm_autologin "LightDM" "/etc/lightdm/lightdm.conf" \
+"[Seat:*]
+autologin-user=$user
+autologin-user-timeout=0" || true
+
+	__toggle_dm_autologin "SDDM" "/etc/sddm.conf" \
+"[Autologin]
+User=$user
+Session=plasma.desktop" || true
+
+	__toggle_dm_autologin "GDM3 (Ubuntu)" "/etc/gdm3/custom.conf" \
+"[daemon]
+AutomaticLoginEnable=True
+AutomaticLogin=$user" || true
+
+	__toggle_dm_autologin "GDM3 (Debian)" "/etc/gdm3/daemon.conf" \
+"[daemon]
+AutomaticLoginEnable=True
+AutomaticLogin=$user" || true
+
+	__toggle_dm_autologin "GDM (Fedora)" "/etc/gdm/custom.conf" \
+"[daemon]
+WaylandEnable=false
+AutomaticLoginEnable=True
+AutomaticLogin=$user
+
+[security]
+[xdmcp]
+[chooser]
+[debug]" || true
+
+	# SUSE special case
+	if [[ -f /etc/sysconfig/displaymanager ]]; then
+		local file="/etc/sysconfig/displaymanager"
+		cp -f "$file" "$_backup_dir/$(basename "$file").rtd-bak" 2>/dev/null || true
+
+		if [[ "$_flip" == "off" ]]; then
+			write_status "⛔ SUSE: disabling auto-login..."
+			sed -i 's/^DISPLAYMANAGER_AUTOLOGIN=.*/DISPLAYMANAGER_AUTOLOGIN=""/' "$file"
+			sed -i 's/^DISPLAYMANAGER_PASSWORD_LESS_LOGIN=.*/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="no"/' "$file"
+		else
+			write_status "✅ SUSE: enabling auto-login..."
+			sed -i "s/^DISPLAYMANAGER_AUTOLOGIN=.*/DISPLAYMANAGER_AUTOLOGIN=\"$user\"/" "$file"
+			sed -i 's/^DISPLAYMANAGER_PASSWORD_LESS_LOGIN=.*/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="yes"/' "$file"
+		fi
+
+		toggle=1
+	fi
+
+	# TTY auto login
+	local tty_conf="/etc/systemd/system/getty@tty1.service.d/override.conf"
+	local tty_dir="${tty_conf%/*}"
+	mkdir -p "$tty_dir"
+
+	if [[ "$_flip" == "off" ]]; then
+		write_status "⛔ TTY: disabling auto-login..."
+		rm -f "$tty_conf"
+	else
+		write_status "✅ TTY: enabling auto-login..."
+		cat > "$tty_conf" <<-EOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --noissue --autologin $user %I \$TERM
+Type=idle
+EOF
+	fi
+	toggle=1
+
+	# Fallback: if no DM matched, drop in a basic SDDM config
+	if [[ -z "$toggle" ]]; then
+		write_warning "⚠️ No supported display manager config found. Creating fallback SDDM config..."
+		cat > /etc/sddm.conf <<-EOF
+[Autologin]
+User=$user
+Session=plasma.desktop
+EOF
 	fi
 }
+
 
 system::set_oem_elevated_privilege_gui() {
 	# Description
@@ -17005,19 +17153,26 @@ common_vdi_post_config=$(cat <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..5}; do git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} && break || { echo "Clone failed, trying again..." ; rm -r ${_OEM_DIR:-"/opt/rtd"}/* ; sleep 10; }; done'
         - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
 
-        # Force unmounting of the target and other filesystems
-        # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /dev || true'
-        # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /cdrom || true'
-        # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /proc || true'
-        # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /sys || true'
-        # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /run || true'
-        # - umount -l /cdrom || true
-        # - eject --force /dev/sr0 || true
-        # - eject --force /dev/sr1 || true
+
 EOF
 )
 
+common_cleanup_config=$(cat <<EOF
+	- echo '******************* Common Cleanup Pre-Config ********************'
 
+        # Force unmounting of the target and other filesystems
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /dev || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /cdrom || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /proc || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /sys || true'
+        - curtin in-target --target=/target -- /bin/bash -c 'umount -l /run || true'
+        - umount -l /cdrom || true
+        - eject --force /dev/sr0 || true
+        - eject --force /dev/sr1 || true
+EOF
+)
+
+# make the main section of the cloud config file
 cat >>${user_data_file} <<EOF
 #cloud-config
 power_state:
@@ -17093,15 +17248,12 @@ cat >>${user_data_file} <<EOF
         - xinit
         - mesa-utils
         - wine
-        - xterm
     late-commands:
 ${common_vdi_pre_config}
 
         # Install Ubuntu Desktop Environment
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install ubuntu-desktop-minimal'
-        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install snapd || true'
-        - curtin in-target --target=/target -- /bin/bash -c 'systemctl start snapd.service ; systemctl enable snapd.service || true'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install firefox || true'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install plymouth-theme-ubuntu-text plymouth-theme-spinner plymouth || true'
         - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service || true
@@ -17117,7 +17269,6 @@ EOF
 cat >>${user_data_file} <<EOF
         - lightdm
         - wine
-        - xterm
     late-commands:
 ${common_vdi_pre_config}
 
@@ -17138,7 +17289,6 @@ EOF
 cat >>${user_data_file} <<EOF
         - lightdm
         - wine
-        - xterm
     late-commands:
 ${common_vdi_pre_config}
 
@@ -17162,7 +17312,6 @@ EOF
 cat >>${user_data_file} <<EOF
         - sddm
         - wine
-        - xterm
     late-commands:
 ${common_vdi_pre_config}
 
@@ -17183,7 +17332,6 @@ EOF
 cat >>${user_data_file} <<EOF
         - sddm
         - wine
-        - xterm
     late-commands:
 ${common_vdi_pre_config}
 
