@@ -633,6 +633,102 @@ EOF
 
 }
 
+dialog::rsync_upload_2() {
+	# Description:
+	#   Upload files or directories via rsync over SSH with a dialog-based progress bar.
+	#
+	# Usage:
+	#   dialog::rsync_upload [--delete] [--bwlimit <KB>] <source> <destination> <ssh_user> <ssh_host>
+	#
+	# Returns:
+	#   0 on success, 1 on failure
+
+	local delete_flag bwlimit src dest ssh_user ssh_host
+	local args=()
+
+	# Parse optional flags
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--delete)
+				delete_flag="--delete"
+				shift
+				;;
+			--bwlimit)
+				bwlimit="--bwlimit=$2"
+				shift 2
+				;;
+			--*)
+				write_error "❌ Unknown option: $1"
+				return 1
+				;;
+			*)
+				args+=("$1")
+				shift
+				;;
+		esac
+	done
+
+	if [[ ${#args[@]} -ne 4 ]]; then
+		write_error "❌ Usage: dialog::rsync_upload [--delete] [--bwlimit <KB>] <source> <destination> <ssh_user> <ssh_host>"
+		return 1
+	fi
+
+	src="${args[0]}"
+	dest="${args[1]}"
+	ssh_user="${args[2]}"
+	ssh_host="${args[3]}"
+
+	if ! command -v rsync >/dev/null || ! command -v dialog >/dev/null; then
+		write_error "❌ Required commands not found: rsync and/or dialog"
+		return 1
+	fi
+
+	# Prevent globbing or space errors
+	if [[ "$src" =~ [[:space:]] || "$src" =~ [\*\?] ]]; then
+		write_error "❌ Source path must be quoted to avoid shell expansion."
+		return 1
+	fi
+
+	local fifo log
+	fifo=$(mktemp -u)
+	log=$(mktemp)
+	mkfifo "$fifo" || {
+		write_error "❌ Failed to create FIFO"
+		return 1
+	}
+	trap 'rm -f "$fifo" "$log"' EXIT
+
+	# Launch rsync and track progress
+	{
+		LC_ALL=C rsync -e ssh --info=progress2 --archive --compress --human-readable \
+			${delete_flag:+$delete_flag} ${bwlimit:+$bwlimit} \
+			"$src" "${ssh_user}@${ssh_host}:${dest}" 2>>"$log" | \
+		while IFS= read -r line; do
+			if [[ "$line" =~ ^[[:space:]]*([0-9]{1,3})% ]]; then
+				printf "%d\n" "${BASH_REMATCH[1]}" > "$fifo"
+			fi
+		done
+		echo 100 > "$fifo"
+	} &
+
+	local pid=$!
+	dialog --title "📤 Uploading via rsync" \
+		--gauge "Transferring to ${ssh_user}@${ssh_host}..." 10 70 0 < "$fifo"
+
+	wait "$pid"
+	local exit_code=$?
+
+	if (( exit_code != 0 )); then
+		write_error "❌ rsync failed. Log: $log"
+		return 1
+	fi
+
+	write_status "✅ File transfer completed."
+	return 0
+}
+
+
+
 dialog::copy_with_progress() {
 	# Description: Function to display a progress bar while copying a large file to a destination.
 	# This function uses 'dialog' to create a progress bar that shows the percentage of an ISO file being copied.
@@ -649,7 +745,7 @@ dialog::copy_with_progress() {
 	#   - 0 on success.
 	#
 	# Usage:
-	#   dialog::copy_with_progress "/path/to/iso/file.iso" "/path/to/destination" "/mount/point"
+   	#   dialog::copy_with_progress "/path/to/iso/file.iso" "/path/to/destination" "/mount/point"
 	#
 	# Example:
 	#   dialog::copy_with_progress "/home/user/file.iso" "/mnt/usb/file.iso" "/mnt/usb"
