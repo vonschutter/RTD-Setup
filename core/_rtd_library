@@ -449,78 +449,72 @@ dialog::check_menu_availability() {
 
 
 dialog::rsync_upload() {
+	# Description:
+	#   Transfer files or directories to a remote host using rsync over SSH,
+	#   showing a live progress bar with dialog. Uses file counting to compute percent.
+	#
+	# Usage:
+	#   dialog::rsync_upload <source> <destination_path> <ssh_user> <ssh_host>
+	#
+	# Returns:
+	#   0 on success, 1 on failure
+
 	local src="$1"
 	local dest="$2"
 	local ssh_user="$3"
 	local ssh_host="$4"
-
-	local progress_pipe; progress_pipe=$(mktemp -u)
-	local log_file; log_file=$(mktemp)
+	local progress_file; progress_file=$(mktemp)
+	local error_file; error_file=$(mktemp)
+	local count=0 total_files=0 percent=0
 
 	if [[ -z "$src" || -z "$dest" || -z "$ssh_user" || -z "$ssh_host" ]]; then
-		write_error "⛔ Missing arguments: dialog::rsync_upload <src> <dest> <user> <host>"
+		printf "⛔ ERROR: Usage: dialog::rsync_upload <source> <dest> <ssh_user> <ssh_host>\n" >&2
 		return 1
 	fi
 
-	if ! dependency::command_exists dialog rsync ssh; then
-		write_error "⛔ Required dependencies missing: dialog, rsync, ssh"
+	if ! command -v dialog >/dev/null || ! command -v rsync >/dev/null || ! command -v find >/dev/null; then
+		printf "⛔ ERROR: Missing required commands: dialog, rsync, or find\n" >&2
 		return 1
 	fi
 
-	trap 'rm -f "$progress_pipe" "$log_file"' EXIT
-
-	if ! mkfifo "$progress_pipe"; then
-		write_error "⛔ Could not create FIFO: $progress_pipe"
+	if [[ ! -e "$src" ]]; then
+		printf "⛔ ERROR: Source path does not exist: %s\n" "$src" >&2
 		return 1
 	fi
 
-	# Run rsync in dry-run mode to build the exact file list (if more accurate needed)
-	if total_files=$(rsync -a --dry-run "$src" "$user@$host:$dest" | grep -v '/$' | wc -l) ; then
-		echo "Total files to transfer: $total_files"
-	else
-		write_error "⛔ Failed to count files in source directory."
+	if ! total_files=$(find "$src" -type f | wc -l); then
+		printf "⛔ ERROR: Failed to count files in source: %s\n" "$src" >&2
 		return 1
 	fi
-	# Initialize progress
-	# Background process to perform rsync and write progress to pipe
+
+	if [[ "$total_files" -eq 0 ]]; then
+		printf "⛔ ERROR: No files to transfer.\n" >&2
+		return 1
+	fi
+
 	{
 		echo 0
-		# Count total number of files to transfer
-		#total_files=$(find "$src" -type f | wc -l)
-
-		# Run rsync and parse each file copied
-		rsync -e ssh --archive --compress --ignore-times --recursive --progress --human-readable "$src" "${user}@${host}:${dest}" | \
-		while IFS= read -r file; do
+		rsync -a --info=NAME --no-inc-recursive --ignore-times "$src" "${ssh_user}@${ssh_host}:${dest}" 2>>"$error_file" | \
+		while IFS= read -r line; do
+			[[ "$line" =~ ^skipping ]] && continue
 			((count++))
 			percent=$((count * 100 / total_files))
-			echo "$percent"
-		done 
+			printf "%s\n" "$percent"
+		done
 		echo 100
-	} | dialog --title "📤 Uploading Files via rsync" --gauge "Transferring..." 10 70 0
+	} | dialog --title "📤 Uploading Files via rsync" --gauge "Transferring to ${ssh_user}@${ssh_host}..." 10 70 0
 
-
-
-
-	local rsync_pid=$!
-
-	# Display progress in dialog box
-	#dialog --title "📤 Uploading Files via rsync" --gauge "Initializing transfer to ${ssh_user}@${ssh_host}..." 10 70 0 < "$progress_pipe"
-
-	wait "$rsync_pid"
-	local rsync_exit_code=$?
-
-	if (( rsync_exit_code != 0 )); then
-		local msg="❌ rsync failed (exit code $rsync_exit_code)"
-		[[ -s "$log_file" ]] && msg+="\n\nLog:\n$(tail -n 10 "$log_file")"
-		dialog::display_error "$msg"
+	if [[ -s "$error_file" ]]; then
+		printf "⛔ ERROR: rsync errors:\n" >&2
+		cat "$error_file" >&2
+		rm -f "$progress_file" "$error_file"
 		return 1
 	fi
 
-	local summary="✅ Transfer complete."
-	[[ -s "$log_file" ]] && summary+="\n\nLog:\n$(tail -n 5 "$log_file")"
-	dialog::display_notice "$summary"
+	rm -f "$progress_file" "$error_file"
 	return 0
 }
+
 
 
 
