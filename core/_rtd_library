@@ -451,71 +451,388 @@ dialog::check_menu_availability() {
 dialog::rsync_upload() {
 	# Description:
 	#   Transfer files or directories to a remote host using rsync over SSH,
-	#   showing a live progress bar with dialog. Uses file counting to compute percent.
+	#   showing a live progress bar with dialog unless --gui false is given.
 	#
 	# Usage:
-	#   dialog::rsync_upload <source> <destination_path> <ssh_user> <ssh_host>
+	#   dialog::rsync_upload --source /path --destination /remote/path --user USER --host HOST [--exclude '*.git'] [--gui false]
 	#
+	# Example:
+	#   dialog::rsync_upload --source ./git --destination /opt/www --user admin --host www.contoso.com --exclude '*.git'
+	#   
 	# Returns:
 	#   0 on success, 1 on failure
+	#
+	# Globals:
+	#   - None
+	#
+	# End of Documentation
+	
 
-	local src="$1"
-	local dest="$2"
-	local ssh_user="$3"
-	local ssh_host="$4"
-	local progress_file; progress_file=$(mktemp)
-	local error_file; error_file=$(mktemp)
-	local count=0 total_files=0 percent=0
+	local src= dest= ssh_user= ssh_host= gui="true" exclude_opt=
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--source)
+				src="$2"; shift 2
+				;;
+			--destination)
+				dest="$2"; shift 2
+				;;
+			--user)
+				ssh_user="$2"; shift 2
+				;;
+			--host)
+				ssh_host="$2"; shift 2
+				;;
+			--exclude)
+				exclude_opt="--exclude=$2"; shift 2
+				;;
+			--gui)
+				gui="$2"; shift 2
+				;;
+			*)
+				printf "⛔ Unknown option: %s\n" "$1" >&2
+				return 1
+				;;
+		esac
+	done
 
 	if [[ -z "$src" || -z "$dest" || -z "$ssh_user" || -z "$ssh_host" ]]; then
-		printf "⛔ ERROR: Usage: dialog::rsync_upload <source> <dest> <ssh_user> <ssh_host>\n" >&2
+		[[ "$gui" == "true" && -x "$(command -v dialog)" ]] && dialog::display_error "⛔ ERROR: Missing required arguments." \
+			|| write_error "⛔ ERROR: Missing required arguments.\n" 
 		return 1
 	fi
 
-	if ! command -v dialog >/dev/null || ! command -v rsync >/dev/null || ! command -v find >/dev/null; then
-		printf "⛔ ERROR: Missing required commands: dialog, rsync, or find\n" >&2
+	if [[ "$gui" != "false" ]] && ! dependency::command_exists dialog; then
+		gui="false"
+	fi
+
+	if ! dependency::command_exists rsync find; then
+		[[ "$gui" == "true" ]] && dialog::display_error "⛔ ERROR: Required dependencies missing: rsync or find, and could not be installed" \
+			|| write_error "⛔ ERROR: Required dependencies missing, and could not be installed"
+		return 1
+	fi
+
+	if ! ssh::ensure_key_installed_on_remote "$ssh_user" "$ssh_host" ; then 
+		[[ "$gui" == "true" ]] && dialog::display_error "⛔ ERROR: The ssh keys are not installed on the remote host. This is required for security purposes" \
+			|| write_error "⛔ ERROR: The ssh keys are not installed on the remote host. This is required for security purposes"
 		return 1
 	fi
 
 	if [[ ! -e "$src" ]]; then
-		printf "⛔ ERROR: Source path does not exist: %s\n" "$src" >&2
+		[[ "$gui" == "true" ]] && dialog::display_error "⛔ ERROR: Source path does not exist: $src" \
+			|| write_error "⛔ ERROR: Source path does not exist: $src\n" 
 		return 1
 	fi
 
+	if [[ "$gui" == "false" ]]; then
+		rsync -a --info=progress2 --ignore-times $exclude_opt "$src" "${ssh_user}@${ssh_host}:${dest}"
+		if [[ $? -ne 0 ]]; then
+			write_error "⛔ ERROR: rsync command failed."
+			return 1
+		fi
+		return 0
+	fi
+
+	local progress_file; progress_file=$(mktemp)
+	local error_file; error_file=$(mktemp)
+	local count=0 total_files=0 percent=0
+
 	if ! total_files=$(find "$src" -type f | wc -l); then
-		printf "⛔ ERROR: Failed to count files in source: %s\n" "$src" >&2
+		dialog::display_error "⛔ ERROR: Could not count files in: $src"
 		return 1
 	fi
 
 	if [[ "$total_files" -eq 0 ]]; then
-		printf "⛔ ERROR: No files to transfer.\n" >&2
+		dialog::display_error "⛔ ERROR: No files to transfer from: $src"
 		return 1
 	fi
 
 	{
 		echo 0
-		rsync -a --info=NAME --no-inc-recursive --ignore-times "$src" "${ssh_user}@${ssh_host}:${dest}" 2>>"$error_file" | \
+		rsync -a --info=NAME --no-inc-recursive --ignore-times $exclude_opt "$src" "${ssh_user}@${ssh_host}:${dest}" 2>>"$error_file" | \
 		while IFS= read -r line; do
 			[[ "$line" =~ ^skipping ]] && continue
 			((count++))
 			percent=$((count * 100 / total_files))
-			printf "%s\n" "$percent"
+			printf "XXX\n%d\nProcessing: %s\nXXX\n" "$percent" "$line"
 		done
 		echo 100
-	} | dialog --title "📤 Uploading Files via rsync" --gauge "Transferring to ${ssh_user}@${ssh_host}..." 10 70 0
+	} | dialog --title "📤 Uploading Files to ${ssh_user}@${ssh_host}..." --gauge "Transferring to ${ssh_user}@${ssh_host}..." 10 80 0
 
 	if [[ -s "$error_file" ]]; then
-		printf "⛔ ERROR: rsync errors:\n" >&2
-		cat "$error_file" >&2
+		dialog::display_error "⛔ rsync failed:\n$(tail -n 10 "$error_file")"
 		rm -f "$progress_file" "$error_file"
 		return 1
 	fi
 
 	rm -f "$progress_file" "$error_file"
+	dialog::display_notice "✅ Transfer completed successfully."
 	return 0
 }
 
 
+dialog::rsync_download() {
+	# Description:
+	#   Download files or directories from a remote host using rsync over SSH,
+	#   showing a live progress bar with dialog unless --gui false is given.
+	#
+	# Usage:
+	#   dialog::rsync_download --source /remote/path --destination /local/path --user USER --host HOST [--exclude '*.git'] [--gui false]
+	#
+	# Returns:
+	#   0 on success, 1 on failure
+	#
+	# Globals:
+	#   - None
+	#
+	# Example: 
+	#   dialog::rsync_download --source /opt/tla --destination /home/user/tla --user bob --host server.mycompany.com --exclude '*.git' 
+	#
+	# End of Documentation
+	
+
+
+	local src= dest= ssh_user= ssh_host= gui="true" exclude_opt=
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--source)
+				src="$2"; shift 2
+				;;
+			--destination)
+				dest="$2"; shift 2
+				;;
+			--user)
+				ssh_user="$2"; shift 2
+				;;
+			--host)
+				ssh_host="$2"; shift 2
+				;;
+			--exclude)
+				exclude_opt="--exclude=$2"; shift 2
+				;;
+			--gui)
+				gui="$2"; shift 2
+				;;
+			*)
+				printf "⛔ Unknown option: %s\n" "$1" >&2
+				return 1
+				;;
+		esac
+	done
+
+	if [[ -z "$src" || -z "$dest" || -z "$ssh_user" || -z "$ssh_host" ]]; then
+		[[ "$gui" == "true" && -x "$(command -v dialog)" ]] && dialog::display_error "⛔ ERROR: Missing required arguments." \
+			|| write_error "⛔ ERROR: Missing required arguments.\n"
+		return 1
+	fi
+
+	if [[ "$gui" != "false" ]] && ! dependency::command_exists dialog; then
+		gui="false"
+	fi
+
+	if ! dependency::command_exists rsync find; then
+		[[ "$gui" == "true" ]] && dialog::display_error "⛔ ERROR: Required dependencies missing: rsync or find, and could not be installed" \
+			|| write_error "⛔ ERROR: Required dependencies missing, and could not be installed"
+		return 1
+	fi
+
+	if [[ "$gui" == "false" ]]; then
+		rsync -a --info=progress2 --ignore-times $exclude_opt "${ssh_user}@${ssh_host}:${src}" "$dest"
+		if [[ $? -ne 0 ]]; then
+			write_error "⛔ ERROR: rsync command failed."
+			return 1
+		fi
+		return 0
+	fi
+
+	local progress_file; progress_file=$(mktemp)
+	local error_file; error_file=$(mktemp)
+	local count=0 total_files=0 percent=0
+
+	if ! total_files=$(ssh "${ssh_user}@${ssh_host}" "find '$src' -type f 2>/dev/null" | wc -l); then
+		dialog::display_error "⛔ ERROR: Could not count files in remote path: $src"
+		return 1
+	fi
+
+	if [[ "$total_files" -eq 0 ]]; then
+		dialog::display_error "⛔ ERROR: No files to transfer from remote: $src"
+		return 1
+	fi
+
+	{
+		echo 0
+		rsync -a --info=NAME --no-inc-recursive --ignore-times $exclude_opt "${ssh_user}@${ssh_host}:${src}" "$dest" 2>>"$error_file" | \
+		while IFS= read -r line; do
+			[[ "$line" =~ ^skipping ]] && continue
+			((count++))
+			percent=$((count * 100 / total_files))
+			printf "XXX\n%d\nProcessing: %s\nXXX\n" "$percent" "$line"
+		done
+		echo 100
+	} | dialog --title "📥 Downloading Files from ${ssh_user}@${ssh_host}..." --gauge "Transferring from ${ssh_user}@${ssh_host}..." 10 80 0
+
+	if [[ -s "$error_file" ]]; then
+		dialog::display_error "⛔ rsync failed:\n$(tail -n 10 "$error_file")"
+		rm -f "$progress_file" "$error_file"
+		return 1
+	fi
+
+	rm -f "$progress_file" "$error_file"
+	dialog::display_notice "✅ Download completed successfully."
+	return 0
+}
+
+ssh::ensure_user_ssh_key() {
+	# Description:
+	#   Check if the current user has a valid SSH keypair (ed25519 preferred).
+	#   If missing, prompt to create one using dialog and generate it if agreed.
+	#
+	# Usage:
+	#   ssh::ensure_user_ssh_key
+	#
+	# Returns:
+	#   0 if key exists or was successfully created, 1 if user declined or error occurred.
+	#
+	# Globals:
+	#   Uses dialog, ssh-keygen, current user environment
+	#
+	# Dependencies:
+	#   dialog, ssh-keygen
+	#
+	# End of Documentation
+
+	if ! dependency::command_exists dialog ssh-keygen; then
+		write_error "⛔ ERROR: dialog or ssh-keygen not found and could not be installed."
+		return 1
+	fi
+
+	local user; user=$(id -un)
+	local home_dir; home_dir=$(eval echo "~$user")
+	local ssh_dir="$home_dir/.ssh"
+	local key_path="$ssh_dir/id_ed25519"
+	local pub_key_path="${key_path}.pub"
+
+	if [[ -f "$pub_key_path" && -f "$key_path" ]]; then
+		write_status "🔐 SSH key already exists for user '$user': $pub_key_path"
+		return 0
+	fi
+
+	dialog --title "🔐 SSH Key Missing" --yesno \
+	"User '$user' does not have an SSH keypair in:
+	$ssh_dir
+
+	Would you like to generate a new ed25519 SSH key now?" 12 70
+
+	local response=$?
+	if [[ "$response" -ne 0 ]]; then
+		write_warning "⚠️  SSH key creation declined by user."
+		return 1
+	fi
+
+	if [[ ! -d "$ssh_dir" ]]; then
+		if ! mkdir -p "$ssh_dir"; then
+			dialog::display_error "⛔ Failed to create $ssh_dir"
+			return 1
+		fi
+		chmod 700 "$ssh_dir"
+	fi
+
+	if ! ssh-keygen -t ed25519 -N '' -f "$key_path" -C "$user@$(hostname)"; then
+		dialog::display_error "⛔ Failed to generate SSH key for $user."
+		return 1
+	fi
+
+	chown "$user:$user" "$key_path" "$pub_key_path"
+	dialog::display_notice "✅ SSH key successfully generated: $pub_key_path"
+
+	return 0
+}
+
+ssh::ensure_key_installed_on_remote() {
+	# Description:
+	#   Verifies if the user's SSH public key is installed on a specified remote host.
+	#   If not, prompts the user (via dialog) to install it using ssh-copy-id.
+	#
+	# Usage:
+	#   ssh::ensure_key_installed_on_remote <remote_user> <remote_host>
+	#
+	# Returns:
+	#   0 if key is installed or was successfully copied, 1 if declined or failed.
+	#
+	# Globals:
+	#   Uses dialog, ssh, ssh-copy-id, current user environment
+	#
+	# Dependencies:
+	#   dialog, ssh, ssh-copy-id
+	#
+	# End of Documentation
+
+	local remote_user="$1"
+	local remote_host="$2"
+
+	if [[ -z "$remote_user" || -z "$remote_host" ]]; then
+		write_error "⛔ ERROR: Missing arguments. Usage: ssh::ensure_key_installed_on_remote <user> <host>"
+		return 1
+	fi
+
+	if ! dependency::command_exists ssh ssh-copy-id dialog; then
+		write_error "⛔ ERROR: Required commands (ssh, ssh-copy-id, dialog) are missing or cannot be installed."
+		return 1
+	fi
+
+	if ! ssh::ensure_user_ssh_key; then
+		return 1
+	fi
+
+	local user; user=$(id -un)
+	local home_dir; home_dir=$(eval echo "~$user")
+	local pub_key
+
+	for key_type in ed25519 rsa ecdsa; do
+		if [[ -f "$home_dir/.ssh/id_${key_type}.pub" ]]; then
+			pub_key="$home_dir/.ssh/id_${key_type}.pub"
+			break
+		fi
+	done
+
+	if [[ -z "$pub_key" ]]; then
+		dialog::display_error "⛔ No SSH public key found in $home_dir/.ssh/. Please generate one first."
+		return 1
+	fi
+
+	if ssh -o BatchMode=yes -o PasswordAuthentication=no -o ConnectTimeout=5 "${remote_user}@${remote_host}" "exit" &>/dev/null; then
+		write_status "✅ SSH key already installed and working for ${remote_user}@${remote_host}"
+		return 0
+	fi
+
+	dialog --title "🔐 SSH Key Not Installed" --yesno \
+	"The SSH key for user '$user' does not appear to be installed on:
+
+	${remote_user}@${remote_host}
+
+	Would you like to install it now using ssh-copy-id?
+	You may be prompted for the remote password." 12 70
+
+	if [[ $? -ne 0 ]]; then
+		write_warning "⚠️  SSH key installation to $remote_host declined by user."
+		return 1
+	fi
+
+	if ! ssh-copy-id -i "$pub_key" "${remote_user}@${remote_host}"; then
+		dialog::display_error "⛔ ssh-copy-id failed. Please check network or credentials."
+		return 1
+	fi
+
+	if ssh -o BatchMode=yes -o PasswordAuthentication=no -o ConnectTimeout=5 "${remote_user}@${remote_host}" "exit" &>/dev/null; then
+		dialog::display_notice "✅ SSH key successfully installed and verified."
+		return 0
+	else
+		dialog::display_error "⛔ Key installed but connection still fails. Manual check recommended."
+		return 1
+	fi
+}
 
 
 dialog::display_cmd_output() {
@@ -609,101 +926,6 @@ EOF
 	unset _pct
 
 }
-
-dialog::rsync_upload_2() {
-	# Description:
-	#   Upload files or directories via rsync over SSH with a dialog-based progress bar.
-	#
-	# Usage:
-	#   dialog::rsync_upload [--delete] [--bwlimit <KB>] <source> <destination> <ssh_user> <ssh_host>
-	#
-	# Returns:
-	#   0 on success, 1 on failure
-
-	local delete_flag bwlimit src dest ssh_user ssh_host
-	local args=()
-
-	# Parse optional flags
-	while [[ $# -gt 0 ]]; do
-		case "$1" in
-			--delete)
-				delete_flag="--delete"
-				shift
-				;;
-			--bwlimit)
-				bwlimit="--bwlimit=$2"
-				shift 2
-				;;
-			--*)
-				write_error "❌ Unknown option: $1"
-				return 1
-				;;
-			*)
-				args+=("$1")
-				shift
-				;;
-		esac
-	done
-
-	if [[ ${#args[@]} -ne 4 ]]; then
-		write_error "❌ Usage: dialog::rsync_upload [--delete] [--bwlimit <KB>] <source> <destination> <ssh_user> <ssh_host>"
-		return 1
-	fi
-
-	src="${args[0]}"
-	dest="${args[1]}"
-	ssh_user="${args[2]}"
-	ssh_host="${args[3]}"
-
-	if ! command -v rsync >/dev/null || ! command -v dialog >/dev/null; then
-		write_error "❌ Required commands not found: rsync and/or dialog"
-		return 1
-	fi
-
-	# Prevent globbing or space errors
-	if [[ "$src" =~ [[:space:]] || "$src" =~ [\*\?] ]]; then
-		write_error "❌ Source path must be quoted to avoid shell expansion."
-		return 1
-	fi
-
-	local fifo log
-	fifo=$(mktemp -u)
-	log=$(mktemp)
-	mkfifo "$fifo" || {
-		write_error "❌ Failed to create FIFO"
-		return 1
-	}
-	trap 'rm -f "$fifo" "$log"' EXIT
-
-	# Launch rsync and track progress
-	{
-		LC_ALL=C rsync -e ssh --info=progress2 --archive --compress --human-readable \
-			${delete_flag:+$delete_flag} ${bwlimit:+$bwlimit} \
-			"$src" "${ssh_user}@${ssh_host}:${dest}" 2>>"$log" | \
-		while IFS= read -r line; do
-			if [[ "$line" =~ ^[[:space:]]*([0-9]{1,3})% ]]; then
-				printf "%d\n" "${BASH_REMATCH[1]}" > "$fifo"
-			fi
-		done
-		echo 100 > "$fifo"
-	} &
-
-	local pid=$!
-	dialog --title "📤 Uploading via rsync" \
-		--gauge "Transferring to ${ssh_user}@${ssh_host}..." 10 70 0 < "$fifo"
-
-	wait "$pid"
-	local exit_code=$?
-
-	if (( exit_code != 0 )); then
-		write_error "❌ rsync failed. Log: $log"
-		return 1
-	fi
-
-	write_status "✅ File transfer completed."
-	return 0
-}
-
 
 
 dialog::copy_with_progress() {
