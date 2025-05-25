@@ -1363,6 +1363,19 @@ term::err_no_menu_system_found() {
 }
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 ################################################################################################
 #
 #
@@ -11160,39 +11173,59 @@ software::vendor_download_and_install() {
 	fi
 }
 
-SoftwareManagementAvailabilityCHK() {
-	# Description: Function to check and see if the system software managment is available. In some cases
-	# the software managment system may be in use. Should this be the case, this function will
-	# wait undill the system is free for use.
-	# TODO: Add support for fedora, Centos, SuSE.
+software::apt_management_availability_check() {
+	# Description:
+	#   Waits for the apt/dpkg software management system to become available.
+	#   Prevents conflicts by ensuring no other process is holding apt/dpkg locks.
+	#
 	# Globals:
-	# Arguments: None
+	#   None
+	#
+	# Arguments:
+	#   None
+	#
 	# Outputs:
+	#   Status messages to stdout
+	#
 	# Returns:
+	#   0 on success
+	#
 	# Usage:
+	#   software::apt_management_availability_check
 	# End of documentation
 
-	if hash apt; then
-		echo ""
-		write_information "--- Checking if software maintenance system is available:"
-		i=0
-		tput sc
-		while fuser /var/lib/dpkg/lock >/dev/null 2>&1; do
-			case $((${i} % 4)) in
-			0) j="-" ;;
-			1) j="\\" ;;
-			2) j="|" ;;
-			3) j="/" ;;
-			esac
-			tput rc
-			echo -en "\r[${j}] Waiting for other software managers to finish..."
-
-			sleep 5
-			((i = i + 1))
-		done
-		write_information "--- Software maintenance system is available."
+	if ! command -v apt >/dev/null 2>&1; then
+		return 0
 	fi
+
+	write_information "--- Checking if software maintenance system is available..."
+
+	local i=0
+	local spinner='-\|/'
+
+	# Save cursor position
+	tput civis
+	tput sc
+
+	trap 'tput cnorm; tput rc; printf "\n⛔ Aborted.\n"; return 1' INT TERM
+
+	while lsof /var/lib/dpkg/lock >/dev/null 2>&1 || \
+	      lsof /var/lib/apt/lists/lock >/dev/null 2>&1 || \
+	      pgrep -x apt >/dev/null || pgrep -x apt-get >/dev/null; do
+
+		local j=${spinner:i++%${#spinner}:1}
+		tput rc
+		printf "[%s] Waiting for other software managers to finish...\r" "$j"
+		sleep 1
+	done
+
+	# Restore cursor
+	tput rc
+	tput cnorm
+	printf "\n"
+	write_information "--- Software maintenance system is available."
 }
+
 
 software::is_native_package_available() {
 	# Description: Function to chek if a package is available in whetever repository, and

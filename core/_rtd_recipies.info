@@ -1237,6 +1237,7 @@ recipe:_RDP:_RustDesk_Remote_Desktop () {
 }
 
 
+
 recipe:_CLOUD:_MEGA_Cloud_Storage () {
 	# MEGA nz Private Cloud Storage (better than Drop Box)...
 	# DEFAULT=TRUE
@@ -1249,7 +1250,8 @@ recipe:_CLOUD:_MEGA_Cloud_Storage () {
 	fetch_mega_file ()
 	{
 		product=$1
-		case distro_type in
+		write_status "Looking for download URL for OS Type: [$distro_type] "
+		case $distro_type in
 			"ubuntu" | "pop" | "linuxmint" )
 				# Grab the Ubuntu name and version and format it like Mega does their download URL...
 				URL="https://mega.nz/linux/repo/xUbuntu_$(hostnamectl |grep -i Ubuntu |cut -f4 -d' ')/amd64/${product}-xUbuntu_$(hostnamectl |grep -i Ubuntu |cut -f4 -d' ')_amd64.deb"
@@ -1276,15 +1278,18 @@ recipe:_CLOUD:_MEGA_Cloud_Storage () {
 				write_error "Please try to download it manually and instrtall it from the website:"
 				write_error "https://mega.nz/sync"
 		esac
+
 		# If a known distributio was found and URL set, use "software::vendor_download_and_install" function to install app...
+		write_information "🌐 Downloading ${product} from: ${URL}"
 		if [[ -n "${URL}" ]] && software::vendor_download_and_install ${URL}; then
-			write_information "MEGA software installed successfully..."
+			write_information "✅ Installed: ${product}"
 		else
-			write_error "MEGA software did not install correctly..."
+			write_error "❌ Failed to install: ${product}"
 		fi
 	}
 	fetch_mega_file megasync
 	fetch_mega_file megacmd
+
 	if is_software_package_installed nautilus ; then fetch_mega_file nautilus-megasync ; fi
 	if is_software_package_installed thunar ; then fetch_mega_file thunar-megasync ; fi
 	if is_software_package_installed nemo ; then fetch_mega_file nemo-megasync ; fi
