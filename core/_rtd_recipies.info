@@ -1251,10 +1251,12 @@ recipe:_CLOUD:_MEGA_Cloud_Storage () {
 	{
 		product=$1
 		write_status "Looking for download URL for OS Type: [$distro_type] "
+
 		case $distro_type in
 			"ubuntu" | "pop" | "linuxmint" )
 				# Grab the Ubuntu name and version and format it like Mega does their download URL...
-				URL="https://mega.nz/linux/repo/xUbuntu_$(hostnamectl |grep -i Ubuntu |cut -f4 -d' ')/amd64/${product}-xUbuntu_$(hostnamectl |grep -i Ubuntu |cut -f4 -d' ')_amd64.deb"
+				local distro_version=$(hostnamectl |grep -i Ubuntu |cut -f6 -d' '| cut -d. -f1,2)
+				URL="https://mega.nz/linux/repo/xUbuntu_${distro_version}/amd64/${product}-xUbuntu_${distro_version}_amd64.deb"
 				write_information "Downloading ${product} from: ${URL}"			
 			;;
 			"debian" )
