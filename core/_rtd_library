@@ -11173,58 +11173,6 @@ software::vendor_download_and_install() {
 	fi
 }
 
-software::apt_management_availability_check() {
-	# Description:
-	#   Waits for the apt/dpkg software management system to become available.
-	#   Prevents conflicts by ensuring no other process is holding apt/dpkg locks.
-	#
-	# Globals:
-	#   None
-	#
-	# Arguments:
-	#   None
-	#
-	# Outputs:
-	#   Status messages to stdout
-	#
-	# Returns:
-	#   0 on success
-	#
-	# Usage:
-	#   software::apt_management_availability_check
-	# End of documentation
-
-	if ! command -v apt >/dev/null 2>&1; then
-		return 0
-	fi
-
-	write_information "--- Checking if software maintenance system is available..."
-
-	local i=0
-	local spinner='-\|/'
-
-	# Save cursor position
-	tput civis
-	tput sc
-
-	trap 'tput cnorm; tput rc; printf "\n⛔ Aborted.\n"; return 1' INT TERM
-
-	while lsof /var/lib/dpkg/lock >/dev/null 2>&1 || \
-	      lsof /var/lib/apt/lists/lock >/dev/null 2>&1 || \
-	      pgrep -x apt >/dev/null || pgrep -x apt-get >/dev/null; do
-
-		local j=${spinner:i++%${#spinner}:1}
-		tput rc
-		printf "[%s] Waiting for other software managers to finish...\r" "$j"
-		sleep 1
-	done
-
-	# Restore cursor
-	tput rc
-	tput cnorm
-	printf "\n"
-	write_information "--- Software maintenance system is available."
-}
 
 
 software::is_native_package_available() {
@@ -11466,42 +11414,81 @@ software::add_native_package() {
 }
 
 software::native_management_availability_check() {
-	# Description: Function to check and see if the system software managment is available. In some cases
-	# the software managment system may be in use. Should this be the case, this function will
-	# wait undill the system is free for use.
-	# TODO: Add support for fedora, Centos, SuSE.
+	# Description:
+	#   Detects the native package manager and checks if it's currently locked or in use.
+	#   Waits until it becomes available to avoid conflicts with other package operations.
+	#
 	# Globals:
-	# Arguments: None
+	#   None
+	#
+	# Arguments:
+	#   None
+	#
 	# Outputs:
+	#   Status messages to stdout and stderr
+	#
 	# Returns:
-	# Usage:
-	# End of documentation
+	#   0 if the package manager becomes available, 1 if unsupported or error
+	# 
+	# End of Documentation
 
-	if hash zypper; then
-		write_information "--- Checking if software maintenance system is available:"
-	elif hash dnf; then
-		write_information "--- Checking if software maintenance system is available:"
-	elif hash apt; then
-		echo ""
-		write_information "--- Checking if software maintenance system is available:"
-		i=0
-		tput sc
-		while fuser /var/lib/dpkg/lock >/dev/null 2>&1; do
-			case $((${i} % 4)) in
-			0) j="-" ;;
-			1) j="\\" ;;
-			2) j="|" ;;
-			3) j="/" ;;
-			esac
-			tput rc
-			echo -en "\r[${j}] Waiting for other software managers to finish..."
+	local manager lock_files=() msg i=0 j
 
-			sleep 5
-			((i = i + 1))
-		done
-		write_information "--- Software maintenance system is available."
+	if command -v apt >/dev/null 2>&1; then
+		manager="apt"
+		lock_files=(
+			"/var/lib/dpkg/lock"
+			"/var/lib/apt/lists/lock"
+			"/var/cache/apt/archives/lock"
+		)
+	elif command -v dnf >/dev/null 2>&1; then
+		manager="dnf"
+		lock_files=("/var/cache/dnf/lockfile")
+	elif command -v yum >/dev/null 2>&1; then
+		manager="yum"
+		lock_files=("/var/run/yum.pid")
+	elif command -v zypper >/dev/null 2>&1; then
+		manager="zypper"
+		lock_files=("/var/run/zypp.pid")
+	else
+		write_error "No supported package manager detected (APT, DNF, YUM, Zypper)."
+		return 1
 	fi
+
+	write_status "Detected package manager: $manager"
+	write_status "Checking availability of the package manager..."
+
+	tput sc
+	while :; do
+		local locked=0
+		for lock in "${lock_files[@]}"; do
+			if [[ -e "$lock" ]] && fuser "$lock" >/dev/null 2>&1; then
+				locked=1
+				break
+			fi
+		done
+
+		if [[ "$locked" -eq 0 ]]; then
+			break
+		fi
+
+		case $((i % 4)) in
+			0) j='-' ;;
+			1) j='\\' ;;
+			2) j='|' ;;
+			3) j='/' ;;
+		esac
+
+		tput rc
+		printf "\r[%s] Waiting for %s to become available..." "$j" "$manager"
+		sleep 2
+		((i++))
+	done
+
+	printf "\r[✔] %s is now available.                                      \n" "$manager"
+	return 0
 }
+
 
 
 software::ensure_snap_package_managment() {
@@ -12227,9 +12214,6 @@ system::log_item() {
 	echo -e "${log_prefix} ${log_icon} : ${log_type} : ${log_message}" >>"$logfile"
 }
 
-rtd_update_system () {
-	software::update_system
-}
 
 software::update_system() {
 	# Description:
