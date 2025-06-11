@@ -9332,6 +9332,282 @@ ssh::ensure_key_installed_on_remote() {
 }
 
 
+security::encrypt_disk_with_luks() {
+	# Description:
+	#   Securely encrypts a block device using LUKS2 with hardened parameters.
+	#   Wipes the block device, configures strong encryption, formats it with ext4, and mounts it.
+	#   Will prompt for a strong passphrase and validate it.
+	#
+	# Globals:
+	#   None
+	#
+	# Arguments:
+	#   --device       Path to the block device (e.g. /dev/sdX)
+	#   --mountpoint   Path to mount the encrypted volume (e.g. /mnt/secure)
+	#
+	# Outputs:
+	#   Uses write_information, write_status, write_error
+	#
+	# Returns:
+	#   0 if successful, 1 on failure
+	#
+	# Usage:
+	#   security::encrypt_disk_with_luks --device /dev/sdX --mountpoint /mnt/secure
+	#
+	# End of Documentation
+
+	local device= mountpoint= passphrase confirm luks_name
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--device)
+				device="$2"; shift 2
+				;;
+			--mountpoint)
+				mountpoint="$2"; shift 2
+				;;
+			*)
+				write_error "Unknown argument: $1"
+				return 1
+				;;
+		esac
+	done
+
+	if [[ -z "$device" || -z "$mountpoint" ]]; then
+		write_error "❯ Missing required arguments. Usage: --device <device> --mountpoint <path>"
+		return 1
+	fi
+
+	if [[ ! -b "$device" ]]; then
+		write_error "Target device is not a block device: $device"
+		return 1
+	fi
+
+
+	if ! dependency::command_exists --auto cryptsetup mkfs.ext4 dd ; then
+		write_error "Failed to install 'cryptsetup'. Please install it manually."
+		return 1
+	fi
+
+	read -rsp "WARNING: This will erase ALL data on $device. Type 'YES' to continue: " confirm; echo
+	if [[ "$confirm" != "YES" ]]; then
+		write_status "Operation aborted by user."
+		return 1
+	fi
+
+	read -rsp "Enter a strong passphrase for LUKS encryption: " passphrase; echo
+	if [[ ${#passphrase} -lt 12 ]]; then
+		write_error "Passphrase too short. Minimum length is 12 characters."
+		return 1
+	fi
+
+	write_status "Wiping $device with random data. This may take a while..."
+	if ! dd if=/dev/urandom of="$device" bs=1M status=progress; then
+		write_error "Failed to wipe device: $device"
+		return 1
+	fi
+
+	write_status "Creating LUKS2 container with hardened configuration..."
+	if ! echo "$passphrase" | cryptsetup luksFormat "$device" \
+		--type luks2 \
+		--cipher aes-xts-plain64 \
+		--key-size 512 \
+		--hash sha512 \
+		--iter-time 5000 \
+		--use-random \
+		--batch-mode \
+		--pbkdf argon2id \
+		--label "SECURE_DISK" \
+		--verify-passphrase; then
+		write_error "Failed to create LUKS container."
+		return 1
+	fi
+
+	luks_name="secure_disk_$(basename "$device")"
+
+	write_status "Opening encrypted container as $luks_name..."
+	if ! echo "$passphrase" | cryptsetup open "$device" "$luks_name" --key-file=-; then
+		write_error "Failed to open encrypted container."
+		return 1
+	fi
+
+	write_status "Formatting encrypted container with ext4 filesystem..."
+	if ! mkfs.ext4 "/dev/mapper/$luks_name"; then
+		cryptsetup close "$luks_name"
+		write_error "Failed to format container."
+		return 1
+	fi
+
+	mkdir -p "$mountpoint" || {
+		write_error "Failed to create mount point: $mountpoint"
+		cryptsetup close "$luks_name"
+		return 1
+	}
+
+	write_status "Mounting container at $mountpoint..."
+	if ! mount "/dev/mapper/$luks_name" "$mountpoint"; then
+		write_error "Failed to mount container at $mountpoint"
+		cryptsetup close "$luks_name"
+		return 1
+	fi
+
+	write_information "✅ Secure LUKS encryption setup complete."
+	write_status "Encrypted device: $device"
+	write_status "Mapped as: /dev/mapper/$luks_name"
+	write_status "Mounted at: $mountpoint"
+
+	return 0
+}
+
+
+
+disk::reencrypt_device() {
+	# Description:
+	#   Securely encrypts an existing unencrypted block device using LUKS.
+	#   This will backup the contents, LUKS format the target device, then restore the data.
+	#
+	# Usage:
+	#   disk::reencrypt_device --device /dev/sdX --mountpoint /mnt/target --backup-dir /mnt/usb
+	#
+	# Globals:
+	#   None
+	#
+	# Returns:
+	#   0 on success, 1 on failure
+	#
+	# End of Documentation
+
+	local device= mountpoint= backup_dir= luks_name= mapper_path=
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--device)
+				device="$2"; shift 2
+				;;
+			--mountpoint)
+				mountpoint="$2"; shift 2
+				;;
+			--backup-dir)
+				backup_dir="$2"; shift 2
+				;;
+			*)
+				write_error "❌ Unknown option: $1"
+				return 1
+				;;
+		esac
+	done
+
+	if [[ -z "$device" || -z "$mountpoint" || -z "$backup_dir" ]]; then
+		write_error "❌ Missing required arguments: --device, --mountpoint, --backup-dir"
+		return 1
+	fi
+
+	if [[ ! -b "$device" ]]; then
+		write_error "❌ Device does not exist or is not a block device: $device"
+		return 1
+	fi
+
+	if [[ ! -d "$mountpoint" ]]; then
+		write_error "❌ Mountpoint does not exist: $mountpoint"
+		return 1
+	fi
+
+	if [[ ! -d "$backup_dir" || ! -w "$backup_dir" ]]; then
+		write_error "❌ Backup directory is not valid or not writable: $backup_dir"
+		return 1
+	fi
+
+	if mount | grep -q "on $backup_dir "; then
+		write_information "✔ Backup directory is mounted: $backup_dir"
+	else
+		write_warning "⚠ Backup directory is not a mountpoint. Make sure it's not on the target device!"
+	fi
+
+	if mount | grep -q "$device"; then
+		write_error "❌ Device appears to be mounted. Please unmount it first: $device"
+		return 1
+	fi
+
+	if ! dependency::command_exists --auto cryptsetup mkfs.ext4 dd tar ; then
+		write_error "Failed to install 'cryptsetup'. Please install it manually."
+		return 1
+	fi
+
+	write_information "📁 Backing up data from device $device to $backup_dir..."
+
+	local label; label="RECRYPT_$(date +%s)"
+	local backup_tar; backup_tar="${backup_dir}/reencrypt_backup_${label}.tar.gz"
+
+	if ! mkdir -p "$mountpoint"; then
+		write_error "❌ Failed to prepare mountpoint directory: $mountpoint"
+		return 1
+	fi
+
+	if ! mount "$device" "$mountpoint"; then
+		write_error "❌ Failed to mount $device to $mountpoint"
+		return 1
+	fi
+
+	if ! tar -czpf "$backup_tar" -C "$mountpoint" .; then
+		umount "$mountpoint"
+		write_error "❌ Failed to backup data to $backup_tar"
+		return 1
+	fi
+
+	write_information "📦 Backup complete: $backup_tar"
+	write_status "🔓 Preparing to format $device with LUKS encryption..."
+
+	umount "$mountpoint"
+
+	read -r -p "This will erase all data on $device. Type YES to continue: " confirm
+	if [[ "$confirm" != "YES" ]]; then
+		write_information "Aborted by user."
+		return 1
+	fi
+
+	if ! cryptsetup luksFormat "$device"; then
+		write_error "❌ Failed to LUKS format the device."
+		return 1
+	fi
+
+	luks_name="luks_${label}"
+	if ! cryptsetup open "$device" "$luks_name"; then
+		write_error "❌ Failed to open LUKS container."
+		return 1
+	fi
+
+	mapper_path="/dev/mapper/$luks_name"
+
+	if ! mkfs.ext4 "$mapper_path"; then
+		cryptsetup close "$luks_name"
+		write_error "❌ Failed to format LUKS container with ext4"
+		return 1
+	fi
+
+	if ! mount "$mapper_path" "$mountpoint"; then
+		cryptsetup close "$luks_name"
+		write_error "❌ Failed to mount encrypted device."
+		return 1
+	fi
+
+	write_information "📂 Restoring backup from $backup_tar to $mountpoint..."
+	if ! tar -xzf "$backup_tar" -C "$mountpoint"; then
+		umount "$mountpoint"
+		cryptsetup close "$luks_name"
+		write_error "❌ Failed to restore backup."
+		return 1
+	fi
+
+	sync
+	umount "$mountpoint"
+	cryptsetup close "$luks_name"
+
+	write_status "✅ Re-encryption complete. Data restored securely."
+	write_information "🧾 Encrypted device: $device"
+	write_information "📦 Backup archive retained at: $backup_tar"
+	return 0
+}
+
+
 
 security::enable_firewall() {
 	# Description:
