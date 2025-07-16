@@ -137,23 +137,52 @@ complete_setup () {
 
 
 
-dependency_library ()
-{
-	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/${LIBFILE}
+search_local() {
+	echo "Requested dependency file: ${1} ..."
+	local script_path="$(readlink -f "$0")"
+	local script_dir="$(dirname "$script_path")"
+	local _tla="${_TLA,,}"
+	local _tla="${_tla:-"rtd"}"
+	local paths=(
+		"$(dirname "$(find /opt/${_tla} -name ${1} 2>/dev/null | head -n 1)")/${1}"
+		"$(dirname "$(find /home/${SUDO_USER}/GIT -name ${1} 2>/dev/null | head -n 1)")/${1}"
+		"$(dirname "$(find /home/${SUDO_USER}/bin -name ${1} 2>/dev/null | head -n 1)")/${1}"
+		"${script_dir}/${1}"
+		"./${1}"
+	)
 
-	# Try to source the library from relative path, ~/bin, and finally from the /opt directory.
-	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/${LIBFILE} ; then
-		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/${LIBFILE}
-	elif source "$(find ${HOME}/bin -name ${LIBFILE} |grep -v bakup )" ; then
-		write_information "${FUNCNAME[0]} 1 Using:  $(find ${HOME}/bin -name ${LIBFILE} |grep -v bakup )"
-	elif source $(find /opt -name ${LIBFILE} |grep -v bakup ) ; then
-		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name ${LIBFILE} |grep -v bakup )"
-	elif wget ${_src_url} ; then
-                write_information "${FUNCNAME[0]} 4 Using: ${_src_url}"
-		source ./${LIBFILE}
+	for path in "${paths[@]}"; do
+		echo "Searching for ${path} ..."
+		if [[ -e "${path}" ]]; then
+			echo "Found ${path}"
+			source "${path}" || { echo "Failed to source ${path}"; exit 1; }
+			return 0
+		fi
+	done
+
+	return 1
+}
+
+dependency_file() {
+	local _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
+	local _tgt="${1}"
+
+	if search_local "${1}"; then
+		return 0
 	else
-		echo -e "RTD functions NOT found!"
-		return 1
+		system::log_item "$(date) failure to find $1 on the local computer, now searching online..."
+		local tmpdir=$(mktemp -d)
+		if curl -sL "$_src_url" -o "${tmpdir}/${1}"; then
+			system::log_item "Using: ${_src_url} directly from URL..."
+			source "${tmpdir}/${1}"
+		elif wget "${_src_url}" -O "${tmpdir}/${1}" &>/dev/null; then
+			source "${tmpdir}/${1}"
+			system::log_item "Using: ${_src_url} downloaded..."
+		else
+			system::log_item "Failed to find  ${1} "
+			exit 1
+		fi
+		rm -rf "${tmpdir}"
 	fi
 }
 
@@ -178,7 +207,7 @@ oem_linux_config ()
 		sudo -E bash $0 $*
 	else
 		if [ -z "${RTDFUNCTIONS}" ]; then
-			dependency_library _rtd_library || { echo "📚 Failed to find _rtd_library"; exit 1; }
+			dependency_file _rtd_library || { echo "📚 Failed to find _rtd_library"; exit 1; }
 		else
 			write_information "📚 _rtd_library is already loaded..."
 		fi

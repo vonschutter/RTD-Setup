@@ -14470,6 +14470,154 @@ kvm::get_zorin_iso() {
 	fi
 }
 
+
+kvm::mount_local_folder_to_guest() {
+	# Description:
+	#   Mounts a local host folder into a running KVM virtual machine (guest) 
+	#   using virtiofs passthrough filesystem. Automatically validates inputs,
+	#   checks VM existence, creates temporary XML mount config, and applies
+	#   the configuration using `virsh attach-device`.
+	#
+	# Usage:
+	#   kvm::mount_local_folder_to_guest --vm <vm-name> [--mount <host-dir>] \
+	#                                    [--guest-dir <guest-dir>] \
+	#                                    [--mount-tag <tag>]
+	#
+	# Parameters:
+	#   --vm | --vm-name | --vmname <vm-name>
+	#       (Required) Name of the KVM guest VM to mount the folder into.
+	#
+	#   --mount <host-dir>
+	#       (Optional) Path of the directory on the host to be mounted.
+	#       Default: /opt/rtd
+	#
+	#   --guest-dir | --guestdir | --guest <guest-dir>
+	#       (Optional) Mount point inside the guest VM.
+	#       Default: /opt/rtd
+	#
+	#   --mount-tag | --tag <mount-tag>
+	#       (Optional) Tag label to uniquely identify the mounted share.
+	#       Default: host-rtd-share
+	#
+	#   --help | -h
+	#       Display help information about this function.
+	#
+	# Returns:
+	#   0 on success, 1 on failure. Detailed error messages are printed to stderr.
+	#
+	# Example:
+	#   kvm::mount_local_folder_to_guest --vm myvm --mount /data \
+	#                                    --guest-dir /mnt/data --mount-tag myshare
+	#
+	# Dependencies:
+	#   Requires `virsh`, `mktemp`, and libvirt with virtiofs support.
+	#
+	# Notes:
+	#   - Skips mounting if the same host directory is already configured.
+	#   - Uses temporary XML device configuration for persistent attachment.
+	# End of documentation
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--mount)
+			if [[ -z "$2" ]]; then
+				write_error "Error: You must provide a VM name." >&2
+				write_information "Usage: $0 <vm-name>" >&2
+				return 1
+			fi
+			host_dir="$2"
+			;;
+		--vm-name | --vmname | --vm)
+			if [[ -z "$2" ]]; then
+				write_error "Error: You must provide a VM name." >&2
+				write_information "Usage: $0 <vm-name>" >&2
+				return 1
+			fi
+			vm_name="$2"
+			;;
+		--mount-tag | --tag)
+			if [[ -z "$2" ]]; then
+				write_error "Error: You must provide a mount tag." >&2
+				write_information "Usage: $0 <vm-name> --mount-tag <tag>"
+			fi
+			mount_tag="$2"
+			;;
+		--guest-dir | --guestdir | --guest)
+			if [[ -z "$2" ]]; then
+				write_error "Error: You must provide a guest directory." >&2
+				write_information "Usage: $0 <vm-name> --guest-dir <guest-directory>"
+				return 1
+			fi
+			guest_dir="$2"
+			;;
+		--help | -h)
+			write_information "Usage: kvm::mount_local_folder_to_guest <vm-name>"
+			write_information "Mounts a local folder to a KVM guest VM."
+			return 0
+			;;
+		*)
+			break
+			;;
+		esac
+	done
+
+	local vm_name="$1"
+	local host_dir="/opt/rtd"
+	local guest_dir="/opt/rtd" # Same location inside the guest
+	local mount_tag="host-rtd-share" # A unique label for the share
+
+	# --- 1. Input Validation and Prerequisite Checks ---
+	if [[ -z "$vm_name" ]]; then
+		write_error "Error: You must provide a VM name." >&2
+		write_information "Usage: $0 <vm-name>" >&2
+		return 1
+	fi
+
+	if ! virsh dominfo "$vm_name" &>/dev/null; then
+		write_error "Error: VM '$vm_name' not found by virsh." >&2
+		return 1
+	fi
+
+	if [[ ! -d "$host_dir" ]]; then
+		write_warning "Warning: Host directory '$host_dir' does not exist."
+		return 1
+	fi
+
+	# Check if the filesystem is already configured
+	if virsh dumpxml "$vm_name" | grep -q "<source dir='$host_dir'/>"; then
+		write_information "Info: A filesystem sharing '$host_dir' is already configured for '$vm_name'."
+		write_information "Skipping host configuration."
+	else
+		# --- 2. Create the temporary XML for the device ---
+		# Using a heredoc is clean and avoids escaping issues.
+		local temp_xml_file
+		temp_xml_file=$(mktemp)
+		cat > "$temp_xml_file" <<-EOF
+		<filesystem type='mount' accessmode='passthrough'>
+		<driver type='virtiofs'/>
+		<source dir='$host_dir'/>
+		<target dir='$mount_tag'/>
+		</filesystem>
+		EOF
+
+		# --- 3. Attach the Device to the VM (Persistently) ---
+		write_information "Attaching host directory '$host_dir' to VM '$vm_name'..."
+		if ! virsh attach-device "$vm_name" "$temp_xml_file" --persistent; then
+			write_error "Error: Failed to attach device to VM '$vm_name'."
+			rm -f "$temp_xml_file"
+			return 1
+		fi
+
+			write_information "Device attached successfully."
+			rm -f "$temp_xml_file"
+	fi
+	
+	return 0
+}
+
+
+
+
 kvm::create_expanding_vm_hardisk() {
 	# Description:
 	#   Creates a non-preallocated, dynamically expanding qcow2 disk image for a VM.
