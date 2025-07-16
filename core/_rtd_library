@@ -1,5 +1,5 @@
 #!/bin/bash
-# shellcheck disable=SC2120
+
 if [[ -z "$BASH_VERSINFO" ]]; then
 	echo "SHELL ENV ERROR: You must use a BASH Shell to load this library. Exiting..."
 	exit 255
@@ -331,10 +331,12 @@ Library_Documentation
 #                                                 "Y88P"
 ################################################################################################
 
+# Disable unset variable error checking because we are using default values :-"default_value"
+set +u
+
 # Define the name of the library files required for this script
 # For flexibility we use variables with default values that can be overridden by the script that
 # sources this library by simply setting them in the parent environment.
-set +u # Disable unset variable error checking because we are using default values :-"default_value"
 : ${_branding_info:="_branding.info"}
 : ${_locations_info:="_locations.info"}
 : ${_rtd_recipies_info:="_rtd_recipies.info"}
@@ -409,11 +411,9 @@ display_gui() {
 	#   display_gui "Hello, World!"
 	#
 	# End of Documentation
-	if [ -z "${RTD_GUI}" ]; then
-		dialog::check_menu_availability
-	fi
-
 	
+	dialog::check_menu_availability
+	dialog::display_notice "$1"
 }
 
 dialog::check_menu_availability() {
@@ -9611,30 +9611,31 @@ disk::reencrypt_device() {
 
 security::enable_firewall() {
 	# Description:
-	#   Enables and configures the system firewall using either UFW or firewalld.
-	#   Allows incoming SSH connections and Minecraft ports.
-	#   Automatically detects the firewall tool and applies relevant rules.
-	#   Requires root privileges to configure the firewall.
-	#   If no recognized firewall tool is found, the function exits with an error message.
-	#   The function is intended for use with Ubuntu, Debian, CentOS, Fedora, and RHEL systems.
-	#   The default Minecraft port is 25565, but a custom port can be specified as an argument.
-	#   You may run the function any number of times to add a port to the firewall rules alleviating the
-	#   need to script finding what firewall tool is present of the syntax for adding a port.
+	#   Enables and configures the system firewall using either UFW (Uncomplicated Firewall) or firewalld.
+	#   Automatically detects the firewall tool present on the system and applies appropriate rules.
+	#   Allows incoming SSH traffic and optionally opens Minecraft-related ports (25565 and 4445), or a custom TCP port.
+	#   Prevents accidental SSH lockout by always ensuring SSH access is allowed.
+	#   Requires root privileges and supports reentrant invocation to safely add additional ports.
 	#
 	# Globals:
 	#   None
 	#
 	# Arguments:
-	#   $1 - Optional. Minecraft port to allow (default: 25565)
+	#   --minecraft, -mc   Enables default Minecraft ports (25565, 4445)
+	#   --port <PORT>, -p <PORT>   Specifies a custom port to allow through the firewall
 	#
 	# Outputs:
-	#   Writes status messages to stdout and errors to stderr
+	#   Informational and error messages sent to stdout/stderr
 	#
 	# Returns:
-	#   0 if successful, 1 if no firewall tool is detected or commands fail
+	#   0 if the firewall rules were successfully applied
+	#   1 if no firewall tool is found, arguments are invalid, or a command fails
 	#
 	# Usage:
-	#   security::enable_firewall 25565
+	#   security::enable_firewall --minecraft
+	#   security::enable_firewall --port 8080
+	#   security::enable_firewall -mc -p 8080
+	# End of documentation
 
 	security::ensure_admin
 	write_status "Running security::enable_firewall function..."
@@ -9796,6 +9797,8 @@ security::scan_for_malware() {
 	#
 	# Usage:
 	#   security::scan_for_malware /path/to/dir1 [/path/to/dir2 ...]
+	#
+	# End of documentation
 
 	local quarantinedir logfile scandirs valid_scandirs dir;
 
@@ -9904,6 +9907,8 @@ security::harden_ubuntu() {
 	#
 	# Usage:
 	#   security::harden_ubuntu
+	#
+	# End of documentation
 	
 	security::ensure_admin
 
@@ -9983,6 +9988,8 @@ security::configure_clamav() {
 	#
 	# Usage:
 	#   security::configure_clamav
+	#
+	# End of documentation
 
 	local clamav_conf freshclam_conf clamd_conf
 
@@ -10069,6 +10076,8 @@ security::configure_fail2ban() {
 	#
 	# Usage:
 	#   security::install_fail2ban
+	#
+	# End of documentation
 
 	security::ensure_admin
 
@@ -10330,6 +10339,11 @@ security::sysctl_hardening() {
 	#
 	# Returns:
 	#   0 if settings applied successfully, 1 on failure
+	#
+	# Usage:
+	#   security::sysctl_hardening
+	#
+	# End of documentation
 
 	local sysctl_bin sysctl_dir sysctl_file
 
@@ -12487,7 +12501,11 @@ system::log_item() {
 		;;
 	esac
 
-	echo -e "${log_prefix} ${log_icon} : ${log_type} : ${log_message}" >>"$logfile"
+	if [[ ! -f "$logfile" ]]; then
+		return 1
+	fi
+	echo -e "${log_prefix} ${log_icon} : ${log_type} : ${log_message}" >>"$logfile"  
+
 }
 
 
@@ -19223,76 +19241,15 @@ eval_params() {
 		done
 		return
 		;;
-	--devhelp-test)
-
-		# Ensure the documentation file exists
-		DOC_FILE="/tmp/yad_doc.txt"
-		echo "Documentation will appear here" > "$DOC_FILE"
-
-		# Use sample functions_output directly
-		functions_output=$(cat <<EOF
-		#167:	write_status 
-		#168:	write_warning 
-		#169:	yad::display_cmd_output 
-		#170:	yad::display_progressbar_pulsating 
-		#171:	zenity::display_file 
-		#172:	zenity::display_info 
-		#173:	zenity::display_url 
-EOF
-		)
-
-		# Parse the functions and build the list for yad
-		functions_list=""
-		while IFS= read -r line; do
-		# Skip empty lines
-		[ -z "$line" ] && continue
-		# Extract number and function name
-		if [[ "$line" =~ ^#([0-9]+):[[:space:]]*(.+)$ ]]; then
-			number="${BASH_REMATCH[1]}"
-			function_name="${BASH_REMATCH[2]}"
-			# For now, use a placeholder description
-			description="Description for $function_name"
-			# Build the list in the required format
-			functions_list+="${number}|${function_name}|${description}\n"
-		fi
-		done <<< "$functions_output"
-
-		# Write the functions list to a temporary file
-		echo -e "$functions_list" > /tmp/functions_list.txt
-
-		# Start the main paned window
-		yad --paned --key=$$ --orient=hor --title="Select a function to see its documentation" \
-		--width=800 --height=600 --splitter=300 --button="Quit:1" &
-
-		PANED_PID=$!
-
-		# Start the text-info pane
-		yad --text-info --no-markup --wrap --filename="$DOC_FILE" \
-		--plug=$$ --tabnum=2 --margins=10 --no-buttons --editable &
-
-		# Start the list pane and handle selection
-		yad --list --separator="|" --column="Number" --column="Function" --column="Description" \
-		--print-column=2 --hide-column=1 \
-		--plug=$$ --tabnum=1 \
-		--filename=/tmp/functions_list.txt \
-		| while read -r selected_function; do
-			if [ -z "$selected_function" ]; then
-			continue
-			fi
-			# For testing, simply display the function name in the documentation pane
-			echo "Documentation for $selected_function" > "$DOC_FILE"
-		done
-
-		wait $PANED_PID
-
-	;;
 	--devhelp-gtk)
 		while true; do
 			exec 3>&1
 			DisplayList=$(list_loaded_internal_functions --zformat)
 			IFS_SAV=$IFS
 			IFS=$(echo -en "\n\b")
-			selection=$(zenity --list --modal --text="Select a function below, to see the function's documentation \n and usage:" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1000}" --print-column=2 --column="Number" --column="Function" --column="Description" ${DisplayList} 2>/dev/null)
+			local text="Select a function below to see the function's documentation and usage:"
+			local title="RTD Library Fuction Documentation"
+			selection=$(zenity --list --modal --title=$title --text=$text --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1000}" --print-column=2 --column="Number" --column="Function" --column="Description" ${DisplayList} 2>/dev/null)
 			exit_status=$?
 			IFS=$IFS_SAV
 			exec 3>&-
@@ -19334,7 +19291,7 @@ EOF
 					unset _req_sucess
 				fi
 				system::log_item "Displaying [${selection}] in a [${ZHEIGHT:-600}]x[${ZWIDTH:-1024}]: \n $result"
-				echo -e "$result" | zenity --text-info --font=monospace --modal --ok-label=BACK --title "RTD Function: [${selection}]" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1024}"
+				echo -e "$result" | zenity --text-info --font=monospace --modal --ok-label=BACK --title "Function Documentation: [${selection}]" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1024}"
 				unset result
 				;;
 			*)
