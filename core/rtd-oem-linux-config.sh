@@ -137,21 +137,22 @@ complete_setup () {
 
 
 
-dependency_rtd_library ()
+dependency_library ()
 {
-	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/${LIBFILE}
 
-	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library ; then
-		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
-	elif source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
-		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
-	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
-		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name _rtd_library |grep -v bakup )"
+	# Try to source the library from relative path, ~/bin, and finally from the /opt directory.
+	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/${LIBFILE} ; then
+		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/${LIBFILE}
+	elif source "$(find ${HOME}/bin -name ${LIBFILE} |grep -v bakup )" ; then
+		write_information "${FUNCNAME[0]} 1 Using:  $(find ${HOME}/bin -name ${LIBFILE} |grep -v bakup )"
+	elif source $(find /opt -name ${LIBFILE} |grep -v bakup ) ; then
+		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name ${LIBFILE} |grep -v bakup )"
 	elif wget ${_src_url} ; then
                 write_information "${FUNCNAME[0]} 4 Using: ${_src_url}"
-		source ./_rtd_library 
+		source ./${LIBFILE}
 	else
-		echo -e "RTD functions NOT found!" 
+		echo -e "RTD functions NOT found!"
 		return 1
 	fi
 }
@@ -177,7 +178,7 @@ oem_linux_config ()
 		sudo -E bash $0 $*
 	else
 		if [ -z "${RTDFUNCTIONS}" ]; then
-			dependency_rtd_library || { echo "📚 Failed to find _rtd_library"; exit 1; }
+			dependency_library _rtd_library || { echo "📚 Failed to find _rtd_library"; exit 1; }
 		else
 			write_information "📚 _rtd_library is already loaded..."
 		fi
