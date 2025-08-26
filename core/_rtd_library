@@ -14385,6 +14385,111 @@ kvm::get_kali_iso() {
 
 }
 
+
+kvm::get_fedora_workstation_iso() {
+	# Description:
+	#   Downloads the specified or latest Fedora Workstation x86_64 ISO.
+	#   Stores under /var/lib/libvirt/boot/, skips download if already present.
+	#
+	# Usage:
+	#   kvm::get_fedora_workstation_iso [--version <number>]
+	#
+	# Dependencies:
+	#   - curl
+	#   - wget
+	#   - system::log_item
+	#
+	# Outputs:
+	#   - Echos the local ISO path.
+	#   - Sets global `iso` to the local file path.
+	#
+	# Returns:
+	#   - 0 if successful or already present, 1 on error.
+	#
+	# Notes:
+	#   - If --version is provided, that version is used.
+	#   - Otherwise, the highest available release is selected.
+	#   - ISO format is: Fedora-Workstation-Live-<version>-1.1.x86_64.iso
+	#   - The function logs progress and errors using system::log_item.
+	#
+	# Example:
+	#   kvm::get_fedora_workstation_iso --version 38
+	#
+	#   kvm::get_fedora_workstation_iso
+	#   # Automatically detects the latest version and downloads it.
+	# End of documentation
+
+	system::log_item "Fetching Fedora Workstation ISO..."
+
+	local BASE_URL="https://dl.fedoraproject.org/pub/fedora/linux/releases"
+	local DEST_DIR="/var/lib/libvirt/boot"
+	local VERSION=""
+	iso=""
+
+	# Parse arguments
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--version)
+				shift
+				VERSION="$1"
+				;;
+			*)
+				system::log_item "Unknown argument: $1" >&2
+				return 1
+				;;
+		esac
+		shift
+	done
+
+	# Auto-detect version if not specified
+	if [[ -z "$VERSION" ]]; then
+		system::log_item "No version provided, auto-detecting latest release..."
+		VERSION="$(curl -s "${BASE_URL}/" | grep -Eo 'href="[0-9]+/' | grep -Eo '[0-9]+' | sort -rV | head -n1)"
+		if [[ -z "$VERSION" ]]; then
+			system::log_item "Failed to detect latest Fedora release version." >&2
+			return 1
+		fi
+		system::log_item "Detected version: $VERSION"
+	else
+		system::log_item "Using specified version: $VERSION"
+	fi
+
+	local ISO_DIR_URL="${BASE_URL}/${VERSION}/Workstation/x86_64/iso/"
+
+	system::log_item "Looking up ISO in: ${ISO_DIR_URL}"
+	local ISO_NAME
+	ISO_NAME="$(curl -s "$ISO_DIR_URL" | grep -oE 'Fedora-Workstation-Live-[0-9]+-[0-9]+\.[0-9]+\.x86_64\.iso' | head -n1)"
+	write_information "Found ISO: ${ISO_NAME}"
+
+	if [[ -z "$ISO_NAME" ]]; then
+		system::log_item "Could not find ISO for version $VERSION in $ISO_DIR_URL" >&2
+		return 1
+	fi
+
+	local ISO_URL="${ISO_DIR_URL}${ISO_NAME}"
+	local DEST="${DEST_DIR}/${ISO_NAME}"
+
+	if [[ -f "$DEST" ]]; then
+		system::log_item "ISO already exists: $DEST"
+		iso=$DEST
+		write_information "$iso"
+		return 0
+	fi
+
+	system::log_item "Downloading ${ISO_URL} -> ${DEST}"
+	wget -q --show-progress -O "$DEST" "$ISO_URL" || {
+		system::log_item "Failed to download ISO: $ISO_URL" >&2
+		return 1
+	}
+
+	system::log_item "Download completed."
+	iso=$DEST
+	write_information "$iso"
+	return 0
+}
+
+
+
 kvm::get_zorin_iso() {
 	# Description: Downloads the latest Zorin OS ISO file for KVM if not already present.
 	#
@@ -14707,7 +14812,7 @@ kvm::make_vm_now_from_fedora_org() {
 	: ${_cpu="${_cpu:-2}"}
 	: ${_mem="${_mem:-2048}"}
 	: ${_dsk="${_dsk:-100}"}
-
+	
 	# Set default values for VM T-Shirts sizes...
 	kvm::util::read_common_options ${*}
 
@@ -14733,8 +14838,15 @@ kvm::make_vm_now_from_fedora_org() {
 	: "${_mirrorlist_url="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-${_os_version}&arch=x86_64"}"
 	: "${_source_url:="https://dl.fedoraproject.org/pub/fedora/linux/releases/${_os_version}/Everything/x86_64/os/"}"
 	: "${_preseed_file="$(mktemp -d)/ks.cfg"}"
-
-	if [[ ${_role} == "workstation" ]]; then
+	
+	if [[ ${_role} == "workstation" || ${_role} == "VDI" ]]; then
+		kvm::get_fedora_workstation_iso --version ${_os_version} || {
+			write_error "Failed to fetch Fedora Workstation ISO. Please check your network connection or the Fedora repository."
+			return 1
+		}
+		write_information "Using Fedora Workstation ISO: ${iso}"
+		: ${fedora_iso_mount_point="/var/lib/libvirt/boot/Fedora_${_os_version}.iso"}
+		write_information "Mounting ISO at: ${fedora_iso_mount_point}"
 		local _service="VDI"
 		system::generate_ks_cfg_file --source "${_source_url}" --role "${_role}" --file "${_preseed_file}" --DE "${_UserDesktopEnvironmentSelection:="@basic-desktop-environment"}"
 	elif [[ ${_role} == "server" ]]; then
@@ -14742,8 +14854,23 @@ kvm::make_vm_now_from_fedora_org() {
 		system::generate_ks_cfg_file --source "${_source_url}" --role "${_role}" --file "${_preseed_file}" --SR "${_UserServerEnvironemtSelection:="@network-server"}"
 	else
 		write_error "Unknown role selection: ${_role} ==> Use workstation or server"
+		read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..."
 		return 1
 	fi
+
+	if [[ -z "${iso}" ]]; then
+		write_error "No ISO file found. Please run kvm::get_fedora_workstation_iso first."
+		return 1
+	else 
+		system::log_item "Using ISO file: ${iso}"
+		mount -o loop "${iso}" ${fedora_iso_mount_point} || {
+			write_error "Failed to mount ISO file: ${iso}"
+			return 1
+		}
+		local vm_kernel="${fedora_iso_mount_point}/boot/x86_64/loader/linux"
+		local vm_initrd="${fedora_iso_mount_point}/boot/x86_64/loader/initrd"
+	fi
+
 
 	local vm_name="Template_Fedora_${_service}_$(date +%Y-%m-%d-%H-%M)"
 
@@ -14765,12 +14892,17 @@ kvm::make_vm_now_from_fedora_org() {
 			--disk size="${_dsk}" \
 			--os-variant="fedora40" \
 			--initrd-inject="${_preseed_file}" \
-			--location="${_source_url}" \
-			--extra-args "inst.ks=file:/$(basename $_preseed_file) inst.repo=https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Everything/x86_64/os/" \
+			--location="${fedora_iso_mount_point},kernel=${vm_kernel},initrd=${vm_initrd}" \
+			--extra-args "inst.ks=file:/$(basename $_preseed_file) inst.stage2=hd:LABEL=Fedora-Live-WS-x86_64" \
 			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
-
+	
+	umount -l "${fedora_iso_mount_point}" || {
+		write_error "Failed to unmount the ISO mount point: ${fedora_iso_mount_point}"
+		return 1
+	}
 	unset _preseed_file vm_kernel vm_initrd _source_url _config _mirrorlist_url _os_version _summary_message distro _UserServerEnvironemtSelection _UserDesktopEnvironmentSelection _role _service
+	
 }
 
 kvm::make_vm_now_from_redhat_com() {
@@ -16774,8 +16906,8 @@ template::kickstart_cfg() {
 			graphical
 			# url --install --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f${_DEFAULT_FEDORA_VER}&arch=x86_64" 
 			# inst.repo="${_repo_url}"
-			url --url "https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Everything/x86_64/os/"
-			#inst.repo="https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Everything/x86_64/os/"
+			#url --url "https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Everything/x86_64/os/"
+			inst.repo="https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Everything/x86_64/os/"
 			firstboot --disable
 			keyboard --vckeymap=${Preference_InitialKeyboardLayout} --xlayouts="${Preference_InitialKeyboardLayout}"
 			lang en_US.UTF-8

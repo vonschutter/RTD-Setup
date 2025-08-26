@@ -87,22 +87,38 @@ Script_Documentation
 
 dependency_library ()
 {
-	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/${LIBFILE}
+	local _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
+	local _tgt="${1}"
 
-	# Try to source the library from relative path, ~/bin, and finally from the /opt directory.
-	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/${LIBFILE} ; then
-		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/${LIBFILE}
-	elif source "$(find ${HOME}/bin -name ${LIBFILE} |grep -v bakup )" ; then
-		write_information "${FUNCNAME[0]} 1 Using:  $(find ${HOME}/bin -name ${LIBFILE} |grep -v bakup )"
-	elif source $(find /opt -name ${LIBFILE} |grep -v bakup ) ; then
-		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name ${LIBFILE} |grep -v bakup )"
-	elif wget ${_src_url} ; then
-                write_information "${FUNCNAME[0]} 4 Using: ${_src_url}"
-		source ./${LIBFILE}
-	else
-		echo -e "RTD functions NOT found!"
+	dependency::search_local ()
+	{
+		echo "${FUNCNAME[0]}: Requested dependency file: ${1} ..."
+
+		for i in "./${1}" "../core/${1}" "../../core/${1}" "${0%/*}/../core/${1}" "${0%/*}/../../core/${1}" "$(find /opt -name ${1} |grep -v bakup )" ; do 
+			echo "${FUNCNAME[0]}: Searching for ${i} ..."
+			if [[ -e "${i}" ]] ; then 
+				echo "${FUNCNAME[0]}: Found ${i}"
+				source "${i}" ""
+				return 0
+			fi
+		done
 		return 1
-	fi
+	}
+
+	if dependency::search_local "${1}" ; then
+		return 0
+	else
+		echo "$(date) failure to find $1 on the local comuter, now searching online..."
+		if curl -sL $_src_url | source /dev/stdin ; then 
+			echo "${FUNCNAME[0]} Using: ${_src_url} directly from URL..."
+		elif wget ${_src_url} &>/dev/null ; then
+			source ./"${1}"
+			echo "${FUNCNAME[0]} Using: ${_src_url} downloaded..."
+		else 
+			echo "${FUNCNAME[0]} Failed to find  ${1} "
+			exit 1
+		fi
+	fi 
 }
 
 
@@ -133,7 +149,7 @@ if [[ $1 == "--help" ]]; then
 fi
 
 # Ensure access to the rtd library functions:
-dependency_library || { echo "Library not found!" ; exit 1 ; }
+dependency_library ${LIBFILE} || { echo "Library not found!" ; exit 1 ; }
 
 # call compression function with its default behavior...
 tool::compress_all_items_here || { write_error -e "Compression failed!"; exit 1; }
