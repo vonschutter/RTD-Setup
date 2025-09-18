@@ -14454,12 +14454,19 @@ kvm::get_fedora_workstation_iso() {
 		system::log_item "Using specified version: $VERSION"
 	fi
 
-	local ISO_DIR_URL="${BASE_URL}/${VERSION}/Workstation/x86_64/iso/"
+	local ISO_DIR_URL="${BASE_URL}/${VERSION}/Everything/x86_64/iso/"
 
 	system::log_item "Looking up ISO in: ${ISO_DIR_URL}"
 	local ISO_NAME
-	ISO_NAME="$(curl -s "$ISO_DIR_URL" | grep -oE 'Fedora-Workstation-Live-[0-9]+-[0-9]+\.[0-9]+\.x86_64\.iso' | head -n1)"
-	write_information "Found ISO: ${ISO_NAME}"
+
+	ISO_NAME=$(
+		curl -fsSL "$ISO_DIR_URL" |
+		grep -Eo 'href="Fedora-Everything-netinst-x86_64-'"${VERSION}"'-[0-9]+\.[0-9]+\.iso"' |
+		sed -E 's/^href="//; s/"$//' |
+		sort -Vu | tail -n1
+	)
+
+	write_information "Found ISO: ${ISO_NAME}"  
 
 	if [[ -z "$ISO_NAME" ]]; then
 		system::log_item "Could not find ISO for version $VERSION in $ISO_DIR_URL" >&2
@@ -14845,8 +14852,8 @@ kvm::make_vm_now_from_fedora_org() {
 			return 1
 		}
 		write_information "Using Fedora Workstation ISO: ${iso}"
-		: ${fedora_iso_mount_point="/var/lib/libvirt/boot/Fedora_${_os_version}.iso"}
-		write_information "Mounting ISO at: ${fedora_iso_mount_point}"
+		: ${fedora_iso_mount_point="/var/lib/libvirt/boot/Fedora_${_os_version}.iso_${RANDOM}"}
+
 		local _service="VDI"
 		system::generate_ks_cfg_file --source "${_source_url}" --role "${_role}" --file "${_preseed_file}" --DE "${_UserDesktopEnvironmentSelection:="@basic-desktop-environment"}"
 	elif [[ ${_role} == "server" ]]; then
@@ -14863,12 +14870,17 @@ kvm::make_vm_now_from_fedora_org() {
 		return 1
 	else 
 		system::log_item "Using ISO file: ${iso}"
-		mount -o loop "${iso}" ${fedora_iso_mount_point} || {
-			write_error "Failed to mount ISO file: ${iso}"
+		system::log_item "Mounting ISO at: ${fedora_iso_mount_point}"
+		mkdir -p "${fedora_iso_mount_point}" || {
+			write_error "Failed to create mount point: ${fedora_iso_mount_point}"
 			return 1
 		}
-		local vm_kernel="${fedora_iso_mount_point}/boot/x86_64/loader/linux"
-		local vm_initrd="${fedora_iso_mount_point}/boot/x86_64/loader/initrd"
+		mount -o loop "${iso}" ${fedora_iso_mount_point} || {
+			write_error "Failed to mount ISO file: ${iso} at ${fedora_iso_mount_point}"
+			return 1
+		}
+		local vm_kernel="${fedora_iso_mount_point}/boot/grub2/i386-pc/kernel.exec"
+		local vm_initrd="${fedora_iso_mount_point}/boot/grub2/i386-pc/lnxboot.image"
 	fi
 
 
@@ -14892,15 +14904,17 @@ kvm::make_vm_now_from_fedora_org() {
 			--disk size="${_dsk}" \
 			--os-variant="fedora40" \
 			--initrd-inject="${_preseed_file}" \
-			--location="${fedora_iso_mount_point},kernel=${vm_kernel},initrd=${vm_initrd}" \
-			--extra-args "inst.ks=file:/$(basename $_preseed_file) inst.stage2=hd:LABEL=Fedora-Live-WS-x86_64" \
+			--location="${iso}" \
+			--extra-args "inst.ks=file:/$(basename $_preseed_file)" \
 			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 	
-	umount -l "${fedora_iso_mount_point}" || {
-		write_error "Failed to unmount the ISO mount point: ${fedora_iso_mount_point}"
-		return 1
-	}
+	# umount -l "${fedora_iso_mount_point}" || {
+	# 	write_error "Failed to unmount the ISO mount point: ${fedora_iso_mount_point}"
+	# 	return 1
+	# } ,kernel=${vm_kernel},initrd=${vm_initrd}
+	# inst.stage2=hd:LABEL=Fedora-Live-WS-x86_64
+	# ${fedora_iso_mount_point},kernel=${vm_kernel},initrd=${vm_initrd}
 	unset _preseed_file vm_kernel vm_initrd _source_url _config _mirrorlist_url _os_version _summary_message distro _UserServerEnvironemtSelection _UserDesktopEnvironmentSelection _role _service
 	
 }
@@ -16038,124 +16052,7 @@ kvm::backup_all_running_vm() {
 }
 
 
-# kvm::backup_running_vm() {
-# 	# Description:
-# 	# Function to back up all running virtual machines on the host it is being run on.
-# 	# This function should be called from within this script and does not require any
-# 	# arguments passed.
-# 	#
-# 	# Globals: ${VM_BACKUP_TARGET} (defaults to /mnt/vmdsk/VM_BACKUP)
-# 	# Arguments: None
-# 	# Outputs: Backups of running vm's.
-# 	# Returns:
-# 	# Usage:
-# 	#
-# 	# kvm::backup_running_vm
-# 	#
-# 	# End of documentation
 
-# 	do_vm_backup() {
-# 		echo "Atempting backup of the folloing VM's:"
-# 		virsh list
-# 		# To exclude a VM (domain), add "nobackup" to its name and it will be ignored.
-# 		# To rename: shutdown the guest, then use this command: virsh domrename "oldname" "newname".
-
-# 		DATE=$(date +%Y-%m-%d.%H:%M:%S)
-# 		LOG="/var/log/kvm-backup.$DATE.LOG"
-# 		BACKUPROOT=${VM_BACKUP_TARGET:=/mnt/vmdsk/VM_BACKUP}
-
-# 		#Get list of all running virtual machines
-# 		DOMAINS=$(virsh list --all | tail -n +3 | awk '{print $2}')
-
-# 		for DOMAIN in $DOMAINS; do
-# 			echo "-----------WORKER START $DOMAIN-----------" >$LOG
-# 			echo "Starting backup for $DOMAIN on $(date +'%d-%m-%Y %H:%M:%S')" >>$LOG
-
-# 			if [[ $DOMAIN == *"nobackup"* ]]; then
-# 				echo "Skipping $DOMAIN , because its excluded." >$LOG
-# 				exit 1
-# 			fi
-
-# 			VMSTATE=$(virsh list --all | grep $DOMAIN | awk '{print $3}')
-# 			if [[ $VMSTATE != "running" ]]; then
-# 				echo "Skipping $DOMAIN , because its not running." >$LOG
-# 				exit 1
-# 			fi
-
-# 			BACKUPFOLDER=$BACKUPROOT/KVM-BACKUPS/$DOMAIN
-# 			if [[ ! -d $BACKUPFOLDER ]]; then
-# 				$RTD_GUI
-# 			fi
-# 			mkdir -p "$BACKUPFOLDER"
-# 			TARGETS="$(virsh domblklist "$DOMAIN" --details | grep disk | awk '{print $3}')"
-# 			IMAGES="$(virsh domblklist "$DOMAIN" --details | grep disk | awk '{print $4}')"
-# 			DISKSPEC=""
-# 			for TARGET in $TARGETS; do
-# 				DISKSPEC="$DISKSPEC --diskspec $TARGET,snapshot=external"
-# 			done
-
-# 			virsh snapshot-create-as --domain "$DOMAIN" --name "backup-$DOMAIN" --no-metadata --atomic --disk-only "$DISKSPEC" >>"$LOG"
-# 			if [ $? -ne 0 ]; then
-# 				echo "Failed to create snapshot for $DOMAIN" >"$LOG"
-# 				exit 1
-# 			fi
-
-# 			for IMAGE in $IMAGES; do
-# 				NAME=$(basename $IMAGE)
-# 				if test -f "$BACKUPFOLDER/$NAME"; then
-# 					echo "Backup exists, merging only changes to image" >"$LOG"
-# 					rsync -apvz --inplace "$IMAGE" "$BACKUPFOLDER"/"$NAME" >>"$LOG"
-# 				else
-# 					echo "Backup does not exist, creating a full sparse copy" >"$LOG"
-# 					rsync -apvz --sparse "$IMAGE" "$BACKUPFOLDER"/"$NAME" >>"$LOG"
-# 				fi
-# 			done
-
-# 			BACKUPIMAGES="$(virsh domblklist "$DOMAIN" --details | grep disk | awk '{print $4}')"
-# 			for TARGET in $TARGETS; do
-# 				if virsh blockcommit "$DOMAIN" "$TARGET" --active --pivot >>"$LOG"; then
-# 					echo "Could not merge changes for disk of $TARGET of $DOMAIN. VM may be in invalid state." >"$LOG"
-# 					exit 1
-# 				fi
-# 			done
-
-# 			for BACKUP in $BACKUPIMAGES; do
-# 				if [[ $BACKUP == *"backup-"* ]]; then
-
-# 					echo "deleted temporary image $BACKUP" >"$LOG"
-# 					rm -f "$BACKUP"
-# 				fi
-# 			done
-
-# 			virsh dumpxml "$DOMAIN" >"$BACKUPFOLDER"/"$DOMAIN".xml
-# 			echo "-----------WORKER END $DOMAIN-----------" >>"$LOG"
-# 			echo "Finished backup of $DOMAIN at $(date +'%d-%m-%Y %H:%M:%S')" >>"$LOG"
-# 		done
-# 	}
-
-# 	if hash virsh; then
-# 		if ($RTD_GUI --title "Virtual Machine Backup" --yesno "Do you want me to back up these VM's?:
-# 		$(virsh list --all)" 0 $WIDTH); then
-# 			do_vm_backup
-# 		else
-# 			show_manage_vm_gui
-# 		fi
-# 	else
-# 		if ($RTD_GUI --title "NOTICE!" --yesno "KVM Virtualization is not installed on this machine. May I attempt to install it for you on this machine?" $HEIGHT $WIDTH); then
-# 			software::check_native_package_dependency qemu-kvm || (
-# 				whiptail --title "ERROR!" --msgbox "KVM install failed!" $HEIGHT $WIDTH &
-# 				show_manage_vm_gui
-# 			) && whiptail --title "Notice!" --msgbox "KVM installation completed!"
-# 			software::check_native_package_dependency virt-goodies || (
-# 				whiptail --title "ERROR!" --msgbox "Virt Goodies install failed!" $HEIGHT $WIDTH &
-# 				show_manage_vm_gui
-# 			) && whiptail --title "Notice!" --msgbox "Virt Goodies installation completed!"
-# 			do_vm_backup
-# 		else
-# 			show_manage_vm_gui
-# 		fi
-# 	fi
-# }
 
 #                        ---
 #                     -        --
@@ -16859,8 +16756,6 @@ template::kickstart_cfg() {
 			# Generated by: system::generate_ks_cfg_file by RTD Power Tools
 			# Choosing mode (graphical|text|cmdline [--non-interactive])
 			# text
-			# url --mirrorlist="${_repo_url}"
-			url --url "${_repo_url}"
 			firstboot --enable
 			keyboard --vckeymap=${Preference_InitialKeyboardLayout:-"us"} --xlayouts="${Preference_InitialKeyboardLayout:-"us"}"
 			lang en_US.UTF-8
@@ -16881,7 +16776,6 @@ template::kickstart_cfg() {
 			git
 			curl
 			dialog
-			neofetch
 			ansible
 			vim-ansible
 			vim-syntastic-ansible
@@ -16903,11 +16797,7 @@ template::kickstart_cfg() {
 		cat >>"${_ks_file}" <<-KS_EOF
 			# Generated by: system::generate_ks_cfg_file by RTD Power Tools
 			# Choosing mode (graphical|text|cmdline [--non-interactive])
-			graphical
-			# url --install --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f${_DEFAULT_FEDORA_VER}&arch=x86_64" 
-			# inst.repo="${_repo_url}"
-			#url --url "https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Everything/x86_64/os/"
-			inst.repo="https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Everything/x86_64/os/"
+			# graphical
 			firstboot --disable
 			keyboard --vckeymap=${Preference_InitialKeyboardLayout} --xlayouts="${Preference_InitialKeyboardLayout}"
 			lang en_US.UTF-8
@@ -16918,7 +16808,7 @@ template::kickstart_cfg() {
 			zerombr
 			clearpart --all
 			autopart --nohome ${Preference_DiskEncryption_RH}
-			# reboot
+			reboot
 			# uncomment to debug installation
 			# %onerror --halt
 			# reboot --eject
@@ -16932,7 +16822,6 @@ template::kickstart_cfg() {
 			curl
 			dialog
 			yad
-			neofetch
 			ansible
 			p7zip
 			p7zip-plugins
