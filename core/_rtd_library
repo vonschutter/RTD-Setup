@@ -16817,7 +16817,8 @@ template::kickstart_cfg() {
 
 			%packages --retries 5 --timeout 20
 			${_UserDesktopEnvironmentSelection}
-			gnome-session-xsession
+			# Likely tempratry workaround for missing xorg-x11-server-Xorg dependency in some spins
+			$(echo "${_UserDesktopEnvironmentSelection}"|grep -iq 'workstation-product-environment' && echo 'gnome-session-xsession' || echo '# custom desktop, not workstation default')
 			xorg-x11-server-Xorg
 			xorg-x11-xauth
 			@system-tools
