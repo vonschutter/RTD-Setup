@@ -2311,7 +2311,7 @@ dependency::file() {
 			system::log_item "Using: ${_src_url} downloaded..."
 		else
 			system::log_item "Failed to find  ${1} "
-			exit 1
+			return 1
 		fi
 		rm -rf "${tmpdir}"
 	fi
@@ -4961,14 +4961,14 @@ system::generate_report_disk_space_used_by_directory() {
 	# End of documentation
 
 	DIRS=$(ls $1)
-	store=/$tmp/out.ct
+	store="/$(mktemp -d)/out.ct"
 	$RTD_GUI --backtitle "$BRANDING" --title "📋 Generating report for: $1" --gauge "Calculating disk space: this may take some time" $HEIGHT $WIDTH < <(
-		echo "Storage Utilization Report:" >>$store
-		echo "______________________________" >>$store
+		echo "Storage Utilization Report:" >>${store}
+		echo "______________________________" >>${store}
 		n=$(ls $1 | wc -l)
 		i=0
 		for f in $DIRS; do
-			du -cksh $1/$f 2>/dev/null | grep -v total >>$store
+			du -cksh $1/$f 2>/dev/null | grep -v total >>${store}
 			PCT=$((100 * (++i) / n))
 			cat <<-EOF
 				XXX
@@ -4979,9 +4979,9 @@ system::generate_report_disk_space_used_by_directory() {
 			sleep 1
 		done
 	)
-	total=$(echo ----- >>$store && du -cksh $1 2>/dev/null | grep total >>$store) | $RTD_GUI --backtitle "$BRANDING" --title "Completing report..." --progressbox "Working..." $HEIGHT $WIDTH
-	result="$(cat $store)"
-	rm $store
+	total=$(echo ----- >>${store} && du -cksh $1 2>/dev/null | grep total >>${store}) | $RTD_GUI --backtitle "$BRANDING" --title "Completing report..." --progressbox "Working..." $HEIGHT $WIDTH
+	result="$(cat ${store})"
+	rm ${store}
 }
 
 
@@ -6557,13 +6557,20 @@ oem::setup_brand_splash_screen() {
 	# Check if the image file exists before proceeding.
 	if [ -f "$image_file_to_brand" ]; then
 		# Use ImageMagick's convert command to overlay text onto the image.
-		convert "$image_file_to_brand" \                      # Input image file.
-		-gravity north \                                  # Position text at the top center.
-		-stroke '#000C' -strokewidth 3 \                  # Apply a semi-transparent black stroke to the text.
-		-annotate 0 "$text_to_brand_with" \               # Annotate image with stroked text.
-		-stroke none -strokewidth 3 -fill white \         # Remove stroke, set text fill color to white.
-		-annotate 0 "$text_to_brand_with" \               # Annotate image with filled text.
-		edit-out.png                                      # Output the edited image to a temporary file.
+		# Input image file.
+		# Position text at the top center.
+		# Apply a semi-transparent black stroke to the text.
+		# Annotate image with stroked text.
+		# Remove stroke, set text fill color to white.
+		# Annotate image with filled text.
+		# Output the edited image to a temporary file.
+		convert "$image_file_to_brand" \
+		-gravity north \
+		-stroke '#000C' -strokewidth 3 \
+		-annotate 0 "$text_to_brand_with" \
+		-stroke none -strokewidth 3 -fill white \
+		-annotate 0 "$text_to_brand_with" \
+		edit-out.png
 
 		# Remove the original image file.
 		rm "$image_file_to_brand"
@@ -18736,6 +18743,7 @@ term::set_colors() {
 	gray="${ecode}0;37"
 	purple="${ecode}1;35"
 	darkpurple="${ecode}0;35"
+	magenta="${ecode}1;35m"
 
 	# Back compatability w. old scripts
 	export YELLOW="$yellow"
