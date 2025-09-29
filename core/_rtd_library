@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [[ -z "$BASH_VERSINFO" ]]; then
+if [[ -z "${BASH_VERSINFO[0]:-}" ]]; then
 	echo "SHELL ENV ERROR: You must use a BASH Shell to load this library. Exiting..."
 	exit 255
 fi
@@ -1316,7 +1316,10 @@ term::task_exec_list_output() {
 	# NOTE:
 	# End of documentation
 
-	local logfile=$(system::determine_logfile)
+	local logfile
+	if ! logfile=$(system::determine_logfile); then
+		return 1
+	fi
 
 	system::log_item "Running ${FUNCNAME[0]} requested by ${FUNCNAME[1]} with parameters $*"
 	echo -ne "Executing $LINE:"\  &
@@ -12420,18 +12423,48 @@ system::determine_logfile() {
 	local tla=${_TLA} ; if [[ -z "$tla" ]]; then tla=$(echo "${scriptname}" | cut -c 1-3); fi
 	local logfile
 	local log_dir
+	local tmpfile
 
 	if [[ -z $_LOGFILE ]]; then
 		# Determine the log directory based on the user ID
 		if [[ $EUID -ne 0 ]]; then
 			log_dir="${HOME}/.config/${tla}/logs"
 		else
-			log_dir=${_LOG_DIR:-"/var/log/${tla,,}"}
+			log_dir="${_LOG_DIR:-"/var/log/${tla,,}"}"
+		fi
+
+		if [[ ! -d "$log_dir" ]]; then
+			# Attempt to create the preferred directory, otherwise fall back to a tmp path
+			if ! mkdir -p "$log_dir" 2>/dev/null; then
+				log_dir="${TMPDIR:-/tmp}/${tla,,}"
+				mkdir -p "$log_dir" 2>/dev/null || log_dir="${TMPDIR:-/tmp}"
+			fi
+		fi
+
+		# Verify we can actually write to the directory; fall back if sandboxed
+		if ! tmpfile=$(mktemp "${log_dir}/.rtd-logtest.XXXXXX" 2>/dev/null); then
+			log_dir="${TMPDIR:-/tmp}/${tla,,}"
+			mkdir -p "$log_dir" 2>/dev/null || log_dir="${TMPDIR:-/tmp}"
+		else
+			rm -f "$tmpfile"
 		fi
 
 		logfile="${log_dir}/${scriptname}.log"
 	else
 		logfile="${_LOGFILE}"
+	fi
+
+	# Ensure the log file exists and is writable; fall back to tmp if needed
+	if [[ ! -e "$logfile" ]]; then
+		if ! touch "$logfile" 2>/dev/null; then
+			logfile="${TMPDIR:-/tmp}/${scriptname}.log"
+			touch "$logfile" 2>/dev/null || return 1
+		fi
+	fi
+
+	if [[ ! -w "$logfile" ]]; then
+		logfile="${TMPDIR:-/tmp}/${scriptname}.log"
+		touch "$logfile" 2>/dev/null || return 1
 	fi
 
 	echo "$logfile"
@@ -12511,7 +12544,15 @@ system::log_item() {
 	if [[ ! -f "$logfile" ]]; then
 		return 1
 	fi
-	echo -e "${log_prefix} ${log_icon} : ${log_type} : ${log_message}" >>"$logfile"  
+
+	local log_entry="${log_prefix} ${log_icon} : ${log_type} : ${log_message}"
+	if ! printf '%s\n' "$log_entry" >>"$logfile" 2>/dev/null; then
+		local fallback="${TMPDIR:-/tmp}/$(basename "$logfile")"
+		if [[ "$fallback" != "$logfile" ]]; then
+			touch "$fallback" 2>/dev/null && printf '%s\n' "$log_entry" >>"$fallback" 2>/dev/null && return 0
+		fi
+		return 1
+	fi
 
 }
 
