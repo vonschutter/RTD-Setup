@@ -12549,7 +12549,10 @@ system::log_item() {
 	if ! printf '%s\n' "$log_entry" >>"$logfile" 2>/dev/null; then
 		local fallback="${TMPDIR:-/tmp}/$(basename "$logfile")"
 		if [[ "$fallback" != "$logfile" ]]; then
-			touch "$fallback" 2>/dev/null && printf '%s\n' "$log_entry" >>"$fallback" 2>/dev/null && return 0
+			if touch "$fallback" 2>/dev/null && printf '%s\n' "$log_entry" >>"$fallback" 2>/dev/null; then
+				_LOGFILE="$fallback"
+				return 0
+			fi
 		fi
 		return 1
 	fi
@@ -19252,7 +19255,7 @@ list_loaded_software_functions() {
 # request this. If no arguments are provided, then all the functions in this
 # library will simply be loaded in to memory.
 
-# Load base color sheme for use in the library...
+# Load base color scheme for use in the library...
 term::set_colors
 
 # If $LOGFILE is not set, then set it to a default location...
@@ -19289,10 +19292,10 @@ if [[ $sourced -eq 0 ]]; then
 	fi
 else
 	write_host --yellow "Library is run directly as an executable! This does nothing by itself."
-	write_host --cyan "Use (bash $0 --help) to se how to use this library."
+	write_host --cyan "Use \"bash $0 --help\" to see how to use this library."
 fi
 
-# Find and load all dependant files for this library...
+# Find and load all dependent files for this library...
 dependency::file _branding.info && system::log_item "✅ _branding.info Loaded without errors..." || system::log_item "👾 _branding.info Loaded with errors..."
 dependency::file _locations.info && system::log_item "✅ _locations.info Loaded without errors..." || system::log_item "👾 _locations.info Loaded with errors..."
 dependency::file _rtd_recipies.info && system::log_item "✅ _rtd_recipies.info Loaded without errors..." || system::log_item "👾 _rtd_recipies.info Loaded with errors..."
@@ -19320,31 +19323,31 @@ eval_params() {
 	case $1 in
 	--help | -?)
 		clear
-		echo -e " 📚 ${UWhite}${0##*/} ${red}::${BICyan} RunTime Data Library HELP ${endcolor}${red}${UWhite}::${endcolor}
+		echo -e " 📚 ${UWhite}${0##*/} ${red}::${BICyan} RunTime Data Library HELP ${endcolor}${red}${UWhite} ::${endcolor}
 
 		${blue}Usage${red}:${endcolor}
-		${IYellow}source ${IGreen}${0##*/} ${endcolor}(to load the library into memory and use its functions.)
+		${IYellow}source ${IGreen}${0##*/} ${endcolor}(load the library into the current shell)
 
 		${blue}Alternate usage${red}:${endcolor}
-		${green}"${0##*/}" ${red} [OPTIONS]${endcolor}
+		${green}"${0##*/}"${endcolor} [OPTIONS]
 
-		${blue}valid option are ${red}: ${endcolor}
+		${blue}Valid options are${red}:${endcolor}
 		--help		        ${red}: ${endcolor}Show this help text
 		--list [software|internal|all]
-                ${blue}Where${red}:${endcolor}
-		--list software         ${red}: ${endcolor}(list) software install bundles available
-		--list internal         ${red}: ${endcolor}(list) internal functions loaded
-		--list internal package ${red}: ${endcolor}(list) filter by package name (requires combination with --list internal|--list all)
-		--list internal make-doc${red}: ${endcolor}(list) print documentation for all functions in the library
-		--list all              ${red}: ${endcolor}(list) all library functions including software
+		    ${blue}Where${red}:${endcolor}
+		    --list software         ${red}: ${endcolor}List available software bundles
+		    --list internal         ${red}: ${endcolor}List internal utility functions
+		    --list internal package ${red}: ${endcolor}Filter internal functions by package name (use with --list internal|all)
+		    --list internal make-doc${red}: ${endcolor}Print inline documentation for every function
+		    --list all              ${red}: ${endcolor}List software bundles together with internal functions
 
-		--devhelp	        ${red}: ${endcolor}diplay script developer's help
-		--devhelp-gtk	        ${red}: ${endcolor}diplay script developer's help in a GTK window
-		--clean		        ${red}: ${endcolor}clean up the environment
-		--version	        ${red}: ${endcolor}display version information
-		--V		        ${red}: ${endcolor}display version information number only (short version)
-		--envcheck	        ${red}: ${endcolor}check the environment and how library was launched
-		--selfcheck	        ${red}: ${endcolor}check the library for syntax errors
+		--devhelp	        ${red}: ${endcolor}Display developer help in the terminal
+		--devhelp-gtk	        ${red}: ${endcolor}Display developer help in a GTK window
+		--clean		        ${red}: ${endcolor}Remove library variables from the current environment
+		--version	        ${red}: ${endcolor}Show detailed version information
+		--V		        ${red}: ${endcolor}Show only the version number
+		--envcheck	        ${red}: ${endcolor}Report how and where the library was loaded
+		--selfcheck	        ${red}: ${endcolor}Run shellcheck to look for syntax issues
 
 		${blue}EXAMPLES${red}:${endcolor}
 		${0##*/} --list internal
@@ -19374,7 +19377,7 @@ eval_params() {
 			esac
 
 			;;
-		all) (echo -e $YELLOW "Software Recipies: $ENDCOLOR" && list_loaded_software_functions && echo -e $YELLOW "INTERNAL Functions: $ENDCOLOR" && list_loaded_internal_functions) ;;
+		all) (echo -e $YELLOW "Software Recipes: $ENDCOLOR" && list_loaded_software_functions && echo -e $YELLOW "INTERNAL Functions: $ENDCOLOR" && list_loaded_internal_functions) ;;
 		*) echo "USAGE: The --list option requires a (what option). Valid option are: software, internal, all." ;;
 		esac
 		return
