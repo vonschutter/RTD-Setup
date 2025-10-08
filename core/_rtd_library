@@ -14070,10 +14070,31 @@ kvm::util::read_distro_options() {
 					fi
 					shift 2
 					;;
-				--product | --product)
+				--product )
 					if [[ $2 == "Leap" || $2 == "SLES" || $2 == "Tumbleweed" ]]; then
 						_UserProductSelection="$2"
 						system::log_item "Product selection: ${_UserProductSelection}"
+
+						# Set the default source URL for the SUSE version if not already set...
+						# NOTE: Using --source_url first, then the global variable (from _locations.info), then the default.
+						case ${_UserProductSelection} in
+							"Leap")
+								: ${source_url:="${_SUSE_LEAP_SOURCE:-"https://download.opensuse.org/distribution/openSUSE-current/repo/oss/"}"}
+								_Product="Leap"
+								;;
+							"SLES")
+								: ${source_url:="${_SUSE_SLES_SOURCE:-"https://download.opensuse.org/distribution/leap/15.5/repo/oss/"}"}
+								_Product="SUSE"
+								;;
+							"Tumbleweed")
+								: ${source_url:="${_SUSE_TUMBLEWEED_SOURCE:-"https://download.opensuse.org/tumbleweed/repo/oss/"}"}
+								_Product="openSUSE"
+								;;
+							*)
+								: ${source_url:="${_SUSE_LEAP_SOURCE:-"https://download.opensuse.org/distribution/openSUSE-current/repo/oss/"}"}
+								_Product="Leap"
+								;;
+						esac
 					else
 						write_error "⛔ Unknown product selection: $2"
 						return 1
@@ -15132,25 +15153,6 @@ kvm::make_vm_now_from_opensuse_org() {
 	# Discover if the appropriate VM net interface is (default or br'0 - n')
 	: ${virt_net="$(system::find_vm_bridge)"}
 
-	# Set the default source URL for the SUSE version if not already set...
-	# NOTE: Using --source_url first, then the global variable (from _locations.info), then the default.
-	if [[ -z "${source_url}" ]]; then
-		case ${_UserProductSelection} in
-		"Leap")
-			: ${source_url:="${_SUSE_LEAP_SOURCE:-"https://download.opensuse.org/distribution/openSUSE-current/repo/oss/"}"}
-			;;
-		"SLES")
-			: ${source_url:="${_SUSE_SLES_SOURCE:-"https://download.opensuse.org/distribution/leap/15.5/repo/oss/"}"}
-			;;
-		"Tumbleweed")
-			: ${source_url:="${_SUSE_TUMBLEWEED_SOURCE:-"https://download.opensuse.org/tumbleweed/repo/oss/"}"}
-			;;
-		*)
-			: ${source_url:="${_SUSE_LEAP_SOURCE:-"https://download.opensuse.org/distribution/openSUSE-current/repo/oss/"}"}
-			;;
-		esac
-	fi
-
 	local vm_name="Template_SUSE_${CONFIG}_$(date +%Y-%m-%d-%H-%M)"
 
 	_summary_message="
@@ -15180,7 +15182,7 @@ kvm::make_vm_now_from_opensuse_org() {
 			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 
-	for i in PRESEED_FILE vm_kernel vm_initrd source_url CONFIG distro; do unset $i; done
+	for i in PRESEED_FILE vm_kernel vm_initrd source_url CONFIG distro _UserProductSelection _autoyast_filename ; do unset $i; done
 }
 
 kvm::make_vm_now_from_debian_org() {
@@ -17610,15 +17612,13 @@ template::AutoYast_xml() {
 			<package>acpi</package>
 			<package>pciutils</package>
 			<package>jq</package>
-			<package>p7zip-full</package>
 			<package>xhost</package>
 			<package>rsync</package>
 			</packages>
 
 			<products config:type="list">
-			<product>${_UserProductSelection:-"Leap"}</product>
+			<product>${_Product:-"Leap"}</product>
 			</products>
-
 		</software>
 
 		<firstboot>
