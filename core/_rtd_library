@@ -258,6 +258,7 @@ export RTD_VERSION="2.04"
 214   zenity::display_file                               ;           Display the contents of a file in a box
 215   zenity::display_info                               ;           Displays any string passed in a GUI information box
 216   zenity::display_url                                ;           Display the contents of a URL passed to the function in a box
+217   gnome::set_startup_sound                           ;           Configure and toggle the GNOME startup sound for the user
 
 
 
@@ -7029,6 +7030,283 @@ gnome::set_basic_extensions_enabled() {
 	fi
 }
 
+
+
+
+gnome::set_startup_sound() {
+        # Description: Configure the GNOME startup sound for the current user.
+        #              The function toggles, enables, or disables a login sound by
+        #              copying the provided sound file to a managed location and
+        #              creating (or removing) an autostart entry that plays it.
+        #
+        # Globals: None
+        # Arguments:
+        #   $1 - Optional. One of "on", "off", or "toggle" (default: toggle).
+        #   $2 - Required. Path to the sound file that should be played at login.
+        #        The path is required even when disabling to keep the interface
+        #        consistent with other library functions.
+        # Outputs:
+        #   - Status and error information via write_status/write_error.
+        #   - User-facing feedback through dialog or yad, depending on environment.
+        # Returns:
+        #   0 on success, >0 on error.
+        # Dependencies:
+        #   - dialog (always available; used for TTY/SSH or fallback interactions).
+        #   - Optional: yad (used when running a GNOME desktop session locally).
+        #   - Optional: gsettings (to enable GNOME event sounds when available).
+        #   - Optional: canberra-gtk-play, paplay, or aplay to play the sound.
+        # End of documentation
+
+        local action="toggle"
+        local sound_argument=""
+        local message_title="GNOME Startup Sound"
+        local ui_tool="dialog"
+        local is_remote=0
+        if [[ -n ${SSH_CONNECTION:-} || -n ${SSH_TTY:-} ]]; then
+                is_remote=1
+        fi
+        local session_hint="${XDG_CURRENT_DESKTOP:-${DESKTOP_SESSION:-${GDMSESSION:-}}}"
+        local session_hint_lower="${session_hint,,}"
+        if [[ $is_remote -eq 0 ]] && [[ -n ${DISPLAY:-} || -n ${WAYLAND_DISPLAY:-} ]]; then
+                if command -v yad &>/dev/null && [[ $session_hint_lower == *gnome* ]]; then
+                        ui_tool="yad"
+                fi
+        fi
+
+        if [[ $# -eq 0 ]]; then
+                local error_msg="Usage: gnome::set_startup_sound [on|off|toggle] /path/to/sound-file"
+                write_error "$error_msg"
+                case "$ui_tool" in
+                        yad)
+                                yad --error --center --title="$message_title" --button=OK --text="$error_msg" &>/dev/null
+                                ;;
+                        *)
+                                dialog::display_error "$error_msg"
+                                ;;
+                esac
+                return 64
+        fi
+
+        case "$1" in
+                on|off|toggle)
+                        action="$1"
+                        shift
+                        ;;
+                *)
+                        :
+                        ;;
+        esac
+
+        if [[ $# -lt 1 ]]; then
+                local error_msg="Missing required sound file path."
+                write_error "$error_msg"
+                case "$ui_tool" in
+                        yad)
+                                yad --error --center --title="$message_title" --button=OK --text="$error_msg" &>/dev/null
+                                ;;
+                        *)
+                                dialog::display_error "$error_msg"
+                                ;;
+                esac
+                return 64
+        fi
+
+        sound_argument="$1"
+
+        if [[ $UID -eq 0 ]]; then
+                local error_msg="This function must be run as the desktop user (not root)."
+                write_error "$error_msg"
+                case "$ui_tool" in
+                        yad)
+                                yad --error --center --title="$message_title" --button=OK --text="$error_msg" &>/dev/null
+                                ;;
+                        *)
+                                dialog::display_error "$error_msg"
+                                ;;
+                esac
+                return 1
+        fi
+
+        local config_root="${XDG_CONFIG_HOME:-${HOME}/.config}"
+        local autostart_dir="${config_root}/autostart"
+        local autostart_file="${autostart_dir}/rtd-startup-sound.desktop"
+        local state_dir="${config_root}/rtd"
+        local state_file="${state_dir}/startup-sound.state"
+        local data_root="${XDG_DATA_HOME:-${HOME}/.local/share}"
+        local managed_dir="${data_root}/rtd/startup-sound"
+        local helper_script="${managed_dir}/play-startup-sound.sh"
+        local is_enabled=0
+        [[ -f "$autostart_file" ]] && is_enabled=1
+
+        local target_action=""
+        case "$action" in
+                on)
+                        target_action="enable"
+                        ;;
+                off)
+                        target_action="disable"
+                        ;;
+                toggle)
+                        if [[ $is_enabled -eq 1 ]]; then
+                                target_action="disable"
+                        else
+                                target_action="enable"
+                        fi
+                        ;;
+                *)
+                        target_action="enable"
+                        ;;
+        esac
+
+        local -r timestamp_now="$(date --iso-8601=seconds 2>/dev/null || date '+%Y-%m-%dT%H:%M:%S%z')"
+        local result_message=""
+
+        if [[ "$target_action" == "enable" ]]; then
+                if [[ ! -f "$sound_argument" ]]; then
+                        local error_msg="The sound file '$sound_argument' does not exist or is not a regular file."
+                        write_error "$error_msg"
+                        case "$ui_tool" in
+                                yad)
+                                        yad --error --center --title="$message_title" --button=OK --text="$error_msg" &>/dev/null
+                                        ;;
+                                *)
+                                        dialog::display_error "$error_msg"
+                                        ;;
+                        esac
+                        return 1
+                fi
+
+                if [[ ! -r "$sound_argument" ]]; then
+                        local error_msg="The sound file '$sound_argument' is not readable."
+                        write_error "$error_msg"
+                        case "$ui_tool" in
+                                yad)
+                                        yad --error --center --title="$message_title" --button=OK --text="$error_msg" &>/dev/null
+                                        ;;
+                                *)
+                                        dialog::display_error "$error_msg"
+                                        ;;
+                        esac
+                        return 1
+                fi
+
+                local sound_realpath="$sound_argument"
+                if command -v realpath &>/dev/null; then
+                        sound_realpath="$(realpath -m "$sound_argument" 2>/dev/null || echo "$sound_argument")"
+                elif command -v readlink &>/dev/null; then
+                        sound_realpath="$(readlink -f "$sound_argument" 2>/dev/null || echo "$sound_argument")"
+                fi
+
+                local extension=""
+                if [[ "$sound_realpath" == *.* ]]; then
+                        extension=".${sound_realpath##*.}"
+                        extension="${extension,,}"
+                fi
+                local stored_sound="${managed_dir}/startup-sound${extension}"
+
+                write_status "📁 Preparing directories for startup sound..."
+                mkdir -p "$managed_dir" "$autostart_dir" "$state_dir"
+
+                write_status "📄 Copying '${sound_realpath##*/}' to '$stored_sound'"
+                if ! install -m 0644 "$sound_realpath" "$stored_sound"; then
+                        local error_msg="Failed to copy '$sound_realpath' to '$stored_sound'."
+                        write_error "$error_msg"
+                        case "$ui_tool" in
+                                yad)
+                                        yad --error --center --title="$message_title" --button=OK --text="$error_msg" &>/dev/null
+                                        ;;
+                                *)
+                                        dialog::display_error "$error_msg"
+                                        ;;
+                        esac
+                        return 1
+                fi
+
+                local quoted_sound=""
+                printf -v quoted_sound '%q' "$stored_sound"
+                printf -v quoted_helper '%q' "$helper_script"
+
+                write_status "🛠️ Writing helper script to '$helper_script'"
+                cat >"$helper_script" <<EOF
+#!/bin/bash
+sound_file=$quoted_sound
+if command -v canberra-gtk-play >/dev/null 2>&1; then
+        exec canberra-gtk-play --file="\$sound_file"
+elif command -v paplay >/dev/null 2>&1; then
+        exec paplay "\$sound_file"
+elif command -v aplay >/dev/null 2>&1; then
+        exec aplay "\$sound_file"
+fi
+if command -v logger >/dev/null 2>&1; then
+        logger -t rtd-startup-sound -- "No audio player available to play startup sound: \$sound_file"
+fi
+exit 127
+EOF
+                chmod 0755 "$helper_script"
+
+                write_status "🗂️ Creating GNOME autostart entry at '$autostart_file'"
+                cat >"$autostart_file" <<EOF
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=RTD Startup Sound
+Comment=Play a custom startup sound when signing into GNOME
+Exec=$quoted_helper
+OnlyShowIn=GNOME;
+X-GNOME-Autostart-enabled=true
+EOF
+
+                write_status "📝 Recording startup sound state at '$state_file'"
+                cat >"$state_file" <<EOF
+ENABLED=1
+SOURCE_PATH="$sound_realpath"
+STORED_PATH="$stored_sound"
+UPDATED_AT="$timestamp_now"
+EOF
+
+                local player_available=1
+                if ! command -v canberra-gtk-play &>/dev/null && ! command -v paplay &>/dev/null && ! command -v aplay &>/dev/null; then
+                        player_available=0
+                        write_warning "No supported audio playback command found (canberra-gtk-play, paplay, aplay)."
+                fi
+
+                if command -v gsettings &>/dev/null; then
+                        if ! gsettings set org.gnome.desktop.sound event-sounds true &>/dev/null; then
+                                write_warning "Unable to enable GNOME event sounds via gsettings."
+                        fi
+                else
+                        write_warning "'gsettings' command not found; skipping GNOME sound toggle."
+                fi
+
+                result_message="✅ Startup sound enabled. GNOME will play '${sound_realpath##*/}' at login."
+                if [[ $player_available -eq 0 ]]; then
+                        result_message+=$'\n⚠️ Install canberra-gtk-play, paplay, or aplay to ensure playback.'
+                fi
+                result_message+=$'\nManaged copy stored at: '"$stored_sound"
+
+        else
+                write_status "🧹 Disabling GNOME startup sound and cleaning up autostart entry."
+                rm -f "$autostart_file"
+                mkdir -p "$state_dir"
+                cat >"$state_file" <<EOF
+ENABLED=0
+UPDATED_AT="$timestamp_now"
+EOF
+                result_message="🔕 Startup sound disabled. GNOME will no longer play a login sound."
+        fi
+
+        write_status "$result_message"
+        case "$ui_tool" in
+                yad)
+                        yad --info --center --width=420 --title="$message_title" --button=OK --text="$result_message" &>/dev/null
+                        ;;
+                *)
+                        dialog::display_notice "$result_message"
+                        ;;
+        esac
+
+        return 0
+}
 
 set_gnome_ui_tweak_no_media_error() {
 	# Description:  Function to handle missing media when attempting to set UI look to
