@@ -6935,21 +6935,35 @@ gnome::set_gnome_ui_tweaks_for_user() {
 }
 
 gnome::set_basic_extensions_enabled() {
-	# Description: Function to set basic extensions enabled for the current user,
-	#              adapting the list based on the detected Linux distribution type.
-	#              Sets window button layout and enables a predefined list of extensions.
-	#              IMPORTANT: This function must be run as the regular user, NOT as root.
-	#              It enables extensions by name but does NOT install them. Ensure the
-	#              target extensions are installed beforehand.
+	# Description:
+	#   - Enables a curated list of GNOME Shell extensions for the current user.
+	#   - Tailors the list to the detected Linux distribution type.
+	#
+	# Globals:
+	#   - None
+	#
+	# Arguments:
+	#   - None
+	#
+	# Outputs:
+	#   - Status updates via write_status.
+	#   - Error details via write_error.
+	#
+	# Returns:
+	#   - 0 when every gsettings command succeeds.
+	#   - 1 when prerequisites are missing or a gsettings command fails.
+	#
+	# Dependencies:
+	#   - gsettings (runtime)
+	#   - system::distribution_type (runtime)
 	#
 	# Usage:
 	#   gnome::set_basic_extensions_enabled
 	#
-	# Globals: None
-	# Arguments: None
-	# Outputs: Status/Error messages via write_status/write_error
-	# Returns: 0 if all gsettings commands succeed, 1 otherwise.
-	# Dependencies: gsettings (runtime), system::distribution_type (runtime)
+	# Notes:
+	#   - Must be executed as the intended desktop user (not root).
+	#   - Requires the listed extensions to already be installed.
+	#
 	# End of documentation
 
 	if [[ $UID -eq 0 ]]; then
@@ -7227,42 +7241,42 @@ gnome::set_startup_sound() {
                 printf -v quoted_helper '%q' "$helper_script"
 
                 write_status "🛠️ Writing helper script to '$helper_script'"
-                cat >"$helper_script" <<EOF
-#!/bin/bash
-sound_file=$quoted_sound
-if command -v canberra-gtk-play >/dev/null 2>&1; then
-        exec canberra-gtk-play --file="\$sound_file"
-elif command -v paplay >/dev/null 2>&1; then
-        exec paplay "\$sound_file"
-elif command -v aplay >/dev/null 2>&1; then
-        exec aplay "\$sound_file"
-fi
-if command -v logger >/dev/null 2>&1; then
-        logger -t rtd-startup-sound -- "No audio player available to play startup sound: \$sound_file"
-fi
-exit 127
-EOF
+                cat >"$helper_script" <<-EOF
+			#!/bin/bash
+			sound_file=$quoted_sound
+			if command -v canberra-gtk-play >/dev/null 2>&1; then
+			        exec canberra-gtk-play --file="\$sound_file"
+			elif command -v paplay >/dev/null 2>&1; then
+			        exec paplay "\$sound_file"
+			elif command -v aplay >/dev/null 2>&1; then
+			        exec aplay "\$sound_file"
+			fi
+			if command -v logger >/dev/null 2>&1; then
+			        logger -t rtd-startup-sound -- "No audio player available to play startup sound: \$sound_file"
+			fi
+			exit 127
+			EOF
                 chmod 0755 "$helper_script"
 
                 write_status "🗂️ Creating GNOME autostart entry at '$autostart_file'"
-                cat >"$autostart_file" <<EOF
-[Desktop Entry]
-Type=Application
-Version=1.0
-Name=RTD Startup Sound
-Comment=Play a custom startup sound when signing into GNOME
-Exec=$quoted_helper
-OnlyShowIn=GNOME;
-X-GNOME-Autostart-enabled=true
-EOF
+                cat >"$autostart_file" <<-EOF
+			[Desktop Entry]
+			Type=Application
+			Version=1.0
+			Name=RTD Startup Sound
+			Comment=Play a custom startup sound when signing into GNOME
+			Exec=$quoted_helper
+			OnlyShowIn=GNOME;
+			X-GNOME-Autostart-enabled=true
+			EOF
 
                 write_status "📝 Recording startup sound state at '$state_file'"
-                cat >"$state_file" <<EOF
-ENABLED=1
-SOURCE_PATH="$sound_realpath"
-STORED_PATH="$stored_sound"
-UPDATED_AT="$timestamp_now"
-EOF
+                cat >"$state_file" <<-EOF
+			ENABLED=1
+			SOURCE_PATH="$sound_realpath"
+			STORED_PATH="$stored_sound"
+			UPDATED_AT="$timestamp_now"
+			EOF
 
                 local player_available=1
                 if ! command -v canberra-gtk-play &>/dev/null && ! command -v paplay &>/dev/null && ! command -v aplay &>/dev/null; then
@@ -7288,10 +7302,10 @@ EOF
                 write_status "🧹 Disabling GNOME startup sound and cleaning up autostart entry."
                 rm -f "$autostart_file"
                 mkdir -p "$state_dir"
-                cat >"$state_file" <<EOF
-ENABLED=0
-UPDATED_AT="$timestamp_now"
-EOF
+                cat >"$state_file" <<-EOF
+			ENABLED=0
+			UPDATED_AT="$timestamp_now"
+			EOF
                 result_message="🔕 Startup sound disabled. GNOME will no longer play a login sound."
         fi
 
