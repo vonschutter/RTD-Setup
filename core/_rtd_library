@@ -14891,59 +14891,129 @@ kvm::get_zorin_iso() {
 	#
 	# End of Documentation
 
-	get_latest_directory() {
-		curl -s https://mirror.zetup.net/zorinos/ | grep -oP 'href="\K[0-9]+(?=/)' | sort -n | tail -1
+	# Namespaced helpers keep global function table collision-free.
+	kvm__get_zorin_iso__get_latest_directory() {
+		local base_url=$1
+		local listing
+
+		listing=$(curl -fsSL --connect-timeout 10 --max-time 60 --retry 3 --retry-delay 5 --retry-connrefused -H "User-Agent: Mozilla/5.0 (compatible; RTD-Setup/1.0)" "${base_url}" 2>/dev/null) || return 1
+		printf '%s\n' "$listing" | grep -oE 'href="[0-9][0-9.]*/"' | sed -E 's/.*href="([0-9][0-9.]*)\/".*/\1/' | sort -V | tail -1
 	}
 
-	get_highest_version_file() {
-		local directory=$1
-		local version_prefix=${2:-Core}
+	kvm__get_zorin_iso__get_highest_version_file() {
+		local base_url=$1
+		local directory=$2
+		local version_prefix=${3:-Core}
+		local listing
+		local files non_beta candidate
 
-		curl -s https://mirror.zetup.net/zorinos/$directory/ | grep -oP 'Zorin-OS-[0-9.]+-'$version_prefix'-[0-9a-zA-Z-]+\.iso' | sort -V | tail -1
+		listing=$(curl -fsSL --connect-timeout 10 --max-time 60 --retry 3 --retry-delay 5 --retry-connrefused -H "User-Agent: Mozilla/5.0 (compatible; RTD-Setup/1.0)" "${base_url%/}/${directory%/}/" 2>/dev/null) || return 1
+		files=$(printf '%s\n' "$listing" | grep -oE "Zorin-OS-[0-9.]+-${version_prefix}-[0-9A-Za-z-]+\.iso")
+		[ -z "$files" ] && return 1
+
+		non_beta=$(printf '%s\n' "$files" | grep -vi 'beta')
+		if [ -n "$non_beta" ]; then
+			candidate=$(printf '%s\n' "$non_beta" | sort -V | tail -1)
+			if [ -n "$candidate" ]; then
+				printf '%s\n' "$candidate"
+				return 0
+			fi
+		fi
+
+		printf '%s\n' "$files" | sort -V | tail -1
 	}
 
-	download_file() {
-		local directory=$1
-		local file=$2
-		local url="https://mirror.zetup.net/zorinos/$directory/$file"
+	kvm__get_zorin_iso__download_file() {
+		local base_url=$1
+		local directory=$2
+		local file=$3
+		local url="${base_url%/}/${directory%/}/$file"
 		local destination="/var/lib/libvirt/boot/$file"
 
-		system::log_item "Downloading $file to $destination..."
-		curl -o "$destination" "$url"
-		if [ $? -eq 0 ]; then
+		system::log_item "Downloading $file to $destination from $url..."
+		if curl -fSL --connect-timeout 10 --max-time 600 --retry 3 --retry-delay 5 --retry-connrefused -H "User-Agent: Mozilla/5.0 (compatible; RTD-Setup/1.0)" -o "$destination" "$url"; then
 			system::log_item "Download completed successfully."
-			echo $file_path
-			iso=$file_path
-		else
-			system::log_item "Download failed."
-			return 1
+			iso="$destination"
+			echo "$destination"
+			return 0
 		fi
+
+		rm -f "$destination"
+		system::log_item "Download failed."
+		return 1
 	}
 
-	latest_directory=$(get_latest_directory)
-	if [ -z "$latest_directory" ]; then
-		system::log_item "No directories found."
-		exit 1
-	fi
-
 	version_prefix=${1:-Core}
-	highest_version_file=$(get_highest_version_file $latest_directory $version_prefix)
+	# Mirrors sourced from https://zorin.com/os/download/18/core/ (plus primary zorinos.com endpoints)
+	local -a base_urls=(
+		"https://mirrors.edge.kernel.org/zorinos/isos/"
+		"https://distro.ibiblio.org/pub/linux/distributions/zorinos/isos/"
+		"http://ftp.umd.edu/zorinos/isos/"
+		"https://mirror.clarkson.edu/zorinos/isos/"
+		"https://mirror.webworld.ie/zorinos/isos/"
+		"https://mirrors.ircam.fr/pub/zorinos/isos/"
+		"https://mirrors.up.pt/pub/zorinos/isos/"
+		"https://mirror.metanet.ch/zorinos/isos/"
+		"https://ftp.halifax.rwth-aachen.de/zorinos/isos/"
+		"https://mirror.23m.com/zorinos/isos/"
+		"https://mirror.dogado.de/zorinos/isos/"
+		"https://mirror.itworxx.de/zorinos/isos/"
+		"https://zorin.c3sl.ufpr.br/zorinos/isos/"
+		"https://mirror.serverion.com/zorinos/isos/"
+		"https://mirrors.dotsrc.org/zorinos/isos/"
+		"https://mirror.one.com/zorinos/isos/"
+		"https://mirror.zetup.net/zorinos/"
+		"https://ftpmirror2.infania.net/mirror/zorinos/isos/"
+		"https://ftp.lysator.liu.se/pub/os/zorinos/isos/"
+		"https://mirror.kumi.systems/zorinos/isos/"
+		"https://ftp.icm.edu.pl/pub/ZorinOS/isos/"
+		"https://mirror.onet.pl/pub/mirrors/zorinos/isos/"
+		"https://ftp.cc.uoc.gr/mirrors/linux/zorinos/isos/"
+		"https://mirror.ihost.md/zorinos/isos/"
+		"https://mirror.hosthink.net/zorinos/isos/"
+		"https://mirror.distrohub.com/zorinos/isos/"
+		"https://free.nchc.org.tw/zorinos/isos/"
+		"https://mirror.datautama.net.id/zorinos/isos/"
+		"https://mirror.kakao.com/zorinos/isos/"
+		"https://mirror.freedif.org/zorinos/isos/"
+		"https://mirror.nju.edu.cn/zorinos/isos/"
+		"https://mirror.sjtu.edu.cn/zorinos/isos/"
+	)
 
-	if [ -z "$highest_version_file" ]; then
-		system::log_item "No files found for version prefix '$version_prefix' in directory '$latest_directory'."
-		exit 1
-	fi
+	local latest_directory highest_version_file file_path
 
-	file_path="/var/lib/libvirt/boot/$highest_version_file"
+	for base_url in "${base_urls[@]}"; do
+		system::log_item "Checking Zorin mirror: $base_url"
 
-	if [ -f "$file_path" ]; then
-		system::log_item "File already exists: $file_path"
-		echo $file_path
-		iso=$file_path
-	else
+		latest_directory=$(kvm__get_zorin_iso__get_latest_directory "$base_url")
+		if [ -z "$latest_directory" ]; then
+			system::log_item "No directories found at $base_url"
+			continue
+		fi
+
+		highest_version_file=$(kvm__get_zorin_iso__get_highest_version_file "$base_url" "$latest_directory" "$version_prefix")
+		if [ -z "$highest_version_file" ]; then
+			system::log_item "No files found for version prefix '$version_prefix' in directory '$latest_directory' at $base_url"
+			continue
+		fi
+
+		file_path="/var/lib/libvirt/boot/$highest_version_file"
+
+		if [ -f "$file_path" ]; then
+			system::log_item "File already exists: $file_path"
+			iso="$file_path"
+			echo "$file_path"
+			return 0
+		fi
+
 		system::log_item "Latest version file: $highest_version_file"
-		download_file "$latest_directory" "$highest_version_file"
-	fi
+		if kvm__get_zorin_iso__download_file "$base_url" "$latest_directory" "$highest_version_file"; then
+			return 0
+		fi
+	done
+
+	system::log_item "Failed to locate or download Zorin ISO using known mirrors."
+	return 1
 }
 
 
@@ -18132,8 +18202,6 @@ common_vdi_post_config=$(cat <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"}'
         - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..5}; do git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} && break || { echo "Clone failed, trying again..." ; rm -r ${_OEM_DIR:-"/opt/rtd"}/* ; sleep 10; }; done'
         - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
-
-
 EOF
 )
 
@@ -18146,9 +18214,10 @@ common_cleanup_config=$(cat <<EOF
         # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /proc || true'
         # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /sys || true'
         # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /run || true'
-        - umount -l /cdrom || true
+
         - eject --force /dev/sr0 || true
         - eject --force /dev/sr1 || true
+        - umount -l /media/cdrom || true
 EOF
 )
 
@@ -18156,7 +18225,7 @@ EOF
 cat >>${user_data_file} <<EOF
 #cloud-config
 power_state:
-    delay: "now"
+    delay: "10"
     mode: reboot
     message: "RTD: Installation complete, rebooting..."
     timeout: 30
@@ -18226,19 +18295,11 @@ EOF
 cat >>${user_data_file} <<EOF
         - gdm3
         - xinit
-        - mesa-utils
-        - wine
     late-commands:
 ${common_vdi_pre_config}
 
         # Install Ubuntu Desktop Environment
-        - curtin in-target --target=/target -- /bin/bash -c 'apt install snapd -y '
-        - curtin in-target --target=/target -- /bin/bash -c 'systemctl start snapd.socket'
-        - curtin in-target --target=/target -- /bin/bash -c 'systemctl start snapd.service '
-        - curtin in-target --target=/target -- /bin/bash -c 'snap install snapd '
-        - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..3}; do apt-get -y install ubuntu-desktop || apt-get upgrade -y || true ; done'
-        - curtin in-target --target=/target -- /bin/bash -c 'snap install firefox'
-        - curtin in-target --target=/target -- /bin/bash -c 'snap install snap-store'
+        - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..3}; do apt-get -y install ubuntu-desktop-minimal || apt-get upgrade -y || true ; done'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install plymouth-theme-ubuntu-text plymouth-theme-spinner plymouth || true'
         - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service || true
 
