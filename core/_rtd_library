@@ -14944,8 +14944,9 @@ kvm::get_zorin_iso() {
 	}
 
 	version_prefix=${1:-Core}
-	# Mirrors sourced from https://zorin.com/os/download/18/core/ (plus primary zorinos.com endpoints)
-	local -a base_urls=(
+	local -a default_base_urls=(
+		"https://mirror.zorinos.com/os/stable/"
+		"https://mirror.zorinos.com/os/"
 		"https://mirrors.edge.kernel.org/zorinos/isos/"
 		"https://distro.ibiblio.org/pub/linux/distributions/zorinos/isos/"
 		"http://ftp.umd.edu/zorinos/isos/"
@@ -14979,6 +14980,23 @@ kvm::get_zorin_iso() {
 		"https://mirror.nju.edu.cn/zorinos/isos/"
 		"https://mirror.sjtu.edu.cn/zorinos/isos/"
 	)
+	local -a base_urls=()
+	# Prefer mirrors defined in RTD-Setup/core/_locations.info if that file has been sourced.
+	if declare -p KVM_ZORIN_ISO_MIRRORS >/dev/null 2>&1; then
+		local mirror_decl
+		mirror_decl=$(declare -p KVM_ZORIN_ISO_MIRRORS 2>/dev/null)
+		if [[ $mirror_decl == "declare -a"* ]]; then
+			if [ ${#KVM_ZORIN_ISO_MIRRORS[@]} -gt 0 ]; then
+				base_urls=("${KVM_ZORIN_ISO_MIRRORS[@]}")
+			fi
+		elif [[ -n "$KVM_ZORIN_ISO_MIRRORS" ]]; then
+			read -r -a base_urls <<<"$KVM_ZORIN_ISO_MIRRORS"
+		fi
+	fi
+	# Fall back to the baked-in list when no shared configuration is available (or it is empty).
+	if [ ${#base_urls[@]} -eq 0 ]; then
+		base_urls=("${default_base_urls[@]}")
+	fi
 
 	local latest_directory highest_version_file file_path
 
