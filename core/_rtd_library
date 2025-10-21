@@ -13988,6 +13988,129 @@ ubuntu::download_iso() {
 ###########################################################################################
 
 
+kvm::util::validate_vm_name() {
+	# Description: Validate a VM name according to hostname rules.
+	# Arguments: $1 - Candidate VM name.
+	# Returns: 0 if valid, 1 otherwise.
+	local candidate="$1"
+
+	if [[ -z "$candidate" ]]; then
+		return 1
+	fi
+
+	if [[ "$candidate" =~ ^[a-zA-Z0-9](?:[a-zA-Z0-9_-]{0,253}[a-zA-Z0-9])?$ ]]; then
+		return 0
+	fi
+
+	system::log_item "${candidate}: Invalid hostname"
+	return 1
+}
+
+
+kvm::util::set_vm_name() {
+	# Description: Set the VM name consistently across functions.
+	# Arguments:
+	#   --var <variable>          - Target variable name (default: vm_name).
+	#   --name <value>            - Explicit VM name to use.
+	#   --force                   - Force override even if already set.
+	#   --no-timestamp            - Do not append a timestamp.
+	#   --timestamp-format <fmt>  - Override timestamp format (default: %Y-%m-%d-%H-%M).
+	#   [additional parts]        - Parts used to build a default name (joined with '_').
+	# Returns: 0 on success, 1 on failure.
+	local target_var="vm_name"
+	local explicit_name=""
+	local include_timestamp=1
+	local timestamp_format="%Y-%m-%d-%H-%M"
+	local force_override=0
+	local parts=()
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--var)
+			target_var="$2"
+			shift 2
+			;;
+		--name | --explicit)
+			explicit_name="$2"
+			shift 2
+			;;
+		--force)
+			force_override=1
+			shift
+			;;
+		--no-timestamp)
+			include_timestamp=0
+			shift
+			;;
+		--timestamp-format)
+			timestamp_format="$2"
+			shift 2
+			;;
+		--)
+			shift
+			while [[ $# -gt 0 ]]; do
+				parts+=("$1")
+				shift
+			done
+			;;
+		*)
+			parts+=("$1")
+			shift
+			;;
+		esac
+	done
+
+	local current_value="${!target_var:-}"
+
+	if [[ -n "$explicit_name" ]]; then
+		if ! kvm::util::validate_vm_name "$explicit_name"; then
+			write_error "⛔ Invalid VM name requested: ${explicit_name}"
+			return 1
+		fi
+		printf -v "$target_var" '%s' "$explicit_name"
+		system::log_item "VM name (${target_var}) set explicitly: ${!target_var}"
+		return 0
+	fi
+
+	if [[ -n "$current_value" && $force_override -eq 0 ]]; then
+		system::log_item "VM name (${target_var}) already set: ${current_value}"
+		return 0
+	fi
+
+	if [[ ${#parts[@]} -eq 0 ]]; then
+		write_error "⛔ Unable to generate VM name: no default parts provided."
+		return 1
+	fi
+
+	local filtered_parts=()
+	for part in "${parts[@]}"; do
+		[[ -n "$part" ]] && filtered_parts+=("$part")
+	done
+
+	if (( include_timestamp )); then
+		filtered_parts+=("$(date +"$timestamp_format")")
+	fi
+
+	local generated=""
+	for element in "${filtered_parts[@]}"; do
+		if [[ -z "$generated" ]]; then
+			generated="$element"
+		else
+			generated+="_${element}"
+		fi
+	done
+
+	if ! kvm::util::validate_vm_name "$generated"; then
+		write_error "⛔ Generated VM name '${generated}' is invalid."
+		return 1
+	fi
+
+	printf -v "$target_var" '%s' "$generated"
+	system::log_item "VM name (${target_var}) set to default: ${!target_var}"
+	return 0
+}
+
+
 kvm::util::read_common_options() {
 	# Description: Function to read common options for KVM virtual machine creation. This function processes
 	# various parameters such as role, memory, CPU, disk size, and t-shirt size, setting them for the VM.
@@ -14014,6 +14137,17 @@ kvm::util::read_common_options() {
 	# Process each argument passed to the function
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
+		--vmname | --VMName | --vm-name | --vm_name | --hostname | --HostName | --host-name | --Host-Name)
+			if [[ -z "$2" ]]; then
+				write_error "⛔ Missing value for VM name."
+				return 1
+			fi
+			if ! kvm::util::set_vm_name --name "$2"; then
+				return 1
+			fi
+			write_status "🖥️ VM Name: ${vm_name}"
+			shift 2
+			;;
 		--role | --Role)
 			# Handle the role option: validate and set the role if valid
 			if [[ $2 == "workstation" || $2 == "desktop" || $2 == "VDI" || $2 == "server" ]]; then
@@ -15344,7 +15478,8 @@ kvm::make_vm_now_from_fedora_org() {
 		local vm_initrd="${fedora_iso_mount_point}/boot/grub2/i386-pc/lnxboot.image"
 	fi
 
-	local vm_name="Template_Fedora_${_service}_$(date +%Y-%m-%d-%H-%M)"
+	local vm_name="${vm_name:-}"
+	kvm::util::set_vm_name --var vm_name "Template_Fedora" "${_service}" || return 1
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in Kickstart: ${_preseed_file} \n
@@ -15438,7 +15573,8 @@ kvm::make_vm_now_from_redhat_com() {
 		return 1
 	fi
 
-	local vm_name="Template_RedHat_${_service}_$(date +%Y-%m-%d-%H-%M)"
+	local vm_name="${vm_name:-}"
+	kvm::util::set_vm_name --var vm_name "Template_RedHat" "${_service}" || return 1
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in Kickstart: ${_preseed_file} \n
@@ -15533,7 +15669,8 @@ kvm::make_vm_now_from_opensuse_org() {
 	# Discover if the appropriate VM net interface is (default or br'0 - n')
 	: ${virt_net="$(system::find_vm_bridge)"}
 
-	local vm_name="Template_SUSE_${CONFIG}_$(date +%Y-%m-%d-%H-%M)"
+	local vm_name="${vm_name:-}"
+	kvm::util::set_vm_name --var vm_name "Template_SUSE" "${CONFIG}" || return 1
 
 	_summary_message="
 	The virtual machine (${vm_name}) \n
@@ -15608,6 +15745,8 @@ kvm::make_vm_now_from_debian_org() {
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet, and set variables.
 	: "${bin_virt_install:=$(type -p virt-install)}"
 
+	local vm_name="${vm_name:-}"
+
 	# Set the default source URL for the Debian version if not already set... and add some options depending on the role.
 	case "${_role}" in
 	desktop | Desktop | VDI | vdi | workstation | Workstation)
@@ -15616,7 +15755,7 @@ kvm::make_vm_now_from_debian_org() {
 		: "${vm_initrd="${_DEBIAN_FRONTEND_GTK_INITRD}"}"
 		: "${ui_diplay_style:="theme=dark"}"
 		: "${vm_usecase="VDI"}"
-		local vm_name="Template_Debian_${vm_usecase}_${_UserDesktopEnvironmentSelection}_$(date +%Y-%m-%d-%H-%M)"
+		kvm::util::set_vm_name --var vm_name "Template_Debian" "${vm_usecase}" "${_UserDesktopEnvironmentSelection}" || return 1
 		write_status "🖥️ 	- Using Variables: \n ${vm_kernel}, \n ${vm_initrd}"
 		system::make_preseed_cfg --role "${_role}" --desktop_environment "${_UserDesktopEnvironmentSelection}" --saveto "$(mktemp -d)"
 		;;
@@ -15626,7 +15765,7 @@ kvm::make_vm_now_from_debian_org() {
 		: "${vm_initrd="${_DEBIAN_FRONTEND_DEFAULT_INITRD}"}"
 		: "${ui_diplay_style:="theme=light"}"
 		: "${vm_usecase="Server"}"
-		local vm_name="Template_Debian_${_task}_$(date +%Y-%m-%d-%H-%M)"
+		kvm::util::set_vm_name --var vm_name "Template_Debian" "${_task}" || return 1
 		write_status "🖥️ 	- Using Variables: \n ${vm_kernel}, \n ${vm_initrd}"
 		system::make_preseed_cfg --role "${_role}" --server_role "${_UserServerEnvironemtSelection}" --saveto "$(mktemp -d)"
 		;;
@@ -15730,7 +15869,8 @@ kvm::make_vm_now_from_kali_org() {
 	fi
 
 	wrtite_status "🔎 	- Using the Kali ISO: ${iso}"
-	local vm_name="Template_kali_${vm_usecase}_$(date +%Y-%m-%d-%H-%M)"
+	local vm_name="${vm_name:-}"
+	kvm::util::set_vm_name --var vm_name "Template_kali" "${vm_usecase}" || return 1
 	system::make_preseed_cfg --role "${_role}" --desktop_environment "standard" --saveto "$(mktemp -d)" --package-list "curl git kali-linux-default kali-desktop-xfce" --ask YES
 	write_status "🔎 	- Discovering what the appropriate VM net interface is (default or br'0 - n')"
 	: ${virt_net="$(system::find_vm_bridge)"}
@@ -15822,9 +15962,10 @@ kvm::make_vm_now_from_zorin() {
 	: ${virt_net="$(system::find_vm_bridge)"}             # This is the default network to use for the VM.
 
 	_ask=YES
-	vm_name="Zorin-OS-16-Pro-64-bit"
 	# Set default values for VM T-Shirts sizes...
 	kvm::util::read_common_options ${*}
+
+	kvm::util::set_vm_name "Template_Zorin-OS" "${_role}" || return 1
 
 	# Set specific options for Debian...
 	kvm::util::read_distro_options --distribution ubuntu ${*}
@@ -15996,7 +16137,12 @@ kvm::make_vm_now_from_ubuntu_com() {
 	fi
 
 	# Format the name of the VM to be created...
-	local vm_name="Template_${server_app}_${_role}_${_tgt_ubuntu_ver}__$(date +%Y-%m-%d-%s)"
+	local _ubuntu_version_component="${_tgt_ubuntu_ver}"
+	if [[ -n "${_ubuntu_version_component}" ]]; then
+		_ubuntu_version_component="${_ubuntu_version_component}_"
+	fi
+	local vm_name="${vm_name:-}"
+	kvm::util::set_vm_name --var vm_name "Template" "${server_app}" "${_role}" "${_ubuntu_version_component}" --timestamp-format "%Y-%m-%d-%s" || return 1
 
 	disk_path=$(kvm::create_expanding_vm_hardisk "$vm_name" "$_dsk") || {
 		write_error "❌ Failed to create VM disk image. Aborting VM creation."
@@ -16089,7 +16235,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 			ubuntu::download_iso --dir ${permanent_download_dir} --media-type desktop --version ${_tgt_ubuntu_ver} 
 			: ${iso:="$permanent_download_dir/$iso_filename"}
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using MODERN installer..."
-			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" ${all_params}
+			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --vmname "${vm_name}" ${all_params}
 
 			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greated than 24, so using cloud config and desktop media to build desktop..."
 			{
@@ -16121,7 +16267,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 			: ${iso:="$permanent_download_dir/$iso_filename"}
 			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than 23, so using cloud config to build server..."
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using SERVER installer as requested..."
-			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" ${all_params}
+			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --vmname "${vm_name}" ${all_params}
 					
 			{
 				"${bin_virt_install}" --name  ${vm_name:-"Ubuntu-Server-${_tgt_ubuntu_ver}-$(date +%Y-%m-%d-%s)"}  \
@@ -16155,7 +16301,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using SERVER installer as requested..."
 			ubuntu::download_iso --dir ${permanent_download_dir} --media-type server --version ${_tgt_ubuntu_ver} 
 			: ${iso:="$permanent_download_dir/$iso_filename"}
-			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" ${all_params}
+			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --vmname "${vm_name}" ${all_params}
 		
 			{
 				"${bin_virt_install}" --name  ${vm_name:-"Ubuntu-Server-${_tgt_ubuntu_ver}-$(date +%Y-%m-%d-%s)"}  \
@@ -16332,7 +16478,10 @@ kvm::make_vm_now_from_microsoft() {
 			}
 	fi
 
-	local vm_name="Template_Windows${target_winver:(-2)}_${CONFIG}_${RANDOM}"
+	local _win_suffix="${target_winver:(-2)}"
+	local _random_suffix="${RANDOM}"
+	local vm_name="${vm_name:-}"
+	kvm::util::set_vm_name --var vm_name "Template_Windows${_win_suffix}" "${CONFIG}" "${_random_suffix}" --no-timestamp || return 1
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in: ${AutoUnattend} \n
@@ -18167,9 +18316,9 @@ template::cloud_config() {
 			shift 2
 			;;
 		--vmname | --VMName | --vm_name | --VmName | --vm-name | --VM-Name | --hostname | --HostName | --host-name | --Host-Name)
-			# The hostname of the VM to be created
-			local vm_name="$2"
-			[[ "$vm_name" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,253}[a-zA-Z0-9])?$ ]] && [[ ${#vm_name} -le 255 ]] && system::log_item "$vm_name: Valid hostname" || system::log_item "$vm_name: Invalid hostname"
+			if ! kvm::util::set_vm_name --var vm_name --name "$2"; then
+				return 1
+			fi
 			shift 2 # Remove argument name from processing
 			;;
 		*)
