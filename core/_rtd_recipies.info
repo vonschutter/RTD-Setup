@@ -240,6 +240,10 @@ recipe:_Internet_Browsing_Private () {
 	# Single_Install_Brave_Browser
 	software::from_snapcraft.io brave $1
 
+	# Firefox is a fast, full-featured Web browser that's easy to use. It has lots of great features including
+	# tabbed browsing, live bookmarks, private browsing, a built-in search engine, and more.
+	software::from_snapcraft.io firefox $1
+
 	# Chromium is an open-source browser project that aims to build a safer, 
 	# faster, and more stable way to experience the web. 
 	software::from_flathub.org com.github.Eloston.UngoogledChromium $1
@@ -274,7 +278,7 @@ recipe:_Internet_Browsing_Private () {
 			software::add_native_package mullvad-browser
 		;;
 		"suse" )
-			write_warning "NOTE: This wrapper is not verified by, affiliated with, or supported by Mullvad VPN AB."
+			write_warning "NOTE: This wrapper is not verified by, affiliated with, or supported by Mullvad AB."
 			write_warning "NOTE: Installing the flathub version of Mullvad browser."
 			software::from_flathub.org net.mullvad.MullvadBrowser $1
 		;;
@@ -304,28 +308,38 @@ recipe:_Internet_Browsing_Corporate () {
 	# WARNING: may attempt to ttrack everything about you!
 	software::from_flathub.org com.opera.Opera $1
 
-	# The Vivaldi browser, not available in snap, or flatpak, nor in repo. 			
-	write_information "Installing Vivaldi Browser directly from vendor repo..."
-	if cat "/etc/os-release" | grep "debian" ; then
-		apt -y install wget gnupg2 software-properties-common
-		wget -qO- https://repo.vivaldi.com/archive/linux_signing_key.pub | sudo apt-key add -
-		echo 'deb https://repo.vivaldi.com/archive/deb/ stable main' | sudo tee /etc/apt/sources.list.d/vivaldi.list
-		apt update
-		software::add_native_package vivaldi-stable
-		return $?
-	elif cat "/etc/os-release" | grep "fedora" ; then
-		software::add_native_package dnf-utils
-		dnf config-manager --add-repo https://repo.vivaldi.com/archive/vivaldi-fedora.repo
-		software::add_native_package vivaldi-stable
-		return $?
-	elif  cat "/etc/os-release" | grep "suse" ; then
-		zypper --gpg-auto-import-keys addrepo --refresh https://repo.vivaldi.com/archive/vivaldi-suse.repo
-		software::add_native_package vivaldi-stable
-		return $?
-	else
-		write_error "Neither debian, fedora, or suse base distros could be found; NOT installing vivaldi."
-		return 1
-	fi
+	# Vivaldi is a cross-platform web browser developed by Vivaldi Technologies, Inc. 
+	# Pfficially avaiable and verrified from snapcraft.io
+	software::from_snapcraft.io vivaldi-stable $1
+		
+	# write_information "Installing Vivaldi Browser directly from vendor repo..."
+	# distribution_type=$(system::distribution_type)
+	# case ${distribution_type} in
+	# 	"ubuntu" | "debian" )
+	# 		software::check_native_package_dependency curl
+	# 		apt -y install wget gnupg2 software-properties-common
+	# 		wget -qO- https://repo.vivaldi.com/archive/linux_signing_key.pub | sudo apt-key add -
+	# 		echo 'deb https://repo.vivaldi.com/archive/deb/ stable main' | sudo tee /etc/apt/sources.list.d/vivaldi.list
+	# 		apt update
+	# 		software::add_native_package vivaldi-stable
+	# 		return $?
+	# 	;;
+	# 	"fedora" | "redhat" )
+	# 		software::add_native_package dnf-utils
+	# 		dnf config-manager --add-repo https://repo.vivaldi.com/archive/vivaldi-fedora.repo
+	# 		software::add_native_package vivaldi-stable
+	# 		return $?
+	# 	;;
+	# 	"suse" )
+	# 		zypper --gpg-auto-import-keys addrepo --refresh https://repo.vivaldi.com/archive/vivaldi-suse.repo
+	# 		software::add_native_package vivaldi-stable
+	# 		return $?
+	# 	;;
+	# 	* )
+	# 		write_error "Neither debian, fedora, or suse base distros could be found; NOT installing vivaldi."
+	# 		return 1
+	# 	;;
+	# esac
 }
 
 
@@ -384,7 +398,7 @@ recipe:_Office:_3D_Printing () {
 
 	software::from_flathub.org net.meshlab.MeshLab $1
 	# ! if you would prefer to use the snap package then please uncomment the lines below.
-	# software::from_snapcraft.io meshlab $1			# The open source system for processing and editing 3D triangular meshes
+	# software::from_snapcraft.io meshlab $1		# The open source system for processing and editing 3D triangular meshes
 
 	software::from_flathub.org flathub com.prusa3d.PrusaSlicer $1
 	# ! if you would prefer to use the snap package then please uncomment the lines below.
@@ -428,19 +442,19 @@ recipe:_Office:_CAD_Software_Options () {
 
 
 recipe:_Office:_Standard_Apps () {
-	# Office apps like: Onlyoffice, Teams, Draw.io, Joplin notes, Mailspring, Keepass, and more
+	# Office apps like: Onlyoffice, Teams, Draw.io, Joplin notes, and more
 	# DEFAULT=TRUE
 	# NOTE: the "$1" after the package-name is if you want to trap the --remove option for 
 	# Bundle removals. This is optional.
 
 	# A modern email client supporting a central management of many accounts.
-	software::from_snapcraft.io mailspring $1
+	# software::from_snapcraft.io mailspring $1
 
 	# Excellent note-taking and note organization app
 	software::from_snapcraft.io joplin-desktop $1
 
 	# Best simple note app for sharing and collaboration on notes	
-	software::from_snapcraft.io simplenote $1		
+	# software::from_snapcraft.io simplenote $1		
 
 	# Excellent simple to use and streamlines office bundle
 	software::from_flathub.org org.onlyoffice.desktopeditors  $1

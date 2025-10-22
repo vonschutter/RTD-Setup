@@ -259,6 +259,9 @@ export RTD_VERSION="2.04"
 215   zenity::display_file                               ;           Display the contents of a file in a box
 216   zenity::display_info                               ;           Displays any string passed in a GUI information box
 217   zenity::display_url                                ;           Display the contents of a URL passed to the function in a box
+218   mint::get_mint_lmde_iso                            ;           Get the latest Linux Mint Debian Edition ISO
+219   kvm::get_almalinux_boot_iso                        ;           Get the AlmaLinux boot ISO for network installation
+220   kvm::make_vm_now_from_linuxmint_com                ;           Generate an LMDE virtual machine template directly from linuxmint.com
 
 
 
@@ -5251,6 +5254,9 @@ system::toggle_oem_auto_elevated_privilege() {
 		# Ensure passwordless sudo is not already set for the user
 		if ! grep -q "^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" "${sudoers_file}" 2>/dev/null; then
 			# Add passwordless sudo entry
+			if [[ ! -f "${sudoers_file}" ]]; then
+				touch "${sudoers_file}"
+			fi
 			write_information "🚧 Adding passwordless sudo for user: ${_OEM_USER}"
 			echo "${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" | sudo EDITOR='tee -a' visudo -f "${sudoers_file}"
 		else
@@ -13998,12 +14004,13 @@ kvm::util::validate_vm_name() {
 		return 1
 	fi
 
-	if [[ "$candidate" =~ ^[a-zA-Z0-9](?:[a-zA-Z0-9_-]{0,253}[a-zA-Z0-9])?$ ]]; then
-		return 0
+	if (( ${#candidate} > 255 )); then
+		system::log_item "${candidate}: Invalid hostname (too long)"
+		return 1
 	fi
 
-	system::log_item "${candidate}: Invalid hostname"
-	return 1
+	system::log_item "${candidate}: Is a valid hostname"
+	return 0
 }
 
 
@@ -14884,6 +14891,153 @@ kvm::get_kali_iso() {
 }
 
 
+mint::get_mint_lmde_iso() {
+	# Description:
+	#   Retrieve the latest Linux Mint Debian Edition (LMDE) Cinnamon 64-bit ISO and
+	#   store it in /var/lib/libvirt/boot/. The resulting path is echoed and exported
+	#   via the global `iso` variable for the calling VM helper to consume.
+	#
+	# Usage:
+	#   mint::get_mint_lmde_iso
+	#
+	# Returns:
+	#   0 if the ISO is available locally (either reused or freshly downloaded),
+	#   1 on failure to discover or download the ISO.
+	#
+	# End of documentation
+	local BASE_URL="${_MINT_LMDE_MIRROR:-${MINT_LMDE_MIRROR:-https://mirrors.edge.kernel.org/linuxmint/debian/}}"
+	local DEST_DIR="/var/lib/libvirt/boot"
+	local listing latest_iso iso_url dest
+
+	system::log_item "Discovering latest LMDE ISO from: ${BASE_URL}"
+	listing=$(curl -fsSL --connect-timeout 10 --max-time 60 --retry 3 --retry-delay 5 --retry-connrefused \
+		-H "User-Agent: Mozilla/5.0 (compatible; RTD-Setup/1.0)" "${BASE_URL}") || {
+		system::log_item "Failed to query LMDE ISO directory (${BASE_URL})." >&2
+		return 1
+	}
+
+	latest_iso=$(printf '%s\n' "$listing" | grep -oE 'lmde-[0-9A-Za-z.-]+-cinnamon-64bit\.iso' | sort -V | tail -1)
+	if [[ -z "$latest_iso" ]]; then
+		system::log_item "Could not determine the latest LMDE ISO from ${BASE_URL}" >&2
+		return 1
+	fi
+
+	iso_url="${BASE_URL%/}/${latest_iso}"
+	dest="${DEST_DIR%/}/${latest_iso}"
+
+	if [[ -f "$dest" ]]; then
+		system::log_item "LMDE ISO already present: ${dest}"
+		iso="$dest"
+		write_information "$iso"
+		return 0
+	fi
+
+	if ! mkdir -p "$DEST_DIR"; then
+		system::log_item "Unable to create ISO destination directory: ${DEST_DIR}" >&2
+		return 1
+	fi
+
+	system::log_item "Downloading ${iso_url} -> ${dest}"
+	if ! wget -q --show-progress -O "$dest" "$iso_url"; then
+		system::log_item "Failed to download LMDE ISO from ${iso_url}" >&2
+		rm -f "$dest"
+		return 1
+	fi
+
+	iso="$dest"
+	write_information "$iso"
+	return 0
+}
+
+
+kvm::get_almalinux_boot_iso() {
+	# Description:
+	#   Download the AlmaLinux network boot ISO for a specific version into
+	#   /var/lib/libvirt/boot/ (if not already present) and expose the local path via `iso`.
+	#
+	# Globals:
+	#   _ALMALINUX_ISO_MIRROR / ALMALINUX_ISO_MIRROR overrides; otherwise defaults to the official mirror.
+	#
+	# Arguments:
+	#   --version <value>  AlmaLinux release to target (e.g. 9.4).
+	#
+	# Outputs:
+	#   Echoes the local ISO path on success.
+	#
+	# Returns:
+	#   0 on success (existing or downloaded ISO), 1 on failure.
+	#
+	# End of documentation
+	local version=""
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--version)
+			version="$2"
+			shift 2
+			;;
+		*)
+			shift
+			;;
+		esac
+	done
+
+	if [[ -z "$version" ]]; then
+		write_error "⛔ kvm::get_almalinux_boot_iso: Missing required --version argument."
+		return 1
+	fi
+
+	local base_url="${_ALMALINUX_ISO_MIRROR:-${ALMALINUX_ISO_MIRROR:-https://repo.almalinux.org/almalinux}}"
+	local iso_dir="${base_url%/}/${version}/isos/x86_64/"
+	local listing boot_iso minimal_iso selected_iso dest
+	local dest_dir="/var/lib/libvirt/boot"
+
+	system::log_item "Discovering AlmaLinux boot ISO from: ${iso_dir}"
+	listing=$(curl -fsSL --connect-timeout 10 --max-time 60 --retry 3 --retry-delay 5 --retry-connrefused \
+		-H "User-Agent: Mozilla/5.0 (compatible; RTD-Setup/1.0)" "${iso_dir}") || {
+		system::log_item "Failed to query AlmaLinux ISO directory (${iso_dir})." >&2
+		return 1
+	}
+
+	boot_iso=$(printf '%s\n' "$listing" | grep -oE 'AlmaLinux-[0-9]+(\.[0-9]+)?-latest-x86_64-boot\.iso' | sort -V | tail -1)
+	minimal_iso=$(printf '%s\n' "$listing" | grep -oE 'AlmaLinux-[0-9]+(\.[0-9]+)?-latest-x86_64-minimal\.iso' | sort -V | tail -1)
+
+	if [[ -n "$boot_iso" ]]; then
+		selected_iso="$boot_iso"
+	elif [[ -n "$minimal_iso" ]]; then
+		selected_iso="$minimal_iso"
+	else
+		system::log_item "Unable to locate AlmaLinux boot/minimal ISO in ${iso_dir}" >&2
+		return 1
+	fi
+
+	dest="${dest_dir%/}/${selected_iso}"
+
+	if [[ -f "$dest" ]]; then
+		system::log_item "AlmaLinux ISO already present: ${dest}"
+		iso="$dest"
+		write_information "$iso"
+		return 0
+	fi
+
+	if ! mkdir -p "$dest_dir"; then
+		system::log_item "Unable to create ISO destination directory: ${dest_dir}" >&2
+		return 1
+	fi
+
+	system::log_item "Downloading ${iso_dir}${selected_iso} -> ${dest}"
+	if ! wget -q --show-progress -O "$dest" "${iso_dir}${selected_iso}"; then
+		system::log_item "Failed to download AlmaLinux ISO from ${iso_dir}${selected_iso}" >&2
+		rm -f "$dest"
+		return 1
+	fi
+
+	iso="$dest"
+	write_information "$iso"
+	return 0
+}
+
+
 kvm::get_fedora_workstation_iso() {
 	# Description:
 	#   Downloads the specified or latest Fedora Workstation x86_64 ISO.
@@ -15480,6 +15634,11 @@ kvm::make_vm_now_from_fedora_org() {
 
 	local vm_name="${vm_name:-}"
 	kvm::util::set_vm_name --var vm_name "Template_Fedora" "${_service}" || return 1
+	local disk_path
+	disk_path=$(kvm::create_expanding_vm_hardisk "$vm_name" "$_dsk") || {
+		write_error "❌ Failed to create VM disk image. Aborting VM creation."
+		return 1
+	}
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in Kickstart: ${_preseed_file} \n
@@ -15496,7 +15655,7 @@ kvm::make_vm_now_from_fedora_org() {
 			--vcpus "${_cpu}" \
 			--memory "${_mem}" \
 			--network "${virt_net:=default}" \
-			--disk size="${_dsk}" \
+			--disk path="${disk_path},format=qcow2" \
 			--os-variant="fedora40" \
 			--initrd-inject="${_preseed_file}" \
 			--location="${iso}" \
@@ -15505,7 +15664,7 @@ kvm::make_vm_now_from_fedora_org() {
 	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 	
 	# Cleanup 
-	unset _preseed_file vm_kernel vm_initrd _source_url _config _mirrorlist_url _os_version _summary_message distro _UserServerEnvironemtSelection _UserDesktopEnvironmentSelection _role _service
+	unset _preseed_file vm_kernel vm_initrd _source_url _config _mirrorlist_url _os_version _summary_message distro _UserServerEnvironemtSelection _UserDesktopEnvironmentSelection _role _service disk_path
 	
 }
 
@@ -15549,8 +15708,19 @@ kvm::make_vm_now_from_redhat_com() {
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: ${virt_net="$(system::find_vm_bridge)"}
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
-	: ${_os_version:-$($RTD_GUI --title "Select Release Version of RedHat" --inputbox "Please pick an available OS version by entering it below. \
-	If you are not sure just let me choose for you... \n ${fedoralogo} " 25 110 "${_DEFAULT_REDHAT_VER}" 3>&1 1>&2 2>&3)}
+	local alma_base_url="https://repo.almalinux.org/almalinux/"
+	local latest_alma_version
+	latest_alma_version=$(curl -fsSL --connect-timeout 10 --max-time 60 --retry 3 --retry-delay 5 --retry-connrefused \
+		-H "User-Agent: Mozilla/5.0 (compatible; RTD-Setup/1.0)" "${alma_base_url}" | \
+		grep -oE 'href="[0-9]+(\.[0-9]+)*/"' | sed -E 's/href="([0-9]+(\.[0-9]+)*)\/"/\1/' | sort -V | tail -1)
+
+	if [[ -z "$latest_alma_version" ]]; then
+		system::log_item "Unable to determine latest AlmaLinux version from ${alma_base_url}, falling back to ${_DEFAULT_REDHAT_VER}"
+		latest_alma_version="${_DEFAULT_REDHAT_VER}"
+	fi
+
+	: ${_os_version:-$($RTD_GUI --title "Select Release Version of AlmaLinux" --inputbox "Please pick an available OS version by entering it below. \
+	If you are not sure just let me choose for you... \n ${fedoralogo} " 25 110 "${latest_alma_version}" 3>&1 1>&2 2>&3)}
 	case $? in
 	"$DIALOG_CANCEL") return ;;
 	"$DIALOG_ESC") return ;;
@@ -15559,27 +15729,44 @@ kvm::make_vm_now_from_redhat_com() {
 
 	: ${_os_version:="${_DEFAULT_REDHAT_VER}"}
 	: ${_mirrorlist_url="https://mirrors.almalinux.org/mirrorlist/${_os_version}/baseos"}
-	: ${_source_url:="https://repo.almalinux.org/almalinux/${_os_version}/BaseOS/x86_64/kickstart/"}
-	: ${_preseed_file="$(mktemp).cfg"}
+	: ${_source_url:="https://repo.almalinux.org/almalinux/${_os_version}/BaseOS/x86_64/os/"}
+	: ${_preseed_file:="$(mktemp -d)/ks.cfg"}
 	: ${_config="${1:-"workstation"}"}
-	if [[ ${_role} == "workstation" ]]; then
-		local _service="VDI"
+
+	if ! kvm::get_almalinux_boot_iso --version "${_os_version}"; then
+		write_error "Unable to retrieve AlmaLinux ${_os_version} boot ISO."
+		return 1
+	fi
+	system::log_item "Using AlmaLinux boot ISO: ${iso}"
+
+	local vm_name="${vm_name:-}"
+	local _service
+	if [[ ${_role} == "workstation" || ${_role} == "VDI" ]]; then
+		_service="VDI"
 		system::generate_ks_cfg_file --source "${_source_url}" --role "${_role}" --file "${_preseed_file}" --DE "${_UserDesktopEnvironmentSelection:="@basic-desktop-environment"}"
 	elif [[ ${_role} == "server" ]]; then
-		local _service="SRV"
+		_service="SRV"
 		system::generate_ks_cfg_file --source "${_source_url}" --role "${_role}" --file "${_preseed_file}" --SR "${_UserServerEnvironemtSelection:="@network-server"}"
 	else
 		write_error "Unknown role selection: ${_role} ==> Use workstation or server"
 		return 1
 	fi
 
-	local vm_name="${vm_name:-}"
-	kvm::util::set_vm_name --var vm_name "Template_RedHat" "${_service}" || return 1
+	kvm::util::set_vm_name --var vm_name "Template" "AlmaLinux" "${_service}" || return 1
+	local disk_path
+	disk_path=$(kvm::create_expanding_vm_hardisk "$vm_name" "$_dsk") || {
+		write_error "❌ Failed to create VM disk image. Aborting VM creation."
+		return 1
+	}
+
+	local alma_major="${_os_version%%.*}"
+	local os_variant="almalinux${alma_major}"
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in Kickstart: ${_preseed_file} \n
 	🔧 - Using this source for the packages and files to download: \n
-	🌎 - ${_source_url%%/*pub*} \n
+	🌎 - ${_source_url} \n
+	🌎 - Boot ISO: ${iso} \n
 	🖥️ - Using the network: ${virt_net:=default} \n
 	🖥️ - Memory: ${_mem} \n
 	🖥️ - CPU's: ${_cpu} \n
@@ -15591,15 +15778,15 @@ kvm::make_vm_now_from_redhat_com() {
 			--vcpus "${_cpu}" \
 			--memory "${_mem}" \
 			--network "${virt_net}" \
-			--disk size="${_dsk}" \
-			--os-variant="fedora30" \
+			--disk path="${disk_path},format=qcow2" \
+			--os-variant="${os_variant}" \
 			--initrd-inject="${_preseed_file}" \
-			--location="${_source_url}" \
-			--extra-args "inst.ks=file:/$(basename $_preseed_file) inst.stage2=https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Everything/x86_64/os/images/install.img" \
+			--location="${iso}" \
+			--extra-args "inst.ks=file:/$(basename $_preseed_file)" \
 			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 
-	for i in _preseed_file vm_kernel vm_initrd _source_url _config _mirrorlist_url _os_version distro; do unset $i; done
+	for i in _preseed_file _source_url _config _mirrorlist_url _os_version distro disk_path iso; do unset $i; done
 }
 
 kvm::make_vm_now_from_opensuse_org() {
@@ -15671,6 +15858,11 @@ kvm::make_vm_now_from_opensuse_org() {
 
 	local vm_name="${vm_name:-}"
 	kvm::util::set_vm_name --var vm_name "Template_SUSE" "${CONFIG}" || return 1
+	local disk_path
+	disk_path=$(kvm::create_expanding_vm_hardisk "$vm_name" "$_dsk") || {
+		write_error "❌ Failed to create VM disk image. Aborting VM creation."
+		return 1
+	}
 
 	_summary_message="
 	The virtual machine (${vm_name}) \n
@@ -15691,7 +15883,7 @@ kvm::make_vm_now_from_opensuse_org() {
 			--vcpus "${_cpu}" \
 			--memory "${_mem}" \
 			--network "${virt_net}" \
-			--disk size="${_dsk}" \
+			--disk path="${disk_path},format=qcow2" \
 			--os-variant=opensusetumbleweed \
 			--initrd-inject="${_autoyast_filename}" \
 			--location="${source_url}" \
@@ -15699,7 +15891,7 @@ kvm::make_vm_now_from_opensuse_org() {
 			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 
-	for i in PRESEED_FILE vm_kernel vm_initrd source_url CONFIG distro _UserProductSelection _autoyast_filename ; do unset $i; done
+	for i in PRESEED_FILE vm_kernel vm_initrd source_url CONFIG distro _UserProductSelection _autoyast_filename disk_path ; do unset $i; done
 }
 
 kvm::make_vm_now_from_debian_org() {
@@ -15779,6 +15971,12 @@ kvm::make_vm_now_from_debian_org() {
 	system::check_required_variables "vm_name" "vm_kernel" "vm_initrd" "source_url" "virt_net" "_mem" "_cpu" "_dsk" "bin_virt_install" "PRESEED_FILE" ||
 		(read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 
+	local disk_path
+	disk_path=$(kvm::create_expanding_vm_hardisk "$vm_name" "$_dsk") || {
+		write_error "❌ Failed to create VM disk image. Aborting VM creation."
+		return 1
+	}
+
 	_summary_message="
 	The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in: ${_preseed_file} \n
@@ -15798,7 +15996,7 @@ kvm::make_vm_now_from_debian_org() {
 			--vcpus "${_cpu}" \
 			--memory "${_mem}" \
 			--network "${virt_net}" \
-			--disk size="${_dsk}" \
+			--disk path="${disk_path},format=qcow2" \
 			--location="${source_url}" \
 			--os-variant="debian10" \
 			--video "virtio" --channel "spicevmc" \
@@ -15808,9 +16006,11 @@ kvm::make_vm_now_from_debian_org() {
 			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 
-	for i in PRESEED_FILE vm_kernel vm_initrd source_url ui_diplay_style vm_name vm_usecase distro; do unset $i; done
+	for i in PRESEED_FILE vm_kernel vm_initrd source_url ui_diplay_style vm_name vm_usecase distro disk_path; do unset $i; done
 
 }
+
+
 
 kvm::make_vm_now_from_kali_org() {
 	# Description: Function to create a Debian KVM virtual michine disk and define a VM. This function should be
@@ -15875,6 +16075,11 @@ kvm::make_vm_now_from_kali_org() {
 	write_status "🔎 	- Discovering what the appropriate VM net interface is (default or br'0 - n')"
 	: ${virt_net="$(system::find_vm_bridge)"}
 	write_status "🔎	- Using network (${virt_net})"
+	local disk_path
+	disk_path=$(kvm::create_expanding_vm_hardisk "$vm_name" "$_dsk") || {
+		write_error "❌ Failed to create VM disk image. Aborting VM creation."
+		return 1
+	}
 
 	_summary_message="
 	The virtual machine (${vm_name}) \n
@@ -15895,7 +16100,7 @@ kvm::make_vm_now_from_kali_org() {
 			--vcpus "${_cpu}" \
 			--memory "${_mem}" \
 			--network "${virt_net}" \
-			--disk size="${_dsk}" \
+			--disk path="${disk_path},format=qcow2" \
 			--location="${iso},kernel=install.amd/gtk/vmlinuz,initrd=install.amd/gtk/initrd.gz" \
 			--os-variant="debian12" \
 			--video "virtio" --channel "spicevmc" \
@@ -15903,7 +16108,7 @@ kvm::make_vm_now_from_kali_org() {
 			--extra-args "ks=file:/$(basename $PRESEED_FILE) " || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 
-	unset PRESEED_FILE vm_kernel vm_initrd source_url ui_diplay_style vm_name vm_usecase distro pkgsel_include_string iso _role _task _cpu _mem _dsk _UserDesktopEnvironmentSelection _UserServerEnvironemtSelection _service
+	unset PRESEED_FILE vm_kernel vm_initrd source_url ui_diplay_style vm_name vm_usecase distro pkgsel_include_string iso _role _task _cpu _mem _dsk _UserDesktopEnvironmentSelection _UserServerEnvironemtSelection _service disk_path
 
 }
 
@@ -15971,6 +16176,11 @@ kvm::make_vm_now_from_zorin() {
 	kvm::util::read_distro_options --distribution ubuntu ${*}
 
 	kvm::get_zorin_iso || (dialog::display_error "💥 - An ERROR has occurred. Unable to get Zorin ISO file. Please press [OK] to continue..." && return 1)
+	local disk_path
+	disk_path=$(kvm::create_expanding_vm_hardisk "$vm_name" "$_dsk") || {
+		dialog::display_error "💥 - Failed to create VM disk image. Please press [OK] to continue..."
+		return 1
+	}
 
 	system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --ask ${_ask:-"NO"} || (dialog::display_error "💥 - An ERROR has occurred. Unable to create preseed file. Please press [OK] to continue..." && return 1)
 
@@ -15993,7 +16203,7 @@ kvm::make_vm_now_from_zorin() {
 			--vcpus "${_cpu}" \
 			--memory "${_mem}" \
 			--network "${virt_net}" \
-			--disk size="${_dsk}" \
+			--disk path="${disk_path},format=qcow2" \
 			--os-variant="ubuntu24.04" \
 			--video "qxl" --channel "spicevmc" \
 			--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd.zstd" \
@@ -16003,6 +16213,8 @@ kvm::make_vm_now_from_zorin() {
 			--initrd-inject="${_saveto}/preseed.cfg" \
 			--initrd-inject="${_saveto}/ks.cfg"  || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+
+	unset disk_path
 }
 
 kvm::make_vm_now_from_ubuntu_com() {
@@ -16482,6 +16694,11 @@ kvm::make_vm_now_from_microsoft() {
 	local _random_suffix="${RANDOM}"
 	local vm_name="${vm_name:-}"
 	kvm::util::set_vm_name --var vm_name "Template_Windows${_win_suffix}" "${CONFIG}" "${_random_suffix}" --no-timestamp || return 1
+	local disk_path
+	disk_path=$(kvm::create_expanding_vm_hardisk "$vm_name" "$_dsk") || {
+		write_error "❌ Failed to create VM disk image. Aborting VM creation."
+		return 1
+	}
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in: ${AutoUnattend} \n
@@ -16503,7 +16720,7 @@ kvm::make_vm_now_from_microsoft() {
 			--vcpus "${_cpu}" \
 			--memory "${_mem}" \
 			--network "${virt_net}" \
-			--disk size="${_dsk}" \
+			--disk path="${disk_path},format=qcow2" \
 			--video ${preferred_video} \
 			--os-variant="$(if osinfo-query -s -f os | grep ${target_winver} &>/dev/null; then echo ${target_winver}; else echo win10; fi)" \
 			--cdrom "${WindowsMedia}" \
@@ -16516,7 +16733,7 @@ kvm::make_vm_now_from_microsoft() {
 	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
 	#			--tpm backend.type=emulator,backend.version=2.0,model=tpm-crb \
 	rm -f "${PostTasks}" || system::log_item "Failed to remove ${PostTasks}..."
-	for i in WindowsInstructions CONFIG WindowsMedia AutoUnattend PostTasks target_winver mem_size uefi_option cpu_count disk_size preferred_video; do unset $i; done
+	for i in WindowsInstructions CONFIG WindowsMedia AutoUnattend PostTasks target_winver mem_size uefi_option cpu_count disk_size preferred_video disk_path; do unset $i; done
 }
 
 kvm::backup_all_running_vm() {
@@ -17400,9 +17617,7 @@ template::kickstart_cfg() {
 			%packages --retries 5 --timeout 20
 			${_UserDesktopEnvironmentSelection}
 			# Likely tempratry workaround for missing xorg-x11-server-Xorg dependency in some spins
-			$(echo "${_UserDesktopEnvironmentSelection}"|grep -iq 'workstation-product-environment' && echo 'gnome-session-xsession' || echo '# custom desktop, not workstation default')
-			xorg-x11-server-Xorg
-			xorg-x11-xauth
+			# $(echo "${_UserDesktopEnvironmentSelection}"|grep -iq 'workstation-product-environment' && echo 'gnome-session-xsession' || echo '# custom desktop, not workstation default')
 			@system-tools
 			openssh-server
 			spice-vdagent
@@ -17410,10 +17625,7 @@ template::kickstart_cfg() {
 			git
 			curl
 			dialog
-			yad
 			ansible
-			p7zip
-			p7zip-plugins
 			%end
 
 			# Post-installation Script
