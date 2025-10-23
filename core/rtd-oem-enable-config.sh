@@ -87,8 +87,6 @@ system::ensure_directory_exists "$_CONFIG_DIR" || exit 1
 
 main() {
 	# --- OEM Auto-Configuration Tasks (Relying on Library Functions) ---
-	# These calls assume the library functions are robust and handle errors internally.
-	# If they don't, add explicit error checking: if ! system::function; then ...; fi
 
 	write_status "🚀 Preparing system for automated OEM post-build tasks..."
 
@@ -106,14 +104,14 @@ main() {
 
 	system::add_or_remove_login_script --add "${CORE_DIR}/rtd-oem-linux-config.sh"
 	system::toggle_oem_auto_elevated_privilege --enable
-	system::toggle_oem_auto_login --enable # Ensure this is idempotent and distro-aware
-	system::set_oem_elevated_privilege_gui --enable # Ensure this is distro-aware
+	system::toggle_oem_auto_login --enable
+	system::set_oem_elevated_privilege_gui --enable
 
-	# These are custom OEM functions, ensure they are defined and robust
+	# --- OEM Tool Integration ---
 	if command -v oem::rtd_tools_make_launchers &>/dev/null; then
 		oem::rtd_tools_make_launchers
 	else
-	system::log_item "WARNING: Function oem::rtd_tools_make_launchers not found."
+		system::log_item "WARNING: Function oem::rtd_tools_make_launchers not found."
 	fi
 
 	if command -v oem::register_all_tools &>/dev/null; then
@@ -123,11 +121,9 @@ main() {
 	fi
 
 	# --- Final Touches ---
-	# Create a symlink for logs (ensure _OEM_DIR is defined, likely by library)
 	if [[ -n "${_OEM_DIR:-}" && -d "$_OEM_DIR" ]]; then
 		system::log_item "Creating symlink for logs: ${_LOG_DIR} -> ${_OEM_DIR}/log"
-		# -T treats destination as a normal file (good for symlinking directories)
-		# -f forces removal of existing destination if it's a file or symlink
+
 		if ! ln -sfn "$_LOG_DIR" "${_OEM_DIR}/log"; then
 			system::log_item "ERROR: Failed to create symlink from ${_LOG_DIR} to ${_OEM_DIR}/log."
 		fi
@@ -142,25 +138,25 @@ main() {
 
 wisdom_quotes_setup() {
 	if [[ -z "${KENS_QUOTES:-}" ]]; then
-	write_error "⛔ KENS_QUOTES variable is not set. Please define it before running the script."
+		write_error "⛔ KENS_QUOTES variable is not set. Please define it before running the script."
 	fi
 	readonly RTD_WISDOM_QUOTES_PATH="${_CONFIG_DIR}/kens_quotes.txt" # Use consistent naming
 
 	write_status "🦉 Preparing wisdom quotes file: ${RTD_WISDOM_QUOTES_PATH}"
 	if ! touch "$RTD_WISDOM_QUOTES_PATH"; then
-	system::log_item "ERROR: Failed to create wisdom quotes file: ${RTD_WISDOM_QUOTES_PATH}"
-	exit 1 # Critical if MOTD depends on it
+		system::log_item "ERROR: Failed to create wisdom quotes file: ${RTD_WISDOM_QUOTES_PATH}"
+		exit 1 # Critical if MOTD depends on it
 	fi
 	# Populate if empty or only with placeholder (idempotency)
 	if ! grep -q "Do not argue with an idiot" "$RTD_WISDOM_QUOTES_PATH"; then
-	system::log_item "Populating Ken's wisdom in '${RTD_WISDOM_QUOTES_PATH}'..."
-	# Use printf for better control over newlines than cat >> EOF
-	# Overwrite to ensure consistency if the file was only touched or had old content
-	printf '%s\n' "$KENS_QUOTES" > "$RTD_WISDOM_QUOTES_PATH" || {
-		system::log_item "⛔ ERROR: Failed to write quotes to ${RTD_WISDOM_QUOTES_PATH}";
-	}
+		system::log_item "Populating Ken's wisdom in '${RTD_WISDOM_QUOTES_PATH}'..."
+		# Use printf for better control over newlines than cat >> EOF
+		# Overwrite to ensure consistency if the file was only touched or had old content
+		printf '%s\n' "$KENS_QUOTES" > "$RTD_WISDOM_QUOTES_PATH" || {
+			system::log_item "⛔ ERROR: Failed to write quotes to ${RTD_WISDOM_QUOTES_PATH}";
+		}
 	else
-	system::log_item "Wisdom quotes file already populated."
+		system::log_item "Wisdom quotes file already populated."
 	fi
 }
 

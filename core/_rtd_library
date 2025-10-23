@@ -5255,10 +5255,21 @@ system::toggle_oem_auto_elevated_privilege() {
 		if ! grep -q "^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" "${sudoers_file}" 2>/dev/null; then
 			# Add passwordless sudo entry
 			if [[ ! -f "${sudoers_file}" ]]; then
-				touch "${sudoers_file}"
+				write_information "🚧 Adding passwordless sudo for user: ${_OEM_USER}"
+				cat >"${sudoers_file}" <<-EOF
+					# Sudoers file for RTD OEM user elevated privileges
+					# Created on $(date)
+					${_OEM_USER} ALL=(ALL) NOPASSWD:ALL
+				EOF
+				if ! grep -q "^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" "${sudoers_file}" 2>/dev/null; then
+					write_error "⛔ Error: Failed to add passwordless sudo for user: ${_OEM_USER}"
+				else 
+					write_information "🚧 Created sudoers file and added passwordless sudo for user: ${_OEM_USER}"
+				fi
+			else 
+				echo "${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" | sudo EDITOR='tee -a' visudo -f "${sudoers_file}"
 			fi
-			write_information "🚧 Adding passwordless sudo for user: ${_OEM_USER}"
-			echo "${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" | sudo EDITOR='tee -a' visudo -f "${sudoers_file}"
+			
 		else
 			write_information "✅ Passwordless sudo already enabled for user: ${_OEM_USER}"
 		fi
@@ -18552,10 +18563,10 @@ common_vdi_pre_config=$(cat <<EOF
         - echo '******************* Common VDI Pre-Config ********************'
 
         # Set up the target for installation
-        - mount --bind /dev  /target/dev
-        - mount --bind /proc /target/proc
-        - mount --bind /sys  /target/sys
-        - mount --bind /run  /target/run
+        # - mount --bind /dev  /target/dev
+        # - mount --bind /proc /target/proc
+        # - mount --bind /sys  /target/sys
+        # - mount --bind /run  /target/run
 
         # Update software sources and upgrade packages
         - curtin in-target --target=/target -- bash -c 'apt-get update -y && apt-get upgrade -y ; exit 0'
@@ -18585,7 +18596,7 @@ EOF
 )
 
 common_cleanup_config=$(cat <<EOF
-        - echo '******************* Common Cleanup Pre-Config ********************'
+        - echo '******************* Common VDI Cleanup Post-Config ********************'
 
         # Force unmounting of the target and other filesystems
         # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /dev || true'
