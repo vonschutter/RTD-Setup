@@ -218,26 +218,27 @@ export RTD_VERSION="2.04"
 174   system::validate_parameters                        ;           Validate parameters passed to a script (that they conform to --long-arg value format)
 175   system::wait_for_internet_availability             ;           Checks that the internet is reachable and waits until it is...
 176   template::autounattend_xml                         ;           Template for an autounattend.xml file
-177   template::AutoYast_xml                             ;           Template for an AutoYast.xml file
-178   template::cloud_config                             ;           Template for a cloud config file
-179   template::kickstart_cfg                            ;           Template for a kickstart file
-180   template::minecraft_server_launcher                ;           Template for a minecraft server launcher
-181   template::preseed_cfg::auto_disk_layout            ;           Template for a preseed file auto disk layout section
-182   template::preseed_cfg::early_command               ;           Template for a preseed file early command section
-183   template::preseed_cfg::expert_recipe               ;           Template for a preseed file expert recipe section
-184   template::preseed_cfg::late_command                ;           Template for a preseed file late command section
-185   template::preseed_cfg::main                        ;           Template for a preseed file main section
-186   template::rtd_me_sh_cmd                            ;           Template for a rtd_me.sh command
-187   term::animate_while_command                        ;           Display terminal output during a silent task execution
-188   term::err_no_menu_system_found                     ;           Function to handle what to do if it is not possible to currently display menus in a terminal
-189   term::set_colors                                   ;           Set colors for prompting on screen in human usable variables
-190   term::start_animation                              ;           Start simple animation to let user know a silent action is currently executing
-191   term::stop_animation                               ;           Stop simple animation to let user know a silent action is done executing
-192   term::task_exec_list_output                        ;           Display a list of tasks to be executed in a terminal
-193   tool::compress_all_items_here                      ;           Compress all items in the current folder
-194   tool::compress_provided_items                      ;           Compress provided items
-195   tool::recompress_all_items_in_folder               ;           Recompress all items in a folder a desired format
-196   tool::recompress_provided_items                    ;           Recompress provided items to another format
+177   template::Agama_json                               ;           Template for an Agama JSON profile
+178   template::AutoYast_xml                             ;           Template for an AutoYast.xml file
+179   template::cloud_config                             ;           Template for a cloud config file
+180   template::kickstart_cfg                            ;           Template for a kickstart file
+181   template::minecraft_server_launcher                ;           Template for a minecraft server launcher
+182   template::preseed_cfg::auto_disk_layout            ;           Template for a preseed file auto disk layout section
+183   template::preseed_cfg::early_command               ;           Template for a preseed file early command section
+184   template::preseed_cfg::expert_recipe               ;           Template for a preseed file expert recipe section
+185   template::preseed_cfg::late_command                ;           Template for a preseed file late command section
+186   template::preseed_cfg::main                        ;           Template for a preseed file main section
+187   template::rtd_me_sh_cmd                            ;           Template for a rtd_me.sh command
+188   term::animate_while_command                        ;           Display terminal output during a silent task execution
+189   term::err_no_menu_system_found                     ;           Function to handle what to do if it is not possible to currently display menus in a terminal
+190   term::set_colors                                   ;           Set colors for prompting on screen in human usable variables
+191   term::start_animation                              ;           Start simple animation to let user know a silent action is currently executing
+192   term::stop_animation                               ;           Stop simple animation to let user know a silent action is done executing
+193   term::task_exec_list_output                        ;           Display a list of tasks to be executed in a terminal
+194   tool::compress_all_items_here                      ;           Compress all items in the current folder
+195   tool::compress_provided_items                      ;           Compress provided items
+196   tool::recompress_all_items_in_folder               ;           Recompress provided items in a folder a desired format
+197   tool::recompress_provided_items                    ;           Recompress provided items to another format
 197   tool::test_iso_boot_media                          ;           Test bootable media using QEMU
 198   tool::up_2_date                                    ;           Older universal software update function
 199   ubuntu::download_iso                               ;           Get the Ubuntu media (ISO) for the target version (detected or selected)
@@ -18456,7 +18457,218 @@ template::AutoYast_xml() {
 		</security>
 		</profile>
 
-	AUTOYAST_EOF
+AUTOYAST_EOF
+}
+
+template::Agama_json() {
+	# Description:
+	#   Generates an Agama JSON profile for automated SUSE Linux installations using the new
+	#   Agama installer format. The generated JSON mirrors the intent of template::AutoYast_xml
+	#   but in the modern schema expected by Agama.
+	#
+	# Globals:
+	#   Preference_DiskEncryption_SUSE      - Disk encryption XML snippet used to extract password.
+	#   Preference_InitialUserPassword      - Initial password for root and user accounts.
+	#   Preference_InitialUser              - Primary username to create.
+	#   Preference_InitialKeyboardLayout    - Keyboard layout to apply.
+	#   _UserDesktopEnvironmentSelection    - Desktop environment pattern to install.
+	#   _UserProductSelection/_Product      - SUSE product channel to enable.
+	#   _SUSE_PACKMAN_LEAP                  - Packman repository URL (optional).
+	#   GIT_RTD_SRC_URL                     - Git source for RTD OEM scripts.
+	#   _OEM_DIR                            - Target directory for RTD OEM scripts.
+	#   _agama_filename                     - Optional pre-defined output file path.
+	#
+	# Arguments:
+	#   $1 - Path to the output JSON file (optional if _agama_filename is already set).
+	#
+	# Outputs:
+	#   - Writes an Agama-compatible JSON profile to the specified file.
+	#
+	# Returns:
+	#   0 - Profile successfully generated.
+	#   1 - Missing output path or Python error while generating JSON.
+	#
+	# Usage:
+	#   template::Agama_json </path/to/profile.json>
+	#
+	# Notes:
+	#   - Requires python3 to be available for JSON generation.
+	#   - Assumes Preference_DiskEncryption_SUSE holds an <encryption_password> snippet when set.
+	#
+	# End of documentation
+
+	local output_file="${1:-${_agama_filename:-}}"
+	if [[ -z ${output_file} ]]; then
+		write_error "No output file provided, use: ${FUNCNAME[0]} </path/to/filename>"
+		return 1
+	fi
+
+	_agama_filename="${output_file}"
+
+	local pref_enc="${Preference_DiskEncryption_SUSE:-}"
+	local init_pass="${Preference_InitialUserPassword:-letmein}"
+	local init_user="${Preference_InitialUser:-tangarora}"
+	local keyboard_layout="${Preference_InitialKeyboardLayout:-english-us}"
+	local desktop_pattern="${_UserDesktopEnvironmentSelection:-gnome_x11}"
+	local product="${_Product:-${_UserProductSelection:-Leap}}"
+	local packman_repo="${_SUSE_PACKMAN_LEAP:-}"
+	local oem_dir="${_OEM_DIR:-/opt/rtd}"
+	local git_src="${GIT_RTD_SRC_URL:-https://github.com/rivertech-division/RTD-Setup.git}"
+
+	PREF_ENC="${pref_enc}" \
+	PREF_INIT_PASS="${init_pass}" \
+	PREF_INIT_USER="${init_user}" \
+	PREF_KEYBOARD="${keyboard_layout}" \
+	PREF_DESKTOP="${desktop_pattern}" \
+	PREF_PRODUCT="${product}" \
+	PREF_PACKMAN="${packman_repo}" \
+	PREF_OEM_DIR="${oem_dir}" \
+	PREF_GIT_SRC="${git_src}" \
+	PREF_OUTPUT="${output_file}" \
+	python3 - <<'PY' || return 1
+import json
+import os
+import re
+import textwrap
+
+output_path = os.environ["PREF_OUTPUT"]
+enc_xml = os.environ.get("PREF_ENC", "")
+init_pass = os.environ.get("PREF_INIT_PASS", "letmein")
+init_user = os.environ.get("PREF_INIT_USER", "tangarora")
+keyboard_layout = os.environ.get("PREF_KEYBOARD", "english-us")
+desktop_pattern = os.environ.get("PREF_DESKTOP", "gnome_x11")
+product = os.environ.get("PREF_PRODUCT", "Leap")
+packman_repo = os.environ.get("PREF_PACKMAN", "")
+oem_dir = os.environ.get("PREF_OEM_DIR", "/opt/rtd")
+git_src = os.environ.get("PREF_GIT_SRC", "https://github.com/vonschutter/RTD-Setup.git")
+
+enc_password = None
+if enc_xml:
+    match = re.search(r"<encryption_password>(.*?)</encryption_password>", enc_xml)
+    if match:
+        enc_password = match.group(1)
+
+script_lines = [
+    "#!/bin/bash",
+    f"git clone {git_src} {oem_dir}",
+    f"chmod 755 {oem_dir}/core/rtd-oem-enable-config.sh",
+    f"{oem_dir}/core/rtd-oem-enable-config.sh",
+    f"cp *.json {oem_dir}/",
+]
+if packman_repo:
+    script_lines.append(f"zypper ar -cfp 90 {packman_repo} packman")
+    script_lines.append("zypper --gpg-auto-import-keys refresh")
+script_lines.extend([
+    "zypper in -y yad"
+])
+
+script_content = "\n".join(script_lines)
+
+storage_proposal = {
+    "confirm": False,
+    "lvm": True,
+    "windows_delete_mode": "all",
+    "linux_delete_mode": "all",
+    "other_delete_mode": "all"
+}
+if enc_password:
+    storage_proposal["encryption_password"] = enc_password
+
+data = {
+    "general": {
+        "mode": {
+            "confirm": False,
+            "final_reboot": True,
+            "final_halt": False,
+            "halt": False,
+            "second_stage": False,
+            "forceboot": True
+        }
+    },
+    "storage": {
+        "proposal": storage_proposal
+    },
+    "networking": {
+        "keep_install_network": True
+    },
+    "deploy_image": {
+        "image_installation": True
+    },
+    "software": {
+        "install_recommended": True,
+        "patterns": [desktop_pattern],
+        "packages": [
+            "wget", "curl", "dialog", "vim", "spice-vdagent",
+            "git", "pkexec", "zip", "zenity", "acpi",
+            "pciutils", "jq", "xhost", "rsync"
+        ],
+        "products": [product]
+    },
+    "firstboot": {
+        "firstboot_enabled": False
+    },
+    "users": [
+        {
+            "encrypted": True,
+            "fullname": "root",
+            "gid": 0,
+            "home": "/root",
+            "shell": "/bin/bash",
+            "uid": 0,
+            "user_password": init_pass,
+            "username": "root"
+        },
+        {
+            "encrypted": True,
+            "fullname": "RTD User",
+            "shell": "/bin/bash",
+            "user_password": init_pass,
+            "username": init_user
+        }
+    ],
+    "keyboard": {
+        "keymap": keyboard_layout
+    },
+    "timezone": {
+        "hwclock": "UTC",
+        "timezone": "Europe/Berlin"
+    },
+    "login_settings": {
+        "autologin_user": init_user,
+        "password_less_login": True
+    },
+    "services": {
+        "default_target": "graphical",
+        "enable": ["sshd"]
+    },
+    "scripts": [
+        {
+            "stage": "init",
+            "interpreter": "bash",
+            "content": script_content
+        }
+    ],
+    "security": {
+        "displaymanager_remote_access": "no",
+        "fail_delay": 3,
+        "faillog_enab": "yes",
+        "gid_max": 60000,
+        "gid_min": 101,
+        "lastlog_enab": "yes",
+        "obscure_checks_enab": "no",
+        "permission_security": "secure",
+        "run_updatedb_as": "nobody",
+        "uid_max": 60000,
+        "uid_min": 500,
+        "selinux_mode": "permissive",
+        "lsm_select": "selinux"
+    }
+}
+
+with open(output_path, "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=4)
+    f.write("\n")
+PY
 }
 
 template::cloud_config() {
@@ -18605,9 +18817,9 @@ common_cleanup_config=$(cat <<EOF
         # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /sys || true'
         # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /run || true'
 
-        - eject --force /dev/sr0 || true
-        - eject --force /dev/sr1 || true
-        - umount -l /media/cdrom || true
+        #- eject --force /dev/sr0 || true
+        #- eject --force /dev/sr1 || true
+        #- umount -l /media/cdrom || true
 EOF
 )
 
@@ -18615,10 +18827,8 @@ EOF
 cat >>${user_data_file} <<EOF
 #cloud-config
 power_state:
-    delay: "10"
-    mode: reboot
+    mode: halt
     message: "RTD: Installation complete, rebooting..."
-    timeout: 30
     condition: true
 autoinstall:
     version: 1
