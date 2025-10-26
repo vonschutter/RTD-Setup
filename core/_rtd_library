@@ -5282,6 +5282,11 @@ system::toggle_oem_auto_elevated_privilege() {
 			# Remove passwordless sudo entry
 			write_information "🚧 Removing passwordless sudo for user: ${_OEM_USER}"
 			sed -i "/^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL/d" "${sudoers_file}"
+			if grep -q "^${_OEM_USER} ALL=(ALL) NOPASSWD:ALL" "${sudoers_file}" 2>/dev/null; then
+				write_error "⛔ Error: Failed to remove passwordless sudo for user: ${_OEM_USER}"
+			else 
+				write_information "🚧 Removed passwordless sudo for user: ${_OEM_USER}"
+			fi
 		else
 			write_information "✅ Passwordless sudo already disabled for user: ${_OEM_USER}"
 		fi
