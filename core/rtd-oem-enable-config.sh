@@ -50,7 +50,7 @@ readonly TLA_LOWERCASE="${TLA_UPPERCASE,,}"  # e.g., rtd
 readonly BASE_DIR="/opt/${TLA_LOWERCASE}"
 readonly CORE_DIR="${BASE_DIR}/core"
 readonly CONFIG_DIR="${BASE_DIR}/config"
-readonly LOG_DIR_PATH="${BASE_DIR}/logs"
+readonly LOG_DIR_PATH="/var/log/${_TLA,,}"
 
 readonly LIBRARY_PATH="${CORE_DIR}/_rtd_library"
 readonly FAILLOG_PATH="${BASE_DIR}/faillog.log"
