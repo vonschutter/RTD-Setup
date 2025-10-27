@@ -12171,13 +12171,13 @@ software::ensure_snap_package_managment() {
 				system::log_item "Special case for suse..."
 				security::ensure_admin
 				if hostnamectl | grep -i "tumbleweed"; then
-					local _repo=$(echo https://download.opensuse.org/repositories/system:/snappy/openSUSE_Tumbleweed snappy)
-					system::log_item "Detected OpenSUSE Timbleweed. Adding repo: ${_repo}"
-					zypper addrepo --refresh "${_repo}"
+					local _repo="https://download.opensuse.org/repositories/system:/snappy/openSUSE_Tumbleweed"
+					system::log_item "Detected OpenSUSE Tumbleweed. Adding repo: ${_repo}"
+					zypper addrepo --refresh "${_repo}" snappy
 				else
-					_repo=$(echo https://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_$(cat /etc/os-release | grep VERSION_ID | cut -d= -f2 | cut -d\" -f2) snappy)
+					_repo=$(echo https://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_$(cat /etc/os-release | grep VERSION_ID | cut -d= -f2 | cut -d\" -f2))
 					system::log_item "Detected OpenSUSE Leap. Adding repo:${_repo}"
-					zypper addrepo --refresh "${_repo}"
+					zypper addrepo --refresh "${_repo} snappy"
 				fi
 				zypper --gpg-auto-import-keys refresh || (
 					write_error "Failed to gpg keys!"
@@ -12191,8 +12191,9 @@ software::ensure_snap_package_managment() {
 					write_error "Failed to satisfy dependecy SNAP!"
 					return 1
 				)
-				systemctl enable snapd
-				systemctl start snapd
+				systemctl enable --now snapd
+				systemctl enable --now snapd.apparmor
+				systemctl start --now snapd
 				systemctl is-active --quiet snapd || (
 					write_error "Service snapd not started sucessfully!"
 					return 1
@@ -18497,7 +18498,7 @@ template::Agama_json() {
 	#   template::Agama_json </path/to/profile.json>
 	#
 	# Notes:
-	#   - Requires python3 to be available for JSON generation.
+	#   - Ensures python3 is present using software::check_native_package_dependency before generating JSON.
 	#   - Assumes Preference_DiskEncryption_SUSE holds an <encryption_password> snippet when set.
 	#
 	# End of documentation
@@ -18509,6 +18510,26 @@ template::Agama_json() {
 	fi
 
 	_agama_filename="${output_file}"
+
+	# Ensure python3 is available (installs if necessary on supported distros)
+	if ! command -v python3 >/dev/null 2>&1; then
+		write_information "Ensuring python3 is available using software::check_native_package_dependency..."
+		if ! software::check_native_package_dependency python3; then
+			write_error "Failed to ensure python3 is installed."
+			return 1
+		fi
+	fi
+
+	local python_bin="python3"
+	if ! command -v "${python_bin}" >/dev/null 2>&1; then
+		write_error "python3 is required but not available."
+		return 1
+	fi
+
+	if ! "${python_bin}" -c 'import json, re, textwrap' >/dev/null 2>&1; then
+		write_error "python3 is missing required standard modules (json, re, textwrap)."
+		return 1
+	fi
 
 	local pref_enc="${Preference_DiskEncryption_SUSE:-}"
 	local init_pass="${Preference_InitialUserPassword:-letmein}"
@@ -18530,7 +18551,7 @@ template::Agama_json() {
 	PREF_OEM_DIR="${oem_dir}" \
 	PREF_GIT_SRC="${git_src}" \
 	PREF_OUTPUT="${output_file}" \
-	python3 - <<'PY' || return 1
+	"${python_bin}" - <<'PY' || return 1
 import json
 import os
 import re
@@ -18904,7 +18925,7 @@ cat >>${user_data_file} <<EOF
 ${common_vdi_pre_config}
 
         # Install Ubuntu Desktop Environment
-        - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..3}; do apt-get -y install ubuntu-desktop-minimal || apt-get upgrade -y || true ; done'
+        - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..3}; do apt-get -y install ubuntu-desktop-minimal || true ; done'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install plymouth-theme-ubuntu-text plymouth-theme-spinner plymouth || true'
         - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service || true
 
@@ -20282,7 +20303,7 @@ system::log_item " ***  : executed by $SUDO_USER as $USER  :  ***"
 system::log_item "💻 Basic System Information:
 $(hostnamectl)"
 
-eval_params() {
+main() {
 	case $1 in
 	--help | -?)
 		clear
@@ -20548,5 +20569,5 @@ eval_params() {
 
 # If the library is asked to do something, evaluate the parameters...
 if [[ -n $1 ]]; then
-	eval_params $*
+	main $*
 fi
