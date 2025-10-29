@@ -20055,10 +20055,12 @@ write_host() {
 	)" ;;
 	*) local _text="$1" ;;
 	esac
-	[[ -z "${_text}" ]] && local _text="${color}🗣  $2 $(tput sgr0)"
+
+	[[ -z "${_text}" ]] && local _text="$(tput sgr0)${color} $2 $(tput sgr0)"
 	echo -e "${_text} "
 
-	# Tell the loging function to log the message requested...
+	# Tell the loging function to log the message requested... 🗣  
+
 	system::log_item "${FUNCNAME[0]}       : 💻 ${FUNCNAME[1]}: ${_text}"
 }
 
@@ -20082,12 +20084,11 @@ write_error() {
 	if [[ "${TERMUITXT}" == "nocolor" ]]; then
 		printf '💥 %s: %s\n' "${FUNCNAME[1]}" "${text}"
 	else
-		local color_prefix
-		color_prefix="$(tput bold; tput setaf 1)"
-		printf '%s💥 %s:%s %s\n' "${color_prefix}" "${FUNCNAME[1]}" "${ENDCOLOR}" "${text}"
+		write_host --red "💥 ${FUNCNAME[1]}: ${text}"
 	fi
 
 	# Tell the loging function to log the message requested...
+
 	[ -n "${text}" ] && system::log_item "${FUNCNAME[0]}      : 💥 ${FUNCNAME[1]}: ${text}"
 }
 
@@ -20112,12 +20113,11 @@ write_warning() {
 	if [[ "${TERMUITXT}" == "nocolor" ]]; then
 		printf '⚠ %s: %s\n' "${FUNCNAME[1]}" "${text}"
 	else
-		local color_prefix
-		color_prefix="$(tput bold; tput setaf 3)"
-		printf '%s⚠ %s:%s %s\n' "${color_prefix}" "${FUNCNAME[1]}" "${ENDCOLOR}" "${text}"
+		write_host --yellow "⚠ ${FUNCNAME[1]}: ${text}"
 	fi
 
 	# Tell the loging function to log the message requested...
+
 	[ -n "${text}" ] && system::log_item "${FUNCNAME[0]}    : ⚠ ${FUNCNAME[1]}: ${text}"
 }
 
@@ -20142,12 +20142,11 @@ write_status() {
 	if [[ "${TERMUITXT}" == "nocolor" ]]; then
 		printf '✓ %s: %s\n' "${FUNCNAME[1]}" "${text}"
 	else
-		local color_prefix
-		color_prefix="$(tput bold; tput setaf 2)"
-		printf '%s✓ %s:%s %s\n' "${color_prefix}" "${FUNCNAME[1]}" "${ENDCOLOR}" "${text}"
+		write_host --green "✓ ${FUNCNAME[1]}: ${text}"
 	fi
 
 	# Tell the loging function to log the message requested...
+
 	[ -n "${text}" ] && system::log_item "${FUNCNAME[0]}     : ✓ ${FUNCNAME[1]}: ${text}"
 }
 
@@ -20172,12 +20171,11 @@ write_information() {
 	if [[ "${TERMUITXT}" == "nocolor" ]]; then
 		printf 'ℹ %s: %s\n' "${FUNCNAME[1]}" "${text}"
 	else
-		local color_prefix
-		color_prefix="$(tput bold; tput setaf 4)"
-		printf '%sℹ %s:%s %s\n' "${color_prefix}" "${FUNCNAME[1]}" "${ENDCOLOR}" "${text}"
+		write_host --blue "ℹ ${FUNCNAME[1]}: ${text}"
 	fi
 
 	# Tell the loging function to log the message requested...
+
 	system::log_item "${FUNCNAME[0]}: ℹ ${FUNCNAME[1]}: ${text}"
 }
 
