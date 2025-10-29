@@ -5236,6 +5236,91 @@ system::set_oem_elevated_privilege_gui() {
 	esac
 }
 
+system::preserve_graphical_session_environment() {
+	# Description: Ensure graphical environment variables are set when running as root after escalation.
+	#
+	# Globals:
+	#   - SUDO_USER
+	#   - PKEXEC_UID
+	#   - DISPLAY
+	#   - WAYLAND_DISPLAY
+	#   - XDG_RUNTIME_DIR
+	#   - DBUS_SESSION_BUS_ADDRESS
+	#   - XAUTHORITY
+	# Arguments:
+	#   - None
+	# Outputs:
+	#   - Exports DISPLAY, WAYLAND_DISPLAY, XDG_RUNTIME_DIR, DBUS_SESSION_BUS_ADDRESS, and XAUTHORITY when missing.
+	# Returns:
+	#   - 0 on success or when no action is required.
+	# Usage:
+	#   system::preserve_graphical_session_environment
+	# End of Documentation
+
+	if [[ $EUID -ne 0 ]]; then
+		return 0
+	fi
+
+	local invoking_user=""
+	local invoking_uid=""
+
+	if [[ -n "${PKEXEC_UID:-}" ]]; then
+		invoking_uid="$PKEXEC_UID"
+		invoking_user=$(id -nu "$PKEXEC_UID" 2>/dev/null || true)
+	elif [[ -n "${SUDO_USER:-}" ]]; then
+		invoking_user="$SUDO_USER"
+		invoking_uid=$(id -u "$SUDO_USER" 2>/dev/null || true)
+	fi
+
+	if [[ -z "$invoking_user" || -z "$invoking_uid" ]]; then
+		system::log_item "system::preserve_graphical_session_environment: unable to determine invoking user."
+		return 1
+	fi
+
+	local runtime_dir="/run/user/${invoking_uid}"
+	local display_hint=""
+	if command -v loginctl >/dev/null 2>&1; then
+		display_hint=$(loginctl show-user "$invoking_user" -p Display --value 2>/dev/null || true)
+	fi
+
+	if [[ -z "${DISPLAY:-}" ]]; then
+		if [[ -n "$display_hint" ]]; then
+			DISPLAY="$display_hint"
+		else
+			DISPLAY=":0"
+		fi
+		export DISPLAY
+	fi
+
+	if [[ -z "${WAYLAND_DISPLAY:-}" && -n "$display_hint" ]]; then
+		[[ "$display_hint" == wayland* ]] && export WAYLAND_DISPLAY="$display_hint"
+	fi
+
+	if [[ -z "${XDG_RUNTIME_DIR:-}" ]]; then
+		export XDG_RUNTIME_DIR="$runtime_dir"
+	fi
+
+	if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" && -d "$runtime_dir" ]]; then
+		export DBUS_SESSION_BUS_ADDRESS="unix:path=${runtime_dir}/bus"
+	fi
+
+	if [[ -z "${XAUTHORITY:-}" ]]; then
+		local auth_file
+		auth_file=$(eval echo "~${invoking_user}/.Xauthority")
+		[[ -f "$auth_file" ]] && export XAUTHORITY="$auth_file"
+	fi
+
+	if command -v xhost >/dev/null 2>&1; then
+		if command -v runuser >/dev/null 2>&1; then
+			runuser -u "$invoking_user" -- xhost +SI:localuser:root >/dev/null 2>&1 || true
+		else
+			su - "$invoking_user" -c "xhost +SI:localuser:root" >/dev/null 2>&1 || true
+		fi
+	fi
+
+	return 0
+}
+
 system::toggle_oem_auto_elevated_privilege() {
 	# Description: Toggles passwordless sudo privileges for a specified user.
 	# WARNING: This function modifies sudoers and can pose a security risk.
@@ -10930,7 +11015,8 @@ security::ensure_admin() {
 		--sudo)
 			system::log_item "🔐 Authenticating using 'sudo'..."
 			write_warning "🔐 This script needs administrative access..."
-			sudo -E SUDO_USER=$USER bash "$(readlink -f "$0")" "$@" || rtd_oem_pause 1
+			local preserve_env_list="DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,WAYLAND_DISPLAY"
+			sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" bash "$(readlink -f "$0")" "$@" || rtd_oem_pause 1
 			exit
 			;;
 	esac
@@ -10938,11 +11024,13 @@ security::ensure_admin() {
 	# Attempt to elevate privileges
 	if [ "$graphical_session" = true ]; then
 		system::log_item "🔐 Using pkexec for privilege escalation..."
-		if pkexec env DISPLAY="$DISPLAY" \
-			XAUTHORITY="$XAUTHORITY" \
-			DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
-			SUDO_USER="$USER" \
-			bash "$(readlink -f "$0")" "$@" ; then
+		local pkexec_env=(env DISPLAY="$DISPLAY")
+		[[ -n "${XAUTHORITY:-}" ]] && pkexec_env+=("XAUTHORITY=$XAUTHORITY")
+		[[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]] && pkexec_env+=("DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS")
+		[[ -n "${XDG_RUNTIME_DIR:-}" ]] && pkexec_env+=("XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR")
+		[[ -n "${WAYLAND_DISPLAY:-}" ]] && pkexec_env+=("WAYLAND_DISPLAY=$WAYLAND_DISPLAY")
+		pkexec_env+=("SUDO_USER=$USER")
+		if pkexec "${pkexec_env[@]}" bash "$(readlink -f "$0")" "$@" ; then
 			exit 0
 		else 
 			exit 1
@@ -10950,6 +11038,7 @@ security::ensure_admin() {
 		
 	else
 		# Use dialog if available, else fallback to sudo
+		# sudo --preserve-env=DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR -H bash "$(readlink -f "$0")" "$@"
 		if command -v dialog &>/dev/null; then
 			token=$(dialog --title "${Title:-"sudo"}" --backtitle "Authentication Required ${BackTitle:-"$(basename "$0")"}" --insecure --stdout --passwordbox "\n This functionality requires elevated privileges. \n Please provide your (sudo) password" 10 90)
 			ret=$?
@@ -10959,7 +11048,8 @@ security::ensure_admin() {
 				system::log_item "🔐 Authenticating using dialog..."
 				export HISTIGNORE='*sudo -S*'
 				echo "${token}" | sudo -S -v || security::ensure_admin
-				sudo -E SUDO_USER=$USER /bin/bash "$(readlink -f "$0")" "$@" || rtd_oem_pause 1
+				local preserve_env_list="DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,WAYLAND_DISPLAY"
+				sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" bash "$(readlink -f "$0")" "$@" || rtd_oem_pause 1
 				;;
 				1) echo "Request cancelled" ;;
 				255) echo "[esc] Request aborted" ;;
@@ -10968,8 +11058,9 @@ security::ensure_admin() {
 			exit
 		else
 			system::log_item "🔐 No dialog installed: authenticating using plain sudo..."
-			write_warning "🔐 This script needs administrative access..."
-			sudo -E SUDO_USER=$USER bash "$(readlink -f "$0")" "$@" || rtd_oem_pause 1
+		write_warning "🔐 This script needs administrative access..."
+		local preserve_env_list="DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,WAYLAND_DISPLAY"
+		sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" bash "$(readlink -f "$0")" "$@" || rtd_oem_pause 1
 			exit
 		fi
 	fi

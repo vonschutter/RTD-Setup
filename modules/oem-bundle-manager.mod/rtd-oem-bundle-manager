@@ -151,6 +151,9 @@ dependency::file ()
 system::ExecStart () {
 	[ "$UID" -eq 0 ] || security::ensure_admin
 	[ -z "$RTD_INTERNET_IP" ] || system::wait_for_internet_availability
+	if [[ "$UID" -eq 0 ]]; then
+		system::preserve_graphical_session_environment || true
+	fi
 
 	# Allow super user to display gui menu on users screen.
 	if [[ -f /etc/pam.d/sudo ]] ; then
