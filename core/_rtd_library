@@ -11403,6 +11403,7 @@ software::update_system_txt() {
 		if hash pkcon &>/dev/null; then
 			pkcon -y refresh
 			pkcon -y update --autoremove
+			pkcon -y update --autoremove
 		elif hash dnf &>/dev/null; then
 			dnf -y upgrade
 		elif hash zypper 2>/dev/null; then
@@ -11416,6 +11417,9 @@ software::update_system_txt() {
 			else
 				write_information "📦 There are $UPGRADABLE packages that need updates..."
 				dpkg --configure -a
+				apt-get upgrade -y
+				apt-get full-upgrade -y
+				apt-get --purge autoremove -y
 				apt-get upgrade -y
 				apt-get full-upgrade -y
 				apt-get --purge autoremove -y
