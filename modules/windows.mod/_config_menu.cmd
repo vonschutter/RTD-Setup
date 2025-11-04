@@ -62,7 +62,7 @@ if exist %CTT_CONFIG_SCRIPT% (
     @title "POWERSHELL: Running %CTT_URL% from the internet..."
     powershell -Command "iwr -useb %CTT_URL% | iex"
 )
-goto MENU
+goto MENU 
 
 :MAS
 if exist %RUN_DIR%\%MAS_ACTIVATION_SCRIPT% (
@@ -70,6 +70,6 @@ if exist %RUN_DIR%\%MAS_ACTIVATION_SCRIPT% (
     powershell -ExecutionPolicy UnRestricted -File %RUN_DIR%\%MAS_ACTIVATION_SCRIPT%
 ) else (
     @title "CMD: Running %MAS_URL% from the internet..."
-    powershell -Command "irm %MAS_URL% | iex"
+    powershell -Command "irm https://get.activated.win | iex"
 )
-goto MENU
+goto MENU 

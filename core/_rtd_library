@@ -17788,6 +17788,11 @@ template::kickstart_cfg() {
 
 			# Post-installation Script
 			%post --interpreter=/bin/bash
+			# Ensure EPEL repository and Ansible are present for automation tooling.
+			if command -v dnf >/dev/null 2>&1; then
+				dnf -y install epel-release
+				dnf -y install ansible
+			fi
 			git clone --depth 1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}
 			chmod 755 ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
 			bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
@@ -17832,6 +17837,11 @@ template::kickstart_cfg() {
 
 			# Post-installation Script
 			%post --interpreter=/bin/bash
+			# Ensure EPEL repository and Ansible are present for automation tooling.
+			if command -v dnf >/dev/null 2>&1; then
+				dnf -y install epel-release
+				dnf -y install ansible
+			fi
 			git clone --depth 1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}
 			chmod 755 ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
 			bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
