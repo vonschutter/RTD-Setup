@@ -747,9 +747,35 @@ manage_vdi_vm_templates() {
 }
 
 show_settings_menu() {
+	while true; do
+		exec 3>&1
+		selection=$( $RTD_GUI --backtitle "$BACKTITLE" --cancel-button "Back" --title "Manage VM Preferences"  --menu "Please select which Preference to manage:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
+		"1" "🔧 Manage VM T-Shirt sizes and defaults" \
+		"2" "🔧 Manage VM Unattended install preferences" \
+		2>&1 1>&3)
+		exit_status=$?
+		exec 3>&-
+		clear
 
-# Under construction
-echo "Settings Menu"
+		case $exit_status in
+			"$DIALOG_CANCEL") return ;;
+			"$DIALOG_ESC") return ;;
+		esac
+
+		case $selection in
+			0 )
+				clear
+				write_information "Program terminated by user..."
+			;;
+			1 )
+				kvm::get_vm_size_preferences --ask
+			;;
+			2 )
+				kvm::get_vm_config_preferences --ask
+			;;
+		esac
+	done
+	
 
 }
 

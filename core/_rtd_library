@@ -227,7 +227,8 @@ export RTD_VERSION="2.04"
 183   kvm::util::read_common_options                               ;           Function to read common options for KVM virtual machine creation. This function processes
 184   kvm::util::read_distro_options                               ;           Function to read distribution specific options for KVM virtual machine creation. This function processes
 185   kvm::get_vm_config_preferences                               ;           Retrieves VM configuration values from a configuration file or defaults.
-186   kvm::get_kali_iso                                            ;           See inline documentation in this file.
+186   kvm::get_vm_size_preferences                                 ;           Loads VM sizing defaults, optionally prompting and persisting user changes.
+187   kvm::get_kali_iso                                            ;           See inline documentation in this file.
 187   mint::get_mint_lmde_iso                                      ;           See inline documentation in this file.
 188   kvm::get_almalinux_boot_iso                                  ;           See inline documentation in this file.
 189   kvm::get_fedora_workstation_iso                              ;           See inline documentation in this file.
@@ -2042,8 +2043,6 @@ dependency::command_exists() {
 	# Attempt install, return based on success/failure
 	system::install_missing_commands "${missing_commands[@]}"
 	return $?
-
-
 }
 
 
@@ -14327,7 +14326,7 @@ kvm::util::read_common_options() {
 	# The function also validates the parameters and sets the prompt option for interactive configuration
 	# if requested by the user.
 	#
-	# Globals: _tshirt_cpu_* _tshirt_mem_* _tshirt_dsk_* for small|medioum|large|extra-large|extra-extra-large
+	# Globals: _TSHIRT_CPU_* _TSHIRT_MEM_* _TSHIRT_DSK_* for small|medioum|large|extra-large|extra-extra-large
 	#          as is saved in a configuration file for the user VM preferences.
 	# Arguments: $@ - The parameters to process.
 	# Outputs: Status and error messages
@@ -14402,33 +14401,33 @@ kvm::util::read_common_options() {
 			# Handle the T-shirt size option: set CPU, memory, and disk size based on the selected size
 			case "${2}" in
 			"small" | "S" | "s")
-				_cpu=${_tshirt_cpu_small:-"2"}
-				_mem=${_tshirt_mem_small:-"2048"}
-				_dsk=${_tshirt_dsk_small:-"100"}
+				_cpu=${_TSHIRT_CPU_SMALL:-"2"}
+				_mem=${_TSHIRT_MEM_SMALL:-"2048"}
+				_dsk=${_TSHIRT_DSK_SMALL:-"100"}
 				write_status "👕 T-Shirt Size Small: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
 				;;
 			"medium" | "M" | "m")
-				_cpu=${_tshirt_cpu_medium:-"4"}
-				_mem=${_tshirt_mem_medium:-"4096"}
-				_dsk=${_tshirt_dsk_medium:-"100"}
+				_cpu=${_TSHIRT_CPU_MEDIUM:-"4"}
+				_mem=${_TSHIRT_MEM_MEDIUM:-"4096"}
+				_dsk=${_TSHIRT_DSK_MEDIUM:-"100"}
 				write_status "👕 T-Shirt Size Medium: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
 				;;
 			"large" | "L" | "l")
-				_cpu=${_tshirt_cpu_large:-"8"}
-				_mem=${_tshirt_mem_large:-"8192"}
-				_dsk=${_tshirt_dsk_large:-"100"}
+				_cpu=${_TSHIRT_CPU_LARGE:-"8"}
+				_mem=${_TSHIRT_MEM_LARGE:-"8192"}
+				_dsk=${_TSHIRT_DSK_LARGE:-"100"}
 				write_status "👕 T-Shirt Size Large: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
 				;;
 			"extra-large" | "XL" | "xl")
-				_cpu=${_tshirt_cpu_XL:-"16"}
-				_mem=${_tshirt_mem_XL:-"16384"}
-				_dsk=${_tshirt_dsk_XL:-"100"}
+				_cpu=${_TSHIRT_CPU_XL:-"16"}
+				_mem=${_TSHIRT_MEM_XL:-"16384"}
+				_dsk=${_TSHIRT_DSK_XL:-"100"}
 				write_status "👕 T-Shirt Size Extra Large: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
 				;;
 			"extra-extra-large" | "XXL" | "xxl")
-				_cpu=${_tshirt_cpu_XXL:-"32"}
-				_mem=${_tshirt_mem_XXL:-"32768"}
-				_dsk=${_tshirt_dsk_XXL:-"100"}
+				_cpu=${_TSHIRT_CPU_XXL:-"32"}
+				_mem=${_TSHIRT_MEM_XXL:-"32768"}
+				_dsk=${_TSHIRT_DSK_XXL:-"100"}
 				write_status "👕 T-Shirt Size Extra Extra Large: CPU: ${_cpu} Memory: ${_mem} Disk: ${_dsk}"
 				;;
 			esac
@@ -14866,7 +14865,7 @@ kvm::get_vm_config_preferences() {
 	#
 	# End of Documentation
 
-	local _config_file=${_OEM_USER_VM_PREFERENCES:-"/home/${SUDO_USER}/.config/${_TLA,,}/build_defaults.inf"}
+	local _config_file="${_OEM_USER_VM_PREFERENCES:-"/home/${SUDO_USER}/.config/rtd/build_defaults.inf"}"
 	if [[ "$1" == "--ask" ]]; then
 		local _ask="YES"
 	else
@@ -14897,9 +14896,9 @@ kvm::get_vm_config_preferences() {
 
 	# If the user has requested to be asked for the preseed file, then ask them:
 	if [[ "$_ask" == "YES" ]]; then
-
+		
 		system::log_item "'ask' is requested, requesting user input for the preseed file:"
-		preseed_choices=$(dialog --backtitle "$BRANDING" --title "RTD Preseed Creator" --mixedform "Enter your preferences in to the form below. Please note that the password fields do not show anything but will capture what you type in" 22 80 0 \
+		preseed_choices=$(dialog --backtitle "$BRANDING" --title "RTD Preseed Creator" --mixedform "Enter your preferences in to the form below. Please note that the password fields do not show anything but will capture what you type in" "${HEIGHT:-"22"}" "${WIDTH:-"80"}" "${LIST_HEIGHT:-"0"}" \
 			"DiskEncryption (YES/NO):" 1 1 "${Preference_DiskEncryption}" 1 40 40 0 0 \
 			"Disk Unlock Password (temp):" 2 1 "${Preference_Disk_Password}" 2 40 40 0 0 \
 			"Admin User Name:" 3 1 "${Preference_InitialUser}" 3 40 40 0 0 \
@@ -14960,6 +14959,8 @@ kvm::get_vm_config_preferences() {
 			system::log_item "Password appears to be encrypted already so skipping encryption..."
 		else
 			system::log_item "Password appears to be clear text, encrypting password..."
+			hash mpasswd || system::install_missing_commands "mkpasswd"
+
 			Preference_InitialUserPassword=$(printf "%s" "$Preference_InitialUserPassword" | mkpasswd -s -m sha-512)
 			if system::update_config "$_config_file" "Preference_InitialUserPassword" "${Preference_InitialUserPassword}"; then
 				system::log_item "Stored encrypted password in user preferences: $_config_file"
@@ -14991,7 +14992,183 @@ kvm::get_vm_config_preferences() {
 		write_information "Prompting for VM settings is not requested: ${_role} ${_task} automatically using defaults or parameter instructions..."
 		return 0
 	fi
+	
+}
 
+kvm::get_vm_size_preferences() {
+	# Description: Loads VM sizing defaults from _locations.info or internal fallbacks and
+	# optionally prompts the user to update them, persisting any changes to the user config.
+	#
+	# This helper mirrors kvm::get_vm_config_preferences but focuses on T-shirt sizing values
+	# used when creating new virtual machines. It prefers values defined in core/_locations.info,
+	# falls back to hard-coded defaults when unavailable, and allows interactive updates when
+	# invoked with --ask. Updated values are written to the user preference file so future runs
+	# reuse the selections.
+	#
+	# Globals:
+	#	- _OEM_USER_VM_SIZE_PREFERENCES: Path to the user VM preferences file.
+	#	- _TLA: Three-letter acronym for the project.
+	# Arguments:
+	#	- --ask (optional): Prompts the user to input sizing values interactively.
+	# Outputs:
+	#	- Populates _TSHIRT_CPU_*, _TSHIRT_MEM_*, _TSHIRT_DSK_* and matching Preference_* globals.
+	# Returns:
+	#	- 0 on success.
+	#	- 1 on dialog cancel or error.
+	#
+	# Usage:
+	#	kvm::get_vm_size_preferences
+	#	kvm::get_vm_size_preferences --ask
+	#
+	# Notes:
+	#	- Requires the dialog utility if --ask is used.
+	#	- Persists updates via system::update_config using the same file as other VM preferences.
+	#
+	# End of documentation
+
+	if [[ $EUID -ne 0 ]]; then
+		SUDO_USER=$USER
+	fi
+
+	local _config_file=${_OEM_USER_VM_SIZE_PREFERENCES:-"${_CONFIG_DIR}/vm_user_build_defaults.info"}
+	local _ask="NO"
+	[[ "$1" == "--ask" ]] && _ask="YES"
+
+	local -a _sizes=("SMALL" "MEDIUM" "LARGE" "XL" "XXL")
+	local -a _metrics=("CPU" "MEM" "DSK")
+	local -A _defaults=(
+		["CPU_SMALL"]="2"    ["MEM_SMALL"]="2048"  ["DSK_SMALL"]="100"
+		["CPU_MEDIUM"]="4"   ["MEM_MEDIUM"]="4096" ["DSK_MEDIUM"]="100"
+		["CPU_LARGE"]="8"    ["MEM_LARGE"]="8192"  ["DSK_LARGE"]="100"
+		["CPU_XL"]="16"      ["MEM_XL"]="16384"    ["DSK_XL"]="100"
+		["CPU_XXL"]="32"     ["MEM_XXL"]="32768"   ["DSK_XXL"]="100"
+	)
+
+	# Initialize T-shirt sizing variables with defaults if not already set
+	for size in "${_sizes[@]}"; do
+		for metric in "${_metrics[@]}"; do
+			local key="${metric}_${size}"
+			local tshirt_var="_TSHIRT_${key}"
+			local pref_var="Preference_TShirt_${key}"
+			local default_value="${_defaults[$key]}"
+
+			local current="${!tshirt_var}"
+			if [[ -z "$current" ]]; then
+				printf -v "$tshirt_var" '%s' "$default_value"
+				current="$default_value"
+			fi
+
+			local pref_current="${!pref_var}"
+			if [[ -z "$pref_current" ]]; then
+				printf -v "$pref_var" '%s' "$current"
+			fi
+		done
+	done
+
+	[[ -f "${_config_file}" ]] && system::read_config "${_config_file}"
+
+	for size in "${_sizes[@]}"; do
+		for metric in "${_metrics[@]}"; do
+			local key="${metric}_${size}"
+			local tshirt_var="_TSHIRT_${key}"
+			local pref_var="Preference_TShirt_${key}"
+			local pref_value="${!pref_var}"
+			local fallback="${!tshirt_var}"
+
+			if [[ -n "$pref_value" ]]; then
+				printf -v "$tshirt_var" '%s' "$pref_value"
+			elif [[ -n "$fallback" ]]; then
+				printf -v "$pref_var" '%s' "$fallback"
+			else
+				local default_value="${_defaults[$key]}"
+				printf -v "$tshirt_var" '%s' "$default_value"
+				printf -v "$pref_var" '%s' "$default_value"
+			fi
+		done
+	done
+
+	if [[ "$_ask" == "YES" ]]; then
+		system::log_item "'ask' is requested, requesting user input for VM sizing defaults:"
+		local sizing_choices exit_status
+		sizing_choices=$(dialog --backtitle "$BRANDING" --title "RTD VM Sizing Defaults" \
+			--mixedform "Update the default T-Shirt sizing values (CPU cores, Memory MB, Disk GB)." 24 80 0 \
+			"Small CPU Cores:" 1 1 "${Preference_TShirt_CPU_SMALL}" 1 40 10 0 0 \
+			"Small Memory (MB):" 2 1 "${Preference_TShirt_MEM_SMALL}" 2 40 10 0 0 \
+			"Small Disk (GB):" 3 1 "${Preference_TShirt_DSK_SMALL}" 3 40 10 0 0 \
+			"Medium CPU Cores:" 5 1 "${Preference_TShirt_CPU_MEDIUM}" 5 40 10 0 0 \
+			"Medium Memory (MB):" 6 1 "${Preference_TShirt_MEM_MEDIUM}" 6 40 10 0 0 \
+			"Medium Disk (GB):" 7 1 "${Preference_TShirt_DSK_MEDIUM}" 7 40 10 0 0 \
+			"Large CPU Cores:" 9 1 "${Preference_TShirt_CPU_LARGE}" 9 40 10 0 0 \
+			"Large Memory (MB):" 10 1 "${Preference_TShirt_MEM_LARGE}" 10 40 10 0 0 \
+			"Large Disk (GB):" 11 1 "${Preference_TShirt_DSK_LARGE}" 11 40 10 0 0 \
+			"XL CPU Cores:" 13 1 "${Preference_TShirt_CPU_XL}" 13 40 10 0 0 \
+			"XL Memory (MB):" 14 1 "${Preference_TShirt_MEM_XL}" 14 40 10 0 0 \
+			"XL Disk (GB):" 15 1 "${Preference_TShirt_DSK_XL}" 15 40 10 0 0 \
+			"XXL CPU Cores:" 17 1 "${Preference_TShirt_CPU_XXL}" 17 40 10 0 0 \
+			"XXL Memory (MB):" 18 1 "${Preference_TShirt_MEM_XXL}" 18 40 10 0 0 \
+			"XXL Disk (GB):" 19 1 "${Preference_TShirt_DSK_XXL}" 19 40 10 0 0 \
+			3>&1 1>&2 2>&3)
+		exit_status=$?
+
+		clear
+
+		case $exit_status in
+		0)
+			system::log_item "Saving updated VM sizing defaults..."
+			;;
+		1)
+			system::log_item "[Cancel] pressed; retaining existing VM sizing defaults..."
+			return 1
+			;;
+		255)
+			system::log_item "[ESC] pressed; exiting VM sizing dialog..."
+			return 1
+			;;
+		*)
+			system::log_item "[ERROR] Dialog closed unexpectedly when updating VM sizing defaults."
+			return 1
+			;;
+		esac
+
+		local -a input_array
+		IFS=$'\n' read -r -d '' -a input_array <<<"$sizing_choices"$'\0'
+
+		local index=0
+		for size in "${_sizes[@]}"; do
+			for metric in "${_metrics[@]}"; do
+				local pref_var="Preference_TShirt_${metric}_${size}"
+				local tshirt_var="_TSHIRT_${metric}_${size}"
+				local value="${input_array[$index]}"
+				local fallback="${!tshirt_var}"
+
+				if [[ -z "$value" ]]; then
+					value="$fallback"
+				elif ! [[ "$value" =~ ^[0-9]+$ ]]; then
+					system::log_item "⚠️ Invalid value '${value}' for ${pref_var}; keeping previous setting '${fallback}'."
+					value="$fallback"
+				fi
+
+				printf -v "$pref_var" '%s' "$value"
+				printf -v "$tshirt_var" '%s' "$value"
+				((index++))
+			done
+		done
+
+		local -a update_args=()
+		for size in "${_sizes[@]}"; do
+			for metric in "${_metrics[@]}"; do
+				local pref_var="Preference_TShirt_${metric}_${size}"
+				update_args+=("$pref_var" "${!pref_var}")
+			done
+		done
+
+		system::update_config "${_config_file}" "${update_args[@]}"
+		write_information "Saved VM sizing defaults to: ${_config_file}"
+	else
+		write_information "Using saved or default VM sizing preferences without prompting..."
+	fi
+
+	return 0
 }
 
 kvm::get_kali_iso() {
@@ -15724,6 +15901,23 @@ kvm::create_expanding_vm_hardisk() {
 	if ! qemu-img create -f qcow2 -o preallocation=off "$disk_path" "${disk_size_gb}G" >> "${_LOGFILE}" 2>&1; then
 		system::log_item "❌ Failed to create disk image: $disk_path"
 		return 1
+	fi
+
+	# Optionally preallocate an initial amount of space so guest operating systems see at least
+	# `initial_alloc_gb` available immediately, while still allowing the qcow2 image to grow
+	# dynamically up to disk_size_gb. This mitigates low disk warnings caused by sparse images.
+	
+	local initial_alloc_gb="${INITIAL_VM_DISK_ALLOC_GB:-32}"
+	if (( disk_size_gb > initial_alloc_gb )); then
+		if dependency::command_exists fallocate ; then
+			if ! fallocate -l "${initial_alloc_gb}G" "$disk_path" >> "${_LOGFILE}" 2>&1; then
+				system::log_item "⚠️  Unable to preallocate ${initial_alloc_gb}G for $disk_path (fallocate failed)."
+			else
+				system::log_item "📦 Preallocated ${initial_alloc_gb}G for $disk_path to avoid early disk exhaustion."
+			fi
+		else
+			system::log_item "ℹ️  fallocate not available; skipping initial disk preallocation for $disk_path."
+		fi
 	fi
 
 	system::log_item "✅ Disk image created: $disk_path"
@@ -16605,7 +16799,8 @@ kvm::make_vm_now_from_ubuntu_com() {
 					netcfg/get_hostname=${vm_name} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
 					localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 					--initrd-inject="${_saveto}/preseed.cfg" \
-					--initrd-inject="${_saveto}/ks.cfg" 
+					--initrd-inject="${_saveto}/ks.cfg" \
+				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 			} >> ${_LOGFILE} 2>&1 & disown
 			dialog::display_summary_message "NOTICE!"
 
@@ -16630,7 +16825,8 @@ kvm::make_vm_now_from_ubuntu_com() {
 					netcfg/get_hostname=RTD-VDI console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
 					localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 					--initrd-inject="${_saveto}/preseed.cfg" \
-					--initrd-inject="${_saveto}/ks.cfg" 
+					--initrd-inject="${_saveto}/ks.cfg" \
+				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 			} >> ${_LOGFILE} 2>&1 & disown
 			dialog::display_summary_message "NOTICE!"
 
@@ -16663,7 +16859,8 @@ kvm::make_vm_now_from_ubuntu_com() {
 					--video "virtio" --channel "spicevmc" \
 					--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-					--extra-args "autoinstall" 
+					--extra-args "autoinstall" \
+				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 			} >> ${_LOGFILE} 2>&1 & disown
 			dialog::display_summary_message "NOTICE!"
 		fi
@@ -16695,8 +16892,10 @@ kvm::make_vm_now_from_ubuntu_com() {
 				--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 				--extra-args "autoinstall reboot=acpi" \
-				--events on_reboot=restart,on_poweroff=destroy,on_crash=destroy 
+				--events on_reboot=restart,on_poweroff=destroy,on_crash=destroy \
+				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 			} >> ${_LOGFILE} 2>&1 & disown
+			rtd_oem_pause 1 "Completed getting VM configuration preferences."
 			dialog::display_summary_message "NOTICE!"
 		fi
 	;;
@@ -16729,7 +16928,8 @@ kvm::make_vm_now_from_ubuntu_com() {
 				--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 				--extra-args "autoinstall reboot=acpi" \
-				--events on_reboot=restart,on_poweroff=destroy,on_crash=destroy 
+				--events on_reboot=restart,on_poweroff=destroy,on_crash=destroy \
+				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 			} >> ${_LOGFILE} 2>&1 & disown
 
 			dialog::display_summary_message "NOTICE!"
@@ -16771,7 +16971,7 @@ kvm::make_vm_now_from_microsoft() {
 	# End of Documentation
 
 	# Check for optional default T-Shirts size overrides...
-	local _cpu _mem _dsk _saveto AutoUnattend PostTasks ConfigMenu WindowsMedia _uefi_option _virt_net
+	local _cpu _mem _dsk _saveto AutoUnattend PostTasks ConfigMenu WindowsMedia boot_options _virt_net
 
 	# Set default values for VM T-Shirts sizes...
 	: ${_cpu="${_cpu:-2}"}
@@ -16790,6 +16990,8 @@ kvm::make_vm_now_from_microsoft() {
 	: ${RTD_GUI:="dialog"}
 	: ${_TLA:="$(basename "$0" | cut -c1-3)"}
 
+	boot_options="cdrom,hd,menu=off"
+
 	# Set default values for VM T-Shirts sizes...
 	kvm::util::read_common_options ${*}
 
@@ -16803,11 +17005,11 @@ kvm::make_vm_now_from_microsoft() {
 	case ${target_winver} in
 	win12)
 		: ${WindowsMedia="/var/lib/libvirt/boot/Win11_English_x64.iso"}
-		: ${uefi_option="--boot uefi"}
+		boot_options="uefi,cdrom,hd,menu=off"
 		;;
 	win11)
 		: ${WindowsMedia="/var/lib/libvirt/boot/Win11_English_x64.iso"}
-		: ${uefi_option="--boot uefi"}
+		boot_options="uefi,cdrom,hd,menu=off"
 		;;
 	win10)
 		: ${WindowsMedia="/var/lib/libvirt/boot/Win10_English_x64.iso"}
@@ -16886,14 +17088,14 @@ kvm::make_vm_now_from_microsoft() {
 		# Copy files to the floppy disk but skipp if some optional tasks above failed...
 		command -v mcopy >/dev/null &&
 			{
-				mcopy -i "${WindowsInstructions}" "${PostTasks}" ::/ || rtd_oem_pause 1
-				mcopy -i "${WindowsInstructions}" "${ConfigMenu}" ::/ || rtd_oem_pause 1
-				mcopy -i "${WindowsInstructions}" "${AutoUnattend}" ::/ || rtd_oem_pause 1
+				mcopy -o -i "${WindowsInstructions}" "${PostTasks}" ::/ || rtd_oem_pause 1
+				mcopy -o -i "${WindowsInstructions}" "${ConfigMenu}" ::/ || rtd_oem_pause 1
+				mcopy -o -i "${WindowsInstructions}" "${AutoUnattend}" ::/ || rtd_oem_pause 1
 
 				write_information "Copy the Windows.mod files files to the floppy disk..."
 				for i in $(find /opt/${_TLA,,} -type d -name "windows.mod")/_*; do
 					if [[ -e "${i}" ]]; then
-						command -v mcopy >/dev/null && { mcopy -i "${WindowsInstructions}" "${i}" ::/ || rtd_oem_pause 1; }
+						command -v mcopy >/dev/null && mcopy -o -i "${WindowsInstructions}" "${i}" ::/ || rtd_oem_pause 1
 						write_status "Copied ${i} to the floppy disk..."
 					else
 						write_warning "No files found in ${i} to copy to the floppy disk..."
@@ -16928,6 +17130,7 @@ kvm::make_vm_now_from_microsoft() {
 	      After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
 
 	write_status "Creating and starting Virtual machine... "
+
 	{
 		"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
 			--vcpus "${_cpu}" \
@@ -16939,15 +17142,30 @@ kvm::make_vm_now_from_microsoft() {
 			--cdrom "${WindowsMedia}" \
 			--disk "${WindowsInstructions}",device=floppy \
 			--livecd \
+			--boot ${boot_options} \
 			--features kvm_hidden=on,smm=on \
 			--tpm backend.type=emulator,backend.version=2.0,model=tpm-tis \
-			${uefi_option} \
 			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
+
+		# Attempt to automatically satisfy the Windows "Press any key to boot from CD or DVD" prompt.
+		if command -v virsh >/dev/null 2>&1; then
+			(
+				sleep 8
+				if virsh --connect qemu:///system list --name | grep -Fxq "${vm_name}"; then
+					virsh --connect qemu:///system send-key "${vm_name}" KEY_ENTER KEY_ENTER KEY_ENTER >/dev/null 2>&1 \
+						|| system::log_item "Failed to auto-send boot key for ${vm_name}"
+				fi
+			) &
+		else
+			system::log_item "virsh not available; unable to auto-send boot key for ${vm_name}"
+		fi
 	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
-	#			--tpm backend.type=emulator,backend.version=2.0,model=tpm-crb \
+
+
+	
 	rm -f "${PostTasks}" || system::log_item "Failed to remove ${PostTasks}..."
 	rm -f "${ConfigMenu}" || system::log_item "Failed to remove ${ConfigMenu}..."
-	for i in WindowsInstructions CONFIG WindowsMedia AutoUnattend PostTasks ConfigMenu target_winver mem_size uefi_option cpu_count disk_size preferred_video disk_path; do unset $i; done
+	for i in WindowsInstructions CONFIG WindowsMedia AutoUnattend PostTasks ConfigMenu target_winver mem_size boot_options cpu_count disk_size preferred_video disk_path; do unset $i; done
 }
 
 kvm::backup_all_running_vm() {
@@ -20424,14 +20642,14 @@ write_information() {
 	fi
 
 	if [[ "${TERMUITXT}" == "nocolor" ]]; then
-		printf 'ℹ %s: %s\n' "${FUNCNAME[1]}" "${text}"
+		printf 'ℹ️ %s: %s\n' "${FUNCNAME[1]}" "${text}"
 	else
-		write_host --blue "ℹ ${FUNCNAME[1]}: ${text}"
+		write_host --blue "ℹ️ ${FUNCNAME[1]}: ${text}"
 	fi
 
 	# Tell the loging function to log the message requested...
 
-	system::log_item "${FUNCNAME[0]}: ℹ ${FUNCNAME[1]}: ${text}"
+	system::log_item "${FUNCNAME[0]}: ℹ️ ${FUNCNAME[1]}: ${text}"
 }
 
 list_loaded_internal_functions() {

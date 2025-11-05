@@ -49,6 +49,8 @@ export _APPS_DIR="${_MODS_DIR}/oem-app-runner.mod/apps" # Location of 3rd party 
 export _LOG_DIR=/var/log/${_TLA,,}                      # Location of log files
 export _CONFIG_DIR=/etc/${_TLA,,}                       # Location of status files and config files
 export _OEM_TEST_IPS=("8.8.8.8" "1.1.1.1" "9.9.9.9")    # Location of test ip addresses
+export _USER_HOME_DIR="$/home/$( if [[ -n $SUDO_USER ]]; then echo $SUDO_USER; else echo $USER; fi )"  # Location of user home directory
+export _USER_CONFIG_DIR="${_USER_HOME_DIR}/.config/${_tla:-"rtd"}" # Location of user specific config files
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # default ID's to be used for system building and configuration
@@ -67,7 +69,7 @@ export _OEM_TIME_ZONE="Etc/UTC"                         # Default time zone for 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # Location of where to store completed software productivity bundles installed and where to find software 
 # productivity bundles that are available for install. 
-export completed_bundles_list="${_CONFIG_DIR}/completed-bundles.inf"
+export completed_bundles_list="${_CONFIG_DIR}/completed-bundles.info"
 export available_bundles_list="${_OEM_DIR}/core/_rtd_recipes.info"
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -120,11 +122,67 @@ KVM_ZORIN_ISO_MIRRORS=(
 # an external storage or san mount point. If you do non need to backup VMs you can set
 # this to blank or ignore it. If you do not have QEMU/KVM installed selecting this
 # option to back up Virtual Machines in the menu will do nothing.
-export VM_BACKUP_TARGET="${VM_BACKUP_TARGET:="/mnt/vmdsk/VM_BACKUP"}"
+VM_BACKUP_TARGET="/mnt/vmdsk/VM_BACKUP"
+
+# ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# Set location to store created virtual machine disk images. This location must have
+# adequate space to store several copies of the virtual machine disks. This may be a
+# network share or an external storage or san mount point. If you do not have QEMU/KVM
+# installed selecting this option to build Virtual Machines in the menu will do nothing.
+VM_BUILD_TARGET="${VM_BUILD_TARGET:="/mnt/vmdsk/VM_IMAGES"}"
+
+# Set the default initial virtual machine disk size in GB. This may be overidden
+# during the virtual machine build process. The disk size will expand as required up to
+# the maximum size set during the VM build process (example: 100GB).
+INITIAL_VM_DISK_ALLOC_GB=32
+
+# VM build default settings for unattended installs.
+_ENCRYPT_DISK="YES"
+_TEMP_DISK_PASSWORD="letmein1234"
+_OEM_USER="tangarora"
+_OEM_USER_FULLNAME="RTD User"
+_OEM_USER_GROUP="sudo"
+_OEM_USER_PASSWORD="letmein1234"
+_OEM_USER_KEYBOARD_LAYOUT="us"
+_OEM_USER_LANGUAGE="en_US"
+_OEM_TIME_ZONE="Etc/UTC"
+_OEM_WIRELESS_ID="loader"
+_OEM_WIRELESS_PASSWORD="letmein1234"
+_role="default"
+_OEM_COPY_SSH_KEY="NO"
+
+# VM default settings for memory and cpu allocation if nothing is specified during the VM build process.
+# T-Shirt sizing for VM builds - small, medium, large, xl, xxl etc.
+# These settings may be overidden during the VM build process.
+# Format: CPU cores, RAM in MB, Disk size in GB
+# These are used as presets for quick selection during the VM build process.
+# For example, a small VM will have 2 CPU cores, 2048 MB of RAM and 100 GB disk size.
+# These are used in a function like so: 
+# kvm::make_vm_now_from_ubuntu_com --role VDI --server-app kubuntu-desktop --ask YES --tshirt-size medium if
+# the _rtd_library is loaded.
+_OEM_USER_VM_SIZE_PREFERENCES="${_USER_CONFIG_DIR}/vm_user_build_defaults.info"
+DEFAULT_VM_MEMORY_MB=2048
+DEFAULT_VM_CPU_COUNT=2
+DEFAULT_VM_DISK_SIZE_GB=100
+_TSHIRT_CPU_SMALL=2
+_TSHIRT_MEM_SMALL=2048
+_TSHIRT_DSK_SMALL=100
+_TSHIRT_CPU_MEDIUM=4
+_TSHIRT_MEM_MEDIUM=4096
+_TSHIRT_DSK_MEDIUM=100
+_TSHIRT_CPU_LARGE=8
+_TSHIRT_MEM_LARGE=8192
+_TSHIRT_DSK_LARGE=100
+_TSHIRT_CPU_XL=16
+_TSHIRT_MEM_XL=16384
+_TSHIRT_DSK_XL=100
+_TSHIRT_CPU_XXL=32
+_TSHIRT_MEM_XXL=32768
+_TSHIRT_DSK_XXL=100
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # Set where desktop wallpapers are stored if not already defined
-: ${_XDG_WALLPAPER_DIR:="/usr/share/wallpapers"} && export _XDG_WALLPAPER_DIR
+: ${_XDG_WALLPAPER_DIR:="/usr/share/wallpapers"} ; export _XDG_WALLPAPER_DIR
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # Sometimes, depending on distribution of Linux, some paths are omitted fom the path statement
@@ -149,9 +207,12 @@ export _DEBIAN_FRONTEND_GTK_KERNEL="${_DEBIAN_SOURCE_URL}/current/images/netboot
 export _DEBIAN_FRONTEND_GTK_INITRD="${_DEBIAN_SOURCE_URL}/current/images/netboot/gtk/debian-installer/amd64/initrd.gz"
 export _DEBIAN_FRONTEND_DEFAULT_KERNEL="${_DEBIAN_SOURCE_URL}/current/images/netboot/debian-installer/amd64/linux"
 export _DEBIAN_FRONTEND_DEFAULT_INITRD="${_DEBIAN_SOURCE_URL}/current/images/netboot/debian-installer/amd64/initrd.gz"
-#export _SOURCE_ISO_URL="https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/$(curl --silent  https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/SHA256SUMS | \grep -o "debian-.*netinst*.iso" |grep -v mac |grep -v edu)"
-#export _SOURCE_FIRMWARE="http://cdimage.debian.org/cdimage/unofficial/non-free/firmware/buster/current/firmware.zip"
-#export _CURRENT_DEB_ISO="$(curl --silent  https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/SHA256SUMS | \grep -o "debian-.*netinst*.iso" |grep -v mac |grep -v edu)"
+
+# The following lines are no longer required as the latest firmware and ISO are included the lates Debian installer automatically.
+# Uncomment if you want to use older versions of Debian.
+# export _SOURCE_ISO_URL="https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/$(curl --silent  https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/SHA256SUMS | \grep -o "debian-.*netinst*.iso" |grep -v mac |grep -v edu)"
+# export _SOURCE_FIRMWARE="http://cdimage.debian.org/cdimage/unofficial/non-free/firmware/buster/current/firmware.zip"
+# export _CURRENT_DEB_ISO="$(curl --silent  https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/SHA256SUMS | \grep -o "debian-.*netinst*.iso" |grep -v mac |grep -v edu)"
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # Suse VM build default sources.
