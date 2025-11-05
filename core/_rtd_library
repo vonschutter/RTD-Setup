@@ -17614,6 +17614,7 @@ template::preseed_cfg::late_command() {
 			# C.4.12. Addon Tasks for Minecraft Server
 			# --------------------------------------------------- #
 			${_d_i_post_statment_ubunto_or_deb} \
+			in-target apt-get -y install ansible ; \
 			in-target /bin/bash /${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ; \
 			in-target mkdir -p /root/.ssh ; \
 			in-target mkdir -p /home/${Preference_InitialUser}/.ssh ; \
@@ -17646,6 +17647,7 @@ template::preseed_cfg::late_command() {
 			${_d_i_post_statment_ubunto_or_deb} \
 			in-target apt-get -y install qemu-system libvirt-daemon-system ; \
 			in-target apt-get -y install git ; \
+			in-target apt-get -y install ansible ; \
 			in-target git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} ; \
 			in-target /usr/bin/chmod 755 ${_OEM_DIR:-"/opt/rtd"}/${_OEM_DIR:-"/opt/rtd"}/* ; \
 			in-target /bin/bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ; \
@@ -17678,6 +17680,7 @@ template::preseed_cfg::late_command() {
 			# --------------------------------------------------- #
 			${_d_i_post_statment_ubunto_or_deb} \
 			in-target apt-get -y install git ; \
+			in-target apt-get -y install ansible ; \
 			in-target apt-get -y install dialog p7zip-full virt-what curl wget ; \
 			in-target apt-get -y install spice-vdagent qemu-guest-agent ; \
 			in-target apt-get -y install neofetch ; \
@@ -18559,6 +18562,7 @@ template::AutoYast_xml() {
 			<package>vim</package>
 			<package>spice-vdagent</package>
 			<package>git</package>
+			<package>ansible</package>
 			<package>pkexec</package>
 			<package>zip</package>
 			<package>zenity</package>
@@ -18633,6 +18637,7 @@ template::AutoYast_xml() {
 		sudo zypper ar -cfp 90 ${_SUSE_PACKMAN_LEAP} packman
 		zypper --gpg-auto-import-keys refresh
 		# zypper dup --from packman -y --force-resolution
+		zypper in -y ansible
 		zypper in -y yad
 		]]>
 			</source>
@@ -18779,6 +18784,7 @@ if packman_repo:
     script_lines.append(f"zypper ar -cfp 90 {packman_repo} packman")
     script_lines.append("zypper --gpg-auto-import-keys refresh")
 script_lines.extend([
+    "zypper in -y ansible",
     "zypper in -y yad"
 ])
 
@@ -18819,7 +18825,7 @@ data = {
         "patterns": [desktop_pattern],
         "packages": [
             "wget", "curl", "dialog", "vim", "spice-vdagent",
-            "git", "pkexec", "zip", "zenity", "acpi",
+            "git", "ansible", "pkexec", "zip", "zenity", "acpi",
             "pciutils", "jq", "xhost", "rsync"
         ],
         "products": [product]
@@ -19014,6 +19020,7 @@ common_vdi_post_config=$(cat <<EOF
 
         # Enable and start spice-vdagent onlogin
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install spice-vdagent qemu-guest-agent ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install ansible ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c 'systemctl enable spice-vdagentd ; exit 0'
 
         # Ensure spice-vdagent autostarts in user sessions
@@ -19074,6 +19081,7 @@ autoinstall:
     packages:
         - dialog
         - git
+        - ansible
         - curl
         - wget
         - zip
