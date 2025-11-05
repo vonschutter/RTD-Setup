@@ -61,7 +61,8 @@ fi
 : ${_LOGFILE:="${_LOG_DIR}/$(basename $0)-$(date +%Y-%m-%d).log"}
 
 
-
+_ui_side_bar="/opt/rtd/modules/oem-bundle-manager.mod/image/banner.png"
+_title="RunTime Data Bundle Manager"
 
 _ABOUT='
 <span font="16" foreground="blue"><b>OEM Bundle Manager</b></span>
@@ -95,12 +96,14 @@ to get a truly useful system. Then Bundle Manager lets you install software by t
   succeed tather than fail and installing dependencies when you need them.
 '
 
-_INFO_TXT="'
-<span font='16' foreground='red'>Add or remove bundles on this system</span> \n
-NOTE: The OEM Bundle Manager, depending on your choices, may download vendor 
-packages, or containes applications such as snap apps, or flatpak apps, 
+_INFO_TXT="
+
+<span font='16' foreground='red'>Add or remove software bundles on this system</span> \n
+NOTE: The Software Bundle Manager make it easy to install software by task or role, 
+depending on your choices, the Software Bundle Manager may download vendor 
+packages, or install applications such as snap apps, or flatpak apps, 
 or even download software from a vendors web site, as well as install 
-fonts and wallpapeers etc. \n '"
+fonts and wallpapeers etc. \n "
 
 
 
@@ -203,7 +206,7 @@ system::ExecStart () {
 				"Remove Bundles from this computer" \
 				"Information abount this tool" \
 				--column="Select What you Want To Do:" --text="$_INFO_TXT" \
-				--title="OEM Bundle Manager" --height=450 --width=640 )
+				--title="RunTime Data Bundle Manager" --height=500 --width=800 )
 			exit_status=$?
 			exec 3>&-
 
@@ -233,40 +236,51 @@ system::ExecStart () {
 		done
 	else [[ $DisplayGUI == "yad" ]];
 		while true; do
-			exec 3>&1
-			selection=$(yad --cancel-label=QUIT  --list \
-				"Add Bundles to this computer" \
-				"Remove Bundles from this computer" \
-				"Information abount this tool" \
-				--column="Select What you Want To Do:" --text="$_INFO_TXT" \
-				--title="OEM Bundle Manager" --height=450 --width=640 )
-			exit_status=$?
-			exec 3>&-
+			local _info_rendered _info_line _info_trimmed _info_label
+			local -a yad_cmd
 
-			system::log_item "$(basename $0) user selected: $selection"
+			_info_rendered=$(printf '%b' "$_INFO_TXT")
+			# Build yad command so informational text is rendered as stacked labels
+			yad_cmd=(
+				--form
+				--image="/opt/rtd/modules/oem-bundle-manager.mod/image/banner.png"
+				--image-on-top
+				--title="${_title}"
+				--columns=1
+			)
 
-			case ${exit_status} in
-				1) system::log_item "$(basename $0) was told to [QUIT]" & echo [QUIT] && exit 
-				;;
-				255) system::log_item "$(basename $0) user pressed [ESC]" & echo [ESC] && exit 
-				;;
+			while IFS= read -r _info_line; do
+				_info_trimmed="${_info_line#"${_info_line%%[![:space:]]*}"}"
+				_info_trimmed="${_info_trimmed%"${_info_trimmed##*[![:space:]]}"}"
+				[[ -z "$_info_trimmed" ]] && continue
+				_info_label="${_info_trimmed//:/\\:}"
+				yad_cmd+=(--field="$_info_label":LBL)
+			done <<< "$_info_rendered"
+
+			yad_cmd+=(
+				--width=700
+				--height=360
+				--button="Add Bundles to this computer:0"
+				--button="Remove Bundles from this computer:2"
+				--button="Information abount this tool:3"
+				--button="Quit:1"
+				--buttons-layout=center
+			)
+
+			# Display the yad form and capture the selected button
+			selection=$(yad "${yad_cmd[@]}")
+			ret=$?
+
+			# Handle the user's selection
+			case $ret in
+				0) software::display_bundle_install_choices_gtk --zenity ;;
+				1) clear && echo "[Quit]" | tee -a "${_log_file}" ; break ;;
+				2) software::display_bundle_removal_choices_gtk --zenity;;
+				3) zenity::display_info "$_ABOUT" ;;
+				252) clear && echo "[ESC]" | tee -a "${_log_file}" && break ;;
+				*) clear && echo "[Unknown Request]" | tee -a "$${_log_file}" && break ;;
 			esac
-
-			case "$selection" in
-				"Add Bundles to this computer|" ) 
-					software::display_bundle_install_choices_gtk --yad 
-				;;
-				"Remove Bundles from this computer|" ) 
-					software::display_bundle_removal_choices_gtk --yad 
-				;;
-				"Information abount this tool|" ) 
-					zenity::display_info "$_ABOUT"  
-				;;
-				* )
-				# Trap unknown exit code...
-				return 1
-				;;
-			esac
+			unset _ret
 		done
 	fi
 }
@@ -316,7 +330,7 @@ system::ExecStart::help ()
 
 main ()
 {
-	DisplayGUI="zenity"
+	DisplayGUI="yad"
 	run="yes"
 
 	while [[ $# -gt 0 ]]; do
