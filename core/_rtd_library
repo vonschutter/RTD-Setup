@@ -200,8 +200,8 @@ export RTD_VERSION="2.04"
 156   software::ensure_snap_package_managment                      ;           Function to ensure that snap is installed.
 157   is_software_package_installed                                ;           Function to check if a piece of software is installed. This function will first check
 158   software::is_native_package_installed                        ;           Function to check if a piece of software is installed. This function will first check
-159   is_software_package_available                                ;           Function to chek if a package is available in whetever repository, and
-160   set_install_command                                          ;           See inline documentation in this file.
+159   software::is_native_package_installed                                ;           Function to chek if a package is available in whetever repository, and
+160   software::set_install_command                                          ;           See inline documentation in this file.
 161   software::add_gnome_extensions                               ;           See inline documentation in this file.
 162   software::check_native_package_dependency                    ;           See inline documentation in this file.
 163   rtd_ppa_checker                                              ;           See inline documentation in this file.
@@ -1203,20 +1203,29 @@ term::animate_while_command() {
 	if [[ -z ${1} ]]; then
 		write_error "Specifying a command to wait for is required!"
 		return 1
-	else
-		term::start_animation "$@"
-
-		# Run the command in the background and get its PID
-		"${@}" &>/dev/null &
-		CMD_PID=$!
-
-		# Wait for the command to complete
-		wait $CMD_PID
-		RET_CODE=$?
-
-		term::stop_animation $RET_CODE
-		return $RET_CODE
 	fi
+
+	local logfile="${TERM_TASK_LOGFILE:-/dev/null}"
+	local monitor_was_enabled=0
+
+	if [[ -o monitor ]]; then
+		monitor_was_enabled=1
+		set +o monitor
+	fi
+
+	term::start_animation "$@"
+
+	# Run the command and log output while the animation updates in the background.
+	"${@}" >>"$logfile" 2>&1
+	RET_CODE=$?
+
+	term::stop_animation "$RET_CODE"
+
+	if (( monitor_was_enabled )); then
+		set -o monitor
+	fi
+
+	return "$RET_CODE"
 
 }
 
@@ -1234,7 +1243,15 @@ term::start_animation() {
 	# term::stop_animation
 	#
 	# End of documentation
-	cmd_while="${@}"
+	local cmd_while
+
+	if [[ -n ${TERM_TASK_CMD_DISPLAY:-} ]]; then
+		cmd_while="${TERM_TASK_CMD_DISPLAY}"
+	else
+		printf -v cmd_while '%q ' "$@"
+		cmd_while=${cmd_while% }
+		cmd_while="Executing ${cmd_while}"
+	fi
 
 	if [[ -z ${cmd_while} ]]; then
 		write_error "Specifying a command to wait for is required!"
@@ -1334,14 +1351,24 @@ term::task_exec_list_output() {
 	# NOTE:
 	# End of documentation
 
-	local logfile
+	local logfile cmd_display status
 	if ! logfile=$(system::determine_logfile); then
 		return 1
 	fi
 
 	system::log_item "Running ${FUNCNAME[0]} requested by ${FUNCNAME[1]} with parameters $*"
-	echo -ne "Executing $LINE:"\  &
+
+	printf -v cmd_display '%q ' "$@"
+	cmd_display=${cmd_display% }
+	TERM_TASK_LOGFILE="$logfile"
+	TERM_TASK_CMD_DISPLAY="Executing ${cmd_display}"
+
 	term::animate_while_command "$@"
+	status=$?
+
+	unset TERM_TASK_LOGFILE TERM_TASK_CMD_DISPLAY
+
+	return "$status"
 
 }
 
@@ -5094,7 +5121,7 @@ AutomaticLogin=$user" || true
 
 	__toggle_dm_autologin "GDM (Fedora)" "/etc/gdm/custom.conf" \
 "[daemon]
-WaylandEnable=false
+WaylandEnable=true
 AutomaticLoginEnable=True
 AutomaticLogin=$user
 
@@ -11180,7 +11207,7 @@ software::package_kit::remove_package() {
 	# installation logic for a given software provider. This should be expanded to include flatpak
 	# snap for example. It should be the same consistent way no matter flavor of Linux.
 	# This function uses the "$_INSTCMD" to install software. "$_INSTCMD" is defined separatley
-	# in the "set_install_command" function (a dependency to this function) and could
+	# in the "software::set_install_command" function (a dependency to this function) and could
 	# be an RPM or deb string, or even snap or flatpak. A preference order between package system and
 	# snap or flatpak use.
 	# End of documentation
@@ -11901,9 +11928,9 @@ software::is_native_package_available() {
 	# if there return a "0" and if not return a "1" or a "3" if there is no recognizable
 	# package manager found. the function expects the name of the package
 	# to be a parameter passed to this fuction. Call this function by:
-	# is_software_package_available "package name"
+	# software::is_native_package_installed "package name"
 	#                 or
-	# is_software_package_available "$1" if calling this function from a script
+	# software::is_native_package_installed "$1" if calling this function from a script
 	# or another function receiving a parameter.
 	#
 	# Supported base distributions: Fedora . SuSE . Debian
@@ -11925,14 +11952,14 @@ InstallSoftwareFromRepo() {
 	# installation logic for a given software provider. This should be expanded to include flatpak
 	# snap for example. It should be the same consistent way no matter flavor of Linux.
 	# This function uses the "$_INSTCMD" to install software. "$_INSTCMD" is defined separatley
-	# in the "set_install_command" function (a dependency to this function) and could
+	# in the "software::set_install_command" function (a dependency to this function) and could
 	# be an RPM or deb string, or even snap or flatpak. A preference order between package system and
 	# snap or flatpak use.
 	# End of documentation
 
 	local PAD LINE PRE _return
 
-	set_install_command &>>"${_LOGFILE}"
+	software::set_install_command &>>"${_LOGFILE}"
 
 	PAD="------------------------------------------------"
 	LINE=$(printf "%s %s" "$@" "$PAD" | cut -c 1-${#PAD})
@@ -11943,10 +11970,10 @@ InstallSoftwareFromRepo() {
 		printf "%b%-6s%b [ $symbol ] $color $message $ENDCOLOR \n"
 	}
 
-	if is_software_package_installed "${1}"; then
+	if software::is_native_package_installed "${1}"; then
 		display_message "Already installed..." "$YELLOW" "\xE2\x9C\x94"
 		return 1
-	elif is_software_package_available "${1}"; then
+	elif software::is_native_package_available "${1}"; then
 		if
 			printf "${PRE}" &
 			software::add_native_package "${1}" &>>"${_LOGFILE}"
@@ -12346,35 +12373,6 @@ software::ensure_snap_package_managment() {
 
 
 
-is_software_package_installed() {
-	# Description: Function to check if a piece of software is installed. This function will first check
-	# if the package manager is deb, zypper or rpm, and then take one parameter passed
-	# and evauate if a software package by that name is installed. This function
-	# will return a "0" or "1" return based on the package managers return code.
-	# Globals:
-	# Arguments: None
-	# Outputs:
-	# Returns: 1/0 where 0 = package is installed/1 = package is NOT installed
-	# Usage:
-	# Call this function by:
-	# is_software_package_installed "package name"
-	#                 or
-	# is_software_package_installed "$1" if calling this function from a script
-	# or another function receiving a parameter.
-	#
-	# End of documentation
-
-	if hash dnf &>/dev/null; then
-		rpm -q "$1" &>/dev/null && return 0 || return 1
-	elif hash zypper &>/dev/null; then
-		zypper se -i "$1" &>/dev/null && return 0 || return 1
-	elif hash apt &>/dev/null; then
-		dpkg -l "$1" | grep -E "^ii\s+$1\s" &>/dev/null && return 0 || return 1
-	else
-		return 3
-	fi
-
-}
 
 software::is_native_package_installed() {
 	# Description: Function to check if a piece of software is installed. This function will first check
@@ -12405,31 +12403,8 @@ software::is_native_package_installed() {
 	fi
 }
 
-is_software_package_available() {
-	# Description: Function to chek if a package is available in whetever repository, and
-	# if there return a "0" and if not return a "1" or a "3" if there is no recognizable
-	# package manager found. the function expects the name of the package
-	# to be a parameter passed to this fuction. Call this function by:
-	# is_software_package_available "package name"
-	#                 or
-	# is_software_package_available "$1" if calling this function from a script
-	# or another function receiving a parameter.
-	#
-	# Supported base distributions: Fedora . SuSE . Debian
-	# End of documentation
 
-	if hash yum &>/dev/null; then
-		yum list available "$1" &>/dev/null && return 0 || return 1
-	elif hash zypper &>/dev/null; then
-		zypper se "${1}" | grep "${1}" &>/dev/null && return 0 || return 1
-	elif hash apt &>/dev/null; then
-		apt -qq list "$1" | grep -q "$1" &>/dev/null && return 0 || return 1
-	else
-		return 3
-	fi
-}
-
-set_install_command() {
+software::set_install_command() {
 	# Description:
 	# add global install command for portability and convenience. This function
 	# allows for scripts to add software across many systems.
@@ -12442,12 +12417,12 @@ set_install_command() {
 	# Arguments: None
 	# Outputs:
 	# Returns:
-	# Usage: "set_install_command"
+	# Usage: "software::set_install_command"
 	#
 	# Arguments: none.
 	#
 	# Return Codes:
-	# set_install_command will return a global variable ${_INSTCMD}
+	# software::set_install_command will return a global variable ${_INSTCMD}
 	# ${_INSTCMD} will expand to teh appropriate install cmmand including options
 	# for non interactive install of a package. ${_INSTCMD} package.name will install said pacakge.
 	#
@@ -13014,7 +12989,7 @@ software::update_system() {
 	# Arguments: None
 	# Outputs:
 	# Returns:
-	# Usage: rtd_update_system
+	# Usage: software::update_system
 	# End of documentation
 	
 	security::ensure_admin
@@ -16053,9 +16028,12 @@ kvm::make_vm_now_from_fedora_org() {
 			--memory "${_mem}" \
 			--network "${virt_net:=default}" \
 			--disk path="${disk_path},format=qcow2" \
-			--os-variant="fedora40" \
+			--os-variant detect=on \
 			--initrd-inject="${_preseed_file}" \
 			--location="${iso}" \
+			--video model=virtio \
+			--graphics spice,listen=127.0.0.1 \
+			--controller type=virtio-serial \
 			--extra-args "inst.ks=file:/$(basename $_preseed_file)" \
 			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
@@ -16902,7 +16880,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 	server | Server | SERVER)
 
 		if [[ ${_tgt_ubuntu_ver::2} -lt 22 ]]; then
-			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than less than 23, VDI build is deprecated. "
+			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than less than 22, build is deprecated. "
 			_summary_message="
 			NOTE: Building a server for Ubuntu versions less than 22 is deprecated \n
 			they are just too old and un modern to be useful. \n
@@ -18040,6 +18018,7 @@ template::kickstart_cfg() {
 			# Generated by: system::generate_ks_cfg_file by RTD Power Tools
 			# Choosing mode (graphical|text|cmdline [--non-interactive])
 			graphical
+			services --enabled=gdm
 			firstboot --disable
 			keyboard --vckeymap=${Preference_InitialKeyboardLayout} --xlayouts="${Preference_InitialKeyboardLayout}"
 			lang en_US.UTF-8
@@ -18056,12 +18035,10 @@ template::kickstart_cfg() {
 
 			%packages --retries 5 --timeout 20
 			${_UserDesktopEnvironmentSelection}
-			# Likely tempratry workaround for missing xorg-x11-server-Xorg dependency in some spins
-			# $(echo "${_UserDesktopEnvironmentSelection}"|grep -iq 'workstation-product-environment' && echo 'gnome-session-xsession' || echo '# custom desktop, not workstation default')
-			@system-tools
 			openssh-server
 			spice-vdagent
-			qemu-guest-agent
+			mesa-dri-drivers
+			mesa-vulkan-drivers
 			git
 			curl
 			dialog
@@ -18070,17 +18047,11 @@ template::kickstart_cfg() {
 
 			# Post-installation Script
 			%post --interpreter=/bin/bash
-			# Ensure EPEL repository and Ansible are present for automation tooling.
-			if command -v dnf >/dev/null 2>&1; then
-				dnf -y install epel-release
-				dnf -y install ansible
-			fi
 			git clone --depth 1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}
 			chmod 755 ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
 			bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
-			systemctl enable sshd
-			systemctl enable gdm
-			restorecon -Rv /usr/share/wayland-sessions /usr/share/xsessions
+			# systemctl enable sshd
+			# restorecon -Rv /usr/share/wayland-sessions /usr/share/xsessions
 			systemctl set-default graphical.target
 			%end
 		KS_EOF
