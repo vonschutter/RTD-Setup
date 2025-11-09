@@ -238,11 +238,11 @@ recipe:_Internet_Browsing_Private () {
 	# Brave secure browser, vendor provided Snap.
 	# If you prefer the downloaded version directly from Brave, uncomment the below line.
 	# Single_Install_Brave_Browser
-	software::from_snapcraft.io brave $1
+	software::software::from_flathub.org com.brave.Browser $1
 
 	# Firefox is a fast, full-featured Web browser that's easy to use. It has lots of great features including
 	# tabbed browsing, live bookmarks, private browsing, a built-in search engine, and more.
-	software::from_snapcraft.io firefox $1
+	hash firefox || software::from_snapcraft.io firefox $1
 
 	# Chromium is an open-source browser project that aims to build a safer, 
 	# faster, and more stable way to experience the web. 
@@ -283,7 +283,7 @@ recipe:_Internet_Browsing_Private () {
 			software::from_flathub.org net.mullvad.MullvadBrowser $1
 		;;
 		* )
-			write_error "Mullvad browser is not supported in this distribution ( ${distribution_type} ) : skipping..."
+			software::from_flathub.org net.mullvad.MullvadBrowser $1
 		;;
 	esac
 }
@@ -310,36 +310,7 @@ recipe:_Internet_Browsing_Corporate () {
 
 	# Vivaldi is a cross-platform web browser developed by Vivaldi Technologies, Inc. 
 	# Pfficially avaiable and verrified from snapcraft.io
-	software::from_snapcraft.io vivaldi-stable $1
-		
-	# write_information "Installing Vivaldi Browser directly from vendor repo..."
-	# distribution_type=$(system::distribution_type)
-	# case ${distribution_type} in
-	# 	"ubuntu" | "debian" )
-	# 		software::check_native_package_dependency curl
-	# 		apt -y install wget gnupg2 software-properties-common
-	# 		wget -qO- https://repo.vivaldi.com/archive/linux_signing_key.pub | sudo apt-key add -
-	# 		echo 'deb https://repo.vivaldi.com/archive/deb/ stable main' | sudo tee /etc/apt/sources.list.d/vivaldi.list
-	# 		apt update
-	# 		software::add_native_package vivaldi-stable
-	# 		return $?
-	# 	;;
-	# 	"fedora" | "redhat" )
-	# 		software::add_native_package dnf-utils
-	# 		dnf config-manager --add-repo https://repo.vivaldi.com/archive/vivaldi-fedora.repo
-	# 		software::add_native_package vivaldi-stable
-	# 		return $?
-	# 	;;
-	# 	"suse" )
-	# 		zypper --gpg-auto-import-keys addrepo --refresh https://repo.vivaldi.com/archive/vivaldi-suse.repo
-	# 		software::add_native_package vivaldi-stable
-	# 		return $?
-	# 	;;
-	# 	* )
-	# 		write_error "Neither debian, fedora, or suse base distros could be found; NOT installing vivaldi."
-	# 		return 1
-	# 	;;
-	# esac
+	software::software::from_flathub.org com.vivaldi.Vivaldi $1
 }
 
 
@@ -382,7 +353,26 @@ recipe:_CLOUD:_Management_Options () {
 }
 
 
+recipe:_Software_Stores:_Alternative_Apps () {
+	# Alternative Software stores (App Outlet, GNOME Software, KDE Discover, and more)
+	# NOTE: the "$1" after the package-name is if you want to trap the --remove option for 
+	# Bundle removals. This is optional.
 
+	# Bazaar is an app store that lets you discover and install Linux apps in the Flatpak format
+	software::from_flathub.org io.github.kolunmi.Bazaar $1		
+
+
+	# App Outlet is a free and open-source application that allows you to discover and install applications
+	# from multiple sources including native, Flatpak, Snap, and AppImage formats.
+	software::from_flathub.org com.github.donadigo.appoutlet $1
+
+	# GNOME Software is an app store and software center for installing applications and updates on Linux systems
+	software::add_native_package gnome-software $1
+
+	# KDE Discover is a software center for the KDE Plasma desktop environment that allows users to browse,
+	# install, and manage software applications and updates on their Linux systems.
+	software::from_snapcraft.io snap-store $1
+}
 
 
 recipe:_Office:_3D_Printing () {
@@ -451,7 +441,7 @@ recipe:_Office:_Standard_Apps () {
 	# software::from_snapcraft.io mailspring $1
 
 	# Excellent note-taking and note organization app
-	software::from_snapcraft.io joplin-desktop $1
+	software::software::from_flathub.org net.cozic.joplin_desktop $1
 
 	# Best simple note app for sharing and collaboration on notes	
 	# software::from_snapcraft.io simplenote $1		
@@ -881,7 +871,7 @@ recipe:_SEC:_Secure_Communication_Options () {
 	snap set signal-desktop tray-icon=true
 
 	# Encrypted chat, group commmunications
-	software::from_snapcraft.io telegram-desktop $1
+	software::software::from_flathub.org flathub org.telegram.desktop $1
 }
 
 recipe:_Office:_AI_Tools () {
@@ -908,15 +898,20 @@ recipe:_Office:_Social_Collaboration_and_Communicaiton () {
 	# for privacy, but may be encrypted. This software is often useful for legacy reasons
 	# or used for gaming.
 
-	# Official Snap: All-in-one voice and text chat for gamers that's free, and works on both your desktop and phone.  
-	software::from_snapcraft.io discord $1				
-		snap connect discord:system-observe
+	# Official Snap: All-in-one voice and text chat for gamers that's free, and works on both your desktop and phone. 
+	software::from_flathub.org org.discordapp.Discord $1
+	# ! if you would prefer to use the snap package then please uncomment the lines below. 
+	# software::from_snapcraft.io discord $1				
+	#	snap connect discord:system-observe
 
 	# Official Snap:  Connect, Create, Talk & Discover, now with Bing GPT-4
-	software::from_snapcraft.io skype $1	
+	# software::from_snapcraft.io skype $1	
 
 	# Send free messages and make free calls to other Viber users on any device and network, in any country!
 	software::from_flathub.com com.viber.Viber $1
+
+	# Fractal is a modern messaging app for the GNOME desktop, built around the Matrix protocol.
+	software::from_flathub.org org.gnome.Fractal $1
 }
 
 
@@ -958,7 +953,7 @@ recipe:_SEC:_network_security () {
 }
 
 recipe:_SEC:_Proton_Suite_of_Ecrypted_Services () {
-	# Proton suite of software (ProtonVPN, ProtonMail Bridge, ProtonDrive)...
+	# Proton suite of software for debian, ubuntu (ProtonVPN, ProtonMail Bridge, ProtonDrive)...
 
 	# Loop through each item in this list of software and perform an install
 	# using the relevant packaging system.
@@ -981,7 +976,7 @@ recipe:_SEC:_Proton_Suite_of_Ecrypted_Services () {
 	esac
 
 	# Uses protonmail.com (encrypted mail)
-	software::from_snapcraft.io electron-mail $1
+	software::software::from_flathub.org com.github.vladimiry.ElectronMail $1
 }
 
 recipe:_SEC:_VPN_Software () {
