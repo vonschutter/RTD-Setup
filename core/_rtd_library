@@ -183,7 +183,7 @@ export RTD_VERSION="2.04"
 139   security::ensure_admin                                       ;           Ensures the script is executed with administrative (root) privileges, allowing
 140   software::package_kit::add_package                           ;           Function to simplify the installation of software by including all display and
 141   software::package_kit::remove_package                        ;           Function to simplify the installation of software by including all display and
-142   software::ensure_software_store_available                    ;           Function to ensure that flatpak is installed and flathup enabled.
+142   software::ensure_gnome_software_store_available              ;           Function to ensure that flatpak is installed and flathup enabled.
 143   software::ensure_flatpak_package_managment                   ;           Function to ensure that flatpak is installed and flathup enabled.
 144   software::update_system_txt                                  ;           See inline documentation in this file.
 145   software::update_all_ui                                      ;           Refresh installed OEM UI customizations, icons, and cursors.
@@ -200,8 +200,8 @@ export RTD_VERSION="2.04"
 156   software::ensure_snap_package_managment                      ;           Function to ensure that snap is installed.
 157   is_software_package_installed                                ;           Function to check if a piece of software is installed. This function will first check
 158   software::is_native_package_installed                        ;           Function to check if a piece of software is installed. This function will first check
-159   software::is_native_package_installed                                ;           Function to chek if a package is available in whetever repository, and
-160   software::set_install_command                                          ;           See inline documentation in this file.
+159   software::is_native_package_installed                        ;           Function to chek if a package is available in whetever repository, and
+160   software::set_install_command                                ;           See inline documentation in this file.
 161   software::add_gnome_extensions                               ;           See inline documentation in this file.
 162   software::check_native_package_dependency                    ;           See inline documentation in this file.
 163   rtd_ppa_checker                                              ;           See inline documentation in this file.
@@ -11229,7 +11229,7 @@ software::package_kit::remove_package() {
 	) | tee -a ${_LOGFILE}
 }
 
-software::ensure_software_store_available() {
+software::ensure_gnome_software_store_available() {
 	# Description: Function to ensure that flatpak is installed and flathup enabled.
 	# Globals: none
 	# Dependencies: [distro pakcage managment] [function: software::check_native_package_dependency] [Internet access]
@@ -11268,13 +11268,13 @@ software::ensure_software_store_available() {
 		if cat /usr/share/xsessions/default.desktop | grep "Plasma"; then
 			write_information "${FUNCNAME[0]}: kde on suse"
 			software::check_native_package_dependency plasma-discover
-			software::check_native_package_dependency plasma-discover-backend-flatpak
-			software::check_native_package_dependency plasma-discover-backend-snap
+			software::check_native_package_dependency discover6-backend-flatpak
+			software::check_native_package_dependency plasma-discover-backend-snapd
 		else
 			write_information "${FUNCNAME[0]}: gnome on suse"
 			software::check_native_package_dependency gnome-software
-			software::check_native_package_dependency gnome-software-plugin-flatpak
-			software::check_native_package_dependency gnome-software-plugin-snap
+			software::check_native_package_dependency discover6-backend-flatpak
+			software::check_native_package_dependency gnome-software-plugin-snapd
 		fi
 		;;
 	*)
@@ -12148,6 +12148,22 @@ software::add_native_package() {
 		fi
 
 		write_information "✅ Successfully installed: ${pkg}"
+
+		case "$pkgmgr" in
+			"APT")
+				apt-get clean
+				apt-get --purge autoremove -y
+				;;
+			"DNF")
+				dnf clean all
+				;;
+			"ZYPPER")
+				zypper clean
+				;;
+			"PKCON")
+				pkcon clean
+				;;
+		esac
 	done
 
 	if [[ ${#failed_packages[@]} -gt 0 ]]; then
@@ -12286,71 +12302,7 @@ software::ensure_snap_package_managment() {
 	# End of documentation
 
 	if [[ $(echo "$OSTYPE" | grep "linux") ]] &>/dev/null; then
-		# these tests focus on the latest versions of the distros evaluated...
-		system::log_item "ensuring SNAP software distribution system is available..."
-		if hash snap &>/dev/null; then
-			system::log_item "Snap is already present..."
-			if [[ -e /snap ]]; then
-				system::log_item "SNAP classic support present... "
-				return $?
-			else
-				system::log_item "SNAP classic support NOT present... "
-				system::log_item "adding links... "
-				ln -s /var/lib/snapd/snap /snap
-				return $?
-			fi
-		else
-			if hostnamectl | grep "SUSE" 2>/dev/null; then
-				system::log_item "Special case for suse..."
-				security::ensure_admin
-				if hostnamectl | grep -i "tumbleweed"; then
-					local _repo="https://download.opensuse.org/repositories/system:/snappy/openSUSE_Tumbleweed"
-					system::log_item "Detected OpenSUSE Tumbleweed. Adding repo: ${_repo}"
-					zypper addrepo --refresh "${_repo}" snappy
-				else
-					_repo=$(echo https://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_$(cat /etc/os-release | grep VERSION_ID | cut -d= -f2 | cut -d\" -f2))
-					system::log_item "Detected OpenSUSE Leap. Adding repo:${_repo}"
-					zypper addrepo --refresh "${_repo} snappy"
-				fi
-				zypper --gpg-auto-import-keys refresh || (
-					write_error "Failed to gpg keys!"
-					return 1
-				)
-				zypper dup --from snappy || (
-					write_error "Failed to update snap repository!"
-					return 1
-				)
-				software::check_native_package_dependency snapd || (
-					write_error "Failed to satisfy dependecy SNAP!"
-					return 1
-				)
-				systemctl enable --now snapd
-				systemctl enable --now snapd.apparmor
-				systemctl start --now snapd
-				systemctl is-active --quiet snapd || (
-					write_error "Service snapd not started sucessfully!"
-					return 1
-				)
-				ln -s /var/lib/snapd/snap /snap
-				return $?
-			else
-				# For distributions that do not need to add a repository to install snap
-				# But would need to install it from their standard reopsitory....
-				if software::check_native_package_dependency snapd; then
-					systemctl enable snapd
-					systemctl start snapd
-					echo snapd is $(systemctl is-active snapd) || return 1
-					if [[ -e /snap ]]; then
-						write_information "SNAP classic support present... "
-					else
-						ln -s /var/lib/snapd/snap /snap
-					fi
-					return $?
-				else
-					write_error "Failed to satisfy dependecy SNAP!"
-				fi
-			fi
-		fi
+		write_information "${FUNCNAME[0]}: OK! Detected Linux..."
 
 	elif [[ "$OSTYPE" == "darwin"* ]]; then
 		write_error "${FUNCNAME[0]}: Mac OSX is currently not supported with snap..."
@@ -12368,9 +12320,139 @@ software::ensure_snap_package_managment() {
 		echo "I have no Idea what this system is"
 		return 1
 	fi
+
+	# these tests focus on the latest versions of the distros evaluated...
+	system::log_item "ensuring SNAP software distribution system is available..."
+	local distro_type
+	distro_type=$(system::distribution_type)
+	if hash snap &>/dev/null; then
+		system::log_item "Snap is already present..."
+		if [[ -e /snap ]]; then
+			system::log_item "SNAP classic support present... "
+			return $?
+		else
+			system::log_item "SNAP classic support NOT present... "
+			system::log_item "adding links... "
+			ln -s /var/lib/snapd/snap /snap
+			return $?
+		fi
+	else
+		case $distro_type in
+		suse )
+			system::log_item "Special case for suse..."
+			security::ensure_admin
+			if hostnamectl | grep -i "tumbleweed"; then
+				local _repo="https://download.opensuse.org/repositories/system:/snappy/openSUSE_Tumbleweed"
+				system::log_item "Detected OpenSUSE Tumbleweed. Adding repo: ${_repo}"
+				software::zypper_add_repo "${_repo}" snappy
+			else
+				_repo=$(echo https://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_$(cat /etc/os-release | grep VERSION_ID | cut -d= -f2 | cut -d\" -f2))
+				system::log_item "Detected OpenSUSE Leap. Adding repo:${_repo}"
+				software::zypper_add_repo "${_repo} snappy"
+			fi
+			zypper --gpg-auto-import-keys refresh || (
+				write_error "Failed to gpg keys!"
+				return 1
+			)
+			zypper dup --from snappy || (
+				write_error "Failed to update snap repository!"
+				return 1
+			)
+			software::check_native_package_dependency snapd || (
+				write_error "Failed to satisfy dependecy SNAP!"
+				return 1
+			)
+			systemctl enable --now snapd
+			systemctl enable --now snapd.apparmor
+			systemctl start --now snapd
+			systemctl is-active --quiet snapd || (
+				write_error "Service snapd not started sucessfully!"
+				return 1
+			)
+			ln -s /var/lib/snapd/snap /snap
+			return $?
+		;;
+		* )
+			# For distributions that do not need to add a repository to install snap
+			# But would need to install it from their standard reopsitory....
+			if software::check_native_package_dependency snapd; then
+				systemctl enable snapd
+				systemctl start snapd
+				echo snapd is $(systemctl is-active snapd) || return 1
+				if [[ -e /snap ]]; then
+					write_information "SNAP classic support present... "
+				else
+					ln -s /var/lib/snapd/snap /snap
+				fi
+				return $?
+			else
+				write_error "Failed to satisfy dependecy SNAP!"
+			fi
+		;;
+		esac
+	fi
+
 }
 
 
+
+software::zypper_add_repo() {
+	# Description:
+	# Adds a Zypper repository safely and logs reults accordingly.
+	# Logs actions and outcomes to a specified log file.
+	#
+	# Globals:
+	#   ZYP_LOGFILE - Path to the log file (default: /var/log/zypper-add-repo.log)
+	# Arguments:
+	#   $1 - Repository URL
+	#   $2 - Repository alias
+	#   $3 - (Optional) Refresh flag (default: --refresh)
+	# Outputs:
+	#   Logs actions and outcomes to the specified log file.
+	# Returns:
+	#   0 - Repository added successfully or already exists
+	#   1 - Failed to add repository
+	#   2 - Missing required arguments
+	# Usage:
+	#   software::zypper_add_repo "http://example.com/repo" "example-repo" "--no-refresh"
+	
+	# End of documentation
+
+	local url="$1"
+	local alias="$2"
+	local refresh_flag="${3:-"--refresh"}"
+	local log="${ZYP_LOGFILE:-/var/log/zypper-add-repo.log}"
+
+	# Validate inputs
+	if [[ -z "$url" || -z "$alias" ]]; then
+		system::log_item "ERROR: url and alias are required."
+		return 2
+	fi
+
+	# 1) Exists by alias?
+	if zypper --non-interactive --quiet lr "$alias" &>/dev/null; then
+		system::log_item "INFO: Repo alias '$alias' already exists. Skipping add."
+		return 0
+	fi
+
+	# 2) Exists by URL (possibly under another alias)?
+	#    Parse the last column from `zypper lr -u` (URI).
+	if zypper --non-interactive lr -u | awk 'NR>2 {print $NF}' | grep -Fxq "$url"; then
+		# Find its alias to report
+		existing_alias="$(zypper lr -u | awk -v u="$url" 'NR>2 && $NF==u {print $3}')"
+		system::log_item "INFO: Repo with URL '$url' already exists (alias: '$existing_alias'). Skipping add."
+		return 0
+	fi
+
+	# 3) Try to add
+	if zypper --non-interactive ar "$refresh_flag" "$url" "$alias"; then
+		system::log_item "OK: Added repo '$alias' ($url) successfully."
+		return 0
+	else
+		system::log_item "ERROR: Failed to add repo '$alias' ($url)."
+		return 1
+	fi
+}
 
 
 
