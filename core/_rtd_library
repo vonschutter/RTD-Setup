@@ -258,6 +258,7 @@ export RTD_VERSION="2.04"
 213   template::cloud_config                                       ;           See inline documentation in this file.
 213   template::minecraft_server_launcher                          ;           Write the template launcher script used by the Minecraft server manager.
 214   install_software                                             ;           Install one or more packages using the first available package manager.
+215   system::laptop_detect                                       ;           Determine whether the current host appears to be a laptop without relying on laptop-detect.
 215   setup_minecraft_root                                         ;           Create the Minecraft server directory structure and seed required files.
 216   run_minecraft_server_manager                                 ;           Launch Byobu panes and tools to manage the Minecraft server runtime.
 217   check_java                                                   ;           Verify a suitable Java runtime is available for the Minecraft tooling.
@@ -3127,11 +3128,225 @@ system::detect_session() {
 		system::log_item "👌 TTY session detected."
 	fi
 
-	echo "${_SESSION_TYPE}"
-	return 0
+echo "${_SESSION_TYPE}"
+return 0
 }
 
 
+
+system::laptop_detect() {
+	# Description: Determine if the current system appears to be a laptop without relying on the laptop-detect utility.
+	#
+	# This function uses multiple heuristics to classify the host form factor:
+	#   - systemd's hostnamectl chassis information (if available)
+	#   - SMBIOS/DMI chassis type via /sys/class/dmi/id/chassis_type or dmidecode
+	#   - Presence of battery power supplies and lid switches exposed in sysfs/procfs
+	#   - Common laptop keywords in the hardware product name
+	#
+	# Globals:
+	#	- _SYSTEM_FORM_FACTOR: Updated to LAPTOP or DESKTOP.
+	#	- RTD_IS_LAPTOP: Set to 1 when a laptop is detected, 0 otherwise.
+	# Arguments:
+	#	- "--quiet":    Suppress user-facing status output (logs only).
+	#	- "--explain":  Print the detection reason alongside the result.
+	#	- "--help":     Display usage information.
+	# Outputs:
+	#	- Echoes "laptop" or "desktop".
+	#	- With --explain, echoes "<result>:<reason>".
+	#	- Status/log messages describing the detection path.
+	# Returns:
+	#	- 0 when laptop indicators are found.
+	#	- 1 when indicators are absent and the host is assumed to be a desktop/unknown.
+	#	- 2 on invalid usage.
+	#
+	# Usage:
+	#	system::laptop_detect
+	#	system::laptop_detect --quiet --explain
+	#
+	# Dependencies:
+	#	- Optional: hostnamectl, dmidecode (only used when present).
+	#
+	# End of Documentation
+
+	local _quiet_mode=0
+	local _print_reason=0
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--quiet)
+			_quiet_mode=1
+			shift
+			;;
+		--explain)
+			_print_reason=1
+			shift
+			;;
+		--help)
+			cat <<-'EOF'
+			Usage: system::laptop_detect [--quiet] [--explain]
+
+			Detect whether the current host appears to be a laptop. The function prints
+			"laptop" (exit 0) or "desktop" (exit 1) and can optionally include the reason
+			for the decision with --explain.
+			EOF
+			return 0
+			;;
+		*)
+			write_error "system::laptop_detect: Unknown option '$1'"
+			return 2
+			;;
+		esac
+	done
+
+	local _result="desktop"
+	local _exit_code=1
+	local _reason_summary=""
+	local -a _positive_matches=()
+	local -a _negative_matches=()
+
+	system::laptop_detect::_log() {
+		if [[ $_quiet_mode -eq 0 ]]; then
+			write_status "$1"
+		else
+			system::log_item "$1"
+		fi
+	}
+
+	# Heuristic 1: hostnamectl chassis classification.
+	if command -v hostnamectl >/dev/null 2>&1; then
+		local _hostnamectl_chassis
+		_hostnamectl_chassis=$(hostnamectl 2>/dev/null | awk -F: '/Chassis/ {gsub(/^[ \t]+/, "", $2); print tolower($2); exit}')
+		if [[ -n "$_hostnamectl_chassis" ]]; then
+			case "$_hostnamectl_chassis" in
+			laptop | portable | notebook | convertible | tablet | handheld)
+				_positive_matches+=("hostnamectl chassis '${_hostnamectl_chassis}'")
+				;;
+			desktop | server | vm | container)
+				_negative_matches+=("hostnamectl chassis '${_hostnamectl_chassis}'")
+				;;
+			esac
+		fi
+	fi
+
+	# Heuristic 2: SMBIOS/DMI chassis type codes.
+	local _dmi_file="/sys/class/dmi/id/chassis_type"
+	if [[ -r "$_dmi_file" ]]; then
+		local _dmi_code
+		_dmi_code=$(<"$_dmi_file")
+		_dmi_code=${_dmi_code//[!0-9]/}
+		if [[ -n "$_dmi_code" ]]; then
+			case "$_dmi_code" in
+			8) _positive_matches+=("SMBIOS chassis type 8 (Portable)") ;;
+			9) _positive_matches+=("SMBIOS chassis type 9 (Laptop)") ;;
+			10) _positive_matches+=("SMBIOS chassis type 10 (Notebook)") ;;
+			11) _positive_matches+=("SMBIOS chassis type 11 (Hand Held)") ;;
+			14) _positive_matches+=("SMBIOS chassis type 14 (Sub Notebook)") ;;
+			30) _positive_matches+=("SMBIOS chassis type 30 (Tablet)") ;;
+			31) _positive_matches+=("SMBIOS chassis type 31 (Convertible)") ;;
+			32) _positive_matches+=("SMBIOS chassis type 32 (Detachable)") ;;
+			3) _negative_matches+=("SMBIOS chassis type 3 (Desktop)") ;;
+			4) _negative_matches+=("SMBIOS chassis type 4 (Low-profile Desktop)") ;;
+			5) _negative_matches+=("SMBIOS chassis type 5 (Pizza Box)") ;;
+			6) _negative_matches+=("SMBIOS chassis type 6 (Mini Tower)") ;;
+			7) _negative_matches+=("SMBIOS chassis type 7 (Tower)") ;;
+			13) _negative_matches+=("SMBIOS chassis type 13 (All-in-One)") ;;
+			*)
+				_negative_matches+=("SMBIOS chassis type ${_dmi_code}")
+				;;
+			esac
+		fi
+	elif command -v dmidecode >/dev/null 2>&1 && [[ $EUID -eq 0 ]]; then
+		local _dmidecode_output
+		_dmidecode_output=$(dmidecode -s chassis-type 2>/dev/null | head -n 1)
+		if [[ -n "$_dmidecode_output" ]]; then
+			local _dmidecode_lower=${_dmidecode_output,,}
+			case "$_dmidecode_lower" in
+			laptop | portable | notebook | sub\ notebook | hand\ held | handheld | tablet | convertible)
+				_positive_matches+=("dmidecode chassis '${_dmidecode_output}'")
+				;;
+			desktop | tower | server | mini-tower | space-saving | all\ in\ one | rack\ mount)
+				_negative_matches+=("dmidecode chassis '${_dmidecode_output}'")
+				;;
+			esac
+		fi
+	fi
+
+	# Preserve nullglob state while checking for battery and lid devices.
+	local _nullglob_restore
+	if ! _nullglob_restore=$(shopt -p nullglob 2>/dev/null); then
+		_nullglob_restore='shopt -u nullglob'
+	fi
+	shopt -s nullglob
+
+	# Heuristic 3: Detect battery power supplies.
+	local battery_path=""
+	for battery_path in /sys/class/power_supply/BAT*; do
+		if [[ -r "$battery_path/type" ]]; then
+			local battery_type=""
+			read -r battery_type <"$battery_path/type"
+			if [[ "${battery_type,,}" == "battery" ]]; then
+				_positive_matches+=("Power supply $(basename "$battery_path") reports a Battery device")
+				break
+			fi
+		fi
+	done
+
+	# Heuristic 4: Detect lid switches.
+	local lid_path=""
+	for lid_path in /proc/acpi/button/lid/*; do
+		if [[ -r "$lid_path/state" ]]; then
+			_positive_matches+=("ACPI lid device $(basename "$lid_path") is present")
+			break
+		fi
+	done
+
+	eval "$_nullglob_restore"
+
+	# Heuristic 5: Look for laptop keywords in the product name.
+	if [[ -r /sys/class/dmi/id/product_name ]]; then
+		local _product_name=""
+		read -r _product_name </sys/class/dmi/id/product_name
+		local _product_name_lc=${_product_name,,}
+		if [[ "$_product_name_lc" =~ (laptop|notebook|thinkpad|ideapad|xps|latitude|elitebook|macbook|surface|zenbook|envy|yoga) ]]; then
+			_positive_matches+=("Product name '${_product_name}' matches known laptop identifiers")
+		fi
+	fi
+
+	if [[ ${#_positive_matches[@]} -gt 0 ]]; then
+		_result="laptop"
+		_exit_code=0
+		_reason_summary=$(printf '%s; ' "${_positive_matches[@]}")
+		_reason_summary=${_reason_summary%; }
+	elif [[ ${#_negative_matches[@]} -gt 0 ]]; then
+		_reason_summary=$(printf '%s; ' "${_negative_matches[@]}")
+		_reason_summary=${_reason_summary%; }
+	else
+		_reason_summary="No chassis or power indicators found"
+	fi
+
+	_SYSTEM_FORM_FACTOR=${_result^^}
+	if [[ $_exit_code -eq 0 ]]; then
+		RTD_IS_LAPTOP=1
+	else
+		RTD_IS_LAPTOP=0
+	fi
+
+	local _message=""
+	if [[ $_exit_code -eq 0 ]]; then
+		_message="💻 Laptop indicators detected (${_reason_summary})."
+	else
+		_message="🖥️ Laptop indicators not found (${_reason_summary})."
+	fi
+	system::laptop_detect::_log "$_message"
+
+	if [[ $_print_reason -eq 1 ]]; then
+		printf '%s:%s\n' "$_result" "$_reason_summary"
+	else
+		printf '%s\n' "$_result"
+	fi
+
+	return $_exit_code
+}
 
 
 system::preseed_to_ubuntu_ks_cfg() {
@@ -5593,6 +5808,9 @@ system::rtd_oem_reseal() {
 	fi
 }
 
+
+
+
 system::create_swapfile() {
 	# Description: Function to create a swapfile and enable it automatically.
 	#
@@ -5699,7 +5917,11 @@ system::tune_system_power_profile() {
 	# Usage: simply call function in a script
 	# End of documentation
 
-	software::check_native_package_dependency tuned
+	if ! software::check_native_package_dependency tuned ; then
+		system::log_item "${FUNCNAME[0]}: The required software tuned is not available! Cannot continue."
+		return 1
+	fi
+	
 	systemctl enable --now tuned
 	tuned-adm profile balanced
 
@@ -5708,17 +5930,30 @@ system::tune_system_power_profile() {
 	*) unset _print ;;
 	esac
 
-	software::check_native_package_dependency virt-what
-	software::check_native_package_dependency laptop-detect
+	if ! software::check_native_package_dependency virt-what ; then
+		system::log_item "${FUNCNAME[0]}: The required software virt-what is not available! Cannot continue."
+		return 1
+	fi
+	
 	if virt-what; then
 		"${_print}" write_information "${FUNCNAME[0]}: This is likely not running in a virtual machine."
-		if laptop-detect; then
+
+		local chassis_type
+		chassis_type="$(system::laptop_detect)"
+		case "${chassis_type}" in
+		laptop)
 			"${_print}" write_information "${FUNCNAME[0]}: This is likely a laptop; applying pwersave profile..."
 			tuned-adm profile powersave
-		else
+			;;
+		desktop)
 			"${_print}" write_information "${FUNCNAME[0]}: This is likely NOT a laptop; applying desktop profile..."
 			tuned-adm profile desktop
-		fi
+			;;
+		*)
+			"${_print}" write_information "${FUNCNAME[0]}: Unable to determine chassis type; defaulting to balanced profile..."
+			tuned-adm profile balanced
+			;;
+		esac
 	else
 		"${_print}" write_information "${FUNCNAME[0]}: This is likely a VM; applying virtual-guest profile..."
 		tuned-adm profile virtual-guest
