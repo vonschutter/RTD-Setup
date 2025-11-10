@@ -11912,6 +11912,39 @@ software::from_flathub.org() {
 
 	local app_name=""
 	local remove_flag=""
+	local flatpak_temp_dir=""
+
+	software::from_flathub.org::_cleanup_tmp() {
+		if [[ -n "$flatpak_temp_dir" && -d "$flatpak_temp_dir" ]]; then
+			rm -rf "$flatpak_temp_dir"
+			system::log_item "Cleaned up Flatpak temp directory: $flatpak_temp_dir"
+			flatpak_temp_dir=""
+		fi
+	}
+
+	software::from_flathub.org::_flatpak_cmd() {
+		local status
+
+		if [[ -z "$flatpak_temp_dir" ]]; then
+			flatpak_temp_dir=$(mktemp -d /tmp/rtd-flatpak.XXXXXX 2>/dev/null) || flatpak_temp_dir=""
+			if [[ -n "$flatpak_temp_dir" ]]; then
+				system::log_item "Using Flatpak temp directory: $flatpak_temp_dir"
+			else
+				system::log_item "Unable to create dedicated Flatpak temp directory; falling back to default TMPDIR."
+			fi
+		fi
+
+		if [[ -n "$flatpak_temp_dir" ]]; then
+			TMPDIR="$flatpak_temp_dir" flatpak "$@"
+			status=$?
+		else
+			flatpak "$@"
+			status=$?
+		fi
+
+		software::from_flathub.org::_cleanup_tmp
+		return $status
+	}
 
 	# Parse command line arguments
 	while [[ $# -gt 0 ]]; do
@@ -11944,7 +11977,7 @@ software::from_flathub.org() {
 	if [[ "$remove_flag" == "--remove" ]]; then
 		system::log_item "Request to remove Flatpak app '$app_name'"
 
-		if flatpak uninstall -y "$app_name"; then
+		if software::from_flathub.org::_flatpak_cmd uninstall -y "$app_name"; then
 			system::log_item "Flatpak app '$app_name' has been uninstalled."
 		else
 			system::log_item "Error: Failed to uninstall Flatpak app '$app_name'"
@@ -11953,15 +11986,15 @@ software::from_flathub.org() {
 	else
 		system::log_item "Request to install Flatpak app '$app_name'"
 
-		if flatpak info "$app_name" >/dev/null 2>&1; then
-			write_information "Flatpak app '$app_name' is already installed."
-		else
-			if flatpak install -y "$app_name"; then
-				system::log_item "Flatpak app '$app_name' has been installed."
+			if flatpak info "$app_name" >/dev/null 2>&1; then
+				write_information "Flatpak app '$app_name' is already installed."
 			else
-				system::log_item "Error: Failed to install Flatpak app '$app_name'"
-				return 1
-			fi
+				if software::from_flathub.org::_flatpak_cmd install -y "$app_name"; then
+					system::log_item "Flatpak app '$app_name' has been installed."
+				else
+					system::log_item "Error: Failed to install Flatpak app '$app_name'"
+					return 1
+				fi
 		fi
 	fi
 }
@@ -12015,6 +12048,39 @@ software::from_snapcraft.io() {
 	local app_name=""
 	local remove_flag=""
 	local requires_classic=""
+	local snap_temp_dir=""
+
+	software::from_snapcraft.io::_cleanup_tmp() {
+		if [[ -n "$snap_temp_dir" && -d "$snap_temp_dir" ]]; then
+			rm -rf "$snap_temp_dir"
+			system::log_item "Cleaned up Snap temp directory: $snap_temp_dir"
+			snap_temp_dir=""
+		fi
+	}
+
+	software::from_snapcraft.io::_install_snap() {
+		local status
+
+		if [[ -z "$snap_temp_dir" ]]; then
+			snap_temp_dir=$(mktemp -d /tmp/rtd-snap-install.XXXXXX 2>/dev/null) || snap_temp_dir=""
+			if [[ -n "$snap_temp_dir" ]]; then
+				system::log_item "Using Snap temp directory: $snap_temp_dir"
+			else
+				system::log_item "Unable to create dedicated Snap temp directory; falling back to default TMPDIR."
+			fi
+		fi
+
+		if [[ -n "$snap_temp_dir" ]]; then
+			TMPDIR="$snap_temp_dir" SNAP_DOWNLOAD_DIR="$snap_temp_dir" snap install "$@"
+			status=$?
+		else
+			snap install "$@"
+			status=$?
+		fi
+
+		software::from_snapcraft.io::_cleanup_tmp
+		return $status
+	}
 
 	# Parse command line arguments
 	while [[ $# -gt 0 ]]; do
@@ -12043,8 +12109,15 @@ software::from_snapcraft.io() {
 		return 1
 	fi
 
-	hash snap || software::ensure_snap_package_managment
-
+	if ! hash snap &>/dev/null; then
+		write_information "Snap package management system is not present; installing now..."
+		software::check_native_package_dependency snapd || {
+			write_error "Failed to install snapd; cannot proceed with snap app management."
+			return 1
+		}
+		system::log_item "Snap package management system has been installed."
+	fi
+	
 	if [[ "$remove_flag" == "--remove" ]]; then
 
 		system::log_item "Request to remove Snap app '$app_name'"
@@ -12063,13 +12136,13 @@ software::from_snapcraft.io() {
 			requires_classic=$(snap info "$app_name" | grep "latest/stable" | grep -o " classic")
 			if [[ -n "$requires_classic" ]]; then
 				system::log_item "The app '$app_name' requires classic confinement (less confined)..."
-				if snap install "$app_name" --classic; then
+				if software::from_snapcraft.io::_install_snap --classic "$app_name"; then
 					system::log_item "Snap app '$app_name' has been installed."
 				else
 					system::log_item "Error: Failed to install Snap app '$app_name'"
 				fi
 			else
-				if snap install "$app_name"; then
+				if software::from_snapcraft.io::_install_snap "$app_name"; then
 					system::log_item "Snap app '$app_name' has been installed."
 				else
 					system::log_item "Error: Failed to install Snap app '$app_name'"
