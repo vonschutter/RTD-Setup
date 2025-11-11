@@ -16127,6 +16127,7 @@ kvm::get_zorin_iso() {
 			write_status "File already exists: $file_path"
 			iso="$file_path"
 			echo "$file_path"
+			_zorin_current_version="$version_prefix"
 			return 0
 		fi
 
@@ -17008,7 +17009,7 @@ kvm::make_vm_now_from_zorin() {
 	dependency::virtualization
 
 	: ${ubuntu_flavor="ubuntu"}                           # This is the default flavor of Ubuntu to use.
-	: ${_role:="workstation"}                             # This is the default role of the Ubuntu VM to create.
+	: ${_role:="VDI"}                                     # This is the default role of the Ubuntu VM to create.
 	: ${_cpu:="${_cpu:=2}"}                               # This is the default number of CPUs to use.
 	: ${_mem:="${_mem:=2048}"}                            # This is the default amount of memory to use.
 	: ${_dsk:="${_dsk:=100}"}                             # This is the default size of the disk to use.
@@ -17022,8 +17023,6 @@ kvm::make_vm_now_from_zorin() {
 	# Set default values for VM T-Shirts sizes...
 	kvm::util::read_common_options ${*}
 
-	kvm::util::set_vm_name "Template_Zorin-OS" "${_role}" || return 1
-
 	# Set specific options for Debian...
 	kvm::util::read_distro_options --distribution ubuntu ${*}
 
@@ -17033,6 +17032,8 @@ kvm::make_vm_now_from_zorin() {
 		dialog::display_error "💥 - Failed to create VM disk image. Please press [OK] to continue..."
 		return 1
 	}
+
+	kvm::util::set_vm_name --var vm_name "Template" "${server_app}" "${_role}" "${_zorin_current_version}" --timestamp-format "%Y-%m-%d-%s" || return 1
 
 	system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --ask ${_ask:-"NO"} || (dialog::display_error "💥 - An ERROR has occurred. Unable to create preseed file. Please press [OK] to continue..." && return 1)
 
