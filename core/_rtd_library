@@ -4404,47 +4404,103 @@ system::distribution_type() {
 	#
 	# End of documentation
 
-	local dtype
+	local dtype marker os_release_file os_id os_id_like
 	dtype="unknown"
 
-	{
-		# First test specifically for Fedora
-		if [ -r /etc/fedora-release ]; then
-			dtype="fedora"
-
-		# Then test against Fedora / RHEL / CentOS / generic Redhat derivative
-		elif [ -r /etc/rc.d/init.d/functions ]; then
-			source /etc/rc.d/init.d/functions
-			[ "zz$(type -t passed 2>/dev/null)" == "zzfunction" ] && dtype="redhat"
-
-		# Then test against SUSE (must be after Redhat,
-		elif [ -r /etc/rc.status ]; then
-			source /etc/rc.status
-			[ "zz$(type -t rc_reset 2>/dev/null)" == "zzfunction" ] && dtype="suse"
-
-		# Then test against Debian, Ubuntu and friends
-		elif [ -r /lib/lsb/init-functions ]; then
-			source /lib/lsb/init-functions
-			[ "zz$(type -t log_begin_msg 2>/dev/null)" == "zzfunction" ] && dtype="debian"
-			# Double-check for Ubuntu since though debian based, ubuntu does many things very differently...
-			[ -r /etc/lsb-release ] && cat /etc/lsb-release | grep Ubuntu && dtype="ubuntu"
-
-		# Then test against Gentoo
-		elif [ -r /etc/init.d/functions.sh ]; then
-			source /etc/init.d/functions.sh
-			[ "zz$(type -t ebegin 2>/dev/null)" == "zzfunction" ] && dtype="gentoo"
-
-		# For Mandriva we currently just test if /etc/mandriva-release exists
-		elif [ -s /etc/mandriva-release ]; then
-			dtype="mandriva"
-
-		# For Slackware we currently just test if /etc/slackware-version exists
-		elif [ -s /etc/slackware-version ]; then
-			dtype="slackware"
-
+	# Prefer ID/ID_LIKE from os-release (covers rolling releases like Tumbleweed).
+	for os_release_file in /etc/os-release /usr/lib/os-release; do
+		if [ -r "$os_release_file" ]; then
+			local ID="" ID_LIKE=""
+			# shellcheck disable=SC1091
+			. "$os_release_file"
+			os_id="$ID"
+			os_id_like="$ID_LIKE"
+			break
 		fi
-	} &>/dev/null
-	echo $dtype
+	done
+
+	if [ -n "$os_id" ] || [ -n "$os_id_like" ]; then
+		for marker in "$os_id" $os_id_like; do
+			[ -n "$marker" ] || continue
+			marker=$(printf '%s' "$marker" | tr '[:upper:]' '[:lower:]')
+			case "$marker" in
+				fedora)
+					dtype="fedora"
+					break
+					;;
+				redhat|redhatenterpriseserver|rhel|centos|rocky|almalinux|alma|scientific|oraclelinux|ol|cloudlinux)
+					dtype="redhat"
+					break
+					;;
+				suse|sles|sled|opensuse*|sle_hpc)
+					dtype="suse"
+					break
+					;;
+				ubuntu)
+					dtype="ubuntu"
+					break
+					;;
+				debian|linuxmint|elementary|pop|zorin|raspbian|kali)
+					dtype="debian"
+					break
+					;;
+				gentoo)
+					dtype="gentoo"
+					break
+					;;
+				mandriva|mageia|mandrake)
+					dtype="mandriva"
+					break
+					;;
+				slackware)
+					dtype="slackware"
+					break
+					;;
+			esac
+		done
+	fi
+
+	if [ "$dtype" == "unknown" ]; then
+		{
+			# First test specifically for Fedora
+			if [ -r /etc/fedora-release ]; then
+				dtype="fedora"
+
+			# Then test against Fedora / RHEL / CentOS / generic Redhat derivative
+			elif [ -r /etc/rc.d/init.d/functions ]; then
+				source /etc/rc.d/init.d/functions
+				[ "zz$(type -t passed 2>/dev/null)" == "zzfunction" ] && dtype="redhat"
+
+			# Then test against SUSE (must be after Redhat,
+			elif [ -r /etc/rc.status ]; then
+				source /etc/rc.status
+				[ "zz$(type -t rc_reset 2>/dev/null)" == "zzfunction" ] && dtype="suse"
+
+			# Then test against Debian, Ubuntu and friends
+			elif [ -r /lib/lsb/init-functions ]; then
+				source /lib/lsb/init-functions
+				[ "zz$(type -t log_begin_msg 2>/dev/null)" == "zzfunction" ] && dtype="debian"
+				# Double-check for Ubuntu since though debian based, ubuntu does many things very differently...
+				[ -r /etc/lsb-release ] && cat /etc/lsb-release | grep Ubuntu && dtype="ubuntu"
+
+			# Then test against Gentoo
+			elif [ -r /etc/init.d/functions.sh ]; then
+				source /etc/init.d/functions.sh
+				[ "zz$(type -t ebegin 2>/dev/null)" == "zzfunction" ] && dtype="gentoo"
+
+			# For Mandriva we currently just test if /etc/mandriva-release exists
+			elif [ -s /etc/mandriva-release ]; then
+				dtype="mandriva"
+
+			# For Slackware we currently just test if /etc/slackware-version exists
+			elif [ -s /etc/slackware-version ]; then
+				dtype="slackware"
+
+			fi
+		} &>/dev/null
+	fi
+
+	echo "$dtype"
 
 }
 
@@ -16436,7 +16492,9 @@ kvm::make_vm_now_from_fedora_org() {
 			--controller type=virtio-serial \
 			--extra-args "inst.ks=file:/$(basename $_preseed_file)" \
 			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+	} 2>&1 | tee -a ${_LOGFILE} && disown
+	
+	dialog::display_summary_message "NOTICE!"
 	
 	# Cleanup 
 	unset _preseed_file vm_kernel vm_initrd _source_url _config _mirrorlist_url _os_version _summary_message distro _UserServerEnvironemtSelection _UserDesktopEnvironmentSelection _role _service disk_path
@@ -16559,7 +16617,9 @@ kvm::make_vm_now_from_redhat_com() {
 			--location="${iso}" \
 			--extra-args "inst.ks=file:/$(basename $_preseed_file)" \
 			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+	} 2>&1 | tee -a ${_LOGFILE} && disown 
+	
+	dialog::display_summary_message "NOTICE!"
 
 	for i in _preseed_file _source_url _config _mirrorlist_url _os_version distro disk_path iso; do unset $i; done
 }
@@ -16664,7 +16724,9 @@ kvm::make_vm_now_from_opensuse_org() {
 			--location="${source_url}" \
 			--extra-args "AutoYaST=file:///$(basename ${_autoyast_filename})" \
 			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+	} 2>&1 | tee -a ${_LOGFILE} && disown
+	
+	dialog::display_summary_message "NOTICE!"
 
 	for i in PRESEED_FILE vm_kernel vm_initrd source_url CONFIG distro _UserProductSelection _autoyast_filename disk_path ; do unset $i; done
 }
@@ -16779,7 +16841,9 @@ kvm::make_vm_now_from_debian_org() {
 			--install kernel="${vm_kernel}",initrd="${vm_initrd}" \
 			--extra-args "ks=file:/$(basename $PRESEED_FILE) ${ui_diplay_style}" \
 			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+	} 2>&1 | tee -a ${_LOGFILE} && disown
+	
+	dialog::display_summary_message "NOTICE!"
 
 	for i in PRESEED_FILE vm_kernel vm_initrd source_url ui_diplay_style vm_name vm_usecase distro disk_path; do unset $i; done
 
@@ -16881,7 +16945,9 @@ kvm::make_vm_now_from_kali_org() {
 			--video "virtio" --channel "spicevmc" \
 			--initrd-inject="${PRESEED_FILE}" \
 			--extra-args "ks=file:/$(basename $PRESEED_FILE) " || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+	} 2>&1 | tee -a ${_LOGFILE} && disown
+	
+	dialog::display_summary_message "NOTICE!"
 
 	unset PRESEED_FILE vm_kernel vm_initrd source_url ui_diplay_style vm_name vm_usecase distro pkgsel_include_string iso _role _task _cpu _mem _dsk _UserDesktopEnvironmentSelection _UserServerEnvironemtSelection _service disk_path
 
@@ -16987,7 +17053,9 @@ kvm::make_vm_now_from_zorin() {
 		localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 			--initrd-inject="${_saveto}/preseed.cfg" \
 			--initrd-inject="${_saveto}/ks.cfg"  || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+	}>> ${_LOGFILE} 2>&1 & disown
+	
+	dialog::display_summary_message "NOTICE!"
 
 	unset disk_path
 }
@@ -17179,7 +17247,8 @@ kvm::make_vm_now_from_ubuntu_com() {
 					--initrd-inject="${_saveto}/preseed.cfg" \
 					--initrd-inject="${_saveto}/ks.cfg" \
 				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-			} >> ${_LOGFILE} 2>&1 & disown
+			} 2>&1 | tee -a ${_LOGFILE} && disown
+
 			dialog::display_summary_message "NOTICE!"
 
 		elif [[ ${_tgt_ubuntu_ver::2} -lt 23 ]]; then
@@ -17205,7 +17274,8 @@ kvm::make_vm_now_from_ubuntu_com() {
 					--initrd-inject="${_saveto}/preseed.cfg" \
 					--initrd-inject="${_saveto}/ks.cfg" \
 				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-			} >> ${_LOGFILE} 2>&1 & disown
+			} 2>&1 | tee -a ${_LOGFILE} && disown
+
 			dialog::display_summary_message "NOTICE!"
 
 		elif [[ ${_tgt_ubuntu_ver::2} -ge 23 && ${_tgt_ubuntu_ver::2} -lt 24 ]]; then
@@ -17239,7 +17309,8 @@ kvm::make_vm_now_from_ubuntu_com() {
 					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 					--extra-args "autoinstall" \
 				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-			} >> ${_LOGFILE} 2>&1 & disown
+			} 2>&1 | tee -a ${_LOGFILE} && disown
+
 			dialog::display_summary_message "NOTICE!"
 		fi
 	;;
@@ -17272,8 +17343,8 @@ kvm::make_vm_now_from_ubuntu_com() {
 				--extra-args "autoinstall reboot=acpi" \
 				--events on_reboot=restart,on_poweroff=destroy,on_crash=destroy \
 				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-			} >> ${_LOGFILE} 2>&1 & disown
-			rtd_oem_pause 1 "Completed getting VM configuration preferences."
+			} 2>&1 | tee -a ${_LOGFILE} && disown
+
 			dialog::display_summary_message "NOTICE!"
 		fi
 	;;
@@ -17308,7 +17379,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 				--extra-args "autoinstall reboot=acpi" \
 				--events on_reboot=restart,on_poweroff=destroy,on_crash=destroy \
 				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-			} >> ${_LOGFILE} 2>&1 & disown
+			} 2>&1 | tee -a ${_LOGFILE} && disown
 
 			dialog::display_summary_message "NOTICE!"
 		fi
@@ -17537,7 +17608,9 @@ kvm::make_vm_now_from_microsoft() {
 		else
 			system::log_item "virsh not available; unable to auto-send boot key for ${vm_name}"
 		fi
-	} 2>&1 | tee -a ${_LOGFILE} && dialog::display_summary_message "NOTICE!"
+	} 2>&1 | tee -a ${_LOGFILE} && disown 
+	
+	dialog::display_summary_message "NOTICE!"
 
 
 	
