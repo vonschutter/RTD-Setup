@@ -3501,11 +3501,10 @@ system::make_preseed_cfg() {
 
 	system::preseed_to_ubuntu_ks_cfg "${_saveto}"
 	system::log_item "Preseed file created: ${PRESEED_FILE}"
+	
+	system::log_item "Containging DATA:
+	$(cat ${PRESEED_FILE})"
 
-	if [[ "$_LOGLEVEL" == "debug" ]]; then
-		system::log_item "Containging DATA:
-		$(cat ${PRESEED_FILE})"
-	fi
 }
 
 system::generate_cloudconfig() {
@@ -3807,7 +3806,18 @@ system::generate_ks_cfg_file() {
 	)
 
 	# Generate the kickstart file
-	template::kickstart_cfg ${_ks_file}
+	if template::kickstart_cfg ${_ks_file} ; then
+		system::log_item "Kickstart file generation succeeded."
+	else
+		system::log_item "Kickstart file generation failed."
+		return 1
+	fi
+
+	system::log_item "Kickstart file created: ${_ks_file}"
+	system::log_item "Containing DATA:
+	$(cat ${_ks_file})"
+	return 0
+
 }
 
 system::generate_autoyast_file() {
@@ -19616,6 +19626,11 @@ with open(output_path, "w", encoding="utf-8") as f:
     json.dump(data, f, indent=4)
     f.write("\n")
 PY
+
+	system::log_item "Agama JSON profile generated at: ${_agama_filename}"
+	system::log_item "Contents of ${_agama_filename}:"
+	cat "${_agama_filename}"
+	return 0
 }
 
 template::cloud_config() {
