@@ -19286,7 +19286,8 @@ template::AutoYast_xml() {
 	#   _UserDesktopEnvironmentSelection - The desktop environment to be installed (e.g., KDE).
 	#   _UserServerEnvironemtSelection - The server environment to be installed (e.g., file_server).
 	#   _UserProductSelection - The SUSE product to be installed (e.g., Leap).
-	#   _SUSE_PACKMAN_LEAP - The repository URL for Packman Leap defined in the _locations file.
+	#   _SUSE_PACKMAN_LEAP/_SUSE_PACKMAN_TUMBLEWEED - Packman repository URLs defined in _locations.
+	#   _SUSE_NON_OSS_LEAP/_SUSE_NON_OSS_TUMBLEWEED - Non-OSS repository URLs defined in _locations.
 	#   _autoyast_filename - The filename where the AutoYaST XML content will be saved.
 	#
 	# Arguments:
@@ -19316,6 +19317,33 @@ template::AutoYast_xml() {
 		write_error "No output file provided, use: ${FUNCNAME[0]} </path/to/filename>"
 		return 1
 	}; fi
+
+	local suse_product="${_UserProductSelection:-${_Product:-Leap}}"
+	local packman_repo=""
+	local non_oss_repo=""
+
+	case "${suse_product,,}" in
+		tumbleweed)
+			packman_repo="${_SUSE_PACKMAN_TUMBLEWEED:-${_SUSE_PACKMAN_LEAP:-}}"
+			non_oss_repo="${_SUSE_NON_OSS_TUMBLEWEED:-${_SUSE_NON_OSS_LEAP:-}}"
+			;;
+		leap|opensuse|opensuse-leap|"")
+			packman_repo="${_SUSE_PACKMAN_LEAP:-}"
+			non_oss_repo="${_SUSE_NON_OSS_LEAP:-}"
+			;;
+		*)
+			packman_repo="${_SUSE_PACKMAN_LEAP:-}"
+			non_oss_repo=""
+			;;
+	esac
+
+	local repo_lines=""
+	if [[ -n ${non_oss_repo} ]]; then
+		repo_lines+=$'\t\tsudo zypper ar -cfp 85 '"${non_oss_repo}"$' non-oss\n'
+	fi
+	if [[ -n ${packman_repo} ]]; then
+		repo_lines+=$'\t\tsudo zypper ar -cfp 90 '"${packman_repo}"$' packman\n'
+	fi
 
 	cat >>${_autoyast_filename} <<-AUTOYAST_EOF
 		<?xml version="1.0"?>
@@ -19438,7 +19466,7 @@ template::AutoYast_xml() {
 		chmod 755 ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
 		${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
 		cp *.xml ${_OEM_DIR:-"/opt/rtd"}/
-		sudo zypper ar -cfp 90 ${_SUSE_PACKMAN_LEAP} packman
+		$(printf "%s" "$repo_lines")
 		zypper --gpg-auto-import-keys refresh
 		# zypper dup --from packman -y --force-resolution
 		zypper in -y ansible
@@ -19482,7 +19510,8 @@ template::Agama_json() {
 	#   Preference_InitialKeyboardLayout    - Keyboard layout to apply.
 	#   _UserDesktopEnvironmentSelection    - Desktop environment pattern to install.
 	#   _UserProductSelection/_Product      - SUSE product channel to enable.
-	#   _SUSE_PACKMAN_LEAP                  - Packman repository URL (optional).
+	#   _SUSE_PACKMAN_LEAP/_SUSE_PACKMAN_TUMBLEWEED - Packman repo URLs (optional).
+	#   _SUSE_NON_OSS_LEAP/_SUSE_NON_OSS_TUMBLEWEED - Non-OSS repo URLs (optional).
 	#   GIT_RTD_SRC_URL                     - Git source for RTD OEM scripts.
 	#   _OEM_DIR                            - Target directory for RTD OEM scripts.
 	#   _agama_filename                     - Optional pre-defined output file path.
@@ -19540,7 +19569,25 @@ template::Agama_json() {
 	local keyboard_layout="${Preference_InitialKeyboardLayout:-english-us}"
 	local desktop_pattern="${_UserDesktopEnvironmentSelection:-gnome_x11}"
 	local product="${_Product:-${_UserProductSelection:-Leap}}"
-	local packman_repo="${_SUSE_PACKMAN_LEAP:-}"
+	local suse_product="${_UserProductSelection:-${_Product:-Leap}}"
+	local packman_repo=""
+	local non_oss_repo=""
+
+	case "${suse_product,,}" in
+		tumbleweed)
+			packman_repo="${_SUSE_PACKMAN_TUMBLEWEED:-${_SUSE_PACKMAN_LEAP:-}}"
+			non_oss_repo="${_SUSE_NON_OSS_TUMBLEWEED:-${_SUSE_NON_OSS_LEAP:-}}"
+			;;
+		leap|opensuse|opensuse-leap|"")
+			packman_repo="${_SUSE_PACKMAN_LEAP:-}"
+			non_oss_repo="${_SUSE_NON_OSS_LEAP:-}"
+			;;
+		*)
+			packman_repo="${_SUSE_PACKMAN_LEAP:-}"
+			non_oss_repo=""
+			;;
+	esac
+
 	local oem_dir="${_OEM_DIR:-/opt/rtd}"
 	local git_src="${GIT_RTD_SRC_URL:-https://github.com/rivertech-division/RTD-Setup.git}"
 
@@ -19551,6 +19598,7 @@ template::Agama_json() {
 	PREF_DESKTOP="${desktop_pattern}" \
 	PREF_PRODUCT="${product}" \
 	PREF_PACKMAN="${packman_repo}" \
+	PREF_NONOSS="${non_oss_repo}" \
 	PREF_OEM_DIR="${oem_dir}" \
 	PREF_GIT_SRC="${git_src}" \
 	PREF_OUTPUT="${output_file}" \
@@ -19568,6 +19616,7 @@ keyboard_layout = os.environ.get("PREF_KEYBOARD", "english-us")
 desktop_pattern = os.environ.get("PREF_DESKTOP", "gnome_x11")
 product = os.environ.get("PREF_PRODUCT", "Leap")
 packman_repo = os.environ.get("PREF_PACKMAN", "")
+non_oss_repo = os.environ.get("PREF_NONOSS", "")
 oem_dir = os.environ.get("PREF_OEM_DIR", "/opt/rtd")
 git_src = os.environ.get("PREF_GIT_SRC", "https://github.com/vonschutter/RTD-Setup.git")
 
@@ -19584,8 +19633,11 @@ script_lines = [
     f"{oem_dir}/core/rtd-oem-enable-config.sh",
     f"cp *.json {oem_dir}/",
 ]
+if non_oss_repo:
+    script_lines.append(f"zypper ar -cfp 85 {non_oss_repo} non-oss")
 if packman_repo:
     script_lines.append(f"zypper ar -cfp 90 {packman_repo} packman")
+if non_oss_repo or packman_repo:
     script_lines.append("zypper --gpg-auto-import-keys refresh")
 script_lines.extend([
     "zypper in -y ansible",
