@@ -16498,7 +16498,8 @@ kvm::make_vm_now_from_fedora_org() {
 			--graphics spice,listen=127.0.0.1 \
 			--controller type=virtio-serial \
 			--extra-args "inst.ks=file:/$(basename $_preseed_file)" \
-			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
+			--wait 5 \
+			|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	} 2>&1 | tee -a ${_LOGFILE} && disown
 	
 	dialog::display_summary_message "NOTICE!"
@@ -16623,7 +16624,7 @@ kvm::make_vm_now_from_redhat_com() {
 			--initrd-inject="${_preseed_file}" \
 			--location="${iso}" \
 			--extra-args "inst.ks=file:/$(basename $_preseed_file)" \
-			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
+			|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	} 2>&1 | tee -a ${_LOGFILE} && disown 
 	
 	dialog::display_summary_message "NOTICE!"
@@ -16730,7 +16731,7 @@ kvm::make_vm_now_from_opensuse_org() {
 			--initrd-inject="${_autoyast_filename}" \
 			--location="${source_url}" \
 			--extra-args "AutoYaST=file:///$(basename ${_autoyast_filename})" \
-			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
+			|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	} 2>&1 | tee -a ${_LOGFILE} && disown
 	
 	dialog::display_summary_message "NOTICE!"
@@ -16847,7 +16848,8 @@ kvm::make_vm_now_from_debian_org() {
 			--initrd-inject="${PRESEED_FILE}" \
 			--install kernel="${vm_kernel}",initrd="${vm_initrd}" \
 			--extra-args "ks=file:/$(basename $PRESEED_FILE) ${ui_diplay_style}" \
-			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
+			--wait 5 \
+			|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	} 2>&1 | tee -a ${_LOGFILE} & disown
 	
 	dialog::display_summary_message "NOTICE!"
@@ -16951,7 +16953,9 @@ kvm::make_vm_now_from_kali_org() {
 			--os-variant="debian12" \
 			--video "virtio" --channel "spicevmc" \
 			--initrd-inject="${PRESEED_FILE}" \
-			--extra-args "ks=file:/$(basename $PRESEED_FILE) " || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
+			--extra-args "ks=file:/$(basename $PRESEED_FILE) " \
+			--wait 5 \
+			|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	} 2>&1 | tee -a ${_LOGFILE} & disown
 	
 	dialog::display_summary_message "NOTICE!"
@@ -17059,7 +17063,9 @@ kvm::make_vm_now_from_zorin() {
 		netcfg/get_hostname=${vm_name} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
 		localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 			--initrd-inject="${_saveto}/preseed.cfg" \
-			--initrd-inject="${_saveto}/ks.cfg"  || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
+			--initrd-inject="${_saveto}/ks.cfg"  \
+			--wait 5 \
+			|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	}>> ${_LOGFILE} 2>&1 & disown
 	
 	dialog::display_summary_message "NOTICE!"
@@ -17253,6 +17259,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 					localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 					--initrd-inject="${_saveto}/preseed.cfg" \
 					--initrd-inject="${_saveto}/ks.cfg" \
+					--wait 5 \
 				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 			} 2>&1 | tee -a ${_LOGFILE} & disown
 
@@ -17280,6 +17287,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 					localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 					--initrd-inject="${_saveto}/preseed.cfg" \
 					--initrd-inject="${_saveto}/ks.cfg" \
+					--wait 5 \
 				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 			} 2>&1 | tee -a ${_LOGFILE} & disown
 
@@ -17315,6 +17323,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 					--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 					--extra-args "autoinstall" \
+					--wait 5 \
 				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 			} 2>&1 | tee -a ${_LOGFILE} & disown
 
@@ -17349,6 +17358,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 				--extra-args "autoinstall reboot=acpi" \
 				--events on_reboot=restart,on_poweroff=destroy,on_crash=destroy \
+				--wait 5 \
 				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 			} 2>&1 | tee -a ${_LOGFILE} & disown
 
@@ -17385,6 +17395,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 				--extra-args "autoinstall reboot=acpi" \
 				--events on_reboot=restart,on_poweroff=destroy,on_crash=destroy \
+				--wait 5 \
 				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 			} 2>&1 | tee -a ${_LOGFILE} & disown
 
@@ -17601,7 +17612,7 @@ kvm::make_vm_now_from_microsoft() {
 			--boot ${boot_options} \
 			--features kvm_hidden=on,smm=on \
 			--tpm backend.type=emulator,backend.version=2.0,model=tpm-tis \
-			--noautoconsole || (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
+			|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 
 		# Attempt to automatically satisfy the Windows "Press any key to boot from CD or DVD" prompt.
 		if command -v virsh >/dev/null 2>&1; then
