@@ -12137,9 +12137,17 @@ software::from_snapcraft.io() {
 		fi
 
 		if [[ -n "$snap_temp_dir" ]]; then
+			if snap list "$app_name" >/dev/null 2>&1; then
+				write_status "$app_name is allready installed"
+				return 0
+			fi
 			TMPDIR="$snap_temp_dir" SNAP_DOWNLOAD_DIR="$snap_temp_dir" snap install "$@"
 			status=$?
 		else
+			if snap list "$app_name" >/dev/null 2>&1; then
+				write_status "$app_name is allready installed"
+				return 0
+			fi
 			snap install "$@"
 			status=$?
 		fi
@@ -13557,7 +13565,7 @@ software::display_bundle_install_choices_gtk() {
 	system::log_item "Called by ${FUNCNAME[1]} with the following arguments: $*"
 
 	: "${_CONFIG_DIR:=${HOME}/.config/${_tla:-"rtd"}}"
-	: "${completed_bundles_list:=${_CONFIG_DIR}/completed-bundles.inf}"
+	: "${completed_bundles_list:=${_CONFIG_DIR}/completed-bundles.info}"
 
 	mkdir -p "${completed_bundles_list%/*}"
 	touch "${completed_bundles_list}"
@@ -13724,7 +13732,7 @@ software::display_bundle_removal_choices_gtk() {
 	system::log_item "Called by ${FUNCNAME[1]} with the following arguments: $*"
 
 	: "${_CONFIG_DIR:=${HOME}/.config/${_TLA:-"rtd"}}"
-	: "${completed_bundles_list:=${_CONFIG_DIR}/completed-bundles.inf}"
+	: "${completed_bundles_list:=${_CONFIG_DIR}/completed-bundles.info}"
 
 	mkdir -p "${completed_bundles_list%/*}"
 	touch "${completed_bundles_list}"
@@ -21231,7 +21239,7 @@ software::list_bundles() {
 
 	local true_false Description completed_bundles_list
 	: "${_CONFIG_DIR:=${HOME}/.config/${_TLA:-"rtd"}}"
-	: "${completed_bundles_list:=${_CONFIG_DIR}/completed-bundles.inf}"
+	: "${completed_bundles_list:=${_CONFIG_DIR}/completed-bundles.info}"
 
 	if [[ ! -f ${completed_bundles_list} ]]; then
 		mkdir -p "${completed_bundles_list%/*}"
