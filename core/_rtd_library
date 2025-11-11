@@ -15976,7 +15976,11 @@ kvm::get_zorin_iso() {
 	# Globals:
 	#	- None
 	# Arguments:
-	#	- Version prefix to filter the ISO files (default: Core).
+	#	- Version prefix / product channel (e.g., Core, Education, Pro). Defaults to Core and can be supplied
+	#	  positionally or via --product/--edition.
+	#	- Optional major version (e.g., 17, 18) to pin to a specific release directory (positional arg or --version,
+	#	  also accepts the literal value "latest" for parity with tools that prefer --version latest).
+	#	- --latest forces discovery of the newest available release (ignores any numeric version argument).
 	# Outputs:
 	#	- The path to the ISO file.
 	# Returns:
@@ -15984,11 +15988,16 @@ kvm::get_zorin_iso() {
 	#	- 1 if no directories or files are found, or if the download fails.
 	#
 	# Usage:
-	#	kvm::get_zorin_iso [version_prefix]
+	#	kvm::get_zorin_iso [--product <edition>] [--version <major_version|latest>] [--latest]
+	#	                   [version_prefix] [major_version]
 	#
 	# Example:
 	#	kvm::get_zorin_iso
 	#	kvm::get_zorin_iso Education
+	#	kvm::get_zorin_iso --product Education --version 17
+	#	kvm::get_zorin_iso --version latest
+	#	kvm::get_zorin_iso --latest
+	#	kvm::get_zorin_iso Core 18      # explicit edition + version
 	#
 	# Notes:
 	#	- This function uses curl to fetch directory and file listings from the Zorin OS mirror.
@@ -16000,10 +16009,23 @@ kvm::get_zorin_iso() {
 	# Namespaced helpers keep global function table collision-free.
 	kvm__get_zorin_iso__get_latest_directory() {
 		local base_url=$1
+		local requested_directory=$2
 		local listing
+		local directories
 
 		listing=$(curl -fsSL --connect-timeout 10 --max-time 60 --retry 3 --retry-delay 5 --retry-connrefused -H "User-Agent: Mozilla/5.0 (compatible; RTD-Setup/1.0)" "${base_url}" 2>/dev/null) || return 1
-		printf '%s\n' "$listing" | grep -oE 'href="[0-9][0-9.]*/"' | sed -E 's/.*href="([0-9][0-9.]*)\/".*/\1/' | sort -V | tail -1
+		directories=$(printf '%s\n' "$listing" | grep -oE 'href="[0-9][0-9.]*/"' | sed -E 's/.*href="([0-9][0-9.]*)\/".*/\1/' | sort -V)
+		[ -z "$directories" ] && return 1
+
+		if [ -n "$requested_directory" ]; then
+			if printf '%s\n' "$directories" | grep -Fx "$requested_directory" >/dev/null; then
+				printf '%s\n' "$requested_directory"
+				return 0
+			fi
+			return 2
+		fi
+
+		printf '%s\n' "$directories" | tail -1
 	}
 
 	kvm__get_zorin_iso__get_highest_version_file() {
@@ -16049,13 +16071,96 @@ kvm::get_zorin_iso() {
 		return 1
 	}
 
-	version_prefix=${1:-Core}
+	local version_prefix="Core"
+	local requested_version=""
+	local version_prefix_from_flag=0
+	local version_from_flag=0
+	local -a positional_args=()
+	local version_pattern='^[0-9]+([.][0-9]+)?$'
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--product|--edition)
+				if [[ -z "${2:-}" ]]; then
+					write_error "Option $1 requires a value (e.g., --product Core)." >&2
+					return 1
+				fi
+				version_prefix="$2"
+				version_prefix_from_flag=1
+				shift 2
+				;;
+			--version)
+				if [[ -z "${2:-}" ]]; then
+					write_error "Option --version requires a value (e.g., --version 18 or --version latest)." >&2
+					return 1
+				fi
+				local version_value="$2"
+				local version_value_lc
+				version_value_lc=$(printf '%s' "$version_value" | tr '[:upper:]' '[:lower:]')
+				if [[ "$version_value_lc" == "latest" ]]; then
+					requested_version=""
+				else
+					if [[ ! "$version_value" =~ $version_pattern ]]; then
+						write_error "Invalid version '${version_value}'. Expected a number such as 17 or 18.1, or the word 'latest'." >&2
+						return 1
+					fi
+					requested_version="$version_value"
+				fi
+				version_from_flag=1
+				shift 2
+				;;
+			--latest)
+				requested_version=""
+				version_from_flag=1
+				shift
+				;;
+			--help|-h)
+				cat <<'EOF'
+Usage: kvm::get_zorin_iso [--product <edition>] [--version <major|latest>] [--latest]
+       kvm::get_zorin_iso [version_prefix] [major_version]
+
+Examples:
+  kvm::get_zorin_iso --product Education --version 17
+  kvm::get_zorin_iso --version latest
+  kvm::get_zorin_iso --latest
+  kvm::get_zorin_iso Pro 18
+EOF
+				return 0
+				;;
+			--*)
+				write_error "Unknown option: $1" >&2
+				return 1
+				;;
+			*)
+				positional_args+=("$1")
+				shift
+				;;
+		esac
+	done
+
+	if [ ${#positional_args[@]} -gt 0 ]; then
+		for token in "${positional_args[@]}"; do
+				local token_lc
+				token_lc=$(printf '%s' "$token" | tr '[:upper:]' '[:lower:]')
+				if [[ "$token_lc" == "latest" ]]; then
+					if [ $version_from_flag -eq 0 ]; then
+						requested_version=""
+						version_from_flag=1
+					fi
+				elif [[ "$token" =~ $version_pattern ]]; then
+					if [ $version_from_flag -eq 0 ]; then
+						requested_version="$token"
+						version_from_flag=1
+				fi
+			else
+				if [ $version_prefix_from_flag -eq 0 ]; then
+					version_prefix="$token"
+					version_prefix_from_flag=1
+				fi
+			fi
+		done
+	fi
 	local -a default_base_urls=(
-		"https://mirror.zorinos.com/os/stable/"
-		"https://mirror.zorinos.com/os/"
-		"https://mirrors.edge.kernel.org/zorinos/isos/"
-		"https://distro.ibiblio.org/pub/linux/distributions/zorinos/isos/"
-		"http://ftp.umd.edu/zorinos/isos/"
 		"https://mirror.clarkson.edu/zorinos/isos/"
 		"https://mirror.webworld.ie/zorinos/isos/"
 		"https://mirrors.ircam.fr/pub/zorinos/isos/"
@@ -16066,14 +16171,12 @@ kvm::get_zorin_iso() {
 		"https://mirror.dogado.de/zorinos/isos/"
 		"https://mirror.itworxx.de/zorinos/isos/"
 		"https://zorin.c3sl.ufpr.br/zorinos/isos/"
-		"https://mirror.serverion.com/zorinos/isos/"
-		"https://mirrors.dotsrc.org/zorinos/isos/"
-		"https://mirror.one.com/zorinos/isos/"
+		"https://mirror.serverion.com/zorinos/"
+		"https://mirrors.dotsrc.org/zorinos/"
 		"https://mirror.zetup.net/zorinos/"
 		"https://ftpmirror2.infania.net/mirror/zorinos/isos/"
-		"https://ftp.lysator.liu.se/pub/os/zorinos/isos/"
-		"https://mirror.kumi.systems/zorinos/isos/"
-		"https://ftp.icm.edu.pl/pub/ZorinOS/isos/"
+		"https://ftp.lysator.liu.se/pub/os/zorinos/"
+		"https://mirror.kumi.systems/zorinos/"
 		"https://mirror.onet.pl/pub/mirrors/zorinos/isos/"
 		"https://ftp.cc.uoc.gr/mirrors/linux/zorinos/isos/"
 		"https://mirror.ihost.md/zorinos/isos/"
@@ -16083,8 +16186,7 @@ kvm::get_zorin_iso() {
 		"https://mirror.datautama.net.id/zorinos/isos/"
 		"https://mirror.kakao.com/zorinos/isos/"
 		"https://mirror.freedif.org/zorinos/isos/"
-		"https://mirror.nju.edu.cn/zorinos/isos/"
-		"https://mirror.sjtu.edu.cn/zorinos/isos/"
+		"https://mirror.nju.edu.cn/zorinos/"
 	)
 	local -a base_urls=()
 	# Prefer mirrors defined in RTD-Setup/core/_locations.info if that file has been sourced.
@@ -16104,13 +16206,19 @@ kvm::get_zorin_iso() {
 		base_urls=("${default_base_urls[@]}")
 	fi
 
-	local latest_directory highest_version_file file_path
+	local latest_directory highest_version_file file_path directory_status
 
 	for base_url in "${base_urls[@]}"; do
 		write_status "Checking Zorin mirror: $base_url"
 
-		latest_directory=$(kvm__get_zorin_iso__get_latest_directory "$base_url")
-		if [ -z "$latest_directory" ]; then
+		latest_directory=$(kvm__get_zorin_iso__get_latest_directory "$base_url" "$requested_version")
+		directory_status=$?
+		if [ $directory_status -eq 2 ]; then
+			if [ -n "$requested_version" ]; then
+				write_warning "Requested Zorin version '$requested_version' not found at $base_url"
+			fi
+			continue
+		elif [ $directory_status -ne 0 ] || [ -z "$latest_directory" ]; then
 			write_warning "No directories found at $base_url"
 			continue
 		fi
@@ -16127,11 +16235,10 @@ kvm::get_zorin_iso() {
 			write_status "File already exists: $file_path"
 			iso="$file_path"
 			echo "$file_path"
-			_zorin_current_version="$version_prefix"
 			return 0
 		fi
 
-		write_information "Latest version file: $highest_version_file"
+		write_information "Selected version file: $highest_version_file"
 		if kvm__get_zorin_iso__download_file "$base_url" "$latest_directory" "$highest_version_file"; then
 			return 0
 		fi
@@ -16985,7 +17092,9 @@ kvm::make_vm_now_from_zorin() {
 	#	- bin_virt_install: Path to the virt-install binary.
 	#	- virt_net: Network to use for the VM.
 	# Arguments:
-	#	- None (reads from global variables and command-line options).
+	#	- Accepts the same generic VM flags handled by kvm::util::read_common_options plus:
+	#	  --edition|--product <Core|Pro|Education> (defaults to Core)
+	#	  --version <number|latest> or --latest (defaults to latest)
 	# Outputs:
 	#	- Creates a KVM virtual machine template.
 	# Returns:
@@ -16993,10 +17102,10 @@ kvm::make_vm_now_from_zorin() {
 	#	- 1 on error.
 	#
 	# Usage:
-	#	kvm::make_vm_now_from_zorin [options]
+	#	kvm::make_vm_now_from_zorin [--edition Core] [--version latest] [generic options]
 	#
 	# Example:
-	#	kvm::make_vm_now_from_zorin --role workstation --cpu 2 --mem 2048 --dsk 100
+	#	kvm::make_vm_now_from_zorin --edition Core --version latest --tshirt-size small
 	#
 	# Notes:
 	#	- This function relies on other utility functions and dependencies such as dependency::virtualization and kvm::get_zorin_iso.
@@ -17008,6 +17117,8 @@ kvm::make_vm_now_from_zorin() {
 	# Check that virtualization is supported on the host
 	dependency::virtualization
 
+	local ubuntu_flavor _role _cpu _mem _dsk permanent_download_dir _saveto CloudConfigDir bin_virt_install virt_net edition version _zorin_current_version
+
 	: ${ubuntu_flavor="ubuntu"}                           # This is the default flavor of Ubuntu to use.
 	: ${_role:="VDI"}                                     # This is the default role of the Ubuntu VM to create.
 	: ${_cpu:="${_cpu:=2}"}                               # This is the default number of CPUs to use.
@@ -17018,22 +17129,89 @@ kvm::make_vm_now_from_zorin() {
 	: ${CloudConfigDir:="$_saveto"}                       # This is the default location cidata files.
 	: ${bin_virt_install:=$(type -p virt-install)}        # This is the default location for the virt-install binary.
 	: ${virt_net="$(system::find_vm_bridge)"}             # This is the default network to use for the VM.
+	: ${edition:="Core"}                                  # This is the default edition of Zorin OS to use.
+	: ${version:="latest"}                                # Default to the most recent Zorin OS release.
+
+	local -a passthrough_args=()
+	local version_pattern='^[0-9]+([.][0-9]+)?$'
+
+	if [ $# -gt 0 ]; then
+		while [[ $# -gt 0 ]]; do
+			case "$1" in
+				--edition|--product)
+					if [[ -z "${2:-}" ]]; then
+						write_error "⛔ Option $1 requires a value (e.g., --edition Core)." >&2
+						return 1
+					fi
+					edition="$2"
+					shift 2
+					continue
+					;;
+				--version)
+					if [[ -z "${2:-}" ]]; then
+						write_error "⛔ Option --version requires a value (e.g., --version 18 or --version latest)." >&2
+						return 1
+					fi
+					local version_value="$2"
+					local version_value_lc
+					version_value_lc=$(printf '%s' "$version_value" | tr '[:upper:]' '[:lower:]')
+					if [[ "$version_value_lc" == "latest" ]]; then
+						version="latest"
+					elif [[ "$version_value" =~ $version_pattern ]]; then
+						version="$version_value"
+					else
+						write_error "⛔ Invalid version '${version_value}'. Use a number (e.g., 17) or 'latest'." >&2
+						return 1
+					fi
+					shift 2
+					continue
+					;;
+				--latest)
+					version="latest"
+					shift
+					continue
+					;;
+				*)
+					passthrough_args+=("$1")
+					shift
+					;;
+			esac
+		done
+	fi
 
 	_ask=YES
 	# Set default values for VM T-Shirts sizes...
-	kvm::util::read_common_options ${*}
+	if [ ${#passthrough_args[@]} -gt 0 ]; then
+		kvm::util::read_common_options "${passthrough_args[@]}"
+		kvm::util::read_distro_options --distribution ubuntu "${passthrough_args[@]}"
+	else
+		kvm::util::read_common_options
+		kvm::util::read_distro_options --distribution ubuntu
+	fi
 
-	# Set specific options for Debian...
-	kvm::util::read_distro_options --distribution ubuntu ${*}
+	kvm::get_zorin_iso --version "$version" --product "$edition" || (dialog::display_error "💥 - An ERROR has occurred. Unable to get Zorin ISO file. Please press [OK] to continue..." && return 1)
 
-	kvm::get_zorin_iso || (dialog::display_error "💥 - An ERROR has occurred. Unable to get Zorin ISO file. Please press [OK] to continue..." && return 1)
+	if [[ -z "${_zorin_current_version}" ]]; then
+		if [[ -n "${iso:-}" ]]; then
+			local iso_basename
+			iso_basename=$(basename -- "$iso")
+			if [[ "$iso_basename" =~ Zorin-OS-([0-9.]+)- ]]; then
+				_zorin_current_version="${BASH_REMATCH[1]}"
+			else
+				_zorin_current_version="${version}"
+			fi
+		else
+			_zorin_current_version="${version}"
+		fi
+	fi
+
+	kvm::util::set_vm_name --var vm_name "Template_Zorin_OS" "${edition}" "${_role}" "${_zorin_current_version}" --timestamp-format "%Y-%m-%d-%s" || return 1
+
 	local disk_path
 	disk_path=$(kvm::create_expanding_vm_hardisk "$vm_name" "$_dsk") || {
 		dialog::display_error "💥 - Failed to create VM disk image. Please press [OK] to continue..."
 		return 1
 	}
-
-	kvm::util::set_vm_name --var vm_name "Template" "${server_app}" "${_role}" "${_zorin_current_version}" --timestamp-format "%Y-%m-%d-%s" || return 1
 
 	system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --ask ${_ask:-"NO"} || (dialog::display_error "💥 - An ERROR has occurred. Unable to create preseed file. Please press [OK] to continue..." && return 1)
 
