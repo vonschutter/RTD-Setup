@@ -3416,7 +3416,7 @@ system::make_preseed_cfg() {
 	system::log_item "Distribution: Role: ${_role} | Desktop: ${_UserDesktopEnvironmentSelection:-"Not selected"} | Server: ${_UserServerEnvironemtSelection:-"Not selected"} | Ask: ${_ask} | Save to: ${_saveto}"
 	system::log_item "Transferring standard selections _role to the preseed file multiselect option..."
 	case "${_role}" in
-	workstation | desktop)
+	workstation | desktop | VDI)
 		_task="${_UserDesktopEnvironmentSelection:="gnome-desktop"}"
 		system::log_item "Setting multiselect _task to: ${_task} because the primary purpose is to be a VDI or Desktop"
 		;;
@@ -16161,31 +16161,19 @@ EOF
 		done
 	fi
 	local -a default_base_urls=(
+		"https://distro.ibiblio.org/pub/linux/distributions/zorinos/"
 		"https://mirror.clarkson.edu/zorinos/isos/"
-		"https://mirror.webworld.ie/zorinos/isos/"
-		"https://mirrors.ircam.fr/pub/zorinos/isos/"
-		"https://mirrors.up.pt/pub/zorinos/isos/"
-		"https://mirror.metanet.ch/zorinos/isos/"
-		"https://ftp.halifax.rwth-aachen.de/zorinos/isos/"
+		"https://mirror.webworld.ie/zorinos/"
+		"https://mirror.metanet.ch/zorinos/"
+		"https://ftp.halifax.rwth-aachen.de/zorinos/"
 		"https://mirror.23m.com/zorinos/isos/"
-		"https://mirror.dogado.de/zorinos/isos/"
-		"https://mirror.itworxx.de/zorinos/isos/"
-		"https://zorin.c3sl.ufpr.br/zorinos/isos/"
+		"https://mirror.dogado.de/zorinos/"
 		"https://mirror.serverion.com/zorinos/"
 		"https://mirrors.dotsrc.org/zorinos/"
-		"https://mirror.zetup.net/zorinos/"
 		"https://ftpmirror2.infania.net/mirror/zorinos/isos/"
-		"https://ftp.lysator.liu.se/pub/os/zorinos/"
 		"https://mirror.kumi.systems/zorinos/"
-		"https://mirror.onet.pl/pub/mirrors/zorinos/isos/"
-		"https://ftp.cc.uoc.gr/mirrors/linux/zorinos/isos/"
-		"https://mirror.ihost.md/zorinos/isos/"
-		"https://mirror.hosthink.net/zorinos/isos/"
-		"https://mirror.distrohub.com/zorinos/isos/"
-		"https://free.nchc.org.tw/zorinos/isos/"
-		"https://mirror.datautama.net.id/zorinos/isos/"
-		"https://mirror.kakao.com/zorinos/isos/"
-		"https://mirror.freedif.org/zorinos/isos/"
+		"https://mirror.ihost.md/zorinos/"
+		"https://mirror.hosthink.net/zorinos/"
 		"https://mirror.nju.edu.cn/zorinos/"
 	)
 	local -a base_urls=()
@@ -17205,7 +17193,7 @@ kvm::make_vm_now_from_zorin() {
 		fi
 	fi
 
-	kvm::util::set_vm_name --var vm_name "Template_Zorin_OS" "${edition}" "${_role}" "${_zorin_current_version}" --timestamp-format "%Y-%m-%d-%s" || return 1
+	kvm::util::set_vm_name --var vm_name "Template_Zorin_OS" "${_zorin_current_version}" "${edition}" "${_role}"  --timestamp-format "%Y-%m-%d-%s" || return 1
 
 	local disk_path
 	disk_path=$(kvm::create_expanding_vm_hardisk "$vm_name" "$_dsk") || {
@@ -18535,8 +18523,8 @@ template::preseed_cfg::late_command() {
 			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /root/.ssh/authorized_keys" ; \
 			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /home/${Preference_InitialUser}/.ssh/authorized_keys" ; \
 			cp /*.cfg /target/${_OEM_DIR:-"/opt/rtd"}/ ; \
-			umount -l /media || echo "Empty" ; \
-			eject || true; \
+			# umount -l /media || echo "Empty" ; \
+			# eject || true; \
 			echo "------  initial Setup Complete!  ------"
 
 			# Answer the last question
@@ -18574,8 +18562,8 @@ template::preseed_cfg::late_command() {
 			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /home/${Preference_InitialUser}/.ssh/authorized_keys" ; \
 			in-target /bin/sh -c "chown -R ${Preference_InitialUser} /home/${Preference_InitialUser}/.ssh"  ; \
 			cp /*.cfg /target/${_OEM_DIR:-"/opt/rtd"}/ ; \
-			umount -l /media || echo "Empty" ; \
-			eject || true; \
+			# umount -l /media || echo "Empty" ; \
+			# eject || true; \
 			echo "------  initial Setup Complete!  ------"
 
 			# Answer the last question
