@@ -1070,7 +1070,6 @@ recipe:_OEM:_Themes_and_Tweaks () {
 		# theme modules "engines" that change the look and feel of buttons and widgets. Also, additional
 		# software is needed to change from one them to another.
 
-		write_information "Adding UI themes..."
 		write_information "Fonud the gnome UI on this system! Adding OEM customizations..."
 		# Special case for Fedora: Add the gnome UI tweak tool...
 
@@ -1081,14 +1080,10 @@ recipe:_OEM:_Themes_and_Tweaks () {
 			software::check_native_package_dependency "fedora-workstation-repositories"
 		esac
 
-		software::check_native_package_dependency gnome-tweaks
-		software::check_native_package_dependency make
-		software::check_native_package_dependency sassc
-		software::check_native_package_dependency gettext
+		software::add_native_package gnome-tweaks make sassc gettext 
 
 		# For critical important extensions try to install from package manager first
-		software::add_native_package "gnome-shell-extension-manager"
-		software::add_native_package "gnome-extensions-app"
+		software::add_native_package "gnome-shell-extension-manager" "gnome-extensions-app"
 
 		# Install the wanted shell extensions that can be found in the distributions repository
 		# 	615:	appindicator		307:  	dash-to-dock
@@ -1099,7 +1094,6 @@ recipe:_OEM:_Themes_and_Tweaks () {
 		# 	7: 	removable-drive-menu	1852: 	GameMode
 		software::add_gnome_extensions 615 517 1319 6 19 7 1852 97 3628 8 307 1160
 
-		write_information "Adding UI themes..."
 		source ${_THEME_DIR}/plus-themes.sh || write_error "There was a problem installing themes... "
 		software::add_native_package arc-theme || write_error "There was a problem installing Arc-themes... "
 
@@ -1130,7 +1124,7 @@ recipe:_OEM:_Themes_and_Tweaks () {
 
 	if  ps -e |grep "plasmashell" ; then
 		# -------------------------------------------------------------------------------------------------------
-		write_information "Detected KDE UI!"
+		write_information "Detected KDE UI on this system! Adding OEM customizations..."
 		if [[ -e ${_THEME_DIR}/plus-themes.sh ]] ; then 
 			bash ${_THEME_DIR}/plus-themes.sh || write_error "There was a problem installing themes... "
 		else 
@@ -1147,7 +1141,10 @@ recipe:_OEM:_Themes_and_Tweaks () {
 		else
 			write_information "Only implementing tweaks for the current user..."
 		fi
-		sudo -H -E -u $SUDO_USER  bash -c "source /opt/rtd/core/_rtd_library ; rtd_oem_kde_set_wallpaper ${_WALLPAPER_DIR}/Wayland.jpg"
+
+		# Set wallpaper and theme
+		sudo -H -E -u $SUDO_USER  bash -c "source /opt/rtd/core/_rtd_library ; kde::set_wallpaper ${_WALLPAPER_DIR}/Wayland.jpg"
+		software::from_snapcraft.io gtk-theme-breeze $1
 		# for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
 		# sudo -E -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c '/usr/bin/lookandfeeltool -a RTD-Win11-Dark --resetLayout'
 		# -------------------------------------------------------------------------------------------------------
