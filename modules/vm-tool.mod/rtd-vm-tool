@@ -485,20 +485,17 @@ manage_server_vm_templates() {
 				cleanup_and_finish nomessage
 			;;
 			12 )
-				PRESEED_FILE="$(mktemp)"
-				generate_fedora_ks_cfg_file "${PRESEED_FILE}" ssh-server
-				kvm::make_vm_now_from_fedora_org fedora30
+				kvm::make_vm_now_from_fedora_org --role server --server_role @minimal-server-environment --tshirt-size small
 				cleanup_and_finish nomessage
 			;;
 			13 )
-				PRESEED_FILE="$(mktemp)"
-				generate_fedora_ks_cfg_file "${PRESEED_FILE}" ansible-server
-				kvm::make_vm_now_from_fedora_org fedora30
+				kvm::make_vm_now_from_fedora_org --role server --server_role @network-server --tshirt-size small --tshirt-size small
 				cleanup_and_finish nomessage
 			;;
 		esac
 	done
 }
+
 
 clone_vdi_template_vm() {
 	# Description:
@@ -751,7 +748,7 @@ show_settings_menu() {
 		exec 3>&1
 		selection=$( $RTD_GUI --backtitle "$BACKTITLE" --cancel-button "Back" --title "Manage VM Preferences"  --menu "Please select which Preference to manage:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
 		"1" "🔧 Manage VM T-Shirt sizes and defaults" \
-		"2" "🔧 Manage VM Unattended install preferences" \
+		"2" "🦾 Manage VM Unattended install preferences" \
 		2>&1 1>&3)
 		exit_status=$?
 		exec 3>&-
@@ -779,12 +776,131 @@ show_settings_menu() {
 
 }
 
+
+show_maintenance_menu() {
+	while true; do
+		exec 3>&1
+		selection=$( $RTD_GUI --backtitle "$BACKTITLE" --cancel-button "Back" --title "Maintenance Tasks" --menu "Select a maintenance task to run:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
+			"1" "🔍 Dry run: list unused QCOW images" \
+			"2" "🧹 Remove unused QCOW images" \
+			"3" "🔍 Dry run: list virtual floppy images" \
+			"4" "🧹 Remove virtual floppy images" \
+			2>&1 1>&3)
+		exit_status=$?
+		exec 3>&-
+		clear
+
+		case $exit_status in
+			"$DIALOG_CANCEL"|"$DIALOG_ESC") return ;;
+		esac
+
+		write_status "Maintenance menu selection: $selection"
+		case $selection in
+			1 ) vmtool::run_qcow_cleanup --dry-run ;;
+			2 ) vmtool::run_qcow_cleanup ;;
+			3 ) vmtool::run_floppy_cleanup --dry-run ;;
+			4 ) vmtool::run_floppy_cleanup ;;
+		esac
+	done
+}
+
+
+vmtool::run_cleanup_task() {
+	local task_title="$1"
+	local func_name="$2"
+	local match_regex="$3"
+	local default_dir="$4"
+	local summary_label="$5"
+	local mode_flag="$6"
+
+	local mode_label="execute"
+	local -a args=()
+	if [[ "$mode_flag" == "--dry-run" ]]; then
+		mode_label="dry-run"
+		args+=(--dry-run)
+	fi
+
+	local tmpfile display_file
+	tmpfile=$(mktemp) || return 1
+
+	write_status "Running ${task_title} (${mode_label})..."
+	if ! ( TERMUITXT="nocolor" "$func_name" "${args[@]}" ) &>"$tmpfile"; then
+		local cleanup_status=$?
+		$RTD_GUI --backtitle "$BACKTITLE" --title "${task_title} (${mode_label}) failed" --textbox "$tmpfile" "$HEIGHT" "$WIDTH"
+		rm -f "$tmpfile"
+		write_warning "${task_title} (${mode_label}) failed with exit code ${cleanup_status}. See dialog for details."
+		return 1
+	fi
+
+	display_file=$(mktemp) || { rm -f "$tmpfile"; return 1; }
+
+	local summary_dir
+	summary_dir=$(grep -o 'Directory=[^ ]*' "$tmpfile" | head -n1 | cut -d= -f2)
+	[[ -z "$summary_dir" ]] && summary_dir="$default_dir"
+	local title_suffix=""
+	if [[ -n "$summary_dir" ]]; then
+		title_suffix=" — ${summary_dir}"
+	fi
+
+	local summary_line
+	summary_line=$(grep -m1 "$summary_label" "$tmpfile" || true)
+
+	printf "Directory: %s\nMode: %s\n\n" "${summary_dir}" "${mode_label}" >"$display_file"
+
+	local listed=0
+	local regex="$match_regex"
+	while IFS= read -r line; do
+		if [[ "$line" =~ $regex ]]; then
+			local captured="${BASH_REMATCH[1]}"
+			printf " - %s\n" "$(basename "$captured")" >>"$display_file"
+			listed=1
+		fi
+	done <"$tmpfile"
+
+	local summary_msg="${summary_line:-$(tail -n1 "$tmpfile")}"
+	if (( listed == 0 )); then
+		summary_msg=${summary_msg:-"No items found in ${summary_dir}."}
+		write_status "${task_title} found nothing to remove; showing notice."
+		$RTD_GUI --backtitle "$BACKTITLE" --title "${task_title}${title_suffix}" --msgbox "${summary_msg}" "$HEIGHT" "$WIDTH"
+	else
+		printf "\n%s\n" "${summary_msg}" >>"$display_file"
+		write_status "Opening ${task_title} summary dialog (${task_title}${title_suffix})..."
+		$RTD_GUI --backtitle "$BACKTITLE" --title "${task_title}${title_suffix}" --textbox "$display_file" "$HEIGHT" "$WIDTH"
+	fi
+
+	rm -f "$tmpfile" "$display_file"
+	write_status "${task_title} (${mode_label}) finished; returning to maintenance menu."
+}
+
+
+vmtool::run_qcow_cleanup() {
+	vmtool::run_cleanup_task \
+		"QCOW Cleanup" \
+		"kvm::cleanup_unused_qcow_images" \
+		"remove unused disk: (.*)" \
+		"/var/lib/libvirt/images" \
+		"QCOW cleanup completed" \
+		"$1"
+}
+
+
+vmtool::run_floppy_cleanup() {
+	vmtool::run_cleanup_task \
+		"Floppy Cleanup" \
+		"kvm::cleanup_virtual_floppy_images" \
+		"floppy image: (.*)" \
+		"/var/lib/libvirt/boot" \
+		"Floppy cleanup completed" \
+		"$1"
+}
+
+
 show_manage_VM_template_menu() {
 	while true; do
 		exec 3>&1
 		selection=$( $RTD_GUI --backtitle "$BACKTITLE" --cancel-button "Back" --title "Manage VM Templates"  --menu "Please select which VM Template to manage:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
-		"1" "🔧 Manage Server VM Templates" \
-		"2" "🔧 Manage Virtual Desktop VM Templates" \
+		"1" "🦾 Create Server VM Templates" \
+		"2" "🦾 Create Virtual Desktop VM Templates" \
 		2>&1 1>&3)
 		exit_status=$?
 		exec 3>&-
@@ -810,15 +926,17 @@ show_manage_VM_template_menu() {
 	done
 }
 
+
 vmtool::show_main_menu() {
 	while true; do
 		exec 3>&1
 		selection=$( $RTD_GUI --backtitle "$BACKTITLE" --cancel-button "EXIT" --title "$_TLA VM Tool" --menu "" $HEIGHT $WIDTH $LIST_HEIGHT \
-			"1" "🔧 Manage Server VM's" \
-			"2" "🔧 Manage Virtual Desktop VM's" \
-			"3" "🔧 Manage VM Templates" \
-			"4" "🆙 Settings"\
-			"5" "❓ About this tool" \
+			"1" "✨ Deploy Server VM's" \
+			"2" "✨ Deploy Virtual Desktop VM's" \
+			"3" "💿 Create VM Templates" \
+			"4" "📐 Tool Settings"\
+			"5" "🧹 Maintenance" \
+			"6" "❓ About this tool" \
 			2>&1 1>&3)
 		exit_status=$?
 		exec 3>&-
@@ -848,7 +966,9 @@ vmtool::show_main_menu() {
 			;;
 			4 ) show_settings_menu
 			;;
-			5 ) display_notice
+			5 ) show_maintenance_menu
+			;;
+			6 ) display_notice
 			;;
 		esac
 	done
