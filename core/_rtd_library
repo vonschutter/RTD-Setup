@@ -5802,76 +5802,129 @@ system::run_command_in_gnome_user_session() {
 	echo -------------------------- End as user: 🪪 $SUDO_USER ---------------------
 }
 
+system::rtd_oem_reseal::_virtualization_context() {
+	local _is_virtual="physical"
+	if hash virt-what 2>/dev/null; then
+		local _virt_result
+		_virt_result="$(virt-what 2>/dev/null | tr -d '\n')"
+		if [[ -n "${_virt_result}" ]]; then
+			_is_virtual="virtual"
+		fi
+	fi
+	echo "${_is_virtual}"
+}
+
+system::rtd_oem_reseal::_install_guest_additions() {
+	write_status "🛠 Installing guest integration tools (qemu-guest-agent, spice-vdagent)..."
+	software::add_native_package qemu-guest-agent spice-vdagent || true
+}
+
+system::rtd_oem_reseal::_prepare_ubuntu_like() {
+	local _virt="${1}"
+	software::add_native_package "oem-config-gtk"
+	oem-config-prepare
+	if [[ "${_virt}" == "virtual" ]]; then
+		system::rtd_oem_reseal::_install_guest_additions
+	fi
+}
+
+system::rtd_oem_reseal::_prepare_debian() {
+	local _virt="${1}"
+	write_status "🧹 Preparing Debian-based system for reseal"
+	software::add_native_package cloud-init || true
+	cloud-init clean --logs >>"${_LOGFILE}" 2>&1 || cloud-init clean >>"${_LOGFILE}" 2>&1 || true
+	truncate -s 0 /etc/machine-id 2>/dev/null || true
+	rm -f /var/lib/dbus/machine-id
+	ln -sf /etc/machine-id /var/lib/dbus/machine-id
+	rm -f /etc/ssh/ssh_host_* 2>/dev/null || true
+	if [[ "${_virt}" == "virtual" ]]; then
+		system::rtd_oem_reseal::_install_guest_additions
+	fi
+}
+
+system::rtd_oem_reseal::_prepare_fedora() {
+	local _virt="${1}"
+	write_status "🤞 Preparing Fedora/RedHat-based system for reseal"
+	software::add_native_package initial-setup initial-setup-gui || true
+	systemctl enable initial-setup-graphical.service >>"${_LOGFILE}" 2>&1 || \
+		systemctl enable initial-setup-text.service >>"${_LOGFILE}" 2>&1 || true
+	if [[ "${_virt}" == "virtual" ]]; then
+		system::rtd_oem_reseal::_install_guest_additions
+	fi
+}
+
+system::rtd_oem_reseal::_prepare_suse() {
+	local _virt="${1}"
+	write_status "👽 Preparing SUSE-based system for reseal"
+	software::add_native_package yast2-firstboot || true
+	systemctl enable yast2-firstboot.service >>"${_LOGFILE}" 2>&1 || true
+	if [[ "${_virt}" == "virtual" ]]; then
+		system::rtd_oem_reseal::_install_guest_additions
+	fi
+}
+
+system::rtd_oem_reseal::_finalize_shutdown() {
+	local _virt="${1}"
+	if [[ "${_virt}" == "virtual" ]]; then
+		write_status "💻 This is a virtual machine. Shutting down..."
+	else
+		write_status "🖥️ This is a physical machine. Shutting down..."
+	fi
+	shutdown -h now
+}
+
 system::rtd_oem_reseal() {
 	# Description:
 	# Function to reseal a newly installed system for delivery to end user.
-	# Globals: The distribution must have an OEM reseal function or software available.
+	# Globals: Requires distro-specific OEM tools or reseal packages to be available.
 	# Arguments: None
-	# Outputs:
+	# Outputs: Logs reseal steps and powers the system off.
 	# Returns:
 	# Usage:
 
 	# End of documentation
-	if cat /etc/os-release | grep ubuntu; then
-		software::add_native_package "oem-config-gtk"
-		oem-config-prepare
-		if hash virt-what 2>/dev/null; then
-			system::log_item "💻 This is a virtual machine. Shutting down..."
-			apt-get -y install qemu-guest-agent
-			apt-get -y install spice-vdagent
-			shutdown -h now
-		else
-			system::log_item "💻 This is a physical machine. Shutting down..."
-			shutdown -h now
-		fi
-	elif cat /etc/os-release | grep kubuntu; then
-		software::add_native_package "oem-config-gtk"
-		oem-config-prepare
-		if hash virt-what 2>/dev/null; then
-			system::log_item "💻 This is a virtual machine. Shutting down..."
-			apt-get -y install qemu-guest-agent
-			apt-get -y install spice-vdagent
-			shutdown -h now
-		else
-			system::log_item "💻 This is a physical machine. Shutting down..."
-			shutdown -h now
-		fi
-	elif cat /etc/os-release | grep suse; then
-		system::log_item "👽 I dont know of any OEM configuration for SuSE"
-	elif cat /etc/os-release | grep fedora; then
-		system::log_item "🤞 BETA: I dont know of any OEM configuration for Fedora... trying anyhow... "
-		tee /usr/local/bin/custom-oem-setup.sh <<-'EOF'
-			#!/bin/bash
 
-			# Example task: prompt for creating a new user account
-			echo "Creating a new user account..."
-			read -p "Enter username: " username
-			useradd -m "$username"
-			passwd "$username"
-
-			# Disable this service so it doesn't run again
-			systemctl disable custom-oem-setup.service
-		EOF
-		chmod +x /usr/local/bin/custom-oem-setup.sh
-
-		tee /etc/systemd/system/custom-oem-setup.service <<-'EOF'
-			[Unit]
-			Description=Custom OEM Setup
-			After=multi-user.target
-
-			[Service]
-			Type=oneshot
-			ExecStart=/usr/local/bin/custom-oem-setup.sh
-
-			[Install]
-			WantedBy=multi-user.target
-		EOF
-
-		sudo systemctl enable custom-oem-setup.service
-		shutdown -h now
-	else
-		system::log_item "🤷‍♀️ I dont know of any OEM configuration for this distribution"
+	if [[ ! -r /etc/os-release ]]; then
+		write_warning "🤷‍♀️ Unable to determine distribution for reseal (missing /etc/os-release)"
+		return 1
 	fi
+
+	# shellcheck source=/dev/null
+	. /etc/os-release
+
+	local _os_id="${ID,,}"
+	local _os_like="${ID_LIKE,,}"
+	local _virt
+	_virt="$(system::rtd_oem_reseal::_virtualization_context)"
+
+	case "${_os_id}" in
+		ubuntu | kubuntu | zorin | linuxmint | pop | elementary)
+			system::rtd_oem_reseal::_prepare_ubuntu_like "${_virt}"
+			;;
+		debian)
+			system::rtd_oem_reseal::_prepare_debian "${_virt}"
+			;;
+		fedora)
+			system::rtd_oem_reseal::_prepare_fedora "${_virt}"
+			;;
+		opensuse* | suse | sles*)
+			system::rtd_oem_reseal::_prepare_suse "${_virt}"
+			;;
+		*)
+			if [[ "${_os_like}" == *"debian"* || "${_os_like}" == *"ubuntu"* ]]; then
+				system::rtd_oem_reseal::_prepare_ubuntu_like "${_virt}"
+			elif [[ "${_os_like}" == *"suse"* ]]; then
+				system::rtd_oem_reseal::_prepare_suse "${_virt}"
+			elif [[ "${_os_like}" == *"fedora"* || "${_os_like}" == *"rhel"* || "${_os_like}" == *"centos"* ]]; then
+				system::rtd_oem_reseal::_prepare_fedora "${_virt}"
+			else
+				write_warning "🤷‍♀️ I dont know of any OEM configuration for this distribution"
+				return 1
+			fi
+			;;
+	esac
+
+	system::rtd_oem_reseal::_finalize_shutdown "${_virt}"
 }
 
 
@@ -12758,15 +12811,40 @@ software::ensure_snap_package_managment() {
 			# For distributions that do not need to add a repository to install snap
 			# But would need to install it from their standard reopsitory....
 			if software::check_native_package_dependency snapd; then
-				systemctl enable snapd
-				systemctl start snapd
-				echo snapd is $(systemctl is-active snapd) || return 1
+				local snap_units=()
+				if systemctl list-unit-files | grep -q '^snapd.socket'; then
+					snap_units+=("snapd.socket")
+				fi
+				if systemctl list-unit-files | grep -q '^snapd.service'; then
+					snap_units+=("snapd.service")
+				fi
+				if systemctl list-unit-files | grep -q '^snapd.apparmor'; then
+					snap_units+=("snapd.apparmor")
+				fi
+
+				for unit in "${snap_units[@]}"; do
+					systemctl enable "$unit" >/dev/null 2>&1 || true
+					systemctl start "$unit" >/dev/null 2>&1 || true
+				done
+
+				if ! snap version >/dev/null 2>&1; then
+					write_status "snapd not ready yet; waiting for service socket..."
+					systemctl restart snapd.socket >/dev/null 2>&1 || true
+					systemctl restart snapd.service >/dev/null 2>&1 || true
+					sleep 3
+				fi
+
+				if ! snap version >/dev/null 2>&1; then
+					write_error "snapd service is not responding."
+					return 1
+				fi
+
 				if [[ -e /snap ]]; then
 					write_information "SNAP classic support present... "
 				else
 					ln -s /var/lib/snapd/snap /snap
 				fi
-				return $?
+				return 0
 			else
 				write_error "Failed to satisfy dependecy SNAP!"
 			fi
@@ -16462,7 +16540,7 @@ kvm::create_expanding_vm_hardisk() {
 kvm::wait_for_domain_definition() {
 	# Description:
 	#   Polls libvirt until the specified domain is defined (or a timeout expires). Useful after
-	#   launching `virt-install --wait 0` so UI messaging can be deferred until the VM actually exists.
+	#   launching `virt-install --wait --noautoconsole` so UI messaging can be deferred until the VM actually exists.
 	#
 	# Arguments:
 	#   $1 - Domain name to check (required).
@@ -16479,14 +16557,23 @@ kvm::wait_for_domain_definition() {
 	local timeout="${2:-60}"
 	local delay="${3:-1}"
 
+	system::log_item "waiting for domain $domain definition with timeout $timeout and delay $delay"
 	if [[ -z "$domain" ]]; then
 		write_warning "kvm::wait_for_domain_definition called without a domain name."
 		return 1
 	fi
 
+	if ! [[ "$timeout" =~ ^[0-9]+$ ]] || (( timeout <= 0 )); then
+		write_warning "kvm::wait_for_domain_definition requires a positive timeout value (received: $timeout)."
+		return 1
+	fi
+
+	system::log_item "🕒 Waiting up to ${timeout}s for domain '$domain' to be defined..."
+
 	local elapsed=0
 	while (( elapsed < timeout )); do
 		if virsh dominfo "$domain" >/dev/null 2>&1; then
+			system::log_item "✅ Domain '$domain' is now defined."
 			return 0
 		fi
 		sleep "$delay"
@@ -16494,6 +16581,81 @@ kvm::wait_for_domain_definition() {
 	done
 
 	write_warning "VM '$domain' not visible after ${timeout}s; continuing."
+	return 1
+}
+
+kvm::wait_for_domain_start() {
+	# Description:
+	#   Blocks until the specified libvirt domain emits a lifecycle "Started" event or until a timeout
+	#   expires. Useful after `virsh start --console` to ensure the guest is actually booting before
+	#   proceeding with follow-up steps.
+	#
+	# Arguments:
+	#   --domain <name>  : Required domain name to monitor.
+	#   --timeout <secs> : Optional timeout in seconds (default: 120).
+	#
+	# Outputs:
+	#   Informational and warning messages indicating progress or errors.
+	#
+	# Returns:
+	#   0 when a start event (or currently running state) is detected.
+	#   1 when input is invalid, virsh fails, or the timeout is exceeded.
+	local domain=""
+	local timeout=120
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--domain)
+				domain="${2:-}"
+				shift 2
+				;;
+			--timeout)
+				timeout="${2:-}"
+				shift 2
+				;;
+			*)
+				write_warning "kvm::wait_for_domain_start received unknown argument: $1"
+				return 1
+				;;
+		esac
+	done
+
+	if [[ -z "$domain" ]]; then
+		write_warning "kvm::wait_for_domain_start requires --domain <name>."
+		return 1
+	fi
+
+	if ! [[ "$timeout" =~ ^[0-9]+$ ]] || (( timeout <= 0 )); then
+		write_warning "kvm::wait_for_domain_start requires a positive --timeout value (received: $timeout)."
+		return 1
+	fi
+
+	local state
+	if state=$(virsh domstate "$domain" 2>/dev/null) && [[ "${state,,}" == "running" ]]; then
+		system::log_item "🟢 Domain '$domain' already running; skipping event wait."
+		return 0
+	fi
+
+	system::log_item "🕒 Waiting up to ${timeout}s for domain '$domain' to emit a start event..."
+	local event_output
+	if ! event_output=$(virsh event --domain "$domain" --event lifecycle --timeout "$timeout" 2>&1); then
+		write_warning "virsh event failed for domain '$domain': $event_output"
+		return 1
+	fi
+
+	if grep -qi "Started" <<< "$event_output"; then
+		system::log_item "🚀 Domain '$domain' reported a lifecycle start event."
+		return 0
+	fi
+
+	# virsh event exits after the timeout if nothing was received, so issue a final domstate check
+	# in case the guest raced to running but did not emit a start lifecycle event in time.
+	if state=$(virsh domstate "$domain" 2>/dev/null) && [[ "${state,,}" == "running" ]]; then
+		system::log_item "⚠️  Domain '$domain' running but no start event observed; continuing."
+		return 0
+	fi
+
+	write_warning "Domain '$domain' did not emit a start event within ${timeout}s (output: ${event_output:-<none>})."
 	return 1
 }
 
@@ -16807,11 +16969,15 @@ kvm::make_vm_now_from_fedora_org() {
 			--graphics spice,listen=127.0.0.1 \
 			--controller type=virtio-serial \
 			--extra-args "inst.ks=file:/$(basename $_preseed_file)" \
-			--wait 0 \
+			--wait --noautoconsole \
 			|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-	} 2>&1 | tee -a ${_LOGFILE} && disown
+	} >>"${_LOGFILE}" 2>&1 & disown
 
 	kvm::wait_for_domain_definition "${vm_name}" 60 1 || true
+
+	if ! kvm::wait_for_domain_start --domain "${vm_name}"; then
+		write_warning "Domain '${vm_name}' did not emit a start event within the expected window."
+	fi
 
 	dialog::display_summary_message "NOTICE!"
 	
@@ -16939,10 +17105,15 @@ kvm::make_vm_now_from_redhat_com() {
 			--initrd-inject="${_preseed_file}" \
 			--location="${iso}" \
 			--extra-args "inst.ks=file:/$(basename $_preseed_file)" \
+			--wait --noautoconsole \
 			|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-	} 2>&1 | tee -a ${_LOGFILE} && disown 
+	} >>"${_LOGFILE}" 2>&1 & disown 
 
 	kvm::wait_for_domain_definition "${vm_name}" 60 1 || true
+
+	if ! kvm::wait_for_domain_start --domain "${vm_name}"; then
+		write_warning "Domain '${vm_name}' did not emit a start event within the expected window."
+	fi
 
 	dialog::display_summary_message "NOTICE!"
 
@@ -17053,10 +17224,15 @@ kvm::make_vm_now_from_opensuse_org() {
 			--initrd-inject="${_autoyast_filename}" \
 			--location="${source_url}" \
 			--extra-args "AutoYaST=file:///$(basename ${_autoyast_filename})" \
+			--wait --noautoconsole \
 			|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-	} 2>&1 | tee -a ${_LOGFILE} && disown
+	} >>"${_LOGFILE}" 2>&1 & disown
 
 	kvm::wait_for_domain_definition "${vm_name}" 60 1 || true
+
+	if ! kvm::wait_for_domain_start --domain "${vm_name}"; then
+		write_warning "Domain '${vm_name}' did not emit a start event within the expected window."
+	fi
 
 	dialog::display_summary_message "NOTICE!"
 
@@ -17172,7 +17348,7 @@ kvm::make_vm_now_from_debian_org() {
 	NOTE: You may connecct to the VM and see the progress at IP: $(hostname -I) \n
 	      After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
 
-	write_status "🔧 - Creating the VM..."
+	write_status "🔧 - Creating the VM... Please Wait..."
 	{
 		"${bin_virt_install}" --name "${vm_name}" \
 			--vcpus "${_cpu}" \
@@ -17184,12 +17360,20 @@ kvm::make_vm_now_from_debian_org() {
 			--video "virtio" --channel "spicevmc" \
 			--initrd-inject="${PRESEED_FILE}" \
 			--install kernel="${vm_kernel}",initrd="${vm_initrd}" \
-			--extra-args "ks=file:/$(basename $PRESEED_FILE) ${ui_diplay_style}" \
-			--wait 0 \
+			--extra-args="auto=true priority=critical preseed/file=/$(basename ${PRESEED_FILE}) ${ui_diplay_style}" \
+			--wait --noautoconsole \
 			|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-	} 2>&1 | tee -a ${_LOGFILE} & disown
+	} >>"${_LOGFILE}" 2>&1 &
+	virt_pid=$!
+	disown "${virt_pid}"
 
-	kvm::wait_for_domain_definition "${vm_name}" 60 1 || true
+	kvm::wait_for_domain_definition "${vm_name}" 60 20 || true
+	virsh set-lifecycle-action "${vm_name}" on_reboot restart
+	virsh set-lifecycle-action "${vm_name}" on_poweroff restart  # Debian installer now powers off after build; restart instead
+
+	if ! kvm::wait_for_domain_start --domain "${vm_name}"; then
+		write_warning "Domain '${vm_name}' did not emit a start event within the expected window."
+	fi
 
 	dialog::display_summary_message "NOTICE!"
 
@@ -17298,11 +17482,15 @@ kvm::make_vm_now_from_kali_org() {
 			--video "virtio" --channel "spicevmc" \
 			--initrd-inject="${PRESEED_FILE}" \
 			--extra-args "ks=file:/$(basename $PRESEED_FILE) " \
-			--wait 0 \
+			--wait --noautoconsole \
 			|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-	} 2>&1 | tee -a ${_LOGFILE} & disown
+	} >>"${_LOGFILE}" 2>&1 & disown
 
-	kvm::wait_for_domain_definition "${vm_name}" 60 1 || true
+	kvm::wait_for_domain_definition "${vm_name}" 60 3 || true
+
+	if ! kvm::wait_for_domain_start --domain "${vm_name}"; then
+		write_warning "Domain '${vm_name}' did not emit a start event within the expected window."
+	fi
 
 	dialog::display_summary_message "NOTICE!"
 
@@ -17486,11 +17674,15 @@ kvm::make_vm_now_from_zorin() {
 		localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 			--initrd-inject="${_saveto}/preseed.cfg" \
 			--initrd-inject="${_saveto}/ks.cfg"  \
-			--wait 0 \
+			--wait --noautoconsole \
 			|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	}>> ${_LOGFILE} 2>&1 & disown
 
-	kvm::wait_for_domain_definition "${vm_name}" 60 1 || true
+	kvm::wait_for_domain_definition "${vm_name}" 60 3 || true
+
+	if ! kvm::wait_for_domain_start --domain "${vm_name}"; then
+		write_warning "Domain '${vm_name}' did not emit a start event within the expected window."
+	fi
 
 	dialog::display_summary_message "NOTICE!"
 
@@ -17602,16 +17794,16 @@ kvm::make_vm_now_from_ubuntu_com() {
 	: ${virt_net="$(system::find_vm_bridge)"}             # This is the default network to use for the VM.
 	: ${_ask="NO"}                                        # This is the default for interactive mode for manual input during setup.
 
-	# Set default values for VM T-Shirts sizes...
+	system::log_item "Read/Set default values for VM T-Shirts sizes..."
 	kvm::util::read_common_options ${all_params}
 
-	# Set specific options for Debian...
+	system::log_item  "Set specific options for Ubuntu..."
 	kvm::util::read_distro_options --distro ubuntu ${all_params}
 
-	# Check that virtualization is supported on the host
+	system::log_item  "Check that virtualization is supported on the host..."DS
 	dependency::virtualization
 
-	# get the version of Ubuntu to use; sets variable _tgt_ubuntu_ver...
+	system::log_item  "Get the version of Ubuntu to use; sets variable _tgt_ubuntu_ver..."
 	if [[ -z "${_tgt_ubuntu_ver}" ]]; then
 		if ubuntu::get_target_version ; then 
 			write_status "🔎 	- Using the Ubuntu version as requested: ${_tgt_ubuntu_ver}"
@@ -17622,13 +17814,14 @@ kvm::make_vm_now_from_ubuntu_com() {
 		fi
 	fi
 
+	system::log_item  "Get VM configuration preferences..."
 	if [[ "${_ask}" == "YES" ]]; then
 		kvm::get_vm_config_preferences --ask
 	else
 		kvm::get_vm_config_preferences
 	fi
 
-	# Format the name of the VM to be created...
+	system::log_item  "Format the name of the VM to be created..."
 	local _ubuntu_version_component="${_tgt_ubuntu_ver}"
 	if [[ -n "${_ubuntu_version_component}" ]]; then
 		_ubuntu_version_component="${_ubuntu_version_component}_"
@@ -17641,6 +17834,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 		kvm::util::set_vm_name --var vm_name "Template" "${server_app}" "${_role}" "${_ubuntu_version_component}" --timestamp-format "%Y-%m-%d-%s" || return 1
 	fi
 
+	system::log_item  "Ensure that the QCOW2 disk image is created for the VM in expandable format..."
 	disk_path=$(kvm::create_expanding_vm_hardisk "$vm_name" "$_dsk") || {
 		write_error "❌ Failed to create VM disk image. Aborting VM creation."
 		return 1
@@ -17659,16 +17853,18 @@ kvm::make_vm_now_from_ubuntu_com() {
 	NOTE: You may connect to the VM and see the progress at IP: \n
 	$(hostname -I) \n
 	After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
-
-	# Check the version of Ubuntu and use the appropriate installer...
+	
+	write_status "🔧 - Creating the VM... Please Wait..."
 	case "${_role}" in
 	workstation | desktop )
 		write_status "🖥️ 	- Using a desktop environment: ${_UserDesktopEnvironmentSelection}"
 		if [[ ${_tgt_ubuntu_ver::2} -lt 16 ]]; then
 
-			# for really old Ubuntu builds (less than 16) use the debian installer (d-i) and using DVD ISO but still PRESEED.cfg...
+			system::log_item  "For really old Ubuntu builds (less than 16) use the debian installer (d-i) and using DVD ISO but still PRESEED.cfg...
 			# Ubuntu 14* look for the kernel called vmlinuz.efi and initrd called initrd instead of vmlinuz and initrd.gz, so
-			# we use a different option to install the VM.
+			# we use a different option to install the VM."
+
+			system::log_item "Downloading the Ubuntu ISO if not already present to ${permanent_download_dir} for media-type desktop version ${_tgt_ubuntu_ver}"
 			ubuntu::download_iso --dir ${permanent_download_dir} --media-type desktop --version ${_tgt_ubuntu_ver} 
 			: ${iso:="$permanent_download_dir/$iso_filename"}
 			system::make_preseed_cfg ${all_params}
@@ -17688,17 +17884,22 @@ kvm::make_vm_now_from_ubuntu_com() {
 					localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 					--initrd-inject="${_saveto}/preseed.cfg" \
 					--initrd-inject="${_saveto}/ks.cfg" \
-					--wait 0 \
+					--wait --noautoconsole \
 				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-			} 2>&1 | tee -a ${_LOGFILE} & disown
+			} >>"${_LOGFILE}" 2>&1 & disown
 
-			kvm::wait_for_domain_definition "${vm_name}" 60 1 || true
+			kvm::wait_for_domain_definition "${vm_name}" 60 3 || true
+
+			if ! kvm::wait_for_domain_start --domain "${vm_name}"; then
+				write_warning "Domain '${vm_name}' did not emit a start event within the expected window."
+			fi
 
 			dialog::display_summary_message "NOTICE!"
 
 		elif [[ ${_tgt_ubuntu_ver::2} -lt 23 ]]; then
 
-			# for interim Ubuntu builds (less than 23) use the debian installer (d-i) using DVD ISO but still PRESEED.cfg...
+			system::log_item "For interim Ubuntu builds (less than 23) use the debian installer (d-i) using DVD ISO but still PRESEED.cfg..."
+			system::log_item "Downloading the Ubuntu ISO if not already present to ${permanent_download_dir} for media-type desktop version ${_tgt_ubuntu_ver}"
 			ubuntu::download_iso --dir ${permanent_download_dir} --media-type desktop --version ${_tgt_ubuntu_ver} 
 			: ${iso:="$permanent_download_dir/$iso_filename"}
 			system::make_preseed_cfg ${all_params}
@@ -17718,18 +17919,22 @@ kvm::make_vm_now_from_ubuntu_com() {
 					localechooser/supported-locales=en_US.UTF-8 ubiquity/use_nonfree=true boot=casper automatic-ubiquity splash noprompt " \
 					--initrd-inject="${_saveto}/preseed.cfg" \
 					--initrd-inject="${_saveto}/ks.cfg" \
-					--wait 0 \
+					--wait --noautoconsole \
 				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-			} 2>&1 | tee -a ${_LOGFILE} & disown
+			} >>"${_LOGFILE}" 2>&1 & disown
 
-			kvm::wait_for_domain_definition "${vm_name}" 60 1 || true
+			kvm::wait_for_domain_definition "${vm_name}" 60 3 || true
+
+			if ! kvm::wait_for_domain_start --domain "${vm_name}"; then
+				write_warning "Domain '${vm_name}' did not emit a start event within the expected window."
+			fi
 
 			dialog::display_summary_message "NOTICE!"
 
 		elif [[ ${_tgt_ubuntu_ver::2} -ge 23 && ${_tgt_ubuntu_ver::2} -lt 24 ]]; then
 
-			# For interim Ubuntu builds (greater than 23 but less than 24) there is no way to automate the install.
-			# Only the server media supports automation... This is not a supported version of Ubuntu.
+			system::log_item "For interim Ubuntu builds (greater than 23 but less than 24) there is no way to automate the install.
+			Only the server media supports automation... This is not a supported version of Ubuntu."
 			dialog::display_notice "🐧 Ubuntu version ${_tgt_ubuntu_ver} no longer supports Debian preseed and not yet
 				CloudCOnfig thus it is an unsupported version of Ubuntu. \n\n
 				\n Please consider using a supported version instead: ${all_lts_versions[*]} \n\n"
@@ -17737,9 +17942,12 @@ kvm::make_vm_now_from_ubuntu_com() {
 
 		elif [[ ${_tgt_ubuntu_ver::2} -ge 24 ]]; then
 
-			# For modern Ubuntu builds (greater than 24) use the cloud config and desktop media to build desktop...
-			# However, this seems to be half baked... Hope it actually works for you...
-			ubuntu::download_iso --dir ${permanent_download_dir} --media-type desktop --version ${_tgt_ubuntu_ver} 
+			system::log_item "For modern Ubuntu builds (greater than 24) use the cloud config and desktop media to build desktop...
+			However, this seems to be half baked... Hope it actually works for you..."
+			
+			system::log_item "Downloading the Ubuntu ISO if not already present to ${permanent_download_dir} for media-type desktop version ${_tgt_ubuntu_ver}"
+			ubuntu::download_iso --dir ${permanent_download_dir} --media-type desktop --version ${_tgt_ubuntu_ver}
+
 			: ${iso:="$permanent_download_dir/$iso_filename"}
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using MODERN installer..."
 			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --vmname "${vm_name}" ${all_params}
@@ -17756,11 +17964,15 @@ kvm::make_vm_now_from_ubuntu_com() {
 					--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 					--extra-args "autoinstall" \
-					--wait 0 \
+					--wait --noautoconsole \
 				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-			} 2>&1 | tee -a ${_LOGFILE} & disown
+			} >>"${_LOGFILE}" 2>&1 & disown
 
-			kvm::wait_for_domain_definition "${vm_name}" 60 1 || true
+			kvm::wait_for_domain_definition "${vm_name}" 60 3 || true
+
+			if ! kvm::wait_for_domain_start --domain "${vm_name}"; then
+				write_warning "Domain '${vm_name}' did not emit a start event within the expected window."
+			fi
 
 			dialog::display_summary_message "NOTICE!"
 		fi
@@ -17775,7 +17987,9 @@ kvm::make_vm_now_from_ubuntu_com() {
 			unset _tgt_ubuntu_ver _summary_message iso_filename CloudConfigDir iso vm_name 
 			return
 		else
-			ubuntu::download_iso --dir ${permanent_download_dir} --media-type server --version ${_tgt_ubuntu_ver} 
+			system::log_item "Downloading the Ubuntu ISO if not already present to ${permanent_download_dir} for media-type server version ${_tgt_ubuntu_ver}"
+			ubuntu::download_iso --dir ${permanent_download_dir} --media-type server --version ${_tgt_ubuntu_ver}
+
 			: ${iso:="$permanent_download_dir/$iso_filename"}
 			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than 23, so using cloud config to build server..."
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using SERVER installer as requested..."
@@ -17793,11 +18007,15 @@ kvm::make_vm_now_from_ubuntu_com() {
 				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 				--extra-args "autoinstall reboot=acpi" \
 				--events on_reboot=restart,on_poweroff=destroy,on_crash=destroy \
-				--wait 0 \
+				--wait --noautoconsole \
 				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-			} 2>&1 | tee -a ${_LOGFILE} & disown
+			} >>"${_LOGFILE}" 2>&1 & disown
 
-			kvm::wait_for_domain_definition "${vm_name}" 60 1 || true
+			kvm::wait_for_domain_definition "${vm_name}" 60 3 || true
+
+			if ! kvm::wait_for_domain_start --domain "${vm_name}"; then
+				write_warning "Domain '${vm_name}' did not emit a start event within the expected window."
+			fi
 
 			dialog::display_summary_message "NOTICE!"
 		fi
@@ -17812,10 +18030,12 @@ kvm::make_vm_now_from_ubuntu_com() {
 			Press OK to return to the previous menu. \n"
 			dialog::display_summary_message "NOTICE!"
 			unset _UserDesktopEnvironmentSelection _UserServerEnvironemtSelection PRESEED_FILE vm_kernel vm_initrd source_url iso _task _role _cpu _dsk _mem _tgt_ubuntu_ver ubuntu_iso_url iso_filename CloudConfig CloudConfigDir _summary_message _saveto _ask _flavor _role _cpu _mem _dsk permanent_download_dir bin_virt_install virt_net vm_name all_params server_app pre_config
-			return
+			return 1
 		else
 			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than 23, so using cloud config to build server..."
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using SERVER installer as requested..."
+
+			system::log_item "Downloading the Ubuntu ISO if not already present to ${permanent_download_dir} for media-type server version ${_tgt_ubuntu_ver}"
 			ubuntu::download_iso --dir ${permanent_download_dir} --media-type server --version ${_tgt_ubuntu_ver} 
 			: ${iso:="$permanent_download_dir/$iso_filename"}
 			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --vmname "${vm_name}" ${all_params}
@@ -17832,11 +18052,15 @@ kvm::make_vm_now_from_ubuntu_com() {
 				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 				--extra-args "autoinstall reboot=acpi" \
 				--events on_reboot=restart,on_poweroff=destroy,on_crash=destroy \
-				--wait 0 \
+				--wait --noautoconsole \
 				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-			} 2>&1 | tee -a ${_LOGFILE} & disown
+			} >>"${_LOGFILE}" 2>&1 & disown
 
-			kvm::wait_for_domain_definition "${vm_name}" 60 1 || true
+			kvm::wait_for_domain_definition "${vm_name}" 60 3 || true
+
+			if ! kvm::wait_for_domain_start --domain "${vm_name}"; then
+				write_warning "Domain '${vm_name}' did not emit a start event within the expected window."
+			fi
 
 			dialog::display_summary_message "NOTICE!"
 		fi
@@ -18056,25 +18280,30 @@ kvm::make_vm_now_from_microsoft() {
 			--boot ${boot_options} \
 			--features kvm_hidden=on,smm=on \
 			--tpm backend.type=emulator,backend.version=2.0,model=tpm-tis \
-			--wait 0 \
+			--wait --noautoconsole \
 			|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 
-		# Attempt to automatically satisfy the Windows "Press any key to boot from CD or DVD" prompt.
-		if command -v virsh >/dev/null 2>&1; then
-			(
-				sleep 8
-				if virsh --connect qemu:///system list --name | grep -Fxq "${vm_name}"; then
-					virsh --connect qemu:///system send-key "${vm_name}" KEY_ENTER KEY_ENTER KEY_ENTER >/dev/null 2>&1 \
-						|| system::log_item "Failed to auto-send boot key for ${vm_name}"
-				fi
-			) &
-		else
-			system::log_item "virsh not available; unable to auto-send boot key for ${vm_name}"
-		fi
-	} 2>&1 | tee -a ${_LOGFILE} & disown 
 
-	kvm::wait_for_domain_definition "${vm_name}" 60 1 || true
+	} >>"${_LOGFILE}" 2>&1 & disown 
 
+	kvm::wait_for_domain_definition "${vm_name}" 60 3 || true
+
+	if ! kvm::wait_for_domain_start --domain "${vm_name}"; then
+		write_warning "Domain '${vm_name}' did not emit a start event within the expected window."
+	fi
+
+	system::log_item "Attempt to automatically satisfy the Windows "Press any key to boot from CD or DVD" prompt."
+	if command -v virsh >/dev/null 2>&1; then
+		(
+			sleep 8
+			if virsh --connect qemu:///system list --name | grep -Fxq "${vm_name}"; then
+				virsh --connect qemu:///system send-key "${vm_name}" KEY_ENTER KEY_ENTER KEY_ENTER >/dev/null 2>&1 \
+					|| system::log_item "Failed to auto-send boot key for ${vm_name}"
+			fi
+		) &
+	else
+		system::log_item "virsh not available; unable to auto-send boot key for ${vm_name}"
+	fi
 	dialog::display_summary_message "NOTICE!"
 
 
@@ -18781,6 +19010,8 @@ template::preseed_cfg::late_command() {
 
 			# Shutdown machine
 			d-i finish-install/reboot_in_progress note
+			d-i debian-installer/exit/halt boolean false
+			d-i debian-installer/exit/reboot boolean true
 
 			# --------------------------------------------------- #
 		EOF
@@ -18814,6 +19045,8 @@ template::preseed_cfg::late_command() {
 
 			# Shutdown machine
 			d-i finish-install/reboot_in_progress note
+			d-i debian-installer/exit/halt boolean false
+			d-i debian-installer/exit/reboot boolean true
 
 			# --------------------------------------------------- #
 		EOF
@@ -18841,6 +19074,7 @@ template::preseed_cfg::late_command() {
 			in-target /bin/sh -c "echo ${Preference_ssh_pub_key} >> /home/${Preference_InitialUser}/.ssh/authorized_keys" ; \
 			in-target /bin/sh -c "chown -R ${Preference_InitialUser} /home/${Preference_InitialUser}/.ssh"  ; \
 			cp /*.cfg /target/${_OEM_DIR:-"/opt/rtd"}/ ; \
+			# /bin/bash reboot ; \
 			# umount -l /media || echo "Empty" ; \
 			# eject || true; \
 			echo "------  initial Setup Complete!  ------"
@@ -18849,10 +19083,13 @@ template::preseed_cfg::late_command() {
 			d-i debian-installer/splash boolean true
 
 			# Option to try to gracefully eject the installation media:
-			d-i cdrom-detect/eject boolean true
+			# d-i cdrom-detect/eject boolean true
 
 			# Shutdown machine
 			d-i finish-install/reboot_in_progress note
+			d-i debian-installer/exit/halt boolean false
+			d-i debian-installer/exit/reboot boolean true
+
 
 			# --------------------------------------------------- #
 		EOF
@@ -18919,7 +19156,7 @@ template::kickstart_cfg() {
 			zerombr
 			clearpart --all
 			autopart --nohome ${Preference_DiskEncryption_RH}
-			reboot
+			reboot --eject
 
 			%packages --retries 5 --timeout 20
 			@server-product-environment
@@ -19583,6 +19820,11 @@ template::autounattend_xml() {
 			                        <Description>Set password age policy</Description>
 			                        <CommandLine>cmd.exe /c net accounts /maxpwage:1</CommandLine>
 			                    </SynchronousCommand>
+			                    <SynchronousCommand wcm:action="add">
+			                        <Order>98</Order>
+			                        <Description>Force reboot to finalize setup</Description>
+			                        <CommandLine>shutdown.exe /r /t 5 /f</CommandLine>
+			                    </SynchronousCommand>
 			                </FirstLogonCommands>
 			            </component>
 			            </settings>
@@ -19724,6 +19966,11 @@ template::autounattend_xml() {
                 <SynchronousCommand wcm:action="add">
                     <Order>7</Order>
                     <CommandLine>cmd.exe /c "A:\rtd-me-sh.cmd" </CommandLine>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <Order>98</Order>
+                    <Description>Force reboot to finalize setup</Description>
+                    <CommandLine>shutdown.exe /r /t 5 /f</CommandLine>
                 </SynchronousCommand>
             </FirstLogonCommands>
         </component>
@@ -19936,6 +20183,7 @@ template::AutoYast_xml() {
 		# zypper dup --from packman -y --force-resolution
 		zypper in -y ansible
 		zypper in -y yad
+		reboot
 		]]>
 			</source>
 			</script>
@@ -20106,7 +20354,8 @@ if non_oss_repo or packman_repo:
     script_lines.append("zypper --gpg-auto-import-keys refresh")
 script_lines.extend([
     "zypper in -y ansible",
-    "zypper in -y yad"
+    "zypper in -y yad",
+    "reboot"
 ])
 
 script_content = "\n".join(script_lines)
@@ -20380,7 +20629,7 @@ EOF
 cat >>${user_data_file} <<EOF
 #cloud-config
 power_state:
-    mode: halt
+    mode: reboot
     message: "RTD: Installation complete, rebooting..."
     condition: true
 autoinstall:

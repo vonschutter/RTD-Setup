@@ -100,15 +100,42 @@ _requirements="dialog wget curl rsync git"
 
 complete_setup () {
 	#conditional default value option for the OEM reaseal
-	if hostnamectl |grep "Ubuntu" 2>/dev/null ; then
-		ConditionalResealOption="Reseal system and prepare for delivery to new user"
-	elif hostnamectl |grep "Pop!_OS" 2>/dev/null ; then
-		ConditionalResealOption="Reseal system and prepare for delivery to new user"
-	else
-		unset ConditionalResealOption
+	local ConditionalResealOption=""
+	if [[ -r /etc/os-release ]]; then
+		# shellcheck source=/dev/null
+		. /etc/os-release
+		local _os_id="${ID,,}"
+		local _os_like="${ID_LIKE,,}"
+		local _pretty_name="${PRETTY_NAME:-${NAME:-system}}"
+		local _reseal_supported="false"
+
+		case "${_os_id}" in
+			ubuntu | kubuntu | zorin | linuxmint | pop | elementary | debian | fedora | opensuse* | suse | sles*)
+				_reseal_supported="true"
+				;;
+		esac
+
+		if [[ "${_reseal_supported}" != "true" && -n "${_os_like}" ]]; then
+			if [[ "${_os_like}" == *"debian"* || "${_os_like}" == *"ubuntu"* ]]; then
+				_reseal_supported="true"
+			elif [[ "${_os_like}" == *"fedora"* || "${_os_like}" == *"rhel"* || "${_os_like}" == *"centos"* ]]; then
+				_reseal_supported="true"
+			elif [[ "${_os_like}" == *"suse"* ]]; then
+				_reseal_supported="true"
+			fi
+		fi
+
+		if [[ "${_reseal_supported}" == "true" ]]; then
+			ConditionalResealOption="Reseal ${_pretty_name} and prepare for delivery to new user"
+		fi
 	fi
 
-	completion=$(printf "Restart system and start using it now\nExit now and do no more\n${ConditionalResealOption}\n" | zenity \
+	local _options_input="Restart system and start using it now\nExit now and do no more\n"
+	if [[ -n "${ConditionalResealOption}" ]]; then
+		_options_input+="${ConditionalResealOption}\n"
+	fi
+
+	completion=$(printf "%b" "${_options_input}" | zenity \
 				--list \
 				--title "System Setup Complete" \
 				--text "<span font="16" foreground="red"> 🚧 System Setup Complete 🚧</span> \n Please select if you witsh to reseal the system (not available for some distributtions), restart and use the system, or just exit" \
