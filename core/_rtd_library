@@ -244,7 +244,9 @@ export RTD_VERSION="2.04"
 199   kvm::make_vm_now_from_ubuntu_com                             ;           See inline documentation in this file.
 200   kvm::make_vm_now_from_microsoft                              ;           See inline documentation in this file.
 201   kvm::backup_all_running_vm                                   ;           See inline documentation in this file.
-202   template::preseed_cfg::early_command                         ;           See inline documentation in this file.
+202   clone_server_template_vm                                     ;           Clone a server template VM and optionally run virt-sysprep or virt-customize.
+203   clone_vdi_template_vm                                        ;           Clone a VDI template VM and optionally run virt-sysprep or virt-customize.
+204   template::preseed_cfg::early_command                         ;           See inline documentation in this file.
 203   template::preseed_cfg::main                                  ;           See inline documentation in this file.
 204   template::preseed_cfg::auto_disk_layout                      ;           See inline documentation in this file.
 205   template::preseed_cfg::expert_recipe                         ;           See inline documentation in this file.
@@ -18428,6 +18430,268 @@ kvm::backup_all_running_vm() {
 		return
 		fi
 	fi
+}
+
+vm::clone_template_vm::_build_customize_args() {
+	# Description:
+	#   Helper function to split a virt-customize option string into an array.
+	#   When the provided spec is a file path it is treated as a script passed via --run.
+	#
+	# Arguments:
+	#   $1 - The user supplied specification string or script path.
+	#   $2 - Name reference to the array that will receive the parsed arguments.
+	#
+	# Returns:
+	#   0 on success, 1 on parsing failure.
+
+	local spec="$1"
+	local -n _result_ref="$2"
+	_result_ref=()
+
+	if [[ -z "$spec" ]]; then
+		return 0
+	fi
+
+	if [[ -f "$spec" ]]; then
+		_result_ref=(--run "$spec")
+		return 0
+	fi
+
+	if command -v python3 >/dev/null 2>&1; then
+		local parsed_output
+		if ! parsed_output=$(python3 - "$spec" <<'PY'
+import shlex
+import sys
+
+try:
+    parts = shlex.split(sys.argv[1])
+except ValueError as exc:
+    sys.stderr.write(str(exc))
+    sys.exit(1)
+
+for token in parts:
+    print(token)
+PY
+); then
+			return 1
+		fi
+		mapfile -t _result_ref <<<"$parsed_output"
+	else
+		write_warning "python3 not found; basic shell parsing will be used for --customize arguments."
+		eval "set -- $spec"
+		_result_ref=("$@")
+	fi
+
+	return 0
+}
+
+vm::clone_template_vm::_clone_from_category() {
+	# Description:
+	#   Internal helper that drives the template clone dialog for a VM category.
+	#
+	# Arguments:
+	#   $1 - Case-insensitive pattern to identify template VMs (matched after the Template prefix).
+	#   $2 - Dialog title string.
+	#   $3 - Dialog menu prompt string.
+	#   $4 - Error message shown when no templates are found.
+	#   $5 - Success label ("VM", "VDI VM", etc.).
+	#   $@ - Optional: --sysprep flag and/or --customize "<virt-customize options or script>".
+	#
+	# Returns:
+	#   0 when a VM is cloned successfully, 1 otherwise.
+
+	local pattern="$1"
+	local menu_title="$2"
+	local menu_prompt="$3"
+	local empty_message="$4"
+	local success_label="$5"
+	shift 5
+
+	local enable_sysprep=0
+	local customize_spec=""
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--sysprep)
+				enable_sysprep=1
+				shift
+				;;
+			--customize)
+				if [[ -z "${2:-}" ]]; then
+					write_error "--customize requires an additional argument specifying virt-customize options or a script path."
+					return 1
+				fi
+				customize_spec="$2"
+				shift 2
+				;;
+			*)
+				write_warning "Ignoring unrecognized option '$1' for template cloning."
+				shift
+				;;
+		esac
+	done
+
+	local vm_list
+	local -a menu_entries=()
+	local template_name new_name selected_index exit_status
+	local index=1
+
+	if ! command -v virsh >/dev/null || ! command -v "$RTD_GUI" >/dev/null; then
+		write_error "❌ Required software not found: may I install it for you?"
+		read -rp "Press Enter to continue..."
+		software::check_native_package_dependency virsh dialog
+		if ! command -v virsh >/dev/null || ! command -v "$RTD_GUI" >/dev/null; then
+			write_error "❌ Required commands not found: virsh or dialog wrapper ($RTD_GUI), please install them manually."
+			return 1
+		fi
+		write_information "✅ Required software installed successfully."
+		return 1
+	fi
+
+	if ! command -v virt-clone >/dev/null 2>&1; then
+		write_error "❌ virt-clone is required but not installed. Install libvirt-clients or libvirt-tools."
+		return 1
+	fi
+
+	if (( enable_sysprep )) && ! command -v virt-sysprep >/dev/null 2>&1; then
+		write_error "❌ virt-sysprep requested via --sysprep but not found. Install libguestfs-tools."
+		return 1
+	fi
+
+	if [[ -n "$customize_spec" ]] && ! command -v virt-customize >/dev/null 2>&1; then
+		write_error "❌ virt-customize requested via --customize but not found. Install libguestfs-tools."
+		return 1
+	fi
+
+	if ! vm_list=$(virsh list --all --name | grep -i '^Template' | grep -i -- "$pattern"); then
+		dialog::display_error "$empty_message"
+		return 1
+	fi
+
+	while IFS= read -r template_name; do
+		[[ -z "$template_name" ]] && continue
+		menu_entries+=("$index" "$template_name")
+		((index++))
+	done <<< "$vm_list"
+
+	if (( ${#menu_entries[@]} == 0 )); then
+		write_error "❌ No Template VMs found to clone"
+		return 1
+	fi
+
+	while true; do
+		exec 3>&1
+		selected_index=$("$RTD_GUI" \
+			--backtitle "$BACKTITLE" --cancel-button "Back" \
+			--title "$menu_title" \
+			--menu "$menu_prompt" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
+			"${menu_entries[@]}" \
+			2>&1 1>&3)
+		exit_status=$?
+		exec 3>&-
+		clear
+
+		case "$exit_status" in
+			"$DIALOG_CANCEL"|"$DIALOG_ESC")
+				return 0
+				;;
+		esac
+
+		template_name="${menu_entries[((selected_index - 1) * 2 + 1)]}"
+		new_name="${template_name#Template_}"
+		new_name="${new_name%%__*}"
+		new_name="${new_name}_$(date +%Y%m%d_%H%M%S)"
+
+		write_status "📀 Cloning ${success_label} '$template_name' to '$new_name'..."
+		if virsh dominfo "$new_name" &>/dev/null; then
+			write_error "⚠️ VM '$new_name' already exists. Choose a different name or remove the existing VM."
+			sleep 2
+			continue
+		fi
+
+		if ! virt-clone --original "$template_name" --name "$new_name" --auto-clone; then
+			write_error "❌ Failed to clone VM '$template_name'"
+			return 1
+		fi
+
+		if (( enable_sysprep )); then
+			write_status "🧼 Running virt-sysprep on '$new_name'..."
+			if ! virt-sysprep -d "$new_name"; then
+				write_error "❌ virt-sysprep failed for '$new_name'"
+				return 1
+			fi
+			write_information "✅ virt-sysprep completed for '$new_name'"
+		fi
+
+		if [[ -n "$customize_spec" ]]; then
+			local spec_for_vm="${customize_spec//\{\{VM_NAME\}\}/$new_name}"
+			local -a customize_args=()
+			if ! vm::clone_template_vm::_build_customize_args "$spec_for_vm" customize_args || (( ${#customize_args[@]} == 0 )); then
+				write_error "❌ Unable to parse --customize arguments for '$new_name'."
+				return 1
+			fi
+
+			write_status "🛠️ Running virt-customize on '$new_name'..."
+			if ! virt-customize -d "$new_name" "${customize_args[@]}"; then
+				write_error "❌ virt-customize failed for '$new_name'"
+				return 1
+			fi
+			write_information "✅ virt-customize completed for '$new_name'"
+		fi
+
+		write_information "✅ ${success_label} '$new_name' created successfully from template '$template_name'"
+		sleep 2
+		return 0
+	done
+}
+
+clone_server_template_vm() {
+	# Description:
+	#   Display available server template VMs (Template*server*) and clone the selected entry.
+	#   Optional flags enable virt-sysprep (--sysprep) and virt-customize (--customize "<options>").
+	#   Use {{VM_NAME}} inside the --customize string to expand to the generated VM name.
+	#
+	# Globals:
+	#   RTD_GUI, BACKTITLE, HEIGHT, WIDTH, LIST_HEIGHT, DIALOG_CANCEL, DIALOG_ESC
+	# Arguments:
+	#   --sysprep           : Run virt-sysprep against the cloned VM before returning.
+	#   --customize "..."   : Pass additional virt-customize options or a script path executed with --run.
+	# Outputs:
+	#   Dialog UI and informational status lines.
+	# Returns:
+	#   0 on success, 1 on failure.
+
+	vm::clone_template_vm::_clone_from_category \
+		"server" \
+		"Clone Template Server VM" \
+		"Select a Template VM to clone:" \
+		"❌ No Server Virtual Machine Templates found on this system. Please create a template VM first." \
+		"VM" \
+		"$@"
+}
+
+clone_vdi_template_vm() {
+	# Description:
+	#   Display available VDI template VMs (Template*VDI*) and clone the selected entry.
+	#   Optional flags enable virt-sysprep (--sysprep) and virt-customize (--customize "<options>").
+	#   Use {{VM_NAME}} inside the --customize string to expand to the generated VM name.
+	#
+	# Globals:
+	#   RTD_GUI, BACKTITLE, HEIGHT, WIDTH, LIST_HEIGHT, DIALOG_CANCEL, DIALOG_ESC
+	# Arguments:
+	#   --sysprep           : Run virt-sysprep against the cloned VM before returning.
+	#   --customize "..."   : Pass additional virt-customize options or a script path executed with --run.
+	# Outputs:
+	#   Dialog UI and informational status lines.
+	# Returns:
+	#   0 on success, 1 on failure.
+
+	vm::clone_template_vm::_clone_from_category \
+		"VDI" \
+		"Clone Template VDI VM" \
+		"Select a Template VDI VM to clone:" \
+		"❌ No VDI Virtual Machine Templates found on this system. Please create a template VM first." \
+		"VDI VM" \
+		"$@"
 }
 
 
