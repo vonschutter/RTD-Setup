@@ -231,18 +231,86 @@ export _DEFAULT_REDHAT_VER="10"
 # repo --name="epel${_DEFAULT_REDHAT_VER}-everything" --baseurl="" --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=epel-${_DEFAULT_REDHAT_VER}&arch=x86_64"
 
 # Define launcher data:
-# This is used to create the launcher menu for the RTD system.
-# These launch the applications in the RTD Tools for the GUI.
-# Feel free to add anything you like here, but please do not change the format.
-# Format: file_base|Name|Comment|module_dir|script_name|icon_path|Terminal(true/false)
-LAUNCHER_DATA=$(cat <<-EOF
-rtd|RTD|RTD Simple System Support Tool|simple-support-tool.mod|rtd-simple-support-tool|Media_files/sys2.ico|true
-rtd-user-bakup|RTD-Backup|RTD User home Backup Tool|system-user-backup.mod|rtd-oem-backup-linux-config|Media_files/sys0.ico|true
-rtd-nordvpn|RTD-NordVPN|Nord VPN Terminal GUI|nordvpn-manager.mod|rtd-nordvpn|Media_files/sys3.ico|true
-rtd-minercraft-server|Minecraft-Server|Automatically download and start a Minecraft Server here now!|minecraft-server-manager.mod|rtd-minecraft-server|Media_files/sys5.ico|true
-rtd-switch-desktop|RTD UI Look Changer|Change the overall look and feel of your desktop (be more like Windows or MAC)|rtd-desktop-look-switcher.mod|rtd-desktop-look-switcher|Media_files/sys7.ico|false
-rtd-software-bundle-manager|RTD Software Bundle Manager|Add and remove bundles of software by task to your computer.|oem-bundle-manager.mod|rtd-oem-bundle-manager|image/software.ico|false
-rtd-hardware-information|RTD Hardware Information Viewer|View detailed hardware information about this computer.|system-hardware-information.mod|rtd-system-hardware-information|image/system-information-icon-3.png|false
-rtd-app-runner|RTD OEM Special App Runner|Run Specialized OEM Applications safely and reliably.|oem-app-runner.mod|rtd-oem-app-runner|image/App-launcher.jpg|true
+# The RTD launcher generator reads the key/value blocks below to build .desktop files.
+# Format:
+#   file_base=<unique desktop filename base>
+#   name=<menu display name>
+#   comment=<tooltip/description>
+#   module_dir=<module directory under ${_MODS_DIR}>
+#   script=<executable relative to module_dir>
+#   icon=<icon relative to module_dir>
+#   terminal=<true|false>
+# Separate launcher entries with a blank line. Lines starting with # are ignored.
+read -r -d '' LAUNCHER_DATA <<'EOF'
+# RTD Simple System Support Tool
+file_base=rtd
+name=RTD
+comment=RTD Simple System Support Tool
+module_dir=simple-support-tool.mod
+script=rtd-simple-support-tool
+icon=Media_files/sys2.ico
+terminal=true
+
+# RTD User Backup Tool
+file_base=rtd-user-bakup
+name=RTD-Backup
+comment=RTD User home Backup Tool
+module_dir=system-user-backup.mod
+script=rtd-oem-backup-linux-config
+icon=Media_files/sys0.ico
+terminal=true
+
+# NordVPN Manager
+file_base=rtd-nordvpn
+name=RTD-NordVPN
+comment=Nord VPN Terminal GUI
+module_dir=nordvpn-manager.mod
+script=rtd-nordvpn
+icon=Media_files/sys3.ico
+terminal=true
+
+# Minecraft Server Manager
+file_base=rtd-minercraft-server
+name=Minecraft-Server
+comment=Automatically download and start a Minecraft Server here now!
+module_dir=minecraft-server-manager.mod
+script=rtd-minecraft-server
+icon=Media_files/sys5.ico
+terminal=true
+
+# Desktop Look Switcher
+file_base=rtd-switch-desktop
+name=RTD UI Look Changer
+comment=Change the overall look and feel of your desktop (be more like Windows or MAC)
+module_dir=rtd-desktop-look-switcher.mod
+script=rtd-desktop-look-switcher
+icon=Media_files/sys7.ico
+terminal=true
+
+# Software Bundle Manager
+file_base=rtd-software-bundle-manager
+name=RTD Software Bundle Manager
+comment=Add and remove bundles of software by task to your computer.
+module_dir=oem-bundle-manager.mod
+script=rtd-oem-bundle-manager
+icon=image/software.ico
+terminal=true
+
+# Hardware Information Viewer
+file_base=rtd-hardware-information
+name=RTD Hardware Information Viewer
+comment=View detailed hardware information about this computer.
+module_dir=system-hardware-information.mod
+script=rtd-system-hardware-information
+icon=image/system-information-icon-3.png
+terminal=false
+
+# OEM App Runner
+file_base=rtd-app-runner
+name=RTD OEM Special App Runner
+comment=Run Specialized OEM Applications safely and reliably.
+module_dir=oem-app-runner.mod
+script=rtd-oem-app-runner
+icon=image/App-launcher.jpg
+terminal=true
 EOF
-)

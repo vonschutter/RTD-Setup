@@ -124,7 +124,7 @@ export RTD_VERSION="2.04"
 80    oem::register_all_tools                                      ;           Function to register all OEM scripts on the current device.
 81    oem::rtd_tools_make_launchers                                ;           Function that creates a default set of launchers for the Linux GUI menu system.
 82    oem::create_single_launcher                                  ;           Function to create a single .desktop file for an application.
-83    _oem::rtd_tools_make_launchers                               ;           Function that creates a default set of launchers for the Linux GUI menu system.
+83    oem::rtd_tools_make_launchers_from_locations                 ;           Function that creates launchers using definitions from _locations.info.
 84    oem::check_boot_splash_screen_enable                         ;           OEM function to enable splash screen on boot if desktop is indicated in
 85    oem::setup_brand_splash_screen                               ;           See inline documentation in this file.
 86    gnome::set_tilix_ui_tweaks_for_user                          ;           See inline documentation in this file.
@@ -5164,6 +5164,7 @@ util::validate_heredoc_tabs_only() {
 		return 1
 	fi
 
+	local line key value
 	while IFS= read -r line || [[ -n "$line" ]]; do
 		((line_number++))
 
@@ -6784,129 +6785,16 @@ oem::register_all_tools() {
 
 
 oem::rtd_tools_make_launchers() {
-	# Description: Function that creates a default set of launchers for the Linux GUI menu system.
-	#
-	# Globals:
-	# The tools (scripts) located in {_OEM_DIR}/*/ are expected as launchers are created for these.
-	# ${_MODS_DIR}
-	#
-	# Arguments: None accepted
-	# Outputs: Launcherc created in /usr/share/applications/
-	# Returns: Default exit status of the last command run.
-	# Usage: oem::rtd_tool_make_launchers
-	#
+	# Description:
+	#   Legacy entry point that now delegates to the launcher definitions stored in _locations.info.
+	# Globals: None (delegated function performs checks)
+	# Arguments: None
+	# Outputs: Whatever the delegated function prints.
+	# Returns: Exit status of oem::rtd_tools_make_launchers_from_locations.
+	# Usage: oem::rtd_tools_make_launchers
 	# End of documentation
 
-	if [[ ! $UID -eq 0 ]]; then
-		write_error "This function requires elevated privileges. Please elevate privileges prior to calling this function."
-		return 1
-	else
-		write_information "Creating ${_TLA} launchers..."
-		# Add launchers for some OEM apps.
-		cat >/usr/share/applications/rtd.desktop <<-EOF
-			[Desktop Entry]
-			Version=2.0
-			Name=RTD
-			Comment=RTD Simple System Support Tool
-			Exec=${_MODS_DIR}/simple-support-tool.mod/rtd-simple-support-tool
-			Path=${_MODS_DIR}/simple-support-tool.mod
-			Icon=${_MODS_DIR}/simple-support-tool.mod/Media_files/sys2.ico
-			Terminal=true
-			Type=Application
-			Categories=OEM;
-		EOF
-
-		cat >/usr/share/applications/rtd-user-bakup.desktop <<-EOF
-			[Desktop Entry]
-			Version=2.0
-			Name=RTD-Backup
-			Comment=RTD User home Backup Tool
-			Exec=${_MODS_DIR}/system-user-backup.mod/rtd-oem-backup-linux-config
-			Path=${_MODS_DIR}/system-user-backup.mod
-			Icon=${_MODS_DIR}/system-user-backup.mod/Media_files/sys0.ico
-			Terminal=true
-			Type=Application
-			Categories=OEM;
-		EOF
-
-		cat >/usr/share/applications/rtd-nordvpn.desktop <<-EOF
-			[Desktop Entry]
-			Version=2.0
-			Name=RTD-NordVPN
-			Comment=Nord VPN Termnal GUI
-			Exec=${_MODS_DIR}/nordvpn-manager.mod/rtd-nordvpn
-			Path=${_MODS_DIR}/nordvpn-manager.mod
-			Icon=${_MODS_DIR}/nordvpn-manager.mod/Media_files/sys3.ico
-			Terminal=true
-			Type=Application
-			Categories=OEM;
-		EOF
-
-		cat >/usr/share/applications/rtd-minercraft-server.desktop <<-EOF
-			[Desktop Entry]
-			Version=2.0
-			Name=Minecraft-Server
-			Comment=Automatically download and start a Minecraft Server here now!
-			Exec=${_MODS_DIR}/minecraft-server-manager.mod/rtd-minecraft-server
-			Path=${_MODS_DIR}/minecraft-server-manager.mod
-			Icon=${_MODS_DIR}/minecraft-server-manager.mod/Media_files/sys5.ico
-			Terminal=true
-			Type=Application
-			Categories=OEM;
-		EOF
-
-		cat >/usr/share/applications/rtd-switch-desktop.desktop <<-EOF
-			[Desktop Entry]
-			Version=2.0
-			Name=RTD UI Look Changer
-			Comment=Change the overall look and feel of your desktop (be more like Windows or MAC)
-			Exec=${_MODS_DIR}/rtd-desktop-look-switcher.mod/rtd-desktop-look-switcher
-			Path=${_MODS_DIR}/rtd-desktop-look-switcher.mod
-			Icon=${_MODS_DIR}/rtd-desktop-look-switcher.mod/Media_files/sys7.ico
-			Terminal=false
-			Type=Application
-			Categories=OEM;
-		EOF
-
-		cat >/usr/share/applications/rtd-software-bundle-manager.desktop <<-EOF
-			[Desktop Entry]
-			Version=2.0
-			Name=RTD Software Bundle Manager
-			Comment=Add and remove bundles of software by task to your computer.
-			Exec=${_MODS_DIR}/oem-bundle-manager/rtd-oem-bundle-manager
-			Path=${_MODS_DIR}/oem-bundle-manager
-			Icon=${_MODS_DIR}/oem-bundle-manager/image/software.ico
-			Terminal=false
-			Type=Application
-			Categories=OEM;
-		EOF
-
-		cat >/usr/share/applications/rtd-hardware-information.desktop <<-EOF
-			[Desktop Entry]
-			Version=2.0
-			Name=RTD Hardware Information Viewer
-			Comment=Add and remove bundles of software by task to your computer.
-			Exec=${_MODS_DIR}/system-hardware-information/rtd-system-hardware-information
-			Path=${_MODS_DIR}/system-hardware-information
-			Icon=${_MODS_DIR}/system-hardware-information/image/system-information-icon-3.png
-			Terminal=false
-			Type=Application
-			Categories=OEM;
-		EOF
-
-		cat >/usr/share/applications/rtd-app-runner.desktop <<-EOF
-			[Desktop Entry]
-			Version=2.0
-			Name=RTD OEM Special App Runner
-			Comment=Run Specialized OEM Applications safely and reliably.
-			Exec=${_MODS_DIR}/oem-app-runner/rtd-oem-app-runner
-			Path=${_MODS_DIR}/oem-app-runner
-			Icon=${_MODS_DIR}/oem-app-runner/image/App-launcher.jpg
-			Terminal=true
-			Type=Application
-			Categories=OEM;
-		EOF
-	fi
+	oem::rtd_tools_make_launchers_from_locations
 }
 
 
@@ -6986,21 +6874,16 @@ oem::create_single_launcher() {
 	return 0
 }
 
-_oem::rtd_tools_make_launchers() {
-	# Description: Function that creates a default set of launchers for the Linux GUI menu system.
-	#
+oem::rtd_tools_make_launchers_from_locations() {
+	# Description:
+	#   Function that creates RTD launchers based on the definitions stored in _locations.info (LAUNCHER_DATA).
 	# Globals:
-	# The tools (scripts) located in {_OEM_DIR}/*/ are expected as launchers are created for these.
-	# ${_MODS_DIR}
-	#
-	# Function will use the launchers defined in the _locations file if it exists.
-	# If not, it will use the default launchers defined in the function.
-	# 
-	#
+	#   _MODS_DIR - Root path of RTD modules referenced by launcher definitions.
+	#   LAUNCHER_DATA - Key/value launcher specification string from _locations.info.
 	# Arguments: None accepted
-	# Outputs: Launcherc created in /usr/share/applications/
+	# Outputs: Launchers created in /usr/share/applications/
 	# Returns: Default exit status of the last command run.
-	# Usage: oem::rtd_tool_make_launchers
+	# Usage: oem::rtd_tools_make_launchers_from_locations
 	# End of documentation
 
 	security::ensure_admin
@@ -7025,34 +6908,96 @@ _oem::rtd_tools_make_launchers() {
 	local tla_name="${_TLA:-RTD}"
 	write_information "Creating ${tla_name} launchers in ${output_dir}..."
 
-	# Define launcher data:
-	# Format: file_base|Name|Comment|module_dir|script_name|icon_path|Terminal(true/false)
-	local default_launcher_data
-	default_launcher_data=$(cat <<-EOF
-		rtd|RTD|RTD Simple System Support Tool|simple-support-tool.mod|rtd-simple-support-tool|Media_files/sys2.ico|true
-		rtd-user-bakup|RTD-Backup|RTD User home Backup Tool|system-user-backup.mod|rtd-oem-backup-linux-config|Media_files/sys0.ico|true
-		rtd-nordvpn|RTD-NordVPN|Nord VPN Terminal GUI|nordvpn-manager.mod|rtd-nordvpn|Media_files/sys3.ico|true
-		rtd-minercraft-server|Minecraft-Server|Automatically download and start a Minecraft Server here now!|minecraft-server-manager.mod|rtd-minecraft-server|Media_files/sys5.ico|true
-		rtd-switch-desktop|RTD UI Look Changer|Change the overall look and feel of your desktop (be more like Windows or MAC)|rtd-desktop-look-switcher.mod|rtd-desktop-look-switcher|Media_files/sys7.ico|false
-		rtd-software-bundle-manager|RTD Software Bundle Manager|Add and remove bundles of software by task to your computer.|oem-bundle-manager|rtd-oem-bundle-manager|image/software.ico|true
-		rtd-hardware-information|RTD Hardware Information Viewer|View detailed hardware information about this computer.|system-hardware-information|rtd-system-hardware-information|image/system-information-icon-3.png|false
-		rtd-app-runner|RTD OEM Special App Runner|Run Specialized OEM Applications safely and reliably.|oem-app-runner|rtd-oem-app-runner|image/App-launcher.jpg|true
-	EOF
-	)
+	if [[ -z "${LAUNCHER_DATA:-}" ]]; then
+		write_error "LAUNCHER_DATA variable is empty. Please define launcher entries in _locations.info."
+		return 1
+	fi
 
-	local file_base name comment mod_dir_name script_name icon_path terminal_bool
+	local file_base="" name="" comment="" mod_dir_name="" script_name="" icon_path="" terminal_bool=""
 	local all_successful=true # Track overall success
 
-	# Process the data using process substitution for reliability with IFS
-	while IFS='|' read -r file_base name comment mod_dir_name script_name icon_path terminal_bool; do
-		# Skip empty lines potentially introduced by heredoc handling
-		[[ -z "$file_base" ]] && continue
-
-		if ! oem::create_single_launcher "$file_base" "$name" "$comment" "$mod_dir_name" "$script_name" "$icon_path" "$terminal_bool"; then
-			# oem::create_single_launcher function already logged the error
-			all_successful=false
+	__oem_launcher_flush_entry() {
+		if [[ -z "${file_base}" ]]; then
+			return
 		fi
-	done <<< "${LAUNCHER_DATA:-"$default_launcher_data"}" # Use here-string
+
+		local _terminal="${terminal_bool:-true}"
+
+		if [[ -z "${name}" || -z "${mod_dir_name}" || -z "${script_name}" ]]; then
+			write_error "Launcher '${file_base}' is missing required fields (name/module_dir/script); skipping."
+			all_successful=false
+		else
+			if ! oem::create_single_launcher "${file_base}" "${name}" "${comment:-${name}}" "${mod_dir_name}" "${script_name}" "${icon_path:-Media_files/sys0.ico}" "${_terminal}"; then
+				all_successful=false
+			fi
+		fi
+
+		file_base=""; name=""; comment=""; mod_dir_name=""; script_name=""; icon_path=""; terminal_bool=""
+	}
+
+	# Process the data using process substitution for reliability with IFS
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		line="${line%$'\r'}"
+		line="${line#"${line%%[![:space:]]*}"}"
+		line="${line%"${line##*[![:space:]]}"}"
+
+		if [[ -z "${line}" ]]; then
+			__oem_launcher_flush_entry
+			continue
+		fi
+
+		[[ "${line:0:1}" == "#" ]] && continue
+
+		if [[ "${line}" != *"="* ]]; then
+			write_warning "Ignoring malformed launcher line: ${line}"
+			continue
+		fi
+
+		key="${line%%=*}"
+		value="${line#*=}"
+		key="${key#"${key%%[![:space:]]*}"}"
+		key="${key%"${key##*[![:space:]]}"}"
+		value="${value#"${value%%[![:space:]]*}"}"
+		value="${value%"${value##*[![:space:]]}"}"
+
+		# Remove optional surrounding quotes
+		if [[ "${value}" == \"*\" && "${value}" == *\" ]]; then
+			value="${value:1:-1}"
+		elif [[ "${value}" == \'*\' && "${value}" == *\' ]]; then
+			value="${value:1:-1}"
+		fi
+
+		case "${key,,}" in
+			file_base|file)
+				file_base="${value}"
+				;;
+			name)
+				name="${value}"
+				;;
+			comment|description)
+				comment="${value}"
+				;;
+			module_dir|module|module_directory)
+				mod_dir_name="${value}"
+				;;
+			script|script_name|exec)
+				script_name="${value}"
+				;;
+			icon|icon_path)
+				icon_path="${value}"
+				;;
+			terminal|terminal_bool|terminal_required)
+				terminal_bool="${value,,}"
+				;;
+			*)
+				write_warning "Unknown launcher key '${key}' ignored."
+				;;
+		esac
+	done <<< "${LAUNCHER_DATA}"
+
+	# Flush any remaining entry
+	__oem_launcher_flush_entry
+	unset -f __oem_launcher_flush_entry
 
 	if [[ "$all_successful" == "true" ]]; then
 		write_information "${tla_name} launchers created successfully."
