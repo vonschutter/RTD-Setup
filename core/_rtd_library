@@ -5805,6 +5805,20 @@ system::run_command_in_gnome_user_session() {
 }
 
 system::rtd_oem_reseal::_virtualization_context() {
+	# Description:
+	#   Detects whether the current system is running as a virtual guest.
+	# Globals:
+	#   None
+	# Arguments:
+	#   None
+	# Outputs:
+	#   Echoes "virtual" if virt-what detects a hypervisor, otherwise "physical".
+	# Returns:
+	#   0 on success. Non-zero only when virt-what invocation fails.
+	# Usage:
+	#   local _virt; _virt="$(system::rtd_oem_reseal::_virtualization_context)"
+	# End of documentation
+
 	local _is_virtual="physical"
 	if hash virt-what 2>/dev/null; then
 		local _virt_result
@@ -5817,11 +5831,39 @@ system::rtd_oem_reseal::_virtualization_context() {
 }
 
 system::rtd_oem_reseal::_install_guest_additions() {
+	# Description:
+	#   Ensures guest integration packages are installed regardless of distro.
+	# Globals:
+	#   None
+	# Arguments:
+	#   None
+	# Outputs:
+	#   Status messages via write_status.
+	# Returns:
+	#   Always 0; errors are ignored to avoid breaking reseal workflows.
+	# Usage:
+	#   system::rtd_oem_reseal::_install_guest_additions
+	# End of documentation
+
 	write_status "🛠 Installing guest integration tools (qemu-guest-agent, spice-vdagent)..."
 	software::add_native_package qemu-guest-agent spice-vdagent || true
 }
 
 system::rtd_oem_reseal::_prepare_ubuntu_like() {
+	# Description:
+	#   Runs OEM reseal prep for Ubuntu-like distributions.
+	# Globals:
+	#   None
+	# Arguments:
+	#   $1 - virtualization context ("virtual" or "physical").
+	# Outputs:
+	#   Status via write_status/write_information.
+	# Returns:
+	#   0 on success.
+	# Usage:
+	#   system::rtd_oem_reseal::_prepare_ubuntu_like "$(system::rtd_oem_reseal::_virtualization_context)"
+	# End of documentation
+
 	local _virt="${1}"
 	software::add_native_package "oem-config-gtk"
 	oem-config-prepare
@@ -5831,6 +5873,20 @@ system::rtd_oem_reseal::_prepare_ubuntu_like() {
 }
 
 system::rtd_oem_reseal::_prepare_debian() {
+	# Description:
+	#   Performs Debian-specific reseal tasks (cloud-init cleanup, host keys, etc.).
+	# Globals:
+	#   None
+	# Arguments:
+	#   $1 - virtualization context ("virtual" or "physical").
+	# Outputs:
+	#   Status via write_status.
+	# Returns:
+	#   0 on success.
+	# Usage:
+	#   system::rtd_oem_reseal::_prepare_debian "${_virt}"
+	# End of documentation
+
 	local _virt="${1}"
 	write_status "🧹 Preparing Debian-based system for reseal"
 	software::add_native_package cloud-init || true
@@ -5845,6 +5901,20 @@ system::rtd_oem_reseal::_prepare_debian() {
 }
 
 system::rtd_oem_reseal::_prepare_fedora() {
+	# Description:
+	#   Enables the Fedora/RHEL initial-setup workflow and guest tools.
+	# Globals:
+	#   None
+	# Arguments:
+	#   $1 - virtualization context ("virtual" or "physical").
+	# Outputs:
+	#   Status via write_status.
+	# Returns:
+	#   0 on success.
+	# Usage:
+	#   system::rtd_oem_reseal::_prepare_fedora "${_virt}"
+	# End of documentation
+
 	local _virt="${1}"
 	write_status "🤞 Preparing Fedora/RedHat-based system for reseal"
 	software::add_native_package initial-setup initial-setup-gui || true
@@ -5856,6 +5926,20 @@ system::rtd_oem_reseal::_prepare_fedora() {
 }
 
 system::rtd_oem_reseal::_prepare_suse() {
+	# Description:
+	#   Enables YaST firstboot and guest tools on SUSE-based distributions.
+	# Globals:
+	#   None
+	# Arguments:
+	#   $1 - virtualization context ("virtual" or "physical").
+	# Outputs:
+	#   Status via write_status.
+	# Returns:
+	#   0 on success.
+	# Usage:
+	#   system::rtd_oem_reseal::_prepare_suse "${_virt}"
+	# End of documentation
+
 	local _virt="${1}"
 	write_status "👽 Preparing SUSE-based system for reseal"
 	software::add_native_package yast2-firstboot || true
@@ -5866,6 +5950,19 @@ system::rtd_oem_reseal::_prepare_suse() {
 }
 
 system::rtd_oem_reseal::_finalize_shutdown() {
+	# Description:
+	#   Logs the shutdown context and powers the system off.
+	# Globals:
+	#   None
+	# Arguments:
+	#   $1 - virtualization context ("virtual" or "physical").
+	# Outputs:
+	#   Status via write_status.
+	# Returns:
+	#   Does not return; triggers shutdown.
+	# Usage:
+	#   system::rtd_oem_reseal::_finalize_shutdown "${_virt}"
+	# End of documentation
 	local _virt="${1}"
 	if [[ "${_virt}" == "virtual" ]]; then
 		write_status "💻 This is a virtual machine. Shutting down..."
