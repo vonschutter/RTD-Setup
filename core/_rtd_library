@@ -7029,6 +7029,116 @@ oem::check_boot_splash_screen_enable() {
 	fi
 }
 
+
+desktop::enable_firefox_pip_global() {
+	# Description:
+	#   Ensures Firefox Picture-in-Picture windows stay on top and across workspaces by configuring devilspie2.
+	# Globals:
+	#   Uses $XDG_SESSION_TYPE, $XDG_CURRENT_DESKTOP, $DESKTOP_SESSION, $XDG_CONFIG_HOME, $HOME.
+	# Arguments: None
+	# Outputs:
+	#   Writes devilspie2 rule and user unit files, enables the service, logs progress.
+	# Returns:
+	#   0 on success, 1 on failure.
+	# Usage:
+	#   desktop::enable_firefox_pip_global
+	# End of documentation
+
+	security::ensure_admin
+	write_status "Configuring Firefox Picture-in-Picture for global behavior..."
+
+	local session_type="${XDG_SESSION_TYPE:-unknown}"
+	local de="${XDG_CURRENT_DESKTOP:-${DESKTOP_SESSION:-unknown}}"
+	local de_lc
+	de_lc="$(printf '%s' "${de}" | tr '[:upper:]' '[:lower:]')"
+
+	write_information "Detected session type: ${session_type}"
+	write_information "Detected desktop environment: ${de}"
+
+	if [[ "${session_type}" == "wayland" ]]; then
+		case "${de_lc}" in
+			*kde*|*plasma*)
+				write_warning "KDE Plasma on Wayland detected. devilspie2 only affects X11/XWayland windows."
+				write_information "If Firefox runs natively in Wayland, launch it with MOZ_DISABLE_WAYLAND=1 firefox."
+				;;
+			*gnome*)
+				write_information "GNOME on Wayland detected. Firefox PiP typically runs via XWayland, rules should apply."
+				;;
+			*sway*|*hyprland*|*river*|*labwc*|*wayfire*)
+				write_warning "wlroots-based compositor detected (${de}). Window rules usually do not work here."
+				write_warning "Aborting configuration to avoid misleading results."
+				return 1
+				;;
+			*)
+				write_warning "Unknown Wayland DE (${de}); devilspie2 effectiveness is uncertain."
+				;;
+		esac
+	else
+		write_information "Non-Wayland (likely X11) session detected; devilspie2 should operate normally."
+	fi
+
+	if ! software::check_native_package_dependency devilspie2; then
+		write_error "Unable to install devilspie2 through available package manager."
+		return 1
+	fi
+
+	local config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+	local ds2_dir="${config_home}/devilspie2"
+	local unit_dir="${config_home}/systemd/user"
+	local rule_file="${ds2_dir}/firefox_pip.lua"
+	local unit_file="${unit_dir}/devilspie2.service"
+
+	mkdir -p "${ds2_dir}" "${unit_dir}"
+
+	cat >"${rule_file}" <<'EOF'
+-- Firefox Picture-in-Picture global rules
+-- Matches PiP window titles (contains "Picture-in-Picture")
+if (get_window_name():match("Picture%-in%-Picture")) then
+	set_on_top(true)         -- Always on top
+	stick_window(true)       -- Visible on all workspaces
+	-- set_skip_tasklist(true)  -- Uncomment to hide from the taskbar/dock
+end
+EOF
+	write_information "Created devilspie2 rule: ${rule_file}"
+
+	cat >"${unit_file}" <<'EOF'
+[Unit]
+Description=Devilspie2 window matching daemon
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/devilspie2
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+EOF
+	write_information "Created systemd user unit: ${unit_file}"
+
+	if systemctl --user --version >/dev/null 2>&1; then
+		write_status "Reloading user systemd manager..."
+		systemctl --user daemon-reload || {
+			write_error "systemctl --user daemon-reload failed."
+			return 1
+		}
+
+		write_status "Enabling and starting devilspie2.service for the user..."
+		if ! systemctl --user enable --now devilspie2.service; then
+			write_error "Failed to enable/start devilspie2.service (user). Ensure a user systemd session is active."
+			return 1
+		fi
+		write_information "devilspie2 user service enabled and running."
+	else
+		write_warning "systemctl --user not available. Start devilspie2 manually (e.g., add 'devilspie2 &' to autostart)."
+	fi
+
+	write_information "Firefox PiP windows should now remain on top and across workspaces (where supported)."
+	return 0
+}
+
+
+
+
 oem::setup_brand_splash_screen() {
 	# Function: oem::setup_brand_splash_screen
 	# Description:
@@ -7147,33 +7257,62 @@ gnome::set_tilix_ui_tweaks_for_user() {
 	# Usage:
 	# End of documentation
 
-	write_status "📐 Setting common Tilix tweaks..."
-	gsettings set com.gexperts.Tilix.Settings theme-variant 'dark'
-	gsettings set com.gexperts.Tilix.Settings font 'SauceCodePro Nerd Font 12'
-	gsettings set com.gexperts.Tilix.Settings use-system-font false
-	gsettings set com.gexperts.Tilix.Settings bold-is-bright true
-	
-	# Terminal and Tilix Dark Theme
-	GNOME_TERMINAL_PROFILE=$(gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}')
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-transparent-background true
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ background-transparency-percent 20
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ default-size-columns 100
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-theme-transparency false
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ scrollback-lines 10000
-	if fc-list | grep -i SauceCodePro; then
-		gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ font 'SauceCodePro Nerd Font 12'
-		gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-system-font false
-		gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ bold-is-bright true
-
-	else
-		gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ font 'Monospace 12'
-		gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-system-font false
-		gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ bold-is-bright true
-
+	if ! command -v gsettings >/dev/null 2>&1; then
+		write_error "gsettings command not available; cannot configure Tilix."
+		return 1
 	fi
+
+	if ! command -v dconf >/dev/null 2>&1; then
+		write_status "Installing dconf-cli so Tilix settings can be imported..."
+		software::check_native_package_dependency dconf-cli || {
+			write_error "Failed to install dconf-cli; aborting Tilix tweaks."
+			return 1
+		}
+	fi
+
+	if ! software::check_native_package_dependency tilix; then
+		write_error "Unable to ensure Tilix is installed."
+		return 1
+	fi
+
+	if ! fc-list >/dev/null 2>&1; then
+		write_status "📦 Ensuring fontconfig utilities are present..."
+		software::check_native_package_dependency fontconfig || write_warning "fontconfig not available; skipping font detection."
+	fi
+
+	write_status "📐 Setting Tilix preferences..."
+	gsettings set com.gexperts.Tilix.Settings theme-variant 'dark' || write_warning "Failed to set Tilix theme."
+	gsettings set com.gexperts.Tilix.Settings font 'SauceCodePro Nerd Font 12' || write_warning "Failed to set Tilix font."
+	gsettings set com.gexperts.Tilix.Settings use-system-font false || true
+	gsettings set com.gexperts.Tilix.Settings bold-is-bright true || true
+
+	# Terminal and Tilix Dark Theme
+	local GNOME_TERMINAL_PROFILE=""
+	GNOME_TERMINAL_PROFILE=$(gsettings get org.gnome.Terminal.ProfilesList default 2>/dev/null | awk -F \"'\" '{print $2}')
+	if [[ -z "${GNOME_TERMINAL_PROFILE}" ]]; then
+		write_warning "Unable to determine default GNOME Terminal profile; skipping GNOME Terminal tweaks."
+	else
+		local _profile_path="org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:${GNOME_TERMINAL_PROFILE}/"
+		gsettings set "${_profile_path}" use-transparent-background true || true
+		gsettings set "${_profile_path}" background-transparency-percent 20 || true
+		gsettings set "${_profile_path}" default-size-columns 100 || true
+		gsettings set "${_profile_path}" use-theme-transparency false || true
+		gsettings set "${_profile_path}" scrollback-lines 10000 || true
+
+		local _preferred_font="Monospace 12"
+		if command -v fc-list >/dev/null 2>&1 && fc-list | grep -qi "SauceCodePro"; then
+			_preferred_font='SauceCodePro Nerd Font 12'
+		fi
+		gsettings set "${_profile_path}" font "${_preferred_font}" || true
+		gsettings set "${_profile_path}" use-system-font false || true
+		gsettings set "${_profile_path}" bold-is-bright true || true
+	fi
+
 	# Add Tilix configuration and shell definitions
-	mkdir -p ~/.config/rtd
-	cat >~/.config/rtd/gconf-tilix-settings.ini <<-'EOF_TLX'
+	local _tilix_config_dir="${HOME}/.config/rtd"
+	mkdir -p "${_tilix_config_dir}"
+	write_status "📝 Writing Tilix profile definitions to ${_tilix_config_dir}/gconf-tilix-settings.ini"
+	cat >"${_tilix_config_dir}/gconf-tilix-settings.ini" <<-'EOF_TLX'
 		[com/gexperts/Tilix]
 		quake-specific-monitor=0
 		quake-width-percent=90
@@ -7251,8 +7390,13 @@ gnome::set_tilix_ui_tweaks_for_user() {
 		palette=['#000000', '#CC0000', '#4D9A05', '#C3A000', '#3464A3', '#754F7B', '#05979A', '#D3D6CF', '#545652', '#EF2828', '#89E234', '#FBE84F', '#729ECF', '#AC7EA8', '#34E2E2', '#EDEDEB']
 		use-theme-colors=true
 		visible-name='Tango'
-	EOF_TLX
-	dconf load / <~/.config/rtd/gconf-tilix-settings.ini
+EOF_TLX
+
+	if dconf load / <"${_tilix_config_dir}/gconf-tilix-settings.ini"; then
+		write_information "Tilix settings imported via dconf."
+	else
+		write_warning "Failed to import Tilix settings with dconf."
+	fi
 }
 
 gnome::set_power_configuraton_for_user() {
