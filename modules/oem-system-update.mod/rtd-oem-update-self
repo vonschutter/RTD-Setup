@@ -143,6 +143,7 @@ system::perform_powertools_update_linux ()
 
 		local _preserved_theme_tmp=""
 		local _preserved_theme_path=""
+		local _themes_existed_before="false"
 
 		for choice in $choices
 			do
@@ -153,7 +154,11 @@ system::perform_powertools_update_linux ()
 
 						local _preserve_themes="false"
 
-						if [[ "${_themes_option_selected}" != "true" && -d "${_theme_dir}" ]]; then
+						if [[ -d "${_theme_dir}" ]]; then
+							_themes_existed_before="true"
+						fi
+
+						if [[ "${_themes_option_selected}" != "true" && "${_themes_existed_before}" == "true" ]]; then
 							_preserve_themes="true"
 							_preserved_theme_tmp=$(mktemp -d /tmp/rtd-theme-preserve.XXXXXX)
 							_preserved_theme_path="${_preserved_theme_tmp}/$(basename "${_theme_dir}")"
@@ -164,6 +169,7 @@ system::perform_powertools_update_linux ()
 								_preserved_theme_tmp=""
 								_preserved_theme_path=""
 								_preserve_themes="false"
+								_themes_existed_before="false"
 							fi
 						fi
 				
@@ -178,12 +184,14 @@ system::perform_powertools_update_linux ()
 
 						mv "/opt/${_tla,,}.tmp" "/opt/${_tla,,}" ; rm -rf /opt/${_tla,,}/.git
 
-						if [[ "${_preserve_themes}" == "true" && -d "${_preserved_theme_path}" ]]; then
-							write_information "Restoring previously installed themes (themes update not selected)..."
-							rm -rf "${_theme_dir}"
-							mkdir -p "$(dirname "${_theme_dir}")"
-							if ! mv "${_preserved_theme_path}" "${_theme_dir}"; then
-								write_warning "Failed to restore preserved themes from ${_preserved_theme_path}."
+						if [[ "${_themes_option_selected}" != "true" ]]; then
+							if [[ "${_preserve_themes}" == "true" && -d "${_preserved_theme_path}" ]]; then
+								write_information "Restoring previously installed themes (themes update not selected)..."
+								rm -rf "${_theme_dir}"
+								mkdir -p "$(dirname "${_theme_dir}")"
+								if ! mv "${_preserved_theme_path}" "${_theme_dir}"; then
+									write_warning "Failed to restore preserved themes from ${_preserved_theme_path}."
+								fi
 							fi
 						fi
 
@@ -196,10 +204,12 @@ system::perform_powertools_update_linux ()
 						else
 							echo "Failed to retrieve power tools correctly! "
 							echo "Suggestion: check write permission in "/opt" or internet connectivity."
-							if [[ "${_preserve_themes}" == "true" && -d "${_preserved_theme_path}" ]]; then
-								write_warning "Restoring original themes after failed update..."
-								mkdir -p "$(dirname "${_theme_dir}")"
-								mv "${_preserved_theme_path}" "${_theme_dir}"
+							if [[ "${_themes_option_selected}" != "true" ]]; then
+								if [[ "${_preserve_themes}" == "true" && -d "${_preserved_theme_path}" ]]; then
+									write_warning "Restoring original themes after failed update..."
+									mkdir -p "$(dirname "${_theme_dir}")"
+									mv "${_preserved_theme_path}" "${_theme_dir}"
+								fi
 							fi
 							[[ -n "${_preserved_theme_tmp}" ]] && rm -rf "${_preserved_theme_tmp}"
 							exit 1
