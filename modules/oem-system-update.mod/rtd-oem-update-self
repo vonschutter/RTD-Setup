@@ -135,12 +135,33 @@ system::perform_powertools_update_linux ()
 		esac
 
 		clear
+
+		local _themes_option_selected="false"
+		if [[ " ${choices} " =~ (^|[[:space:]])3($|[[:space:]]) ]]; then
+			_themes_option_selected="true"
+		fi
+
+		local _preserved_theme_tmp=""
+
 		for choice in $choices
 			do
 			case $choice in
 				1)
 					write_information "Attempting to get the latest RTD tools..."
 					hash git &>> ${_logfile} || check_dependencies git
+
+					local _preserve_themes="false"
+					local _theme_dir_name
+					_theme_dir_name=$(basename "${_theme_dir}")
+
+					if [[ "${_themes_option_selected}" != "true" && -d "${_theme_dir}" ]]; then
+						_preserve_themes="true"
+						_preserved_theme_tmp=$(mktemp -d /tmp/rtd-theme-preserve.XXXXXX)
+						if ! cp -a "${_theme_dir}" "${_preserved_theme_tmp}/"; then
+							write_warning "Failed to copy existing themes for preservation; proceeding without restore."
+							_preserve_themes="false"
+						fi
+					fi
 				
 					if git clone --depth=1 "${_git_src_url}" "/opt/${_tla,,}.tmp" ; then
 						write_information "Powertools successfully retrieved..."
@@ -152,6 +173,16 @@ system::perform_powertools_update_linux ()
 						fi
 
 						mv "/opt/${_tla,,}.tmp" "/opt/${_tla,,}" ; rm -rf /opt/${_tla,,}/.git
+
+						if [[ "${_preserve_themes}" == "true" && -d "${_preserved_theme_tmp}/${_theme_dir_name}" ]]; then
+							write_information "Restoring previously installed themes (themes update not selected)..."
+							rm -rf "${_theme_dir}"
+							mkdir -p "$(dirname "${_theme_dir}")"
+							mv "${_preserved_theme_tmp}/${_theme_dir_name}" "${_theme_dir}"
+						fi
+
+						[[ -n "${_preserved_theme_tmp}" ]] && rm -rf "${_preserved_theme_tmp}" && _preserved_theme_tmp=""
+
 						source "/opt/${_tla,,}/core/_rtd_library"
 						oem::register_all_tools
 						ln -s "${_log_dir}" "${_OEM_DIR}/log"
@@ -159,6 +190,7 @@ system::perform_powertools_update_linux ()
 					else
 						echo "Failed to retrieve power tools correctly! "
 						echo "Suggestion: check write permission in "/opt" or internet connectivity."
+						[[ -n "${_preserved_theme_tmp}" ]] && rm -rf "${_preserved_theme_tmp}"
 						exit 1
 					fi
 				;;
