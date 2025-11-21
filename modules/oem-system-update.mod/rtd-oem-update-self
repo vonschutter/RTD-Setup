@@ -142,6 +142,7 @@ system::perform_powertools_update_linux ()
 		fi
 
 		local _preserved_theme_tmp=""
+		local _preserved_theme_path=""
 
 		for choice in $choices
 			do
@@ -150,18 +151,21 @@ system::perform_powertools_update_linux ()
 					write_information "Attempting to get the latest RTD tools..."
 					hash git &>> ${_logfile} || check_dependencies git
 
-					local _preserve_themes="false"
-					local _theme_dir_name
-					_theme_dir_name=$(basename "${_theme_dir}")
+						local _preserve_themes="false"
 
-					if [[ "${_themes_option_selected}" != "true" && -d "${_theme_dir}" ]]; then
-						_preserve_themes="true"
-						_preserved_theme_tmp=$(mktemp -d /tmp/rtd-theme-preserve.XXXXXX)
-						if ! cp -a "${_theme_dir}" "${_preserved_theme_tmp}/"; then
-							write_warning "Failed to copy existing themes for preservation; proceeding without restore."
-							_preserve_themes="false"
+						if [[ "${_themes_option_selected}" != "true" && -d "${_theme_dir}" ]]; then
+							_preserve_themes="true"
+							_preserved_theme_tmp=$(mktemp -d /tmp/rtd-theme-preserve.XXXXXX)
+							_preserved_theme_path="${_preserved_theme_tmp}/$(basename "${_theme_dir}")"
+							write_information "Temporarily moving ${_theme_dir} aside so it can be restored unchanged..."
+							if ! mv "${_theme_dir}" "${_preserved_theme_tmp}/"; then
+								write_warning "Failed to move existing themes for preservation; proceeding without restoring them."
+								rm -rf "${_preserved_theme_tmp}"
+								_preserved_theme_tmp=""
+								_preserved_theme_path=""
+								_preserve_themes="false"
+							fi
 						fi
-					fi
 				
 					if git clone --depth=1 "${_git_src_url}" "/opt/${_tla,,}.tmp" ; then
 						write_information "Powertools successfully retrieved..."
@@ -174,11 +178,13 @@ system::perform_powertools_update_linux ()
 
 						mv "/opt/${_tla,,}.tmp" "/opt/${_tla,,}" ; rm -rf /opt/${_tla,,}/.git
 
-						if [[ "${_preserve_themes}" == "true" && -d "${_preserved_theme_tmp}/${_theme_dir_name}" ]]; then
+						if [[ "${_preserve_themes}" == "true" && -d "${_preserved_theme_path}" ]]; then
 							write_information "Restoring previously installed themes (themes update not selected)..."
 							rm -rf "${_theme_dir}"
 							mkdir -p "$(dirname "${_theme_dir}")"
-							mv "${_preserved_theme_tmp}/${_theme_dir_name}" "${_theme_dir}"
+							if ! mv "${_preserved_theme_path}" "${_theme_dir}"; then
+								write_warning "Failed to restore preserved themes from ${_preserved_theme_path}."
+							fi
 						fi
 
 						[[ -n "${_preserved_theme_tmp}" ]] && rm -rf "${_preserved_theme_tmp}" && _preserved_theme_tmp=""
@@ -187,12 +193,17 @@ system::perform_powertools_update_linux ()
 						oem::register_all_tools
 						ln -s "${_log_dir}" "${_OEM_DIR}/log"
 						oem::rtd_tools_make_launchers
-					else
-						echo "Failed to retrieve power tools correctly! "
-						echo "Suggestion: check write permission in "/opt" or internet connectivity."
-						[[ -n "${_preserved_theme_tmp}" ]] && rm -rf "${_preserved_theme_tmp}"
-						exit 1
-					fi
+						else
+							echo "Failed to retrieve power tools correctly! "
+							echo "Suggestion: check write permission in "/opt" or internet connectivity."
+							if [[ "${_preserve_themes}" == "true" && -d "${_preserved_theme_path}" ]]; then
+								write_warning "Restoring original themes after failed update..."
+								mkdir -p "$(dirname "${_theme_dir}")"
+								mv "${_preserved_theme_path}" "${_theme_dir}"
+							fi
+							[[ -n "${_preserved_theme_tmp}" ]] && rm -rf "${_preserved_theme_tmp}"
+							exit 1
+						fi
 				;;
 				2)  
 					write_information "Creating menu launchers..."
