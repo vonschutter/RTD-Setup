@@ -7,10 +7,21 @@ This is a simple wrapper for the nordvpn CLI. It essentially makes the basic and
 
 ![RTD CMD](Media_files/CMD.png?raw=true "Main Window")
 
+## How it works
+- Detects `whiptail` or `dialog` for menu rendering (will offer to install if missing)
+- Checks for the `nordvpn` CLI; if missing it can pull the official DEB/RPM release and set it up
+- Presents a country list (plus “nearest server”) and connects via the official `nordvpn connect` command
+- Keeps the session status visible and offers a quick disconnect path
+
+## Usage
+```bash
+rtd-nordvpn
+```
+Follow the prompts to install the NordVPN client when needed, pick a country, and connect. If you cancel the country menu, the tool disconnects and exits cleanly.
+
 ## To do:
 As time allows, this script may be extended:
 - To work fully on other distribution platforms 
 - Exposing the configuration elements of nordvpn as a GUI. 
 - Adding support for using Zenity or KDE GUI manu elements for a full GUI experinece
-
 

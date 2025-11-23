@@ -29,3 +29,15 @@ These tweaks are not intended to be so similar that they confuse the user as to 
 
 ## How to use this script. 
 Refer to the install instructions of the [RTD Power Tools](https://github.com/vonschutter/RTD-Setup/blob/main/README.md)
+
+Once installed, run:
+```bash
+rtd-desktop-look-switcher
+```
+
+The script will:
+- fetch any required themes/icons/extensions via the shared `_rtd_library`
+- apply the selected preset (GTK theme, icon pack, fonts, shell extensions, dash/dock placement)
+- offer a “Distribution Reset” to roll back to stock GNOME defaults
+
+The changes are per-user and can be re-run at any time to swap between looks.

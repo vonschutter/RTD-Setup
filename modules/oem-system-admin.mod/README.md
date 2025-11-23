@@ -20,4 +20,26 @@
         - Clear out zombie processes
         - etc.
 
-Generally the scripts herein are generally entry points to functions in the _rtd_library. Some Scripts are written in a mololithic way, if this makes sense.
+Generally the scripts herein are entry points to functions in the `_rtd_library`. The quickest way to explore them is to launch the menu helper:
+```bash
+rtd-script-menu
+```
+Zenity will list every `rtd-*` helper in this module and run the one you select.
+
+## Included scripts (high level)
+- `rtd-7z-this`, `rtd-7z-all-files-here`, `rtd-7z-encrypt-this`, `rtd-7z-encrypt-all-files-here`: 7z compression helpers with optional AES encryption
+- `rtd-add-ubuntu-to-landscape-onprem`: enroll a system into Landscape
+- `rtd-burniso`, `rtd-make-bootable-usb-drive`, `rtd-make-bootable-cd`: write install media to USB or optical discs
+- `rtd-clear_iptables`, `rtd-start-routes`, `rtd-netuse`: network cleanup, routing, and bandwidth monitoring
+- `rtd-clear-zombie`, `rtd-restart-sound`, `rtd-tracker-force-update`, `rtd-xterm-sysconsole`: day-to-day remediation tasks (process cleanup, sound reset, tracker refresh, terminal console)
+- `rtd-configure-huion`: configure Huion tablets
+- `rtd-deb-cleanup`, `rtd-oem-old-kernel-remover`, `rtd-ppa-checker`: package and repo maintenance
+- `rtd-dropbox-on-ecryptfs`: enable Dropbox sync on encrypted home folders
+- `rtd-get-Windows-product-key`: retrieve the OEM Windows key from BIOS/UEFI
+- `rtd-internet-location`: show the public IP and geographic location
+- `rtd-malware-scan`, `rtd-malware-scan-HOME`: run clamav scans across the system or home
+- `rtd-organize-everything`, `rtd-mv`, `rtd-unrar-all`, `rtd-join-avi`, `rtd-make-swap`: file organization, extraction, and swap creation helpers
+- `rtd-ssh-connection-list-local`: list incoming SSH connections
+- `rtd-on-notify-wait`: wait on a file or process and then notify
+
+Each script is self contained; run any of them directly from a terminal (for example `rtd-ppa-checker`). When launched through the Power Tools installer they will use the shared logging and dependency helpers from `_rtd_library`.

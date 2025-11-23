@@ -1,31 +1,26 @@
 # Simple System Hardware Information
 < [Back](https://github.com/vonschutter/RTD-Setup/blob/main/README.md) |
 
-Simple System Hardware Information tool is a utility for viewing informatoin about your system. All desktops do not include a user tool to view these details so a simple accessible tool to see information about hardware is useful for support putrposes. 
+The simple hardware viewer (`rtd-system-hardware-information`) launches a YAD-based dashboard that reads hardware and sensor data directly from the system so you can answer “what hardware is in this box?” without digging through multiple tools. It runs on any distro with basic CLI tooling.
 
+## What it shows
+- Overview pulled from `hostnamectl` plus kernel and chassis details
+- CPU, memory, disk/partition, PCI and USB device lists
+- Kernel modules (with inline `modinfo`), battery stats, and temperature sensors
+- Live buttons to open `modinfo` for a selected module
 
-## Screenshots
-
-
-
-![1680304786891](image/README/1680304786891.png "Viewing CPU information")
-
-![1680304828450](image/README/1680304828450.png)
+## Usage
+```bash
+rtd-system-hardware-information
+```
+No arguments are required. The script will install its lightweight dependencies (`yad`, `acpi`, `pciutils`) if they are missing, then open tabs for each data source. Close the window to exit.
 
 ## Installation
-
-This tool is part of the RTD Power Tools and is included in the standard install. 
-
-To get these tools for yourself on Linux just copy and paste the line below in to a terminal:
-
+The tool ships with the RTD Power Tools. To install the full toolkit on a fresh machine:
 ```bash
 wget https://github.com/vonschutter/RTD-Setup/raw/main/rtd-me.sh.cmd && bash ./rtd-me.sh.cmd
 ```
 
-Alternatively, if you do not want to download the install script, you can run it direclty from the URL like this:
-
-```bash
-curl -sL https://github.com/vonschutter/RTD-Setup/raw/main/rtd-me.sh.cmd|bash
-```
-
-Please note that you will need elevated priviledges on the Linux system (root).
+## Screenshots
+![1680304786891](image/README/1680304786891.png "Viewing CPU information")
+![1680304828450](image/README/1680304828450.png)

@@ -26,6 +26,16 @@ It will aks if you want ot back up some usual options:
 Any option or options may be selected. The files will be encrypted and highly compressed to a destination of choice.
 To use a nework location that location mst first me "mounted" on the local system first.
 
+## Usage
+```bash
+rtd-oem-backup-linux-config
+```
+What happens:
+- Elevates with sudo when needed, then loads the shared `_rtd_library`
+- Presents a checklist (options above) via `dialog`
+- Creates an encrypted, compressed archive in the destination you choose (external drive or mounted network path)
+- Logs activity under `/var/log/rtd`
+
 ## Screenshots:
 
 **Backup initial launch:**

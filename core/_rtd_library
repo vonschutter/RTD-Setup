@@ -19607,15 +19607,21 @@ template::kickstart_cfg() {
 	}; fi
 
 	local _kickstart_epel_repo=""
+	local _kickstart_baseos_repo=""
+	read -r -d '' _kickstart_baseos_repo <<-'KS_BASEOS'
+	repo --name=baseos --baseurl=https://repo.almalinux.org/almalinux/$releasever/BaseOS/$basearch/os/
+	KS_BASEOS
+
 	local _kickstart_appstream_repo=""
+	read -r -d '' _kickstart_appstream_repo <<-'KS_APPSTREAM'
+	repo --name=appstream --baseurl=https://repo.almalinux.org/almalinux/$releasever/AppStream/$basearch/os/
+	KS_APPSTREAM
+
+	local _kickstart_epel_repo=""
 	if [[ "${_kickstart_enable_epel:-}" == "true" ]]; then
 		read -r -d '' _kickstart_epel_repo <<-'KS_EPEL'
 		repo --name=epel --baseurl=https://dl.fedoraproject.org/pub/epel/$releasever/Everything/$basearch/
 		KS_EPEL
-		
-		read -r -d '' _kickstart_appstream_repo <<-'KS_APPSTREAM'
-		repo --name=appstream --baseurl=https://repo.almalinux.org/almalinux/$releasever/AppStream/$basearch/os/
-		KS_APPSTREAM
 	fi
 
 	# Generate the kickstart file
@@ -19639,6 +19645,7 @@ template::kickstart_cfg() {
 			autopart --nohome ${Preference_DiskEncryption_RH}
 			${_kickstart_appstream_repo}
 			${_kickstart_epel_repo}
+			${_kickstart_baseos_repo}
 			reboot --eject
 
 			%packages --retries 5 --timeout 20
@@ -19686,14 +19693,24 @@ template::kickstart_cfg() {
 			autopart --nohome ${Preference_DiskEncryption_RH}
 			${_kickstart_appstream_repo}
 			${_kickstart_epel_repo}
+			${_kickstart_baseos_repo}
 			reboot --eject
 
 			%packages --retries 5 --timeout 20
-				${_UserDesktopEnvironmentSelection}
+				${_UserDesktopEnvironmentSelection:-"@^workstation-product-environment"}
+				@base-x
 				openssh-server
 				spice-vdagent
 				mesa-dri-drivers
 				mesa-vulkan-drivers
+				gdm
+				gnome-shell
+				gnome-session
+				gnome-terminal
+				xorg-x11-server-Xorg
+				xorg-x11-drivers
+				xorg-x11-utils
+				xorg-x11-xauth
 				git
 				curl
 				dialog
@@ -19705,6 +19722,7 @@ template::kickstart_cfg() {
 				bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
 				# systemctl enable sshd
 				# restorecon -Rv /usr/share/wayland-sessions /usr/share/xsessions
+				systemctl enable gdm
 				systemctl set-default graphical.target
 			%end
 		KS_EOF
