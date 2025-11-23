@@ -6,11 +6,10 @@
 
 The core of the RTD Power Tools are the core libraries and the configuration scripts for computers, servers, and VMs. The core library and the configuration files are the following:
 
-*   \_branding: Contains configurations for how things look
-*   \_locations: Contains URL's, file locations, etc.
-*   \_rtd\_library: Contains all functions that do all the heavy lifting and repeated work.
-*   \_rtd\_library.ps1: Windows main configuration script (debloats, turns off tracking, and installs useful software)
-*   \_rtd\_recipies: Collections of software to make available for install.
+*   _branding: Contains configurations for how things look
+*   _locations: Contains URL's, file locations, etc.
+*   _rtd_library: Contains all functions that do all the heavy lifting and repeated work.
+*   _rtd_recipies: Collections of software to make available for install.
 *   sigs (folder): contains the hashes used to validate the oem apps compressed in the /apps folder
 *   rtd-oem-enable-config.sh: script to enable the tools when auto installed via PRESEED, or AUTOUNATTEND.
 *   rtd-oem-linux-config.sh: script to configrure a server, VDI, VM, or PC using the \_rtd\_library functions
