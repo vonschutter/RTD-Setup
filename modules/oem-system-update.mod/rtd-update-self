@@ -141,7 +141,13 @@ system::perform_powertools_update_linux ()
 				1)
 					write_information "Attempting to get the latest RTD tools..."
 					hash git &>> ${_logfile} || software::check_native_package_dependency git
-				
+
+					[[ -e "${_theme_dir}" ]] && { 
+						write_information "Moving themes out of the way..."
+						local _theme_backup_dir="${_bakup_dir}/themes-$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"
+						mv "${_theme_dir}" "${_theme_backup_dir}" || write_warning "Failed to backup themes from ${_theme_dir} to ${_theme_backup_dir}..."
+						}
+					
 					if git clone --depth=1 "${_git_src_url}" "/opt/${_tla,,}.tmp" ; then
 						write_information "Powertools successfully retrieved..."
 						if [[ -d /opt/${_tla,,}  ]] ; then
@@ -152,10 +158,15 @@ system::perform_powertools_update_linux ()
 						fi
 
 						mv "/opt/${_tla,,}.tmp" "/opt/${_tla,,}" ; rm -rf /opt/${_tla,,}/.git
+						
+						[[ -e "${_theme_backup_dir}" ]] && { 
+							write_information "Restoring themes from ${_theme_backup_dir}..."
+							mv "${_theme_backup_dir}" "${_theme_dir}"
+							}
+
 						source "/opt/${_tla,,}/core/_rtd_library"
 						oem::register_all_tools
 						ln -s "${_log_dir}" "${_OEM_DIR}/log"
-						oem::rtd_tools_make_launchers
 					else
 						echo "Failed to retrieve power tools correctly! "
 						echo "Suggestion: check write permission in "/opt" or internet connectivity."

@@ -3409,7 +3409,7 @@ system::make_preseed_cfg() {
 	#
 	# End of documentation
 
-	system::log_item "Called by: ${FUNCNAME[1]}"
+
 
 	# Read requested configuration options
 	kvm::util::read_common_options "$@"
@@ -3716,6 +3716,13 @@ system::generate_ks_cfg_file() {
 	# Get vm config standard options
 	kvm::get_vm_config_preferences
 
+	# Determine if special handling (like EPEL) is required based on the caller.
+	if [[ "${FUNCNAME[1]}" == "kvm::make_vm_now_from_redhat_com" ]]; then
+		_kickstart_enable_epel="true"
+	else
+		unset _kickstart_enable_epel
+	fi
+
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 		--filename | --file)
@@ -3724,7 +3731,7 @@ system::generate_ks_cfg_file() {
 			shift
 			;;
 		--desktop_environment | --DE)
-			if [[ $2 == "@deepin-desktop-environment" || $2 == "@sway-desktop-environment" || $2 == "@basic-desktop-environment" || $2 == "@(i3-desktop-environment" || $2 == "@developer-workstation-environment" || $2 == "@budgie-desktop-environment" || $2 == "@sugar-desktop-environment" || $2 == "@mate-desktop-environment" || $2 == "@kde-desktop-environment" || $2 == "@xfce-desktop-environment" || $2 == "@lxde-desktop-environment" || $2 == "@lxqt-desktop-environment" || $2 == "@cinnamon-desktop-environment" || $2 == "@mate-desktop-environment" || $2 == "@workstation-product-environment" ]]; then
+			if [[ $2 == "@workstation-product" || $2 == "@deepin-desktop-environment" || $2 == "@sway-desktop-environment" || $2 == "@basic-desktop-environment" || $2 == "@(i3-desktop-environment" || $2 == "@developer-workstation-environment" || $2 == "@budgie-desktop-environment" || $2 == "@sugar-desktop-environment" || $2 == "@mate-desktop-environment" || $2 == "@kde-desktop-environment" || $2 == "@xfce-desktop-environment" || $2 == "@lxde-desktop-environment" || $2 == "@lxqt-desktop-environment" || $2 == "@cinnamon-desktop-environment" || $2 == "@mate-desktop-environment" || $2 == "@workstation-product-environment" ]]; then
 				local _UserDesktopEnvironmentSelection="${2}"
 				write_host --cyan "🖥️ Selecting desktop environment: ${_UserDesktopEnvironmentSelection}"
 			else
@@ -3824,6 +3831,7 @@ system::generate_ks_cfg_file() {
 	fi
 
 	unset _kickstart_install_source
+	unset _kickstart_enable_epel
 
 	system::log_item "Kickstart file created: ${_ks_file}"
 	system::log_item "Containing DATA:
@@ -15486,16 +15494,16 @@ kvm::util::read_distro_options() {
 				esac
 			done
 			;;
-		"rhel" | "RHEL" | "RedHat" | "REDHAT")
+		"rhel" | "RHEL" | "RedHat" | "REDHAT" | "Almalinux" | "ALMALINUX" | "RockyLinux" | "ROCKYLINUX" | "CentOS" | "CENTOS" | "centos" )
 			system::log_item "🐧 Set the requested options for RedHat..."
 			while [[ $# -gt 0 ]]; do
 				case "${1}" in
 				--desktop_environment | --DE)
-					if [[ $2 == "@deepin-desktop-environment" || $2 == "@sway-desktop-environment" || $2 == "@basic-desktop-environment" || $2 == "@developer-workstation-environment" || $2 == "@sugar-desktop-environment" || $2 == "@kde-desktop-environment" || $2 == "@workstation-product-environment" ]]; then
+					if [[ $2 == "@workstation-product"  ]]; then
 						_UserDesktopEnvironmentSelection="${2}"
 						system::log_item --cyan "🖥️ Selecting desktop environment: ${_UserDesktopEnvironmentSelection}"
 					else
-						system::log_item "⛔ Unknown Desktop Environment: $2 ==> Use basic-desktop-environment, developer-workstation-environment, sugar-desktop-environment, kde-desktop-environment, workstation-product-environment"
+						system::log_item "⛔ Unknown Desktop Environment: $2 ==> Use workstation-product"
 						return 1
 					fi
 					shift 2
@@ -17259,7 +17267,7 @@ kvm::make_vm_now_from_redhat_com() {
 	local _service
 	if [[ ${_role} == "workstation" || ${_role} == "VDI" ]]; then
 		_service="VDI"
-		system::generate_ks_cfg_file --source "${_source_url}" --role "${_role}" --file "${_preseed_file}" --DE "${_UserDesktopEnvironmentSelection:="@basic-desktop-environment"}"
+		system::generate_ks_cfg_file --source "${_source_url}" --role "${_role}" --file "${_preseed_file}" --DE "${_UserDesktopEnvironmentSelection:="@workstation-product"}"
 	elif [[ ${_role} == "server" ]]; then
 		_service="SRV"
 		system::generate_ks_cfg_file --source "${_source_url}" --role "${_role}" --file "${_preseed_file}" --SR "${_UserServerEnvironemtSelection:="@network-server"}"
@@ -19598,6 +19606,18 @@ template::kickstart_cfg() {
 		return 1
 	}; fi
 
+	local _kickstart_epel_repo=""
+	local _kickstart_appstream_repo=""
+	if [[ "${_kickstart_enable_epel:-}" == "true" ]]; then
+		read -r -d '' _kickstart_epel_repo <<-'KS_EPEL'
+		repo --name=epel --baseurl=https://dl.fedoraproject.org/pub/epel/$releasever/Everything/$basearch/
+		KS_EPEL
+		
+		read -r -d '' _kickstart_appstream_repo <<-'KS_APPSTREAM'
+		repo --name=appstream --baseurl=https://repo.almalinux.org/almalinux/$releasever/AppStream/$basearch/os/
+		KS_APPSTREAM
+	fi
+
 	# Generate the kickstart file
 	case ${_role} in
 	server)
@@ -19617,6 +19637,8 @@ template::kickstart_cfg() {
 			zerombr
 			clearpart --all
 			autopart --nohome ${Preference_DiskEncryption_RH}
+			${_kickstart_appstream_repo}
+			${_kickstart_epel_repo}
 			reboot --eject
 
 			%packages --retries 5 --timeout 20
@@ -19627,9 +19649,6 @@ template::kickstart_cfg() {
 			git
 			curl
 			dialog
-			ansible
-			vim-ansible
-			vim-syntastic-ansible
 			${_UserServerEnvironemtSelection}
 			%end
 
@@ -19665,6 +19684,8 @@ template::kickstart_cfg() {
 			zerombr
 			clearpart --all
 			autopart --nohome ${Preference_DiskEncryption_RH}
+			${_kickstart_appstream_repo}
+			${_kickstart_epel_repo}
 			reboot --eject
 
 			%packages --retries 5 --timeout 20
@@ -19676,7 +19697,6 @@ template::kickstart_cfg() {
 				git
 				curl
 				dialog
-				ansible
 			%end
 
 			%post --interpreter=/bin/bash
