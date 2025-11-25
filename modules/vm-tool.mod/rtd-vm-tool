@@ -374,11 +374,12 @@ manage_server_vm_templates() {
 		"6" "🐧 Ubuntu Samba Server" \
 		"7" "🐧 Ubuntu Print Server" \
 		"8" "🐧 Ubuntu Graphical Server" \
-		"9" "🌀 Debian Print Server" \
-		"10" "🌀 Debian Minimal Server" \
-		"11" "⛏️ Minecraft Server" \
-		"12" "🎩 Fedora Minimal Server" \
-		"13" "🎩 Fedora Ansible Server" \
+		"9" "🐧 Ubuntu Docker Server" \
+		"10" "🌀 Debian Print Server" \
+		"11" "🌀 Debian Minimal Server" \
+		"12" "⛏️ Minecraft Server" \
+		"13" "🎩 Fedora Minimal Server" \
+		"14" "🎩 Fedora Ansible Server" \
 		2>&1 1>&3)
 		exit_status=$?
 		exec 3>&-
@@ -427,22 +428,26 @@ manage_server_vm_templates() {
 				cleanup_and_finish nomessage
 			;;
 			9 )
-				kvm::make_vm_now_from_debian_org --role server --server_role print-server
+				kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app docker.io --tshirt-size medium
 				cleanup_and_finish nomessage
 			;;
 			10 )
-				kvm::make_vm_now_from_debian_org --role server --server_role openssh-server
+				kvm::make_vm_now_from_debian_org --role server --server_role print-server
 				cleanup_and_finish nomessage
 			;;
 			11 )
-				kvm::make_vm_now_from_ubuntu_com --role server --pre-config minecraft --tshirt-size medium
+				kvm::make_vm_now_from_debian_org --role server --server_role openssh-server
 				cleanup_and_finish nomessage
 			;;
 			12 )
-				kvm::make_vm_now_from_fedora_org --role server --server_role @minimal-server-environment --tshirt-size small
+				kvm::make_vm_now_from_ubuntu_com --role server --pre-config minecraft --tshirt-size medium
 				cleanup_and_finish nomessage
 			;;
 			13 )
+				kvm::make_vm_now_from_fedora_org --role server --server_role @minimal-server-environment --tshirt-size small
+				cleanup_and_finish nomessage
+			;;
+			14 )
 				kvm::make_vm_now_from_fedora_org --role server --server_role @network-server --tshirt-size small --tshirt-size small
 				cleanup_and_finish nomessage
 			;;

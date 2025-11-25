@@ -19704,9 +19704,6 @@ template::kickstart_cfg() {
 				spice-vdagent
 				mesa-dri-drivers
 				mesa-vulkan-drivers
-				gdm
-				gnome-shell
-				gnome-session
 				xorg-x11-server-Xwayland
 				git
 				curl
@@ -19714,15 +19711,15 @@ template::kickstart_cfg() {
 			%end
 
 			%post --interpreter=/bin/bash
+				if command -v dnf >/dev/null 2>&1; then
+					dnf -y install epel-release
+					dnf -y install ansible
+				fi
 				git clone --depth 1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}
 				chmod 755 ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
 				bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
 				# systemctl enable sshd
 				# restorecon -Rv /usr/share/wayland-sessions /usr/share/xsessions
-				if command -v dnf >/dev/null 2>&1; then
-					dnf -y install epel-release
-					dnf -y install ansible
-				fi
 				systemctl enable gdm
 				systemctl set-default graphical.target
 			%end
@@ -21111,18 +21108,15 @@ EOF
 )
 
 common_cleanup_config=$(cat <<EOF
-        - echo '******************* Common VDI Cleanup Post-Config ********************'
+        - echo '******************* Common Cleanup Post-Config ********************'
 
-        # Force unmounting of the target and other filesystems
-        # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /dev || true'
-        # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /cdrom || true'
-        # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /proc || true'
-        # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /sys || true'
-        # - curtin in-target --target=/target -- /bin/bash -c 'umount -l /run || true'
-
-        #- eject --force /dev/sr0 || true
-        #- eject --force /dev/sr1 || true
-        #- umount -l /media/cdrom || true
+        # Ensure installer media and loop devices are detached before reboot
+        # - /bin/bash -c 'umount -lf /cdrom 2>/dev/null || true'
+        # - /bin/bash -c 'umount -lf /media/cdrom 2>/dev/null || true'
+        # - /bin/bash -c 'umount -lf /run/install/media 2>/dev/null || true'
+        # - /bin/bash -c 'for d in /run/shutdown/mounts/*; do umount -lf "$d" 2>/dev/null || true; done'
+        - /bin/bash -c 'losetup -D 2>/dev/null || true'
+        # - /bin/bash -c 'eject -m 2>/dev/null || true'
 EOF
 )
 
@@ -21297,17 +21291,17 @@ EOF
 	;;
 esac
 
+
+
 elif [[ $role == "server" ]]; then
 	# -----------------------------------------------------------------------------------------
 	# Add SERVER section to the cloud config file based on preferences
 	# This will install a server application if selected along with standard ubuntu-server
 	# -----------------------------------------------------------------------------------------
-	case ${server_app} in
-
-	${server_app} )
-	system::log_item "📱 Got: ${server_app} Attempting to install $server_app..."
-	system::log_item "📱 Generating cloud-config for $server_app"
-	# -----------------------------------------------------------------------------------------
+	if [[ -n "${server_app}" ]]; then
+		system::log_item "📱 Got: ${server_app} Attempting to install $server_app..."
+		system::log_item "📱 Generating cloud-config for $server_app"
+		# -----------------------------------------------------------------------------------------
 
 cat >>${user_data_file} <<EOF
         - ubuntu-server
@@ -21316,27 +21310,29 @@ cat >>${user_data_file} <<EOF
         - echo "******************* ${server_app} Config ********************"
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install ${server_app} ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ; exit 0'
+${common_cleanup_config}
 EOF
-	# -----------------------------------------------------------------------------------------
-	;;
-
-	*)
-	system::log_item "〇 No server application selected, installing ubuntu-server"
-	system::log_item "🖧 Generating cloud-config for ubuntu-server"
-	# -----------------------------------------------------------------------------------------
+		# -----------------------------------------------------------------------------------------
+	else
+		server_app="openssh-server"
+		system::log_item "〇 No server application selected; defaulting to ${server_app}"
+		system::log_item "🖧 Generating cloud-config for ubuntu-server"
+		# -----------------------------------------------------------------------------------------
 cat >>${user_data_file} <<EOF
-        - ssh-server
+        - ubuntu-server
+        - ${server_app}
     late-commands:
         - echo "******************* ${server_app} Default Config ********************"
-        - curtin in-target --target=/target -- apt-get install ${server_app:-"ssh-server"}
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install ${server_app}'
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ; exit 0'
+${common_cleanup_config}
 EOF
-	# -----------------------------------------------------------------------------------------
-	;;
-	esac
+		# -----------------------------------------------------------------------------------------
+	fi
 
 
 
@@ -21377,12 +21373,14 @@ EOF
 	system::log_item "🖧 Please install the desired application MANUALLY"
 	# -----------------------------------------------------------------------------------------
 cat >>${user_data_file} <<EOF
+${common_vdi_pre_config}
     late-commands:
         - echo "******************* ${server_app} Config ********************"
         - curtin in-target --target=/target -- apt-get install ${server_app:-"openssh-server"}
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ; exit 0'
+${common_cleanup_config}
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -22500,6 +22498,39 @@ software::list_bundles() {
 	esac
 }
 
+library::envcheck_report() {
+	# Display how and where the library was loaded for support/debugging.
+	local load_mode loader source_path working_dir log_location caller_context
+
+	source_path="${BASH_SOURCE[0]:-$0}"
+	working_dir="${PWD}"
+	log_location="${_LOGFILE:-unset}"
+
+	if [[ $sourced -eq 0 ]]; then
+		load_mode="sourced"
+		if [[ "$(basename "$0")" == "bash" ]]; then
+			loader="bash (interactive terminal)"
+		else
+			loader="script ${0##*/}"
+		fi
+		caller_context="${FUNCNAME[3]:-}"
+	else
+		load_mode="executed"
+		loader="${0##*/}"
+	fi
+
+	if [[ -n "${caller_context}" && "${caller_context}" != "main" ]]; then
+		loader+=" (caller: ${caller_context})"
+	fi
+
+	write_information "Library file      : ${source_path}"
+	write_information "Load mode         : ${load_mode}"
+	write_information "Invoker           : ${loader}"
+	write_information "Working directory : ${working_dir}"
+	write_information "Log file          : ${log_location}"
+	system::log_item "envcheck: mode=${load_mode} invoker=${loader} source=${source_path} pwd=${working_dir} log=${log_location}"
+}
+
 list_loaded_software_functions() {
 	# Description: Function to list all software (_rtd_recipes) functions loaded... for debugging/support purposes.
 	# Globals:
@@ -22583,10 +22614,9 @@ export RTDFUNCTIONS="${RTD_VERSION}"
 system::log_item "Library Loaded Variables:
 RTD Functions Version: ${RTDFUNCTIONS}
 .........................................
-_LOG_DIR=${_LOG_DIR}
-_LOGFILE=${_LOGFILE}
-_SCRIPTNAME=${_SCRIPTNAME}
+$(library::envcheck_report)
 .........................................
+
 "
 
 # Log the environment and how the library was launched...
@@ -22594,6 +22624,8 @@ system::log_item " ***  : $(basename ${BASH_SOURCE[0]}) loaded by $(basename "${
 system::log_item " ***  : executed by $SUDO_USER as $USER  :  ***"
 system::log_item "💻 Basic System Information:
 $(hostnamectl)"
+
+
 
 main() {
 	case $1 in
@@ -22822,18 +22854,8 @@ main() {
 		return 0
 		;;
 	--envcheck)
-		# Check if the library is loaded from a terminal or another script (behavior may differ)...
-		# This may be useful to log for support reasons.
-		if [[ $sourced -eq 0 ]]; then
-			if [[ "$(basename $0)" == "bash" ]]; then
-				write_host --cyan "Script is sourced from bash in a terminal: $0 $*"
-			else
-				write_host --cyan "Script is being sourced from a script: $(basename $0) $*"
-			fi
-		else
-			write_host --yellow "Library is run directly as an executable! This does nothing by itself."
-		fi
-		return
+		library::envcheck_report "$@"
+		return 0
 		;;
 	--selfcheck)
 		write_host --cyan "Checking library syntax..."
