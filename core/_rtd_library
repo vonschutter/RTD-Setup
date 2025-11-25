@@ -19719,6 +19719,10 @@ template::kickstart_cfg() {
 				bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
 				# systemctl enable sshd
 				# restorecon -Rv /usr/share/wayland-sessions /usr/share/xsessions
+				if command -v dnf >/dev/null 2>&1; then
+					dnf -y install epel-release
+					dnf -y install ansible
+				fi
 				systemctl enable gdm
 				systemctl set-default graphical.target
 			%end
