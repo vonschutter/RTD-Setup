@@ -1013,7 +1013,16 @@ vmtool::show_main_menu() {
 					if ! kvm::clone_server_template_vm --post-clone-handler vmtool::post_clone_ansible_pull "${RTD_VM_CLONE_ARGS[@]}"; then
 						write_warning "Clone cancelled or failed. No VM created."
 					else
-						write_information "Clone workflow finished. Last VM: ${RTD_LAST_CLONED_VM:-unknown}"
+						if [[ -n "${RTD_LAST_CLONED_VM:-}" ]]; then
+							write_information "Clone workflow finished. Last VM: ${RTD_LAST_CLONED_VM}"
+							if virsh dominfo "${RTD_LAST_CLONED_VM}" &>/dev/null; then
+								write_information "Verified VM exists: ${RTD_LAST_CLONED_VM}"
+							else
+								write_warning "VM ${RTD_LAST_CLONED_VM} not found after clone; please check libvirt logs."
+							fi
+						else
+							write_warning "Clone reported success but RTD_LAST_CLONED_VM is empty."
+						fi
 					fi
 				;;
 				2 ) kvm::clone_vdi_template_vm "${RTD_VM_CLONE_ARGS[@]}"

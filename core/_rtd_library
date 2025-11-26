@@ -18712,6 +18712,10 @@ vm::clone_template_vm::_clone_from_category() {
 	local success_label="$5"
 	shift 5
 
+	# Soften errexit while we drive interactive dialog flows.
+	local _restore_errexit=0
+	[[ $- == *e* ]] && _restore_errexit=1 && set +e
+
 	local enable_sysprep=0
 	local customize_spec=""
 	local post_clone_handler=""
@@ -18790,10 +18794,15 @@ vm::clone_template_vm::_clone_from_category() {
 
 	if (( ${#menu_entries[@]} == 0 )); then
 		write_error "❌ No Template VMs found to clone"
+		(( _restore_errexit )) && set -e
 		return 1
 	fi
 
 	while true; do
+		write_status "clone_from_category: launching selection dialog (entries=${#menu_entries[@]})"
+		local restore_errexit=0
+		[[ $- == *e* ]] && restore_errexit=1 && set +e
+
 		exec 3>&1
 		selected_index=$("$RTD_GUI" \
 			--backtitle "$BACKTITLE" --cancel-button "Back" \
@@ -18805,17 +18814,33 @@ vm::clone_template_vm::_clone_from_category() {
 		exec 3>&-
 		clear
 
+		(( restore_errexit )) && set -e
+
+		write_status "clone_from_category: dialog exit_status=${exit_status} selected_index='${selected_index}'"
+
 		case "$exit_status" in
 			"$DIALOG_CANCEL"|"$DIALOG_ESC")
 				write_warning "clone_from_category: user cancelled from template menu."
+				(( _restore_errexit )) && set -e
 				return 0
 				;;
 		esac
+
+		if [[ -z "${selected_index}" ]]; then
+			write_warning "clone_from_category: no selection returned; aborting."
+			(( _restore_errexit )) && set -e
+			return 1
+		fi
 
 		template_name="${menu_entries[((selected_index - 1) * 2 + 1)]}"
 		new_name="${template_name#Template_}"
 		new_name="${new_name%%__*}"
 		new_name="${new_name}_$(date +%Y%m%d_%H%M%S)"
+
+		if [[ -z "$template_name" ]]; then
+			write_warning "clone_from_category: template_name empty after selection_index='${selected_index}'."
+			return 1
+		fi
 
 		write_status "clone_from_category: user selected ${template_name}, new VM will be ${new_name}"
 
@@ -18830,6 +18855,7 @@ vm::clone_template_vm::_clone_from_category() {
 			write_error "❌ Failed to clone VM '$template_name'"
 			return 1
 		fi
+		write_information "clone_from_category: virt-clone completed for ${new_name}"
 
 		if (( enable_sysprep )); then
 			write_status "🧼 Running virt-sysprep on '$new_name'..."
@@ -18866,6 +18892,7 @@ vm::clone_template_vm::_clone_from_category() {
 
 		write_information "✅ ${success_label} '$new_name' created successfully from template '$template_name'"
 		sleep 2
+		(( _restore_errexit )) && set -e
 		return 0
 	done
 }
