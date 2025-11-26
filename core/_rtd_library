@@ -244,8 +244,8 @@ export RTD_VERSION="2.04"
 199   kvm::make_vm_now_from_ubuntu_com                             ;           See inline documentation in this file.
 200   kvm::make_vm_now_from_microsoft                              ;           See inline documentation in this file.
 201   kvm::backup_all_running_vm                                   ;           See inline documentation in this file.
-202   clone_server_template_vm                                     ;           Clone a server template VM and optionally run virt-sysprep or virt-customize.
-203   clone_vdi_template_vm                                        ;           Clone a VDI template VM and optionally run virt-sysprep or virt-customize.
+202   kvm::clone_server_template_vm                                     ;           Clone a server template VM and optionally run virt-sysprep or virt-customize.
+203   kvm::clone_vdi_template_vm                                        ;           Clone a VDI template VM and optionally run virt-sysprep or virt-customize.
 204   template::preseed_cfg::early_command                         ;           See inline documentation in this file.
 203   template::preseed_cfg::main                                  ;           See inline documentation in this file.
 204   template::preseed_cfg::auto_disk_layout                      ;           See inline documentation in this file.
@@ -18700,6 +18700,7 @@ vm::clone_template_vm::_clone_from_category() {
 	#   $4 - Error message shown when no templates are found.
 	#   $5 - Success label ("VM", "VDI VM", etc.).
 	#   $@ - Optional: --sysprep flag and/or --customize "<virt-customize options or script>".
+	#        --post-clone-handler <function> : function called with new VM name after successful clone.
 	#
 	# Returns:
 	#   0 when a VM is cloned successfully, 1 otherwise.
@@ -18713,6 +18714,7 @@ vm::clone_template_vm::_clone_from_category() {
 
 	local enable_sysprep=0
 	local customize_spec=""
+	local post_clone_handler=""
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 			--sysprep)
@@ -18725,6 +18727,10 @@ vm::clone_template_vm::_clone_from_category() {
 					return 1
 				fi
 				customize_spec="$2"
+				shift 2
+				;;
+			--post-clone-handler)
+				post_clone_handler="$2"
 				shift 2
 				;;
 			*)
@@ -18842,13 +18848,21 @@ vm::clone_template_vm::_clone_from_category() {
 			write_information "✅ virt-customize completed for '$new_name'"
 		fi
 
+		# Expose the last cloned VM name for callers and allow optional handler execution.
+		export RTD_LAST_CLONED_VM="$new_name"
+		if [[ -n "$post_clone_handler" ]]; then
+			if ! "$post_clone_handler" "$new_name"; then
+				write_warning "Post-clone handler '${post_clone_handler}' reported a problem for '$new_name'."
+			fi
+		fi
+
 		write_information "✅ ${success_label} '$new_name' created successfully from template '$template_name'"
 		sleep 2
 		return 0
 	done
 }
 
-clone_server_template_vm() {
+kvm::clone_server_template_vm() {
 	# Description:
 	#   Display available server template VMs (Template*server*) and clone the selected entry.
 	#   Optional flags enable virt-sysprep (--sysprep) and virt-customize (--customize "<options>").
@@ -18873,7 +18887,7 @@ clone_server_template_vm() {
 		"$@"
 }
 
-clone_vdi_template_vm() {
+kvm::clone_vdi_template_vm() {
 	# Description:
 	#   Display available VDI template VMs (Template*VDI*) and clone the selected entry.
 	#   Optional flags enable virt-sysprep (--sysprep) and virt-customize (--customize "<options>").
@@ -18896,6 +18910,193 @@ clone_vdi_template_vm() {
 		"❌ No VDI Virtual Machine Templates found on this system. Please create a template VM first." \
 		"VDI VM" \
 		"$@"
+}
+
+vm::cicd::_render_extra_vars() {
+	# Render extra-vars YAML for ansible-pull based on provided inputs.
+	local file="$1" ; shift
+	local server_tasks_csv="$1" ; shift
+	local llm_variant="$1" ; shift
+	local llm_models_csv="$1" ; shift
+
+	local llm_enable=false
+	[[ "$llm_variant" != "none" && -n "$llm_variant" ]] && llm_enable=true
+
+	IFS=',' read -r -a tasks_arr <<<"${server_tasks_csv:-openssh-server}"
+	IFS=',' read -r -a models_arr <<<"${llm_models_csv:-}"
+
+	{
+		echo "server_tasks:"
+		for t in "${tasks_arr[@]}"; do
+			[[ -z "$t" ]] && continue
+			echo "  - ${t}"
+		done
+		echo "llm_enable: ${llm_enable}"
+		echo "llm_variant: \"${llm_variant:-none}\""
+		if [[ "$llm_variant" == "ollama" ]]; then
+			echo "ollama_models:"
+			for m in "${models_arr[@]}"; do
+				[[ -z "$m" ]] && continue
+				echo "  - ${m}"
+			done
+		fi
+	} >"$file"
+}
+
+vm::cicd::_render_user_data() {
+	# Build cloud-init user-data that installs ansible and runs ansible-pull with prepared extra vars.
+	local user_data="$1"
+	local hostname="$2"
+	local repo_url="$3"
+	local playbook_path="$4"
+	local extra_vars_path="$5"
+
+	cat >"$user_data" <<EOF
+#cloud-config
+hostname: ${hostname}
+manage_etc_hosts: true
+package_update: true
+packages:
+  - ansible
+  - git
+write_files:
+  - path: ${extra_vars_path}
+    owner: root:root
+    permissions: '0600'
+    content: |
+$(sed 's/^/      /' "$extra_vars_path")
+runcmd:
+  - [bash, -lc, "ansible-pull -U ${repo_url} ${playbook_path} -e @${extra_vars_path}"]
+EOF
+}
+
+vm::cicd::_render_meta_data() {
+	local meta_file="$1"
+	local hostname="$2"
+	cat >"$meta_file" <<EOF
+instance-id: ${hostname}-$(date +%s)
+local-hostname: ${hostname}
+EOF
+}
+
+vm::cicd::_create_nocloud_iso() {
+	local iso_path="$1"
+	local user_data="$2"
+	local meta_data="$3"
+
+	if command -v cloud-localds >/dev/null 2>&1; then
+		cloud-localds "$iso_path" "$user_data" "$meta_data"
+		return $?
+	fi
+
+	if command -v genisoimage >/dev/null 2>&1 || command -v mkisofs >/dev/null 2>&1; then
+		local iso_cmd
+		iso_cmd=$(command -v genisoimage || command -v mkisofs)
+		"$iso_cmd" -output "$iso_path" -volid cidata -joliet -rock "$user_data" "$meta_data"
+		return $?
+	fi
+
+	write_error "Neither cloud-localds nor genisoimage/mkisofs is available to create NoCloud ISO."
+	return 1
+}
+
+vm::cicd::configure_vm_with_ansible_pull() {
+	# Description:
+	#   Create a NoCloud ISO containing ansible-pull instructions and attach it to a VM, then start the VM.
+	#
+	# Arguments:
+	#   --vm <name>            : Target VM name (required).
+	#   --repo <url>           : ansible-pull repository URL (default: https://github.com/vonschutter/RTD-Ansible.git).
+	#   --playbook <path>      : Playbook path inside repo (default: playbooks/server-auto-config.yml).
+	#   --server-tasks <csv>   : Comma-separated server tasks (default: openssh-server).
+	#   --llm-variant <name>   : LLM variant (none|ollama|text-generation-webui) default none.
+	#   --llm-models <csv>     : Comma-separated ollama models to pre-pull.
+	#   --iso-path <path>      : Where to write the ISO (default: /var/lib/libvirt/images/<vm>_cicd.iso).
+	#
+	# Returns:
+	#   0 on success, non-zero on error.
+
+	local vm_name=""
+	local repo_url="https://github.com/vonschutter/RTD-Ansible.git"
+	local playbook_path="playbooks/server-auto-config.yml"
+	local server_tasks_csv="openssh-server"
+	local llm_variant="none"
+	local llm_models_csv=""
+	local iso_path=""
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--vm) vm_name="$2"; shift 2 ;;
+			--repo) repo_url="$2"; shift 2 ;;
+			--playbook) playbook_path="$2"; shift 2 ;;
+			--server-tasks) server_tasks_csv="$2"; shift 2 ;;
+			--llm-variant) llm_variant="$2"; shift 2 ;;
+			--llm-models) llm_models_csv="$2"; shift 2 ;;
+			--iso-path) iso_path="$2"; shift 2 ;;
+			*) write_warning "vm::cicd::configure_vm_with_ansible_pull: ignoring unknown arg '$1'"; shift ;;
+		esac
+	done
+
+	if [[ -z "$vm_name" ]]; then
+		write_error "vm::cicd::configure_vm_with_ansible_pull requires --vm <name>"
+		return 1
+	fi
+
+	iso_path="${iso_path:-/var/lib/libvirt/images/${vm_name}_cicd.iso}"
+
+	local tmpdir
+	if ! tmpdir=$(mktemp -d); then
+		write_error "Failed to allocate temp dir for NoCloud data."
+		return 1
+	fi
+
+	local extra_vars="${tmpdir}/extra-vars.yml"
+	local user_data="${tmpdir}/user-data"
+	local meta_data="${tmpdir}/meta-data"
+
+	vm::cicd::_render_extra_vars "$extra_vars" "$server_tasks_csv" "$llm_variant" "$llm_models_csv"
+	vm::cicd::_render_user_data "$user_data" "$vm_name" "$repo_url" "$playbook_path" "/root/ansible-extra-vars.yml"
+	vm::cicd::_render_meta_data "$meta_data" "$vm_name"
+
+	write_status "Creating NoCloud ISO for $vm_name at $iso_path"
+	if ! vm::cicd::_create_nocloud_iso "$iso_path" "$user_data" "$meta_data"; then
+		rm -rf "$tmpdir"
+		return 1
+	fi
+
+	rm -rf "$tmpdir"
+
+	if ! virsh dominfo "$vm_name" &>/dev/null; then
+		write_error "VM '$vm_name' does not exist; cannot attach ISO."
+		return 1
+	fi
+
+	# Attach the ISO as a cdrom device (config only; live if running).
+	local attach_args=(attach-disk "$vm_name" "$iso_path" sdz --type cdrom --mode readonly --config)
+	if virsh domstate "$vm_name" | grep -qi running; then
+		attach_args+=(--live)
+	fi
+
+	if ! virsh "${attach_args[@]}" >/dev/null 2>&1; then
+		write_warning "Failed to attach ISO with virsh attach-disk; attempting change-media on hda..."
+		virsh change-media "$vm_name" hda --insert "$iso_path" --config --force --live >/dev/null 2>&1 || {
+			write_error "Unable to attach ISO $iso_path to $vm_name"
+			return 1
+		}
+	fi
+
+	if ! virsh domstate "$vm_name" | grep -qi running; then
+		write_status "Starting VM $vm_name with CI/CD seed attached..."
+		if ! virsh start "$vm_name" >/dev/null 2>&1; then
+			write_error "Failed to start VM $vm_name"
+			return 1
+		fi
+	else
+		write_information "VM $vm_name already running; ISO attached for next boot."
+	fi
+
+	write_information "CI/CD seed ISO attached to $vm_name. Ansible pull will run at first boot via cloud-init."
+	return 0
 }
 
 

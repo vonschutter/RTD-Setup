@@ -801,6 +801,180 @@ show_manage_VM_template_menu() {
 	done
 }
 
+vmtool::map_role_to_server_task() {
+	# Convert a server_meta_* role name to the server_task string used by ansible.
+	local role="$1" short
+	short="${role#server_meta_}"
+	case "$short" in
+		opennssh) echo "openssh-server" ;; # safety typo guard
+		openssh) echo "openssh-server" ;;
+		lamp) echo "lamp-server" ;;
+		dns) echo "dns-server" ;;
+		mail) echo "mail-server" ;;
+		samba) echo "samba-server" ;;
+		print) echo "print-server" ;;
+		postgresql) echo "postgresql-server" ;;
+		ubuntu) echo "ubuntu-server" ;;
+		*) echo "$short" ;;
+	esac
+}
+
+vmtool::ensure_ansible_repo() {
+	# Ensure a local RTD-Ansible clone exists; clone if missing.
+	: "${RTD_ANSIBLE_REPO:=https://github.com/vonschutter/RTD-Ansible.git}"
+	: "${RTD_ANSIBLE_DIR:=${HOME}/GIT/RTD-Ansible}"
+
+	if [[ -d "$RTD_ANSIBLE_DIR/.git" ]]; then
+		system::log_item "RTD-Ansible found at ${RTD_ANSIBLE_DIR}"
+		return 0
+	fi
+
+	if ! dependency::command_exists git; then
+		write_error "git is required to clone RTD-Ansible."
+		return 1
+	fi
+
+	mkdir -p "$(dirname "$RTD_ANSIBLE_DIR")"
+	write_status "Cloning RTD-Ansible into ${RTD_ANSIBLE_DIR}..."
+	if git clone --depth 1 "$RTD_ANSIBLE_REPO" "$RTD_ANSIBLE_DIR"; then
+		write_information "RTD-Ansible cloned successfully."
+		return 0
+	fi
+
+	write_warning "Failed to clone RTD-Ansible from ${RTD_ANSIBLE_REPO}"
+	return 1
+}
+
+vmtool::build_server_role_menu() {
+	# Build checklist entries dynamically from server_meta_* roles in RTD-Ansible.
+	local repo="${RTD_ANSIBLE_DIR:-${HOME}/GIT/RTD-Ansible}"
+	local roles_dir="${repo}/roles"
+	local -n _out_ref="$1"
+	_out_ref=()
+
+	if [[ -d "$roles_dir" ]]; then
+		while IFS= read -r role; do
+			local label desc
+			label="${role#server_meta_}"
+			desc="${label//_/ }"
+			# Default OFF for everything except openssh which we set ON.
+			local state="OFF"
+			[[ "$label" == "openssh" ]] && state="ON"
+			_out_ref+=("$label" "$desc" "$state")
+		done < <(find "$roles_dir" -maxdepth 1 -mindepth 1 -type d -name 'server_meta_*' -printf '%f\n' | sort)
+	fi
+
+	# Fallback if none found
+	if (( ${#_out_ref[@]} == 0 )); then
+		_out_ref=(
+			"openssh" "SSH" ON
+			"lamp" "LAMP stack" OFF
+			"dns" "Bind9 DNS" OFF
+			"mail" "Mail stack" OFF
+			"samba" "Samba" OFF
+			"print" "CUPS" OFF
+			"postgresql" "PostgreSQL" OFF
+			"ubuntu" "Base Ubuntu Server" OFF
+		)
+	fi
+}
+
+vmtool::prompt_cicd_options() {
+	# Collect CI/CD options up front. Stores selections in globals:
+	#   RTD_CICD_ENABLE, RTD_CICD_REPO, RTD_CICD_PLAYBOOK, RTD_CICD_TASKS, RTD_CICD_LLM_VARIANT, RTD_CICD_LLM_MODELS
+	RTD_CICD_ENABLE=0
+	RTD_CICD_REPO="${RTD_ANSIBLE_REPO:-https://github.com/vonschutter/RTD-Ansible.git}"
+	RTD_CICD_PLAYBOOK="${RTD_ANSIBLE_PLAYBOOK:-playbooks/server-auto-config.yml}"
+	RTD_CICD_TASKS="openssh-server"
+	RTD_CICD_LLM_VARIANT="none"
+	RTD_CICD_LLM_MODELS=""
+
+	if ! dialog::prompt_yes_no --title "CI/CD" --message "Seed cloned VM with CI/CD ISO and auto-run ansible-pull?"; then
+		write_information "CI/CD seeding disabled for this run."
+		return 0
+	fi
+
+	RTD_CICD_ENABLE=1
+
+	exec 3>&1
+	RTD_CICD_REPO=$($RTD_GUI --backtitle "$BACKTITLE" --inputbox "Ansible repo URL" "$HEIGHT" "$WIDTH" "$RTD_CICD_REPO" 2>&1 1>&3)
+	local exit_status=$?
+	exec 3>&-
+	[[ $exit_status -ne 0 ]] && { RTD_CICD_ENABLE=0; return 0; }
+
+	exec 3>&1
+	RTD_CICD_PLAYBOOK=$($RTD_GUI --backtitle "$BACKTITLE" --inputbox "Ansible playbook path" "$HEIGHT" "$WIDTH" "$RTD_CICD_PLAYBOOK" 2>&1 1>&3)
+	exit_status=$?
+	exec 3>&-
+	[[ $exit_status -ne 0 ]] && { RTD_CICD_ENABLE=0; return 0; }
+
+	local -a task_menu_entries=()
+	vmtool::ensure_ansible_repo || write_warning "Using fallback menu (RTD-Ansible clone missing)."
+	vmtool::build_server_role_menu task_menu_entries
+
+	exec 3>&1
+	local task_selection
+	task_selection=$($RTD_GUI --backtitle "$BACKTITLE" --checklist "Select server meta-packages to apply" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
+		"${task_menu_entries[@]}" 2>&1 1>&3)
+	exit_status=$?
+	exec 3>&-
+	[[ $exit_status -ne 0 ]] && { RTD_CICD_ENABLE=0; return 0; }
+	# Map selected role shorthands to server_task strings
+	local -a mapped_tasks=()
+	for item in $task_selection; do
+		item=${item//\"/}
+		local mapped
+		mapped=$(vmtool::map_role_to_server_task "$item")
+		[[ -n "$mapped" ]] && mapped_tasks+=("$mapped")
+	done
+	if (( ${#mapped_tasks[@]} == 0 )); then
+		mapped_tasks=("openssh-server")
+	fi
+	RTD_CICD_TASKS=$(IFS=','; echo "${mapped_tasks[*]}")
+
+	exec 3>&1
+	RTD_CICD_LLM_VARIANT=$($RTD_GUI --backtitle "$BACKTITLE" --menu "LLM server option (optional)" "$HEIGHT" "$WIDTH" 6 \
+		"none" "No LLM stack" \
+		"ollama" "Ollama service (snap)" \
+		"text-generation-webui" "text-generation-webui" \
+		2>&1 1>&3)
+	exit_status=$?
+	exec 3>&-
+	[[ $exit_status -ne 0 ]] && RTD_CICD_LLM_VARIANT="none"
+
+	if [[ "$RTD_CICD_LLM_VARIANT" == "ollama" ]]; then
+		exec 3>&1
+		RTD_CICD_LLM_MODELS=$($RTD_GUI --backtitle "$BACKTITLE" --inputbox "Ollama models to pre-pull (comma-separated)" "$HEIGHT" "$WIDTH" "llama3" 2>&1 1>&3)
+		exit_status=$?
+		exec 3>&-
+		[[ $exit_status -ne 0 ]] && RTD_CICD_LLM_MODELS=""
+	else
+		RTD_CICD_LLM_MODELS=""
+	fi
+}
+
+vmtool::post_clone_ansible_pull() {
+	# Use pre-collected CI/CD settings to attach a seed ISO and trigger ansible-pull on boot.
+	local vm_name="$1"
+
+	if [[ "${RTD_CICD_ENABLE:-0}" -ne 1 ]]; then
+		write_information "CI/CD seeding skipped for $vm_name (not enabled)."
+		return 0
+	fi
+
+	if vm::cicd::configure_vm_with_ansible_pull \
+		--vm "$vm_name" \
+		--repo "${RTD_CICD_REPO}" \
+		--playbook "${RTD_CICD_PLAYBOOK}" \
+		--server-tasks "${RTD_CICD_TASKS}" \
+		--llm-variant "${RTD_CICD_LLM_VARIANT}" \
+		--llm-models "${RTD_CICD_LLM_MODELS}"; then
+		write_information "CI/CD ISO attached to $vm_name; ansible-pull will run on boot."
+	else
+		write_warning "Failed to attach CI/CD ISO to $vm_name."
+	fi
+}
+
 
 vmtool::show_main_menu() {
 	while true; do
@@ -833,9 +1007,16 @@ vmtool::show_main_menu() {
 			case $selection in
 				0 ) echo "Program Quit."
 				;;
-				1 ) clone_server_template_vm "${RTD_VM_CLONE_ARGS[@]}"
+				1 )
+					vmtool::prompt_cicd_options
+					write_status "Starting server template clone..."
+					if ! kvm::clone_server_template_vm --post-clone-handler vmtool::post_clone_ansible_pull "${RTD_VM_CLONE_ARGS[@]}"; then
+						write_warning "Clone cancelled or failed. No VM created."
+					else
+						write_information "Clone workflow finished. Last VM: ${RTD_LAST_CLONED_VM:-unknown}"
+					fi
 				;;
-				2 ) clone_vdi_template_vm "${RTD_VM_CLONE_ARGS[@]}"
+				2 ) kvm::clone_vdi_template_vm "${RTD_VM_CLONE_ARGS[@]}"
 				;;
 				3 ) show_manage_VM_template_menu
 				;;
