@@ -18745,6 +18745,8 @@ vm::clone_template_vm::_clone_from_category() {
 	local template_name new_name selected_index exit_status
 	local index=1
 
+	write_status "clone_from_category: pattern=${pattern} title='${menu_title}' prompt='${menu_prompt}'"
+
 	if ! command -v virsh >/dev/null || ! command -v "$RTD_GUI" >/dev/null; then
 		write_error "❌ Required software not found: may I install it for you?"
 		read -rp "Press Enter to continue..."
@@ -18774,8 +18776,11 @@ vm::clone_template_vm::_clone_from_category() {
 
 	if ! vm_list=$(virsh list --all --name | grep -i '^Template' | grep -i -- "$pattern"); then
 		dialog::display_error "$empty_message"
+		write_warning "clone_from_category: no matching templates for pattern '${pattern}'"
 		return 1
 	fi
+
+	write_information "clone_from_category: available templates:\n${vm_list}"
 
 	while IFS= read -r template_name; do
 		[[ -z "$template_name" ]] && continue
@@ -18802,6 +18807,7 @@ vm::clone_template_vm::_clone_from_category() {
 
 		case "$exit_status" in
 			"$DIALOG_CANCEL"|"$DIALOG_ESC")
+				write_warning "clone_from_category: user cancelled from template menu."
 				return 0
 				;;
 		esac
@@ -18810,6 +18816,8 @@ vm::clone_template_vm::_clone_from_category() {
 		new_name="${template_name#Template_}"
 		new_name="${new_name%%__*}"
 		new_name="${new_name}_$(date +%Y%m%d_%H%M%S)"
+
+		write_status "clone_from_category: user selected ${template_name}, new VM will be ${new_name}"
 
 		write_status "📀 Cloning ${success_label} '$template_name' to '$new_name'..."
 		if virsh dominfo "$new_name" &>/dev/null; then
