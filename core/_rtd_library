@@ -218,6 +218,11 @@ export RTD_VERSION="2.04"
 174   oem::setup_choices_server                                    ;           Function to display legacy installation options. This will install software that is usefull
 175   fedora::get_fedora_netinst_iso_url                           ;           See inline documentation in this file.
 176   fedora::get_latest_release_version                           ;           See inline documentation in this file.
+177   vm::cicd::_render_extra_vars                                 ;           Render ansible-pull extra vars from selections.
+178   vm::cicd::_render_user_data                                  ;           Build cloud-init user-data to run ansible-pull.
+179   vm::cicd::_render_meta_data                                  ;           Build NoCloud meta-data for cloud-init.
+180   vm::cicd::_create_nocloud_iso                                ;           Create a NoCloud seed ISO for cloud-init.
+181   vm::cicd::configure_vm_with_ansible_pull                     ;           Seed/attach CI/CD ISO and start a VM.
 177   ubuntu::enable_plymouth_theme                                ;           Detects the Ubuntu spin (flavor) and ensures the appropriate
 178   ubuntu::get_target_version                                   ;           See inline documentation in this file.
 179   ubuntu::get_latest_release_version                           ;           See inline documentation in this file.
@@ -18713,9 +18718,6 @@ vm::clone_template_vm::_clone_from_category() {
 	shift 5
 
 	# Soften errexit while we drive interactive dialog flows.
-	local _restore_errexit=0
-	[[ $- == *e* ]] && _restore_errexit=1 && set +e
-
 	local enable_sysprep=0
 	local customize_spec=""
 	local post_clone_handler=""
@@ -18800,14 +18802,11 @@ vm::clone_template_vm::_clone_from_category() {
 
 	if (( ${#menu_entries[@]} == 0 )); then
 		write_error "❌ No Template VMs found to clone"
-		(( _restore_errexit )) && set -e
 		return 1
 	fi
 
 	while true; do
 		write_status "clone_from_category: launching selection dialog (entries=${#menu_entries[@]})"
-		local restore_errexit=0
-		[[ $- == *e* ]] && restore_errexit=1 && set +e
 
 		exec 3>&1
 		selected_tag=$("$RTD_GUI" \
@@ -18820,21 +18819,17 @@ vm::clone_template_vm::_clone_from_category() {
 		exec 3>&-
 		clear
 
-		(( restore_errexit )) && set -e
-
 		write_status "clone_from_category: dialog exit_status=${exit_status} selected_tag='${selected_tag}'"
 
 		case "$exit_status" in
 			"$DIALOG_CANCEL"|"$DIALOG_ESC")
 				write_warning "clone_from_category: user cancelled from template menu."
-				(( _restore_errexit )) && set -e
 				return 0
 				;;
 		esac
 
 		if [[ -z "${selected_tag}" ]]; then
 			write_warning "clone_from_category: no selection returned; aborting."
-			(( _restore_errexit )) && set -e
 			return 1
 		fi
 
@@ -18899,7 +18894,6 @@ vm::clone_template_vm::_clone_from_category() {
 
 		write_information "✅ ${success_label} '$new_name' created successfully from template '$template_name'"
 		sleep 2
-		(( _restore_errexit )) && set -e
 		return 0
 	done
 }
@@ -18919,6 +18913,7 @@ kvm::clone_server_template_vm() {
 	#   Dialog UI and informational status lines.
 	# Returns:
 	#   0 on success, 1 on failure.
+	# End of documentation
 
 	system::log_item "Called with args: $*"
 
@@ -18946,6 +18941,7 @@ kvm::clone_vdi_template_vm() {
 	#   Dialog UI and informational status lines.
 	# Returns:
 	#   0 on success, 1 on failure.
+	# End of documentation
 
 	system::log_item "Called with args: $*"
 
@@ -18959,7 +18955,16 @@ kvm::clone_vdi_template_vm() {
 }
 
 vm::cicd::_render_extra_vars() {
-	# Render extra-vars YAML for ansible-pull based on provided inputs.
+	# Description:
+	#   Render an extra-vars YAML file for ansible-pull based on provided inputs.
+	# Arguments:
+	#   $1 - output file path
+	#   $2 - CSV of server tasks
+	#   $3 - llm_variant
+	#   $4 - CSV of llm models (for ollama)
+	# Returns:
+	#   0 on success
+	# End of documentation
 	local file="$1" ; shift
 	local server_tasks_csv="$1" ; shift
 	local llm_variant="$1" ; shift
@@ -18990,7 +18995,17 @@ vm::cicd::_render_extra_vars() {
 }
 
 vm::cicd::_render_user_data() {
-	# Build cloud-init user-data that installs ansible and runs ansible-pull with prepared extra vars.
+	# Description:
+	#   Build cloud-init user-data that installs ansible and runs ansible-pull with prepared extra vars.
+	# Arguments:
+	#   $1 - output user-data path
+	#   $2 - hostname for the guest
+	#   $3 - repo URL for ansible-pull
+	#   $4 - playbook path inside the repo
+	#   $5 - target path for the extra-vars file inside the guest
+	# Returns:
+	#   0 on success
+	# End of documentation
 	local user_data="$1"
 	local hostname="$2"
 	local repo_url="$3"
@@ -19021,6 +19036,14 @@ EOF
 }
 
 vm::cicd::_render_meta_data() {
+	# Description:
+	#   Build a minimal NoCloud meta-data file with instance and hostname.
+	# Arguments:
+	#   $1 - meta-data output path
+	#   $2 - hostname
+	# Returns:
+	#   0 on success
+	# End of documentation
 	local meta_file="$1"
 	local hostname="$2"
 	cat >"$meta_file" <<EOF
@@ -19030,6 +19053,15 @@ EOF
 }
 
 vm::cicd::_create_nocloud_iso() {
+	# Description:
+	#   Create a NoCloud ISO from provided user-data and meta-data files.
+	# Arguments:
+	#   $1 - ISO output path
+	#   $2 - user-data file path
+	#   $3 - meta-data file path
+	# Returns:
+	#   0 on success, non-zero on failure
+	# End of documentation
 	local iso_path="$1"
 	local user_data="$2"
 	local meta_data="$3"
@@ -19063,10 +19095,11 @@ vm::cicd::configure_vm_with_ansible_pull() {
 	#   --server-tasks <csv>   : Comma-separated server tasks (default: openssh-server).
 	#   --llm-variant <name>   : LLM variant (none|ollama|text-generation-webui) default none.
 	#   --llm-models <csv>     : Comma-separated ollama models to pre-pull.
-	#   --iso-path <path>      : Where to write the ISO (default: /var/lib/libvirt/images/<vm>_cicd.iso).
+	#   --iso-path <path>      : Where to write the ISO (default: temp file in /tmp).
 	#
 	# Returns:
 	#   0 on success, non-zero on error.
+	# End of documentation
 
 	local vm_name=""
 	local repo_url="https://github.com/vonschutter/RTD-Ansible.git"
@@ -19095,7 +19128,7 @@ vm::cicd::configure_vm_with_ansible_pull() {
 		return 1
 	fi
 
-	local iso_dir="/var/lib/libvirt/images"
+	local iso_dir="${TMPDIR:-/tmp}"
 	mkdir -p "$iso_dir"
 	iso_path="${iso_path:-$(mktemp -p "$iso_dir" -t "${vm_name}_cicd_XXXXXX.iso")}"
 
@@ -19141,19 +19174,13 @@ vm::cicd::configure_vm_with_ansible_pull() {
 	write_status "Prepared NoCloud seed at ${iso_path} (size: $(stat -c%s "$iso_path" 2>/dev/null || echo '?') bytes)"
 
 	# Attach the ISO as a cdrom device (config only; live if running).
-	local attach_bus="sata"
-	local attach_target="sdz"
-	local attach_args=(attach-disk "$vm_name" "$iso_path" "$attach_target" --type cdrom --mode readonly --config --targetbus "$attach_bus")
+	local attach_target="hdc"
+	local attach_args=(attach-disk "$vm_name" "$iso_path" "$attach_target" --type cdrom --mode readonly --config)
 	virsh domstate "$vm_name" | grep -qi running && attach_args+=(--live)
 
 	if ! virsh "${attach_args[@]}" >/dev/null 2>&1; then
-		write_warning "Failed to attach ISO with virsh attach-disk; attempting change-media on a cdrom target..."
-		if ! virsh change-media "$vm_name" hda --insert "$iso_path" --config --force --live >/dev/null 2>&1; then
-			if ! virsh change-media "$vm_name" sda --insert "$iso_path" --config --force --live >/dev/null 2>&1; then
-				write_error "Unable to attach ISO $iso_path to $vm_name"
-				return 1
-			fi
-		fi
+		write_error "Unable to attach ISO $iso_path to $vm_name"
+		return 1
 	fi
 
 	if ! virsh domstate "$vm_name" | grep -qi running; then
