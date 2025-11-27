@@ -19003,6 +19003,7 @@ vm::cicd::_render_user_data() {
 	#   $3 - repo URL for ansible-pull
 	#   $4 - playbook path inside the repo
 	#   $5 - target path for the extra-vars file inside the guest
+	#   $6 - source path to the rendered extra-vars file on the host
 	# Returns:
 	#   0 on success
 	# End of documentation
@@ -19011,6 +19012,7 @@ vm::cicd::_render_user_data() {
 	local repo_url="$3"
 	local playbook_path="$4"
 	local extra_vars_path="$5"
+	local extra_vars_source="$6"
 
 	local extra_vars_dir
 	extra_vars_dir=$(dirname "$extra_vars_path")
@@ -19028,7 +19030,7 @@ write_files:
     owner: root:root
     permissions: '0600'
     content: |
-$(sed 's/^/      /' "$extra_vars_path")
+$(sed 's/^/      /' "$extra_vars_source")
 runcmd:
   - [bash, -lc, "mkdir -p ${extra_vars_dir}"]
   - [bash, -lc, "ansible-pull -U ${repo_url} ${playbook_path} -e @${extra_vars_path}"]
@@ -19128,7 +19130,8 @@ vm::cicd::configure_vm_with_ansible_pull() {
 		return 1
 	fi
 
-	local iso_dir="${TMPDIR:-/tmp}"
+	# Place the seed ISO in the libvirt images path for correct labeling; still use a unique temp name.
+	local iso_dir="/var/lib/libvirt/images"
 	mkdir -p "$iso_dir"
 	iso_path="${iso_path:-$(mktemp -p "$iso_dir" -t "${vm_name}_cicd_XXXXXX.iso")}"
 
@@ -19143,7 +19146,7 @@ vm::cicd::configure_vm_with_ansible_pull() {
 	local meta_data="${tmpdir}/meta-data"
 
 	vm::cicd::_render_extra_vars "$extra_vars" "$server_tasks_csv" "$llm_variant" "$llm_models_csv"
-	vm::cicd::_render_user_data "$user_data" "$vm_name" "$repo_url" "$playbook_path" "${extra_vars_target}"
+	vm::cicd::_render_user_data "$user_data" "$vm_name" "$repo_url" "$playbook_path" "${extra_vars_target}" "${extra_vars}"
 	vm::cicd::_render_meta_data "$meta_data" "$vm_name"
 
 	write_status "Creating NoCloud ISO for $vm_name at $iso_path"
@@ -19167,6 +19170,15 @@ vm::cicd::configure_vm_with_ansible_pull() {
 		if ! virt-customize -d "$vm_name" --install cloud-init >/dev/null 2>&1; then
 			write_warning "Unable to verify/install cloud-init inside ${vm_name}. Continuing."
 		fi
+
+		# Re-enable cloud-init in case the template had it disabled.
+		write_status "Re-enabling cloud-init in ${vm_name} if it was disabled..."
+		if ! virt-customize -d "$vm_name" \
+			--run-command "rm -f /etc/cloud/cloud-init.disabled" \
+			--run-command "rm -f /etc/cloud/cloud.cfg.d/99-installer.cfg /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg || true" \
+			--run-command "cloud-init clean || true"; then
+			write_warning "Could not re-enable/clean cloud-init inside ${vm_name}; seed may be ignored."
+		fi
 	else
 		write_warning "virt-customize not available; cannot pre-install cloud-init if missing."
 	fi
@@ -19174,13 +19186,40 @@ vm::cicd::configure_vm_with_ansible_pull() {
 	write_status "Prepared NoCloud seed at ${iso_path} (size: $(stat -c%s "$iso_path" 2>/dev/null || echo '?') bytes)"
 
 	# Attach the ISO as a cdrom device (config only; live if running).
-	local attach_target="hdc"
-	local attach_args=(attach-disk "$vm_name" "$iso_path" "$attach_target" --type cdrom --mode readonly --config)
-	virsh domstate "$vm_name" | grep -qi running && attach_args+=(--live)
+	local cd_targets=()
+	while IFS= read -r t; do
+		[[ -n "$t" ]] && cd_targets+=("$t")
+	done < <(virsh dumpxml "$vm_name" 2>/dev/null | awk '
+		/<disk / && /device=.cdrom./ {in_cd=1}
+		in_cd && /<target / {
+			if (match($0, /dev=.([^\\\"]+)/, a)) { print a[1] }
+		}
+		/<\\/disk>/ {in_cd=0}
+	')
 
-	if ! virsh "${attach_args[@]}" >/dev/null 2>&1; then
-		write_error "Unable to attach ISO $iso_path to $vm_name"
-		return 1
+	# Keep one CD target, remove extras to avoid accumulation.
+	if (( ${#cd_targets[@]} > 1 )); then
+		for ((i=1; i<${#cd_targets[@]}; i++)); do
+			write_status "Detaching extra cdrom target ${cd_targets[$i]} from ${vm_name}"
+			virsh detach-disk "$vm_name" "${cd_targets[$i]}" --config --live >/dev/null 2>&1 || true
+		done
+	fi
+
+	if (( ${#cd_targets[@]} >= 1 )); then
+		local cd_target="${cd_targets[0]}"
+		write_status "Using existing cdrom target ${cd_target} for ${vm_name}"
+		if ! virsh change-media "$vm_name" "$cd_target" --insert "$iso_path" --config --force --live >/dev/null 2>&1; then
+			write_error "Unable to attach ISO $iso_path to $vm_name via change-media on ${cd_target}"
+			return 1
+		fi
+	else
+		local attach_target="sdz"
+		local attach_args=(attach-disk "$vm_name" "$iso_path" "$attach_target" --type cdrom --targetbus sata --mode readonly --config)
+		virsh domstate "$vm_name" | grep -qi running && attach_args+=(--live)
+		if ! virsh "${attach_args[@]}" >/dev/null 2>&1; then
+			write_error "Unable to attach ISO $iso_path to $vm_name (attach-disk ${attach_target})"
+			return 1
+		fi
 	fi
 
 	if ! virsh domstate "$vm_name" | grep -qi running; then
