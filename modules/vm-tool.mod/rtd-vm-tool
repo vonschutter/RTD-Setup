@@ -897,14 +897,14 @@ vmtool::prompt_cicd_options() {
 	RTD_CICD_ENABLE=1
 
 	exec 3>&1
-	RTD_CICD_REPO=$($RTD_GUI --backtitle "$BACKTITLE" --inputbox "Ansible repo URL" "$HEIGHT" "$WIDTH" "$RTD_CICD_REPO" 2>&1 1>&3)
-	local exit_status=$?
+		RTD_CICD_REPO=$($RTD_GUI --backtitle "$BACKTITLE" --inputbox "Ansible repo URL" "$HEIGHT" "$WIDTH" "$RTD_CICD_REPO" 2>&1 1>&3)
+		local exit_status=$?
 	exec 3>&-
 	[[ $exit_status -ne 0 ]] && { RTD_CICD_ENABLE=0; return 0; }
 
 	exec 3>&1
-	RTD_CICD_PLAYBOOK=$($RTD_GUI --backtitle "$BACKTITLE" --inputbox "Ansible playbook path" "$HEIGHT" "$WIDTH" "$RTD_CICD_PLAYBOOK" 2>&1 1>&3)
-	exit_status=$?
+		RTD_CICD_PLAYBOOK=$($RTD_GUI --backtitle "$BACKTITLE" --inputbox "Ansible playbook path" "$HEIGHT" "$WIDTH" "$RTD_CICD_PLAYBOOK" 2>&1 1>&3)
+		exit_status=$?
 	exec 3>&-
 	[[ $exit_status -ne 0 ]] && { RTD_CICD_ENABLE=0; return 0; }
 
@@ -916,7 +916,7 @@ vmtool::prompt_cicd_options() {
 	local task_selection
 	task_selection=$($RTD_GUI --backtitle "$BACKTITLE" --checklist "Select server meta-packages to apply" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
 		"${task_menu_entries[@]}" 2>&1 1>&3)
-	exit_status=$?
+		exit_status=$?
 	exec 3>&-
 	[[ $exit_status -ne 0 ]] && { RTD_CICD_ENABLE=0; return 0; }
 	# Map selected role shorthands to server_task strings
@@ -938,14 +938,14 @@ vmtool::prompt_cicd_options() {
 		"ollama" "Ollama service (snap)" \
 		"text-generation-webui" "text-generation-webui" \
 		2>&1 1>&3)
-	exit_status=$?
+		exit_status=$?
 	exec 3>&-
 	[[ $exit_status -ne 0 ]] && RTD_CICD_LLM_VARIANT="none"
 
 	if [[ "$RTD_CICD_LLM_VARIANT" == "ollama" ]]; then
 		exec 3>&1
-		RTD_CICD_LLM_MODELS=$($RTD_GUI --backtitle "$BACKTITLE" --inputbox "Ollama models to pre-pull (comma-separated)" "$HEIGHT" "$WIDTH" "llama3" 2>&1 1>&3)
-		exit_status=$?
+			RTD_CICD_LLM_MODELS=$($RTD_GUI --backtitle "$BACKTITLE" --inputbox "Ollama models to pre-pull (comma-separated)" "$HEIGHT" "$WIDTH" "llama3" 2>&1 1>&3)
+			exit_status=$?
 		exec 3>&-
 		[[ $exit_status -ne 0 ]] && RTD_CICD_LLM_MODELS=""
 	else

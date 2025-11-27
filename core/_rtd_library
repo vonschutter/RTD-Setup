@@ -18723,6 +18723,7 @@ vm::clone_template_vm::_clone_from_category() {
 		case "$1" in
 			--sysprep)
 				enable_sysprep=1
+				system::log_item "--sysprep requested by ${FUNCNAME[1]}"
 				shift
 				;;
 			--customize)
@@ -18731,10 +18732,17 @@ vm::clone_template_vm::_clone_from_category() {
 					return 1
 				fi
 				customize_spec="$2"
+				system::log_item "customize_spec requested by ${FUNCNAME[1]} ='${customize_spec}'"
 				shift 2
 				;;
 			--post-clone-handler)
+				if [[ -z "${2:-}" ]]; then
+					write_warning "--post-clone-handler provided without a function name."
+					shift
+					continue
+				fi
 				post_clone_handler="$2"
+				system::log_item "post_clone_handler requested by ${FUNCNAME[1]} ='${post_clone_handler}'"
 				shift 2
 				;;
 			*)
@@ -18746,8 +18754,7 @@ vm::clone_template_vm::_clone_from_category() {
 
 	local vm_list
 	local -a menu_entries=()
-	local template_name new_name selected_index exit_status
-	local index=1
+	local template_name new_name selected_tag exit_status
 
 	write_status "clone_from_category: pattern=${pattern} title='${menu_title}' prompt='${menu_prompt}'"
 
@@ -18788,8 +18795,7 @@ vm::clone_template_vm::_clone_from_category() {
 
 	while IFS= read -r template_name; do
 		[[ -z "$template_name" ]] && continue
-		menu_entries+=("$index" "$template_name")
-		((index++))
+		menu_entries+=("$template_name" "$template_name")
 	done <<< "$vm_list"
 
 	if (( ${#menu_entries[@]} == 0 )); then
@@ -18804,7 +18810,7 @@ vm::clone_template_vm::_clone_from_category() {
 		[[ $- == *e* ]] && restore_errexit=1 && set +e
 
 		exec 3>&1
-		selected_index=$("$RTD_GUI" \
+		selected_tag=$("$RTD_GUI" \
 			--backtitle "$BACKTITLE" --cancel-button "Back" \
 			--title "$menu_title" \
 			--menu "$menu_prompt" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
@@ -18816,7 +18822,7 @@ vm::clone_template_vm::_clone_from_category() {
 
 		(( restore_errexit )) && set -e
 
-		write_status "clone_from_category: dialog exit_status=${exit_status} selected_index='${selected_index}'"
+		write_status "clone_from_category: dialog exit_status=${exit_status} selected_tag='${selected_tag}'"
 
 		case "$exit_status" in
 			"$DIALOG_CANCEL"|"$DIALOG_ESC")
@@ -18826,13 +18832,13 @@ vm::clone_template_vm::_clone_from_category() {
 				;;
 		esac
 
-		if [[ -z "${selected_index}" ]]; then
+		if [[ -z "${selected_tag}" ]]; then
 			write_warning "clone_from_category: no selection returned; aborting."
 			(( _restore_errexit )) && set -e
 			return 1
 		fi
 
-		template_name="${menu_entries[((selected_index - 1) * 2 + 1)]}"
+		template_name="${selected_tag}"
 		new_name="${template_name#Template_}"
 		new_name="${new_name%%__*}"
 		new_name="${new_name}_$(date +%Y%m%d_%H%M%S)"
@@ -18885,6 +18891,7 @@ vm::clone_template_vm::_clone_from_category() {
 		# Expose the last cloned VM name for callers and allow optional handler execution.
 		export RTD_LAST_CLONED_VM="$new_name"
 		if [[ -n "$post_clone_handler" ]]; then
+			write_status "clone_from_category: invoking post-clone handler '${post_clone_handler}' for ${new_name}"
 			if ! "$post_clone_handler" "$new_name"; then
 				write_warning "Post-clone handler '${post_clone_handler}' reported a problem for '$new_name'."
 			fi
@@ -18913,6 +18920,8 @@ kvm::clone_server_template_vm() {
 	# Returns:
 	#   0 on success, 1 on failure.
 
+	system::log_item "Called with args: $*"
+
 	vm::clone_template_vm::_clone_from_category \
 		"server" \
 		"Clone Template Server VM" \
@@ -18937,6 +18946,8 @@ kvm::clone_vdi_template_vm() {
 	#   Dialog UI and informational status lines.
 	# Returns:
 	#   0 on success, 1 on failure.
+
+	system::log_item "Called with args: $*"
 
 	vm::clone_template_vm::_clone_from_category \
 		"VDI" \
@@ -18986,6 +18997,9 @@ vm::cicd::_render_user_data() {
 	local playbook_path="$4"
 	local extra_vars_path="$5"
 
+	local extra_vars_dir
+	extra_vars_dir=$(dirname "$extra_vars_path")
+
 	cat >"$user_data" <<EOF
 #cloud-config
 hostname: ${hostname}
@@ -19001,6 +19015,7 @@ write_files:
     content: |
 $(sed 's/^/      /' "$extra_vars_path")
 runcmd:
+  - [bash, -lc, "mkdir -p ${extra_vars_dir}"]
   - [bash, -lc, "ansible-pull -U ${repo_url} ${playbook_path} -e @${extra_vars_path}"]
 EOF
 }
@@ -19019,19 +19034,21 @@ vm::cicd::_create_nocloud_iso() {
 	local user_data="$2"
 	local meta_data="$3"
 
+	# Ensure we have tooling to build the seed ISO
+	# cloud-localds lives in cloud-image-utils; genisoimage is a reliable fallback on Ubuntu.
+	software::check_native_package_dependency cloud-image-utils genisoimage >/dev/null 2>&1 || true
+
 	if command -v cloud-localds >/dev/null 2>&1; then
 		cloud-localds "$iso_path" "$user_data" "$meta_data"
 		return $?
 	fi
 
-	if command -v genisoimage >/dev/null 2>&1 || command -v mkisofs >/dev/null 2>&1; then
-		local iso_cmd
-		iso_cmd=$(command -v genisoimage || command -v mkisofs)
-		"$iso_cmd" -output "$iso_path" -volid cidata -joliet -rock "$user_data" "$meta_data"
+	if command -v genisoimage >/dev/null 2>&1; then
+		genisoimage -output "$iso_path" -volid cidata -joliet -rock "$user_data" "$meta_data"
 		return $?
 	fi
 
-	write_error "Neither cloud-localds nor genisoimage/mkisofs is available to create NoCloud ISO."
+	write_error "Neither cloud-localds nor genisoimage is available to create NoCloud ISO."
 	return 1
 }
 
@@ -19058,6 +19075,7 @@ vm::cicd::configure_vm_with_ansible_pull() {
 	local llm_variant="none"
 	local llm_models_csv=""
 	local iso_path=""
+	local extra_vars_target="/etc/ansible-pull/extra-vars.yml"
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
@@ -19077,7 +19095,9 @@ vm::cicd::configure_vm_with_ansible_pull() {
 		return 1
 	fi
 
-	iso_path="${iso_path:-/var/lib/libvirt/images/${vm_name}_cicd.iso}"
+	local iso_dir="/var/lib/libvirt/images"
+	mkdir -p "$iso_dir"
+	iso_path="${iso_path:-$(mktemp -p "$iso_dir" -t "${vm_name}_cicd_XXXXXX.iso")}"
 
 	local tmpdir
 	if ! tmpdir=$(mktemp -d); then
@@ -19090,7 +19110,7 @@ vm::cicd::configure_vm_with_ansible_pull() {
 	local meta_data="${tmpdir}/meta-data"
 
 	vm::cicd::_render_extra_vars "$extra_vars" "$server_tasks_csv" "$llm_variant" "$llm_models_csv"
-	vm::cicd::_render_user_data "$user_data" "$vm_name" "$repo_url" "$playbook_path" "/root/ansible-extra-vars.yml"
+	vm::cicd::_render_user_data "$user_data" "$vm_name" "$repo_url" "$playbook_path" "${extra_vars_target}"
 	vm::cicd::_render_meta_data "$meta_data" "$vm_name"
 
 	write_status "Creating NoCloud ISO for $vm_name at $iso_path"
@@ -19106,18 +19126,34 @@ vm::cicd::configure_vm_with_ansible_pull() {
 		return 1
 	fi
 
-	# Attach the ISO as a cdrom device (config only; live if running).
-	local attach_args=(attach-disk "$vm_name" "$iso_path" sdz --type cdrom --mode readonly --config)
-	if virsh domstate "$vm_name" | grep -qi running; then
-		attach_args+=(--live)
+	# Ensure cloud-init is installed in the guest so the seed is acted upon.
+	# virt-customize lives in libguestfs-tools on Ubuntu/Debian.
+	software::check_native_package_dependency libguestfs-tools >/dev/null 2>&1 || true
+	if command -v virt-customize >/dev/null 2>&1; then
+		write_status "Ensuring cloud-init is present on ${vm_name}..."
+		if ! virt-customize -d "$vm_name" --install cloud-init >/dev/null 2>&1; then
+			write_warning "Unable to verify/install cloud-init inside ${vm_name}. Continuing."
+		fi
+	else
+		write_warning "virt-customize not available; cannot pre-install cloud-init if missing."
 	fi
 
+	write_status "Prepared NoCloud seed at ${iso_path} (size: $(stat -c%s "$iso_path" 2>/dev/null || echo '?') bytes)"
+
+	# Attach the ISO as a cdrom device (config only; live if running).
+	local attach_bus="sata"
+	local attach_target="sdz"
+	local attach_args=(attach-disk "$vm_name" "$iso_path" "$attach_target" --type cdrom --mode readonly --config --targetbus "$attach_bus")
+	virsh domstate "$vm_name" | grep -qi running && attach_args+=(--live)
+
 	if ! virsh "${attach_args[@]}" >/dev/null 2>&1; then
-		write_warning "Failed to attach ISO with virsh attach-disk; attempting change-media on hda..."
-		virsh change-media "$vm_name" hda --insert "$iso_path" --config --force --live >/dev/null 2>&1 || {
-			write_error "Unable to attach ISO $iso_path to $vm_name"
-			return 1
-		}
+		write_warning "Failed to attach ISO with virsh attach-disk; attempting change-media on a cdrom target..."
+		if ! virsh change-media "$vm_name" hda --insert "$iso_path" --config --force --live >/dev/null 2>&1; then
+			if ! virsh change-media "$vm_name" sda --insert "$iso_path" --config --force --live >/dev/null 2>&1; then
+				write_error "Unable to attach ISO $iso_path to $vm_name"
+				return 1
+			fi
+		fi
 	fi
 
 	if ! virsh domstate "$vm_name" | grep -qi running; then
