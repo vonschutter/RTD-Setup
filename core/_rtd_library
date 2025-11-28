@@ -218,11 +218,11 @@ export RTD_VERSION="2.04"
 174   oem::setup_choices_server                                    ;           Function to display legacy installation options. This will install software that is usefull
 175   fedora::get_fedora_netinst_iso_url                           ;           See inline documentation in this file.
 176   fedora::get_latest_release_version                           ;           See inline documentation in this file.
-177   vm::cicd::_render_extra_vars                                 ;           Render ansible-pull extra vars from selections.
-178   vm::cicd::_render_user_data                                  ;           Build cloud-init user-data to run ansible-pull.
-179   vm::cicd::_render_meta_data                                  ;           Build NoCloud meta-data for cloud-init.
-180   vm::cicd::_create_nocloud_iso                                ;           Create a NoCloud seed ISO for cloud-init.
-181   vm::cicd::configure_vm_with_ansible_pull                     ;           Seed/attach CI/CD ISO and start a VM.
+177   kvm::cicd::_render_extra_vars                                 ;           Render ansible-pull extra vars from selections.
+178   kvm::cicd::_render_user_data                                  ;           Build cloud-init user-data to run ansible-pull.
+179   kvm::cicd::_render_meta_data                                  ;           Build NoCloud meta-data for cloud-init.
+180   kvm::cicd::_create_nocloud_iso                                ;           Create a NoCloud seed ISO for cloud-init.
+181   kvm::cicd::configure_vm_with_ansible_pull                     ;           Seed/attach CI/CD ISO and start a VM.
 177   ubuntu::enable_plymouth_theme                                ;           Detects the Ubuntu spin (flavor) and ensures the appropriate
 178   ubuntu::get_target_version                                   ;           See inline documentation in this file.
 179   ubuntu::get_latest_release_version                           ;           See inline documentation in this file.
@@ -15046,6 +15046,47 @@ kvm::util::set_vm_name() {
 	return 0
 }
 
+kvm::util::config_label() {
+	# Description: Build a human-friendly configuration label (e.g. "Minecraft-Server") from a raw token.
+	# Arguments:
+	#   $1 - raw configuration/role string (e.g. minecraft, lamp-server, gnome-desktop).
+	#   $2 - optional role hint (e.g. server) to append "-Server" when missing.
+	# Returns:
+	#   Prints the formatted label to stdout.
+	local raw="${1:-}"
+	local role_hint="${2:-}"
+
+	[[ -z "$raw" ]] && return 0
+
+	# Normalize separators to spaces for easier word parsing.
+	local cleaned="${raw//[_]/ }"
+	cleaned=${cleaned//-/ }
+	cleaned=${cleaned//./ }
+	cleaned=${cleaned//\// }
+	cleaned=$(tr -s '[:space:]' ' ' <<<"$cleaned")
+
+	local words=()
+	for word in $cleaned; do
+		[[ -z "$word" ]] && continue
+		word=${word,,}
+		word=${word^}
+		words+=("$word")
+	done
+
+	local label
+	if (( ${#words[@]} )); then
+		label=$(IFS=-; echo "${words[*]}")
+	else
+		label="$raw"
+	fi
+
+	if [[ "${role_hint,,}" == "server" && "${label,,}" != *"server"* ]]; then
+		label="${label}-Server"
+	fi
+
+	echo "$label"
+}
+
 
 kvm::util::read_common_options() {
 	# Description: Function to read common options for KVM virtual machine creation. This function processes
@@ -17146,10 +17187,18 @@ kvm::make_vm_now_from_fedora_org() {
 
 	local _existing_vm_name="${vm_name:-}"
 	local vm_name=""
+	local config_label=""
+	if [[ ${_role} == "server" ]]; then
+		config_label=$(kvm::util::config_label "${_UserServerEnvironemtSelection:-${_service}}" "${_role}")
+	else
+		config_label=$(kvm::util::config_label "${_UserDesktopEnvironmentSelection:-${_service}}" "${_role}")
+	fi
+	[[ -z "$config_label" ]] && config_label="${_service}"
+
 	if [[ -n "$_existing_vm_name" ]]; then
 		kvm::util::set_vm_name --var vm_name --name "$_existing_vm_name" || return 1
 	else
-		kvm::util::set_vm_name --var vm_name "Template_Fedora" "${_service}" || return 1
+		kvm::util::set_vm_name --var vm_name "Template_Fedora" "${config_label}" || return 1
 	fi
 	local disk_path
 	disk_path=$(kvm::create_expanding_vm_hardisk "$vm_name" "$_dsk") || {
@@ -17270,6 +17319,7 @@ kvm::make_vm_now_from_redhat_com() {
 	local _existing_vm_name="${vm_name:-}"
 	local vm_name=""
 	local _service
+	local config_label=""
 	if [[ ${_role} == "workstation" || ${_role} == "VDI" ]]; then
 		_service="VDI"
 		system::generate_ks_cfg_file --source "${_source_url}" --role "${_role}" --file "${_preseed_file}" --DE "${_UserDesktopEnvironmentSelection:="@workstation-product"}"
@@ -17281,10 +17331,17 @@ kvm::make_vm_now_from_redhat_com() {
 		return 1
 	fi
 
+	if [[ ${_role} == "server" ]]; then
+		config_label=$(kvm::util::config_label "${_UserServerEnvironemtSelection:-${_service}}" "${_role}")
+	else
+		config_label=$(kvm::util::config_label "${_UserDesktopEnvironmentSelection:-${_service}}" "${_role}")
+	fi
+	[[ -z "$config_label" ]] && config_label="${_service}"
+
 	if [[ -n "$_existing_vm_name" ]]; then
 		kvm::util::set_vm_name --var vm_name --name "$_existing_vm_name" || return 1
 	else
-		kvm::util::set_vm_name --var vm_name "Template" "AlmaLinux" "${_service}" || return 1
+		kvm::util::set_vm_name --var vm_name "Template" "AlmaLinux" "${config_label}" || return 1
 	fi
 	local disk_path
 	disk_path=$(kvm::create_expanding_vm_hardisk "$vm_name" "$_dsk") || {
@@ -17400,10 +17457,19 @@ kvm::make_vm_now_from_opensuse_org() {
 
 	local _existing_vm_name="${vm_name:-}"
 	local vm_name=""
+	local config_label=""
+
+	if [[ ${_role} == "server" ]]; then
+		config_label=$(kvm::util::config_label "${_UserServerEnvironemtSelection:-${CONFIG}}" "${_role}")
+	else
+		config_label=$(kvm::util::config_label "${CONFIG}" "${_role}")
+	fi
+	[[ -z "$config_label" ]] && config_label="${CONFIG}"
+
 	if [[ -n "$_existing_vm_name" ]]; then
 		kvm::util::set_vm_name --var vm_name --name "$_existing_vm_name" || return 1
 	else
-		kvm::util::set_vm_name --var vm_name "Template_SUSE" "${CONFIG}" || return 1
+		kvm::util::set_vm_name --var vm_name "Template_SUSE" "${config_label}" || return 1
 	fi
 	local disk_path
 	disk_path=$(kvm::create_expanding_vm_hardisk "$vm_name" "$_dsk") || {
@@ -17505,7 +17571,9 @@ kvm::make_vm_now_from_debian_org() {
 		: "${vm_initrd="${_DEBIAN_FRONTEND_GTK_INITRD}"}"
 		: "${ui_diplay_style:="theme=dark"}"
 		: "${vm_usecase="VDI"}"
-		_vm_name_parts=("Template_Debian" "${vm_usecase}" "${_UserDesktopEnvironmentSelection}")
+		local de_label
+		de_label=$(kvm::util::config_label "${_UserDesktopEnvironmentSelection}" "${_role}")
+		_vm_name_parts=("Template_Debian" "${vm_usecase}" "${de_label:-${_UserDesktopEnvironmentSelection}}")
 		write_status "🖥️ 	- Using Variables: \n ${vm_kernel}, \n ${vm_initrd}"
 		system::make_preseed_cfg --role "${_role}" --desktop_environment "${_UserDesktopEnvironmentSelection}" --saveto "$(mktemp -d)"
 		;;
@@ -17515,7 +17583,9 @@ kvm::make_vm_now_from_debian_org() {
 		: "${vm_initrd="${_DEBIAN_FRONTEND_DEFAULT_INITRD}"}"
 		: "${ui_diplay_style:="theme=light"}"
 		: "${vm_usecase="Server"}"
-		_vm_name_parts=("Template_Debian" "${_task}")
+		local task_label
+		task_label=$(kvm::util::config_label "${_task}" "server")
+		_vm_name_parts=("Template_Debian" "${task_label:-${_task}}")
 		write_status "🖥️ 	- Using Variables: \n ${vm_kernel}, \n ${vm_initrd}"
 		system::make_preseed_cfg --role "${_role}" --server_role "${_UserServerEnvironemtSelection}" --saveto "$(mktemp -d)"
 		;;
@@ -18039,10 +18109,18 @@ kvm::make_vm_now_from_ubuntu_com() {
 	fi
 	local _existing_vm_name="${vm_name:-}"
 	local vm_name=""
+	local config_label=""
+	if [[ "${_role,,}" == "server" ]]; then
+		config_label=$(kvm::util::config_label "${server_app}" "${_role}")
+	else
+		config_label=$(kvm::util::config_label "${_UserDesktopEnvironmentSelection:-${_role}}" "${_role}")
+	fi
+	[[ -z "$config_label" ]] && config_label="${server_app:-${_role}}"
+
 	if [[ -n "$_existing_vm_name" ]]; then
 		kvm::util::set_vm_name --var vm_name --name "$_existing_vm_name" || return 1
 	else
-		kvm::util::set_vm_name --var vm_name "Template" "${server_app}" "${_role}" "${_ubuntu_version_component}" --timestamp-format "%Y-%m-%d-%s" || return 1
+		kvm::util::set_vm_name --var vm_name "Template" "${config_label}" "${_role}" "${_ubuntu_version_component}" --timestamp-format "%Y-%m-%d-%s" || return 1
 	fi
 
 	system::log_item  "Ensure that the QCOW2 disk image is created for the VM in expandable format..."
@@ -18641,7 +18719,7 @@ kvm::backup_all_running_vm() {
 	fi
 }
 
-vm::clone_template_vm::_build_customize_args() {
+kvm::clone_template_vm::_build_customize_args() {
 	# Description:
 	#   Helper function to split a virt-customize option string into an array.
 	#   When the provided spec is a file path it is treated as a script passed via --run.
@@ -18694,7 +18772,7 @@ PY
 	return 0
 }
 
-vm::clone_template_vm::_clone_from_category() {
+kvm::clone_template_vm::_clone_from_category() {
 	# Description:
 	#   Internal helper that drives the template clone dialog for a VM category.
 	#
@@ -18870,7 +18948,7 @@ vm::clone_template_vm::_clone_from_category() {
 		if [[ -n "$customize_spec" ]]; then
 			local spec_for_vm="${customize_spec//\{\{VM_NAME\}\}/$new_name}"
 			local -a customize_args=()
-			if ! vm::clone_template_vm::_build_customize_args "$spec_for_vm" customize_args || (( ${#customize_args[@]} == 0 )); then
+			if ! kvm::clone_template_vm::_build_customize_args "$spec_for_vm" customize_args || (( ${#customize_args[@]} == 0 )); then
 				write_error "❌ Unable to parse --customize arguments for '$new_name'."
 				return 1
 			fi
@@ -18917,7 +18995,7 @@ kvm::clone_server_template_vm() {
 
 	system::log_item "Called with args: $*"
 
-	vm::clone_template_vm::_clone_from_category \
+	kvm::clone_template_vm::_clone_from_category \
 		"server" \
 		"Clone Template Server VM" \
 		"Select a Template VM to clone:" \
@@ -18945,7 +19023,7 @@ kvm::clone_vdi_template_vm() {
 
 	system::log_item "Called with args: $*"
 
-	vm::clone_template_vm::_clone_from_category \
+	kvm::clone_template_vm::_clone_from_category \
 		"VDI" \
 		"Clone Template VDI VM" \
 		"Select a Template VDI VM to clone:" \
@@ -18954,7 +19032,7 @@ kvm::clone_vdi_template_vm() {
 		"$@"
 }
 
-vm::cicd::_render_extra_vars() {
+kvm::cicd::_render_extra_vars() {
 	# Description:
 	#   Render an extra-vars YAML file for ansible-pull based on provided inputs.
 	# Arguments:
@@ -18994,7 +19072,7 @@ vm::cicd::_render_extra_vars() {
 	} >"$file"
 }
 
-vm::cicd::_render_user_data() {
+kvm::cicd::_render_user_data() {
 	# Description:
 	#   Build cloud-init user-data that installs ansible and runs ansible-pull with prepared extra vars.
 	# Arguments:
@@ -19037,7 +19115,7 @@ runcmd:
 EOF
 }
 
-vm::cicd::_render_meta_data() {
+kvm::cicd::_render_meta_data() {
 	# Description:
 	#   Build a minimal NoCloud meta-data file with instance and hostname.
 	# Arguments:
@@ -19054,7 +19132,7 @@ local-hostname: ${hostname}
 EOF
 }
 
-vm::cicd::_create_nocloud_iso() {
+kvm::cicd::_create_nocloud_iso() {
 	# Description:
 	#   Create a NoCloud ISO from provided user-data and meta-data files.
 	# Arguments:
@@ -19086,7 +19164,7 @@ vm::cicd::_create_nocloud_iso() {
 	return 1
 }
 
-vm::cicd::configure_vm_with_ansible_pull() {
+kvm::cicd::configure_vm_with_ansible_pull() {
 	# Description:
 	#   Create a NoCloud ISO containing ansible-pull instructions and attach it to a VM, then start the VM.
 	#
@@ -19121,12 +19199,12 @@ vm::cicd::configure_vm_with_ansible_pull() {
 			--llm-variant) llm_variant="$2"; shift 2 ;;
 			--llm-models) llm_models_csv="$2"; shift 2 ;;
 			--iso-path) iso_path="$2"; shift 2 ;;
-			*) write_warning "vm::cicd::configure_vm_with_ansible_pull: ignoring unknown arg '$1'"; shift ;;
+			*) write_warning "kvm::cicd::configure_vm_with_ansible_pull: ignoring unknown arg '$1'"; shift ;;
 		esac
 	done
 
 	if [[ -z "$vm_name" ]]; then
-		write_error "vm::cicd::configure_vm_with_ansible_pull requires --vm <name>"
+		write_error "kvm::cicd::configure_vm_with_ansible_pull requires --vm <name>"
 		return 1
 	fi
 
@@ -19145,12 +19223,12 @@ vm::cicd::configure_vm_with_ansible_pull() {
 	local user_data="${tmpdir}/user-data"
 	local meta_data="${tmpdir}/meta-data"
 
-	vm::cicd::_render_extra_vars "$extra_vars" "$server_tasks_csv" "$llm_variant" "$llm_models_csv"
-	vm::cicd::_render_user_data "$user_data" "$vm_name" "$repo_url" "$playbook_path" "${extra_vars_target}" "${extra_vars}"
-	vm::cicd::_render_meta_data "$meta_data" "$vm_name"
+	kvm::cicd::_render_extra_vars "$extra_vars" "$server_tasks_csv" "$llm_variant" "$llm_models_csv"
+	kvm::cicd::_render_user_data "$user_data" "$vm_name" "$repo_url" "$playbook_path" "${extra_vars_target}" "${extra_vars}"
+	kvm::cicd::_render_meta_data "$meta_data" "$vm_name"
 
 	write_status "Creating NoCloud ISO for $vm_name at $iso_path"
-	if ! vm::cicd::_create_nocloud_iso "$iso_path" "$user_data" "$meta_data"; then
+	if ! kvm::cicd::_create_nocloud_iso "$iso_path" "$user_data" "$meta_data"; then
 		rm -rf "$tmpdir"
 		return 1
 	fi

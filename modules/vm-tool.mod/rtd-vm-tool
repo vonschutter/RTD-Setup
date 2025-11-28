@@ -962,7 +962,7 @@ vmtool::post_clone_ansible_pull() {
 		return 0
 	fi
 
-	if vm::cicd::configure_vm_with_ansible_pull \
+	if kvm::cicd::configure_vm_with_ansible_pull \
 		--vm "$vm_name" \
 		--repo "${RTD_CICD_REPO}" \
 		--playbook "${RTD_CICD_PLAYBOOK}" \
@@ -976,6 +976,120 @@ vmtool::post_clone_ansible_pull() {
 }
 
 
+vmtool::wait_for_vm_stop() {
+	# Poll until a VM reaches a stopped state or the timeout expires.
+	local vm_name="$1"
+	local timeout="${2:-30}"
+	local waited=0
+	local state
+
+	while (( waited < timeout )); do
+		state=$(virsh domstate "$vm_name" 2>/dev/null | tr '[:upper:]' '[:lower:]')
+		if [[ "$state" == shut* || "$state" == "off" ]]; then
+			return 0
+		fi
+		sleep 1
+		(( waited++ ))
+	done
+
+	return 1
+}
+
+vmtool::start_stop_vm_menu() {
+	if ! command -v virsh >/dev/null 2>&1; then
+		dialog::display_error "❌ virsh not found. Please install libvirt-clients/libvirt-tools."
+		return 1
+	fi
+
+	while true; do
+		local -a menu_entries=()
+		local vm state label action_hint selection exit_status
+
+		while IFS= read -r vm; do
+			[[ -z "$vm" ]] && continue
+			state=$(virsh domstate "$vm" 2>/dev/null | tr '[:upper:]' '[:lower:]')
+			case "$state" in
+				running)
+					label="🟢 Running"
+					action_hint="Stop"
+				;;
+				paused)
+					label="⏸️ Paused"
+					action_hint="Stop"
+				;;
+				shut*|off)
+					label="⚪ Off"
+					action_hint="Start"
+				;;
+				*)
+					label="❔ ${state:-unknown}"
+					action_hint="Toggle"
+				;;
+			esac
+			menu_entries+=("$vm" "$label | ${action_hint} this VM")
+		done < <(virsh list --all --name | grep -vi '^Template' | sed '/^$/d')
+
+		if (( ${#menu_entries[@]} == 0 )); then
+			dialog::display_error "No non-Template VMs found to manage."
+			return 0
+		fi
+
+		exec 3>&1
+		selection=$($RTD_GUI --backtitle "$BACKTITLE" --cancel-button "Back" --title "🚀 Start / Stop VMs" --menu "Select a VM to start or stop.\nTemplate images are hidden automatically." "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
+			"${menu_entries[@]}" 2>&1 1>&3)
+		exit_status=$?
+		exec 3>&-
+		clear
+
+		case "$exit_status" in
+			"$DIALOG_CANCEL"|"${DIALOG_ESC:-255}") return ;;
+		esac
+
+		[[ -z "$selection" ]] && continue
+
+		state=$(virsh domstate "$selection" 2>/dev/null | tr '[:upper:]' '[:lower:]')
+		case "$state" in
+			shut*|off|"")
+				if ! dialog::prompt_yes_no --back-title "$BACKTITLE" --title "🚀 Start VM" --message "Start \"$selection\"?\n\nCurrent state: ${state:-unknown}"; then
+					continue
+				fi
+				if virsh start "$selection"; then
+					kvm::wait_for_domain_start --domain "$selection" --timeout 90 || write_warning "Start signal sent but no start event observed for $selection."
+					result="Launch requested for \"$selection\".\n\nLatest state: $(virsh domstate "$selection" 2>/dev/null || echo \"unknown\")"
+					dialog::display_result "VM Starting"
+				else
+					dialog::display_error "Failed to start \"$selection\"."
+				fi
+			;;
+			running|paused|pmsuspended*)
+				if ! dialog::prompt_yes_no --back-title "$BACKTITLE" --title "🛑 Stop VM" --message "Stop \"$selection\" gracefully?\n\nCurrent state: ${state}"; then
+					continue
+				fi
+				if virsh shutdown "$selection"; then
+					if vmtool::wait_for_vm_stop "$selection" 45; then
+						result="\"$selection\" is now stopped."
+						dialog::display_result "VM Stopped"
+					else
+						if dialog::prompt_yes_no --back-title "$BACKTITLE" --title "Force Stop?" --message "\"$selection\" did not stop within 45s.\nForce power off?"; then
+							if virsh destroy "$selection"; then
+								result="\"$selection\" was forcefully powered off."
+								dialog::display_result "VM Powered Off"
+							else
+								dialog::display_error "Failed to force stop \"$selection\"."
+							fi
+						fi
+					fi
+				else
+					dialog::display_error "Failed to send shutdown signal to \"$selection\"."
+				fi
+			;;
+			*)
+				dialog::display_error "Unknown state for \"$selection\"; cannot toggle automatically."
+			;;
+		esac
+	done
+}
+
 vmtool::show_main_menu() {
 	while true; do
 		exec 3>&1
@@ -983,9 +1097,10 @@ vmtool::show_main_menu() {
 			"1" "✨ Deploy Server VM's" \
 			"2" "✨ Deploy Virtual Desktop VM's" \
 			"3" "💿 Create VM Templates" \
-			"4" "📐 Tool Settings"\
-			"5" "🧹 Maintenance" \
-			"6" "❓ About this tool" \
+			"4" "⚡ Start / Stop VM's" \
+			"5" "📐 Tool Settings"\
+			"6" "🧹 Maintenance" \
+			"7" "❓ About this tool" \
 			2>&1 1>&3)
 		exit_status=$?
 		exec 3>&-
@@ -1029,11 +1144,13 @@ vmtool::show_main_menu() {
 				;;
 				3 ) show_manage_VM_template_menu
 				;;
-				4 ) show_settings_menu
+				4 ) vmtool::start_stop_vm_menu
 				;;
-				5 ) show_maintenance_menu
+				5 ) show_settings_menu
 				;;
-				6 ) display_notice
+				6 ) show_maintenance_menu
+				;;
+				7 ) display_notice
 				;;
 		esac
 	done
