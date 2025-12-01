@@ -6,14 +6,14 @@
 
 The core of the RTD Power Tools are the core libraries and the configuration scripts for computers, servers, and VMs. The core library and the configuration files are the following:
 
-*   _branding: Contains configurations for how things look
-*   _locations: Contains URL's, file locations, etc.
-*   _rtd_library: Contains all functions that do all the heavy lifting and repeated work.
-*   _rtd_recipies: Collections of software to make available for install.
+*   _branding: Contains configurations for how things look.
+*   _locations: Contains URLs, file locations, etc.
+*   _rtd_library: Contains all functions that do the heavy lifting and repeated work.
+*   _rtd_recipes: Collections of software to make available for install.
 *   sigs (folder): contains the hashes used to validate the oem apps compressed in the /apps folder
-*   rtd-oem-enable-config.sh: script to enable the tools when auto installed via PRESEED, or AUTOUNATTEND.
-*   rtd-oem-linux-config.sh: script to configrure a server, VDI, VM, or PC using the \_rtd\_library functions
-*   rtd-oem-win10-config.ps1: script to configrure a server, VDI, VM, or PC
+*   rtd-oem-enable-config.sh: script to enable the tools when auto installed via PRESEED or AUTOUNATTEND.
+*   rtd-oem-linux-config.sh: script to configure a server, VDI, VM, or PC using the \_rtd\_library functions.
+*   rtd-oem-win10-config.ps1: script to configure a server, VDI, VM, or PC.
 
 Further tools and utilities are located in the /apps folder and the /modules folder. These modules may make use of the \_rtd\_library accomplish their tasks. For example; the software-bundle-manager:![1683551411392](image/README/1683551411392.png)
 
@@ -29,7 +29,7 @@ Further tools and utilities are located in the /apps folder and the /modules fol
 
 In short: source the library once, and every RTD script gains a well-tested catalog of commands and UI helpers. This keeps each module tiny, ensures cross-distro behavior, and gives OEM teams confidence that installs will be identical whether triggered from a live session, a Kickstart/Preseed job, or a remote automation task.
 
-NOTE: For the software bundle installer, and particularly for validating dependencies, software titles may be named slightly differently in some versions of Linux and may therefore not install since they are not found. For this reason, more emphasis is placed on "snap" apps and "flatpacks" where possible to allow universal installs. Snapps and Flatpaks allow for applications to be sandboxed for security as well.
+NOTE: For the software bundle installer, and particularly for validating dependencies, software titles may be named slightly differently in some versions of Linux and may therefore not install since they are not found. For this reason, more emphasis is placed on "snap" apps and "flatpaks" where possible to allow universal installs. Snaps and Flatpaks allow for applications to be sandboxed for security as well.
 
 The RTD Power Tools may be installed manually and/or added by either of PRESEED, KICKSTART, AUTOYAST, or AUTOUNATTEND installation configuration files. These configuration files are included by default in the RTD Power Tools Library and are created when needed. These are applied when either creating a VM or installation media using the RTD Power Tools.
 

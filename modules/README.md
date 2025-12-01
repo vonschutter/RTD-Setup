@@ -11,7 +11,7 @@ It is good for to include a README file that explains the function of the contri
 
 ```ini
 [ modules ] (root directory of addon modules)
-    [name].mod (name of contributio or function of contained scripts)    	 
+    [name].mod (name of contribution or function of contained scripts)
          rtd-name-of-script   
          README.md (description of what the script does)
 ```
@@ -19,7 +19,7 @@ It is good for to include a README file that explains the function of the contri
 
 The default modules for the RTD Power Tools are:
 
-1. RTD-Desktop-Look-Switcher: used to change the overall look of Gnome for Wondows and Mac refugees
+1. RTD-Desktop-Look-Switcher: used to change the overall look of Gnome for Windows and Mac refugees
 2. RTD-OEM-bundle-manager: used to add and remove bundles of software quickly and easily
 3. RTD_OEM-System_Admin: system support tools
-4. RTD-VPN-Router: quick setup of a pc or VM as a VPN router (routing all traffic coming to it othrouugh a VPN)
+4. RTD-VPN-Router: quick setup of a PC or VM as a VPN router (routing all traffic coming to it through a VPN)

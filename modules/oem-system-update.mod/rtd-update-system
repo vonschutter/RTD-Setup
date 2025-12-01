@@ -83,13 +83,13 @@ main ()
 		# Check if the script is being run as root
 		if [[ $EUID -ne 0 ]]; then
 			echo -e $YELLOW"This script needs administrative access..." $ENDCOLOR
-			exec sudo -E SUDO_USER=$USER /bin/bash "${0}" "$*" || rtd_oem_pause 1
+			exec sudo -E SUDO_USER=$USER /bin/bash "${0}" "$*" || pause::for_input 1
 		else
 			echo -e $GREEN"Administrative access granted..." $ENDCOLOR
 		fi
 
 		# Check if the RTD library is loaded
-		check_rtd_library || rtd_oem_pause 1 "$0: $* Failed to load RTD Library!"
+		check_rtd_library || pause::for_input 1 "$0: $* Failed to load RTD Library!"
 
 	# Execute the fist instruction passed to this script...
 	if [ ! -z $INSTRUCTION ]; then
@@ -115,8 +115,8 @@ main ()
 			exit 0
 			;;
 		--noui)
-			become_root "$1" 	|| rtd_oem_pause 1 "$0: $* Failed to elevate privileges!"
-			check_rtd_library 	|| rtd_oem_pause 1 "$0: $* Failed to load RTD Library!"
+			become_root "$1" 	|| pause::for_input 1 "$0: $* Failed to elevate privileges!"
+			check_rtd_library 	|| pause::for_input 1 "$0: $* Failed to load RTD Library!"
 			write_status "Updating installed software text display only..."
 			software::update_system_txt 
 			;;
@@ -124,15 +124,15 @@ main ()
 			distro_type=$(system::distribution_type)
 			case $distro_type in
 				"debian" | "ubuntu" | "linuxmint" | "raspbian" | "pop" | "kali" | "kubuntu" | "elementary" | "zorin" | "mxlinux" | "Lubuntu" |  ubuntu*)
-					become_root "$1" 	|| rtd_oem_pause 1 "$0: $* Failed to elevate privileges!"
-					check_rtd_library	|| rtd_oem_pause 1 "$0: $* Failed to load RTD Library!"
+					become_root "$1" 	|| pause::for_input 1 "$0: $* Failed to elevate privileges!"
+					check_rtd_library	|| pause::for_input 1 "$0: $* Failed to load RTD Library!"
 					write_warning "🌀 Found deb based distro, updating installed software..."
 					write_warning "💻 Using txt only as deb cannot be forced not to ask any questions"
 					software::update_system_txt
 					;;
 				*)
-					become_root "$1" 	|| rtd_oem_pause 1 "$0: $* Failed to elevate privileges!"
-					check_rtd_library	|| rtd_oem_pause 1 "$0: $* Failed to load RTD Library!"
+					become_root "$1" 	|| pause::for_input 1 "$0: $* Failed to elevate privileges!"
+					check_rtd_library	|| pause::for_input 1 "$0: $* Failed to load RTD Library!"
 					write_status "🐧 Updating installed software..."
 					software::update_all_ui 
 					;;
@@ -253,7 +253,7 @@ become_root ()
 	if [[ $EUID -ne 0 ]]; then
 		# Ensure administrative privileges.
 		echo -e $YELLOW"This script needs administrative access..." $ENDCOLOR
-		exec sudo -E SUDO_USER=$USER /bin/bash "${0}" "$*" || rtd_oem_pause 1
+		exec sudo -E SUDO_USER=$USER /bin/bash "${0}" "$*" || pause::for_input 1
 	else
 		# We are root, so no need to become root.
 		echo -e $GREEN"Administrative access granted..." $ENDCOLOR

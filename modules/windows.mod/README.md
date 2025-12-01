@@ -7,10 +7,10 @@ Herin are a few scripts that may be injected in to a windows VM as desired. By d
 Scripts and components may be included like thus in an OEM script (bash and mtools):
 
 ```bash
-mkfs.msdos -C ${WindowsInstructions} 1440 || rtd_oem_pause 1
+mkfs.msdos -C ${WindowsInstructions} 1440 || pause::for_input 1
 
 for i in "${_OEM_DIR}/modules/Windows.mod/_*" ; do
-	mcopy -i ${WindowsInstructions} ${i} ::/ || rtd_oem_pause 1
+	mcopy -i ${WindowsInstructions} ${i} ::/ || pause::for_input 1
 done
 ```
 
