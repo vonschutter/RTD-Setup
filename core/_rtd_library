@@ -2230,57 +2230,60 @@ dependency::desktop() {
 	#
 	# End of documentation
 	local _sought="${1,,}"
+	[[ -z "${_sought}" ]] && { system::log_item "No desktop environment specified to check for."; return 1; }
+
 	system::log_item "checking if there is a running $_sought desktop session..."
-	local _desktop
+	local detected=""
 
-	# Try to find the currently running desktop environment reliably...
-	if [[ -z "$XDG_CURRENT_DESKTOP" ]]; then
+	# Prefer XDG_CURRENT_DESKTOP when set; normalize tokens and allow colon/semicolon separators.
+	if [[ -n "$XDG_CURRENT_DESKTOP" ]]; then
+		for token in ${XDG_CURRENT_DESKTOP//[:;]/ }; do
+			token="${token,,}"
+			[[ -z "$detected" ]] && detected="$token"
+			if [[ "$token" == *"$_sought"* ]]; then
+				system::log_item "Found desktop via XDG_CURRENT_DESKTOP: $token"
+				return 0
+			fi
+		done
+	else
 		system::log_item "XDG_CURRENT_DESKTOP appears to be unset, attempting to search processes for desktop match..."
-		if pgrep -f "plasmashell" &>/dev/null; then
-			_desktop="kde"
-		elif pgrep -f "gnome-shell" &>/dev/null; then
-			_desktop="gnome"
-		elif pgrep -f "mate-session" &>/dev/null; then
-			_desktop="mate"
-		elif pgrep -f "xfce4-session" &>/dev/null; then
-			_desktop="xfce"
-		elif pgrep -f "cinnamon" &>/dev/null; then
-			_desktop="cinnamon"
-		elif pgrep -f "lxsession" &>/dev/null; then
-			_desktop="lxde"
-		elif pgrep -f "lxqt-session" &>/dev/null; then
-			_desktop="lxqt"
-		elif pgrep -f "unity-panel" &>/dev/null; then
-			_desktop="unity"
-		elif pgrep -f "pantheon-session" &>/dev/null; then
-			_desktop="pantheon"
-		elif pgrep -f "sway" &>/dev/null; then
-			_desktop="sway"
-		elif pgrep -f "enlightenment" &>/dev/null; then
-			_desktop="enlightenment"
-		elif pgrep -f "openbox" &>/dev/null; then
-			_desktop="openbox"
-		elif pgrep -f "icewm" &>/dev/null; then
-			_desktop="icewm"
-		elif pgrep -f "fluxbox" &>/dev/null; then
-			_desktop="fluxbox"
-		elif pgrep -f "jwm" &>/dev/null; then
-			_desktop="jwm"
-		else
-			_desktop="unknown"
-		fi
-	else
-		_desktop="$XDG_CURRENT_DESKTOP"
 	fi
 
-	# Check what we found...
-	system::log_item "Found: _desktop=$_desktop"
-	local _desktop="${_desktop,,}"
-	if [[ "$_desktop" == *"$_sought"* ]]; then
+	# Fallback: look for well-known session processes with exact matches to avoid false positives.
+	local proc_map=(
+		"plasmashell:kde"
+		"gnome-shell:gnome"
+		"mate-session:mate"
+		"xfce4-session:xfce"
+		"cinnamon:cinnamon"
+		"lxsession:lxde"
+		"lxqt-session:lxqt"
+		"unity-panel-service:unity"
+		"pantheon-session:pantheon"
+		"sway:sway"
+		"enlightenment:enlightenment"
+		"openbox:openbox"
+		"icewm:icewm"
+		"fluxbox:fluxbox"
+		"jwm:jwm"
+	)
+
+	for entry in "${proc_map[@]}"; do
+		local proc="${entry%%:*}"
+		local name="${entry##*:}"
+		if pgrep -x "$proc" &>/dev/null; then
+			detected="$name"
+			break
+		fi
+	done
+
+	system::log_item "Found: detected=${detected:-unknown}"
+	local detected_lc="${detected,,}"
+	if [[ -n "$detected_lc" && "$detected_lc" == *"$_sought"* ]]; then
 		return 0
-	else
-		return 1
 	fi
+
+	return 1
 }
 
 dependency::os_linux() {
@@ -2314,24 +2317,45 @@ dependency::os_linux() {
 	#
 	# End of Documentation
 
-	if echo "$OSTYPE" | grep -q "linux"; then
-		return 0
-	elif [[ "$OSTYPE" == "darwin"* ]]; then
-		write_error "${FUNCNAME[0]}: Mac OSX is currently not supported."
-		return 1
-	elif [[ "$OSTYPE" == "cygwin" ]]; then
-		write_error "${FUNCNAME[0]}: CYGWIN is currently unsupported."
-		return 1
-	elif [[ "$OSTYPE" == "msys" ]]; then
-		write_error "${FUNCNAME[0]}: Lightweight shell is currently unsupported."
-		return 1
-	elif [[ "$OSTYPE" == "freebsd"* ]]; then
-		write_error "${FUNCNAME[0]}: FreeBSD is currently unsupported."
-		return 1
-	else
-		write_error "${FUNCNAME[0]}: Unsupported operating system: $OSTYPE."
-		return 1
-	fi
+	local _ostype="${OSTYPE:-}"
+
+	case "$_ostype" in
+		linux*)
+			# Detect WSL for callers that may need to branch on it
+			if grep -qi "microsoft" /proc/version 2>/dev/null || [[ -n "${WSL_DISTRO_NAME:-}" ]]; then
+				system::log_item "${FUNCNAME[0]}: Detected Linux (WSL)."
+			fi
+			return 0
+			;;
+		darwin*)
+			write_error "${FUNCNAME[0]}: Mac OSX is currently not supported."
+			return 1
+			;;
+		cygwin*)
+			write_error "${FUNCNAME[0]}: CYGWIN is currently unsupported."
+			return 1
+			;;
+		msys*)
+			write_error "${FUNCNAME[0]}: Lightweight shell is currently unsupported."
+			return 1
+			;;
+		freebsd*)
+			write_error "${FUNCNAME[0]}: FreeBSD is currently unsupported."
+			return 1
+			;;
+		"")
+			# Fallback to uname when OSTYPE is unset or unusual
+			if [[ "$(uname -s 2>/dev/null)" == "Linux" ]]; then
+				return 0
+			fi
+			write_error "${FUNCNAME[0]}: Unable to determine OS (OSTYPE unset)."
+			return 1
+			;;
+		*)
+			write_error "${FUNCNAME[0]}: Unsupported operating system: ${_ostype}."
+			return 1
+			;;
+	esac
 }
 
 
@@ -2945,11 +2969,25 @@ system::download_and_manipulate_iso_debian() {
 	if [[ ! -f "$iso_store" ]]; then
 		write_status "Geting install image..."
 		write_information "Download: $_SOURCE_ISO_URL"
-		wget -4 -q --show-progress "$_SOURCE_ISO_URL" -O "$iso_store"
-		write_information "Retreived: $(ls $iso_store)"
+		if ! wget -4 -q --show-progress "$_SOURCE_ISO_URL" -O "$iso_store"; then
+			write_error "FAILED to download $_SOURCE_ISO_URL"
+			system::prepare_environment_for_iso_creation --cleanup
+			return 1
+		fi
+		write_information "Retreived: $(ls "$iso_store")"
 	fi
 
-	$bin_7z x "$iso_store" "-o$tmp_disc_dir" || write_error "FAILED to download and/or extract $_SOURCE_ISO_URL"
+	if [[ ! -s "$iso_store" ]]; then
+		write_error "Downloaded ISO is missing or empty: $iso_store"
+		system::prepare_environment_for_iso_creation --cleanup
+		return 1
+	fi
+
+	if ! "$bin_7z" x "$iso_store" "-o$tmp_disc_dir"; then
+		write_error "FAILED to extract $_SOURCE_ISO_URL"
+		system::prepare_environment_for_iso_creation --cleanup
+		return 1
+	fi
 	mkdir -p "$tmp_initrd_dir/custom" && system::log_item "Created custom directory in $tmp_disc_dir" || write_error "FAILED to create custom directory in $tmp_disc_dir"
 
 	# write_status "Geting non-free firmware..."
@@ -3089,6 +3127,9 @@ system::create_iso_image_debian() {
 		esac
 	done
 
+	local rc=0
+	local missing_files=0
+
 	system::log_item "Check for required information (a target and source directory)..."
 	system::check_required_variables target_iso iso_source_dir isohdpfx_bin
 
@@ -3102,15 +3143,28 @@ system::create_iso_image_debian() {
 		rm -f "${target_iso}"
 	fi
 
-	pushd "${iso_source_dir}" || system::log_item "Failed to enter ${iso_source_dir}"
+	if ! pushd "${iso_source_dir}"; then
+		system::log_item "Failed to enter ${iso_source_dir}"
+		system::prepare_environment_for_iso_creation --cleanup
+		return 1
+	fi
 
 	[[ -e '[BOOT]' ]] && (rm -r '[BOOT]' || system::log_item "Failed to delete [BOOT] directory")
 
-	[[ -f "isolinux/isolinux.bin" ]]
-	[[ -f "isolinux/boot.cat" ]]
-	[[ -f "isolinux/isolinux.cfg" ]] || system::log_item "Missing files in ${iso_source_dir}/isolinux"
+	for req in "isolinux/isolinux.bin" "isolinux/boot.cat" "isolinux/isolinux.cfg"; do
+		if [[ ! -f "$req" ]]; then
+			write_error "Missing required boot file: ${iso_source_dir}/$req"
+			missing_files=1
+		fi
+	done
 
-	"$bin_xorriso" -as mkisofs -r \
+	if [[ $missing_files -ne 0 ]]; then
+		popd
+		system::prepare_environment_for_iso_creation --cleanup
+		return 1
+	fi
+
+	if ! "$bin_xorriso" -as mkisofs -r \
 		-V "${VOLUME_TITLE:-"RTD"}" \
 		-J -b "isolinux/isolinux.bin" \
 		-c boot.cat \
@@ -3122,16 +3176,31 @@ system::create_iso_image_debian() {
 		-eltorito-alt-boot \
 		-e boot/grub/efi.img \
 		-no-emul-boot \
-		-isohybrid-gpt-basdat -o "${target_iso}" ./ &>>"${_LOGFILE}" || pause::for_input 1 "An error may have occurred (review above outout) then: Press [ENTER] to continue:"
+		-isohybrid-gpt-basdat -o "${target_iso}" ./ &>>"${_LOGFILE}"; then
+		pause::for_input 1 "An error may have occurred (review above outout) then: Press [ENTER] to continue:"
+		rc=1
+	fi
 
-	chmod 777 "${target_iso}" &>>"${_LOGFILE}" || pause::for_input 1 "${FUNCNAME[0]}: An error may have occurred (review above outout) then: Press [ENTER] to continue:"
+	if [[ $rc -eq 0 ]] && ! chmod 777 "${target_iso}" &>>"${_LOGFILE}"; then
+		pause::for_input 1 "${FUNCNAME[0]}: An error may have occurred (review above outout) then: Press [ENTER] to continue:"
+		rc=1
+	fi
 
 	popd || {
 		write_error "Failed to popd"
 		pause::for_input 1
+		rc=1
 	}
 
-	tool::test_iso_boot_media "${target_iso}"
+	if [[ $rc -eq 0 ]]; then
+		tool::test_iso_boot_media "${target_iso}"
+		rc=$?
+	fi
+
+	if [[ $rc -ne 0 ]]; then
+		system::prepare_environment_for_iso_creation --cleanup
+		return $rc
+	fi
 
 	while true; do
 		exec 3>&1
@@ -3146,28 +3215,39 @@ system::create_iso_image_debian() {
 		clear
 
 		case $exit_status in
-		"$DIALOG_CANCEL") return 255 ;;
-		"$DIALOG_ESC") return 255 ;;
+		"$DIALOG_CANCEL")
+			rc=255
+			break
+			;;
+		"$DIALOG_ESC")
+			rc=255
+			break
+			;;
 		esac
 
 		case $selection in
 		1)
 			if $RTD_GUI --yesno "Proceed to make a bootable thumbdrive from this ISO media (${target_iso})?" "$HEIGHT" "$WIDTH"; then
 				create_physical_media_from_iso "$target_iso"
+				rc=$?
 			else
-				return 255
+				rc=255
 			fi
+			break
 			;;
 		2)
 			if $RTD_GUI --yesno "Proceed to add this ISO (${target_iso}) to your Ventoy media for multiple boot options?" "$HEIGHT" "$WIDTH"; then
 				util::add_iso_to_ventoy "$target_iso"
+				rc=$?
 			else
-				return 255
+				rc=255
 			fi
+			break
 			;;
 		3)
 			$RTD_GUI --msgbox "The new ISO file is located at: $target_iso" "$HEIGHT" "$WIDTH"
-			return 0
+			rc=0
+			break
 			;;
 		*)
 			dialog::display_error "Invalid selection: $selection"
@@ -3176,6 +3256,7 @@ system::create_iso_image_debian() {
 	done
 
 	system::prepare_environment_for_iso_creation --cleanup
+	return $rc
 }
 
 
@@ -3213,8 +3294,8 @@ system::detect_session() {
 		system::log_item "👌 TTY session detected."
 	fi
 
-echo "${_SESSION_TYPE}"
-return 0
+	echo "${_SESSION_TYPE}"
+	return 0
 }
 
 
@@ -9307,34 +9388,44 @@ rtd_oem_ubuntu_auto_install_iso_builder() {
 	if [[ "$HOME" == "/root" ]]; then HOME=/home/$SUDO_USER; fi
 	ubuntu::download_iso --dir $HOME/Virtual-DVDs/Downloaded --flavor ubuntu --version ${tgt_ubuntu_ver} --type desktop
 
+	if [[ -z "${iso:-}" || ! -f "$iso" ]]; then
+		write_error "Ubuntu ISO is missing after download attempt (iso=${iso:-unset})"
+		system::prepare_environment_for_iso_creation --cleanup
+		return 1
+	fi
+
 	mnt="${tmp_disc_dir:=$(mktemp -d)}"
 	tmp_disc_dir=$mnt
 	write_status "Mounting intallation media..."
-	mount $iso $mnt -o user,ro || pause::for_input 1
+	if ! mount "$iso" "$mnt" -o user,ro; then
+		pause::for_input 1
+		system::prepare_environment_for_iso_creation --cleanup
+		return 1
+	fi
 	write_status "Verifying media presence..."
-	cat $mnt/.disk/*info || pause::for_input 1
+	cat "$mnt"/.disk/*info || pause::for_input 1
 	auto="$BRANDING_ORG-$CONFIG-auto-install-from-${BASE}"
 	write_information "Creating Installations media: $auto "
 	if [ ! -e $auto ]; then
-		cp -a $mnt $auto
-		chmod -R +w $auto
+		cp -a "$mnt" "$auto"
+		chmod -R +w "$auto"
 	fi
 	write_status "Modifying startup instructions...  "
 	for f in splash.pcx splash.png; do
-		oem::setup_brand_splash_screen $auto/isolinux/$f
+		oem::setup_brand_splash_screen "$auto/isolinux/$f"
 	done
-	pushd ./$auto/isolinux/
+	pushd "./$auto/isolinux/"
 	find splash.pcx | cpio -ov >>bootlogo
 	find splash.png | cpio -ov >>bootlogo
 	popd
 	write_status "Unmounting $mnt... "
-	umount $mnt || pause::for_input 1
+	umount "$mnt" || pause::for_input 1
 
 	case "$2" in
 	desktop | Desktop | live | Live)
 		#configure_auto_unattended_ubuntu_live_boot_media $auto $CONFIG && echo -e "$GREEN OK! $ENDCOLOR" || pause::for_input 1
 		write_status "Modifying installation instructions in live media... "
-		cat >$auto/isolinux/txt.cfg <<-EOF
+		cat >"$auto/isolinux/txt.cfg" <<-EOF
 			default live-install
 			label live-install
 			menu label ^^Auto Install Ubuntu $CONFIG
@@ -9342,13 +9433,13 @@ rtd_oem_ubuntu_auto_install_iso_builder() {
 			append  file=/cdrom/preseed.cfg auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=us console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US localechooser/supported-locales=en_US.UTF-8 boot=casper automatic-ubiquity initrd=/casper/initrd quiet splash noprompt noshell ---
 		EOF
 
-		system::make_preseed_cfg $auto $CONFIG
+			system::make_preseed_cfg "$auto" "$CONFIG"
 
-		;;
+			;;
 	*)
 		#configure_auto_unattended_ubuntu_server_boot_media $auto $CONFIG && echo -e "$GREEN OK! $ENDCOLOR" || pause::for_input 1
 		write_status "Modifying installation instructions in server image... "
-		cat >$auto/isolinux/isolinux.cfg <<-EOF
+		cat >"$auto/isolinux/isolinux.cfg" <<-EOF
 			default install
 			label install
 			gfxmode=791
@@ -9360,8 +9451,8 @@ rtd_oem_ubuntu_auto_install_iso_builder() {
 			append file=/cdrom/preseed/ubuntu-server.seed initrd=/install/initrd.gz ks=cdrom:/ks.cfg preseed/file=/cdrom/preseed.cfg --
 		EOF
 
-		touch $auto/preseed.cfg
-		cat >$auto/boot/grub/grub.cfg <<-'EOF'
+		touch "$auto/preseed.cfg"
+		cat >"$auto/boot/grub/grub.cfg" <<-'EOF'
 			set timeout=10
 			GRUB_GFXMODE="1024x768"
 			set menu_color_normal=white/black
@@ -9376,7 +9467,7 @@ rtd_oem_ubuntu_auto_install_iso_builder() {
 	target_iso="$put_iso_file_here_when_done/$auto.iso"
 
 	if [[ -f $target_iso ]]; then
-		rm $target_iso
+		rm "$target_iso"
 	fi
 
 	$bin_xorriso -as mkisofs -isohybrid-mbr "$isohdpfx_bin" \
@@ -9385,8 +9476,8 @@ rtd_oem_ubuntu_auto_install_iso_builder() {
 		-eltorito-alt-boot -e boot/grub/efi.img -no-emul-boot \
 		-isohybrid-gpt-basdat -o "$put_iso_file_here_when_done/$auto.iso" $auto
 	pause::for_input $?
-	umount -l $mnt
-	rm -rf $mnt $auto
+	umount -l "$mnt"
+	rm -rf "$mnt" "$auto"
 
 	if ($RTD_GUI --title "Media ready" --yesno "Created $auto.iso Would you like to test the new image?." 0 0); then
 		software::check_native_package_dependency qemu-kvm
@@ -9395,6 +9486,8 @@ rtd_oem_ubuntu_auto_install_iso_builder() {
 	else
 		echo "User selected No, exit status was $?."
 	fi
+
+	system::prepare_environment_for_iso_creation --cleanup
 }
 
 system::process_vm_opt_args() {
@@ -10199,41 +10292,94 @@ tool::test_iso_boot_media() {
 	#
 	# End of Documentation
 	iso_test="${1}"
+
 	if [[ -z "${iso_test}" ]]; then
 		dialog::display_error "${FUNCNAME[0]}: requires one argument (ISO file to test). Please read ${_LOGFILE} for more information."
 		return 1
-	else
-		system::log_item "Testing ${iso_test}..."
-		if ($RTD_GUI --title "BOOT Media Testing" --yesno "\n Would you like to test your boot media ${iso_test} to see if it works?" 10 80); then
-			clear
-			write_information "TESTING ${iso_test}."
-			if ! hash qemu-system-x86_64; then software::check_native_package_dependency qemu-system-x86_64; fi
-			: "${bin_qemu_img:=$(type -P qemu-img)}"
-			: "${bin_qemu_system_x86_64:=$(type -P qemu-system-x86_64)}"
-			: "${put_qcow_file_here_when_done:="/home/$SUDO_USER/Virtual-HDs"}"
-			: "${qcow2_file:="${put_qcow_file_here_when_done}/$(basename "$iso_test" .iso).qcow2"}"
-
-			system::log_item "executing command: ${bin_qemu_img} create -f qcow2 ${qcow2_file} 10G"
-
-			[[ -f ${qcow2_file} ]] && rm -f "${qcow2_file}"
-			if ${bin_qemu_img} create -f qcow2 "${qcow2_file}" 10G 2>&1 | tee -a "${_LOGFILE}"; then
-				write_information "Created QCOW2 file: ${qcow2_file}"
-			else
-				write_error "Failed to create QCOW2 file: ${qcow2_file}"
-			fi
-
-			system::log_item "Executing command: ${bin_qemu_system_x86_64} -smp 2 -enable-kvm -m 4G --cdrom ${iso_test} ${qcow2_file}"
-			if ${bin_qemu_system_x86_64} -smp 2 -enable-kvm -m 4G --cdrom "${iso_test}" "${qcow2_file}" 2>&1 | tee -a "${_LOGFILE}"; then
-				write_information "Successfully tested ${iso_test}."
-			else
-				write_error "Failed to test ${iso_test}."
-			fi
-		else
-			clear
-			dialog::display_notice "User selected No, exit status was $?."
-			system::log_item "User selected No, exit status was $?."
-		fi
 	fi
+
+	if ! dependency::virtualization ; then
+		dialog::display_error "${FUNCNAME[0]}: Virtualization support is not available on this system. Please read ${_LOGFILE} for more information."
+		return 1
+	fi
+
+	if [[ ! -f "${iso_test}" ]]; then
+		dialog::display_error "${FUNCNAME[0]}: The provided ISO file ${iso_test} does not exist. Please read ${_LOGFILE} for more information."
+		return 1
+	fi
+
+	write_information "SUDO_USER  is set to: ${SUDO_USER:-not set}"
+	write_information "USER       is set to: ${USER:-not set}"
+
+	local user_name="${SUDO_USER:-${USER}}"
+	write_information "Determined user name as: ${user_name:-not set}"
+	local home_dir="${HOME}"
+	write_information "Determined home directory as: ${home_dir:-not set}"
+	if [[ -z "${user_name}" ]]; then
+		user_name="$(id -un 2>/dev/null || true)"
+	fi
+
+
+	system::log_item "Testing ${iso_test}..."
+	if ($RTD_GUI --title "BOOT Media Testing" --yesno "\n Would you like to test your boot media ${iso_test} to see if it works?" 10 80); then
+		clear
+		write_information "TESTING ${iso_test}."
+		if ! hash qemu-system-x86_64; then software::check_native_package_dependency qemu-system-x86_64; fi
+		: "${bin_qemu_img:=$(type -P qemu-img)}"
+		: "${bin_qemu_system_x86_64:=$(type -P qemu-system-x86_64)}"
+
+		# Build output paths locally to avoid stale globals bleeding in
+		local put_qcow_file_here_when_done="${home_dir}/Virtual-HDs"
+		local qcow2_file=""
+
+		write_information "Will attempt to create QCOW2 file in: ${put_qcow_file_here_when_done}"
+		if ! mkdir -p "${put_qcow_file_here_when_done}"; then
+			write_error "Failed to create target directory: ${put_qcow_file_here_when_done}"
+			put_qcow_file_here_when_done="/tmp/${user_name:-rtd}/Virtual-HDs"
+			if ! mkdir -p "${put_qcow_file_here_when_done}"; then
+				write_error "Fallback directory also failed: ${put_qcow_file_here_when_done}"
+				return 1
+			fi
+			write_information "Using fallback directory: ${put_qcow_file_here_when_done}"
+		fi
+
+		qcow2_file="${put_qcow_file_here_when_done}/$(basename "$iso_test" .iso).qcow2"
+
+		system::log_item "executing command: ${bin_qemu_img} create -f qcow2 ${qcow2_file} 10G"
+
+		[[ -f ${qcow2_file} ]] && rm -f "${qcow2_file}"
+		if ${bin_qemu_img} create -f qcow2 "${qcow2_file}" 10G 2>&1 | tee -a "${_LOGFILE}"; then
+			write_information "Created QCOW2 file: ${qcow2_file}"
+		else
+			write_error "Failed to create QCOW2 file: ${qcow2_file}"
+		fi
+
+		system::log_item "Executing command: ${bin_qemu_system_x86_64} -smp 2 -enable-kvm -m 4G --cdrom ${iso_test} ${qcow2_file}"
+		local qemu_start_ts qemu_end_ts qemu_runtime rc
+		qemu_start_ts="$(date +%s 2>/dev/null || true)"
+		if ${bin_qemu_system_x86_64} -smp 2 -enable-kvm -m 4G --cdrom "${iso_test}" "${qcow2_file}" 2>&1 | tee -a "${_LOGFILE}"; then
+			rc=0
+		else
+			rc=$?
+		fi
+		qemu_end_ts="$(date +%s 2>/dev/null || true)"
+		if [[ -n "${qemu_start_ts}" && -n "${qemu_end_ts}" ]]; then
+			qemu_runtime=$((qemu_end_ts - qemu_start_ts))
+		fi
+
+		if [[ ${rc:-1} -ne 0 ]]; then
+			write_error "Failed to test ${iso_test} (qemu exit ${rc:-1})."
+		elif [[ -n "${qemu_runtime}" && ${qemu_runtime} -lt 5 ]]; then
+			write_warning "QEMU exited after ${qemu_runtime}s; VM may not have booted properly."
+		else
+			write_information "Successfully tested ${iso_test}."
+		fi
+	else
+		clear
+		dialog::display_notice "User selected No, exit status was $?."
+		system::log_item "User selected No, exit status was $?."
+	fi
+	
 }
 
 ################################################################################################
@@ -23065,13 +23211,28 @@ library::list_loaded_internal_functions() {
 
 
 library::check_status() {
-	# Check if library is loaded from a terminal or another script (behavior may differ)...
-	if (return 0 2>/dev/null); then
-		sourced=0
-	else
-		sourced=1
-		echo clear >/dev/null
-	fi
+	# Description:
+	#   Function to check how the library was loaded (sourced or executed directly)
+	# Globals:
+	#   $sourced - Indicates if the script was sourced (0) or executed directly (1).
+	# Arguments:
+	#   None
+	# Outputs:
+	#   Standard output indicating the load status of the library.
+	# Returns:
+	#   0 if sourced, 1 if executed directly.
+	# Usage:
+	#
+	# if (return 0 2>/dev/null); then
+	# 	sourced=0
+	# else
+	# 	sourced=1
+	# 	echo clear >/dev/null
+	# fi
+	# library::check_status
+	#
+	# End of documentation
+
 
 	if [[ $sourced -eq 0 ]]; then
 		if [[ "$(basename $0)" == "bash" ]]; then
@@ -23262,7 +23423,13 @@ library::apply_rtd_defaults
 # Determine logfile location...
 _LOGFILE="$(system::determine_logfile)"
 
-# Check how the library was loaded...
+# Check if library is loaded from a terminal or another script (behavior may differ)...
+if (return 0 2>/dev/null); then
+	sourced=0
+else
+	sourced=1
+	echo clear >/dev/null
+fi
 library::check_status
 
 
@@ -23395,22 +23562,6 @@ main() {
 			echo "$result" >/tmp/yad_doc.txt
 		}
 
-		local fifo="/tmp/rtd_yad_select_${YAD_KEY}.fifo"
-		[[ -p "$fifo" ]] && rm -f "$fifo"
-		mkfifo "$fifo"
-
-		(
-			while read -r selected_function; do
-				if [ -z "$selected_function" ]; then
-					echo "No function selected, continuing..."
-					continue
-				fi
-
-				display_documentation "$selected_function"
-			done <"$fifo"
-		) &
-		FIFO_PID=$!
-
 		while true; do
 			library::list_loaded_internal_functions --yformat
 
@@ -23422,8 +23573,16 @@ main() {
 			yad --text-info --text="Documentation:" --no-markup --tail --filename=/tmp/yad_doc.txt --plug=$YAD_KEY --tabnum=2 --margins=10 --wrap --no-buttons &
 
 			yad --list --no-markup --title="Select Function" --text="Functions:" --column="Number" --column="Function" --column="Description" \
-				--center --print-column=2 --select-action="bash -lc 'printf \"%s\\n\" \"\\${2:-\\$1}\" > \"$fifo\"' _" --plug=$YAD_KEY --tabnum=1 \
-				"${functions_list[@]}" &
+				--center --print-column=2 --separator='|' --listen --plug=$YAD_KEY --tabnum=1 \
+				"${functions_list[@]}" | while IFS='|' read -r selected_function _; do
+
+				if [ -z "$selected_function" ]; then
+					echo "No function selected, continuing..."
+					continue
+				fi
+
+				display_documentation "$selected_function"
+			done &
 
 			wait $YAD_PID
 			exit_status=$?
@@ -23433,8 +23592,6 @@ main() {
 				break
 			fi
 		done
-		kill "$FIFO_PID" 2>/dev/null
-		rm -f "$fifo"
 		return
 		;;
 	--devhelp-gtk)
