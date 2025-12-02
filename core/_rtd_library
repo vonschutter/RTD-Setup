@@ -111,8 +111,8 @@ export RTD_VERSION="2.04"
 67    kvm::util::set_vm_name                                       ;           Set the VM name consistently across functions.
 68    kvm::util::validate_vm_name                                  ;           Validate a VM name according to hostname rules.
 69    library::apply_rtd_defaults                                  ;           Normalize core RTD paths/URLs with fallback defaults.
-70    list_loaded_internal_functions                               ;           See inline documentation in this file.
-71    list_loaded_software_functions                               ;           Function to list all software (_rtd_recipes) functions loaded... for debugging/support purposes.
+70    library::list_loaded_internal_functions                      ;           See inline documentation in this file.
+71    library::list_loaded_software_functions                      ;           Function to list all software (_rtd_recipes) functions loaded... for debugging/support purposes.
 72    main                                                         ;           Entry point for executing library utility modes when run as a script.
 73    mint::get_mint_lmde_iso                                      ;           See inline documentation in this file.
 74    network::check_inet_access                                   ;           See inline documentation in this file.
@@ -428,88 +428,9 @@ set +u
 # Online source for scripts and configuration
 : ${_src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"}
 
-# load branding information:
-: ${_OEM_dependencies="branding.info _locations.info _rtd_recipies.info"}
+# load global information:
+declare -a _OEM_dependencies=("$_branding_info" "$_locations_info" "$_rtd_recipies_info")
 
-library::apply_rtd_defaults() {
-	# Description: Apply sane default values to core RTD paths and URLs using precedence.
-	#              Existing environment or sourced *.info values win; hardcoded defaults fill gaps.
-	# Arguments: None.
-	# Globals: Mutates *_DIR, *_tla, GIT_* vars when unset.
-	# Returns: 0
-	# End of documentation
-
-
-	dependency::file _branding.info && system::log_item "✅ _branding.info Loaded without errors..." || system::log_item "👾 _branding.info Loaded with errors..."
-	dependency::file _locations.info && system::log_item "✅ _locations.info Loaded without errors..." || system::log_item "👾 _locations.info Loaded with errors..."
-	dependency::file _rtd_recipies.info && system::log_item "✅ _rtd_recipies.info Loaded without errors..." || system::log_item "👾 _rtd_recipies.info Loaded with errors..."
-
-	: "${_TLA:="RTD"}"
-	: "${_tla:="${_TLA,,}"}"
-
-	local user_home_default="/home/${SUDO_USER:-$USER}"
-	: "${_USER_HOME_DIR:="${user_home_default}"}"
-	: "${_USER_CONFIG_DIR:="${_USER_HOME_DIR}/.config/${_tla}"}"
-
-	local _git_profile_default="${_GIT_PROFILE:-${GIT_Profile:-vonschutter}}"
-	: "${_GIT_PROFILE:="${_git_profile_default}"}"
-	: "${GIT_Profile:="${_git_profile_default}"}"
-	: "${GIT_Theme_URL:="https://github.com/${_git_profile_default}/RTD-Themes.git"}"
-	: "${GIT_RTD_SETUP_BASE_URL:="https://github.com/${_git_profile_default}/RTD-Setup/"}"
-	: "${GIT_RTD_SRC_URL:="https://github.com/${_git_profile_default}/RTD-Setup.git"}"
-
-	: "${_OEM_DIR:="/opt/${_tla}"}"
-	: "${_CACHE_DIR:="${_OEM_DIR}/cache"}"
-	: "${_WALLPAPER_DIR:="${_OEM_DIR}/wallpaper"}"
-	: "${_CUSTOM_SOUND_DIR:="${_OEM_DIR}/sound"}"
-	: "${_THEME_DIR:="${_OEM_DIR}/themes"}"
-	: "${_APP_DIR:="${_OEM_DIR}/apps"}"
-	: "${_MODS_DIR:="${_OEM_DIR}/modules"}"
-	: "${_CORE_DIR:="${_OEM_DIR}/core"}"
-	: "${_APPS_DIR:="${_MODS_DIR}/oem-app-runner.mod/apps"}"
-	: "${_LOG_DIR:="/var/log/${_tla}"}"
-	: "${_CONFIG_DIR:="/etc/${_tla}"}"
-	: "${_OEM_TEST_IPS:="8.8.8.8 1.1.1.1 9.9.9.9"}"
-	: "${_XDG_WALLPAPER_DIR:="/usr/share/wallpapers"}"
-
-	: "${VM_BUILD_TARGET:="/mnt/vmdsk/VM_IMAGES"}"
-	: "${VM_BACKUP_TARGET:="/mnt/vmdsk/VM_BACKUP"}"
-	: "${INITIAL_VM_DISK_ALLOC_GB:=32}"
-
-	: "${DEFAULT_VM_MEMORY_MB:=2048}"
-	: "${DEFAULT_VM_CPU_COUNT:=2}"
-	: "${DEFAULT_VM_DISK_SIZE_GB:=100}"
-	: "${_TSHIRT_CPU_SMALL:=2}"
-	: "${_TSHIRT_MEM_SMALL:=2048}"
-	: "${_TSHIRT_DSK_SMALL:=100}"
-	: "${_TSHIRT_CPU_MEDIUM:=4}"
-	: "${_TSHIRT_MEM_MEDIUM:=4096}"
-	: "${_TSHIRT_DSK_MEDIUM:=100}"
-	: "${_TSHIRT_CPU_LARGE:=8}"
-	: "${_TSHIRT_MEM_LARGE:=8192}"
-	: "${_TSHIRT_DSK_LARGE:=100}"
-	: "${_TSHIRT_CPU_XL:=16}"
-	: "${_TSHIRT_MEM_XL:=16384}"
-	: "${_TSHIRT_DSK_XL:=100}"
-	: "${_TSHIRT_CPU_XXL:=32}"
-	: "${_TSHIRT_MEM_XXL:=32768}"
-	: "${_TSHIRT_DSK_XXL:=100}"
-
-	: "${NON_WESTERN_FONTS_LIST:="fonts-kacst fonts-kacst-one fonts-khmeros-core fonts-lklug-sinhala fonts-lohit-guru fonts-guru \
-	fonts-nanum fonts-noto-cjk fonts-takao-pgothic fonts-tibetan-machine fonts-guru-extra fonts-lao fonts-sil-padauk \
-	fonts-sil-abyssinica fonts-tlwg-* fonts-beng fonts-beng-extra fonts-deva fonts-deva-extra fonts-gubbi fonts-gujr \
-	fonts-gujr-extra fonts-kalapi fonts-knda fonts-lohit-* fonts-orya* fonts-pagul fonts-sahadeva fonts-samyak-* \
-	fonts-sarai fonts-smc fonts-smc-* fonts-taml fonts-telu fonts-telu-extra"}"
-
-	export _TLA _tla _USER_HOME_DIR _USER_CONFIG_DIR _OEM_DIR _CACHE_DIR _WALLPAPER_DIR _CUSTOM_SOUND_DIR \
-		_THEME_DIR _APP_DIR _MODS_DIR _CORE_DIR _APPS_DIR _LOG_DIR _CONFIG_DIR _OEM_TEST_IPS _XDG_WALLPAPER_DIR \
-		GIT_Profile _GIT_PROFILE GIT_Theme_URL GIT_RTD_SETUP_BASE_URL GIT_RTD_SRC_URL VM_BUILD_TARGET VM_BACKUP_TARGET \
-		INITIAL_VM_DISK_ALLOC_GB DEFAULT_VM_MEMORY_MB DEFAULT_VM_CPU_COUNT DEFAULT_VM_DISK_SIZE_GB \
-		_TSHIRT_CPU_SMALL _TSHIRT_MEM_SMALL _TSHIRT_DSK_SMALL _TSHIRT_CPU_MEDIUM _TSHIRT_MEM_MEDIUM _TSHIRT_DSK_MEDIUM \
-		_TSHIRT_CPU_LARGE _TSHIRT_MEM_LARGE _TSHIRT_DSK_LARGE _TSHIRT_CPU_XL _TSHIRT_MEM_XL _TSHIRT_DSK_XL \
-		_TSHIRT_CPU_XXL _TSHIRT_MEM_XXL _TSHIRT_DSK_XXL NON_WESTERN_FONTS_LIST
-	return 0
-}
 
 
 
@@ -11979,6 +11900,70 @@ software::package_kit::remove_package() {
 	) | tee -a ${_LOGFILE}
 }
 
+software::list_bundles() {
+	# Description: Function to list all software bundles defined in _rtd_recipes that are either installable or removable.
+	# Globals:
+	# Arguments: none or [--zformat]
+	# Outputs: Standard out, list of functions either formatted for zenity or not. Output may be used to populate a zenity menu or dialog.
+	# Returns:
+	# Usage: software::list_bundles [] [--zformat-installable | --zformat-removable]
+	# End of documentation
+
+	local true_false Description completed_bundles_list
+	: "${_CONFIG_DIR:=${HOME}/.config/${_TLA:-"rtd"}}"
+	: "${completed_bundles_list:=${_CONFIG_DIR}/completed-bundles.info}"
+
+	if [[ ! -f ${completed_bundles_list} ]]; then
+		mkdir -p "${completed_bundles_list%/*}"
+		touch "${completed_bundles_list}"
+	else
+		if [[ -s ${completed_bundles_list} ]]; then
+			local _dedupe_tmp
+			if _dedupe_tmp=$(mktemp 2>/dev/null); then
+				if awk 'NF && !seen[$0]++ {print}' "${completed_bundles_list}" >"${_dedupe_tmp}"; then
+					mv "${_dedupe_tmp}" "${completed_bundles_list}"
+				else
+					rm -f "${_dedupe_tmp}"
+				fi
+			fi
+		fi
+	fi
+
+	case "$1" in
+	--zformat-installable)
+		# List software bundles for use with zenity
+		for _bundle in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep "${bundle_prefix}" | grep -v "Single_Install"); do
+			# Build each line to be displayed in the bundle installer...
+			true_false="$(grep -A 2 "$_bundle ()" "${_OEM_DIR:-"/opt/rtd"}/core/${_rtd_recipies_info}" )"
+			true_false="$(echo $true_false | grep "DEFAULT=TRUE"  &>/dev/null && echo "true" || echo "false")"
+			Description="$(grep -A 1 "$_bundle ()" "${_OEM_DIR:-"/opt/rtd"}/core/${_rtd_recipies_info}" | tail -1)"
+			Description="${Description/"# "/": "}"
+			Description="${Description/"	"/""}"
+			grep -Fxq "${_bundle/recipe:_/}" "${completed_bundles_list}" || echo -en "${true_false}\n ${_bundle/recipe:_/}\n ${Description}\n"
+		done
+		;;
+	--zformat-removable)
+		# List software bundles for use with zenity
+		while IFS= read -r _installed_bundle; do
+			[[ -z "${_installed_bundle}" ]] && continue
+			# Build each line to be displayed in the bundle installer...
+			Description=$(grep -A 1 "recipe:_$_installed_bundle ()" "${_OEM_DIR:-"/opt/rtd"}/core/${_rtd_recipies_info}" | tail -1)
+			Description="${Description/"# "/": "}"
+			Description="${Description/"	"/""}"
+			echo -e "false\n ${_installed_bundle}\n ${Description}\n"
+		done <"${completed_bundles_list}"
+		;;
+	*)
+		# Default list format
+		i=1
+		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep ${bundle_prefix:-"recipe_"} | grep -v "Single_Install"); do
+			echo "$index #$i"
+			((i = i + 1))
+		done
+		;;
+	esac
+}
+
 software::ensure_gnome_software_store_available() {
 	# Description: Function to ensure that flatpak is installed and flathup enabled.
 	# Globals: none
@@ -13755,6 +13740,12 @@ system::determine_logfile() {
 	local log_dir
 	local tmpfile
 
+	# If already determined, reuse cached value to avoid repeated mktemp checks.
+	if [[ -n "${_LOGFILE:-}" ]]; then
+		echo "$_LOGFILE"
+		return 0
+	fi
+
 	if [[ -z $_LOGFILE ]]; then
 		# Determine the log directory based on the user ID
 		if [[ $EUID -ne 0 ]]; then
@@ -13776,7 +13767,8 @@ system::determine_logfile() {
 			log_dir="${TMPDIR:-/tmp}/${tla,,}"
 			mkdir -p "$log_dir" 2>/dev/null || log_dir="${TMPDIR:-/tmp}"
 		else
-			rm -f "$tmpfile"
+			# Use command to bypass user aliases (e.g., rm -> trash) and silence output.
+			command rm -f -- "$tmpfile" 2>/dev/null
 		fi
 
 		logfile="${log_dir}/${scriptname}.log"
@@ -13797,6 +13789,8 @@ system::determine_logfile() {
 		touch "$logfile" 2>/dev/null || return 1
 	fi
 
+	_LOGFILE="$logfile"
+	export _LOGFILE
 	echo "$logfile"
 }
 
@@ -13987,7 +13981,7 @@ display_software_installation_choices_gtk() {
 
 	DisplayMenu=(zenity --list --cancel-label="Go Back" --timeout 120 --width=800 --height=600 --text "$_BACKTITLE" --checklist
 		--column "ON/OFF" --column "Select Software to add:" --separator " ")
-	SoftwareList=$(list_loaded_software_functions --nonum)
+	SoftwareList=$(library::list_loaded_software_functions --nonum)
 	MenuOptions=($(for i in $SoftwareList; do echo -e "${zstatus:=false} ${i}"; done))
 
 	declare -A choices
@@ -22694,6 +22688,7 @@ term::set_colors() {
 	echo -e "🎨 $yellow * $darkyellow * $red * $darkred * $green * $darkgreen * $blue * $darkblue * $cyan * $darkcyan * $gray * $darkgray * $purple * $darkpurple * $endcolor"
 }
 
+
 pause::for_input() {
 	# Description:
 	# A simple function to pause and wait for end user input.
@@ -22727,6 +22722,7 @@ pause::for_input() {
 		read -p "$ERRMSG: Press  [ ENTER ] to continue:"
 	fi
 }
+
 
 pause::a_given_time() {
 	# Description:
@@ -22779,6 +22775,7 @@ pause::a_given_time() {
 		write_status "$_end_message"
 	fi
 }
+
 
 write_host() {
 	# Description:
@@ -22874,6 +22871,7 @@ write_host() {
 	echo -e "${_text} "
 }
 
+
 write_error() {
 	# Description:
 	# is a simplified and consistent way to write output to the screen.
@@ -22901,6 +22899,7 @@ write_error() {
 
 	[ -n "${text}" ] && system::log_item " 💥 ${FUNCNAME[1]}: ${text}"
 }
+
 
 write_warning() {
 	# Description:
@@ -22931,6 +22930,7 @@ write_warning() {
 	[ -n "${text}" ] && system::log_item " ⚠ ${FUNCNAME[1]}: ${text}"
 }
 
+
 write_status() {
 	# Description:
 	# This is a simplified and consistent way to write output to the screen.
@@ -22959,6 +22959,7 @@ write_status() {
 
 	[ -n "${text}" ] && system::log_item " ✓ ${FUNCNAME[1]}: ${text}"
 }
+
 
 write_information() {
 	# Description:
@@ -22989,7 +22990,8 @@ write_information() {
 	system::log_item " 🛈  ${FUNCNAME[1]}: ${text}"
 }
 
-list_loaded_internal_functions() {
+
+library::list_loaded_internal_functions() {
 	# Description:
 	#   Function to list all internal library functions currently loaded. This function can be used
 	#   for debugging, support, and documentation purposes. It allows for different output formats
@@ -23015,11 +23017,11 @@ list_loaded_internal_functions() {
 	#   None (function outputs data to standard output)
 	#
 	# Usage:
-	#   list_loaded_internal_functions            # Outputs the list in a basic numbered format.
-	#   list_loaded_internal_functions --zformat  # Outputs the list in Zenity format.
-	#   list_loaded_internal_functions --yformat  # Outputs the list in Yad format stored in the functions_list array.
-	#   list_loaded_internal_functions --make-doc # Outputs the list in plain-text documentation format.
-	#   list_loaded_internal_functions --hformat  # Outputs the list in header format.
+	#   library::list_loaded_internal_functions            # Outputs the list in a basic numbered format.
+	#   library::list_loaded_internal_functions --zformat  # Outputs the list in Zenity format.
+	#   library::list_loaded_internal_functions --yformat  # Outputs the list in Yad format stored in the functions_list array.
+	#   library::list_loaded_internal_functions --make-doc # Outputs the list in plain-text documentation format.
+	#   library::list_loaded_internal_functions --hformat  # Outputs the list in header format.
 	#
 	# End of documentation
 
@@ -23061,69 +23063,130 @@ list_loaded_internal_functions() {
 	fi
 }
 
-software::list_bundles() {
-	# Description: Function to list all software bundles defined in _rtd_recipes that are either installable or removable.
-	# Globals:
-	# Arguments: none or [--zformat]
-	# Outputs: Standard out, list of functions either formatted for zenity or not. Output may be used to populate a zenity menu or dialog.
-	# Returns:
-	# Usage: software::list_bundles [] [--zformat-installable | --zformat-removable]
-	# End of documentation
 
-	local true_false Description completed_bundles_list
-	: "${_CONFIG_DIR:=${HOME}/.config/${_TLA:-"rtd"}}"
-	: "${completed_bundles_list:=${_CONFIG_DIR}/completed-bundles.info}"
-
-	if [[ ! -f ${completed_bundles_list} ]]; then
-		mkdir -p "${completed_bundles_list%/*}"
-		touch "${completed_bundles_list}"
+library::check_status() {
+	# Check if library is loaded from a terminal or another script (behavior may differ)...
+	if (return 0 2>/dev/null); then
+		sourced=0
 	else
-		if [[ -s ${completed_bundles_list} ]]; then
-			local _dedupe_tmp
-			if _dedupe_tmp=$(mktemp 2>/dev/null); then
-				if awk 'NF && !seen[$0]++ {print}' "${completed_bundles_list}" >"${_dedupe_tmp}"; then
-					mv "${_dedupe_tmp}" "${completed_bundles_list}"
-				else
-					rm -f "${_dedupe_tmp}"
-				fi
-			fi
-		fi
+		sourced=1
+		echo clear >/dev/null
 	fi
 
-	case "$1" in
-	--zformat-installable)
-		# List software bundles for use with zenity
-		for _bundle in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep "${bundle_prefix}" | grep -v "Single_Install"); do
-			# Build each line to be displayed in the bundle installer...
-			true_false="$(grep -A 2 "$_bundle ()" "${_OEM_DIR:-"/opt/rtd"}/core/${_rtd_recipies_info}" )"
-			true_false="$(echo $true_false | grep "DEFAULT=TRUE"  &>/dev/null && echo "true" || echo "false")"
-			Description="$(grep -A 1 "$_bundle ()" "${_OEM_DIR:-"/opt/rtd"}/core/${_rtd_recipies_info}" | tail -1)"
-			Description="${Description/"# "/": "}"
-			Description="${Description/"	"/""}"
-			grep -Fxq "${_bundle/recipe:_/}" "${completed_bundles_list}" || echo -en "${true_false}\n ${_bundle/recipe:_/}\n ${Description}\n"
-		done
-		;;
-	--zformat-removable)
-		# List software bundles for use with zenity
-		while IFS= read -r _installed_bundle; do
-			[[ -z "${_installed_bundle}" ]] && continue
-			# Build each line to be displayed in the bundle installer...
-			Description=$(grep -A 1 "recipe:_$_installed_bundle ()" "${_OEM_DIR:-"/opt/rtd"}/core/${_rtd_recipies_info}" | tail -1)
-			Description="${Description/"# "/": "}"
-			Description="${Description/"	"/""}"
-			echo -e "false\n ${_installed_bundle}\n ${Description}\n"
-		done <"${completed_bundles_list}"
-		;;
-	*)
-		# Default list format
-		i=1
-		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep ${bundle_prefix:-"recipe_"} | grep -v "Single_Install"); do
-			echo "$index #$i"
-			((i = i + 1))
-		done
-		;;
-	esac
+	if [[ $sourced -eq 0 ]]; then
+		if [[ "$(basename $0)" == "bash" ]]; then
+			write_host --cyan "Script is sourced from bash in a terminal: $0 $*"
+		else
+			write_host --cyan "Script is being sourced from a script: $(basename $0) : |${FUNCNAME[3]}: $*"
+		fi
+	else
+		write_host --yellow "Library is run directly as an executable! This does nothing by itself."
+		write_host --cyan "Use \"bash $0 --help\" to see how to use this library."
+	fi
+
+	write_status "📚 RTD Power Library $RTD_VERSION loaded OK"
+	export RTDFUNCTIONS="${RTD_VERSION}"
+
+	# log variables for support reasons...
+	system::log_item "Library Loaded Variables:
+	.........................................
+	RTD Functions Version: ${RTDFUNCTIONS}
+	.........................................
+$(library::envcheck_report)
+	.........................................
+
+	"
+	system::log_item " ***  : $(basename ${BASH_SOURCE[0]}) loaded by $(basename "${0}") on $HOSTNAME  :  ***"
+	system::log_item " ***  : executed by $SUDO_USER as $USER  :  ***"
+	system::log_item "💻 Basic System Information:
+	$(hostnamectl)"
 }
+
+
+library::apply_rtd_defaults() {
+	# Description: Apply sane default values to core RTD paths and URLs using precedence.
+	#              Existing environment or sourced *.info values win; hardcoded defaults fill gaps.
+	# Arguments: None.
+	# Globals: Mutates *_DIR, *_tla, GIT_* vars when unset.
+	# Returns: 0
+	# End of documentation
+	local _dep=""
+	
+	for _dep in ${_OEM_dependencies}; do
+		dependency::file "${_dep}" && system::log_item "✅  ${_dep} Loaded without errors..." || system::log_item "👾 ${_dep} Loaded with errors..." 
+	done
+	# dependency::file _branding.info && system::log_item "✅ _branding.info Loaded without errors..." || system::log_item "👾 _branding.info Loaded with errors..."
+	# dependency::file _locations.info && system::log_item "✅ _locations.info Loaded without errors..." || system::log_item "👾 _locations.info Loaded with errors..."
+	# dependency::file _rtd_recipies.info && system::log_item "✅ _rtd_recipies.info Loaded without errors..." || system::log_item "👾 _rtd_recipies.info Loaded with errors..."
+
+	: "${_TLA:="RTD"}"
+	: "${_tla:="${_TLA,,}"}"
+
+	local user_home_default="/home/${SUDO_USER:-$USER}"
+	: "${_USER_HOME_DIR:="${user_home_default}"}"
+	: "${_USER_CONFIG_DIR:="${_USER_HOME_DIR}/.config/${_tla}"}"
+
+	local _git_profile_default="${_GIT_PROFILE:-${GIT_Profile:-vonschutter}}"
+	: "${_GIT_PROFILE:="${_git_profile_default}"}"
+	: "${GIT_Profile:="${_git_profile_default}"}"
+	: "${GIT_Theme_URL:="https://github.com/${_git_profile_default}/RTD-Themes.git"}"
+	: "${GIT_RTD_SETUP_BASE_URL:="https://github.com/${_git_profile_default}/RTD-Setup/"}"
+	: "${GIT_RTD_SRC_URL:="https://github.com/${_git_profile_default}/RTD-Setup.git"}"
+
+	: "${_OEM_DIR:="/opt/${_tla}"}"
+	: "${_CACHE_DIR:="${_OEM_DIR}/cache"}"
+	: "${_WALLPAPER_DIR:="${_OEM_DIR}/wallpaper"}"
+	: "${_CUSTOM_SOUND_DIR:="${_OEM_DIR}/sound"}"
+	: "${_THEME_DIR:="${_OEM_DIR}/themes"}"
+	: "${_APP_DIR:="${_OEM_DIR}/apps"}"
+	: "${_MODS_DIR:="${_OEM_DIR}/modules"}"
+	: "${_CORE_DIR:="${_OEM_DIR}/core"}"
+	: "${_APPS_DIR:="${_MODS_DIR}/oem-app-runner.mod/apps"}"
+	: "${_LOG_DIR:="/var/log/${_tla}"}"
+	: "${_CONFIG_DIR:="/etc/${_tla}"}"
+	: "${_OEM_TEST_IPS:="8.8.8.8 1.1.1.1 9.9.9.9"}"
+	: "${_XDG_WALLPAPER_DIR:="/usr/share/wallpapers"}"
+
+	: "${VM_BUILD_TARGET:="/mnt/vmdsk/VM_IMAGES"}"
+	: "${VM_BACKUP_TARGET:="/mnt/vmdsk/VM_BACKUP"}"
+	: "${INITIAL_VM_DISK_ALLOC_GB:=32}"
+
+	: "${DEFAULT_VM_MEMORY_MB:=2048}"
+	: "${DEFAULT_VM_CPU_COUNT:=2}"
+	: "${DEFAULT_VM_DISK_SIZE_GB:=100}"
+	: "${_TSHIRT_CPU_SMALL:=2}"
+	: "${_TSHIRT_MEM_SMALL:=2048}"
+	: "${_TSHIRT_DSK_SMALL:=100}"
+	: "${_TSHIRT_CPU_MEDIUM:=4}"
+	: "${_TSHIRT_MEM_MEDIUM:=4096}"
+	: "${_TSHIRT_DSK_MEDIUM:=100}"
+	: "${_TSHIRT_CPU_LARGE:=8}"
+	: "${_TSHIRT_MEM_LARGE:=8192}"
+	: "${_TSHIRT_DSK_LARGE:=100}"
+	: "${_TSHIRT_CPU_XL:=16}"
+	: "${_TSHIRT_MEM_XL:=16384}"
+	: "${_TSHIRT_DSK_XL:=100}"
+	: "${_TSHIRT_CPU_XXL:=32}"
+	: "${_TSHIRT_MEM_XXL:=32768}"
+	: "${_TSHIRT_DSK_XXL:=100}"
+
+	: "${NON_WESTERN_FONTS_LIST:="fonts-kacst fonts-kacst-one fonts-khmeros-core fonts-lklug-sinhala fonts-lohit-guru fonts-guru \
+	fonts-nanum fonts-noto-cjk fonts-takao-pgothic fonts-tibetan-machine fonts-guru-extra fonts-lao fonts-sil-padauk \
+	fonts-sil-abyssinica fonts-tlwg-* fonts-beng fonts-beng-extra fonts-deva fonts-deva-extra fonts-gubbi fonts-gujr \
+	fonts-gujr-extra fonts-kalapi fonts-knda fonts-lohit-* fonts-orya* fonts-pagul fonts-sahadeva fonts-samyak-* \
+	fonts-sarai fonts-smc fonts-smc-* fonts-taml fonts-telu fonts-telu-extra"}"
+
+	export _TLA _tla _USER_HOME_DIR _USER_CONFIG_DIR _OEM_DIR _CACHE_DIR _WALLPAPER_DIR _CUSTOM_SOUND_DIR \
+		_THEME_DIR _APP_DIR _MODS_DIR _CORE_DIR _APPS_DIR _LOG_DIR _CONFIG_DIR _OEM_TEST_IPS _XDG_WALLPAPER_DIR \
+		GIT_Profile _GIT_PROFILE GIT_Theme_URL GIT_RTD_SETUP_BASE_URL GIT_RTD_SRC_URL VM_BUILD_TARGET VM_BACKUP_TARGET \
+		INITIAL_VM_DISK_ALLOC_GB DEFAULT_VM_MEMORY_MB DEFAULT_VM_CPU_COUNT DEFAULT_VM_DISK_SIZE_GB \
+		_TSHIRT_CPU_SMALL _TSHIRT_MEM_SMALL _TSHIRT_DSK_SMALL _TSHIRT_CPU_MEDIUM _TSHIRT_MEM_MEDIUM _TSHIRT_DSK_MEDIUM \
+		_TSHIRT_CPU_LARGE _TSHIRT_MEM_LARGE _TSHIRT_DSK_LARGE _TSHIRT_CPU_XL _TSHIRT_MEM_XL _TSHIRT_DSK_XL \
+		_TSHIRT_CPU_XXL _TSHIRT_MEM_XXL _TSHIRT_DSK_XXL NON_WESTERN_FONTS_LIST
+	return 0
+}
+
+
 
 library::envcheck_report() {
 	# Display how and where the library was loaded for support/debugging.
@@ -23158,13 +23221,14 @@ library::envcheck_report() {
 	system::log_item "envcheck: mode=${load_mode} invoker=${loader} source=${source_path} pwd=${working_dir} log=${log_location}"
 }
 
-list_loaded_software_functions() {
+
+library::list_loaded_software_functions() {
 	# Description: Function to list all software (_rtd_recipes) functions loaded... for debugging/support purposes.
 	# Globals:
 	# Arguments: none or [--nonum]
 	# Outputs: Standard out, list of functions either numerated or not.
 	# Returns:
-	# Usage: list_loaded_software_functions [] [--nonum]
+	# Usage: library::list_loaded_software_functions [] [--nonum]
 	# End of documentation
 
 	if [[ "$1" == "--nonum" ]]; then
@@ -23192,64 +23256,14 @@ list_loaded_software_functions() {
 # Load base color scheme for use in the library...
 term::set_colors
 
-# If $LOGFILE is not set, then set it to a default location...
-if [[ -z $_LOGFILE ]]; then
-	# Set log location and name...
-	if [[ $EUID -ne 0 ]]; then
-		: ${_LOG_DIR:="${HOME}/.config/${_RTD:-"rtd"}/logs"}
-		mkdir -p ${_LOG_DIR}
-	else
-		: ${_LOG_DIR:="/var/log/${_RTD:-"rtd"}"}
-		mkdir -p ${_LOG_DIR}
-	fi
-
-	# Set the log file to be used by the library...
-	: ${_SCRIPTNAME:=$(basename "${BASH_SOURCE[0]}")}
-	: ${_LOGFILE:="${_LOG_DIR}/${_SCRIPTNAME}.log"}
-	# initialize logging and provide process details...
-	export _LOGFILE
-fi
-
-# Check if library is loaded from a terminal or another script (behavior may differ)...
-if (return 0 2>/dev/null); then
-	sourced=0
-else
-	sourced=1
-	echo clear >/dev/null
-fi
-
-if [[ $sourced -eq 0 ]]; then
-	if [[ "$(basename $0)" == "bash" ]]; then
-		write_host --cyan "Script is sourced from bash in a terminal: $0 $*"
-	else
-		write_host --cyan "Script is being sourced from a script: $(basename $0) : |${FUNCNAME[3]}: $*"
-	fi
-else
-	write_host --yellow "Library is run directly as an executable! This does nothing by itself."
-	write_host --cyan "Use \"bash $0 --help\" to see how to use this library."
-fi
-
 # Find and load all dependent files for this library...
 library::apply_rtd_defaults
 
-write_status "📚 RTD Power Library $RTD_VERSION loaded OK"
-export RTDFUNCTIONS="${RTD_VERSION}"
+# Determine logfile location...
+_LOGFILE="$(system::determine_logfile)"
 
-# log variables for support reasons...
-system::log_item "Library Loaded Variables:
-RTD Functions Version: ${RTDFUNCTIONS}
-.........................................
-$(library::envcheck_report)
-.........................................
-
-"
-
-# Log the environment and how the library was launched...
-system::log_item " ***  : $(basename ${BASH_SOURCE[0]}) loaded by $(basename "${0}") on $HOSTNAME  :  ***"
-system::log_item " ***  : executed by $SUDO_USER as $USER  :  ***"
-system::log_item "💻 Basic System Information:
-$(hostnamectl)"
-
+# Check how the library was loaded...
+library::check_status
 
 
 main() {
@@ -23293,24 +23307,24 @@ main() {
 	--list)
 		case $2 in
 		software)
-			list_loaded_software_functions
+			library::list_loaded_software_functions
 			;;
 		internal)
 			case $3 in
 			make-doc)
-				list_loaded_internal_functions --make-doc
+				library::list_loaded_internal_functions --make-doc
 				;;
 			*)
 				echo -e $YELLOW "INTERNAL Functions: $ENDCOLOR"
 				echo ".........................................."
 				echo "Number	Function"
 				echo ".........................................."
-				list_loaded_internal_functions --hformat | grep "${3:-""}"
+				library::list_loaded_internal_functions --hformat | grep "${3:-""}"
 				;;
 			esac
 
 			;;
-		all) (echo -e $YELLOW "Software Recipes: $ENDCOLOR" && list_loaded_software_functions && echo -e $YELLOW "INTERNAL Functions: $ENDCOLOR" && list_loaded_internal_functions) ;;
+		all) (echo -e $YELLOW "Software Recipes: $ENDCOLOR" && library::list_loaded_software_functions && echo -e $YELLOW "INTERNAL Functions: $ENDCOLOR" && library::list_loaded_internal_functions) ;;
 		*) echo "USAGE: The --list option requires a (what option). Valid option are: software, internal, all." ;;
 		esac
 		return
@@ -23318,7 +23332,7 @@ main() {
 	--devhelp)
 		while true; do
 			exec 3>&1
-			selection=$(dialog --clear --no-collapse --backtitle "${BRANDING:-" RunTime Data : Function library : Script Development Support"}" --title "RTD Library Loaded Functions:" --menu "\n Chose a function below to see more details about the function." "${HEIGHT:-0}" "${WIDTH:-90}" "${LIST_HEIGHT:-0}" $(list_loaded_internal_functions) 2>&1 1>&3)
+			selection=$(dialog --clear --no-collapse --backtitle "${BRANDING:-" RunTime Data : Function library : Script Development Support"}" --title "RTD Library Loaded Functions:" --menu "\n Chose a function below to see more details about the function." "${HEIGHT:-0}" "${WIDTH:-90}" "${LIST_HEIGHT:-0}" $(library::list_loaded_internal_functions) 2>&1 1>&3)
 			exit_status=$?
 			exec 3>&-
 
@@ -23347,7 +23361,7 @@ main() {
 	--devhelp-gui)
 		touch /tmp/yad_doc.txt
 		echo "Documentation will appear here" >/tmp/yad_doc.txt
-		list_loaded_internal_functions --yformat
+		library::list_loaded_internal_functions --yformat
 
 		YAD_KEY=$$
 
@@ -23408,7 +23422,7 @@ main() {
 	--devhelp-gtk)
 		while true; do
 			exec 3>&1
-			DisplayList=$(list_loaded_internal_functions --zformat)
+			DisplayList=$(library::list_loaded_internal_functions --zformat)
 			IFS_SAV=$IFS
 			IFS=$(echo -en "\n\b")
 			local text="Select a function below to see the function's documentation and usage:"
