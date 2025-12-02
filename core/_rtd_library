@@ -42,242 +42,306 @@ export RTD_VERSION="2.04"
 
 	Functions defined in this library:
 
-1     display_gui                                                  ;           Displays a GUI dialog box with the given message.
-2     dialog::check_menu_availability                              ;           First discover what menu system is installed. Some systems use "dialog" and
-3     dialog::display_cmd_output                                   ;           Displays the output of a command in a dialog box.
-4     dialog::copy_file_progress                                   ;           Displays a file copy progress dialog.
-5     dialog::copy_with_progress                                   ;           Function to display a progress bar while copying a large file to a destination.
-6     dialog::display_notice                                       ;           Displays an information notice using a dialog box.
-7     dialog::display_error                                        ;           Displays an error notice using a dialog box.
-8     dialog::display_summary_message                              ;           Function to read a variable "result" and display its contents. The purpose of this function
-9     dialog::display_result                                       ;           Displays the contents of the variable "result" in a message box.
-10    dialog::prompt_yes_no                                        ;           Displays a Yes/No prompt using a dialog box.
-11    yad::display_cmd_output                                      ;           Displays the output of a command in a YAD box.
-12    yad::display_progressbar_pulsating                           ;           Displays the output of a command in a pulsating progress box.
-13    zenity::display_info                                         ;           Displays an information notice using a Zenity info box.
-14    yad::display_info                                            ;           Displays an information notice using a Zenity info box.
-15    zenity::display_url                                          ;           Displays the content of a URL in a GUI using Zenity.
-16    yad::display_url                                             ;           Displays the content of a URL in a GUI using Zenity.
-17    zenity::display_file                                         ;           Displays the content of a text file in a Zenity window.
-18    yad::display_file                                            ;           Displays the content of a text file in a Zenity window.
-19    term::animate_while_command                                  ;           Displays an animation during the execution of a silent command.
-20    term::start_animation                                        ;           See inline documentation in this file.
-21    term::stop_animation                                         ;           See inline documentation in this file.
-22    term::task_exec_list_output                                  ;           Execute a command while displaying a formatted status line in the terminal.
-23    term::err_no_menu_system_found                               ;           Function to handle the error condition if a manu system is not found on the system.
-24    network::check_inet_access                                   ;           See inline documentation in this file.
-25    network::whats_my_ipinfo                                     ;           See inline documentation in this file.
-26    network::whats_my_external_ip                                ;           See inline documentation in this file.
-27    network::rsync_upload                                        ;           See inline documentation in this file.
-28    network::rsync_download                                      ;           See inline documentation in this file.
-29    dependency::command_exists                                   ;           Checks if specified commands exist on the system and installs missing ones.
-30    dependency::desktop                                          ;           Identifies the currently running desktop environment.
-31    dependency::os_linux                                         ;           Checks if the current operating system is Linux.
-32    dependency::search_local                                     ;           See inline documentation in this file.
-33    dependency::file                                             ;           Checks for a Bash library or script file and sources it.
-34    dependency::check_hardware_virtualization_support            ;           Checks if the hardware supports virtualization (VT-x or AMD-V).
-35    dependency::check_if_running_in_vm                           ;           Checks if the system is running inside a virtual machine.
-36    dependency::virtualization                                   ;           Checks for required components for making virtual machines and verifies hardware support for virtualization.
-37    system::prepare_environment_for_iso_creation                 ;           Function to check that all dependencies are available for manipulating the
-38    system::download_and_manipulate_iso_debian                   ;           See inline documentation in this file.
-39    system::create_iso_image_debian                              ;           Function to generate the new ISO file from the extracted and
-40    system::detect_session                                       ;           Detects the current session type (TTY, SSH, GUI, Wayland).
-41    system::preseed_to_ubuntu_ks_cfg                             ;           Generates a preseed section [Ubuntu only] (ks.cfg).
-42    system::make_preseed_cfg                                     ;           Function to write out a debina preeseed file to a location requested by the first parameter.
-43    system::generate_cloudconfig                                 ;           See inline documentation in this file.
-44    system::generate_ks_cfg_file                                 ;           Generates an installation configuration file (kickstart) for Fedora/Red Hat.
-45    system::generate_autoyast_file                               ;           See inline documentation in this file.
-46    system::install_missing_commands                             ;           Installs missing commands based on the distribution type.
-47    system::keyboard_set_layout                                  ;           See inline documentation in this file.
-48    system::check_file_limits                                    ;           See inline documentation in this file.
-49    system::distribution_type                                    ;           See inline documentation in this file.
-50    system::check_required_variables                             ;           Function to check for the presence and non-emptiness of a list of variables.
-51    system::find_vm_bridge                                       ;           See inline documentation in this file.
-52    system::restart_sound                                        ;           Function to check for PipeWire or Pulse Audio and attempt to restart sound.
-53    system::remove_old_kernel                                    ;           Function to remove all old linux kernels.
-54    system::oem_autounlock_disk                                  ;           Configure the system to unlock an encrypted root volume automatically.
-55    system::get_Windows_Product_Key                              ;           Function to retrieve a Windows product key from the BIOS. This assumes that the OEM
-56    system::wait_for_internet_availability                       ;           Waits for an active internet connection before proceeding.
-57    system::io_on_notify_wait                                    ;           Function that, when called, will wait for a disk change
-58    system::display_spinner                                      ;           Simple function to display a spinner in the terminal.
-59    system::add_or_remove_login_script                           ;           See inline documentation in this file.
-60    util::validate_heredoc_tabs_only                             ;           See inline documentation in this file.
-61    system::update_config                                        ;           This function updates a configuration file with key-value pairs.
-62    system::read_config                                          ;           This function reads a configuration file with key-value pairs.
-63    system::generate_report_disk_space_used_by_directory         ;           Function to generate a report for folders' disk space use.
-64    system::toggle_oem_auto_login                                ;           See inline documentation in this file.
-65    system::set_oem_elevated_privilege_gui                       ;           Configure sudo/root environments so GUI apps can launch using the OEM user's X session.
-66    system::toggle_oem_auto_elevated_privilege                   ;           Toggles passwordless sudo privileges for a specified user.
-67    system::make_system_recovery_partition                       ;           Incomplete function to build an OEM rescue partition...
-68    system::run_command_in_gnome_user_session                    ;           Function to do a reverse sudo back to teh original Gnome user who called upon sudo.
-69    system::rtd_oem_reseal                                       ;           See inline documentation in this file.
-70    system::create_swapfile                                      ;           Function to create a swapfile and enable it automatically.
-71    system::tune_system_power_profile                            ;           Tuned is a Linux feature that monitors a system and optimizes its performance
-72    system::rtd_oem_find_live_release                            ;           This function will return the URL for the version of Debian, Ubuntu server or Destktop requested.
-73    system::validate_parameters                                  ;           Function to validate that all parameters match the pattern --option "value".
-74    system::cleanup_and_finish                                   ;           Function to remove all temporary file locations left over from building
-75    oem::rtd_reset_default_environment_config                    ;           See inline documentation in this file.
-76    oem::distro_release_upgrade                                  ;           See inline documentation in this file.
-77    github::clone_repo_user                                      ;           See inline documentation in this file.
-78    github::list_all_user_repositories                           ;           See inline documentation in this file.
-79    oem::deploy_themes                                           ;           Downloads and deploys themes from GitHub.
-80    oem::register_all_tools                                      ;           Function to register all OEM scripts on the current device.
-81    oem::rtd_tools_make_launchers                                ;           Function that creates a default set of launchers for the Linux GUI menu system.
-82    oem::create_single_launcher                                  ;           Function to create a single .desktop file for an application.
-83    oem::rtd_tools_make_launchers_from_locations                 ;           Function that creates launchers using definitions from _locations.info.
-84    oem::check_boot_splash_screen_enable                         ;           OEM function to enable splash screen on boot if desktop is indicated in
-85    oem::setup_brand_splash_screen                               ;           See inline documentation in this file.
-86    gnome::set_tilix_ui_tweaks_for_user                          ;           See inline documentation in this file.
-87    gnome::set_power_configuraton_for_user                       ;           See inline documentation in this file.
-88    gnome::set_better_font_smoothing_for_user                    ;           See inline documentation in this file.
-89    gnome::set_better_usability_for_user                         ;           Apply GNOME desktop usability improvements for the OEM user.
-90    gnome::configure_dash_to_dock                                ;           Configure GNOME Dash to Dock with the OEM default layout and behavior.
-91    gnome::configure_dash_to_panel                               ;           Configure GNOME Dash to Panel with OEM defaults.
-92    gnome::configure_nautilus                                    ;           Apply OEM defaults to the Nautilus file manager.
-93    gnome::organize_overlay_menu                                 ;           Organize GNOME application overlays into OEM-defined categories.
-94    set_gnome_ui_common_tweaks_for_user                          ;           See inline documentation in this file.
-95    gnome::set_gnome_ui_tweaks_for_user                          ;           See inline documentation in this file.
-96    gnome::set_basic_extensions_enabled                          ;           See inline documentation in this file.
-97    gnome::set_startup_sound                                     ;           Configure the GNOME startup sound for the current user.
-98    set_gnome_ui_tweak_no_media_error                            ;           Function to handle missing media when attempting to set UI look to
-99    set_gnome_ui_mac_tweaks_for_user                             ;           Function to set UI look to resemble MAC for users accustomed to that.
-100   set_gnome_ui_win10_tweaks_for_user                           ;           Function to set UI look to resemble Windows 10 for users accustomed to that.
-101   set_gnome_ui_corporate_crisp_tweaks_for_user                 ;           Function to set UI look to appeal to teh corporate or business user.
-102   set_gnome_ui_moca_tweaks_for_user                            ;           Function to set UI look to be friendly on the eyes, limiting eye strain.
-103   oem::register_wallpapers_for_gnome                           ;           Register OEM wallpaper assets with GNOME so they appear in background selectors.
-104   rtd_oem_turn_on_gui_network_management                       ;           Function to set NetworkManager by default to manage networking.
-105   system::_enable_service                                      ;           Function to enable and start a systemd service.
-106   system::ensure_directory_exists                              ;           Function to ensure a directory exists, creating it if necessary.
-107   system::_disable_service                                     ;           See inline documentation in this file.
-108   system::_turn_on_gui_network_management                      ;           Configures the system to use NetworkManager for network configuration,
-109   add_gnome3_favorite_app                                      ;           Function to add a new favorite app to the gnome favorites bar.
-110   rtd_oem_kde_set_wallpaper                                    ;           See inline documentation in this file.
-111   create_physical_media_from_iso                               ;           See inline documentation in this file.
-112   util::add_iso_to_ventoy                                      ;           Function to add an ISO file to a Ventoy USB drive for multiple boot options.
-113   rtd_oem_ubuntu_auto_install_iso_builder                      ;           Function to generate an edited ISO file from a folder.
-114   system::process_vm_opt_args                                  ;           See inline documentation in this file.
-115   system::find_download_ubuntu_iso                             ;           Locate a requested Ubuntu ISO and download it when not already cached.
-116   system::create_physical_media_from_ubuntu_iso                ;           See inline documentation in this file.
-117   tool::compress_all_items_here                                ;           Function to compress the contents of the present working directory.
-118   tool::compress_provided_items                                ;           Function to compress the contents of the present working directory.
-119   tool::recompress_all_items_in_folder                         ;           Function to recompress all archive files in the current directory to a specified format.
-120   tool::recompress_provided_items                              ;           Function to recompress specified files to a target compression format.
-121   tool::up_2_date                                              ;           Function to simplify updating system completely. At present this function sets the
-122   tool::test_iso_boot_media                                    ;           Function to test a created ISO file by booting it in a temporary VM using QEMU.
-123   ssh::ensure_user_ssh_key                                     ;           See inline documentation in this file.
-124   ssh::ensure_key_installed_on_remote                          ;           See inline documentation in this file.
-125   security::encrypt_disk_with_luks                             ;           See inline documentation in this file.
-126   disk::reencrypt_device                                       ;           See inline documentation in this file.
-127   security::enable_firewall                                    ;           See inline documentation in this file.
-128   security::check_if_password_pOwned                           ;           See inline documentation in this file.
-129   security::scan_for_malware                                   ;           See inline documentation in this file.
-130   security::change_disk_pass                                   ;           Function to change the passphrase fo an encrypted storage device.
-131   security::harden_ubuntu                                      ;           See inline documentation in this file.
-132   security::configure_clamav                                   ;           See inline documentation in this file.
-133   security::configure_fail2ban                                 ;           See inline documentation in this file.
-134   security::configure_rkhunter                                 ;           Function to install and configure RKHunter (Rootkit Hunter) for system security.
-135   security::configure_auditd                                   ;           Function to install and configure auditd for system auditing.
-136   security::sysctl_hardening                                   ;           See inline documentation in this file.
-137   security::secure_password_policy                             ;           Function to enforce a secure password policy on the system.
-138   security::install_AIDE                                       ;           Function to install and configure AIDE (Advanced Intrusion Detection Environment).
-139   security::ensure_admin                                       ;           Ensures the script is executed with administrative (root) privileges, allowing
-140   software::package_kit::add_package                           ;           Function to simplify the installation of software by including all display and
-141   software::package_kit::remove_package                        ;           Function to simplify the installation of software by including all display and
-142   software::ensure_gnome_software_store_available              ;           Function to ensure that flatpak is installed and flathup enabled.
-143   software::ensure_flatpak_package_managment                   ;           Function to ensure that flatpak is installed and flathup enabled.
-144   software::update_system_txt                                  ;           See inline documentation in this file.
-145   software::update_all_ui                                      ;           Refresh installed OEM UI customizations, icons, and cursors.
-146   software::from_flathub.org                                   ;           Function to simplify and streamline the installation and removal of flatpaks.
-147   software::from_snapcraft.io                                  ;           Function to ensure that snap is installed.
-148   software::add_software_task                                  ;           Display executed task and echo ON/NOK based on sucess
-149   software::ensure_restricted_codecs                           ;           simple function to ensure that restricted codecs are available on the system.
+1     add_gnome3_favorite_app                                      ;           Function to add a new favorite app to the gnome favorites bar.
+2     create_physical_media_from_iso                               ;           See inline documentation in this file.
+3     dependency::check_hardware_virtualization_support            ;           Checks if the hardware supports virtualization (VT-x or AMD-V).
+4     dependency::check_if_running_in_vm                           ;           Checks if the system is running inside a virtual machine.
+5     dependency::command_exists                                   ;           Checks if specified commands exist on the system and installs missing ones.
+6     dependency::desktop                                          ;           Identifies the currently running desktop environment.
+7     dependency::file                                             ;           Checks for a Bash library or script file and sources it.
+8     dependency::os_linux                                         ;           Checks if the current operating system is Linux.
+9     dependency::search_local                                     ;           See inline documentation in this file.
+10    dependency::virtualization                                   ;           Checks for required components for making virtual machines and verifies hardware support for virtualization.
+11    dialog::check_menu_availability                              ;           First discover what menu system is installed. Some systems use "dialog" and
+12    dialog::copy_file_progress                                   ;           Displays a file copy progress dialog.
+13    dialog::copy_with_progress                                   ;           Function to display a progress bar while copying a large file to a destination.
+14    dialog::display_cmd_output                                   ;           Displays the output of a command in a dialog box.
+15    dialog::display_error                                        ;           Displays an error notice using a dialog box.
+16    dialog::display_notice                                       ;           Displays an information notice using a dialog box.
+17    dialog::display_result                                       ;           Displays the contents of the variable "result" in a message box.
+18    dialog::display_summary_message                              ;           Function to read a variable "result" and display its contents. The purpose of this function
+19    dialog::prompt_yes_no                                        ;           Displays a Yes/No prompt using a dialog box.
+20    disk::reencrypt_device                                       ;           See inline documentation in this file.
+21    display_gui                                                  ;           Displays a GUI dialog box with the given message.
+22    display_software_installation_choices_gtk                    ;           Display a legacy GTK checklist of software recipes that can be installed.
+23    fedora::get_fedora_netinst_iso_url                           ;           See inline documentation in this file.
+24    fedora::get_latest_release_version                           ;           See inline documentation in this file.
+25    github::clone_repo_user                                      ;           See inline documentation in this file.
+26    github::list_all_user_repositories                           ;           See inline documentation in this file.
+27    gnome::configure_dash_to_dock                                ;           Configure GNOME Dash to Dock with the OEM default layout and behavior.
+28    gnome::configure_dash_to_panel                               ;           Configure GNOME Dash to Panel with OEM defaults.
+29    gnome::configure_nautilus                                    ;           Apply OEM defaults to the Nautilus file manager.
+30    gnome::organize_overlay_menu                                 ;           Organize GNOME application overlays into OEM-defined categories.
+31    gnome::set_basic_extensions_enabled                          ;           See inline documentation in this file.
+32    gnome::set_better_font_smoothing_for_user                    ;           See inline documentation in this file.
+33    gnome::set_better_usability_for_user                         ;           Apply GNOME desktop usability improvements for the OEM user.
+34    gnome::set_gnome_ui_tweaks_for_user                          ;           See inline documentation in this file.
+35    gnome::set_power_configuraton_for_user                       ;           See inline documentation in this file.
+36    gnome::set_startup_sound                                     ;           Configure the GNOME startup sound for the current user.
+37    gnome::set_tilix_ui_tweaks_for_user                          ;           See inline documentation in this file.
+38    install_software                                             ;           Install one or more packages using the first available package manager.
+39    InstallSoftwareFromRepo                                      ;           Function to simplify the installation of software by including all display and
+40    is_software_package_installed                                ;           Function to check if a piece of software is installed. This function will first check
+41    kvm::backup_all_running_vm                                   ;           See inline documentation in this file.
+42    kvm::cicd::_create_nocloud_iso                               ;           Create a NoCloud seed ISO for cloud-init.
+43    kvm::cicd::_render_extra_vars                                ;           Render ansible-pull extra vars from selections.
+44    kvm::cicd::_render_meta_data                                 ;           Build NoCloud meta-data for cloud-init.
+45    kvm::cicd::_render_user_data                                 ;           Build cloud-init user-data to run ansible-pull.
+46    kvm::cicd::configure_vm_with_ansible_pull                    ;           Seed/attach CI/CD ISO and start a VM.
+47    kvm::clone_server_template_vm                                ;           Clone a server template VM and optionally run virt-sysprep or virt-customize.
+48    kvm::clone_vdi_template_vm                                   ;           Clone a VDI template VM and optionally run virt-sysprep or virt-customize.
+49    kvm::create_expanding_vm_hardisk                             ;           See inline documentation in this file.
+50    kvm::get_almalinux_boot_iso                                  ;           See inline documentation in this file.
+51    kvm::get_fedora_workstation_iso                              ;           See inline documentation in this file.
+52    kvm::get_kali_iso                                            ;           See inline documentation in this file.
+53    kvm::get_vm_config_preferences                               ;           Retrieves VM configuration values from a configuration file or defaults.
+54    kvm::get_vm_size_preferences                                 ;           Loads VM sizing defaults, optionally prompting and persisting user changes.
+55    kvm::get_zorin_iso                                           ;           Downloads the latest Zorin OS ISO file for KVM if not already present.
+56    kvm::make_vm_now_from_debian_org                             ;           Function to create a Debian KVM virtual michine disk and define a VM. This function should be
+57    kvm::make_vm_now_from_fedora_org                             ;           Function to create a Fedora KVM virtual michine disk and define a VM. This function should be
+58    kvm::make_vm_now_from_kali_org                               ;           Function to create a Debian KVM virtual michine disk and define a VM. This function should be
+59    kvm::make_vm_now_from_microsoft                              ;           See inline documentation in this file.
+60    kvm::make_vm_now_from_opensuse_org                           ;           Creates a SUSE KVM virtual machine disk and defines a VM. This function is intended to be
+61    kvm::make_vm_now_from_redhat_com                             ;           Function to create a Alma Linux KVM virtual michine disk and define a VM. This function should be
+62    kvm::make_vm_now_from_ubuntu_com                             ;           See inline documentation in this file.
+63    kvm::make_vm_now_from_zorin                                  ;           Creates a KVM virtual machine template using a Zorin OS ISO.
+64    kvm::mount_local_folder_to_guest                             ;           See inline documentation in this file.
+65    kvm::util::read_common_options                               ;           Function to read common options for KVM virtual machine creation. This function processes
+66    kvm::util::read_distro_options                               ;           Function to read distribution specific options for KVM virtual machine creation. This function processes
+67    kvm::util::set_vm_name                                       ;           Set the VM name consistently across functions.
+68    kvm::util::validate_vm_name                                  ;           Validate a VM name according to hostname rules.
+69    library::apply_rtd_defaults                                  ;           Normalize core RTD paths/URLs with fallback defaults.
+70    list_loaded_internal_functions                               ;           See inline documentation in this file.
+71    list_loaded_software_functions                               ;           Function to list all software (_rtd_recipes) functions loaded... for debugging/support purposes.
+72    main                                                         ;           Entry point for executing library utility modes when run as a script.
+73    mint::get_mint_lmde_iso                                      ;           See inline documentation in this file.
+74    network::check_inet_access                                   ;           See inline documentation in this file.
+75    network::check_inet_access                                   ;           Verify internet connectivity by pinging configured test IPs.
+76    network::get_oem_test_ips                                    ;           Return configured test IPs honoring _OEM_TEST_IPS overrides.
+77    network::rsync_download                                      ;           See inline documentation in this file.
+78    network::rsync_download                                      ;           Download files via rsync with sensible options.
+79    network::rsync_upload                                        ;           See inline documentation in this file.
+80    network::rsync_upload                                        ;           Upload files via rsync with sensible options.
+81    network::whats_my_external_ip                                ;           See inline documentation in this file.
+82    network::whats_my_external_ip                                ;           Fetch the external IP address using curl.
+83    network::whats_my_ipinfo                                     ;           See inline documentation in this file.
+84    network::whats_my_ipinfo                                     ;           Retrieve public IP and geolocation data from multiple services.
+85    oem::check_boot_splash_screen_enable                         ;           OEM function to enable splash screen on boot if desktop is indicated in
+86    oem::create_single_launcher                                  ;           Function to create a single .desktop file for an application.
+87    oem::deploy_themes                                           ;           Downloads and deploys themes from GitHub.
+88    oem::distro_release_upgrade                                  ;           See inline documentation in this file.
+89    oem::register_all_tools                                      ;           Function to register all OEM scripts on the current device.
+90    oem::register_wallpapers_for_gnome                           ;           Register OEM wallpaper assets with GNOME so they appear in background selectors.
+91    oem::remove_non_western_latin_fonts                          ;           a simple function to remove known
+92    oem::rtd_reset_default_environment_config                    ;           See inline documentation in this file.
+93    oem::rtd_tools_make_launchers                                ;           Function that creates a default set of launchers for the Linux GUI menu system.
+94    oem::rtd_tools_make_launchers_from_locations                 ;           Function that creates launchers using definitions from _locations.info.
+95    oem::setup_brand_splash_screen                               ;           See inline documentation in this file.
+96    oem::setup_choices_server                                    ;           Function to display legacy installation options. This will install software that is usefull
+97    pause::a_given_time                                          ;           See inline documentation in this file.
+98    pause::for_input                                             ;           See inline documentation in this file.
+99    rtd_oem_kde_set_wallpaper                                    ;           See inline documentation in this file.
+100   rtd_oem_turn_on_gui_network_management                       ;           Function to set NetworkManager by default to manage networking.
+101   rtd_oem_ubuntu_auto_install_iso_builder                      ;           Function to generate an edited ISO file from a folder.
+102   rtd_ppa_checker                                              ;           See inline documentation in this file.
+103   rtd_server_setup_choices_productivity                        ;           Function to display terminal software installation options. This will install
+104   rtd_server_setup_choices_services                            ;           Function to display server installation options. This will install software that is usefull
+105   security::change_disk_pass                                   ;           Function to change the passphrase fo an encrypted storage device.
+106   security::check_if_password_pOwned                           ;           See inline documentation in this file.
+107   security::configure_auditd                                   ;           Function to install and configure auditd for system auditing.
+108   security::configure_clamav                                   ;           See inline documentation in this file.
+109   security::configure_fail2ban                                 ;           See inline documentation in this file.
+110   security::configure_rkhunter                                 ;           Function to install and configure RKHunter (Rootkit Hunter) for system security.
+111   security::enable_firewall                                    ;           See inline documentation in this file.
+112   security::encrypt_disk_with_luks                             ;           See inline documentation in this file.
+113   security::ensure_admin                                       ;           Ensures the script is executed with administrative (root) privileges, allowing
+114   security::harden_ubuntu                                      ;           See inline documentation in this file.
+115   security::install_AIDE                                       ;           Function to install and configure AIDE (Advanced Intrusion Detection Environment).
+116   security::scan_for_malware                                   ;           See inline documentation in this file.
+117   security::secure_password_policy                             ;           Function to enforce a secure password policy on the system.
+118   security::sysctl_hardening                                   ;           See inline documentation in this file.
+119   set_gnome_ui_common_tweaks_for_user                          ;           See inline documentation in this file.
+120   set_gnome_ui_corporate_crisp_tweaks_for_user                 ;           Function to set UI look to appeal to teh corporate or business user.
+121   set_gnome_ui_mac_tweaks_for_user                             ;           Function to set UI look to resemble MAC for users accustomed to that.
+122   set_gnome_ui_moca_tweaks_for_user                            ;           Function to set UI look to be friendly on the eyes, limiting eye strain.
+123   set_gnome_ui_tweak_no_media_error                            ;           Function to handle missing media when attempting to set UI look to
+124   set_gnome_ui_win10_tweaks_for_user                           ;           Function to set UI look to resemble Windows 10 for users accustomed to that.
+125   software::add_gnome_extensions                               ;           See inline documentation in this file.
+126   software::add_native_package                                 ;           See inline documentation in this file.
+127   software::add_software_task                                  ;           Display executed task and echo ON/NOK based on sucess
+128   software::check_native_package_dependency                    ;           See inline documentation in this file.
+129   software::determine_package_name_from_cmd                    ;           Function to determine the package name from the command line.
+130   software::display_bundle_install_choices_gtk                 ;           Show a GTK checklist of OEM software bundles that are not yet installed.
+131   software::display_bundle_removal_choices_gtk                 ;           Show a GTK checklist of previously installed OEM bundles for removal.
+132   software::ensure_flatpak_package_managment                   ;           Function to ensure that flatpak is installed and flathup enabled.
+133   software::ensure_gnome_software_store_available              ;           Function to ensure that flatpak is installed and flathup enabled.
+134   software::ensure_restricted_codecs                           ;           simple function to ensure that restricted codecs are available on the system.
+135   software::ensure_snap_package_managment                      ;           Function to ensure that snap is installed.
+136   software::from_flathub.org                                   ;           Function to simplify and streamline the installation and removal of flatpaks.
+137   software::from_snapcraft.io                                  ;           Function to ensure that snap is installed.
+138   software::is_native_package_available                        ;           Function to chek if a package is available in whetever repository, and
+139   software::is_native_package_installed                        ;           Function to check if a piece of software is installed. This function will first check
+140   software::is_native_package_installed                        ;           Function to chek if a package is available in whetever repository, and
+141   software::list_bundles                                       ;           Function to list all software bundles defined in _rtd_recipes that are either installable or removable.
+142   software::native_management_availability_check               ;           See inline documentation in this file.
+143   software::package_kit::add_package                           ;           Function to simplify the installation of software by including all display and
+144   software::package_kit::remove_package                        ;           Function to simplify the installation of software by including all display and
+145   software::remove_native_software_package                     ;           See inline documentation in this file.
+146   software::set_install_command                                ;           See inline documentation in this file.
+147   software::update_all_ui                                      ;           Refresh installed OEM UI customizations, icons, and cursors.
+148   software::update_system                                      ;           See inline documentation in this file.
+149   software::update_system_txt                                  ;           See inline documentation in this file.
 150   software::vendor_download_and_install                        ;           Function by Nate Beaken to ease and make consistent the downloading of the non repository
-151   software::is_native_package_available                        ;           Function to chek if a package is available in whetever repository, and
-152   InstallSoftwareFromRepo                                      ;           Function to simplify the installation of software by including all display and
-153   software::determine_package_name_from_cmd                    ;           Function to determine the package name from the command line.
-154   software::add_native_package                                 ;           See inline documentation in this file.
-155   software::native_management_availability_check               ;           See inline documentation in this file.
-156   software::ensure_snap_package_managment                      ;           Function to ensure that snap is installed.
-157   is_software_package_installed                                ;           Function to check if a piece of software is installed. This function will first check
-158   software::is_native_package_installed                        ;           Function to check if a piece of software is installed. This function will first check
-159   software::is_native_package_installed                        ;           Function to chek if a package is available in whetever repository, and
-160   software::set_install_command                                ;           See inline documentation in this file.
-161   software::add_gnome_extensions                               ;           See inline documentation in this file.
-162   software::check_native_package_dependency                    ;           See inline documentation in this file.
-163   rtd_ppa_checker                                              ;           See inline documentation in this file.
-164   rtd_oem_remove_non_western_latin_fonts                       ;           a simple function to remove known
-165   software::remove_native_software_package                     ;           See inline documentation in this file.
-166   system::determine_logfile                                    ;           See inline documentation in this file.
-167   system::log_item                                             ;           See inline documentation in this file.
-168   software::update_system                                      ;           See inline documentation in this file.
-169   display_software_installation_choices_gtk                    ;           Display a legacy GTK checklist of software recipes that can be installed.
-170   software::display_bundle_install_choices_gtk                 ;           Show a GTK checklist of OEM software bundles that are not yet installed.
-171   software::display_bundle_removal_choices_gtk                 ;           Show a GTK checklist of previously installed OEM bundles for removal.
-172   rtd_server_setup_choices_services                            ;           Function to display server installation options. This will install software that is usefull
-173   rtd_server_setup_choices_productivity                        ;           Function to display terminal software installation options. This will install
-174   oem::setup_choices_server                                    ;           Function to display legacy installation options. This will install software that is usefull
-175   fedora::get_fedora_netinst_iso_url                           ;           See inline documentation in this file.
-176   fedora::get_latest_release_version                           ;           See inline documentation in this file.
-176   kvm::cicd::_render_extra_vars                               ;           Render ansible-pull extra vars from selections.
-177   kvm::cicd::_render_user_data                                ;           Build cloud-init user-data to run ansible-pull.
-178   kvm::cicd::_render_meta_data                                ;           Build NoCloud meta-data for cloud-init.
-179   kvm::cicd::_create_nocloud_iso                              ;           Create a NoCloud seed ISO for cloud-init.
-180   kvm::cicd::configure_vm_with_ansible_pull                   ;           Seed/attach CI/CD ISO and start a VM.
-181   ubuntu::enable_plymouth_theme                               ;           Detects the Ubuntu spin (flavor) and ensures the appropriate
-182   ubuntu::get_target_version                                  ;           See inline documentation in this file.
-183   ubuntu::get_latest_release_version                          ;           See inline documentation in this file.
-184   ubuntu::download_iso                                        ;           Downloads the specified Ubuntu ISO (Desktop or Server) based on the provided flavor, version, and type.
-185   kvm::util::validate_vm_name                                 ;           Validate a VM name according to hostname rules.
-186   kvm::util::set_vm_name                                      ;           Set the VM name consistently across functions.
-187   kvm::util::read_common_options                              ;           Function to read common options for KVM virtual machine creation. This function processes
-188   kvm::util::read_distro_options                              ;           Function to read distribution specific options for KVM virtual machine creation. This function processes
-189   kvm::get_vm_config_preferences                              ;           Retrieves VM configuration values from a configuration file or defaults.
-190   kvm::get_vm_size_preferences                                ;           Loads VM sizing defaults, optionally prompting and persisting user changes.
-191   kvm::get_kali_iso                                           ;           See inline documentation in this file.
-192   mint::get_mint_lmde_iso                                     ;           See inline documentation in this file.
-193   kvm::get_almalinux_boot_iso                                 ;           See inline documentation in this file.
-194   kvm::get_fedora_workstation_iso                             ;           See inline documentation in this file.
-195   kvm::get_zorin_iso                                          ;           Downloads the latest Zorin OS ISO file for KVM if not already present.
-196   kvm::mount_local_folder_to_guest                            ;           See inline documentation in this file.
-197   kvm::create_expanding_vm_hardisk                            ;           See inline documentation in this file.
-198   kvm::make_vm_now_from_fedora_org                            ;           Function to create a Fedora KVM virtual michine disk and define a VM. This function should be
-199   kvm::make_vm_now_from_redhat_com                            ;           Function to create a Alma Linux KVM virtual michine disk and define a VM. This function should be
-200   kvm::make_vm_now_from_opensuse_org                          ;           Creates a SUSE KVM virtual machine disk and defines a VM. This function is intended to be
-201   kvm::make_vm_now_from_debian_org                            ;           Function to create a Debian KVM virtual michine disk and define a VM. This function should be
-202   kvm::make_vm_now_from_kali_org                              ;           Function to create a Debian KVM virtual michine disk and define a VM. This function should be
-203   kvm::make_vm_now_from_zorin                                 ;           Creates a KVM virtual machine template using a Zorin OS ISO.
-204   kvm::make_vm_now_from_ubuntu_com                            ;           See inline documentation in this file.
-205   kvm::make_vm_now_from_microsoft                             ;           See inline documentation in this file.
-206   kvm::backup_all_running_vm                                  ;           See inline documentation in this file.
-207   kvm::clone_server_template_vm                               ;           Clone a server template VM and optionally run virt-sysprep or virt-customize.
-208   kvm::clone_vdi_template_vm                                  ;           Clone a VDI template VM and optionally run virt-sysprep or virt-customize.
-209   template::preseed_cfg::early_command                        ;           See inline documentation in this file.
-210   template::preseed_cfg::main                                 ;           See inline documentation in this file.
-211   template::preseed_cfg::auto_disk_layout                     ;           See inline documentation in this file.
-212   template::preseed_cfg::expert_recipe                        ;           See inline documentation in this file.
-213   template::preseed_cfg::late_command                         ;           See inline documentation in this file.
-214   template::kickstart_cfg                                     ;           See inline documentation in this file.
-215   template::rtd_me_sh_cmd                                     ;           See inline documentation in this file.
-216   template::config_menu_cmd                                   ;           Generate the Windows configuration menu batch script.
-217   template::autounattend_xml                                  ;           See inline documentation in this file.
-218   template::AutoYast_xml                                      ;           See inline documentation in this file.
-219   template::Agama_json                                        ;           See inline documentation in this file.
-220   template::cloud_config                                      ;           See inline documentation in this file.
-221   template::minecraft_server_launcher                         ;           Write the template launcher script used by the Minecraft server manager.
-222   install_software                                            ;           Install one or more packages using the first available package manager.
-223   system::laptop_detect                                       ;           Determine whether the current host appears to be a laptop without relying on laptop-detect.
-224   term::set_colors                                            ;           Set colors for prompting on screen in human readable variables. These will be set globally
-225   pause::for_input                                            ;           See inline documentation in this file.
-226   pause::a_given_time                                         ;           See inline documentation in this file.
-227   write_host                                                  ;           See inline documentation in this file.
-228   write_error                                                 ;           See inline documentation in this file.
-229   write_warning                                               ;           See inline documentation in this file.
-230   write_status                                                ;           See inline documentation in this file.
-231   write_information                                           ;           See inline documentation in this file.
-232   list_loaded_internal_functions                              ;           See inline documentation in this file.
-233   software::list_bundles                                      ;           Function to list all software bundles defined in _rtd_recipes that are either installable or removable.
-234   list_loaded_software_functions                              ;           Function to list all software (_rtd_recipes) functions loaded... for debugging/support purposes.
-235   main                                                        ;           Entry point for executing library utility modes when run as a script.
+151   ssh::ensure_key_installed_on_remote                          ;           See inline documentation in this file.
+152   ssh::ensure_user_ssh_key                                     ;           See inline documentation in this file.
+153   system::_disable_service                                     ;           See inline documentation in this file.
+154   system::_enable_service                                      ;           Function to enable and start a systemd service.
+155   system::_turn_on_gui_network_management                      ;           Configures the system to use NetworkManager for network configuration,
+156   system::add_or_remove_login_script                           ;           See inline documentation in this file.
+157   system::check_file_limits                                    ;           See inline documentation in this file.
+158   system::check_required_variables                             ;           Function to check for the presence and non-emptiness of a list of variables.
+159   system::cleanup_and_finish                                   ;           Function to remove all temporary file locations left over from building
+160   system::create_iso_image_debian                              ;           Function to generate the new ISO file from the extracted and
+161   system::create_physical_media_from_ubuntu_iso                ;           See inline documentation in this file.
+162   system::create_swapfile                                      ;           Function to create a swapfile and enable it automatically.
+163   system::detect_session                                       ;           Detects the current session type (TTY, SSH, GUI, Wayland).
+164   system::determine_logfile                                    ;           See inline documentation in this file.
+165   system::display_spinner                                      ;           Simple function to display a spinner in the terminal.
+166   system::distribution_type                                    ;           See inline documentation in this file.
+167   system::download_and_manipulate_iso_debian                   ;           See inline documentation in this file.
+168   system::ensure_directory_exists                              ;           Function to ensure a directory exists, creating it if necessary.
+169   system::find_download_ubuntu_iso                             ;           Locate a requested Ubuntu ISO and download it when not already cached.
+170   system::find_vm_bridge                                       ;           See inline documentation in this file.
+171   system::generate_autoyast_file                               ;           See inline documentation in this file.
+172   system::generate_cloudconfig                                 ;           See inline documentation in this file.
+173   system::generate_ks_cfg_file                                 ;           Generates an installation configuration file (kickstart) for Fedora/Red Hat.
+174   system::generate_report_disk_space_used_by_directory         ;           Function to generate a report for folders' disk space use.
+175   system::get_Windows_Product_Key                              ;           Function to retrieve a Windows product key from the BIOS. This assumes that the OEM
+176   system::install_missing_commands                             ;           Installs missing commands based on the distribution type.
+177   system::io_on_notify_wait                                    ;           Function that, when called, will wait for a disk change
+178   system::keyboard_set_layout                                  ;           See inline documentation in this file.
+179   system::laptop_detect                                        ;           Determine whether the current host appears to be a laptop without relying on laptop-detect.
+180   system::log_item                                             ;           See inline documentation in this file.
+181   system::make_preseed_cfg                                     ;           Function to write out a debina preeseed file to a location requested by the first parameter.
+182   system::make_system_recovery_partition                       ;           Incomplete function to build an OEM rescue partition...
+183   system::oem_autounlock_disk                                  ;           Configure the system to unlock an encrypted root volume automatically.
+184   system::prepare_environment_for_iso_creation                 ;           Function to check that all dependencies are available for manipulating the
+185   system::preseed_to_ubuntu_ks_cfg                             ;           Generates a preseed section [Ubuntu only] (ks.cfg).
+186   system::process_vm_opt_args                                  ;           See inline documentation in this file.
+187   system::read_config                                          ;           This function reads a configuration file with key-value pairs.
+188   system::remove_old_kernel                                    ;           Function to remove all old linux kernels.
+189   system::restart_sound                                        ;           Function to check for PipeWire or Pulse Audio and attempt to restart sound.
+190   system::rtd_oem_find_live_release                            ;           This function will return the URL for the version of Debian, Ubuntu server or Destktop requested.
+191   system::rtd_oem_reseal                                       ;           See inline documentation in this file.
+192   system::run_command_in_gnome_user_session                    ;           Function to do a reverse sudo back to teh original Gnome user who called upon sudo.
+193   system::set_oem_elevated_privilege_gui                       ;           Configure sudo/root environments so GUI apps can launch using the OEM user's X session.
+194   system::toggle_oem_auto_elevated_privilege                   ;           Toggles passwordless sudo privileges for a specified user.
+195   system::toggle_oem_auto_login                                ;           See inline documentation in this file.
+196   system::tune_system_power_profile                            ;           Tuned is a Linux feature that monitors a system and optimizes its performance
+197   system::update_config                                        ;           This function updates a configuration file with key-value pairs.
+198   system::validate_parameters                                  ;           Function to validate that all parameters match the pattern --option "value".
+199   system::wait_for_internet_availability                       ;           Waits for an active internet connection before proceeding.
+200   template::Agama_json                                         ;           See inline documentation in this file.
+201   template::autounattend_xml                                   ;           See inline documentation in this file.
+202   template::AutoYast_xml                                       ;           See inline documentation in this file.
+203   template::cloud_config                                       ;           See inline documentation in this file.
+204   template::config_menu_cmd                                    ;           Generate the Windows configuration menu batch script.
+205   template::kickstart_cfg                                      ;           See inline documentation in this file.
+206   template::minecraft_server_launcher                          ;           Write the template launcher script used by the Minecraft server manager.
+207   template::preseed_cfg::auto_disk_layout                      ;           See inline documentation in this file.
+208   template::preseed_cfg::early_command                         ;           See inline documentation in this file.
+209   template::preseed_cfg::expert_recipe                         ;           See inline documentation in this file.
+210   template::preseed_cfg::late_command                          ;           See inline documentation in this file.
+211   template::preseed_cfg::main                                  ;           See inline documentation in this file.
+212   template::rtd_me_sh_cmd                                      ;           See inline documentation in this file.
+213   term::animate_while_command                                  ;           Displays an animation during the execution of a silent command.
+214   term::err_no_menu_system_found                               ;           Function to handle the error condition if a manu system is not found on the system.
+215   term::set_colors                                             ;           Set colors for prompting on screen in human readable variables. These will be set globally
+216   term::start_animation                                        ;           See inline documentation in this file.
+217   term::stop_animation                                         ;           See inline documentation in this file.
+218   term::task_exec_list_output                                  ;           Execute a command while displaying a formatted status line in the terminal.
+219   tool::compress_all_items_here                                ;           Function to compress the contents of the present working directory.
+220   tool::compress_provided_items                                ;           Function to compress the contents of the present working directory.
+221   tool::recompress_all_items_in_folder                         ;           Function to recompress all archive files in the current directory to a specified format.
+222   tool::recompress_provided_items                              ;           Function to recompress specified files to a target compression format.
+223   tool::test_iso_boot_media                                    ;           Function to test a created ISO file by booting it in a temporary VM using QEMU.
+224   tool::up_2_date                                              ;           Function to simplify updating system completely. At present this function sets the
+225   ubuntu::download_iso                                         ;           Downloads the specified Ubuntu ISO (Desktop or Server) based on the provided flavor, version, and type.
+226   ubuntu::enable_plymouth_theme                                ;           Detects the Ubuntu spin (flavor) and ensures the appropriate
+227   ubuntu::get_latest_release_version                           ;           See inline documentation in this file.
+228   ubuntu::get_target_version                                   ;           See inline documentation in this file.
+229   util::add_iso_to_ventoy                                      ;           Function to add an ISO file to a Ventoy USB drive for multiple boot options.
+230   util::validate_heredoc_tabs_only                             ;           See inline documentation in this file.
+231   write_error                                                  ;           See inline documentation in this file.
+232   write_host                                                   ;           See inline documentation in this file.
+233   write_information                                            ;           See inline documentation in this file.
+234   write_status                                                 ;           See inline documentation in this file.
+235   write_warning                                                ;           See inline documentation in this file.
+236   yad::display_cmd_output                                      ;           Displays the output of a command in a YAD box.
+237   yad::display_file                                            ;           Displays the content of a text file in a Zenity window.
+238   yad::display_info                                            ;           Displays an information notice using a Zenity info box.
+239   yad::display_progressbar_pulsating                           ;           Displays the output of a command in a pulsating progress box.
+240   yad::display_url                                             ;           Displays the content of a URL in a GUI using Zenity.
+241   zenity::display_file                                         ;           Displays the content of a text file in a Zenity window.
+242   zenity::display_info                                         ;           Displays an information notice using a Zenity info box.
+243   zenity::display_url                                          ;           Displays the content of a URL in a GUI using Zenity.
+### Namespace Map (grouped for quick navigation)
+# System:
+#   library::apply_rtd_defaults
+#   system::ensure_directory_exists
+#   system::_enable_service
+#   system::_disable_service
+#   system::_turn_on_gui_network_management
+#   system::process_vm_opt_args
+#   system::find_download_ubuntu_iso
+#   system::create_physical_media_from_ubuntu_iso
+#
+# Network:
+#   network::check_inet_access
+#   network::get_oem_test_ips
+#   network::whats_my_ipinfo
+#   network::whats_my_external_ip
+#   network::rsync_upload
+#   network::rsync_download
+#
+# Security:
+#   security::ensure_admin
+#   security::encrypt_disk_with_luks
+#   security::enable_firewall
+#   security::scan_for_malware
+#   security::harden_ubuntu
+#   security::configure_clamav
+#   security::configure_fail2ban
+#   security::configure_rkhunter
+#   security::configure_auditd
+#   security::sysctl_hardening
+#   security::secure_password_policy
+#   security::install_AIDE
+#
+# Software:
+#   software::check_native_package_dependency
+#   software::add_native_package
+#   software::is_native_package_available
+#   software::ensure_gnome_software_store_available
+#   software::ensure_flatpak_package_managment
+#   software::update_system_txt
+#   software::update_all_ui
+#   software::from_flathub.org
+#   software::from_snapcraft.io
+#   software::vendor_download_and_install
+#   software::determine_package_name_from_cmd
+#
+# KVM/Template (selection):
+#   kvm::util::set_vm_name
+#   kvm::util::read_common_options
+#   kvm::get_vm_config_preferences
+#   kvm::get_vm_size_preferences
+#   kvm::clone_server_template_vm
+#   kvm::clone_vdi_template_vm
+#   kvm::cicd::configure_vm_with_ansible_pull
+#   template::cloud_config
+#   template::preseed_cfg::main / ::late_command / ::auto_disk_layout
+
 
 
 
@@ -363,6 +427,88 @@ set +u
 
 # load branding information:
 : ${_OEM_dependencies="branding.info _locations.info _rtd_recipies.info"}
+
+library::apply_rtd_defaults() {
+	# Description: Apply sane default values to core RTD paths and URLs using precedence.
+	#              Existing environment or sourced *.info values win; hardcoded defaults fill gaps.
+	# Arguments: None.
+	# Globals: Mutates *_DIR, *_tla, GIT_* vars when unset.
+	# Returns: 0
+	# End of documentation
+
+
+	dependency::file _branding.info && system::log_item "✅ _branding.info Loaded without errors..." || system::log_item "👾 _branding.info Loaded with errors..."
+	dependency::file _locations.info && system::log_item "✅ _locations.info Loaded without errors..." || system::log_item "👾 _locations.info Loaded with errors..."
+	dependency::file _rtd_recipies.info && system::log_item "✅ _rtd_recipies.info Loaded without errors..." || system::log_item "👾 _rtd_recipies.info Loaded with errors..."
+
+	: "${_TLA:="RTD"}"
+	: "${_tla:="${_TLA,,}"}"
+
+	local user_home_default="/home/${SUDO_USER:-$USER}"
+	: "${_USER_HOME_DIR:="${user_home_default}"}"
+	: "${_USER_CONFIG_DIR:="${_USER_HOME_DIR}/.config/${_tla}"}"
+
+	local _git_profile_default="${_GIT_PROFILE:-${GIT_Profile:-vonschutter}}"
+	: "${_GIT_PROFILE:="${_git_profile_default}"}"
+	: "${GIT_Profile:="${_git_profile_default}"}"
+	: "${GIT_Theme_URL:="https://github.com/${_git_profile_default}/RTD-Themes.git"}"
+	: "${GIT_RTD_SETUP_BASE_URL:="https://github.com/${_git_profile_default}/RTD-Setup/"}"
+	: "${GIT_RTD_SRC_URL:="https://github.com/${_git_profile_default}/RTD-Setup.git"}"
+
+	: "${_OEM_DIR:="/opt/${_tla}"}"
+	: "${_CACHE_DIR:="${_OEM_DIR}/cache"}"
+	: "${_WALLPAPER_DIR:="${_OEM_DIR}/wallpaper"}"
+	: "${_CUSTOM_SOUND_DIR:="${_OEM_DIR}/sound"}"
+	: "${_THEME_DIR:="${_OEM_DIR}/themes"}"
+	: "${_APP_DIR:="${_OEM_DIR}/apps"}"
+	: "${_MODS_DIR:="${_OEM_DIR}/modules"}"
+	: "${_CORE_DIR:="${_OEM_DIR}/core"}"
+	: "${_APPS_DIR:="${_MODS_DIR}/oem-app-runner.mod/apps"}"
+	: "${_LOG_DIR:="/var/log/${_tla}"}"
+	: "${_CONFIG_DIR:="/etc/${_tla}"}"
+	: "${_OEM_TEST_IPS:="8.8.8.8 1.1.1.1 9.9.9.9"}"
+	: "${_XDG_WALLPAPER_DIR:="/usr/share/wallpapers"}"
+
+	: "${VM_BUILD_TARGET:="/mnt/vmdsk/VM_IMAGES"}"
+	: "${VM_BACKUP_TARGET:="/mnt/vmdsk/VM_BACKUP"}"
+	: "${INITIAL_VM_DISK_ALLOC_GB:=32}"
+
+	: "${DEFAULT_VM_MEMORY_MB:=2048}"
+	: "${DEFAULT_VM_CPU_COUNT:=2}"
+	: "${DEFAULT_VM_DISK_SIZE_GB:=100}"
+	: "${_TSHIRT_CPU_SMALL:=2}"
+	: "${_TSHIRT_MEM_SMALL:=2048}"
+	: "${_TSHIRT_DSK_SMALL:=100}"
+	: "${_TSHIRT_CPU_MEDIUM:=4}"
+	: "${_TSHIRT_MEM_MEDIUM:=4096}"
+	: "${_TSHIRT_DSK_MEDIUM:=100}"
+	: "${_TSHIRT_CPU_LARGE:=8}"
+	: "${_TSHIRT_MEM_LARGE:=8192}"
+	: "${_TSHIRT_DSK_LARGE:=100}"
+	: "${_TSHIRT_CPU_XL:=16}"
+	: "${_TSHIRT_MEM_XL:=16384}"
+	: "${_TSHIRT_DSK_XL:=100}"
+	: "${_TSHIRT_CPU_XXL:=32}"
+	: "${_TSHIRT_MEM_XXL:=32768}"
+	: "${_TSHIRT_DSK_XXL:=100}"
+
+	: "${NON_WESTERN_FONTS_LIST:="fonts-kacst fonts-kacst-one fonts-khmeros-core fonts-lklug-sinhala fonts-lohit-guru fonts-guru \
+	fonts-nanum fonts-noto-cjk fonts-takao-pgothic fonts-tibetan-machine fonts-guru-extra fonts-lao fonts-sil-padauk \
+	fonts-sil-abyssinica fonts-tlwg-* fonts-beng fonts-beng-extra fonts-deva fonts-deva-extra fonts-gubbi fonts-gujr \
+	fonts-gujr-extra fonts-kalapi fonts-knda fonts-lohit-* fonts-orya* fonts-pagul fonts-sahadeva fonts-samyak-* \
+	fonts-sarai fonts-smc fonts-smc-* fonts-taml fonts-telu fonts-telu-extra"}"
+
+	export _TLA _tla _USER_HOME_DIR _USER_CONFIG_DIR _OEM_DIR _CACHE_DIR _WALLPAPER_DIR _CUSTOM_SOUND_DIR \
+		_THEME_DIR _APP_DIR _MODS_DIR _CORE_DIR _APPS_DIR _LOG_DIR _CONFIG_DIR _OEM_TEST_IPS _XDG_WALLPAPER_DIR \
+		GIT_Profile _GIT_PROFILE GIT_Theme_URL GIT_RTD_SETUP_BASE_URL GIT_RTD_SRC_URL VM_BUILD_TARGET VM_BACKUP_TARGET \
+		INITIAL_VM_DISK_ALLOC_GB DEFAULT_VM_MEMORY_MB DEFAULT_VM_CPU_COUNT DEFAULT_VM_DISK_SIZE_GB \
+		_TSHIRT_CPU_SMALL _TSHIRT_MEM_SMALL _TSHIRT_DSK_SMALL _TSHIRT_CPU_MEDIUM _TSHIRT_MEM_MEDIUM _TSHIRT_DSK_MEDIUM \
+		_TSHIRT_CPU_LARGE _TSHIRT_MEM_LARGE _TSHIRT_DSK_LARGE _TSHIRT_CPU_XL _TSHIRT_MEM_XL _TSHIRT_DSK_XL \
+		_TSHIRT_CPU_XXL _TSHIRT_MEM_XXL _TSHIRT_DSK_XXL NON_WESTERN_FONTS_LIST
+	return 0
+}
+
+
 
 # All library functions are listed below in a few sections:
 # - Standard Interactions
@@ -1484,13 +1630,14 @@ network::check_inet_access() {
 	#
 	# End of Documentation
 
-	local test_ips="${_OEM_TEST_IPS:-"8.8.8.8 1.1.1.1 9.9.9.9"}"
 	local wait_time
+	local -a test_ips
+	mapfile -t test_ips < <(network::get_oem_test_ips)
 
 	case "$1" in
 		--interactive)
 			wait_time="$2"
-			for ip in $test_ips; do
+			for ip in "${test_ips[@]}"; do
 				if ping -c 1 "$ip" &>/dev/null; then
 					write_status "✅ Internet access is available."
 					return 0
@@ -1506,7 +1653,8 @@ network::check_inet_access() {
 			done
 			;;
 		*)
-			if ping -c 1 8.8.8.8 &>/dev/null; then
+			local default_ip="${test_ips[0]:-8.8.8.8}"
+			if ping -c 1 "$default_ip" &>/dev/null; then
 				system::log_item "✅ Internet access is available."
 				return 0
 			else
@@ -1517,6 +1665,21 @@ network::check_inet_access() {
 	esac
 }
 
+
+network::get_oem_test_ips() {
+	# Description: Return test IPs as newline-separated list honoring _OEM_TEST_IPS override.
+	# Arguments: None.
+	# Outputs: STDOUT newline-delimited IPs.
+	# Returns: 0
+	# End of documentation
+	if [[ -n "${_OEM_TEST_IPS}" ]]; then
+		# shellcheck disable=SC2206
+		local ips=(${_OEM_TEST_IPS})
+		printf "%s\n" "${ips[@]}"
+	else
+		printf "%s\n" "8.8.8.8" "1.1.1.1" "9.9.9.9"
+	fi
+}
 
 network::whats_my_ipinfo() {
 	# Description:
@@ -4835,11 +4998,7 @@ system::wait_for_internet_availability() {
 	}
 
 	local -a test_ips
-	if [[ -n "${_OEM_TEST_IPS}" ]]; then
-		read -r -a test_ips <<< "$_OEM_TEST_IPS"
-	else
-		test_ips=("8.8.8.8" "1.1.1.1" "9.9.9.9") # Google, Cloudflare, Quad9
-	fi
+	mapfile -t test_ips < <(network::get_oem_test_ips)
 
 	# Ensure array is not empty
 	if [[ ${#test_ips[@]} -eq 0 ]]; then
@@ -6402,6 +6561,55 @@ system::cleanup_and_finish() {
 
 
 
+github::clone_repo_user() {
+	# Description:
+	# Function to CLONE all github.com repositories for a specified user.
+	# simply call the function and pass the username as parameter to clone
+	# all github repositories in to the current folder.
+	#
+	# Globals: None
+	# Arguments: User-name
+	# Outputs:
+	# Returns: a download of all repositories for the given user.
+	# Usage: ${FUNCNAME[0]} user-name
+	# End of documentation
+
+	if [ $# -eq 0 ]; then
+		echo "Usage: ${FUNCNAME[0]} <user_name> "
+		exit 1
+	fi
+
+	for repo in $(curl -s https://api.github.com/users/${1}/repos?per_page=1000 | grep git_url | awk '{print $2}' | sed 's/"\(.*\)",/\1/'); do
+		git clone --depth=1 "https${repo:3}"
+	done
+
+}
+
+github::list_all_user_repositories() {
+	# Description:
+	# Function to LIST all github.com repositories for a specified user.
+	# simply call the function and pass the username as parameter to show
+	# all github repositories the indicated user.
+	#
+	# Globals: None
+	# Arguments: User-name
+	# Outputs:
+	# Returns: a LIST of all repositories for the given user.
+	# Usage: ${FUNCNAME[0]} user-name
+	# End of documentation
+
+	if [ $# -eq 0 ]; then
+		echo "Usage: ${FUNCNAME[0]} <user_name> "
+		return 1
+	fi
+
+	for repo in $(curl -s https://api.github.com/users/${1}/repos?per_page=1000 | grep git_url | awk '{print $2}' | sed 's/"\(.*\)",/\1/'); do
+		echo "https${repo:3}"
+	done
+
+}
+
+
 oem::rtd_reset_default_environment_config() {
 	# Description:
 	# Function to reset temporary configurations to their original settings as provided by the distributor.
@@ -6640,56 +6848,35 @@ oem::distro_release_upgrade() {
 }
 
 
-github::clone_repo_user() {
-	# Description:
-	# Function to CLONE all github.com repositories for a specified user.
-	# simply call the function and pass the username as parameter to clone
-	# all github repositories in to the current folder.
-	#
-	# Globals: None
-	# Arguments: User-name
+oem::remove_non_western_latin_fonts() {
+	# Description:  a simple function to remove known
+	# non-western (latin) fonts from a distribution. Notably, Ubuntu provides too many fonts
+	# of all kinds by default, even if the user will never need the fonts. However, the fonts
+	# may cause unexpected font tool behavior and crashes, due to the large number of fonts
+	# and their features. It is there fore a good Idea to remove these fonts if they are not needed.
+	# Globals:
+	# Arguments: None
 	# Outputs:
-	# Returns: a download of all repositories for the given user.
-	# Usage: ${FUNCNAME[0]} user-name
-	# End of documentation
-
-	if [ $# -eq 0 ]; then
-		echo "Usage: ${FUNCNAME[0]} <user_name> "
-		exit 1
-	fi
-
-	for repo in $(curl -s https://api.github.com/users/${1}/repos?per_page=1000 | grep git_url | awk '{print $2}' | sed 's/"\(.*\)",/\1/'); do
-		git clone --depth=1 "https${repo:3}"
-	done
-
-}
-
-github::list_all_user_repositories() {
-	# Description:
-	# Function to LIST all github.com repositories for a specified user.
-	# simply call the function and pass the username as parameter to show
-	# all github repositories the indicated user.
+	# Returns:
+	# Usage:
+	#	Simply call this function by stating its name:
+	# 	oem::remove_non_western_latin_fonts
 	#
-	# Globals: None
-	# Arguments: User-name
-	# Outputs:
-	# Returns: a LIST of all repositories for the given user.
-	# Usage: ${FUNCNAME[0]} user-name
+	# The function will not return any sucess or failure codes. It will do its best and exit.
 	# End of documentation
-
-	if [ $# -eq 0 ]; then
-		echo "Usage: ${FUNCNAME[0]} <user_name> "
+	security::ensure_admin
+	local font_list=$NON_WESTERN_FONTS_LIST
+	write_status "Attempting to remove non-western fonts..."
+	count=0
+	if [[ -z "$font_list" ]]; then
+		write_warning "No non-western fonts defined for removal..."
 		return 1
 	fi
-
-	for repo in $(curl -s https://api.github.com/users/${1}/repos?per_page=1000 | grep git_url | awk '{print $2}' | sed 's/"\(.*\)",/\1/'); do
-		echo "https${repo:3}"
+	for i in $font_list; do
+		software::remove_native_software_package $i && ((count++))
 	done
-
+	write_information "Removed [ $count ] non-western Fonts"
 }
-
-
-
 
 
 oem::deploy_themes() {
@@ -7042,114 +7229,6 @@ oem::check_boot_splash_screen_enable() {
 		fi
 	fi
 }
-
-
-desktop::enable_firefox_pip_global() {
-	# Description:
-	#   Ensures Firefox Picture-in-Picture windows stay on top and across workspaces by configuring devilspie2.
-	# Globals:
-	#   Uses $XDG_SESSION_TYPE, $XDG_CURRENT_DESKTOP, $DESKTOP_SESSION, $XDG_CONFIG_HOME, $HOME.
-	# Arguments: None
-	# Outputs:
-	#   Writes devilspie2 rule and user unit files, enables the service, logs progress.
-	# Returns:
-	#   0 on success, 1 on failure.
-	# Usage:
-	#   desktop::enable_firefox_pip_global
-	# End of documentation
-
-	security::ensure_admin
-	write_status "Configuring Firefox Picture-in-Picture for global behavior..."
-
-	local session_type="${XDG_SESSION_TYPE:-unknown}"
-	local de="${XDG_CURRENT_DESKTOP:-${DESKTOP_SESSION:-unknown}}"
-	local de_lc
-	de_lc="$(printf '%s' "${de}" | tr '[:upper:]' '[:lower:]')"
-
-	write_information "Detected session type: ${session_type}"
-	write_information "Detected desktop environment: ${de}"
-
-	if [[ "${session_type}" == "wayland" ]]; then
-		case "${de_lc}" in
-			*kde*|*plasma*)
-				write_warning "KDE Plasma on Wayland detected. devilspie2 only affects X11/XWayland windows."
-				write_information "If Firefox runs natively in Wayland, launch it with MOZ_DISABLE_WAYLAND=1 firefox."
-				;;
-			*gnome*)
-				write_information "GNOME on Wayland detected. Firefox PiP typically runs via XWayland, rules should apply."
-				;;
-			*sway*|*hyprland*|*river*|*labwc*|*wayfire*)
-				write_warning "wlroots-based compositor detected (${de}). Window rules usually do not work here."
-				write_warning "Aborting configuration to avoid misleading results."
-				return 1
-				;;
-			*)
-				write_warning "Unknown Wayland DE (${de}); devilspie2 effectiveness is uncertain."
-				;;
-		esac
-	else
-		write_information "Non-Wayland (likely X11) session detected; devilspie2 should operate normally."
-	fi
-
-	if ! software::check_native_package_dependency devilspie2; then
-		write_error "Unable to install devilspie2 through available package manager."
-		return 1
-	fi
-
-	local config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
-	local ds2_dir="${config_home}/devilspie2"
-	local unit_dir="${config_home}/systemd/user"
-	local rule_file="${ds2_dir}/firefox_pip.lua"
-	local unit_file="${unit_dir}/devilspie2.service"
-
-	mkdir -p "${ds2_dir}" "${unit_dir}"
-
-	cat >"${rule_file}" <<'EOF'
--- Firefox Picture-in-Picture global rules
--- Matches PiP window titles (contains "Picture-in-Picture")
-if (get_window_name():match("Picture%-in%-Picture")) then
-	set_on_top(true)         -- Always on top
-	stick_window(true)       -- Visible on all workspaces
-	-- set_skip_tasklist(true)  -- Uncomment to hide from the taskbar/dock
-end
-EOF
-	write_information "Created devilspie2 rule: ${rule_file}"
-
-	cat >"${unit_file}" <<'EOF'
-[Unit]
-Description=Devilspie2 window matching daemon
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/devilspie2
-Restart=on-failure
-
-[Install]
-WantedBy=default.target
-EOF
-	write_information "Created systemd user unit: ${unit_file}"
-
-	if systemctl --user --version >/dev/null 2>&1; then
-		write_status "Reloading user systemd manager..."
-		systemctl --user daemon-reload || {
-			write_error "systemctl --user daemon-reload failed."
-			return 1
-		}
-
-		write_status "Enabling and starting devilspie2.service for the user..."
-		if ! systemctl --user enable --now devilspie2.service; then
-			write_error "Failed to enable/start devilspie2.service (user). Ensure a user systemd session is active."
-			return 1
-		fi
-		write_information "devilspie2 user service enabled and running."
-	else
-		write_warning "systemctl --user not available. Start devilspie2 manually (e.g., add 'devilspie2 &' to autostart)."
-	fi
-
-	write_information "Firefox PiP windows should now remain on top and across workspaces (where supported)."
-	return 0
-}
-
 
 
 
@@ -8024,6 +8103,116 @@ gnome::set_startup_sound() {
         return 0
 }
 
+
+
+desktop::enable_firefox_pip_global() {
+	# Description:
+	#   Ensures Firefox Picture-in-Picture windows stay on top and across workspaces by configuring devilspie2.
+	# Globals:
+	#   Uses $XDG_SESSION_TYPE, $XDG_CURRENT_DESKTOP, $DESKTOP_SESSION, $XDG_CONFIG_HOME, $HOME.
+	# Arguments: None
+	# Outputs:
+	#   Writes devilspie2 rule and user unit files, enables the service, logs progress.
+	# Returns:
+	#   0 on success, 1 on failure.
+	# Usage:
+	#   desktop::enable_firefox_pip_global
+	# End of documentation
+
+	security::ensure_admin
+	write_status "Configuring Firefox Picture-in-Picture for global behavior..."
+
+	local session_type="${XDG_SESSION_TYPE:-unknown}"
+	local de="${XDG_CURRENT_DESKTOP:-${DESKTOP_SESSION:-unknown}}"
+	local de_lc
+	de_lc="$(printf '%s' "${de}" | tr '[:upper:]' '[:lower:]')"
+
+	write_information "Detected session type: ${session_type}"
+	write_information "Detected desktop environment: ${de}"
+
+	if [[ "${session_type}" == "wayland" ]]; then
+		case "${de_lc}" in
+			*kde*|*plasma*)
+				write_warning "KDE Plasma on Wayland detected. devilspie2 only affects X11/XWayland windows."
+				write_information "If Firefox runs natively in Wayland, launch it with MOZ_DISABLE_WAYLAND=1 firefox."
+				;;
+			*gnome*)
+				write_information "GNOME on Wayland detected. Firefox PiP typically runs via XWayland, rules should apply."
+				;;
+			*sway*|*hyprland*|*river*|*labwc*|*wayfire*)
+				write_warning "wlroots-based compositor detected (${de}). Window rules usually do not work here."
+				write_warning "Aborting configuration to avoid misleading results."
+				return 1
+				;;
+			*)
+				write_warning "Unknown Wayland DE (${de}); devilspie2 effectiveness is uncertain."
+				;;
+		esac
+	else
+		write_information "Non-Wayland (likely X11) session detected; devilspie2 should operate normally."
+	fi
+
+	if ! software::check_native_package_dependency devilspie2; then
+		write_error "Unable to install devilspie2 through available package manager."
+		return 1
+	fi
+
+	local config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+	local ds2_dir="${config_home}/devilspie2"
+	local unit_dir="${config_home}/systemd/user"
+	local rule_file="${ds2_dir}/firefox_pip.lua"
+	local unit_file="${unit_dir}/devilspie2.service"
+
+	mkdir -p "${ds2_dir}" "${unit_dir}"
+
+	cat >"${rule_file}" <<'EOF'
+-- Firefox Picture-in-Picture global rules
+-- Matches PiP window titles (contains "Picture-in-Picture")
+if (get_window_name():match("Picture%-in%-Picture")) then
+	set_on_top(true)         -- Always on top
+	stick_window(true)       -- Visible on all workspaces
+	-- set_skip_tasklist(true)  -- Uncomment to hide from the taskbar/dock
+end
+EOF
+	write_information "Created devilspie2 rule: ${rule_file}"
+
+	cat >"${unit_file}" <<'EOF'
+[Unit]
+Description=Devilspie2 window matching daemon
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/devilspie2
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+EOF
+	write_information "Created systemd user unit: ${unit_file}"
+
+	if systemctl --user --version >/dev/null 2>&1; then
+		write_status "Reloading user systemd manager..."
+		systemctl --user daemon-reload || {
+			write_error "systemctl --user daemon-reload failed."
+			return 1
+		}
+
+		write_status "Enabling and starting devilspie2.service for the user..."
+		if ! systemctl --user enable --now devilspie2.service; then
+			write_error "Failed to enable/start devilspie2.service (user). Ensure a user systemd session is active."
+			return 1
+		fi
+		write_information "devilspie2 user service enabled and running."
+	else
+		write_warning "systemctl --user not available. Start devilspie2 manually (e.g., add 'devilspie2 &' to autostart)."
+	fi
+
+	write_information "Firefox PiP windows should now remain on top and across workspaces (where supported)."
+	return 0
+}
+
+
+
 set_gnome_ui_tweak_no_media_error() {
 	# Description:  Function to handle missing media when attempting to set UI look to
 	# 		resemble MAC/Windows/etc. for users accustomed to that.
@@ -8785,6 +8974,8 @@ system::_turn_on_gui_network_management() {
 		return 1
 	fi
 }
+
+
 
 add_gnome3_favorite_app() {
 	# Description: Function to add a new favorite app to the gnome favorites bar.
@@ -13355,7 +13546,7 @@ software::check_native_package_dependency() {
 }
 
 
-rtd_ppa_checker() {
+software::rtd_ppa_checker() {
 	# Description:
 	# Function to check status of Ubuntu and derivatives' PPA aarchives.
 	# This function will take one optional argument to toggle the "delete" option. If the delet option
@@ -13376,6 +13567,13 @@ rtd_ppa_checker() {
 	#
 	# End of documentation
 	ensure_admin
+	
+	distro=$(system::distribution_type)
+	if [[ "$distro" != "ubuntu" && "$distro" != "linuxmint" && "$distro" != "debian" ]]; then
+		write_error "This function is only supported on Ubuntu and derivatives."
+		return 1
+	fi
+
 	for f in /etc/apt/sources.list.d/*.list; do
 		grep -Po "(?<=^deb\s).*?(?=#|$)" "$f" | while read -r ENTRY; do
 			echo "ENTRY: $ENTRY"
@@ -13408,33 +13606,6 @@ rtd_ppa_checker() {
 }
 
 
-rtd_oem_remove_non_western_latin_fonts() {
-	# Description:  a simple function to remove known
-	# non-western (latin) fonts from a distribution. Notably, Ubuntu provides too many fonts
-	# of all kinds by default, even if the user will never need the fonts. However, the fonts
-	# may cause unexpected font tool behavior and crashes, due to the large number of fonts
-	# and their features. It is there fore a good Idea to remove these fonts if they are not needed.
-	# Globals:
-	# Arguments: None
-	# Outputs:
-	# Returns:
-	# Usage:
-	#	Simply call this function by stating its name:
-	# 	rtd_oem_remove_non_western_latin_fonts
-	#
-	# The function will not return any sucess or failure codes. It will do its best and exit.
-	# End of documentation
-	security::ensure_admin
-	font_list="fonts-kacst fonts-kacst-one fonts-khmeros-core fonts-lklug-sinhala fonts-lohit-guru fonts-guru fonts-nanum fonts-noto-cjk fonts-takao-pgothic fonts-tibetan-machine fonts-guru-extra \
-		fonts-lao fonts-sil-padauk fonts-sil-abyssinica fonts-tlwg-* fonts-beng fonts-beng-extra fonts-deva fonts-deva-extra fonts-gubbi fonts-gujr fonts-gujr-extra fonts-kalapi fonts-knda \
-		fonts-lohit-* fonts-orya* fonts-pagul fonts-sahadeva fonts-samyak-* fonts-sarai fonts-smc fonts-smc-* fonts-taml fonts-telu fonts-telu-extra"
-	write_status "Attempting to remove non-western fonts..."
-	count=0
-	for i in $font_list; do
-		software::remove_native_software_package $i && ((count++))
-	done
-	write_information "Removed [ $count ] non-western Fonts"
-}
 
 software::remove_native_software_package() {
 	# Description:
@@ -23056,9 +23227,7 @@ else
 fi
 
 # Find and load all dependent files for this library...
-dependency::file _branding.info && system::log_item "✅ _branding.info Loaded without errors..." || system::log_item "👾 _branding.info Loaded with errors..."
-dependency::file _locations.info && system::log_item "✅ _locations.info Loaded without errors..." || system::log_item "👾 _locations.info Loaded with errors..."
-dependency::file _rtd_recipies.info && system::log_item "✅ _rtd_recipies.info Loaded without errors..." || system::log_item "👾 _rtd_recipies.info Loaded with errors..."
+library::apply_rtd_defaults
 
 write_status "📚 RTD Power Library $RTD_VERSION loaded OK"
 export RTDFUNCTIONS="${RTD_VERSION}"
