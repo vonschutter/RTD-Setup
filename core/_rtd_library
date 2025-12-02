@@ -23360,28 +23360,34 @@ main() {
 		;;
 	--devhelp-gui)
 		touch /tmp/yad_doc.txt
-		echo "Documentation will appear here" >/tmp/yad_doc.txt
+		: >/tmp/yad_doc.txt
 		library::list_loaded_internal_functions --yformat
 
 		YAD_KEY=$$
 
 		function display_documentation() {
 			local selected_function="$1"
-			selected_function="${selected_function%%|*}"
-			result=$(while read -r line; do
-				if [[ "$line" == "${selected_function}() {"* || "$line" == "${selected_function}()"* || "$line" == "${selected_function}()"* ]]; then
-					printline="yes"
-				fi
+			local script_source="${BASH_SOURCE[0]:-$0}"
+			local printline=""
+			local result=""
 
-				if [[ "$printline" == "yes" ]]; then
-					local _req_success=true
-					if [[ "$line" == "# End of documentation"* || "$line" == *"# End of documentation"* || "$line" == *End*of*Documentation* ]]; then
-						printline="no"
-					else
-						echo "$line" | grep -E '(^|\s*)#\s*' | sed 's/#//'
+			selected_function="${selected_function%%|*}"
+			result=$(
+				while read -r line; do
+					if [[ "$line" == "${selected_function}() {"* || "$line" == "${selected_function}()"* ]]; then
+						printline="yes"
 					fi
-				fi
-			done <"${0}")
+
+					if [[ "$printline" == "yes" ]]; then
+						local _req_success=true
+						if [[ "$line" == "# End of documentation"* || "$line" == *"# End of documentation"* || "$line" == *End*of*Documentation* ]]; then
+							printline="no"
+						else
+							echo "$line" | grep -E '(^|\s*)#\s*' | sed 's/#//'
+						fi
+					fi
+				done <"${script_source}"
+			)
 
 			if [ -z "$result" ]; then
 				result="No documentation found for ${selected_function}."
@@ -23389,25 +23395,35 @@ main() {
 			echo "$result" >/tmp/yad_doc.txt
 		}
 
-		while true; do
-			yad --paned --title="Select a function below to see the function's documentation and usage:" \
-				--key=$YAD_KEY --orient=hor --width="${ZWIDTH:-1200}" --height="${ZHEIGHT:-600}" --splitter=300 --listen --button="Quit:1" --button="Refresh:0" &
+		local fifo="/tmp/rtd_yad_select_${YAD_KEY}.fifo"
+		[[ -p "$fifo" ]] && rm -f "$fifo"
+		mkfifo "$fifo"
 
-			YAD_PID=$!
-
-			echo "$result" | yad --text-info --text="Documentation:" --no-markup --filename=/tmp/yad_doc.txt --plug=$YAD_KEY --tabnum=2 --margins=10 --wrap --no-buttons --listen &
-
-			yad --list --no-markup --title="Select Function" --text="Functions:" --column="Number" --column="Function" --column="Description" \
-				--dclick-action="Ctrl+Enter" --select-action="display_documentation $selected_function" --center --print-column=2 --plug=$YAD_KEY --tabnum=1 \
-				"${functions_list[@]}" | while IFS='|' read -r selected_function; do
-
+		(
+			while read -r selected_function; do
 				if [ -z "$selected_function" ]; then
 					echo "No function selected, continuing..."
 					continue
 				fi
 
 				display_documentation "$selected_function"
-			done
+			done <"$fifo"
+		) &
+		FIFO_PID=$!
+
+		while true; do
+			library::list_loaded_internal_functions --yformat
+
+			yad --paned --title="Select a function below to see the function's documentation and usage:" \
+				--key=$YAD_KEY --orient=hor --width="${ZWIDTH:-1200}" --height="${ZHEIGHT:-600}" --splitter=300 --listen --button="Quit:1" --button="Refresh:0" &
+
+			YAD_PID=$!
+
+			yad --text-info --text="Documentation:" --no-markup --tail --filename=/tmp/yad_doc.txt --plug=$YAD_KEY --tabnum=2 --margins=10 --wrap --no-buttons &
+
+			yad --list --no-markup --title="Select Function" --text="Functions:" --column="Number" --column="Function" --column="Description" \
+				--center --print-column=2 --select-action="bash -lc 'printf \"%s\\n\" \"\\${2:-\\$1}\" > \"$fifo\"' _" --plug=$YAD_KEY --tabnum=1 \
+				"${functions_list[@]}" &
 
 			wait $YAD_PID
 			exit_status=$?
@@ -23417,6 +23433,8 @@ main() {
 				break
 			fi
 		done
+		kill "$FIFO_PID" 2>/dev/null
+		rm -f "$fifo"
 		return
 		;;
 	--devhelp-gtk)
