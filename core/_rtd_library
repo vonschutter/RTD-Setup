@@ -19111,6 +19111,31 @@ PY
 	return 0
 }
 
+kvm::clone_template_vm::_format_name_component() {
+	# Convert a raw string into Title_Case components joined by underscores (or spaces when requested).
+	local raw="$1"
+	local joiner="${2:-_}"
+	raw="${raw//-/_}"
+	raw="${raw// /_}"
+	local out=""
+	IFS='_' read -ra parts <<<"$raw"
+	for part in "${parts[@]}"; do
+		[[ -z "$part" ]] && continue
+		out+="${part^}${joiner}"
+	done
+	out=${out%"${joiner}"}
+	echo "$out"
+}
+
+kvm::clone_template_vm::_display_template_label() {
+	# Build a human friendly label for a template entry.
+	local template_name="$1"
+	local core="${template_name#Template_}"
+	core="${core%%__*}"
+	core=$(kvm::clone_template_vm::_format_name_component "$core" " ")
+	echo "Source: ${core}"
+}
+
 kvm::clone_template_vm::_clone_from_category() {
 	# Description:
 	#   Internal helper that drives the template clone dialog for a VM category.
@@ -19214,7 +19239,7 @@ kvm::clone_template_vm::_clone_from_category() {
 
 	while IFS= read -r template_name; do
 		[[ -z "$template_name" ]] && continue
-		menu_entries+=("Source:" "$template_name")
+		menu_entries+=("$template_name" "$(kvm::clone_template_vm::_display_template_label "$template_name")")
 	done <<< "$vm_list"
 
 	if (( ${#menu_entries[@]} == 0 )); then
@@ -19251,9 +19276,19 @@ kvm::clone_template_vm::_clone_from_category() {
 		fi
 
 		template_name="${selected_tag}"
-		new_name="${template_name#Template_}"
-		new_name="${new_name%%__*}"
-		new_name="${new_name}_$(date +%Y%m%d_%H%M%S)"
+		local template_core="${template_name#Template_}"
+		template_core="${template_core%%__*}"
+
+		local template_os="${template_core%%_*}"
+		if [[ -z "$template_os" || "$template_os" == "$template_core" ]]; then
+			template_os="$template_core"
+		fi
+		template_os=$(kvm::clone_template_vm::_format_name_component "$template_os")
+
+		local service_label="${RTD_VM_SERVICE_LABEL:-Server}"
+		service_label=$(kvm::clone_template_vm::_format_name_component "$service_label")
+
+		new_name="${template_os}_${service_label}_$(date +%Y%m%d_%H%M%S)"
 
 		if [[ -z "$template_name" ]]; then
 			write_warning "clone_from_category: template_name empty after selection_index='${selected_index}'."

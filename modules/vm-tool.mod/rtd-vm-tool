@@ -819,6 +819,44 @@ vmtool::map_role_to_server_task() {
 	esac
 }
 
+vmtool::derive_service_label() {
+	# Create a human-friendly service label for VM naming based on the first selected task or LLM variant.
+	local tasks_csv="$1"
+	local llm_variant="$2"
+
+	if [[ -n "$llm_variant" && "$llm_variant" != "none" ]]; then
+		echo "LLM_Server"
+		return
+	fi
+
+	local first_task="${tasks_csv%%,*}"
+	first_task=${first_task//\"/}
+	[[ -z "$first_task" ]] && { echo "Server"; return; }
+
+	case "$first_task" in
+		openssh-server) echo "SSH_Server" ;;
+		lamp-server) echo "LAMP_Server" ;;
+		dns-server) echo "DNS_Server" ;;
+		mail-server) echo "Mail_Server" ;;
+		samba-server) echo "Samba_Server" ;;
+		print-server) echo "Print_Server" ;;
+		postgresql-server) echo "PostgreSQL_Server" ;;
+		ubuntu-server) echo "Ubuntu_Server" ;;
+		*)
+			local label="${first_task//-/_}"
+			label="${label// /_}"
+			local out=""
+			IFS='_' read -ra parts <<<"$label"
+			for part in "${parts[@]}"; do
+				[[ -z "$part" ]] && continue
+				out+="${part^}_"
+			done
+			out=${out%_}
+			echo "${out:-Server}"
+		;;
+	esac
+}
+
 vmtool::ensure_ansible_repo() {
 	# Ensure a local RTD-Ansible clone exists; clone if missing.
 	: "${RTD_ANSIBLE_REPO:=https://github.com/vonschutter/RTD-Ansible.git}"
@@ -880,14 +918,15 @@ vmtool::build_server_role_menu() {
 }
 
 vmtool::prompt_cicd_options() {
-	# Collect CI/CD options up front. Stores selections in globals:
-	#   RTD_CICD_ENABLE, RTD_CICD_REPO, RTD_CICD_PLAYBOOK, RTD_CICD_TASKS, RTD_CICD_LLM_VARIANT, RTD_CICD_LLM_MODELS
-	RTD_CICD_ENABLE=0
-	RTD_CICD_REPO="${RTD_ANSIBLE_REPO:-https://github.com/vonschutter/RTD-Ansible.git}"
-	RTD_CICD_PLAYBOOK="${RTD_ANSIBLE_PLAYBOOK:-playbooks/server-auto-config.yml}"
-	RTD_CICD_TASKS="openssh-server"
-	RTD_CICD_LLM_VARIANT="none"
-	RTD_CICD_LLM_MODELS=""
+# Collect CI/CD options up front. Stores selections in globals:
+#   RTD_CICD_ENABLE, RTD_CICD_REPO, RTD_CICD_PLAYBOOK, RTD_CICD_TASKS, RTD_CICD_LLM_VARIANT, RTD_CICD_LLM_MODELS
+RTD_CICD_ENABLE=0
+RTD_CICD_REPO="${RTD_ANSIBLE_REPO:-https://github.com/vonschutter/RTD-Ansible.git}"
+RTD_CICD_PLAYBOOK="${RTD_ANSIBLE_PLAYBOOK:-playbooks/server-auto-config.yml}"
+RTD_CICD_TASKS="openssh-server"
+RTD_CICD_LLM_VARIANT="none"
+RTD_CICD_LLM_MODELS=""
+RTD_VM_SERVICE_LABEL="Server"
 
 	if ! dialog::prompt_yes_no --title "CI/CD" --message "Seed cloned VM with CI/CD ISO and auto-run ansible-pull?"; then
 		write_information "CI/CD seeding disabled for this run."
@@ -951,6 +990,8 @@ vmtool::prompt_cicd_options() {
 	else
 		RTD_CICD_LLM_MODELS=""
 	fi
+
+	RTD_VM_SERVICE_LABEL=$(vmtool::derive_service_label "${mapped_tasks[*]}" "$RTD_CICD_LLM_VARIANT")
 }
 
 vmtool::post_clone_ansible_pull() {
