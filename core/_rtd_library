@@ -19728,6 +19728,7 @@ whonix::version_ge() {
 	#	- $2: Version B
 	# Outputs: None
 	# Returns: 0 when A >= B, 1 otherwise
+	# End of documentation
 	[[ -z ${1:-} || -z ${2:-} ]] && return 1
 	[[ $(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1) == "$1" ]]
 }
@@ -19740,6 +19741,7 @@ whonix::current_vm_version() {
 	#	- $1: VM name (Whonix-Gateway or Whonix-Workstation)
 	# Outputs: Echoes the detected version (if any)
 	# Returns: 0
+	# End of documentation
 	local vm=$1 disk=""
 	if virsh -c qemu:///system list --all --name | grep -qxF "$vm"; then
 		disk=$(virsh -c qemu:///system dumpxml "$vm" 2>/dev/null | sed -nE "s@.*<source file=['\"]([^'\"]+)['\"].*@\\1@p" | head -1 || true)
@@ -19763,6 +19765,7 @@ whonix::discover_bundle() {
 	# Arguments: None
 	# Outputs: Log messages.
 	# Returns: 0 on success, exits on fatal error.
+	# End of documentation
 	local index="${WHONIX_BASE}/" html dirlist file
 	write_information "Discovering latest Whonix libvirt bundle"
 	html=$(wget -qO- "$index") || { write_warning "cannot reach $index"; return 1; }
@@ -19798,6 +19801,7 @@ whonix::prepare_workdir() {
 	# Arguments: None
 	# Outputs: Log messages.
 	# Returns: 0
+	# End of documentation
 	if [[ -d $WORK_DIR ]]; then
 		local existing
 		existing=$(find "$WORK_DIR" -maxdepth 1 -type f -name '*.libvirt.xz' -printf '%f\n' | head -1 || true)
@@ -19818,6 +19822,7 @@ whonix::download_with_verify() {
 	#	- $3: Checksum URL (optional)
 	# Outputs: Log messages.
 	# Returns: 0 on success, 1 on failure
+	# End of documentation
 	local url=$1 dest=$2 sha=${3:-} tmp="${dest}.part" retry=2
 	while ((retry--)); do
 		write_information "downloading $(basename "$dest") ..."
@@ -19848,6 +19853,7 @@ whonix::download_bundle() {
 	# Arguments: None
 	# Outputs: Log messages.
 	# Returns: 0
+	# End of documentation
 	if [[ -s $BUNDLE_PATH ]]; then
 	write_status "re-using existing $BUNDLE_NAME"
 	return 0
@@ -19862,6 +19868,7 @@ whonix::extract_archive() {
 	# Arguments: None
 	# Outputs: Log messages.
 	# Returns: 0 on success, 1 on failure
+	# End of documentation
 	local marker="${WORK_DIR}/.bundle.name" have_marker=0 have_images=0
 	[[ -s $marker && $(<"$marker") == "$BUNDLE_NAME" ]] && have_marker=1
 
@@ -19903,6 +19910,7 @@ whonix::detect_image_owner() {
 	# Arguments: None
 	# Outputs: Sets IMAGE_OWNER.
 	# Returns: 0
+	# End of documentation
 	if [[ -z $IMAGE_OWNER && -d $IMAGE_DIR ]]; then
 		IMAGE_OWNER=$(stat -c "%U:%G" "$IMAGE_DIR" 2>/dev/null || true)
 	fi
@@ -19924,6 +19932,7 @@ whonix::stage_images() {
 	# Arguments: None
 	# Outputs: Log messages.
 	# Returns: 0
+	# End of documentation
 	whonix::detect_image_owner
 	mkdir -p "$IMAGE_DIR"
 
@@ -19954,6 +19963,7 @@ whonix::ensure_networks_defined() {
 	# Arguments: None
 	# Outputs: Log messages.
 	# Returns: 0
+	# End of documentation
 	(
 		cd "$WORK_DIR" || exit 1
 		for xml in *{e,E}xternal*.xml *{i,I}nternal*.xml; do
@@ -19987,6 +19997,7 @@ whonix::ensure_networks_running() {
 	# Arguments: None
 	# Outputs: Log messages.
 	# Returns: 0
+	# End of documentation
 	local nets
 	nets=$(virsh -c qemu:///system net-list --all --name | grep -i whonix || true)
 	while read -r net; do
@@ -20009,6 +20020,7 @@ whonix::add_extra_workstation() {
 	#	- $1: Base disk path to overlay.
 	# Outputs: Log messages.
 	# Returns: 0 on success, 1 on failure
+	# End of documentation
 	local base_disk=$1
 	[[ -f $base_disk ]] || { write_warning "cannot add workstation – base disk missing ($base_disk)"; return 1; }
 
@@ -20034,6 +20046,7 @@ whonix::define_vms() {
 	# Arguments: None
 	# Outputs: Log messages.
 	# Returns: 0 on success, 1 on failure
+	# End of documentation
 	local vm xml target_path fixed candidates vm_exists existing_disk up_to_date
 
 	for vm in Whonix-Gateway Whonix-Workstation; do
@@ -20090,6 +20103,7 @@ whonix::maybe_skip_install() {
 	#	- REFRESH, ADD_WORKSTATION, WHONIX_VERSION, IMAGE_DIR
 	# Outputs: Log message when skipping.
 	# Returns: Exits 0 when skipping; 0 otherwise.
+	# End of documentation
 	local gw ws
 	gw=$(whonix::current_vm_version Whonix-Gateway || true)
 	ws=$(whonix::current_vm_version Whonix-Workstation || true)

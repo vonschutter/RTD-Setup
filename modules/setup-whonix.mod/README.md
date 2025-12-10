@@ -12,6 +12,25 @@ This module provides an idempotent installer for Whonix on KVM/libvirt, includin
 - **Version skip:** If installed Gateway/Workstation are already at or above the discovered version and no refresh/add is requested, the script exits early.
 - **Extra workstation:** Optional creation of an additional workstation overlay.
 
+## Usage
+
+
+```bash
+bash rtd-setup-whonix.sh [--refresh] [--add]
+```
+
+### To simply setup Whonix on your computer run: 
+```bash
+bash rtd-setup-whonix.sh 
+```
+
+### Alternatively, run it directly from the git repo without cloning:
+```bash
+bash <(curl -sL https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/modules/setup-whonix.mod/rtd-setup-whonix.sh)
+```
+
+
+
 ## Contents
 - `rtd-setup-whonix.sh` – entrypoint script using RTD library helpers and `whonix::` functions defined in `_rtd_library`.
 
@@ -26,10 +45,6 @@ The script will:
 - Ensure the default libvirt network exists and is autostarted.
 
 
-## Usage
-```bash
-bash rtd-setup-whonix.sh [--refresh] [--add]
-```
 
 Flags:
 - `--refresh` – Force re-define VMs and replace staged images with the newly downloaded bundle (networks are kept).
@@ -51,4 +66,3 @@ Typical flow:
 - Logging/output uses RTD `write_*` helpers and will also log via the library.
 - If `_rtd_library` cannot be loaded or the version check fails, the script aborts.
 - Bundle preference is the GUI/LXQt variant; falls back to any libvirt bundle if LXQt is unavailable.
-
