@@ -4,7 +4,7 @@ if [[ -z "${BASH_VERSINFO[0]:-}" ]]; then
 	echo "SHELL ENV ERROR: You must use a BASH Shell to load this library. Exiting..."
 	exit 255
 fi
-export RTD_VERSION="2.04"
+export RTD_VERSION="2.05"
 : <<'Library_Documentation'
 ::              R T D   F u n c t i o n   L i b r a r y
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -285,6 +285,20 @@ export RTD_VERSION="2.04"
 241   zenity::display_file                                         ;           Displays the content of a text file in a Zenity window.
 242   zenity::display_info                                         ;           Displays an information notice using a Zenity info box.
 243   zenity::display_url                                          ;           Displays the content of a URL in a GUI using Zenity.
+244   whonix::version_ge                                           ;           Compare two dotted version strings, returns success when first is >= second.
+245   whonix::current_vm_version                                   ;           Extract the Whonix version from an existing VM disk path.
+246   whonix::discover_bundle                                      ;           Discover the latest Whonix libvirt bundle (prefers GUI/LXQt) and checksum URLs.
+247   whonix::prepare_workdir                                      ;           Ensure the working directory is ready for a Whonix bundle.
+248   whonix::download_with_verify                                 ;           Download a file with retries and optional SHA-512 verification.
+249   whonix::download_bundle                                      ;           Fetch the Whonix bundle if not already present locally.
+250   whonix::extract_archive                                      ;           Extract the Whonix libvirt archive when images/XMLs are missing.
+251   whonix::detect_image_owner                                   ;           Determine the appropriate owner:group for libvirt image placement.
+252   whonix::stage_images                                         ;           Move/reuse Whonix qcow2/raw images into the libvirt images directory.
+253   whonix::ensure_networks_defined                              ;           Define Whonix virtual networks idempotently.
+254   whonix::ensure_networks_running                              ;           Start Whonix virtual networks if they are not active.
+255   whonix::define_vms                                           ;           Define or refresh Whonix Gateway/Workstation VMs against target images.
+256   whonix::add_extra_workstation                                ;           Create an additional workstation VM overlaying an existing base disk.
+257   whonix::maybe_skip_install                                   ;           Skip all work when existing VMs are already at/above the target version (unless refresh/add requested).
 
 
 
@@ -345,8 +359,17 @@ KVM/Template (selection):
   template::cloud_config
   template::preseed_cfg::main / ::late_command / ::auto_disk_layout
 
-
-
+Whonix:
+  whonix::discover_bundle
+  whonix::prepare_workdir
+  whonix::download_bundle
+  whonix::extract_archive
+  whonix::stage_images
+  whonix::ensure_networks_defined
+  whonix::ensure_networks_running
+  whonix::define_vms
+  whonix::add_extra_workstation
+  whonix::maybe_skip_install
 
 Use Google Coding standards:
 In general any function that is not both obvious and short must be commented. Any function in a library must be commented regardless of
@@ -19689,6 +19712,396 @@ kvm::cicd::configure_vm_with_ansible_pull() {
 }
 
 
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Whonix helper functions         ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+
+whonix::version_ge() {
+	# Description: Compare two dotted version strings and succeed if the first is >= the second.
+	# Globals: None
+	# Arguments:
+	#	- $1: Version A
+	#	- $2: Version B
+	# Outputs: None
+	# Returns: 0 when A >= B, 1 otherwise
+	[[ -z ${1:-} || -z ${2:-} ]] && return 1
+	[[ $(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1) == "$1" ]]
+}
+
+whonix::current_vm_version() {
+	# Description: Extract the Whonix version from an existing VM disk path.
+	# Globals:
+	#	- IMAGE_DIR: Directory containing libvirt images.
+	# Arguments:
+	#	- $1: VM name (Whonix-Gateway or Whonix-Workstation)
+	# Outputs: Echoes the detected version (if any)
+	# Returns: 0
+	local vm=$1 disk=""
+	if virsh -c qemu:///system list --all --name | grep -qxF "$vm"; then
+		disk=$(virsh -c qemu:///system dumpxml "$vm" 2>/dev/null | sed -nE "s@.*<source file=['\"]([^'\"]+)['\"].*@\\1@p" | head -1 || true)
+	fi
+	if [[ -z $disk ]] && compgen -G "$IMAGE_DIR/${vm}"*.qcow2 >/dev/null; then
+		disk=$(compgen -G "$IMAGE_DIR/${vm}"*.qcow2 | head -1)
+	fi
+	if [[ -z $disk ]]; then
+		disk=$(sh -c "ls -1 $IMAGE_DIR/${vm}*.qcow2 2>/dev/null" || true)
+		disk=$(head -1 <<<"$disk")
+		[[ -z $disk ]] && return 0
+	fi
+	perl -ne 'if(/Whonix-[^-]+-[A-Za-z]+-([0-9.]+)\.Intel_AMD64\.qcow2/ || /Whonix-[^-]+-([0-9.]+)\.Intel_AMD64\.qcow2/ || /Whonix-[^-]+-([0-9.]+)/){print $1;exit}' <<<"$disk"
+}
+
+whonix::discover_bundle() {
+	# Description: Discover the latest Whonix libvirt bundle (prefers GUI/LXQt) and checksum.
+	# Globals:
+	#	- WHONIX_BASE: Base URL for Whonix libvirt downloads.
+	#	- WHONIX_URL, WHONIX_SHA, WHONIX_VERSION, BUNDLE_NAME, BUNDLE_PATH, WORK_DIR
+	# Arguments: None
+	# Outputs: Log messages.
+	# Returns: 0 on success, exits on fatal error.
+	local index="${WHONIX_BASE}/" html dirlist file
+	write_information "Discovering latest Whonix libvirt bundle"
+	html=$(wget -qO- "$index") || { write_warning "cannot reach $index"; return 1; }
+	WHONIX_VERSION=$(grep -oP 'href="\K[0-9.]*(?=/)' <<<"$html" | sort -V | grep -E '.' | tail -1)
+	[[ -n $WHONIX_VERSION ]] || { write_warning "no version folder found at $index"; return 1; }
+	dirlist=$(wget -qO- "${index}${WHONIX_VERSION}/") || { write_warning "cannot list ${index}${WHONIX_VERSION}/"; return 1; }
+	file=$(grep -oP 'href="\K[^"]+\.libvirt\.xz' <<<"$dirlist" | grep -m1 'LXQt')
+	file=${file:-$(grep -oP 'href="\K[^"]+\.libvirt\.xz' <<<"$dirlist" | head -1)}
+	[[ -n $file ]] || { write_warning "no *.libvirt.xz file found in ${index}${WHONIX_VERSION}/"; return 1; }
+
+	WHONIX_URL="${index}${WHONIX_VERSION}/${file}"
+	if wget --spider -q "${WHONIX_URL}.sha512sums"; then
+		WHONIX_SHA="${WHONIX_URL}.sha512sums"
+	elif wget --spider -q "${WHONIX_URL}.sha512sum"; then
+		WHONIX_SHA="${WHONIX_URL}.sha512sum"
+	else
+		WHONIX_SHA=""
+	fi
+	BUNDLE_NAME="$file"
+	BUNDLE_PATH="${WORK_DIR}/${BUNDLE_NAME}"
+	if [[ -n $WHONIX_SHA ]]; then
+		write_status "checksum available for ${BUNDLE_NAME}"
+	else
+		write_warning "no checksum file found for ${BUNDLE_NAME}"
+	fi
+	write_status "latest version ${WHONIX_VERSION}, bundle ${BUNDLE_NAME}"
+}
+
+whonix::prepare_workdir() {
+	# Description: Ensure the working directory is ready for the target bundle and clear stale bundles.
+	# Globals:
+	#	- WORK_DIR, BUNDLE_NAME
+	# Arguments: None
+	# Outputs: Log messages.
+	# Returns: 0
+	if [[ -d $WORK_DIR ]]; then
+		local existing
+		existing=$(find "$WORK_DIR" -maxdepth 1 -type f -name '*.libvirt.xz' -printf '%f\n' | head -1 || true)
+		if [[ -n $existing && $existing != "$BUNDLE_NAME" ]]; then
+			write_information "Clearing old work dir ($existing -> $BUNDLE_NAME)"
+			rm -rf "$WORK_DIR"
+		fi
+	fi
+	mkdir -p "$WORK_DIR"
+}
+
+whonix::download_with_verify() {
+	# Description: Download a file with retries and optional SHA-512 verification.
+	# Globals: None
+	# Arguments:
+	#	- $1: URL
+	#	- $2: Destination path
+	#	- $3: Checksum URL (optional)
+	# Outputs: Log messages.
+	# Returns: 0 on success, 1 on failure
+	local url=$1 dest=$2 sha=${3:-} tmp="${dest}.part" retry=2
+	while ((retry--)); do
+		write_information "downloading $(basename "$dest") ..."
+		if wget --progress=bar:force:noscroll -O "$tmp" "$url"; then
+			mv "$tmp" "$dest"
+			break
+		fi
+		write_warning "download failed, retrying ..."
+		sleep 1
+	done
+	rm -f "$tmp"
+	[[ -s $dest ]] || return 1
+
+	if [[ -n $sha ]]; then
+		write_information "fetching checksum"
+		local expected
+		expected=$(wget -qO- "$sha" | awk '{print $1}')
+		[[ ${#expected} -eq 128 ]] || return 1
+		write_information "verifying SHA-512"
+		echo "$expected  $dest" | sha512sum -c >/dev/null || return 1
+	fi
+}
+
+whonix::download_bundle() {
+	# Description: Fetch the Whonix bundle if not already present locally.
+	# Globals:
+	#	- BUNDLE_PATH, BUNDLE_NAME, WHONIX_URL, WHONIX_SHA
+	# Arguments: None
+	# Outputs: Log messages.
+	# Returns: 0
+	if [[ -s $BUNDLE_PATH ]]; then
+	write_status "re-using existing $BUNDLE_NAME"
+	return 0
+fi
+	whonix::download_with_verify "$WHONIX_URL" "$BUNDLE_PATH" "$WHONIX_SHA" || return 1
+}
+
+whonix::extract_archive() {
+	# Description: Extract the Whonix libvirt archive only when images/XMLs are missing.
+	# Globals:
+	#	- WORK_DIR, IMAGE_DIR, BUNDLE_NAME, BUNDLE_PATH, WHONIX_VERSION
+	# Arguments: None
+	# Outputs: Log messages.
+	# Returns: 0 on success, 1 on failure
+	local marker="${WORK_DIR}/.bundle.name" have_marker=0 have_images=0
+	[[ -s $marker && $(<"$marker") == "$BUNDLE_NAME" ]] && have_marker=1
+
+	if compgen -G "$WORK_DIR"/Whonix*-Gateway*.qcow2 >/dev/null \
+		&& compgen -G "$WORK_DIR"/Whonix*-Workstation*.qcow2 >/dev/null; then
+		have_images=1
+	elif [[ -d $IMAGE_DIR ]]; then
+		if compgen -G "$IMAGE_DIR"/Whonix*-Gateway*"${WHONIX_VERSION}"*.qcow2 >/dev/null \
+			&& compgen -G "$IMAGE_DIR"/Whonix*-Workstation*"${WHONIX_VERSION}"*.qcow2 >/dev/null; then
+			have_images=1
+		elif compgen -G "$IMAGE_DIR"/Whonix*-Gateway*.qcow2 >/dev/null \
+			&& compgen -G "$IMAGE_DIR"/Whonix*-Workstation*.qcow2 >/dev/null; then
+			have_images=1
+		fi
+	fi
+
+	if (( have_marker )) \
+		&& ls "$WORK_DIR"/Whonix*-Gateway*.xml "$WORK_DIR"/Whonix*-Workstation*.xml &>/dev/null \
+		&& (( have_images )); then
+		write_status "Using existing extraction for $BUNDLE_NAME"
+		return 0
+	fi
+
+	write_status "Extracting archive (this can take a while)"
+	find "$WORK_DIR" -mindepth 1 -maxdepth 1 ! -name "$(basename "$BUNDLE_PATH")" ! -name ".bundle.name" -exec rm -rf -- {} +
+	tar -xf "$BUNDLE_PATH" -C "$WORK_DIR"
+	echo "$BUNDLE_NAME" > "$marker"
+
+	ls "$WORK_DIR"/Whonix*-Gateway*.xml &>/dev/null || return 1
+	ls "$WORK_DIR"/Whonix*-Workstation*.xml &>/dev/null || return 1
+	ls "$WORK_DIR"/Whonix*-Gateway*.qcow2 &>/dev/null || return 1
+	ls "$WORK_DIR"/Whonix*-Workstation*.qcow2 &>/dev/null || return 1
+}
+
+whonix::detect_image_owner() {
+	# Description: Determine the appropriate owner:group for libvirt images.
+	# Globals:
+	#	- IMAGE_DIR, IMAGE_OWNER
+	# Arguments: None
+	# Outputs: Sets IMAGE_OWNER.
+	# Returns: 0
+	if [[ -z $IMAGE_OWNER && -d $IMAGE_DIR ]]; then
+		IMAGE_OWNER=$(stat -c "%U:%G" "$IMAGE_DIR" 2>/dev/null || true)
+	fi
+	if [[ -z $IMAGE_OWNER ]]; then
+		if getent group libvirt-qemu &>/dev/null; then
+			IMAGE_OWNER="libvirt-qemu:libvirt-qemu"
+		elif getent group qemu &>/dev/null; then
+			IMAGE_OWNER="qemu:qemu"
+		else
+			IMAGE_OWNER="root:root"
+		fi
+	fi
+}
+
+whonix::stage_images() {
+	# Description: Move or reuse Whonix qcow2/raw images in the libvirt images directory.
+	# Globals:
+	#	- WORK_DIR, IMAGE_DIR, IMAGE_OWNER, REFRESH
+	# Arguments: None
+	# Outputs: Log messages.
+	# Returns: 0
+	whonix::detect_image_owner
+	mkdir -p "$IMAGE_DIR"
+
+	for img in "$WORK_DIR"/*.raw "$WORK_DIR"/*.qcow2; do
+		[[ -e $img ]] || continue
+		local target="$IMAGE_DIR/$(basename "$img")"
+		if [[ -e $target ]]; then
+			if (( REFRESH )); then
+				write_status "$(basename "$img") (refresh) -> replacing existing copy"
+				mv -f "$img" "$target"
+			else
+				write_status "$(basename "$img") already present -> re-using existing copy (no refresh)"
+				continue
+			fi
+		else
+			write_status "$(basename "$img") -> $IMAGE_DIR"
+			mv -f "$img" "$target"
+		fi
+		chown "$IMAGE_OWNER" "$target" 2>/dev/null || true
+		chmod 0644 "$target"
+	done
+}
+
+whonix::ensure_networks_defined() {
+	# Description: Define Whonix virtual networks idempotently.
+	# Globals:
+	#	- WORK_DIR
+	# Arguments: None
+	# Outputs: Log messages.
+	# Returns: 0
+	(
+		cd "$WORK_DIR" || exit 1
+		for xml in *{e,E}xternal*.xml *{i,I}nternal*.xml; do
+			[[ -e $xml ]] || continue
+			local net
+			net=$(perl -ne 'print $1 if /<name>([^<]+)<\/name>/' "$xml" | head -1)
+			net=${net:-${xml%.xml}}
+			[[ -z $net ]] && { write_warning "cannot determine network name from $xml – skipping"; continue; }
+
+			if virsh -c qemu:///system net-list --all --name | grep -qxF "$net"; then
+				write_status "network '$net' already defined"
+			else
+				write_status "defining network '$net'"
+				virsh -c qemu:///system net-define "$xml" || write_warning "could not define '$net' (likely UUID clash)"
+			fi
+
+			if virsh -c qemu:///system net-list --name | grep -qxF "$net"; then
+				write_status "network '$net' already active"
+			else
+				write_status "starting & autostarting '$net'"
+				virsh -c qemu:///system net-start "$net"
+				virsh -c qemu:///system net-autostart "$net"
+			fi
+		done
+	)
+}
+
+whonix::ensure_networks_running() {
+	# Description: Start Whonix virtual networks if they are not active.
+	# Globals: None
+	# Arguments: None
+	# Outputs: Log messages.
+	# Returns: 0
+	local nets
+	nets=$(virsh -c qemu:///system net-list --all --name | grep -i whonix || true)
+	while read -r net; do
+		[[ -n $net ]] || continue
+		if ! virsh -c qemu:///system net-list --name | grep -qxF "$net"; then
+			write_status "starting $net"
+			virsh -c qemu:///system net-start "$net"
+			virsh -c qemu:///system net-autostart "$net"
+		else
+			write_status "$net already active"
+		fi
+	done <<< "$nets"
+}
+
+whonix::add_extra_workstation() {
+	# Description: Create an additional workstation VM overlaying an existing base disk.
+	# Globals:
+	#	- WHONIX_VERSION, IMAGE_OWNER, IMAGE_DIR, WORK_DIR
+	# Arguments:
+	#	- $1: Base disk path to overlay.
+	# Outputs: Log messages.
+	# Returns: 0 on success, 1 on failure
+	local base_disk=$1
+	[[ -f $base_disk ]] || { write_warning "cannot add workstation – base disk missing ($base_disk)"; return 1; }
+
+	local ts new_vm new_disk template
+	ts=$(date +%s)
+	new_vm="Whonix-Workstation-extra-${WHONIX_VERSION}-${ts}"
+	new_disk="${IMAGE_DIR}/Whonix-Workstation-extra-${WHONIX_VERSION}-${ts}.qcow2"
+
+	write_status "adding extra workstation '${new_vm}'"
+	qemu-img create -f qcow2 -b "$base_disk" -F qcow2 "$new_disk" >/dev/null
+	chown "$IMAGE_OWNER" "$new_disk" 2>/dev/null || true
+	chmod 0644 "$new_disk"
+
+	template="${WORK_DIR}/Whonix-Workstation-extra-${ts}.xml"
+	perl -0pe "s@<name>[^<]+</name>@<name>${new_vm}</name>@; s@<source file=['\"][^'\"]+['\"]@<source file=\"${new_disk}\"@;" "$WORK_DIR/Whonix-Workstation.xml" > "$template"
+	virsh -c qemu:///system define "$template"
+}
+
+whonix::define_vms() {
+	# Description: Define or refresh Whonix Gateway/Workstation VMs against target images.
+	# Globals:
+	#	- WORK_DIR, IMAGE_DIR, WHONIX_VERSION, REFRESH, ADD_WORKSTATION
+	# Arguments: None
+	# Outputs: Log messages.
+	# Returns: 0 on success, 1 on failure
+	local vm xml target_path fixed candidates vm_exists existing_disk up_to_date
+
+	for vm in Whonix-Gateway Whonix-Workstation; do
+		xml=$(ls "${vm}"*.xml 2>/dev/null | head -1 || true)
+		[[ -n $xml ]] || { write_warning "no XML for $vm – skipping"; continue; }
+
+		vm_exists=0
+		existing_disk=""
+		up_to_date=0
+		if virsh -c qemu:///system list --all --name | grep -qxF "$vm"; then
+			vm_exists=1
+			existing_disk=$(virsh -c qemu:///system dumpxml "$vm" 2>/dev/null | sed -nE "s@.*<source file=['\"]([^'\"]+)['\"].*@\\1@p" | head -1 || true)
+			if [[ -n $existing_disk ]] && [[ $existing_disk == *"$WHONIX_VERSION"* ]]; then
+				up_to_date=1
+			fi
+		fi
+
+		target_path=""
+		candidates=$(compgen -G "$IMAGE_DIR/${vm}"*.qcow2 2>/dev/null || true)
+		if [[ -z $candidates ]]; then
+			candidates=$(whonix::_need_root sh -c "ls -1 $IMAGE_DIR/${vm}*.qcow2 2>/dev/null" || true)
+		fi
+		if [[ -n $candidates ]]; then
+			target_path=$(head -1 <<<"$candidates")
+		elif compgen -G "$WORK_DIR/${vm}"*.qcow2 >/dev/null; then
+			target_path=$(compgen -G "$WORK_DIR/${vm}"*.qcow2 | head -1)
+		fi
+		[[ -n $target_path ]] || { write_warning "disk image for $vm missing in $IMAGE_DIR (or $WORK_DIR)"; return 1; }
+		test -f "$target_path" || { write_warning "disk image $target_path missing; extraction may have failed"; return 1; }
+
+		if (( vm_exists )) && (( up_to_date )) && (( REFRESH == 0 )); then
+			write_status "VM '$vm' already on version $WHONIX_VERSION – keeping existing definition"
+			if [[ $vm == "Whonix-Workstation" ]] && (( ADD_WORKSTATION )); then
+				whonix::add_extra_workstation "$target_path"
+			fi
+			continue
+		fi
+
+		fixed="${WORK_DIR}/${vm}-fixed.xml"
+		perl -0pe "s@<source file=['\"][^'\"]+['\"]@<source file=\"${target_path}\"@;" "$xml" > "$fixed"
+
+		if (( vm_exists )); then
+			write_status "updating existing VM '$vm'"
+		else
+			write_status "defining VM '$vm'"
+		fi
+		virsh -c qemu:///system define "$fixed"
+	done
+}
+
+whonix::maybe_skip_install() {
+	# Description: Skip all work when existing VMs are already at/above the target version unless refresh/add is requested.
+	# Globals:
+	#	- REFRESH, ADD_WORKSTATION, WHONIX_VERSION, IMAGE_DIR
+	# Outputs: Log message when skipping.
+	# Returns: Exits 0 when skipping; 0 otherwise.
+	local gw ws
+	gw=$(whonix::current_vm_version Whonix-Gateway || true)
+	ws=$(whonix::current_vm_version Whonix-Workstation || true)
+	if (( REFRESH == 0 )) && (( ADD_WORKSTATION == 0 )) \
+		&& whonix::version_ge "$gw" "$WHONIX_VERSION" \
+		&& whonix::version_ge "$ws" "$WHONIX_VERSION"; then
+	write_status "Existing Whonix VMs are up-to-date (Gateway ${gw:-unknown}, Workstation ${ws:-unknown}) – nothing to do"
+	exit 0
+fi
+}
+
+
 
 
 #                        ---
@@ -23131,14 +23544,14 @@ write_status() {
 	fi
 
 	if [[ "${TERMUITXT}" == "nocolor" ]]; then
-		printf '✓ %s: %s\n' "${FUNCNAME[1]}" "${text}"
+		printf '✓ %s: %s\n' " ${FUNCNAME[1]}" "${text}"
 	else
-		write_host --green "✓ ${FUNCNAME[1]}: ${text}"
+		write_host --green "✓  ${FUNCNAME[1]}: ${text}"
 	fi
 
 	# Tell the loging function to log the message requested...
 
-	[ -n "${text}" ] && system::log_item " ✓ ${FUNCNAME[1]}: ${text}"
+	[ -n "${text}" ] && system::log_item " ✓  ${FUNCNAME[1]}: ${text}"
 }
 
 
@@ -23439,6 +23852,7 @@ library::list_loaded_software_functions() {
 		done
 	fi
 }
+
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
