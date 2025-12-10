@@ -19,7 +19,7 @@ This module provides an idempotent installer for Whonix on KVM/libvirt, includin
 bash rtd-setup-whonix.sh [--refresh] [--add]
 ```
 
-### To simply setup Whonix on your computer run: 
+### To simply setup Whonix on your computer automatically run: 
 ```bash
 bash rtd-setup-whonix.sh 
 ```
