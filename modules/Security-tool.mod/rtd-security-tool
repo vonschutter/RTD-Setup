@@ -1,18 +1,67 @@
 #!/usr/bin/env bash
-
-# File: security-utilities-menu.sh
-# Description:
-#   Dialog-driven menu to execute various security hardening and configuration
-#   functions defined in the RTD _rtd_library.
+#::				S I M P L E     S Y S T E M   S E C U R I T Y    T O O L
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Author(s):   	SLS, KLS, NB.  
+:	${RTD_Version=1.0}
+:	${GIT_Profile:=vonschutter}
+#::
+#::
+#::	Purpose: To simplify support tasks
+#::		  - Check and take actions to improve system security.
+#::
+#::     Usage: to run: "bash /path/to/script" or if installed in the $PATH; by rtd simply type "rtd-security-tool" in a terminal.
+#::
+#::     Description:
+#::         Dialog-driven menu to execute various security hardening and configuration
+#::         functions defined in the RTD _rtd_library.
+#::
+#::     Requirements:
+#::         - _rtd_library must exist and be sourceable
+#::         - dialog must be installed
+#::
+#::     This script is shared in the hopes that
+#::     someone will find it usefull.
+#::
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #
-# Requirements:
-#   - _rtd_library must exist and be sourceable
-#   - dialog must be installed
 #
-# End of documentation
+#	RTD admin scrips are placed in /opt/rtd/modules. Optionally scripts may use the common
+#	functions in _rtd_library and _rtd_recipies.info files located in /opt/rtd/core.:
+#
+#	  _rtd_library   -- contain usefull admin functions for scripts, such as "how to install software" on different systems.
+#	  _rtd_recipies  -- contain software installation and configuration "recipies".
+#
+#	Taxonomy of this script: we prioritize the use of functions over monolithic script writing, and proper indentation
+#	to make the script more readable. Each function shall also be documented to the point of the obvious.
+#	Suggested function structure per google guidelines:
+#
+#	function_descriptive_name () {
+#		# Documentation and comments...
+#		...code...
+#	}
+#
+#
+#	These scripts are also structured in to three major sections: "settings", "functions", and "execute".
+#	Settings, contain configurable options for the script. Functions, contain all functions. Execute,
+#	contains all the actual logic and control of the script.
+#
+#
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::            Script Settings               ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 
-export RTD_GUI="dialog"
+
+RTD_GUI=(dialog --clear --backtitle "RunTime Data              SECURITY UTILITIES             Verion: ${RTD_Version}")
+
 
 dependency::file ()
 {
@@ -59,10 +108,10 @@ fi
 security_menu() {
 	while true; do
 		exec 3>&1
-		selection=$(dialog --clear --backtitle "RTD SECURITY UTILITIES" \
+		selection=$( "${RTD_GUI[@]}" \
 			--title "🔐 Security Tools Menu" \
 			--cancel-label "Exit" \
-			--menu "Choose a security task to execute:" 20 80 14 \
+			--menu "Choose a security task to execute:" 24 120 14 \
 			1 "Enable Firewall (UFW/firewalld)" \
 			2 "Check if Password is Pwned" \
 			3 "Run ClamAV Scan" \
