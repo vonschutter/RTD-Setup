@@ -18,7 +18,7 @@ This module ships `rtd-vm-tool`, a menu-driven Bash utility for managing KVM/lib
 
 - Bash shell.
 - KVM/libvirt on the host with appropriate permissions; `virsh`/`qemu` available.
-- `dialog` or `whiptail` for the TUI (`RTD_GUI` controls the picker; default `dialog`).
+- `dialog` for the TUI (`RTD_GUI` controls the picker; default `dialog`).
 - `_rtd_library` v2.04+ (loaded via `dependency::file _rtd_library` inside the script). The tool depends on `kvm::` functions and `write_*` helpers and will not operate without the library.
 
 ## Usage
