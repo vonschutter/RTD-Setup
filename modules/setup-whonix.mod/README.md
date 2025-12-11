@@ -4,6 +4,8 @@ This script provides an idempotent installer for Whonix on KVM/libvirt, includin
 
 Whonix is a security-focused, privacy-hardened operating system designed to route all traffic through Tor and reduce metadata leaks. Tor (The Onion Router) is a network that relays traffic through multiple volunteer-run nodes to obfuscate origin and destination, providing anonymity against network surveillance. Learn more at <https://www.whonix.org> and <https://www.torproject.org>.
 
+The `_rtd_library` this script relies on is plain Bash and publicly auditable on GitHub in the RTD-Setup repository.
+
 ## Features
 
 - **Auto-discovery:** Fetches the latest Whonix GUI (LXQt) libvirt bundle and checksum from `https://download.whonix.org/libvirt/`.
