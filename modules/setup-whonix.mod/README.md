@@ -1,4 +1,6 @@
-# Whonix KVM Installer Module
+# Whonix KVM Auto Installer
+
+![Whonix KVM Installer](Media_files/header-time.jpg)
 
 This script provides an idempotent installer for Whonix on KVM/libvirt, including automatic bundle discovery, download/verify, network setup, and VM definition. It is intended to be used with the RTD tools and depends on `_rtd_library` v2.05+ (2.04 is rejected). If this library is not found locally the script will attempt to fetch it automatically.
 
@@ -34,6 +36,10 @@ bash rtd-setup-whonix.sh
 ```bash
 bash <(curl -sL https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/modules/setup-whonix.mod/rtd-setup-whonix.sh)
 ```
+
+## Screenshot
+
+![Whonix VM Definitions](Media_files/Screenshot.png)
 
 ## Contents
 
