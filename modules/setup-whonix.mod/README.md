@@ -1,6 +1,6 @@
 # Whonix KVM Installer Module
 
-This module provides an idempotent installer for Whonix on KVM/libvirt, including automatic bundle discovery, download/verify, network setup, and VM definition. It is intended to be used within the RTD stack and depends on `_rtd_library` v2.05+ (2.04 is rejected).
+This script provides an idempotent installer for Whonix on KVM/libvirt, including automatic bundle discovery, download/verify, network setup, and VM definition. It is intended to be used with the RTD tools and depends on `_rtd_library` v2.05+ (2.04 is rejected). If this library is not found locall the script will attempt to fetch it automatically.
 
 Whonix is a security-focused, privacy-hardened operating system designed to route all traffic through Tor and reduce metadata leaks. Tor (The Onion Router) is a network that relays traffic through multiple volunteer-run nodes to obfuscate origin and destination, providing anonymity against network surveillance. Learn more at <https://www.whonix.org> and <https://www.torproject.org>.
 
