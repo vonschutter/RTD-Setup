@@ -1,4 +1,4 @@
-# Security Tool Module
+# RTD Security Tool
 
 ![RTD Security Tool](Media_files/header-time.jpg)
 
