@@ -6979,37 +6979,34 @@ oem::register_all_tools() {
 	sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
 	if ! grep "xhost local:root" "${_bashrc}"; then echo 'xhost local:root >/dev/null' >>"${_bashrc}"; fi
 
-	if [[ -n "${_MODS_DIR}" ]]; then
-		for d in ${_MODS_DIR}/*/; do
-			write_status "Creating links to $d"
-			for f in $d/${_TLA,,}*; do
-				write_status "Processing: ${f}"
-				if [[ ! -f "${f}" ]]; then
-					continue
-				else 
+		if [[ -n "${_MODS_DIR}" ]]; then
+			for d in ${_MODS_DIR}/*/; do
+				write_status "Creating links to scripts in $d"
+				for f in $d/${_TLA,,}*; do
+					write_status "Processing: ${f}"
+					if [[ ! -f "${f}" ]]; then
+						continue
+					fi
+					if [[ ! -x "${f}" ]]; then
+						write_status "File ${f} is not executable: setting executable bit"
+						if chmod +x "${f}" ; then
+							write_status "Set executable bit for ${f} successfully"
+						else
+							write_error "Failed to set executable bit for ${f}"
+						fi
+					fi
 					write_status "Linking app ${f} so its available in the the terminal..."
 					ln -f -s "${f}" -t /bin/
-					continue
-				fi
-				if [[ ! -x "${f}" ]]; then
-					write_status "File ${f} is not executable: setting executable bit"
-					if chmod +x "${f}" ; then
-						write_status "Set executable bit for ${f} successfully"
-					else
-						write_error "Failed to set executable bit for ${f}"
-					fi
-					continue
-				fi
+				done
 			done
-		done
-		write_status "Creating links to ${_OEM_DIR:-"/opt/rtd"}/core/*.sh"
-		chmod +x "${_OEM_DIR:-"/opt/rtd"}"/core/*.sh
-		ln -f -s "${_OEM_DIR:-"/opt/rtd"}"/core/*.sh -t /bin/
-		return
-	else
-		write_error "Location variables not set!"
-		return 1
-	fi
+			write_status "Creating links to ${_OEM_DIR:-"/opt/rtd"}/core/*.sh"
+			chmod +x "${_OEM_DIR:-"/opt/rtd"}"/core/*.sh
+			ln -f -s "${_OEM_DIR:-"/opt/rtd"}"/core/*.sh -t /bin/
+			return
+		else
+			write_error "Location variables not set!"
+			return 1
+		fi
 }
 
 
@@ -19720,6 +19717,21 @@ kvm::cicd::configure_vm_with_ansible_pull() {
 
 
 
+whonix::init_context() {
+	# Ensure Whonix globals are defined so callers running with 'set -u' are safe.
+	: "${WORK_DIR:=${HOME:-/tmp}/.local/share/whonix-kvm}"
+	: "${IMAGE_DIR:=/var/lib/libvirt/images}"
+	: "${WHONIX_BASE:=https://download.whonix.org/libvirt}"
+	: "${WHONIX_URL:=}"
+	: "${WHONIX_SHA:=}"
+	: "${WHONIX_VERSION:=}"
+	: "${BUNDLE_NAME:=}"
+	: "${BUNDLE_PATH:=}"
+	: "${IMAGE_OWNER:=}"
+	: "${REFRESH:=0}"
+	: "${ADD_WORKSTATION:=0}"
+}
+
 whonix::version_ge() {
 	# Description: Compare two dotted version strings and succeed if the first is >= the second.
 	# Globals: None
@@ -19742,6 +19754,7 @@ whonix::current_vm_version() {
 	# Outputs: Echoes the detected version (if any)
 	# Returns: 0
 	# End of documentation
+	whonix::init_context
 	local vm=$1 disk=""
 	if virsh -c qemu:///system list --all --name | grep -qxF "$vm"; then
 		disk=$(virsh -c qemu:///system dumpxml "$vm" 2>/dev/null | sed -nE "s@.*<source file=['\"]([^'\"]+)['\"].*@\\1@p" | head -1 || true)
@@ -19766,6 +19779,7 @@ whonix::discover_bundle() {
 	# Outputs: Log messages.
 	# Returns: 0 on success, exits on fatal error.
 	# End of documentation
+	whonix::init_context
 	local index="${WHONIX_BASE}/" html dirlist file
 	write_information "Discovering latest Whonix libvirt bundle"
 	html=$(wget -qO- "$index") || { write_warning "cannot reach $index"; return 1; }
@@ -19802,6 +19816,7 @@ whonix::prepare_workdir() {
 	# Outputs: Log messages.
 	# Returns: 0
 	# End of documentation
+	whonix::init_context
 	if [[ -d $WORK_DIR ]]; then
 		local existing
 		existing=$(find "$WORK_DIR" -maxdepth 1 -type f -name '*.libvirt.xz' -printf '%f\n' | head -1 || true)
@@ -19854,6 +19869,7 @@ whonix::download_bundle() {
 	# Outputs: Log messages.
 	# Returns: 0
 	# End of documentation
+	whonix::init_context
 	if [[ -s $BUNDLE_PATH ]]; then
 	write_status "re-using existing $BUNDLE_NAME"
 	return 0
@@ -19869,6 +19885,7 @@ whonix::extract_archive() {
 	# Outputs: Log messages.
 	# Returns: 0 on success, 1 on failure
 	# End of documentation
+	whonix::init_context
 	local marker="${WORK_DIR}/.bundle.name" have_marker=0 have_images=0
 	[[ -s $marker && $(<"$marker") == "$BUNDLE_NAME" ]] && have_marker=1
 
@@ -19911,6 +19928,7 @@ whonix::detect_image_owner() {
 	# Outputs: Sets IMAGE_OWNER.
 	# Returns: 0
 	# End of documentation
+	whonix::init_context
 	if [[ -z $IMAGE_OWNER && -d $IMAGE_DIR ]]; then
 		IMAGE_OWNER=$(stat -c "%U:%G" "$IMAGE_DIR" 2>/dev/null || true)
 	fi
@@ -19933,6 +19951,7 @@ whonix::stage_images() {
 	# Outputs: Log messages.
 	# Returns: 0
 	# End of documentation
+	whonix::init_context
 	whonix::detect_image_owner
 	mkdir -p "$IMAGE_DIR"
 
@@ -19964,6 +19983,7 @@ whonix::ensure_networks_defined() {
 	# Outputs: Log messages.
 	# Returns: 0
 	# End of documentation
+	whonix::init_context
 	(
 		cd "$WORK_DIR" || exit 1
 		for xml in *{e,E}xternal*.xml *{i,I}nternal*.xml; do
@@ -19998,6 +20018,7 @@ whonix::ensure_networks_running() {
 	# Outputs: Log messages.
 	# Returns: 0
 	# End of documentation
+	whonix::init_context
 	local nets
 	nets=$(virsh -c qemu:///system net-list --all --name | grep -i whonix || true)
 	while read -r net; do
@@ -20021,6 +20042,7 @@ whonix::add_extra_workstation() {
 	# Outputs: Log messages.
 	# Returns: 0 on success, 1 on failure
 	# End of documentation
+	whonix::init_context
 	local base_disk=$1
 	[[ -f $base_disk ]] || { write_warning "cannot add workstation – base disk missing ($base_disk)"; return 1; }
 
@@ -20047,6 +20069,7 @@ whonix::define_vms() {
 	# Outputs: Log messages.
 	# Returns: 0 on success, 1 on failure
 	# End of documentation
+	whonix::init_context
 	local vm xml target_path fixed candidates vm_exists existing_disk up_to_date
 
 	for vm in Whonix-Gateway Whonix-Workstation; do
@@ -20104,6 +20127,7 @@ whonix::maybe_skip_install() {
 	# Outputs: Log message when skipping.
 	# Returns: Exits 0 when skipping; 0 otherwise.
 	# End of documentation
+	whonix::init_context
 	local gw ws
 	gw=$(whonix::current_vm_version Whonix-Gateway || true)
 	ws=$(whonix::current_vm_version Whonix-Workstation || true)
@@ -23738,9 +23762,6 @@ library::apply_rtd_defaults() {
 	for _dep in ${_OEM_dependencies}; do
 		dependency::file "${_dep}" && system::log_item "✅  ${_dep} Loaded without errors..." || system::log_item "👾 ${_dep} Loaded with errors..." 
 	done
-	# dependency::file _branding.info && system::log_item "✅ _branding.info Loaded without errors..." || system::log_item "👾 _branding.info Loaded with errors..."
-	# dependency::file _locations.info && system::log_item "✅ _locations.info Loaded without errors..." || system::log_item "👾 _locations.info Loaded with errors..."
-	# dependency::file _rtd_recipies.info && system::log_item "✅ _rtd_recipies.info Loaded without errors..." || system::log_item "👾 _rtd_recipies.info Loaded with errors..."
 
 	: "${_TLA:="RTD"}"
 	: "${_tla:="${_TLA,,}"}"
