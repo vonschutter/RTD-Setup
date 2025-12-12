@@ -172,7 +172,7 @@ main(){
 	check_rtd_version
 	set_source_urls
 	init_paths
-	security::ensure_admin --sudo || die "Failed to obtain admin privileges"
+	security::ensure_admin || die "Failed to obtain admin privileges"
 	ensure_deps
 	add_user_groups
 	start_default_net
