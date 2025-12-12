@@ -19936,14 +19936,8 @@ whonix::current_vm_version() {
 	if virsh -c qemu:///system list --all --name | grep -qxF "$vm"; then
 		disk=$(virsh -c qemu:///system dumpxml "$vm" 2>/dev/null | sed -nE "s@.*<source file=['\"]([^'\"]+)['\"].*@\\1@p" | head -1 || true)
 	fi
-	if [[ -z $disk ]] && compgen -G "$IMAGE_DIR/${vm}"*.qcow2 >/dev/null; then
-		disk=$(compgen -G "$IMAGE_DIR/${vm}"*.qcow2 | head -1)
-	fi
-	if [[ -z $disk ]]; then
-		disk=$(sh -c "ls -1 $IMAGE_DIR/${vm}*.qcow2 2>/dev/null" || true)
-		disk=$(head -1 <<<"$disk")
-		[[ -z $disk ]] && return 0
-	fi
+	[[ -z $disk ]] && return 0
+
 	perl -ne 'if(/Whonix-[^-]+-[A-Za-z]+-([0-9.]+)\.Intel_AMD64\.qcow2/ || /Whonix-[^-]+-([0-9.]+)\.Intel_AMD64\.qcow2/ || /Whonix-[^-]+-([0-9.]+)/){print $1;exit}' <<<"$disk"
 }
 
@@ -20250,7 +20244,8 @@ whonix::define_vms() {
 	local vm xml target_path fixed candidates vm_exists existing_disk up_to_date
 
 	for vm in Whonix-Gateway Whonix-Workstation; do
-		xml=$(ls "${vm}"*.xml 2>/dev/null | head -1 || true)
+		# Look for XML in the extracted work directory; do not rely on current working dir.
+		xml=$(compgen -G "${WORK_DIR}/${vm}"*.xml 2>/dev/null | head -1 || true)
 		[[ -n $xml ]] || { write_warning "no XML for $vm – skipping"; continue; }
 
 		vm_exists=0
@@ -20287,6 +20282,8 @@ whonix::define_vms() {
 
 		fixed="${WORK_DIR}/${vm}-fixed.xml"
 		perl -0pe "s@<source file=['\"][^'\"]+['\"]@<source file=\"${target_path}\"@;" "$xml" > "$fixed"
+		# Ensure remote graphical console works over SSH by binding SPICE to localhost instead of using FD passing.
+		perl -0pi -e "s@<graphics type='spice'([^>]*)listen='none'([^>]*)>@<graphics type='spice'\$1listen='127.0.0.1'\$2>@g; s@<listen type='none'/>@<listen type='address' address='127.0.0.1'/>@g" "$fixed"
 
 		if (( vm_exists )); then
 			write_status "updating existing VM '$vm'"
