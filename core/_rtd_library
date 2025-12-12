@@ -6979,34 +6979,77 @@ oem::register_all_tools() {
 	sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
 	if ! grep "xhost local:root" "${_bashrc}"; then echo 'xhost local:root >/dev/null' >>"${_bashrc}"; fi
 
-		if [[ -n "${_MODS_DIR}" ]]; then
-			for d in ${_MODS_DIR}/*/; do
-				write_status "Creating links to scripts in $d"
-				for f in $d/${_TLA,,}*; do
-					write_status "Processing: ${f}"
-					if [[ ! -f "${f}" ]]; then
-						continue
+	if [[ -z "${_MODS_DIR}" || ! -d "${_MODS_DIR}" ]]; then
+		write_error "Location variables not set or modules dir missing!"
+		return 1
+	fi
+
+	local link_target="/usr/local/bin"
+	if [[ ! -d $link_target || ! -w $link_target ]]; then
+		link_target="/bin"
+	fi
+
+	shopt -s nullglob
+	for d in "${_MODS_DIR}"/*/; do
+		write_status "Creating links to scripts in $d"
+		for f in "$d"/${_TLA,,}*; do
+			write_status "Processing: ${f}"
+			if [[ ! -f "${f}" ]]; then
+				continue
+			fi
+			if [[ ! -x "${f}" ]]; then
+				write_status "File ${f} is not executable: setting executable bit"
+				if chmod +x "${f}" ; then
+					write_status "Set executable bit for ${f} successfully"
+				else
+					write_error "Failed to set executable bit for ${f}"
+				fi
+			fi
+			local dest="${link_target}/$(basename "$f")"
+			local target
+			target=$(readlink -f "${dest}" 2>/dev/null || true)
+			if [[ "${target}" == "$(readlink -f "$f")" ]]; then
+				write_status "Link for $BYellow ${f} $Green already points to target $BCyan (${dest})"
+			else
+				write_status "Linking app $BYellow ${f} $Green so its available in the terminal..."
+				ln -sf "${f}" "${dest}"
+			fi
+			if [[ "${link_target}" != "/bin" ]]; then
+				local legacy="/bin/$(basename "$f")"
+				if [[ -L "${legacy}" ]]; then
+					local legacy_target
+					legacy_target=$(readlink -f "${legacy}" 2>/dev/null || true)
+					if [[ "${legacy_target}" == "$(readlink -f "$f")" ]]; then
+						write_status "Removing legacy link $BRed ${legacy} "
+						rm -f "${legacy}"
 					fi
-					if [[ ! -x "${f}" ]]; then
-						write_status "File ${f} is not executable: setting executable bit"
-						if chmod +x "${f}" ; then
-							write_status "Set executable bit for ${f} successfully"
-						else
-							write_error "Failed to set executable bit for ${f}"
-						fi
-					fi
-					write_status "Linking app ${f} so its available in the the terminal..."
-					ln -f -s "${f}" -t /bin/
-				done
-			done
-			write_status "Creating links to ${_OEM_DIR:-"/opt/rtd"}/core/*.sh"
-			chmod +x "${_OEM_DIR:-"/opt/rtd"}"/core/*.sh
-			ln -f -s "${_OEM_DIR:-"/opt/rtd"}"/core/*.sh -t /bin/
-			return
-		else
-			write_error "Location variables not set!"
-			return 1
+				fi
+			fi
+		done
+	done
+	shopt -u nullglob
+
+	write_status "Creating links to ${_OEM_DIR:-"/opt/rtd"}/core/*.sh"
+	for f in "${_OEM_DIR:-"/opt/rtd"}"/core/*.sh; do
+		[[ -e $f ]] || continue
+		chmod +x "$f" || write_warning "Could not set executable on $f"
+		dest="${link_target}/$(basename "$f")"
+		target=$(readlink -f "${dest}" 2>/dev/null || true)
+		if [[ "${target}" == "$(readlink -f "$f")" ]]; then
+			continue
 		fi
+		ln -sf "$f" "$dest"
+		if [[ "${link_target}" != "/bin" ]]; then
+			legacy="/bin/$(basename "$f")"
+			if [[ -L "${legacy}" ]]; then
+				legacy_target=$(readlink -f "${legacy}" 2>/dev/null || true)
+				if [[ "${legacy_target}" == "$(readlink -f "$f")" ]]; then
+					rm -f "${legacy}"
+				fi
+			fi
+		fi
+	done
+	return
 }
 
 
@@ -23446,56 +23489,35 @@ write_host() {
 	_option=$1
 
 	case ${_option} in
-	--yellow) color="$(
-		tput bold
-		tput setaf 3
-	)" ;;
-	--darkyellow) color="$(
-		tput dim
-		tput setaf 3
-	)" ;;
-	--red) color="$(
-		tput bold
-		tput setaf 1
-	)" ;;
-	--darkred) color="$(tput setaf 3)" ;;
-	--endcolor) color="$(tput sgr0)" ;;
-	--green) color="$(
-		tput bold
-		tput setaf 2
-	)" ;;
-	--darkgreen) color="$(
-		tput dim
-		tput setaf 2
-	)" ;;
-	--blue) color="$(
-		tput bold
-		tput setaf 4
-	)" ;;
-	--darkblue) color="$(
-		tput dim
-		tput setaf 4
-	)" ;;
-	--cyan) color="$(
-		tput bold
-		tput setaf 6
-	)" ;;
-	--darkcyan) color="$(
-		tput dim
-		tput setaf 6
-	)" ;;
-	--gray) color="$(
-		tput dim
-		tput setaf 7
-	)" ;;
-	--purple) color="$(
-		tput bold
-		tput setaf 5
-	)" ;;
-	--darkpurple) color="$(
-		tput dim
-		tput setaf 5
-	)" ;;
+	--endcolor|--reset) color="$(tput sgr0)" ;;
+	# Yellow
+	--yellow|--Y|--Yellow) color="$(tput setaf 3)" ;;
+	--Byellow|--BY|--BYellow|--yellow-bold) color="$(tput bold; tput setaf 3)" ;;
+	--Dyellow|--DY|--DYellow|--yellow-dim) color="$(tput dim; tput setaf 3)" ;;
+	# Red
+	--red|--R|--Red) color="$(tput setaf 1)" ;;
+	--Bred|--BR|--BRed|--red-bold) color="$(tput bold; tput setaf 1)" ;;
+	--Dred|--DR|--DRed|--red-dim) color="$(tput dim; tput setaf 1)" ;;
+	# Green
+	--green|--G|--Green) color="$(tput setaf 2)" ;;
+	--Bgreen|--BG|--BGreen|--green-bold) color="$(tput bold; tput setaf 2)" ;;
+	--Dgreen|--DG|--DGreen|--green-dim) color="$(tput dim; tput setaf 2)" ;;
+	# Blue
+	--blue|--B|--Blue) color="$(tput setaf 4)" ;;
+	--Bblue|--BB|--BBlue|--blue-bold) color="$(tput bold; tput setaf 4)" ;;
+	--Dblue|--DB|--DBlue|--blue-dim) color="$(tput dim; tput setaf 4)" ;;
+	# Cyan
+	--cyan|--C|--Cyan) color="$(tput setaf 6)" ;;
+	--Bcyan|--BC|--BCyan|--cyan-bold) color="$(tput bold; tput setaf 6)" ;;
+	--Dcyan|--DC|--DCyan|--cyan-dim) color="$(tput dim; tput setaf 6)" ;;
+	# Gray
+	--gray|--grey|--Gr|--Gray|--Grey) color="$(tput setaf 7)" ;;
+	--Bgray|--Bgrey|--BGy|--gray-bold) color="$(tput bold; tput setaf 7)" ;;
+	--Dgray|--Dgrey|--DGy|--gray-dim) color="$(tput dim; tput setaf 7)" ;;
+	# Purple
+	--purple|--P|--Purple) color="$(tput setaf 5)" ;;
+	--Bpurple|--BP|--BPurple|--purple-bold) color="$(tput bold; tput setaf 5)" ;;
+	--Dpurple|--DP|--DPurple|--purple-dim) color="$(tput dim; tput setaf 5)" ;;
 	*) local _text="$1" ;;
 	esac
 
