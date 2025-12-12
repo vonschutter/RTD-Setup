@@ -7084,7 +7084,31 @@ oem::register_all_tools() {
 	# Dependencies: _locations
 	#
 	# End of Documentation
-	_bashrc="/home/${_OEM_USER:-"tangarora"}/.bashrc"
+	# Resolve the target user's home reliably instead of assuming tangarora
+	local _target_user="${_OEM_USER:-${SUDO_USER:-${USER}}}"
+	local _home_dir=""
+
+	# Prefer passwd database; fall back to current user's $HOME if unknown user is supplied
+	if getent passwd "${_target_user}" >/dev/null 2>&1; then
+		_home_dir=$(getent passwd "${_target_user}" | cut -d: -f6)
+	elif [[ "${_target_user}" == "${USER}" && -n "${HOME}" && -d "${HOME}" ]]; then
+		_home_dir="${HOME}"
+	else
+		write_warning "User ${_target_user} not found; falling back to current user ${USER}"
+		_target_user="${USER}"
+		if [[ -n "${HOME}" && -d "${HOME}" ]]; then
+			_home_dir="${HOME}"
+		else
+			_home_dir=$(getent passwd "${USER}" | cut -d: -f6)
+		fi
+	fi
+
+	if [[ -z "${_home_dir}" || ! -d "${_home_dir}" ]]; then
+		write_error "Cannot determine home directory for user ${_target_user}"
+		return 1
+	fi
+	_bashrc="${_home_dir}/.bashrc"
+	[[ -f "${_bashrc}" ]] || touch "${_bashrc}"
 
 	sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
 	if ! grep "xhost local:root" "${_bashrc}"; then echo 'xhost local:root >/dev/null' >>"${_bashrc}"; fi
