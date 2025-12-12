@@ -212,8 +212,9 @@ export RTD_VERSION="2.05"
 168   system::ensure_directory_exists                              ;           Function to ensure a directory exists, creating it if necessary.
 169   system::find_download_ubuntu_iso                             ;           Locate a requested Ubuntu ISO and download it when not already cached.
 170   system::find_vm_bridge                                       ;           See inline documentation in this file.
-171   system::generate_autoyast_file                               ;           See inline documentation in this file.
-172   system::generate_cloudconfig                                 ;           See inline documentation in this file.
+171   system::optimize_startup                                     ;           Apply basic boot/runtime tunables for responsiveness.
+172   system::generate_autoyast_file                               ;           See inline documentation in this file.
+173   system::generate_cloudconfig                                 ;           See inline documentation in this file.
 173   system::generate_ks_cfg_file                                 ;           Generates an installation configuration file (kickstart) for Fedora/Red Hat.
 174   system::generate_report_disk_space_used_by_directory         ;           Function to generate a report for folders' disk space use.
 175   system::get_Windows_Product_Key                              ;           Function to retrieve a Windows product key from the BIOS. This assumes that the OEM
@@ -6537,6 +6538,114 @@ system::validate_parameters() {
 	return 0
 }
 
+
+system::optimize_harddrive() {
+	# Description:
+	#   Detect mounted block devices and apply basic performance-oriented tunables
+	#   (scheduler, readahead, write cache) appropriate for HDD/SSD/NVMe.
+	# Globals: Uses write_status/write_warning helpers.
+	# Returns: 0 on success, 1 on failures or when not run as root.
+	# Usage: system::optimize_harddrive
+	# End of documentation
+	[[ $EUID -ne 0 ]] && { write_warning "system::optimize_harddrive requires root"; return 1; }
+
+	local link_target="/usr/local/bin"
+	local dev_path dev name type rotational scheduler_path read_ahead_path desired_scheduler available target ra_kb
+
+	_set_scheduler() {
+		local sched_file=$1 blk_type=$2
+		local current available_sched desired sched
+		available_sched=$(tr -d '[]' <"$sched_file" 2>/dev/null || true)
+		case "$blk_type" in
+			nvme) desired=(none noop "mq-deadline") ;;
+			ssd) desired=(none noop "mq-deadline") ;;
+			hdd) desired=("mq-deadline" bfq kyber deadline noop) ;;
+			*) desired=() ;;
+		esac
+		for sched in "${desired[@]}"; do
+			if grep -qw "$sched" <<<"$available_sched"; then
+				echo "$sched"
+				return
+			fi
+		done
+		echo ""
+	}
+
+	for dev_path in /sys/block/*; do
+		dev=${dev_path##*/}
+		[[ $dev =~ ^(loop|ram|fd|sr|md|dm-|zd).* ]] && continue
+
+		type="unknown"
+		if [[ $dev == nvme* ]]; then
+			type="nvme"
+			rotational=0
+		else
+			rotational=$(<"$dev_path/queue/rotational" 2>/dev/null || echo "")
+			if [[ $rotational == "0" ]]; then
+				type="ssd"
+			elif [[ $rotational == "1" ]]; then
+				type="hdd"
+			fi
+		fi
+
+		scheduler_path="$dev_path/queue/scheduler"
+		read_ahead_path="$dev_path/queue/read_ahead_kb"
+
+		if [[ -w $scheduler_path ]]; then
+			desired_scheduler=$(_set_scheduler "$scheduler_path" "$type")
+			if [[ -n $desired_scheduler ]]; then
+				echo "$desired_scheduler" >"$scheduler_path" && write_status "Set scheduler $desired_scheduler for /dev/$dev"
+			else
+				write_warning "No suitable scheduler found for /dev/$dev (type $type)"
+			fi
+		else
+			write_warning "Cannot adjust scheduler for /dev/$dev (no permission or file missing)"
+		fi
+
+		case "$type" in
+			hdd) ra_kb=512 ;;
+			ssd) ra_kb=256 ;;
+			nvme) ra_kb=128 ;;
+			*) ra_kb=256 ;;
+		esac
+		if [[ -w $read_ahead_path ]]; then
+			echo "$ra_kb" >"$read_ahead_path" && write_status "Set readahead ${ra_kb}KB for /dev/$dev"
+		else
+			write_warning "Cannot adjust readahead for /dev/$dev"
+		fi
+
+		if [[ $type != "nvme" && -x "$(command -v hdparm)" ]]; then
+			hdparm -W1 "/dev/$dev" &>/dev/null || write_warning "Failed to enable write cache on /dev/$dev"
+		fi
+	done
+}
+
+system::optimize_startup() {
+	# Description:
+	#   Apply lightweight boot/runtime tunables to improve responsiveness: ensure trim timer,
+	#   adjust swap/writeback sysctls, and reuse disk optimizations.
+	# Globals: Uses write_status/write_warning.
+	# Returns: 0 on success, 1 on failures or when not run as root.
+	# Usage: system::optimize_startup
+	# End of documentation
+	[[ $EUID -ne 0 ]] && { write_warning "system::optimize_startup requires root"; return 1; }
+
+	if command -v systemctl &>/dev/null; then
+		if systemctl list-unit-files | grep -q '^fstrim.timer'; then
+			systemctl enable --now fstrim.timer >/dev/null 2>&1 \
+				&& write_status "Enabled fstrim.timer for periodic SSD/NVMe trimming" \
+				|| write_warning "Could not enable fstrim.timer"
+		fi
+	fi
+
+	sysctl -w vm.swappiness=10 >/dev/null 2>&1 && write_status "Set vm.swappiness=10" || write_warning "Could not set vm.swappiness"
+	sysctl -w vm.dirty_background_ratio=5 >/dev/null 2>&1 && write_status "Set vm.dirty_background_ratio=5" || write_warning "Could not set vm.dirty_background_ratio"
+	sysctl -w vm.dirty_ratio=10 >/dev/null 2>&1 && write_status "Set vm.dirty_ratio=10" || write_warning "Could not set vm.dirty_ratio"
+	sysctl -w vm.vfs_cache_pressure=50 >/dev/null 2>&1 && write_status "Set vm.vfs_cache_pressure=50" || write_warning "Could not set vm.vfs_cache_pressure"
+
+	system::optimize_harddrive
+}
+
 system::cleanup_and_finish() {
 	# Description: Function to remove all temporary file locations left over from building
 	# the new netinstall ISO etc. and clean  up some variables...
@@ -6959,6 +7068,7 @@ oem::deploy_themes() {
 		return 1
 	fi
 }
+
 
 oem::register_all_tools() {
 	# Description: Function to register all OEM scripts on the current device.
