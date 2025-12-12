@@ -20244,8 +20244,14 @@ whonix::define_vms() {
 	local vm xml target_path fixed candidates vm_exists existing_disk up_to_date
 
 	for vm in Whonix-Gateway Whonix-Workstation; do
-		# Look for XML in the extracted work directory; do not rely on current working dir.
-		xml=$(compgen -G "${WORK_DIR}/${vm}"*.xml 2>/dev/null | head -1 || true)
+		# Prefer the upstream bundle XML (avoid reusing prior -fixed files)
+		xml=""
+		if [[ -f "${WORK_DIR}/${vm}.xml" ]]; then
+			xml="${WORK_DIR}/${vm}.xml"
+		else
+			# pick the first matching XML that is not a prior fixed file
+			xml=$(compgen -G "${WORK_DIR}/${vm}"*.xml 2>/dev/null | grep -v -- '-fixed.xml$' | head -1 || true)
+		fi
 		[[ -n $xml ]] || { write_warning "no XML for $vm – skipping"; continue; }
 
 		vm_exists=0
