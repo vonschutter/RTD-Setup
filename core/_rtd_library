@@ -20283,7 +20283,7 @@ whonix::define_vms() {
 		fixed="${WORK_DIR}/${vm}-fixed.xml"
 		perl -0pe "s@<source file=['\"][^'\"]+['\"]@<source file=\"${target_path}\"@;" "$xml" > "$fixed"
 		# Ensure remote graphical console works over SSH by binding SPICE to localhost instead of using FD passing.
-		perl -0pi -e "s@<graphics type='spice'([^>]*)listen='none'([^>]*)>@<graphics type='spice'\$1listen='127.0.0.1'\$2>@g; s@<listen type='none'/>@<listen type='address' address='127.0.0.1'/>@g" "$fixed"
+		perl -0pi -e "s@<graphics type=['\"]spice['\"]([^>]*)listen=['\"]none['\"]([^>]*)>@<graphics type='spice'\$1listen='127.0.0.1'\$2>@gi; s@<listen type=['\"]none['\"]/>@<listen type='address' address='127.0.0.1'/>@gi" "$fixed"
 
 		if (( vm_exists )); then
 			write_status "updating existing VM '$vm'"
