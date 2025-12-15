@@ -2,7 +2,7 @@
 
 \< [Back](https://github.com/vonschutter/RTD-Setup/blob/main/README.md) |
 
-## Overview:
+## Overview
 
 The core of the RTD Power Tools are the core libraries and the configuration scripts for computers, servers, and VMs. The core library and the configuration files are the following:
 
@@ -71,7 +71,7 @@ This library is a large collection of Bash functions organized into several logi
     └── fedora::*, ubuntu::*, mint::* (Distro-specific ISO downloaders)
 ```
 
-#### Key Namespaces & Purpose:
+#### Key Namespaces & Purpose
 
 * **`dialog::`, `yad::`, `zenity::`**: Provide functions to create interactive prompts and display information to the user in both terminal (TUI) and graphical (GUI) environments.
 * **`system::`**: Core functions for interacting with the underlying OS, managing services, handling files, and performing system-level tasks.
@@ -89,7 +89,7 @@ The RTD Power Tools may be installed manually and/or added by either of PRESEED,
 | --- |
 | ![1683625615788](image/README/1683625615788.png) |
 
-## RTD Power Tools Library Usage:
+## RTD Power Tools Library Usage
 
 The RTD Toolset is a collection of scripts intended to facilitate adding, optional and highly useful, software to a vanilla install of Debian, SUSE, or RedHat based distributions automatically. This tool could be useful for a smaller OEM to load systems in a consistent and easy way. Alternatively; an individual may simply want to have an easy way to reload or install another version of Linux without the hassle of adding all the software or answering all the setup questions.
 
@@ -141,7 +141,7 @@ To see options to use this library type:
         _rtd_library --devhelp-gtk
 ```
 
-### DevHelp main dialog screen:
+### DevHelp main dialog screen
 
 For example if you are using the tool remotely via SSH, you may display a help screen as illustrated below. This would facilitate working with scripts remotely.
 
@@ -150,13 +150,13 @@ To see useful documentation on each function in this library in a Terminal or re
 
 ![1683618476060](image/README/1683618476060.png)
 
-### DevHelp function description screen:
+### DevHelp function description screen dialog
 
 Once a function is selected the instructions are shown for how to use the function.
 
 ![1683618508270](image/README/1683618508270.png)
 
-### DevHelpGtk main main dialog screen:
+### DevHelpGtk main main dialog screen
 
 Handily if you are on a Linux desktop you may display library function documentation on your desktop using the --devhelp-gtk option.
 
@@ -165,13 +165,13 @@ To see useful documentation on each function in this library in GTK (local deskt
 
 ![1683622846033](image/README/1683622846033.png)
 
-### DevHelp function description screen:
+### DevHelp function description screen gtk
 
 As with the remote option, once selected the gtk dialogs will display documentation on how to use each function.
 
 ![1683623896061](image/README/1683623896061.png)
 
-## Please consider sharing back and contributing:
+## Please consider sharing back and contributing
 
 These scripts are released for the convenience of all and are provided as is. However, all contributions are appreciated. The simplest way to contribute is to provide a shell script to be included in the /modules directory and the shell script itself named with the TLA "rtd'' so that the installer can find it and create a link in the $PATH.
 
