@@ -22,7 +22,7 @@ rtd-oem-bundle-manager
 
 The main window will let you choose between a few options: to add bundles, remove bundles, or detailed information about the tool itself.
 
-![1679592203031](image/README/1679592203031.png)
+![1679592203031](image/README/main.png)
 
 When selecting "Add Bundles to this computer" you will see a list of bundles available to install on your computer. Only bundles that have not already been installed will be listed in this dialog. To the right of the Bundle name there is a brief description of the contents of the bundle. Bundles are defined in the "_rtd_recipes" file.
 
