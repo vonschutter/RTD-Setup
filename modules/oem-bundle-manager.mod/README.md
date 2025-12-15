@@ -28,7 +28,7 @@ When selecting "Add Bundles to this computer" you will see a list of bundles ava
 
 NOTE: Software is not provided as part of the OEM Bundle Manager of the RTD Power Tools, but downloaded from the internet when needed.
 
-![1679592132039](image/README/1679592132039.png)
+![1679592132039](image/README/install.png)
 
 Once a bundle is added to your computer, it may be removed by choosing the "Remove Bundles from this computer" from the selection in the main window. Any installed bundles will be listed here. Selecting it in this window will remove it from your computer.
 
