@@ -29,6 +29,58 @@ Further tools and utilities are located in the /apps folder and the /modules fol
 
 In short: source the library once, and every RTD script gains a well-tested catalog of commands and UI helpers. This keeps each module tiny, ensures cross-distro behavior, and gives OEM teams confidence that installs will be identical whether triggered from a live session, a Kickstart/Preseed job, or a remote automation task.
 
+### `_rtd_library` - Function Map
+
+This library is a large collection of Bash functions organized into several logical namespaces.
+
+```
+.
+├── 📜 Standard Interactions & UI
+│   ├── dialog::* (TUI dialogs: notice, error, progress, yes/no)
+│   ├── yad::*    (GUI dialogs using YAD)
+│   ├── zenity::* (GUI dialogs using Zenity)
+│   └── term::*   (Terminal animations and formatted output)
+│
+├── ⚙️ System & OEM Management
+│   ├── system::*       (Service management, logging, ISO creation, sys-info)
+│   ├── oem::*          (Branding, theming, creating launchers, resealing)
+│   ├── gnome::*        (GNOME-specific tweaks: Dash-to-Panel, Nautilus, fonts)
+│   └── security::*     (Firewall, encryption, hardening, malware scanning)
+│
+├── 📦 Software Management
+│   ├── software::*     (Install/remove packages, manage Flatpak/Snap, update system)
+│   └── dependency::*   (Check for commands, OS, desktop environment)
+│
+├── 🌐 Network Operations
+│   ├── network::*      (Check internet, get public IP, rsync wrappers)
+│   └── ssh::*          (Manage SSH keys)
+│
+├── 🖥️ Virtualization (KVM)
+│   ├── kvm::*          (Create, clone, and manage KVM virtual machines)
+│   ├── kvm::cicd::*    (Automate VM config with cloud-init and Ansible)
+│   ├── kvm::util::*    (VM naming and configuration helpers)
+│   └── whonix::*       (Specific functions to deploy Whonix Gateway/Workstation VMs)
+│
+├── 📝 Templates & Configuration
+│   ├── template::*     (Generate config files: AutoYast, Kickstart, preseed, etc.)
+│   └── library::*      (Core library functions, path normalization)
+│
+└── 🛠️ Miscellaneous Tools
+    ├── tool::*         (Compress/recompress files, test ISO boot media)
+    ├── disk::*         (Device re-encryption)
+    └── fedora::*, ubuntu::*, mint::* (Distro-specific ISO downloaders)
+```
+
+#### Key Namespaces & Purpose:
+
+*   **`dialog::`, `yad::`, `zenity::`**: Provide functions to create interactive prompts and display information to the user in both terminal (TUI) and graphical (GUI) environments.
+*   **`system::`**: Core functions for interacting with the underlying OS, managing services, handling files, and performing system-level tasks.
+*   **`software::`**: A complete suite for managing software packages from native repositories, Flatpak, and Snap, including dependency checks and system updates.
+*   **`oem::` & `gnome::`**: A powerful set of tools for customizing or "branding" a Linux installation with specific themes, wallpapers, default settings, and application launchers.
+*   **`kvm::`**: Provides extensive automation for creating and managing KVM virtual machines, including downloading ISOs, creating disks, and defining VMs from templates.
+*   **`security::`**: Functions to enhance system security by configuring firewalls, intrusion detection systems, and encryption.
+*   **`network::`**: Helpers for network-related tasks like checking connectivity and transferring files securely.
+
 NOTE: For the software bundle installer, and particularly for validating dependencies, software titles may be named slightly differently in some versions of Linux and may therefore not install since they are not found. For this reason, more emphasis is placed on "snap" apps and "flatpaks" where possible to allow universal installs. Snaps and Flatpaks allow for applications to be sandboxed for security as well.
 
 The RTD Power Tools may be installed manually and/or added by either of PRESEED, KICKSTART, AUTOYAST, or AUTOUNATTEND installation configuration files. These configuration files are included by default in the RTD Power Tools Library and are created when needed. These are applied when either creating a VM or installation media using the RTD Power Tools.
