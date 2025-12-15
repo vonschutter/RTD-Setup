@@ -15,7 +15,7 @@ The core of the RTD Power Tools are the core libraries and the configuration scr
 *   rtd-oem-linux-config.sh: script to configure a server, VDI, VM, or PC using the \_rtd\_library functions.
 *   rtd-oem-win10-config.ps1: script to configure a server, VDI, VM, or PC.
 
-Further tools and utilities are located in the /apps folder and the /modules folder. These modules may make use of the \_rtd\_library accomplish their tasks. For example; the software-bundle-manager:![1683551411392](image/README/1683551411392.png)
+Further tools and utilities are located in the /apps folder and the /modules folder. These modules may make use of the \_rtd\_library accomplish their tasks. For example; the software-bundle-manager
 
 ### What is `_rtd_library`?
 
