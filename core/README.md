@@ -6,14 +6,14 @@
 
 The core of the RTD Power Tools are the core libraries and the configuration scripts for computers, servers, and VMs. The core library and the configuration files are the following:
 
-*   _branding: Contains configurations for how things look.
-*   _locations: Contains URLs, file locations, etc.
-*   _rtd_library: Contains all functions that do the heavy lifting and repeated work.
-*   _rtd_recipes: Collections of software to make available for install.
-*   sigs (folder): contains the hashes used to validate the oem apps compressed in the /apps folder
-*   rtd-oem-enable-config.sh: script to enable the tools when auto installed via PRESEED or AUTOUNATTEND.
-*   rtd-oem-linux-config.sh: script to configure a server, VDI, VM, or PC using the \_rtd\_library functions.
-*   rtd-oem-win10-config.ps1: script to configure a server, VDI, VM, or PC.
+* branding: Contains configurations for how things look.
+* locations: Contains URLs, file locations, etc.
+* _rtd_library: Contains all functions that do the heavy lifting and repeated work.
+* _rtd_recipes: Collections of software to make available for install.
+* sigs (folder): contains the hashes used to validate the oem apps compressed in the /apps folder
+* rtd-oem-enable-config.sh: script to enable the tools when auto installed via PRESEED or AUTOUNATTEND.
+* rtd-oem-linux-config.sh: script to configure a server, VDI, VM, or PC using the \_rtd\_library functions.
+* rtd-oem-win10-config.ps1: script to configure a server, VDI, VM, or PC.
 
 Further tools and utilities are located in the /apps folder and the /modules folder. These modules may make use of the \_rtd\_library accomplish their tasks. For example; the software-bundle-manager
 
@@ -21,11 +21,11 @@ Further tools and utilities are located in the /apps folder and the /modules fol
 
 `_rtd_library` is the automation “engine room” for the RTD toolset. It wraps hundreds of reusable bash functions for tasks such as:
 
-*   Building Kickstart/Preseed/AutoYAST files, provisioning KVM guests, and templating OEM installs.
-*   Managing desktops (GNOME/KDE tweaks, splash themes, login scripts) and applying OEM branding.
-*   Installing curated software bundles consistently across Debian, Ubuntu, Fedora, AlmaLinux, SUSE, etc.
-*   Providing developer-facing helpers (`system::log_item`, `software::check_native_package_dependency`, dialog wrappers) so module scripts stay short and declarative.
-*   Surfacing inline documentation directly from the shell through `--help`, `--devhelp`, and `--devhelp-gtk`, which makes it easy to rediscover functions while developing or debugging.
+* Building Kickstart/Preseed/AutoYAST files, provisioning KVM guests, and templating OEM installs.
+* Managing desktops (GNOME/KDE tweaks, splash themes, login scripts) and applying OEM branding.
+* Installing curated software bundles consistently across Debian, Ubuntu, Fedora, AlmaLinux, SUSE, etc.
+* Providing developer-facing helpers (`system::log_item`, `software::check_native_package_dependency`, dialog wrappers) so module scripts stay short and declarative.
+* Surfacing inline documentation directly from the shell through `--help`, `--devhelp`, and `--devhelp-gtk`, which makes it easy to rediscover functions while developing or debugging.
 
 In short: source the library once, and every RTD script gains a well-tested catalog of commands and UI helpers. This keeps each module tiny, ensures cross-distro behavior, and gives OEM teams confidence that installs will be identical whether triggered from a live session, a Kickstart/Preseed job, or a remote automation task.
 
@@ -33,7 +33,7 @@ In short: source the library once, and every RTD script gains a well-tested cata
 
 This library is a large collection of Bash functions organized into several logical namespaces.
 
-```
+```bash
 .
 ├── 📜 Standard Interactions & UI
 │   ├── dialog::* (TUI dialogs: notice, error, progress, yes/no)
@@ -73,13 +73,13 @@ This library is a large collection of Bash functions organized into several logi
 
 #### Key Namespaces & Purpose:
 
-*   **`dialog::`, `yad::`, `zenity::`**: Provide functions to create interactive prompts and display information to the user in both terminal (TUI) and graphical (GUI) environments.
-*   **`system::`**: Core functions for interacting with the underlying OS, managing services, handling files, and performing system-level tasks.
-*   **`software::`**: A complete suite for managing software packages from native repositories, Flatpak, and Snap, including dependency checks and system updates.
-*   **`oem::` & `gnome::`**: A powerful set of tools for customizing or "branding" a Linux installation with specific themes, wallpapers, default settings, and application launchers.
-*   **`kvm::`**: Provides extensive automation for creating and managing KVM virtual machines, including downloading ISOs, creating disks, and defining VMs from templates.
-*   **`security::`**: Functions to enhance system security by configuring firewalls, intrusion detection systems, and encryption.
-*   **`network::`**: Helpers for network-related tasks like checking connectivity and transferring files securely.
+* **`dialog::`, `yad::`, `zenity::`**: Provide functions to create interactive prompts and display information to the user in both terminal (TUI) and graphical (GUI) environments.
+* **`system::`**: Core functions for interacting with the underlying OS, managing services, handling files, and performing system-level tasks.
+* **`software::`**: A complete suite for managing software packages from native repositories, Flatpak, and Snap, including dependency checks and system updates.
+* **`oem::` & `gnome::`**: A powerful set of tools for customizing or "branding" a Linux installation with specific themes, wallpapers, default settings, and application launchers.
+* **`kvm::`**: Provides extensive automation for creating and managing KVM virtual machines, including downloading ISOs, creating disks, and defining VMs from templates.
+* **`security::`**: Functions to enhance system security by configuring firewalls, intrusion detection systems, and encryption.
+* **`network::`**: Helpers for network-related tasks like checking connectivity and transferring files securely.
 
 NOTE: For the software bundle installer, and particularly for validating dependencies, software titles may be named slightly differently in some versions of Linux and may therefore not install since they are not found. For this reason, more emphasis is placed on "snap" apps and "flatpaks" where possible to allow universal installs. Snaps and Flatpaks allow for applications to be sandboxed for security as well.
 
@@ -95,7 +95,7 @@ The RTD Toolset is a collection of scripts intended to facilitate adding, option
 
 Consider this usecase: You want to move from one distribution to another. To move to a different distribution from the one that you are currently using all you would need to do is run the **rtd-me.sh.cmd** by opening a terminal and typing:
 
-```
+```url
 wget https://github.com/vonschutter/RTD-Build/raw/master/rtd-me.sh.cmd ; bash ./rtd-me.sh.cmd 
 ```
 
@@ -106,7 +106,7 @@ many of the tools rely on the \_rtd\_library bash function library. To see what 
 To see options to use this library type:  
 `bash bash _rtd_library --help`
 
-```
+```bash
  📚 _rtd_library :: RunTime Data Library HELP  ::
 
         Usage:
