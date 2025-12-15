@@ -66,8 +66,9 @@ else
 		chmod 700 "${_LOG_DIR}"
 	fi
 fi
-touch ${_LOGFILE:="${_LOG_DIR}/$(basename $0)-$(date +%Y-%m-%d).log"}
-
+: ${_LOGFILE:="${_LOG_DIR}/$(basename $0)-$(date +%Y-%m-%d).log"}
+touch "${_LOGFILE}"
+chmod 644 "${_LOGFILE}"
 
 _ui_side_bar="/opt/rtd/modules/oem-bundle-manager.mod/image/banner.png"
 _title="RunTime Data Bundle Manager"
@@ -282,11 +283,11 @@ system::ExecStart () {
 			# Handle the user's selection
 			case $ret in
 				0) software::display_bundle_install_choices_gtk --zenity ;;
-				1) clear && echo "[Quit]" | tee -a "${_log_file}" ; break ;;
+				1) clear && echo "[Quit]" | tee -a "${_LOGFILE}" ; break ;;
 				2) software::display_bundle_removal_choices_gtk --zenity;;
 				3) zenity::display_info "$_ABOUT" ;;
-				252) clear && echo "[ESC]" | tee -a "${_log_file}" && break ;;
-				*) clear && echo "[Unknown Request]" | tee -a "$${_log_file}" && break ;;
+				252) clear && echo "[ESC]" | tee -a "${_LOGFILE}" && break ;;
+				*) clear && echo "[Unknown Request]" | tee -a "${_LOGFILE}" && break ;;
 			esac
 			unset _ret
 		done
@@ -333,7 +334,7 @@ system::ExecStart::help ()
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 
-	dependency::file _rtd_library &>/dev/null|| { echo "📚 Failed to find _rtd_library"; exit 1; }
+dependency::file _rtd_library &>/dev/null|| { echo "📚 Failed to find _rtd_library"; exit 1; }
 
 
 main ()
