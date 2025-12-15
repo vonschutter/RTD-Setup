@@ -12065,6 +12065,9 @@ security::ensure_admin() {
 		return
 	fi
 
+	local _ensure_admin_should_exit=1
+	[[ $- == *i* ]] && _ensure_admin_should_exit=0
+
 	# Determine if we are in a graphical session
 	if [ -n "$XDG_SESSION_TYPE" ] && [ "$XDG_SESSION_TYPE" = "wayland" ]; then
 		system::log_item "👌 A Wayland session is running."
@@ -12078,42 +12081,64 @@ security::ensure_admin() {
 	fi
 
 	# Secret (undocumented) options for testing
-	case $1 in 
-		--auto)	
+	case $1 in
+		--auto)
 			system::log_item "🔐 Authenticating using automatic determination of metod..."
 			;;
-		--pexec | --gtk ) 
+		--pexec | --gtk )
 			system::log_item "🔐 Authenticating using 'pkexec'..."
 			graphical_session=true
+			shift
 			;;
 		--dialog | --tty)
 			system::log_item "🔐 Authenticating using 'dialog'..."
-			graphical_session=flase
+			graphical_session=false
+			shift
 			;;
 		--sudo)
 			system::log_item "🔐 Authenticating using 'sudo'..."
 			write_warning "🔐 This script needs administrative access..."
 			local preserve_env_list="DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,WAYLAND_DISPLAY"
-			sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" bash "$(readlink -f "$0")" "$@" || pause::for_input 1
-			exit
+			shift
+			# When sourced interactively, $0 is usually the bash binary; re-running that path as a script
+			# causes "cannot execute binary file". In that case, just run the requested command with sudo.
+			if [[ "$(basename "$0")" == "bash" ]]; then
+				sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" "$@" || pause::for_input 1 "Thre was an error running the requested command with sudo."
+			else
+				sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" bash "$(readlink -f "$0")" "$@" || pause::for_input 1 "There was an error running the requested command with sudo."
+			fi
+			local rc=$?
+			if (( _ensure_admin_should_exit )); then
+				exit $rc
+			else
+				return $rc
+			fi
 			;;
 	esac
 
 	# Attempt to elevate privileges
 	if [ "$graphical_session" = true ]; then
 		system::log_item "🔐 Using pkexec for privilege escalation..."
-		local pkexec_env=(env DISPLAY="$DISPLAY")
-		[[ -n "${XAUTHORITY:-}" ]] && pkexec_env+=("XAUTHORITY=$XAUTHORITY")
-		[[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]] && pkexec_env+=("DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS")
-		[[ -n "${XDG_RUNTIME_DIR:-}" ]] && pkexec_env+=("XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR")
-		[[ -n "${WAYLAND_DISPLAY:-}" ]] && pkexec_env+=("WAYLAND_DISPLAY=$WAYLAND_DISPLAY")
-		pkexec_env+=("SUDO_USER=$USER")
-		if pkexec "${pkexec_env[@]}" bash "$(readlink -f "$0")" "$@" ; then
-			exit 0
-		else 
-			exit 1
-		fi
-		
+			local pkexec_env=(env DISPLAY="$DISPLAY")
+			[[ -n "${XAUTHORITY:-}" ]] && pkexec_env+=("XAUTHORITY=$XAUTHORITY")
+			[[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]] && pkexec_env+=("DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS")
+			[[ -n "${XDG_RUNTIME_DIR:-}" ]] && pkexec_env+=("XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR")
+			[[ -n "${WAYLAND_DISPLAY:-}" ]] && pkexec_env+=("WAYLAND_DISPLAY=$WAYLAND_DISPLAY")
+			pkexec_env+=("SUDO_USER=$USER")
+			# If sourced, $0 is the bash binary; re-running it as a script fails. Run the requested
+			# command directly under pkexec in that case.
+			if [[ "$(basename "$0")" == "bash" ]]; then
+				pkexec "${pkexec_env[@]}" "$@" || pause::for_input 1
+			else
+				pkexec "${pkexec_env[@]}" bash "$(readlink -f "$0")" "$@" || pause::for_input 1
+			fi
+			local rc=$?
+			if (( _ensure_admin_should_exit )); then
+				exit $rc
+			else
+				return $rc
+			fi
+
 	else
 		# Use dialog if available, else fallback to sudo
 		# sudo --preserve-env=DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR -H bash "$(readlink -f "$0")" "$@"
@@ -12121,6 +12146,7 @@ security::ensure_admin() {
 			token=$(dialog --title "${Title:-"sudo"}" --backtitle "Authentication Required ${BackTitle:-"$(basename "$0")"}" --insecure --stdout --passwordbox "\n This functionality requires elevated privileges. \n Please provide your (sudo) password" 10 90)
 			ret=$?
 			clear
+			local rc=0
 			case $ret in
 				0)
 				system::log_item "🔐 Authenticating using dialog..."
@@ -12128,18 +12154,28 @@ security::ensure_admin() {
 				echo "${token}" | sudo -S -v || security::ensure_admin
 				local preserve_env_list="DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,WAYLAND_DISPLAY"
 				sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" bash "$(readlink -f "$0")" "$@" || pause::for_input 1
+				rc=$?
 				;;
-				1) echo "Request cancelled" ;;
-				255) echo "[esc] Request aborted" ;;
-				*) exit 1 ;;
+				1) echo "Request cancelled" ; rc=1 ;;
+				255) echo "[esc] Request aborted" ; rc=255 ;;
+				*) rc=1 ;;
 			esac
-			exit
+			if (( _ensure_admin_should_exit )); then
+				exit $rc
+			else
+				return $rc
+			fi
 		else
 			system::log_item "🔐 No dialog installed: authenticating using plain sudo..."
-		write_warning "🔐 This script needs administrative access..."
-		local preserve_env_list="DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,WAYLAND_DISPLAY"
-		sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" bash "$(readlink -f "$0")" "$@" || pause::for_input 1
-			exit
+			write_warning "🔐 This script needs administrative access..."
+			local preserve_env_list="DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,WAYLAND_DISPLAY"
+			sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" bash "$(readlink -f "$0")" "$@" || pause::for_input 1
+			local rc=$?
+			if (( _ensure_admin_should_exit )); then
+				exit $rc
+			else
+				return $rc
+			fi
 		fi
 	fi
 }
