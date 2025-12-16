@@ -7602,7 +7602,7 @@ gnome::set_tilix_ui_tweaks_for_user() {
 		}
 	fi
 
-	if ! software::check_native_package_dependency tilix; then
+	if ! command -v tilix >/dev/null 2>&1; then
 		write_error "Unable to ensure Tilix is installed."
 		return 1
 	fi
@@ -7949,10 +7949,12 @@ gnome::_reset_ui_theme_settings() {
 }
 
 gnome::ensure_window_buttons_visible() {
-	# Description: Force enable minimize/maximize/close buttons after a reset or distro default change.
+	# Description: Force enable window controls (minimize/maximize/close) and allow custom ordering.
 	# Globals: none
+	# Arguments: [$1] button layout string (default: appmenu:minimize,maximize,close)
 	# Returns: 0
-	gsettings set org.gnome.desktop.wm.preferences button-layout 'appmenu:minimize,maximize,close'
+	local layout="${1:-appmenu:minimize,maximize,close}"
+	gsettings set org.gnome.desktop.wm.preferences button-layout "${layout}"
 }
 
 gnome::_reload_shell_theme() {
@@ -8603,9 +8605,9 @@ gnome::set_ui_mac_tweaks_for_user() {
 	# Apply common settings:
 	gnome::_reset_ui_theme_settings
 	gnome::set_ui_common_tweaks_for_user
+	gnome::ensure_window_buttons_visible "close,minimize,maximize:"
 	write_status "Setting MAC like tweaks..."
 
-	GNOME_TERMINAL_PROFILE=$(gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}')
 	UiTone=${1:-"Light"}
 
 	case ${UiTone} in
@@ -8688,9 +8690,9 @@ gnome::set_ui_win10_tweaks_for_user() {
 	# Apply common settings:
 	gnome::_reset_ui_theme_settings
 	gnome::set_ui_common_tweaks_for_user
+	gnome::ensure_window_buttons_visible "appmenu:minimize,maximize,close"
 	write_status "Setting Windows like tweaks..."
 
-	GNOME_TERMINAL_PROFILE=$(gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}')
 	UiTone=${1:-"Light"}
 
 	# Gnome Shell Theming
@@ -8772,9 +8774,8 @@ gnome::set_ui_corporate_crisp_tweaks_for_user() {
 	# Apply common settings:
 	gnome::_reset_ui_theme_settings
 	gnome::set_ui_common_tweaks_for_user
+	gnome::ensure_window_buttons_visible "appmenu:minimize,maximize,close"
 	write_status "Setting Crisp like tweaks..."
-
-	GNOME_TERMINAL_PROFILE="$(gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}')"
 
 	UiTone=${1:-"Light"}
 
@@ -8860,9 +8861,8 @@ gnome::set_ui_moca_tweaks_for_user() {
 	# Apply common settings:
 	gnome::_reset_ui_theme_settings
 	gnome::set_ui_common_tweaks_for_user
+	gnome::ensure_window_buttons_visible "appmenu:minimize,maximize,close"
 	write_status "Setting Eye strain saving tweaks..."
-
-	GNOME_TERMINAL_PROFILE=$(gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}')
 
 	if [[ -d /usr/share/themes/vimix-dark-doder ]]; then
 		gsettings set org.gnome.desktop.interface gtk-theme 'vimix-dark-doder'
