@@ -7914,6 +7914,23 @@ gnome::organize_overlay_menu() {
 	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/Cloud/ categories "['Cloud-Management', 'Cloud', 'aws', 'azure', 'gcp']"
 }
 
+gnome::_apply_gtk4_theme() {
+	# Description: Write a GTK4 settings.ini with the requested theme/icon and dark preference.
+	# Globals: XDG_CONFIG_HOME, HOME
+	# Arguments: <theme> <icon> <prefer_dark:1|0>
+	# Returns: 0
+	local theme="$1" icon="$2" prefer_dark="${3:-0}"
+	local gtk4_dir="${XDG_CONFIG_HOME:-${HOME}/.config}/gtk-4.0"
+	local gtk4_file="${gtk4_dir}/settings.ini"
+	mkdir -p "${gtk4_dir}"
+	cat >"${gtk4_file}" <<-EOF
+	[Settings]
+	gtk-theme-name=${theme}
+	gtk-icon-theme-name=${icon}
+	gtk-application-prefer-dark-theme=${prefer_dark}
+	EOF
+}
+
 gnome::set_ui_common_tweaks_for_user() {
 	gnome::set_ui_tweaks_for_user
 }
@@ -8511,6 +8528,7 @@ gnome::set_ui_mac_tweaks_for_user() {
 			gsettings set org.gnome.desktop.interface icon-theme 'WhiteSur-dark'
 			gsettings set org.gnome.shell.extensions.user-theme name "WhiteSur-Dark"
 			gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+			gnome::_apply_gtk4_theme "WhiteSur-Dark" "WhiteSur-dark" 1
 
 			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name MojaveNight.jpg)
 
@@ -8525,6 +8543,7 @@ gnome::set_ui_mac_tweaks_for_user() {
 			gsettings set org.gnome.desktop.interface icon-theme 'WhiteSur'
 			gsettings set org.gnome.shell.extensions.user-theme name "WhiteSur-Light"
 			gsettings set org.gnome.desktop.interface color-scheme 'default'
+			gnome::_apply_gtk4_theme "WhiteSur-Light" "WhiteSur" 0
 
 			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name MojaveDay.jpg)
 
@@ -8593,6 +8612,7 @@ gnome::set_ui_win10_tweaks_for_user() {
 			gsettings set org.gnome.shell.extensions.user-theme name "Windows-10-Dark"
 			gsettings set org.gnome.desktop.interface icon-theme 'Windows-10-Icons'
 			gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+			gnome::_apply_gtk4_theme "Windows-10-Dark" "Windows-10-Icons" 1
 		else
 			gnome::set_ui_tweak_no_media_error
 		fi
@@ -8603,6 +8623,7 @@ gnome::set_ui_win10_tweaks_for_user() {
 			gsettings set org.gnome.shell.extensions.user-theme name "Windows-10-Light"
 			gsettings set org.gnome.desktop.interface icon-theme 'Windows-10-Icons'
 			gsettings set org.gnome.desktop.interface color-scheme 'default'
+			gnome::_apply_gtk4_theme "Windows-10-Light" "Windows-10-Icons" 0
 		else
 			gnome::set_ui_tweak_no_media_error
 		fi
@@ -8677,6 +8698,7 @@ gnome::set_ui_corporate_crisp_tweaks_for_user() {
 			gsettings set org.gnome.shell.extensions.user-theme name "Arc-Dark"
 			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name RTD_Wallpapers_HQ_Public_Domain_019.jpg)
 			gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+			gnome::_apply_gtk4_theme "Arc-Dark" "Arc-icon-theme" 1
 		else
 			gnome::set_ui_tweak_no_media_error
 		fi
@@ -8687,6 +8709,7 @@ gnome::set_ui_corporate_crisp_tweaks_for_user() {
 			gsettings set org.gnome.shell.extensions.user-theme name "Arc"
 			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name RTD_Wallpapers_HQ_Public_Domain_020.jpg)
 			gsettings set org.gnome.desktop.interface color-scheme 'default'
+			gnome::_apply_gtk4_theme "Arc" "Arc-icon-theme" 0
 		else
 			gnome::set_ui_tweak_no_media_error
 		fi
@@ -8759,6 +8782,7 @@ gnome::set_ui_moca_tweaks_for_user() {
 		gsettings set org.gnome.shell.extensions.user-theme name "vimix-dark-doder"
 		gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name Chocolate_brown_wallpaper.jpg)
 		gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+		gnome::_apply_gtk4_theme "vimix-dark-doder" "Flatery-Black-Dark" 1
 	else
 		gnome::set_ui_tweak_no_media_error
 	fi
