@@ -7931,6 +7931,14 @@ gnome::_apply_gtk4_theme() {
 	EOF
 }
 
+gnome::_reload_shell_theme() {
+	# Description: Ask GNOME Shell to reload after theme changes. No-op if not available.
+	if command -v busctl &>/dev/null; then
+		busctl --quiet --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s \
+			'Meta.restart("Reloading GNOME Shell to apply theme changes...")' || true
+	fi
+}
+
 gnome::set_ui_common_tweaks_for_user() {
 	gnome::set_ui_tweaks_for_user
 }
@@ -8529,6 +8537,7 @@ gnome::set_ui_mac_tweaks_for_user() {
 			gsettings set org.gnome.shell.extensions.user-theme name "WhiteSur-Dark"
 			gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 			gnome::_apply_gtk4_theme "WhiteSur-Dark" "WhiteSur-dark" 1
+			gnome::_reload_shell_theme
 
 			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name MojaveNight.jpg)
 
@@ -8544,6 +8553,7 @@ gnome::set_ui_mac_tweaks_for_user() {
 			gsettings set org.gnome.shell.extensions.user-theme name "WhiteSur-Light"
 			gsettings set org.gnome.desktop.interface color-scheme 'default'
 			gnome::_apply_gtk4_theme "WhiteSur-Light" "WhiteSur" 0
+			gnome::_reload_shell_theme
 
 			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name MojaveDay.jpg)
 
@@ -8613,6 +8623,7 @@ gnome::set_ui_win10_tweaks_for_user() {
 			gsettings set org.gnome.desktop.interface icon-theme 'Windows-10-Icons'
 			gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 			gnome::_apply_gtk4_theme "Windows-10-Dark" "Windows-10-Icons" 1
+			gnome::_reload_shell_theme
 		else
 			gnome::set_ui_tweak_no_media_error
 		fi
@@ -8624,6 +8635,7 @@ gnome::set_ui_win10_tweaks_for_user() {
 			gsettings set org.gnome.desktop.interface icon-theme 'Windows-10-Icons'
 			gsettings set org.gnome.desktop.interface color-scheme 'default'
 			gnome::_apply_gtk4_theme "Windows-10-Light" "Windows-10-Icons" 0
+			gnome::_reload_shell_theme
 		else
 			gnome::set_ui_tweak_no_media_error
 		fi
@@ -8699,6 +8711,7 @@ gnome::set_ui_corporate_crisp_tweaks_for_user() {
 			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name RTD_Wallpapers_HQ_Public_Domain_019.jpg)
 			gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 			gnome::_apply_gtk4_theme "Arc-Dark" "Arc-icon-theme" 1
+			gnome::_reload_shell_theme
 		else
 			gnome::set_ui_tweak_no_media_error
 		fi
@@ -8710,6 +8723,7 @@ gnome::set_ui_corporate_crisp_tweaks_for_user() {
 			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name RTD_Wallpapers_HQ_Public_Domain_020.jpg)
 			gsettings set org.gnome.desktop.interface color-scheme 'default'
 			gnome::_apply_gtk4_theme "Arc" "Arc-icon-theme" 0
+			gnome::_reload_shell_theme
 		else
 			gnome::set_ui_tweak_no_media_error
 		fi
@@ -8783,6 +8797,7 @@ gnome::set_ui_moca_tweaks_for_user() {
 		gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name Chocolate_brown_wallpaper.jpg)
 		gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 		gnome::_apply_gtk4_theme "vimix-dark-doder" "Flatery-Black-Dark" 1
+		gnome::_reload_shell_theme
 	else
 		gnome::set_ui_tweak_no_media_error
 	fi
