@@ -7940,10 +7940,12 @@ gnome::_reset_ui_theme_settings() {
 	gsettings reset org.gnome.desktop.interface color-scheme   || true
 	gsettings reset org.gnome.shell.extensions.user-theme name || true
 
-	# Clean up GTK4 overrides so next theme writes a fresh settings.ini
+	# Clean up GTK4 overrides so next theme writes a fresh settings.ini.
+	# Removing the entire gtk-4.0 dir also clears stray gtk.css/asset caches that can pin window buttons.
 	local gtk4_dir="${XDG_CONFIG_HOME:-${HOME}/.config}/gtk-4.0"
-	local gtk4_file="${gtk4_dir}/settings.ini"
-	[[ -f "${gtk4_file}" ]] && rm -f "${gtk4_file}"
+	if [[ -d "${gtk4_dir}" ]]; then
+		rm -rf "${gtk4_dir}"
+	fi
 }
 
 gnome::_reload_shell_theme() {
