@@ -35,15 +35,17 @@
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 _LOG_DIR="${HOME}/.config/rtd/log"
 _LOGFILE="${_LOG_DIR}/$(basename $0).log"
+_HEIGHT="480" 
+_WIDTH="830"
 
 mkdir -p "${_LOG_DIR}"
-touch $_LOGFILE
+touch "${_LOGFILE}"
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -121,11 +123,12 @@ if dependency::desktop gnome ; then
 		ProgressTXT="Working..."
 
 		selection=$(zenity --title="${DefaultTitle^^}" --list \
-		--text "        Select your prefferred style of desktop look below. Please NOTE: that the resulting look is just an
+		--text "        	Select your prefferred style of desktop look below. Please NOTE: that the resulting look is just an
 		adjustment to look more like what you may be used to, and not a perfect replica of the original look.
-		Though some may say that the look and function this Gnome variant is an improvement over the originals.
-		" \
-		--height="400" --width="830" \
+		NOTE: Gnome resists changes and does not respect older extensions that these themes rely on. Therefore not all 
+		elements may be changed as expected. " \
+		--height="$_HEIGHT" \
+		--width="$_WIDTH" \
 		--print-column=1 --column "Look" --column "Description" \
 		"Windows 10 Dark Mode" "Change the look of this desktop be more like Windows 10 Dark" \
 		"Windows 10 Light Mode" "Change the look of this desktop be more like Windows 10 Light" \
@@ -135,6 +138,7 @@ if dependency::desktop gnome ; then
 		"Crisp Evening" "Crisp and clean proffessional business look (Tuned for evening time)" \
 		"Moca Smooth" "A dark and chocolate smooth comfortable look" \
 		"${DefaultDistro/ /}" "The default look and feel of ${DefaultDistro/ /} (this distribution of Linux)" ) &>>"${_LOGFILE}"
+
 		exit_status=$?
 
 		exec 3>&-
@@ -150,8 +154,8 @@ if dependency::desktop gnome ; then
 			"Windows 10 Light Mode" ) set_gnome_ui_win10_tweaks_for_user Light & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
 			"Mac OS Bright" ) set_gnome_ui_mac_tweaks_for_user Light & sleep 5 ; notify-send --urgency=low "${selection} set"  ;;
 			"Mac OS Dusk" ) set_gnome_ui_mac_tweaks_for_user Dark & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
-			"Crisp Day" ) set_gnome_ui_corprate_crisp_tweaks_for_user Light & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
-			"Crisp Evening" ) set_gnome_ui_corprate_crisp_tweaks_for_user Dark & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
+			"Crisp Day" ) set_gnome_ui_corporate_crisp_tweaks_for_user Light & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
+			"Crisp Evening" ) set_gnome_ui_corporate_crisp_tweaks_for_user Dark & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
 			"Moca Smooth" ) set_gnome_ui_moca_tweaks_for_user & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
 			"${DefaultDistro/ /}" )
 				# Resetting deskop environment to distribution defaults!
