@@ -7967,6 +7967,60 @@ gnome::set_ui_common_tweaks_for_user() {
 	gnome::set_ui_tweaks_for_user
 }
 
+gnome::_apply_terminal_preferences() {
+	# Description: Apply consistent GNOME Terminal profile settings if GNOME Terminal is available.
+	# Globals: None
+	# Returns: 0 on success, 1 if GNOME Terminal is not installed or no profile found.
+	if ! command -v gsettings &>/dev/null; then
+		write_error "gsettings command not available; cannot configure GNOME Terminal."
+		return 1
+	fi
+
+	# Detect the default GNOME Terminal profile UUID(s)
+	local profiles default_uuid
+	profiles=$(gsettings get org.gnome.Terminal.ProfilesList list 2>/dev/null | tr -d "[]',")
+	default_uuid=$(gsettings get org.gnome.Terminal.ProfilesList default 2>/dev/null | tr -d "'")
+
+	# Fall back to the first profile in the list if no default is found
+	if [[ -z "${default_uuid}" || "${default_uuid}" == "''" ]]; then
+		default_uuid=$(printf '%s\n' ${profiles} | head -n1)
+	fi
+
+	[[ -z "${default_uuid}" ]] && {
+		write_error "No GNOME Terminal profiles found; cannot apply terminal preferences."
+		return 1 ; 
+		}
+
+	local base="org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:${default_uuid}/"
+
+	# Apply preferences
+	gsettings set ${base} font 'Monospace 10'                         || true
+	gsettings set ${base} use-system-font false                       || true
+	gsettings set ${base} audible-bell false                          || true
+	gsettings set ${base} use-theme-colors false                      || true
+	gsettings set ${base} background-color '#000000'                  || true
+	gsettings set ${base} foreground-color '#AFAFAF'                  || true
+	gsettings set ${base} use-transparent-background true             || true
+	gsettings set ${base} background-transparency-percent 20          || true
+	gsettings set ${base} bold-is-bright true                         || true
+
+	# Apply to all known profiles as well
+	for uuid in ${profiles}; do
+		local b="org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:${uuid}/"
+		gsettings set ${b} font 'Monospace 10'                    || true
+		gsettings set ${b} use-system-font false                  || true
+		gsettings set ${b} audible-bell false                     || true
+		gsettings set ${b} use-theme-colors false                 || true
+		gsettings set ${b} background-color '#000000'             || true
+		gsettings set ${b} foreground-color '#AFAFAF'             || true
+		gsettings set ${b} use-transparent-background true        || true
+		gsettings set ${b} background-transparency-percent 20     || true
+		gsettings set ${b} bold-is-bright true                    || true
+	done
+
+	return 0
+}
+
 gnome::set_ui_tweaks_for_user() {
 	# Description:
 	# Configure GNOME for OEM look and feel. This is completely as desired.
@@ -8563,7 +8617,7 @@ gnome::set_ui_mac_tweaks_for_user() {
 			gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 			gnome::_apply_gtk4_theme "WhiteSur-Dark" "WhiteSur-dark" 1
 			gnome::_reload_shell_theme
-			gnome::ensure_window_buttons_visible
+			gnome::set_ui_common_tweaks_for_user
 
 			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name MojaveNight.jpg)
 			gsettings set org.gnome.desktop.background picture-uri-dark file://$(find ${_OEM_DIR:-"/opt/rtd"} -name MojaveNight.jpg)
@@ -8581,7 +8635,7 @@ gnome::set_ui_mac_tweaks_for_user() {
 			gsettings set org.gnome.desktop.interface color-scheme 'default'
 			gnome::_apply_gtk4_theme "WhiteSur-Light" "WhiteSur" 0
 			gnome::_reload_shell_theme
-			gnome::ensure_window_buttons_visible
+			gnome::set_ui_common_tweaks_for_user
 
 			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name MojaveDay.jpg)
 			gsettings set org.gnome.desktop.background picture-uri-dark file://$(find ${_OEM_DIR:-"/opt/rtd"} -name MojaveDay.jpg)
@@ -8607,12 +8661,7 @@ gnome::set_ui_mac_tweaks_for_user() {
 	'ubuntu-appindicators@ubuntu.com', \
 	'CoverflowAltTab@palatis.blogspot.com']"
 
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-transparent-background true
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ background-transparency-percent 20
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ default-size-columns 100
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-theme-transparency true
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ scrollback-lines 10000
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ bold-is-bright true
+	gnome::_apply_terminal_preferences
 
 	# Restore Keyboard Layout (reset by gnome)
 	# gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
@@ -8654,7 +8703,7 @@ gnome::set_ui_win10_tweaks_for_user() {
 			gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 			gnome::_apply_gtk4_theme "Windows-10-Dark" "Windows-10-Icons" 1
 			gnome::_reload_shell_theme
-			gnome::ensure_window_buttons_visible
+			gnome::set_ui_common_tweaks_for_user
 		else
 			gnome::set_ui_tweak_no_media_error
 		fi
@@ -8692,14 +8741,7 @@ gnome::set_ui_win10_tweaks_for_user() {
 	gsettings set org.gnome.shell.extensions.dash-to-dock extend-height 'true'
 	gsettings set org.gnome.shell.extensions.dash-to-dock dock-fixed 'true'
 
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ font 'Monospace 10'
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-system-font false
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ audible-bell false
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-theme-colors true
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ background-color '#000000'
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ foreground-color '#AFAFAF'
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-transparent-background 'false'
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ bold-is-bright true
+	gnome::_apply_terminal_preferences
 
 	# Set wallpaper
 	gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name Redmond.png)
@@ -8792,15 +8834,7 @@ gnome::set_ui_corporate_crisp_tweaks_for_user() {
 	gsettings set org.gnome.shell.extensions.dash-to-dock extend-height 'true'
 	gsettings set org.gnome.shell.extensions.dash-to-dock dock-fixed 'true'
 
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ font 'Monospace 10'
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-system-font false
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ audible-bell false
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-theme-colors false
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ background-color '#000000'
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ foreground-color '#AFAFAF'
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-transparent-background true
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ background-transparency-percent 20
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ bold-is-bright true
+	gnome::_apply_terminal_preferences
 
 	# Restore Keyboard Layout (reset by gnome)
 	# gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
@@ -8866,15 +8900,7 @@ gnome::set_ui_moca_tweaks_for_user() {
 	gsettings set org.gnome.shell.extensions.dash-to-panel trans-use-custom-opacity 'true'
 
 	# Configure terminal look...
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ font 'Monospace 10'
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-system-font false
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ audible-bell false
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-theme-colors false
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ background-color '#000000'
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ foreground-color '#AFAFAF'
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ use-transparent-background true
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ background-transparency-percent 20
-	gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ bold-is-bright true
+	gnome::_apply_terminal_preferences
 
 	# Restore Keyboard Layout (reset by gnome)
 	# gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
