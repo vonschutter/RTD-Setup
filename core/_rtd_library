@@ -75,7 +75,7 @@ export RTD_VERSION="2.05"
 31    gnome::set_basic_extensions_enabled                          ;           See inline documentation in this file.
 32    gnome::set_better_font_smoothing_for_user                    ;           See inline documentation in this file.
 33    gnome::set_better_usability_for_user                         ;           Apply GNOME desktop usability improvements for the OEM user.
-34    gnome::set_gnome_ui_tweaks_for_user                          ;           See inline documentation in this file.
+34    gnome::set_ui_tweaks_for_user                                ;           See inline documentation in this file.
 35    gnome::set_power_configuraton_for_user                       ;           See inline documentation in this file.
 36    gnome::set_startup_sound                                     ;           Configure the GNOME startup sound for the current user.
 37    gnome::set_tilix_ui_tweaks_for_user                          ;           See inline documentation in this file.
@@ -160,12 +160,12 @@ export RTD_VERSION="2.05"
 116   security::scan_for_malware                                   ;           See inline documentation in this file.
 117   security::secure_password_policy                             ;           Function to enforce a secure password policy on the system.
 118   security::sysctl_hardening                                   ;           See inline documentation in this file.
-119   set_gnome_ui_common_tweaks_for_user                          ;           See inline documentation in this file.
-120   set_gnome_ui_corporate_crisp_tweaks_for_user                 ;           Function to set UI look to appeal to teh corporate or business user.
-121   set_gnome_ui_mac_tweaks_for_user                             ;           Function to set UI look to resemble MAC for users accustomed to that.
-122   set_gnome_ui_moca_tweaks_for_user                            ;           Function to set UI look to be friendly on the eyes, limiting eye strain.
-123   set_gnome_ui_tweak_no_media_error                            ;           Function to handle missing media when attempting to set UI look to
-124   set_gnome_ui_win10_tweaks_for_user                           ;           Function to set UI look to resemble Windows 10 for users accustomed to that.
+119   gnome::set_ui_common_tweaks_for_user                         ;           See inline documentation in this file.
+120   gnome::set_ui_corporate_crisp_tweaks_for_user                ;           Function to set UI look to appeal to teh corporate or business user.
+121   gnome::set_ui_mac_tweaks_for_user                            ;           Function to set UI look to resemble MAC for users accustomed to that.
+122   gnome::set_ui_moca_tweaks_for_user                           ;           Function to set UI look to be friendly on the eyes, limiting eye strain.
+123   gnome::set_ui_tweak_no_media_error                           ;           Function to handle missing media when attempting to set UI look to
+124   gnome::set_ui_win10_tweaks_for_user                          ;           Function to set UI look to resemble Windows 10 for users accustomed to that.
 125   software::add_gnome_extensions                               ;           See inline documentation in this file.
 126   software::add_native_package                                 ;           See inline documentation in this file.
 127   software::add_software_task                                  ;           Display executed task and echo ON/NOK based on sucess
@@ -7914,22 +7914,22 @@ gnome::organize_overlay_menu() {
 	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/Cloud/ categories "['Cloud-Management', 'Cloud', 'aws', 'azure', 'gcp']"
 }
 
-set_gnome_ui_common_tweaks_for_user() {
-	gnome::set_gnome_ui_tweaks_for_user
+gnome::set_ui_common_tweaks_for_user() {
+	gnome::set_ui_tweaks_for_user
 }
 
-gnome::set_gnome_ui_tweaks_for_user() {
+gnome::set_ui_tweaks_for_user() {
 	# Description:
-	# Configure Gnome for OEM look and feel. This is completely as desired.
+	# Configure GNOME for OEM look and feel. This is completely as desired.
 	# This function takes no arguments. Simply call it to make the changes.
-	# Howerver, this function must be called as the user it should apply to.
-	# if it is called in a script with "sudo" priviledges, it will make chages to
+	# However, this function must be called as the user it should apply to.
+	# If it is called in a script with "sudo" privileges, it will make changes to
 	# the look and feel for the "root" user.
 	#
-	# To run this function as the user who started a script with sudo script content
-	# could be echoed out ot a temporary file and executed as follows
+	# To run this function as the user who started a script with sudo, script content
+	# could be echoed out to a temporary file and executed as follows:
 	# sudo -H -u $SUDO_USER DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u "$SUDO_USER")/bus temporary_script.sh > /dev/null 2>&1
-	# or alternatively by calling the function "system::run_command_in_gnome_user_session /path/to/temorary_script.sh".
+	# or alternatively by calling the function "system::run_command_in_gnome_user_session /path/to/temporary_script.sh".
 	# Globals:
 	# Arguments: None
 	# Outputs:
@@ -7938,7 +7938,7 @@ gnome::set_gnome_ui_tweaks_for_user() {
 	#
 	# USAGE:
 	#
-	# set_gnome_ui_common_tweaks_for_user
+	# gnome::set_ui_common_tweaks_for_user
 	#
 	# End of documentation
 
@@ -8452,13 +8452,13 @@ EOF
 
 
 
-set_gnome_ui_tweak_no_media_error() {
+gnome::set_ui_tweak_no_media_error() {
 	# Description:  Function to handle missing media when attempting to set UI look to
 	# 		resemble MAC/Windows/etc. for users accustomed to that.
 	#
 	# Usage:
-	# set_gnome_ui_tweak_no_media_error
-	# OEM_Hint="My custom mesage" ; set_gnome_ui_tweak_no_media_error
+	# gnome::set_ui_tweak_no_media_error
+	# OEM_Hint="My custom mesage" ; gnome::set_ui_tweak_no_media_error
 	#
 	# Globals: ${OEM_Hint}
 	# Arguments: none
@@ -8481,12 +8481,12 @@ set_gnome_ui_tweak_no_media_error() {
 	esac
 }
 
-set_gnome_ui_mac_tweaks_for_user() {
+gnome::set_ui_mac_tweaks_for_user() {
 	# Description: Function to set UI look to resemble MAC for users accustomed to that.
 	#
 	# Usage:
-	# set_gnome_ui_mac_tweaks_for_user Dark
-	# set_gnome_ui_mac_tweaks_for_user Light
+	# gnome::set_ui_mac_tweaks_for_user Dark
+	# gnome::set_ui_mac_tweaks_for_user Light
 	#
 	# Globals:
 	# Arguments: Dark/Light
@@ -8498,7 +8498,7 @@ set_gnome_ui_mac_tweaks_for_user() {
 	# KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
 
 	# Apply common settings:
-	set_gnome_ui_common_tweaks_for_user
+	gnome::set_ui_common_tweaks_for_user
 	write_status "Setting MAC like tweaks..."
 
 	GNOME_TERMINAL_PROFILE=$(gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}')
@@ -8510,12 +8510,13 @@ set_gnome_ui_mac_tweaks_for_user() {
 			gsettings set org.gnome.desktop.interface gtk-theme 'WhiteSur-Dark'
 			gsettings set org.gnome.desktop.interface icon-theme 'WhiteSur-dark'
 			gsettings set org.gnome.shell.extensions.user-theme name "WhiteSur-Dark"
+			gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 
 			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name MojaveNight.jpg)
 
 			#gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ theme-variant 'dark'
 		else
-			set_gnome_ui_tweak_no_media_error
+			gnome::set_ui_tweak_no_media_error
 		fi
 		;;
 	Light | light)
@@ -8523,12 +8524,13 @@ set_gnome_ui_mac_tweaks_for_user() {
 			gsettings set org.gnome.desktop.interface gtk-theme 'WhiteSur-Light'
 			gsettings set org.gnome.desktop.interface icon-theme 'WhiteSur'
 			gsettings set org.gnome.shell.extensions.user-theme name "WhiteSur-Light"
+			gsettings set org.gnome.desktop.interface color-scheme 'default'
 
 			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name MojaveDay.jpg)
 
 			#gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$GNOME_TERMINAL_PROFILE/ theme-variant 'light'
 		else
-			set_gnome_ui_tweak_no_media_error
+			gnome::set_ui_tweak_no_media_error
 		fi
 		;;
 	esac
@@ -8560,7 +8562,7 @@ set_gnome_ui_mac_tweaks_for_user() {
 	return
 }
 
-set_gnome_ui_win10_tweaks_for_user() {
+gnome::set_ui_win10_tweaks_for_user() {
 	# Description: Function to set UI look to resemble Windows 10 for users accustomed to that.
 	#
 	# Globals:
@@ -8568,8 +8570,8 @@ set_gnome_ui_win10_tweaks_for_user() {
 	# Outputs:
 	# Returns: Standard err for last task
 	# Usage:
-	# set_gnome_ui_win10_tweaks_for_user Dark
-	# set_gnome_ui_win10_tweaks_for_user Light
+	# gnome::set_ui_win10_tweaks_for_user Dark
+	# gnome::set_ui_win10_tweaks_for_user Light
 	#
 	# End of documentation
 	GIT_Profile=${GIT_Profile:-vonschutter}
@@ -8577,7 +8579,7 @@ set_gnome_ui_win10_tweaks_for_user() {
 	# KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
 
 	# Apply common settings:
-	set_gnome_ui_common_tweaks_for_user
+	gnome::set_ui_common_tweaks_for_user
 	write_status "Setting Windows like tweaks..."
 
 	GNOME_TERMINAL_PROFILE=$(gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}')
@@ -8590,8 +8592,9 @@ set_gnome_ui_win10_tweaks_for_user() {
 			gsettings set org.gnome.desktop.interface gtk-theme 'Windows-10-Dark'
 			gsettings set org.gnome.shell.extensions.user-theme name "Windows-10-Dark"
 			gsettings set org.gnome.desktop.interface icon-theme 'Windows-10-Icons'
+			gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 		else
-			set_gnome_ui_tweak_no_media_error
+			gnome::set_ui_tweak_no_media_error
 		fi
 		;;
 	Light | light)
@@ -8599,8 +8602,9 @@ set_gnome_ui_win10_tweaks_for_user() {
 			gsettings set org.gnome.desktop.interface gtk-theme 'Windows-10-Light'
 			gsettings set org.gnome.shell.extensions.user-theme name "Windows-10-Light"
 			gsettings set org.gnome.desktop.interface icon-theme 'Windows-10-Icons'
+			gsettings set org.gnome.desktop.interface color-scheme 'default'
 		else
-			set_gnome_ui_tweak_no_media_error
+			gnome::set_ui_tweak_no_media_error
 		fi
 		;;
 	esac
@@ -8641,7 +8645,7 @@ set_gnome_ui_win10_tweaks_for_user() {
 	return
 }
 
-set_gnome_ui_corporate_crisp_tweaks_for_user() {
+gnome::set_ui_corporate_crisp_tweaks_for_user() {
 	# Description: Function to set UI look to appeal to teh corporate or business user.
 	#
 	# Globals:
@@ -8649,16 +8653,16 @@ set_gnome_ui_corporate_crisp_tweaks_for_user() {
 	# Outputs:
 	# Returns: Standard err for last task
 	# Usage:
-	# set_gnome_ui_corporate_crisp_tweaks_for_user Dark
-	# set_gnome_ui_corporate_crisp_tweaks_for_user Light
-	#
+	# gnome::set_ui_corporate_crisp_tweaks_for_user Dark
+	# gnome::set_ui_corporate_crisp_tweaks_for_user Light
+	# 
 	# End of documentation
 	GIT_Profile=${GIT_Profile:-vonschutter}
 	# Save users keyboard preferences:
 	# KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
 
 	# Apply common settings:
-	set_gnome_ui_common_tweaks_for_user
+	gnome::set_ui_common_tweaks_for_user
 	write_status "Setting Crisp like tweaks..."
 
 	GNOME_TERMINAL_PROFILE="$(gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}')"
@@ -8672,8 +8676,9 @@ set_gnome_ui_corporate_crisp_tweaks_for_user() {
 			gsettings set org.gnome.desktop.interface gtk-theme 'Arc-Dark'
 			gsettings set org.gnome.shell.extensions.user-theme name "Arc-Dark"
 			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name RTD_Wallpapers_HQ_Public_Domain_019.jpg)
+			gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 		else
-			set_gnome_ui_tweak_no_media_error
+			gnome::set_ui_tweak_no_media_error
 		fi
 		;;
 	Light | light)
@@ -8681,8 +8686,9 @@ set_gnome_ui_corporate_crisp_tweaks_for_user() {
 			gsettings set org.gnome.desktop.interface gtk-theme 'Arc'
 			gsettings set org.gnome.shell.extensions.user-theme name "Arc"
 			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name RTD_Wallpapers_HQ_Public_Domain_020.jpg)
+			gsettings set org.gnome.desktop.interface color-scheme 'default'
 		else
-			set_gnome_ui_tweak_no_media_error
+			gnome::set_ui_tweak_no_media_error
 		fi
 		;;
 	esac
@@ -8690,7 +8696,7 @@ set_gnome_ui_corporate_crisp_tweaks_for_user() {
 	if [[ -d /usr/share/icons/Arc-icon-theme ]]; then
 		gsettings set org.gnome.desktop.interface icon-theme 'Arc-icon-theme'
 	else
-		set_gnome_ui_tweak_no_media_error
+		gnome::set_ui_tweak_no_media_error
 	fi
 
 	# Set font
@@ -8727,7 +8733,7 @@ set_gnome_ui_corporate_crisp_tweaks_for_user() {
 	return
 }
 
-set_gnome_ui_moca_tweaks_for_user() {
+gnome::set_ui_moca_tweaks_for_user() {
 	# Description: Function to set UI look to be friendly on the eyes, limiting eye strain.
 	#
 	# Globals:
@@ -8735,7 +8741,7 @@ set_gnome_ui_moca_tweaks_for_user() {
 	# Outputs:
 	# Returns: Standard err for last task
 	# Usage:
-	# set_gnome_ui_moca_tweaks_for_user
+	# gnome::set_ui_moca_tweaks_for_user
 	#
 	# End of documentation
 	GIT_Profile=${GIT_Profile:-vonschutter}
@@ -8743,7 +8749,7 @@ set_gnome_ui_moca_tweaks_for_user() {
 	# KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
 
 	# Apply common settings:
-	set_gnome_ui_common_tweaks_for_user
+	gnome::set_ui_common_tweaks_for_user
 	write_status "Setting Eye strain saving tweaks..."
 
 	GNOME_TERMINAL_PROFILE=$(gsettings get org.gnome.Terminal.ProfilesList default | awk -F \' '{print $2}')
@@ -8752,14 +8758,15 @@ set_gnome_ui_moca_tweaks_for_user() {
 		gsettings set org.gnome.desktop.interface gtk-theme 'vimix-dark-doder'
 		gsettings set org.gnome.shell.extensions.user-theme name "vimix-dark-doder"
 		gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR:-"/opt/rtd"} -name Chocolate_brown_wallpaper.jpg)
+		gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 	else
-		set_gnome_ui_tweak_no_media_error
+		gnome::set_ui_tweak_no_media_error
 	fi
 
 	if [[ -d /usr/share/icons/Flatery-Black-Dark ]]; then
 		gsettings set org.gnome.desktop.interface icon-theme 'Flatery-Black-Dark'
 	else
-		set_gnome_ui_tweak_no_media_error
+		gnome::set_ui_tweak_no_media_error
 	fi
 
 	# Set font
