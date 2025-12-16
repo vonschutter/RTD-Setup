@@ -7931,6 +7931,21 @@ gnome::_apply_gtk4_theme() {
 	EOF
 }
 
+gnome::_reset_ui_theme_settings() {
+	# Description: Reset GNOME theme-related settings so a new theme can apply cleanly.
+	# Globals: XDG_CONFIG_HOME, HOME
+	# Returns: 0
+	gsettings reset org.gnome.desktop.interface gtk-theme      || true
+	gsettings reset org.gnome.desktop.interface icon-theme     || true
+	gsettings reset org.gnome.desktop.interface color-scheme   || true
+	gsettings reset org.gnome.shell.extensions.user-theme name || true
+
+	# Clean up GTK4 overrides so next theme writes a fresh settings.ini
+	local gtk4_dir="${XDG_CONFIG_HOME:-${HOME}/.config}/gtk-4.0"
+	local gtk4_file="${gtk4_dir}/settings.ini"
+	[[ -f "${gtk4_file}" ]] && rm -f "${gtk4_file}"
+}
+
 gnome::_reload_shell_theme() {
 	# Description: Ask GNOME Shell to reload after theme changes. No-op if not available.
 	if command -v busctl &>/dev/null; then
@@ -8523,6 +8538,7 @@ gnome::set_ui_mac_tweaks_for_user() {
 	# KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
 
 	# Apply common settings:
+	gnome::_reset_ui_theme_settings
 	gnome::set_ui_common_tweaks_for_user
 	write_status "Setting MAC like tweaks..."
 
@@ -8608,6 +8624,7 @@ gnome::set_ui_win10_tweaks_for_user() {
 	# KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
 
 	# Apply common settings:
+	gnome::_reset_ui_theme_settings
 	gnome::set_ui_common_tweaks_for_user
 	write_status "Setting Windows like tweaks..."
 
@@ -8695,6 +8712,7 @@ gnome::set_ui_corporate_crisp_tweaks_for_user() {
 	# KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
 
 	# Apply common settings:
+	gnome::_reset_ui_theme_settings
 	gnome::set_ui_common_tweaks_for_user
 	write_status "Setting Crisp like tweaks..."
 
@@ -8786,6 +8804,7 @@ gnome::set_ui_moca_tweaks_for_user() {
 	# KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
 
 	# Apply common settings:
+	gnome::_reset_ui_theme_settings
 	gnome::set_ui_common_tweaks_for_user
 	write_status "Setting Eye strain saving tweaks..."
 
