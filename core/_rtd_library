@@ -7578,15 +7578,18 @@ oem::setup_brand_splash_screen() {
 }
 
 gnome::set_tilix_ui_tweaks_for_user() {
-	# Description:
-	# Configure Tilix for OEM look and feel. This is completely as desired.
-	# This function takes no arguments. Simply call it to make the changes.
-	#
+	# Description: Configure Tilix and GNOME Terminal with OEM defaults and import
+	#              prebuilt profiles via dconf.
 	# Globals:
-	# Arguments: None
+	#   - HOME: Used to write Tilix settings under ${HOME}/.config/rtd.
+	# Arguments:
+	#   - None
 	# Outputs:
+	#   - Status/error logs.
+	#   - Writes ${HOME}/.config/rtd/gconf-tilix-settings.ini and imports it with dconf.
 	# Returns:
-	# Usage:
+	#   - 0 when configuration commands run (best-effort); 1 if required tools are missing.
+	# Usage: gnome::set_tilix_ui_tweaks_for_user
 	# End of documentation
 
 	if ! command -v gsettings >/dev/null 2>&1; then
@@ -7676,7 +7679,6 @@ gnome::set_tilix_ui_tweaks_for_user() {
 		default-size-columns=180
 		default-size-rows=40
 		dim-transparency-percent=0
-		font='Ubuntu Mono 10'
 		foreground-color='#EFEFEF'
 		highlight-colors-set=false
 		palette=['#000000', '#AA0000', '#00AA00', '#AA5400', '#0000AA', '#AA00AA', '#00AAAA', '#AAAAAA', '#545454', '#FF5454', '#54FF54', '#FFFF54', '#5454FF', '#FF54FF', '#54FFFF', '#FFFFFF']
@@ -7732,20 +7734,17 @@ EOF_TLX
 }
 
 gnome::set_power_configuraton_for_user() {
-	# Description:
-	# Configure power settings for OEM look and feel. This is completely as desired.
-	# This function takes no arguments. Simply call it to make the changes.
-	#
+	# Description: Apply OEM power and interface defaults (sleep, tracker indexer,
+	#              battery percentage, clock details, hot corners).
 	# Globals:
-	# Arguments: None
+	#   - None
+	# Arguments:
+	#   - None
 	# Outputs:
+	#   - Status logs as gsettings values are applied.
 	# Returns:
-	# Usage:
-	#
-	# USAGE:
-	#
-	# set_power_configuraton_for_user
-	#
+	#   - 0 on success.
+	# Usage: gnome::set_power_configuraton_for_user
 	# End of documentation
 
 	write_status "📐 Setting common power configuration..."
@@ -7765,20 +7764,17 @@ gnome::set_power_configuraton_for_user() {
 }
 
 gnome::set_better_font_smoothing_for_user() {
-	# Description:
-	# Configure font smoothing for OEM look and feel. This is completely as desired.
-	# This function takes no arguments. Simply call it to make the changes.
-	#
+	# Description: Tune GNOME font smoothing (hinting, antialiasing, subpixel order)
+	#              for OEM defaults.
 	# Globals:
-	# Arguments: None
+	#   - None
+	# Arguments:
+	#   - None
 	# Outputs:
+	#   - Status logs while applying gsettings changes.
 	# Returns:
-	# Usage:
-	#
-	# USAGE:
-	#
-	# set_better_font_smoothing_for_user
-	#
+	#   - 0 on success.
+	# Usage: gnome::set_better_font_smoothing_for_user
 	# End of documentation
 
 	write_status "📐 Setting common font smoothing..."
@@ -7788,7 +7784,18 @@ gnome::set_better_font_smoothing_for_user() {
 }
 
 gnome::set_better_usability_for_user() {
-	# Usability Improvements
+	# Description: Apply general GNOME usability tweaks (mouse acceleration, volume,
+	#              calendar, window controls, workspace behavior).
+	# Globals:
+	#   - None
+	# Arguments:
+	#   - None
+	# Outputs:
+	#   - Status/error logs via gsettings.
+	# Returns:
+	#   - 0 on success.
+	# Usage: gnome::set_better_usability_for_user
+	# End of documentation
 	gsettings set org.gnome.desktop.peripherals.mouse accel-profile 'adaptive'
 	gsettings set org.gnome.desktop.sound allow-volume-above-100-percent false
 	gsettings set org.gnome.desktop.calendar show-weekdate true
@@ -7798,7 +7805,18 @@ gnome::set_better_usability_for_user() {
 }
 
 gnome::configure_dash_to_dock() {
-	# Configure Dash to Dock
+	# Description: Configure Dash-to-Dock with OEM defaults (layout, indicators,
+	#              isolation, size, transparency).
+	# Globals:
+	#   - None
+	# Arguments:
+	#   - None
+	# Outputs:
+	#   - Writes GNOME Shell extension settings via gsettings.
+	# Returns:
+	#   - 0 on success.
+	# Usage: gnome::configure_dash_to_dock
+	# End of documentation
 	gsettings set org.gnome.shell.extensions.dash-to-dock click-action 'minimize'
 	gsettings set org.gnome.shell.extensions.dash-to-dock dock-position 'BOTTOM'
 	gsettings set org.gnome.shell.extensions.dash-to-dock apply-custom-theme false
@@ -7823,7 +7841,18 @@ gnome::configure_dash_to_dock() {
 }
 
 gnome::configure_dash_to_panel() {
-	# Configure Dash to Panel
+	# Description: Configure Dash-to-Panel with OEM defaults including icon sizing
+	#              and a full dconf profile.
+	# Globals:
+	#   - None
+	# Arguments:
+	#   - None
+	# Outputs:
+	#   - Writes GNOME Shell extension settings and loads a dconf dump.
+	# Returns:
+	#   - 0 on success.
+	# Usage: gnome::configure_dash_to_panel
+	# End of documentation
 	gsettings set org.gnome.shell.extensions.dash-to-panel click-action 'minimize'
 	gsettings set org.gnome.shell.extensions.dash-to-panel dash-max-icon-size 32
 
@@ -7870,7 +7899,18 @@ gnome::configure_dash_to_panel() {
 }
 
 gnome::configure_nautilus() {
-	# Nautilus (File Manager) Usability
+	# Description: Apply Nautilus usability defaults (zoom level, executable prompts,
+	#              tree view, directory sorting).
+	# Globals:
+	#   - None
+	# Arguments:
+	#   - None
+	# Outputs:
+	#   - Applies gsettings values for Nautilus and GTK file chooser.
+	# Returns:
+	#   - 0 on success.
+	# Usage: gnome::configure_nautilus
+	# End of documentation
 	gsettings set org.gnome.nautilus.icon-view default-zoom-level 'standard'
 	gsettings set org.gnome.nautilus.preferences executable-text-activation 'ask'
 	gsettings set org.gtk.Settings.FileChooser sort-directories-first true
@@ -7880,7 +7920,18 @@ gnome::configure_nautilus() {
 
 
 gnome::organize_overlay_menu() {
-	# Set the GNOME Shell Apps Dashboard sort app in categories based on the FreeDesktop standard.
+	# Description: Organize the GNOME application grid into OEM categories following
+	#              the FreeDesktop specification.
+	# Globals:
+	#   - None
+	# Arguments:
+	#   - None
+	# Outputs:
+	#   - Applies gsettings folder definitions for app folders.
+	# Returns:
+	#   - 0 on success.
+	# Usage: gnome::organize_overlay_menu
+	# End of documentation
 	gsettings set org.gnome.desktop.app-folders folder-children "['accessories', 'chrome-apps', 'games', 'graphics', 'internet', 'office', 'programming', 'science', 'sound---video', 'system-tools', 'universal-access', 'wine', 'OEM', '3D-Printing', 'Cloud']"
 	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/accessories/ name "Accessories"
 	gsettings set org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/accessories/ categories "['Utility']"
@@ -7915,10 +7966,21 @@ gnome::organize_overlay_menu() {
 }
 
 gnome::_apply_gtk4_theme() {
-	# Description: Write a GTK4 settings.ini with the requested theme/icon and dark preference.
-	# Globals: XDG_CONFIG_HOME, HOME
-	# Arguments: <theme> <icon> <prefer_dark:1|0>
-	# Returns: 0
+	# Description: Write a GTK4 settings.ini with the requested theme/icon and dark
+	#              preference so GTK4 apps match the shell theme.
+	# Globals:
+	#   - XDG_CONFIG_HOME: Used to resolve the GTK4 config directory.
+	#   - HOME: Fallback location for .config when XDG_CONFIG_HOME is unset.
+	# Arguments:
+	#   1: GTK theme name (e.g., "WhiteSur-Dark").
+	#   2: Icon theme name (e.g., "WhiteSur-dark").
+	#   3: Dark preference flag (1 to prefer dark, 0 otherwise).
+	# Outputs:
+	#   - Writes ${XDG_CONFIG_HOME:-${HOME}/.config}/gtk-4.0/settings.ini
+	# Returns:
+	#   - 0 on success.
+	# Usage: gnome::_apply_gtk4_theme <theme> <icon> <prefer_dark:1|0>
+	# End of documentation
 	local theme="$1" icon="$2" prefer_dark="${3:-0}"
 	local gtk4_dir="${XDG_CONFIG_HOME:-${HOME}/.config}/gtk-4.0"
 	local gtk4_file="${gtk4_dir}/settings.ini"
@@ -7932,9 +7994,19 @@ gnome::_apply_gtk4_theme() {
 }
 
 gnome::_reset_ui_theme_settings() {
-	# Description: Reset GNOME theme-related settings so a new theme can apply cleanly.
-	# Globals: XDG_CONFIG_HOME, HOME
-	# Returns: 0
+	# Description: Reset GNOME theme-related settings and remove GTK4 overrides to
+	#              allow a new theme to apply cleanly.
+	# Globals:
+	#   - XDG_CONFIG_HOME: Used to locate GTK4 config directory.
+	#   - HOME: Fallback location for .config when XDG_CONFIG_HOME is unset.
+	# Arguments:
+	#   - None
+	# Outputs:
+	#   - Clears GNOME theme gsettings and deletes GTK4 theme cache/overrides.
+	# Returns:
+	#   - 0 on success.
+	# Usage: gnome::_reset_ui_theme_settings
+	# End of documentation
 	gsettings reset org.gnome.desktop.interface gtk-theme      || true
 	gsettings reset org.gnome.desktop.interface icon-theme     || true
 	gsettings reset org.gnome.desktop.interface color-scheme   || true
@@ -7949,16 +8021,35 @@ gnome::_reset_ui_theme_settings() {
 }
 
 gnome::ensure_window_buttons_visible() {
-	# Description: Force enable window controls (minimize/maximize/close) and allow custom ordering.
-	# Globals: none
-	# Arguments: [$1] button layout string (default: appmenu:minimize,maximize,close)
-	# Returns: 0
+	# Description: Force-enable window controls (minimize/maximize/close) and allow
+	#              custom ordering through the button-layout string.
+	# Globals:
+	#   - None
+	# Arguments:
+	#   1: Optional button layout string (default: appmenu:minimize,maximize,close).
+	# Outputs:
+	#   - Writes GNOME window manager preferences via gsettings.
+	# Returns:
+	#   - 0 on success.
+	# Usage: gnome::ensure_window_buttons_visible [<button_layout>]
+	# End of documentation
 	local layout="${1:-appmenu:minimize,maximize,close}"
 	gsettings set org.gnome.desktop.wm.preferences button-layout "${layout}"
 }
 
 gnome::_reload_shell_theme() {
-	# Description: Ask GNOME Shell to reload after theme changes. No-op if not available.
+	# Description: Request a GNOME Shell reload so theme changes take effect. No-op
+	#              when busctl is unavailable.
+	# Globals:
+	#   - None
+	# Arguments:
+	#   - None
+	# Outputs:
+	#   - Triggers a GNOME Shell restart via busctl Eval call when possible.
+	# Returns:
+	#   - 0 on success or when busctl is missing.
+	# Usage: gnome::_reload_shell_theme
+	# End of documentation
 	if command -v busctl &>/dev/null; then
 		busctl --quiet --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s \
 			'Meta.restart("Reloading GNOME Shell to apply theme changes...")' || true
@@ -7966,13 +8057,33 @@ gnome::_reload_shell_theme() {
 }
 
 gnome::set_ui_common_tweaks_for_user() {
+	# Description: Convenience alias that forwards to gnome::set_ui_tweaks_for_user.
+	# Globals:
+	#   - None
+	# Arguments:
+	#   - None
+	# Outputs:
+	#   - Pass-through logs from gnome::set_ui_tweaks_for_user.
+	# Returns:
+	#   - Whatever gnome::set_ui_tweaks_for_user returns.
+	# Usage: gnome::set_ui_common_tweaks_for_user
+	# End of documentation
 	gnome::set_ui_tweaks_for_user
 }
 
 gnome::_apply_terminal_preferences() {
-	# Description: Apply consistent GNOME Terminal profile settings if GNOME Terminal is available.
-	# Globals: None
-	# Returns: 0 on success, 1 if GNOME Terminal is not installed or no profile found.
+	# Description: Apply consistent GNOME Terminal profile settings across the default
+	#              and all known profiles.
+	# Globals:
+	#   - None
+	# Arguments:
+	#   - None
+	# Outputs:
+	#   - Status/error logs; writes gsettings values for GNOME Terminal profiles.
+	# Returns:
+	#   - 0 on success, 1 if gsettings/GNOME Terminal profiles are unavailable.
+	# Usage: gnome::_apply_terminal_preferences
+	# End of documentation
 	if ! command -v gsettings &>/dev/null; then
 		write_error "gsettings command not available; cannot configure GNOME Terminal."
 		return 1
@@ -8024,27 +8135,20 @@ gnome::_apply_terminal_preferences() {
 }
 
 gnome::set_ui_tweaks_for_user() {
-	# Description:
-	# Configure GNOME for OEM look and feel. This is completely as desired.
-	# This function takes no arguments. Simply call it to make the changes.
-	# However, this function must be called as the user it should apply to.
-	# If it is called in a script with "sudo" privileges, it will make changes to
-	# the look and feel for the "root" user.
-	#
-	# To run this function as the user who started a script with sudo, script content
-	# could be echoed out to a temporary file and executed as follows:
-	# sudo -H -u $SUDO_USER DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u "$SUDO_USER")/bus temporary_script.sh > /dev/null 2>&1
-	# or alternatively by calling the function "system::run_command_in_gnome_user_session /path/to/temporary_script.sh".
+	# Description: Apply the core OEM GNOME tweaks for the current desktop user
+	#              (Tilix, usability, Nautilus, app folders, extensions). Must be
+	#              executed as the target user, not root.
 	# Globals:
-	# Arguments: None
+	#   - None
+	# Arguments:
+	#   - None
 	# Outputs:
+	#   - Status/error logs while delegating to helper functions.
 	# Returns:
+	#   - Propagates the status of the sub-commands.
 	# Usage:
-	#
-	# USAGE:
-	#
-	# gnome::set_ui_common_tweaks_for_user
-	#
+	#   gnome::set_ui_tweaks_for_user
+	#   system::run_command_in_gnome_user_session gnome::set_ui_tweaks_for_user
 	# End of documentation
 
 	write_status "📐 Seting common OEM tweaks..."
@@ -8173,28 +8277,25 @@ gnome::set_basic_extensions_enabled() {
 
 
 gnome::set_startup_sound() {
-        # Description: Configure the GNOME startup sound for the current user.
-        #              The function toggles, enables, or disables a login sound by
-        #              copying the provided sound file to a managed location and
-        #              creating (or removing) an autostart entry that plays it.
-        #
-        # Globals: None
-        # Arguments:
-        #   $1 - Optional. One of "on", "off", or "toggle" (default: toggle).
-        #   $2 - Required. Path to the sound file that should be played at login.
-        #        The path is required even when disabling to keep the interface
-        #        consistent with other library functions.
-        # Outputs:
-        #   - Status and error information via write_status/write_error.
-        #   - User-facing feedback through dialog or yad, depending on environment.
-        # Returns:
-        #   0 on success, >0 on error.
-        # Dependencies:
-        #   - dialog (always available; used for TTY/SSH or fallback interactions).
-        #   - Optional: yad (used when running a GNOME desktop session locally).
-        #   - Optional: gsettings (to enable GNOME event sounds when available).
-        #   - Optional: canberra-gtk-play, paplay, or aplay to play the sound.
-        # End of documentation
+	# Description: Configure the GNOME startup sound for the current user by
+	#              enabling, disabling, or toggling an autostart helper that plays
+	#              a provided audio file.
+	# Globals:
+	#   - XDG_CONFIG_HOME/HOME: Used for autostart entry and state storage.
+	#   - XDG_DATA_HOME/HOME: Used to store the managed sound and helper script.
+	# Arguments:
+	#   1: Optional action: on|off|toggle (default: toggle).
+	#   2: Required sound file path to register and play at login.
+	# Outputs:
+	#   - Status/error logs; writes helper script, autostart entry, and state file.
+	#   - User prompts via dialog or yad depending on display availability.
+	# Returns:
+	#   - 0 on success; non-zero on validation or dependency failure.
+	# Dependencies:
+	#   - dialog (required), yad (optional GUI), gsettings (optional), and one of
+	#     canberra-gtk-play/paplay/aplay for playback.
+	# Usage: gnome::set_startup_sound [on|off|toggle] /path/to/sound-file
+	# End of documentation
 
         local action="toggle"
         local sound_argument=""
@@ -8558,17 +8659,19 @@ EOF
 
 
 gnome::set_ui_tweak_no_media_error() {
-	# Description:  Function to handle missing media when attempting to set UI look to
-	# 		resemble MAC/Windows/etc. for users accustomed to that.
-	#
-	# Usage:
-	# gnome::set_ui_tweak_no_media_error
-	# OEM_Hint="My custom mesage" ; gnome::set_ui_tweak_no_media_error
-	#
-	# Globals: ${OEM_Hint}
-	# Arguments: none
+	# Description: Notify the user that theme assets are missing and optionally
+	#              trigger theme deployment when applying UI presets.
+	# Globals:
+	#   - OEM_Hint: Optional custom prompt message shown in zenity.
+	# Arguments:
+	#   - None
 	# Outputs:
-	# Returns: Standard err for last task
+	#   - zenity question dialog; may call oem::deploy_themes and plus-themes.se.
+	# Returns:
+	#   - 0 when user cancels; 1 on unknown response; propagates command errors.
+	# Usage:
+	#   gnome::set_ui_tweak_no_media_error
+	#   OEM_Hint="My custom message" gnome::set_ui_tweak_no_media_error
 	# End of documentation
 	: ${OEM_Hint:="I cannot find the actual theme files needed. Should I attempt to get these?"}
 
@@ -8587,16 +8690,20 @@ gnome::set_ui_tweak_no_media_error() {
 }
 
 gnome::set_ui_mac_tweaks_for_user() {
-	# Description: Function to set UI look to resemble MAC for users accustomed to that.
-	#
-	# Usage:
-	# gnome::set_ui_mac_tweaks_for_user Dark
-	# gnome::set_ui_mac_tweaks_for_user Light
-	#
+	# Description: Apply a macOS-inspired GNOME theme (WhiteSur) for the current
+	#              desktop user.
 	# Globals:
-	# Arguments: Dark/Light
+	#   - _OEM_DIR: Used to locate background images.
+	# Arguments:
+	#   1: Optional tone selection: Dark|Light (default: Light).
 	# Outputs:
-	# Returns: Standard err for last task
+	#   - Applies gsettings theme/icon/background values, GTK4 theme file, and
+	#     terminal preferences; triggers GNOME Shell reload.
+	# Returns:
+	#   - 0 on success; propagates errors from missing assets or helper calls.
+	# Usage:
+	#   gnome::set_ui_mac_tweaks_for_user Dark
+	#   gnome::set_ui_mac_tweaks_for_user Light
 	# End of documentation
 
 	# Save users keyboard preferences:
@@ -8672,16 +8779,20 @@ gnome::set_ui_mac_tweaks_for_user() {
 }
 
 gnome::set_ui_win10_tweaks_for_user() {
-	# Description: Function to set UI look to resemble Windows 10 for users accustomed to that.
-	#
+	# Description: Apply a Windows 10-inspired GNOME theme for the current desktop
+	#              user, including dash-to-panel configuration.
 	# Globals:
-	# Arguments: Dark/Light
+	#   - _OEM_DIR: Used to locate wallpaper assets.
+	# Arguments:
+	#   1: Optional tone selection: Dark|Light (default: Light).
 	# Outputs:
-	# Returns: Standard err for last task
+	#   - Applies gsettings theme/icon/background values, GTK4 theme file, dash
+	#     tweaks, and terminal preferences; triggers GNOME Shell reload.
+	# Returns:
+	#   - 0 on success; propagates errors when assets are missing.
 	# Usage:
-	# gnome::set_ui_win10_tweaks_for_user Dark
-	# gnome::set_ui_win10_tweaks_for_user Light
-	#
+	#   gnome::set_ui_win10_tweaks_for_user Dark
+	#   gnome::set_ui_win10_tweaks_for_user Light
 	# End of documentation
 	GIT_Profile=${GIT_Profile:-vonschutter}
 	# Save users keyboard preferences:
@@ -8756,16 +8867,20 @@ gnome::set_ui_win10_tweaks_for_user() {
 }
 
 gnome::set_ui_corporate_crisp_tweaks_for_user() {
-	# Description: Function to set UI look to appeal to teh corporate or business user.
-	#
+	# Description: Apply a clean corporate-inspired GNOME theme (Arc) for the
+	#              current desktop user.
 	# Globals:
-	# Arguments: Dark/Light
+	#   - _OEM_DIR: Used to locate wallpaper assets.
+	# Arguments:
+	#   1: Optional tone selection: Dark|Light (default: Light).
 	# Outputs:
-	# Returns: Standard err for last task
+	#   - Applies gsettings theme/icon/background values, GTK4 theme file, dash
+	#     tweaks, and terminal preferences; triggers GNOME Shell reload.
+	# Returns:
+	#   - 0 on success; propagates errors when assets are missing.
 	# Usage:
-	# gnome::set_ui_corporate_crisp_tweaks_for_user Dark
-	# gnome::set_ui_corporate_crisp_tweaks_for_user Light
-	# 
+	#   gnome::set_ui_corporate_crisp_tweaks_for_user Dark
+	#   gnome::set_ui_corporate_crisp_tweaks_for_user Light
 	# End of documentation
 	GIT_Profile=${GIT_Profile:-vonschutter}
 	# Save users keyboard preferences:
@@ -8844,15 +8959,18 @@ gnome::set_ui_corporate_crisp_tweaks_for_user() {
 }
 
 gnome::set_ui_moca_tweaks_for_user() {
-	# Description: Function to set UI look to be friendly on the eyes, limiting eye strain.
-	#
+	# Description: Apply an eye-friendly mocha-inspired GNOME theme (Vimix/Flatery)
+	#              for the current desktop user.
 	# Globals:
-	# Arguments: none
+	#   - _OEM_DIR: Used to locate wallpaper assets.
+	# Arguments:
+	#   - None
 	# Outputs:
-	# Returns: Standard err for last task
-	# Usage:
-	# gnome::set_ui_moca_tweaks_for_user
-	#
+	#   - Applies gsettings theme/icon/background values, GTK4 theme file, dash
+	#     tweaks, and terminal preferences; triggers GNOME Shell reload.
+	# Returns:
+	#   - 0 on success; propagates errors when assets are missing.
+	# Usage: gnome::set_ui_moca_tweaks_for_user
 	# End of documentation
 	GIT_Profile=${GIT_Profile:-vonschutter}
 	# Save users keyboard preferences:
