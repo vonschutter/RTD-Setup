@@ -1276,7 +1276,7 @@ zenity::display_file() {
 	_filename="${*}"
 	hash zenity &>/dev/null || software::check_native_package_dependency zenity &>/dev/null || return 1
 	hash pandoc &>/dev/null || software::check_native_package_dependency pandoc &>/dev/null || return 1
-	zenity --text-info --title="${_TITLE:="$_filename"}:" --filename=<(pandoc -s $_filename -t plain) --width=800 --height=600 
+	zenity --text-info --title="${_TITLE:="$_filename"}:" --filename=<(pandoc -s $_filename -t plain) --width=800 --height=600 2>/dev/null
 	#&>/dev/null
 
 }
@@ -2213,7 +2213,8 @@ dependency::command_exists() {
 	if [[ "$session_type" =~ ^(GUI|WAYLAND)$ ]] && command -v zenity &>/dev/null; then
 		if ! zenity --question \
 			--title="Missing Commands" \
-			--text="The following commands are missing: ${missing_commands[*]}. \nInstall now?"; then
+			--text="The following commands are missing: ${missing_commands[*]}. \nInstall now?" \
+			2>/dev/null; then
 			write_error "Required command(s) not found: ${missing_commands[*]}"
 			return 1
 		fi
@@ -8690,7 +8691,7 @@ gnome::set_ui_tweak_no_media_error() {
 	# End of documentation
 	: ${OEM_Hint:="I cannot find the actual theme files needed. Should I attempt to get these?"}
 
-	zenity --question --text "${OEM_Hint}" --width=600
+	zenity --question --text "${OEM_Hint}" --width=600 2>/dev/null
 	case "$?" in
 	0)
 		oem::deploy_themes
@@ -14648,7 +14649,7 @@ display_software_installation_choices_gtk() {
 	MenuOptions=($(for i in $SoftwareList; do echo -e "${zstatus:=false} ${i}"; done))
 
 	declare -A choices
-	choices=$("${DisplayMenu[@]}" "${MenuOptions[@]}")
+	choices=$("${DisplayMenu[@]}" "${MenuOptions[@]}" 2>/dev/null)
 
 	for choice in ${choices}; do
 		# call each chosen software install (by function) & add recepie (removed for display purposes)
@@ -14723,7 +14724,7 @@ software::display_bundle_install_choices_gtk() {
 			--text=" Select a Software Bundle below that you want to add to this computer: \n NOTE: only bundles that are not yet installed are shown. \n" \
 			--height=600 --width=980 \
 			--print-column=2 --column="Selected" --column="Bundle" --column="Description" \
-			--separator=" " ${DisplayList})
+			--separator=" " ${DisplayList} 2>/dev/null)
 		exit_status=$?
 		IFS=$IFS_SAV
 		exec 3>&-
@@ -24222,6 +24223,233 @@ write_information() {
 }
 
 
+
+
+library::__cache_dir() {
+	# Description: Resolve and create the cache directory used by RTD helper caches.
+	# Globals: XDG_CACHE_HOME (r), HOME (r), TMPDIR (r)
+	# Arguments: None
+	# Outputs: Absolute path to the cache directory on STDOUT.
+	# Returns: 0 on success; falls back to TMPDIR (/tmp) if mkdir fails.
+	# Usage: cache_dir=$(library::__cache_dir)
+	# End of documentation
+	local cache_dir="${XDG_CACHE_HOME:-${HOME:-/tmp}/.cache}/rtd"
+	mkdir -p "$cache_dir" 2>/dev/null || cache_dir="${TMPDIR:-/tmp}"
+	echo "$cache_dir"
+}
+
+library::__desc_cache_file() {
+	# Description: Return the cache file path used to persist function descriptions.
+	# Globals: XDG_CACHE_HOME (r), HOME (r), TMPDIR (r)
+	# Arguments: None
+	# Outputs: Cache file path on STDOUT.
+	# Returns: 0
+	# Usage: cache_file=$(library::__desc_cache_file)
+	# End of documentation
+	local cache_dir
+	cache_dir=$(library::__cache_dir)
+	local key
+	key=$(printf '%s' "$0" | md5sum | awk '{print $1}')
+	echo "${cache_dir}/desc-${key}.cache"
+}
+
+library::__load_desc_cache() {
+	# Description: Load cached header/description maps when the cache is newer than this script.
+	# Globals: __FUNC_HEADER_DESC (w), __FUNC_DESC_CACHE (w), __FUNC_HEADER_DESC_BUILT (w), __LIB_SCRIPT_MTIME (r/w)
+	# Arguments: None
+	# Outputs: None
+	# Returns: 0 if cache loaded; 1 when cache is missing or stale.
+	# Usage: library::__load_desc_cache
+	# End of documentation
+	local cache_file
+	cache_file=$(library::__desc_cache_file)
+	[[ -f "$cache_file" ]] || return 1
+
+	local script_mtime cache_mtime
+	script_mtime=${__LIB_SCRIPT_MTIME:-$(stat -c %Y "$0" 2>/dev/null || date +%s)}
+	cache_mtime=$(head -n1 "$cache_file" | sed 's/^#mtime://')
+	[[ -n "$cache_mtime" && "$cache_mtime" -ge "$script_mtime" ]] || return 1
+
+	declare -gA __FUNC_HEADER_DESC
+	declare -gA __FUNC_DESC_CACHE
+	while IFS= read -r line; do
+		case "$line" in
+			\#header:*)
+				line=${line#\#header:}
+				if [[ "$line" =~ ^([^:]+):(.*)$ ]]; then
+					__FUNC_HEADER_DESC["${BASH_REMATCH[1]}"]="${BASH_REMATCH[2]}"
+				fi
+				;;
+			\#desc:*)
+				line=${line#\#desc:}
+				if [[ "$line" =~ ^([^:]+):(.*)$ ]]; then
+					__FUNC_DESC_CACHE["${BASH_REMATCH[1]}"]="${BASH_REMATCH[2]}"
+				fi
+				;;
+		esac
+	done < <(tail -n +2 "$cache_file")
+	__FUNC_HEADER_DESC_BUILT=1
+	return 0
+}
+
+library::__save_desc_cache() {
+	# Description: Persist header/description maps to disk for faster subsequent runs.
+	# Globals: __FUNC_HEADER_DESC (r), __FUNC_DESC_CACHE (r), __LIB_SCRIPT_MTIME (r/w)
+	# Arguments: None
+	# Outputs: None (writes cache file on disk).
+	# Returns: 0 on success; ignores write errors.
+	# Usage: library::__save_desc_cache
+	# End of documentation
+	local cache_file script_mtime
+	cache_file=$(library::__desc_cache_file)
+	script_mtime=${__LIB_SCRIPT_MTIME:-$(stat -c %Y "$0" 2>/dev/null || date +%s)}
+	{
+		echo "#mtime:${script_mtime}"
+		local key
+		for key in "${!__FUNC_HEADER_DESC[@]}"; do
+			printf '#header:%s:%s\n' "$key" "${__FUNC_HEADER_DESC[$key]}"
+		done
+		for key in "${!__FUNC_DESC_CACHE[@]}"; do
+			printf '#desc:%s:%s\n' "$key" "${__FUNC_DESC_CACHE[$key]}"
+		done
+	} >"$cache_file" 2>/dev/null || true
+}
+
+library::__build_header_desc_map() {
+	# Description:
+	#   Populate an associative array mapping function names -> header descriptions
+	#   from the "Functions defined in this library" table at the top of this file.
+	# Globals:
+	#   __FUNC_HEADER_DESC (assoc w), __FUNC_HEADER_DESC_BUILT (w), __LIB_SCRIPT_MTIME (r/w)
+	# Arguments: None
+	# Outputs: None
+	# Returns: 0
+	# Usage:
+	#   library::__build_header_desc_map
+	# End of documentation
+
+	if library::__load_desc_cache; then
+		[[ "${__FUNC_HEADER_DESC_BUILT:-0}" -eq 1 ]] && return 0
+	fi
+
+	declare -gA __FUNC_HEADER_DESC
+	local header_re='^[[:space:]]*[0-9]+[[:space:]]+([^;]+);[[:space:]]*(.*)$'
+	while IFS= read -r line; do
+		if [[ "$line" =~ $header_re ]]; then
+			local name="${BASH_REMATCH[1]}"
+			local desc="${BASH_REMATCH[2]}"
+			name="${name#"${name%%[![:space:]]*}"}"
+			name="${name%"${name##*[![:space:]]}"}"
+			__FUNC_HEADER_DESC["$name"]="$desc"
+		fi
+	done < <(awk '/^Functions defined/{flag=1;next} flag && /^[[:space:]]*[0-9]+[[:space:]]+[^;]+;/{print}' "$0")
+	__FUNC_HEADER_DESC_BUILT=1
+}
+
+library::__get_function_description() {
+	# Description:
+	#   Resolve a one-line description for a function by first reading its inline
+	#   "Description:" comment, then falling back to the header function table.
+	# Globals:
+	#   __FUNC_DESC_CACHE (assoc r/w), __FUNC_HEADER_DESC (assoc r/w), __LIB_SCRIPT_MTIME (r/w)
+	# Arguments:
+	#   $1 - Function name (without parentheses).
+	# Outputs:
+	#   Echoes the description string or a placeholder when missing.
+	# Returns:
+	#   0 (always).
+	# Usage:
+	#   library::__get_function_description "software::add_native_package"
+	# End of documentation
+
+	declare -gA __FUNC_DESC_CACHE
+	declare -gA __FUNC_HEADER_DESC
+	library::__build_header_desc_map
+
+	local func="$1" desc=""
+	if [[ -n "${__FUNC_DESC_CACHE[$func]:-}" ]]; then
+		echo "${__FUNC_DESC_CACHE[$func]}"
+		return 0
+	fi
+	# Prefer inline '# Description:' following the function definition.
+	desc=$(
+		awk -v fn="${func}()" '
+			$0 ~ "^"fn"[[:space:]]*{" {found=1; next}
+			found && $0 ~ /^[[:space:]]*#/ {
+				if (match($0, /[Dd]escription:[[:space:]]*(.*)/, m)) { print m[1]; exit }
+			}
+			found && $0 !~ /^[[:space:]]*#/ { exit }
+		' "$0"
+	)
+	# Fallback: look in the header function table (lines with index ; description).
+	if [[ -z "$desc" ]]; then
+		desc=$(
+			awk -v fn="$func" '
+				/^[[:space:]]*[0-9]+[[:space:]]+[^;]+;/{ 
+					s=$0
+					if (match(s, /^[[:space:]]*[0-9]+[[:space:]]+([^;]+);[[:space:]]*(.*)$/, m)) {
+						name=m[1]; gsub(/^[[:space:]]+|[[:space:]]+$/, "", name)
+						if (name == fn) { print m[2]; exit }
+					}
+				}
+			' "$0"
+		)
+	fi
+	__FUNC_DESC_CACHE["$func"]="${desc:-<no description found>}"
+	echo "${__FUNC_DESC_CACHE[$func]}"
+	library::__save_desc_cache
+}
+
+library::__zformat_cache_file() {
+	# Description: Return the cache file path for cached --zformat output.
+	# Globals: XDG_CACHE_HOME (r), HOME (r), TMPDIR (r)
+	# Arguments: None
+	# Outputs: Cache file path on STDOUT.
+	# Returns: 0
+	# Usage: cache_file=$(library::__zformat_cache_file)
+	# End of documentation
+	local cache_dir
+	cache_dir=$(library::__cache_dir)
+	local key
+	key=$(printf '%s' "$0" | md5sum | awk '{print $1}')
+	echo "${cache_dir}/zformat-${key}.cache"
+}
+
+library::__load_zformat_cache() {
+	# Description: Emit cached --zformat lines when the cache is fresh.
+	# Globals: __LIB_SCRIPT_MTIME (r/w)
+	# Arguments: None
+	# Outputs: Cached zformat lines to STDOUT.
+	# Returns: 0 if cache loaded; 1 if cache missing/stale.
+	# Usage: library::__load_zformat_cache
+	# End of documentation
+	local cache_file script_mtime cache_mtime
+	cache_file=$(library::__zformat_cache_file)
+	[[ -f "$cache_file" ]] || return 1
+	script_mtime=${__LIB_SCRIPT_MTIME:-$(stat -c %Y "$0" 2>/dev/null || date +%s)}
+	cache_mtime=$(head -n1 "$cache_file" | sed 's/^#mtime://')
+	[[ -n "$cache_mtime" && "$cache_mtime" -ge "$script_mtime" ]] || return 1
+	tail -n +2 "$cache_file"
+	return 0
+}
+
+library::__save_zformat_cache() {
+	# Description: Persist the most recent --zformat lines to disk for reuse.
+	# Globals: __RTD_DEVHELP_ZFORMAT (r), __LIB_SCRIPT_MTIME (r/w)
+	# Arguments: None
+	# Outputs: None (writes cache file).
+	# Returns: 0 on success; ignores write errors.
+	# Usage: library::__save_zformat_cache
+	# End of documentation
+	local cache_file script_mtime
+	cache_file=$(library::__zformat_cache_file)
+	script_mtime=${__LIB_SCRIPT_MTIME:-$(stat -c %Y "$0" 2>/dev/null || date +%s)}
+	{
+		echo "#mtime:${script_mtime}"
+		printf "%s\n" "${__RTD_DEVHELP_ZFORMAT[@]}"
+	} >"$cache_file" 2>/dev/null || true
+}
+
 library::list_loaded_internal_functions() {
 	# Description:
 	#   Function to list all internal library functions currently loaded. This function can be used
@@ -24230,7 +24458,10 @@ library::list_loaded_internal_functions() {
 	#   helping to output documentation or providinig a list of loaded functions for information.
 	#
 	# Globals:
-	#   None
+	#   __RTD_DEVHELP_LIST (array scratch, w)
+	#   __RTD_DEVHELP_ZFORMAT (array scratch, w)
+	#   __RTD_DEVHELP_LIST_BUILT (flag, w)
+	#   __LIB_SCRIPT_MTIME (r/w)
 	#
 	# Arguments:
 	#   $1 - Optional format flag. Supported flags are:
@@ -24256,42 +24487,90 @@ library::list_loaded_internal_functions() {
 	#
 	# End of documentation
 
+	# For zformat in a fresh subshell, try on-disk cache first (fastest).
+	if [[ "$1" == "--zformat" && -z "${__RTD_DEVHELP_LIST_BUILT:-}" ]]; then
+		if library::__load_zformat_cache; then
+			return 0
+		fi
+	fi
+
+	# Cache script mtime once for all cache helpers.
+	: "${__LIB_SCRIPT_MTIME:=$(stat -c %Y "$0" 2>/dev/null || date +%s)}"
+
+	# Fast-path: reuse previously built menu entries within this shell session.
+	if [[ -n "${__RTD_DEVHELP_LIST_BUILT:-}" && ${#__RTD_DEVHELP_LIST[@]:-0} -gt 0 ]]; then
+		case "$1" in
+			--zformat)
+				printf '%s\n' "${__RTD_DEVHELP_ZFORMAT[@]}"
+				return 0
+				;;
+			--yformat)
+				functions_list=("${__RTD_DEVHELP_LIST[@]}")
+				return 0
+				;;
+			--make-doc)
+				for ((i=0; i<${#__RTD_DEVHELP_LIST[@]}; i+=3)); do
+					printf "%-5s %-50s ; %s\n" "${__RTD_DEVHELP_LIST[i]}" "${__RTD_DEVHELP_LIST[i+1]}" "${__RTD_DEVHELP_LIST[i+2]}"
+				done
+				return 0
+				;;
+			--hformat)
+				for ((i=0; i<${#__RTD_DEVHELP_LIST[@]}; i+=3)); do
+					echo "#${__RTD_DEVHELP_LIST[i]}:	${__RTD_DEVHELP_LIST[i+1]} "
+				done
+				return 0
+				;;
+		esac
+	fi
+
+
+	__RTD_DEVHELP_ZFORMAT=()
+
 	if [[ "$1" == "--zformat" ]]; then
 		i=1
-		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep -v "recipe:_" | grep -v "Single_Install"); do
-			Description=$(head -300 $0 | grep "${index}" | head -1 | cut -f2 -d';')
+		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep -v "^library::" | grep -v "recipe:_" | grep -v "Single_Install"); do
+			Description=$(library::__get_function_description "${index}")
+			__RTD_DEVHELP_LIST+=("$i" "${index}" "${Description}")
+			__RTD_DEVHELP_ZFORMAT+=("$i" "${index}" "${Description}")
 			echo -e "$i \n ${index} \n ${Description} \n"
 			((i = i + 1))
 		done
 	elif [[ "$1" == "--yformat" ]]; then
 		functions_list=()
 		i=1
-		for index in $(declare -F | awk '{print $NF}' | sort | grep -E -v "^_" | grep -v "recipe:_" | grep -v "Single_Install"); do
-			Description=$(head -300 "$0" | grep "${index}" | head -1 | cut -f2 -d';' | sed 's/^ //g') # Trim leading spaces
+		for index in $(declare -F | awk '{print $NF}' | sort | grep -E -v "^_" | grep -v "^library::" | grep -v "recipe:_" | grep -v "Single_Install"); do
+			Description=$(library::__get_function_description "${index}" | sed 's/^ //g') # Trim leading spaces
 			# Add the elements to the array
 			functions_list+=("$i" "${index}" "${Description}")
+			__RTD_DEVHELP_LIST+=("$i" "${index}" "${Description}")
 			((i = i + 1))
 		done
 	elif [[ "${1}" == "--make-doc" ]]; then
 		i=1
-		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep -v "recipe:_" | grep -v "Single_Install"); do
-			Description=$(head -300 $0 | grep "${index}" | head -1 | cut -f2 -d';')
+		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep -v "^library::" | grep -v "recipe:_" | grep -v "Single_Install"); do
+			Description=$(library::__get_function_description "${index}")
 			printf "%-5s %-50s ; %s\n" "${i}" "${index}" "${Description}"
+			__RTD_DEVHELP_LIST+=("$i" "${index}" "${Description}")
 			((i = i + 1))
 		done
 	elif [[ "$1" == "--hformat" ]]; then
 		i=1
-		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep -v "recipe:_" | grep -v "Single_Install"); do
+		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep -v "^library::" | grep -v "recipe:_" | grep -v "Single_Install"); do
 			echo "#$i:	$index "
+			__RTD_DEVHELP_LIST+=("$i" "${index}" "$(library::__get_function_description "${index}")")
 			((i = i + 1))
 		done
 	else
 		i=1
-		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep -v "recipe_" | grep -v "Single_Install"); do
+		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep -v "^library::" | grep -v "recipe_" | grep -v "Single_Install"); do
 			echo "$index #$i "
+			__RTD_DEVHELP_LIST+=("$i" "${index}" "$(library::__get_function_description "${index}")")
 			((i = i + 1))
 		done
 	fi
+
+	__RTD_DEVHELP_LIST_BUILT=1
+	[[ ${#__RTD_DEVHELP_ZFORMAT[@]} -gt 0 ]] && library::__save_zformat_cache
 }
 
 
@@ -24580,9 +24859,13 @@ main() {
 		return
 		;;
 	--devhelp)
+		write_status "Reading library to build the menu list once (reused on return from child dialogs)"
+		write_information "Please be patient, since this could take some time..."
+		DisplayList=$(library::list_loaded_internal_functions)
+		write_status "Library read OK, launching dialog now..."
 		while true; do
 			exec 3>&1
-			selection=$(dialog --clear --no-collapse --backtitle "${BRANDING:-" RunTime Data : Function library : Script Development Support"}" --title "RTD Library Loaded Functions:" --menu "\n Chose a function below to see more details about the function." "${HEIGHT:-0}" "${WIDTH:-90}" "${LIST_HEIGHT:-0}" $(library::list_loaded_internal_functions) 2>&1 1>&3)
+			selection=$(dialog --clear --no-collapse --backtitle "${BRANDING:-" RunTime Data : Function library : Script Development Support"}" --title "RTD Library Loaded Functions:" --menu "\n Chose a function below to see more details about the function." "${HEIGHT:-0}" "${WIDTH:-90}" "${LIST_HEIGHT:-0}" ${DisplayList} 2>&1 1>&3)
 			exit_status=$?
 			exec 3>&-
 
@@ -24609,9 +24892,10 @@ main() {
 		return
 		;;
 	--devhelp-gui)
+		# Build once for reuse; functions_list is consumed by yad.
+		library::list_loaded_internal_functions --yformat
 		touch /tmp/yad_doc.txt
 		: >/tmp/yad_doc.txt
-		library::list_loaded_internal_functions --yformat
 
 		YAD_KEY=$$
 
@@ -24678,9 +24962,12 @@ main() {
 		return
 		;;
 	--devhelp-gtk)
+		write_status "Reading library to build the menu list once (reused on return from child dialogs)"
+		write_information "Please be patient, since this could take some time..."
+		DisplayList=$(library::list_loaded_internal_functions --zformat)
+		write_status "Library read OK, launching dialog now..."
 		while true; do
 			exec 3>&1
-			DisplayList=$(library::list_loaded_internal_functions --zformat)
 			IFS_SAV=$IFS
 			IFS=$(echo -en "\n\b")
 			local text="Select a function below to see the function's documentation and usage:"
@@ -24727,7 +25014,7 @@ main() {
 					unset _req_sucess
 				fi
 				system::log_item "Displaying [${selection}] in a [${ZHEIGHT:-600}]x[${ZWIDTH:-1024}]: \n $result"
-				echo -e "$result" | zenity --text-info --font=monospace --modal --ok-label=BACK --title "Function Documentation: [${selection}]" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1024}"
+				echo -e "$result" | zenity --text-info --font=monospace --modal --ok-label=BACK --title "Function Documentation: [${selection}]" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1024}" 2>/dev/null
 				unset result
 				;;
 			*)
