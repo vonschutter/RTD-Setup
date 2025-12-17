@@ -14074,7 +14074,6 @@ software::add_gnome_extensions() {
 	#
 	# Example:
 	#   software::add_gnome_extensions "dash-to-dock"
-
 	#
 	# End of documentation
 
@@ -14108,7 +14107,13 @@ software::add_gnome_extensions() {
 	write_status "Status: Installing GNOME extension(s): $* ..."
 	for extension in "${extensions[@]}"; do
 		write_status "Status: Installing GNOME extension: $extension."
-		if ! bash "$extension_installer" "$extension" --yes |& tee -a "${_logfile}"; then
+		bash "$extension_installer" "$extension" --yes 2>&1 | tee -a "${_logfile}"
+		local installer_rc=${PIPESTATUS[0]}
+		local tee_rc=${PIPESTATUS[1]}
+		if (( tee_rc != 0 )); then
+			write_warning "Warning: Failed to write to log file ${_logfile} (tee exit ${tee_rc})."
+		fi
+		if (( installer_rc != 0 )); then
 			write_error "Error: Failure to install GNOME extension: $extension."
 			install_status=1
 		else
@@ -24963,8 +24968,8 @@ main() {
 			exec 3>&1
 			IFS_SAV=$IFS
 			IFS=$(echo -en "\n\b")
-			local text="Select a function below to see the function's documentation and usage:"
-			local title="RTD Library Fuction Documentation"
+			local text="This library contains many functions that may be used in any script that sources it. This list is searchable, simply start typing to filter. \n Select a function below to see the function's documentation and usage:"
+			local title="RunTime Data Library Fuction Documentation Viewer"
 			selection=$(zenity --list --modal --title=$title --text=$text --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1000}" --print-column=2 --column="Number" --column="Function" --column="Description" ${DisplayList} 2>/dev/null)
 			exit_status=$?
 			IFS=$IFS_SAV
