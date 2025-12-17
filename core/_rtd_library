@@ -18435,6 +18435,13 @@ kvm::make_vm_now_from_debian_org() {
 	local vm_name=""
 	local -a _vm_name_parts=()
 
+	# Ensure Debian installer defaults are populated even if _locations.info was not sourced
+	: "${_DEBIAN_SOURCE_URL:="https://deb.debian.org/debian/dists/stable/main/installer-amd64"}"
+	: "${_DEBIAN_FRONTEND_GTK_KERNEL:="${_DEBIAN_SOURCE_URL}/current/images/netboot/gtk/debian-installer/amd64/linux"}"
+	: "${_DEBIAN_FRONTEND_GTK_INITRD:="${_DEBIAN_SOURCE_URL}/current/images/netboot/gtk/debian-installer/amd64/initrd.gz"}"
+	: "${_DEBIAN_FRONTEND_DEFAULT_KERNEL:="${_DEBIAN_SOURCE_URL}/current/images/netboot/debian-installer/amd64/linux"}"
+	: "${_DEBIAN_FRONTEND_DEFAULT_INITRD:="${_DEBIAN_SOURCE_URL}/current/images/netboot/debian-installer/amd64/initrd.gz"}"
+
 	# Set the default source URL for the Debian version if not already set... and add some options depending on the role.
 	case "${_role}" in
 	desktop | Desktop | VDI | vdi | workstation | Workstation)
@@ -18492,7 +18499,7 @@ kvm::make_vm_now_from_debian_org() {
 	The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in: ${_preseed_file} \n
 	🔧 - Using this source for the packages and files to download: \n
-	🌎 - ${_source_url%%/*pub*} \n
+	🌎 - ${source_url%%/*pub*} \n
 	🖥️ - Using the network: ${virt_net:=default} \n
 	🖥️ - Memory: ${_mem} \n
 	🖥️ - CPU's: ${_cpu} \n
