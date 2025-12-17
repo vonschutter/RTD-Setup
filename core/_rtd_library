@@ -14121,6 +14121,25 @@ software::add_gnome_extensions() {
 		fi
 	done
 
+	if (( install_status == 0 )); then
+		if [[ "${XDG_SESSION_TYPE}" == "wayland" ]]; then
+			write_status "Status: GNOME extension(s) installed. Please log out/in to reload GNOME Shell (Wayland session)."
+		else
+			write_status "Status: GNOME extension(s) installed. Reloading GNOME Shell..."
+			if command -v dbus-send >/dev/null 2>&1; then
+				if [[ -n "$SUDO_USER" ]]; then
+					sudo -H -u "$SUDO_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" dbus-send --session --type=method_call --dest=org.gnome.Shell /org/gnome/Shell org.gnome.Shell.Eval string:"global.reexec_self();" \
+						|| write_warning "Warning: Failed to restart GNOME Shell automatically."
+				else
+					dbus-send --session --type=method_call --dest=org.gnome.Shell /org/gnome/Shell org.gnome.Shell.Eval string:"global.reexec_self();" \
+						|| write_warning "Warning: Failed to restart GNOME Shell automatically."
+				fi
+			else
+				write_warning "Warning: dbus-send not available; cannot restart GNOME Shell automatically."
+			fi
+		fi
+		fi
+
 	return $install_status
 }
 
