@@ -4832,57 +4832,105 @@ system::check_required_variables() {
 }
 
 system::find_vm_bridge() {
-	# Description:
-	# This function searches for the default bridge network device on the system. It is designed to
-	# work in environments where virtual machines (VMs) are managed, typically using bridge networks for
-	# VM connectivity. If no bridge network device is found (prefixed with br or named bridge), the
-	# function defaults to a NAT device named "default".
+	# Description: Locate a usable network for VM networking. Prefer a host bridge with a physical member; otherwise fall back to a libvirt network (preferring "default"). Logs diagnostics, returning 1 only when nothing usable is found.
 	#
-	# Globals:
-	# None. This function does not depend on or modify any global variables.
+	# Globals: None
 	#
-	# Arguments:
-	# None. The function does not take any arguments.
+	# Arguments: None
 	#
-	# Outputs:
-	# The function outputs one of the following, depending on the system's network configuration:
+	# Outputs: STDOUT; prints "bridge=<name>" when a br* interface is found, "network=<libvirt_net>" when a libvirt network is usable, or "NONE" when missing. Diagnostics are logged.
 	#
-	#     The name of the first bridge network device found (e.g., br0, bridge0).
-	#     default if no bridge network device is found.
-	#
-	# Returns:
-	#     The name of a bridge network device (e.g., br0, bridge0) if one is found.
-	#     default if no bridge network device is found.
+	# Returns: 0 when a bridge or libvirt network is found; 1 when nothing usable exists.
 	#
 	# Usage:
-	# To use this function, simply call it within a script. For example:
+	#   bridge=$(system::find_vm_bridge)   # e.g., "bridge=br0", "network=default", or "NONE"
+	#   echo "Using ${bridge}"
 	#
-	# bridge_device=$(system::find_vm_bridge)
-	# echo "The default bridge device is: $bridge_device"
+	# Notes:
+	#   - Scans /sys/class/net for interfaces starting with "br" that have a physical member (not just veth/vnet/tap).
+	#   - Intended for libvirt/KVM style bridges; adjust if your environment uses a different naming scheme.
+	#   - If no bridge is found and virsh is available, the first active libvirt network is returned (preferring "default"). If none are active, a defined network is returned (preferring "default").
 	#
-	# This will store the name of the default bridge network device (or default if none is found)
-	# in the variable bridge_device and then print it.
-	#
-	# Additional Notes:
-	#
-	#     This function is particularly useful in virtualized environments where network bridging is
-	#     a common requirement.It assumes a standard naming convention for bridge devices (starting with br or named bridge).
-	#     The function uses grep to filter the network devices and ls to list them from /sys/class/net,
-	#     which is a standard location for network interface information in Linux.
 	# End of documentation
 
 	# Alternative short hand:
-	# if ls /sys/class/net | grep '^br' | head -n 1 | xargs -I {} echo "bridge:{}" |grep br ; else echo default; fi
+	# if ls /sys/class/net | grep '^br' | head -n 1 | xargs -I {} echo "bridge={}" |grep br ; else echo default; fi
 
-	# Check for bridge interfaces
-	bridge=$(ls /sys/class/net | grep '^br' | head -n 1)
+	# First, look for a host bridge that appears to have a physical member (avoid docker/CNI-only bridges).
+	local bridge_path bridge opstate ipv4_addr has_physical member_path member
+	for bridge_path in /sys/class/net/br*; do
+		[[ -e "$bridge_path" ]] || continue
+		bridge="${bridge_path##*/}"
+		# Skip docker-style bridges (br-<12hex>) which are usually isolated
+		if [[ "$bridge" =~ ^br-[0-9a-fA-F]{12}$ ]]; then
+			system::log_item "Skipping docker-style bridge ${bridge}"
+			continue
+		fi
+		# Prefer bridges that are up; skip clearly down interfaces
+		opstate=$(cat "/sys/class/net/${bridge}/operstate" 2>/dev/null || echo "")
+		if [[ "$opstate" == "down" || "$opstate" == "dormant" || "$opstate" == "lowerlayerdown" ]]; then
+			system::log_item "Skipping bridge ${bridge} (operstate=${opstate:-unknown})"
+			continue
+		fi
+		# Require at least one non-virtual member (e.g., en*, eth*, bond*, team*). Skip veth/vnet/tap-only bridges.
+		has_physical=0
+		if [[ -d "/sys/class/net/${bridge}/brif" ]]; then
+			for member_path in /sys/class/net/${bridge}/brif/*; do
+				[[ -e "$member_path" ]] || continue
+				member="${member_path##*/}"
+				if [[ "$member" =~ ^(veth|vnet|tap|docker|br-).*$ ]]; then
+					continue
+				fi
+				if [[ "$member" =~ ^(en|eth|ens|eno|enp|em|bond|team).* ]]; then
+					has_physical=1
+					break
+				fi
+			done
+		fi
+		if (( ! has_physical )); then
+			system::log_item "Skipping bridge ${bridge} (no physical member detected)"
+			continue
+		fi
+		ipv4_addr=$(ip -o -4 addr show dev "$bridge" 2>/dev/null | awk 'NR==1{print $4}')
+		echo "bridge=${bridge}"
+		system::log_item "found bridge ${bridge}${ipv4_addr:+ with IPv4 ${ipv4_addr}}"
+		return 0
+	done
 
-	# Output the first bridge found or "default" if none exists
-	if [[ -n "$bridge" ]]; then
-		echo "bridge:$bridge"
-	else
-		echo "default"
+	# If no suitable bridge, prefer active libvirt networks (NAT) before giving up
+	local active_nets default_active first_net defined_nets first_defined
+	if command -v virsh >/dev/null 2>&1; then
+		active_nets=$(virsh net-list --state-active --name 2>/dev/null | awk 'NF')
+		default_active=$(printf '%s\n' "$active_nets" | grep -Fx "default" || true)
+		if [[ -n "$default_active" ]]; then
+			system::log_item "Using libvirt NAT network 'default'."
+			echo "network=default"
+			return 0
+		fi
+		first_net=$(printf '%s\n' "$active_nets" | head -n 1)
+		if [[ -n "$first_net" ]]; then
+			system::log_item "Using first active libvirt network: ${first_net}."
+			echo "network=${first_net}"
+			return 0
+		fi
+		# If no active networks, fall back to any defined libvirt network (prefer default)
+		defined_nets=$(virsh net-list --all --name 2>/dev/null | awk 'NF')
+		if printf '%s\n' "$defined_nets" | grep -Fxq "default"; then
+			system::log_item "Using defined libvirt network 'default' (will auto-start if needed)."
+			echo "network=default"
+			return 0
+		fi
+		first_defined=$(printf '%s\n' "$defined_nets" | head -n 1)
+		if [[ -n "$first_defined" ]]; then
+			system::log_item "Using first defined libvirt network: ${first_defined}."
+			echo "network=${first_defined}"
+			return 0
+		fi
 	fi
+
+	system::log_item "No suitable bridge or libvirt network found; returning NONE."
+	echo "NONE"
+	return 1
 }
 
 system::restart_sound() {
@@ -4910,14 +4958,16 @@ system::restart_sound() {
 }
 
 system::remove_old_kernel() {
-	# Description: Function to remove all old linux kernels.
-	#
-	#
-	# Globals:
+	# Description: Purge older Linux kernel packages, keeping the currently running kernel.
+	# Globals: OSTYPE (r)
 	# Arguments: None
-	# Outputs:
-	# Returns: Standard error level.
-	# Usage: simply call function in a script
+	# Outputs: Status messages via dialog::display_notice; package manager output on STDOUT/STDERR.
+	# Returns: 0 on success; 1 on unsupported OS/PM or user cancellation.
+	# Usage:
+	#   system::remove_old_kernel
+	# Notes:
+	#   - Supports apt, zypper, and dnf-based distros; requires admin privileges.
+	#   - No action on non-Linux systems (returns 1 with an error).
 	# End of documentation
 
 	if echo "$OSTYPE" | grep -q "linux" &>/dev/null; then
@@ -17996,6 +18046,10 @@ kvm::make_vm_now_from_fedora_org() {
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: "${virt_net="$(system::find_vm_bridge)"}"
+	if [[ "$virt_net" == "NONE" ]]; then
+		write_error "No bridge interface detected. Supply --network explicitly (e.g., bridge=br0 or network=default) before proceeding."
+		return 1
+	fi
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
 	: "${_DEFAULT_FEDORA_VER:="$(curl -s https://dl.fedoraproject.org/pub/fedora/linux/releases/ | grep -oP 'href="\K[0-9]+(?=/")' | sort -n | tail -1)"}"
 
@@ -18156,6 +18210,10 @@ kvm::make_vm_now_from_redhat_com() {
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: ${virt_net="$(system::find_vm_bridge)"}
+	if [[ "$virt_net" == "NONE" ]]; then
+		write_error "No bridge interface detected. Supply --network explicitly (e.g., bridge=br0 or network=default) before proceeding."
+		return 1
+	fi
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
 	local alma_base_url="https://repo.almalinux.org/almalinux/"
 	local latest_alma_version
@@ -18326,6 +18384,10 @@ kvm::make_vm_now_from_opensuse_org() {
 
 	# Discover if the appropriate VM net interface is (default or br'0 - n')
 	: ${virt_net="$(system::find_vm_bridge)"}
+	if [[ "$virt_net" == "NONE" ]]; then
+		write_error "No bridge interface detected. Supply --network explicitly (e.g., bridge=br0 or network=default) before proceeding."
+		return 1
+	fi
 
 	local _existing_vm_name="${vm_name:-}"
 	local vm_name=""
@@ -18483,6 +18545,10 @@ kvm::make_vm_now_from_debian_org() {
 
 	write_status "🔎 	- Discovering what the appropriate VM net interface is (default or br'0 - n')"
 	: ${virt_net="$(system::find_vm_bridge)"}
+	if [[ "$virt_net" == "NONE" ]]; then
+		write_error "No bridge interface detected. Supply --network explicitly (e.g., bridge=br0 or network=default) before proceeding."
+		return 1
+	fi
 	write_status "🔎	- Using network (${virt_net})"
 	: ${source_url:="${_DEBIAN_SOURCE_URL}"}
 
@@ -18610,6 +18676,10 @@ kvm::make_vm_now_from_kali_org() {
 	system::make_preseed_cfg --role "${_role}" --desktop_environment "standard" --saveto "$(mktemp -d)" --package-list "curl git kali-linux-default kali-desktop-xfce" --ask YES
 	write_status "🔎 	- Discovering what the appropriate VM net interface is (default or br'0 - n')"
 	: ${virt_net="$(system::find_vm_bridge)"}
+	if [[ "$virt_net" == "NONE" ]]; then
+		write_error "No bridge interface detected. Supply --network explicitly (e.g., bridge=br0 or network=default) before proceeding."
+		return 1
+	fi
 	write_status "🔎	- Using network (${virt_net})"
 	local disk_path
 	disk_path=$(kvm::create_expanding_vm_hardisk "$vm_name" "$_dsk") || {
@@ -18716,6 +18786,10 @@ kvm::make_vm_now_from_zorin() {
 	: ${CloudConfigDir:="$_saveto"}                       # This is the default location cidata files.
 	: ${bin_virt_install:=$(type -p virt-install)}        # This is the default location for the virt-install binary.
 	: ${virt_net="$(system::find_vm_bridge)"}             # This is the default network to use for the VM.
+	if [[ "$virt_net" == "NONE" ]]; then
+		write_error "No bridge interface detected. Supply --network explicitly (e.g., bridge=br0 or network=default) before proceeding."
+		return 1
+	fi
 	: ${edition:="Core"}                                  # This is the default edition of Zorin OS to use.
 	: ${version:="latest"}                                # Default to the most recent Zorin OS release.
 
@@ -18954,6 +19028,10 @@ kvm::make_vm_now_from_ubuntu_com() {
 	: ${CloudConfigDir:="$_saveto"}                       # This is the default location cidata files.
 	: ${bin_virt_install:=$(type -p virt-install)}        # This is the default location for the virt-install binary.
 	: ${virt_net="$(system::find_vm_bridge)"}             # This is the default network to use for the VM.
+	if [[ "$virt_net" == "NONE" ]]; then
+		write_error "No bridge interface detected. Supply --network explicitly (e.g., bridge=br0 or network=default) before proceeding."
+		return 1
+	fi
 	: ${_ask="NO"}                                        # This is the default for interactive mode for manual input during setup.
 
 	system::log_item "Read/Set default values for VM T-Shirts sizes..."
@@ -19287,6 +19365,10 @@ kvm::make_vm_now_from_microsoft() {
 	: ${CONFIG:="VDI"}
 	: ${WindowsInstructions:="/var/lib/libvirt/boot/win$(date +%Y-%m-%d-%H-%M-%S-%s).img"}
 	: ${virt_net="$(system::find_vm_bridge)"}
+	if [[ "$virt_net" == "NONE" ]]; then
+		write_error "No bridge interface detected. Supply --network explicitly (e.g., bridge=br0 or network=default) before proceeding."
+		return 1
+	fi
 	: ${_saveto="$(mktemp -d /tmp/WinConfig.XXXXXX)"}
 	: ${AutoUnattend="${_saveto}/autounattend.xml"}
 	: ${PostTasks="${_saveto}/rtd-me-sh.cmd"}
