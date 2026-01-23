@@ -391,23 +391,23 @@ show_make_media_gui_server ()
 			echo "Program terminated by user..."
 		;;
 		1 )
-			rtd_oem_ubuntu_auto_install_iso_builder openssh-server server
+			oem::task::auto_install_iso_ubuntu openssh-server server
 			cleanup_and_finish
 		;;
 		2 )
-			rtd_oem_ubuntu_auto_install_iso_builder xubuntu-core server
+			oem::task::auto_install_iso_ubuntu xubuntu-core server
 			cleanup_and_finish
 		;;
 		3 )
-			system::download_and_manipulate_iso_debian --role server --server_role openssh-server --DE lxde-desktop
+			oem::task::auto_install_iso_debian --role server --server_role openssh-server --DE lxde-desktop
 			cleanup_and_finish
 		;;
 		4 )
-			system::download_and_manipulate_iso_debian --role server --server_role openssh-server 
+			oem::task::auto_install_iso_debian --role server --server_role openssh-server 
 			cleanup_and_finish
 		;;
 		5 )
-			system::download_and_manipulate_iso_debian --role server --server_role MinecraftServer 
+			oem::task::auto_install_iso_debian --role server --server_role MinecraftServer 
 			cleanup_and_finish
                 ;;
 		esac
@@ -423,12 +423,11 @@ show_make_media_gui_desktop () {
 		selection=$($RTD_GUI \
 		--backtitle "$BRANDING" --title "Create Automatic OS Install Media"  --menu "Please select which automatic operating system installation media to create:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT"  \
 		"1" "Automatic Install Media for Ubuntu Standard Desktop (more MAC like)" \
-		"2" "Automatic Install Media for Ubuntu with Plasma Desktop (more Windows like)" \
-		"3" "Automatic Install Media for Ubuntu Gnome (without Ubuntu customization)" \
-		"4" "Automatic Install Media for Ubuntu Minimal Standard desktop" \
-		"5" "Automatic Install Media for Debian Default Desktop" \
-		"6" "Automatic Install Media for Debian Light Weight Desktop" \
-		"7" "Automatic Install Media for Debian Plasma Desktop" \
+		"2" "Automatic Install Media for Debian Default Desktop" \
+		"3" "Automatic Install Media for Debian Light Weight Desktop" \
+		"4" "Automatic Install Media for Debian Plasma Desktop" \
+		"5" "Automatic Install Media for Zorin OS Core" \
+		"6" "Automatic Install Media for Windows 11" \
 		2>&1 1>&3)
 		exit_status=$?
 		exec 3>&-
@@ -445,34 +444,28 @@ show_make_media_gui_desktop () {
 		;;
 		1 )
 			system::log_item "chosen: Automatic Install Media for Ubuntu Standard Desktop (more MAC like)"
-			rtd_oem_ubuntu_auto_install_iso_builder --distro ubuntu --role workstation  --DE ubuntu-desktop --ask YES
+			oem::task::auto_install_iso_ubuntu --distro ubuntu --role workstation  --DE ubuntu-desktop --ask YES
 			#ubuntu-desktop desktop
 			cleanup_and_finish
 		;;
 		2 )
-			rtd_oem_ubuntu_auto_install_iso_builder --distro ubuntu --role workstation  --DE kubuntu-desktop --ask YES
-			#kubuntu-desktop desktop
+			oem::task::auto_install_iso_debian --distro debian --role workstation  --DE gnome-desktop --ask YES
 			cleanup_and_finish
 		;;
 		3 )
-			rtd_oem_ubuntu_auto_install_iso_builder --distro ubuntu --role workstation  --DE ubuntu-gnome-desktop --ask YES
-			#ubuntu-gnome-desktop desktop
+			oem::task::auto_install_iso_debian --distro debian --role workstation --DE  cinnamon-desktop --ask YES
 			cleanup_and_finish
 		;;
-                4 )
-			rtd_oem_ubuntu_auto_install_iso_builder --distro ubuntu --role workstation  --DE ubuntu-desktop-minimal --ask YES
+		4 )
+			oem::task::auto_install_iso_debian --distro debian --role workstation --DE  kde-desktop --ask YES
 			cleanup_and_finish
 		;;
 		5 )
-			system::download_and_manipulate_iso_debian --distro debian --role workstation  --DE gnome-desktop --ask YES
+			oem::task::auto_install_iso_zorin --edition Core --ask YES
 			cleanup_and_finish
 		;;
 		6 )
-			system::download_and_manipulate_iso_debian --distro debian --role workstation --DE  cinnamon-desktop --ask YES
-			cleanup_and_finish
-		;;
-		7 )
-			system::download_and_manipulate_iso_debian --distro debian --role workstation --DE  kde-desktop --ask YES
+			oem::task::auto_install_iso_windows --winver win11 --ask YES
 			cleanup_and_finish
 		;;
 		esac

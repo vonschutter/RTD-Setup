@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+#
+# RTD GNOME Theme Manager (simple GUI)
+# Lists themes found in ~/.themes and /usr/share/themes, lets the user pick one,
+# and applies GTK 3/4 + GNOME Shell theme plus an optional wallpaper.
+#
+# Requirements: gsettings, zenity, gnome-extensions (optional for enabling shell theme)
+
+set -euo pipefail
+
+die() { echo "Error: $*" >&2; exit 1; }
+warn() { echo "Warning: $*" >&2; }
+
+require() { command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"; }
+
+require gsettings
+require zenity
+require gnome-extensions
+
+find_themes() {
+	local -a themes=()
+	# Prefer user themes, but include system themes too.
+	while IFS= read -r -d '' dir; do
+		themes+=("$(basename "$dir")")
+	done < <(find "$HOME/.themes" /usr/share/themes -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null | sort -z)
+
+	# Keep unique names in order
+	printf '%s\n' "${themes[@]}" | awk '!seen[$0]++'
+}
+
+find_wallpapers() {
+	local -a roots=(
+		"$HOME/.themes"
+		"$HOME/Pictures/Wallpapers"
+		"$HOME/Pictures"
+	)
+	while IFS= read -r -d '' img; do
+		printf '%s\n' "$img"
+	done < <(find "${roots[@]}" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) -print0 2>/dev/null | sort -z)
+}
+
+theme_path() {
+	local theme="$1"
+	local -a roots=("$HOME/.themes" "/usr/share/themes")
+	local dir
+	for dir in "${roots[@]}"; do
+		if [[ -d "${dir}/${theme}" ]]; then
+			printf '%s\n' "${dir}/${theme}"
+			return 0
+		fi
+	done
+	return 1
+}
+
+find_theme_wallpaper() {
+	local theme="$1"
+	local tpath
+	tpath=$(theme_path "$theme") || return 1
+	find "$tpath" -maxdepth 3 -type f \( -iname 'wallpaper.*' -o -iname 'background.*' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) \
+		-print -quit 2>/dev/null
+}
+
+pick_theme() {
+	local themes
+	themes=$(find_themes) || return 1
+	[[ -z "$themes" ]] && die "No themes found in ~/.themes or /usr/share/themes."
+
+	zenity --list \
+		--title="GNOME Theme Manager" \
+		--text="Select a theme to apply" \
+		--column="Themes" \
+		--height=400 --width=320 \
+		--hide-header <<<"$themes"
+}
+
+find_installer() {
+	# First, try PATH
+	if command -v rtd-gnome-shell-extension-installer >/dev/null 2>&1; then
+		command -v rtd-gnome-shell-extension-installer
+		return
+	fi
+
+	# Then search common RTD locations
+	local candidate
+	candidate=$(find /opt -maxdepth 4 -type f -name 'rtd-gnome-shell-extension-installer' 2>/dev/null | head -n1 || true)
+	if [[ -n "$candidate" && -x "$candidate" ]]; then
+		echo "$candidate"
+		return
+	fi
+
+	# Fallback: download a fresh copy to a temp location
+	local tmp_installer
+	tmp_installer="$(mktemp -p /tmp rtd-gnome-extension-installer.XXXXXX)"
+	if curl -fsSL "https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer" -o "$tmp_installer"; then
+		chmod +x "$tmp_installer"
+		echo "$tmp_installer"
+		return
+	fi
+
+	warn "Unable to download rtd-gnome-shell-extension-installer."
+}
+
+ensure_extension() {
+	local uuid="$1" id="$2"
+
+	if gnome-extensions list 2>/dev/null | grep -Fxq "$uuid"; then
+		enable_extension_uuid "$uuid"
+		return 0
+	fi
+
+	local installer
+	installer=$(find_installer)
+	if [[ -z "$installer" ]]; then
+		warn "Extension '${uuid}' not installed and no installer found. Please install manually."
+		return 1
+	fi
+
+	echo "Installing GNOME extension ${uuid} (id ${id})..."
+	if bash "$installer" "$id" --yes >/dev/null 2>&1; then
+		enable_extension_uuid "$uuid"
+	else
+		warn "Failed to install extension ${uuid}."
+		return 1
+	fi
+}
+
+ensure_dependencies() {
+	# Allow user extensions to load
+	gsettings set org.gnome.shell disable-user-extensions false 2>/dev/null || true
+
+	# Ensure key extensions are present and enabled
+	ensure_extension "user-theme@gnome-shell-extensions.gcampax.github.com" "19"
+	ensure_extension "dash-to-dock@micxgx.gmail.com" "307"
+	ensure_extension "dash-to-panel@jderose9.github.com" "1160"
+}
+
+enable_extension_uuid() {
+	local uuid="$1"
+
+	# Primary: gnome-extensions
+	if gnome-extensions enable "$uuid" 2>/dev/null; then
+		return 0
+	fi
+
+	# Fallback: D-Bus call to GNOME Shell (works on Wayland without full reload)
+	if command -v busctl >/dev/null 2>&1; then
+		busctl --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell.Extensions EnableExtension s "$uuid" >/dev/null 2>&1 && return 0
+	fi
+
+	# Final fallback: gsettings to toggle user extensions back on (forces reload when possible)
+	gsettings set org.gnome.shell disable-user-extensions false >/dev/null 2>&1 || true
+	return 1
+}
+
+apply_theme() {
+	local theme="$1"
+	local wallpaper="${2:-}"
+
+	gsettings set org.gnome.desktop.interface gtk-theme "$theme" || warn "Failed to set GTK theme."
+	# GTK 4 uses same setting; also align icon/cursor if present
+	gsettings set org.gnome.desktop.interface icon-theme "$theme" >/dev/null 2>&1 || true
+	gsettings set org.gnome.desktop.interface cursor-theme "$theme" >/dev/null 2>&1 || true
+
+	# Apply shell theme if user-theme extension is available
+	if gsettings writable org.gnome.shell.extensions.user-theme name >/dev/null 2>&1; then
+		gsettings set org.gnome.shell.extensions.user-theme name "$theme" || warn "Failed to set GNOME Shell theme."
+	else
+		warn "User Themes extension not available; skipping shell theme."
+	fi
+
+	if [[ -n "$wallpaper" && -f "$wallpaper" ]]; then
+		local uri="file://$wallpaper"
+		gsettings set org.gnome.desktop.background picture-uri "$uri" || warn "Failed to set wallpaper."
+		# Keep dark-mode background in sync when available
+		gsettings set org.gnome.desktop.background picture-uri-dark "$uri" >/dev/null 2>&1 || true
+	fi
+}
+
+main() {
+	local theme wallpaper
+
+	ensure_dependencies
+
+	theme=$(pick_theme) || exit 1
+	[[ -z "$theme" ]] && exit 0
+
+	wallpaper=$(find_theme_wallpaper "$theme" || true)
+
+	apply_theme "$theme" "$wallpaper"
+
+	zenity --info --title="GNOME Theme Manager" --text="Applied theme: $theme${wallpaper:+\nWallpaper: $wallpaper}"
+}
+
+main "$@"
