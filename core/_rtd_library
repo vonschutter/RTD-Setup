@@ -425,6 +425,17 @@ zenity:
 328  zenity::display_info                                         ;           Displays an information notice using a Zenity info box.
 329  zenity::display_url                                          ;           Displays the content of a URL in a GUI using Zenity.
 
+kde (extended):
+330  desktop::apply_user_tweaks                                   ;           Detect active desktop and expose GNOME/KDE tweak helpers (optional dialog).
+331  kde::set_global_look_and_feel                                ;           Apply a KDE Look & Feel package (Lookandfeeltool/Plasma 6).
+332  kde::set_color_scheme                                        ;           Apply a KDE color scheme.
+333  kde::set_icon_theme                                          ;           Apply an icon theme for Plasma.
+334  kde::set_cursor_theme                                        ;           Apply a cursor theme and size.
+335  kde::set_layout_panel                                        ;           Apply a Plasma layout file (panels/containments).
+336  kde::tune_fonts_antialias                                    ;           Set font hinting/subpixel/DPI values for Plasma.
+337  kde::apply_window_rules                                      ;           Install basic kwin window rules or a provided rules file.
+338  kde::set_startup_apps                                        ;           Create/update per-user autostart entries.
+
 
 Use Google Coding standards:
 In general any function that is not both obvious and short must be commented. Any function in a library must be commented regardless of
@@ -2414,6 +2425,109 @@ dependency::desktop() {
 	fi
 
 	return 1
+}
+
+desktop::apply_user_tweaks() {
+	# Description:
+	#   Dispatch user-facing tweaks depending on the active desktop environment.
+	#   Non-interactive by default; with --interactive will present a small menu.
+	# Arguments:
+	#   --desktop <gnome|kde> : Override detected desktop.
+	#   --interactive         : Show dialog menu of available tweaks.
+	# Outputs: Status messages or a menu selection applied.
+	# Returns: 0 on success, non-zero on error/cancel.
+	local desktop=""
+	local interactive=0
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--desktop) desktop="${2,,}"; shift 2 ;;
+		--interactive) interactive=1; shift ;;
+		*) shift ;;
+		esac
+	done
+
+	if [[ -z "$desktop" ]]; then
+		if dependency::desktop gnome; then
+			desktop="gnome"
+		elif dependency::desktop kde; then
+			desktop="kde"
+		fi
+	fi
+
+	if [[ -z "$desktop" ]]; then
+		write_error "Unable to detect desktop (GNOME/KDE). Use --desktop to override."
+		return 1
+	fi
+
+	if [[ $interactive -eq 1 ]] && dependency::command_exists dialog; then
+		if [[ "$desktop" == "gnome" ]]; then
+			local choices=(
+				"common" "Apply core GNOME tweaks (themes/icons/ui)."
+				"win10"  "Apply Windows 10 styled GNOME tweaks."
+				"mac"    "Apply macOS styled GNOME tweaks."
+			)
+			exec 3>&1
+			local sel
+			sel=$(dialog --backtitle "${BRANDING:-RTD Power Tools}" \
+				--title "GNOME Tweaks" \
+				--menu "Select tweak set to apply:" 15 70 5 "${choices[@]}" 2>&1 1>&3)
+			exec 3>&-
+			case "$sel" in
+			common) gnome::set_ui_common_tweaks_for_user ;;
+			win10) gnome::set_ui_win10_tweaks_for_user ;;
+			mac) gnome::set_ui_mac_tweaks_for_user ;;
+			*) write_information "No tweak applied."; return 0 ;;
+			esac
+			return $?
+		elif [[ "$desktop" == "kde" ]]; then
+			local choices=(
+				"lnf"   "Look & Feel (Breeze Dark)."
+				"color" "Color scheme (BreezeDark)."
+				"icon"  "Icon theme (breeze-dark)."
+				"wall"  "Wallpaper (prompt for file)."
+				"fonts" "Font AA (hintmedium/rgb)."
+			)
+			exec 3>&1
+			local sel
+			sel=$(dialog --backtitle "${BRANDING:-RTD Power Tools}" \
+				--title "KDE Tweaks" \
+				--menu "Select tweak to apply:" 16 70 6 "${choices[@]}" 2>&1 1>&3)
+			exec 3>&-
+			case "$sel" in
+			lnf) kde::set_global_look_and_feel --package org.kde.breezedark.desktop ;;
+			color) kde::set_color_scheme --scheme BreezeDark ;;
+			icon) kde::set_icon_theme --theme breeze-dark ;;
+			wall)
+				exec 3>&1
+				local wp
+				wp=$(dialog --backtitle "${BRANDING:-RTD Power Tools}" --title "Wallpaper" --fselect "${HOME}/" 12 70 2>&1 1>&3)
+				exec 3>&-
+				[[ -n "$wp" ]] && kde::set_wallpaper "$wp"
+				;;
+			fonts) kde::tune_fonts_antialias --hintstyle hintmedium --subpixel rgb ;;
+			*) write_information "No tweak applied."; return 0 ;;
+			esac
+			return $?
+		fi
+	fi
+
+	# Non-interactive summary
+	if [[ "$desktop" == "gnome" ]]; then
+		write_information "Detected GNOME. Available tweaks (non-interactive mode):"
+		write_information "  - gnome::set_ui_common_tweaks_for_user"
+		write_information "  - gnome::set_ui_win10_tweaks_for_user"
+		write_information "  - gnome::set_ui_mac_tweaks_for_user"
+	elif [[ "$desktop" == "kde" ]]; then
+		write_information "Detected KDE. Available tweaks (non-interactive mode):"
+		write_information "  - kde::set_global_look_and_feel --package <id>"
+		write_information "  - kde::set_color_scheme --scheme <name>"
+		write_information "  - kde::set_icon_theme --theme <name>"
+		write_information "  - kde::set_wallpaper <file>"
+		write_information "  - kde::tune_fonts_antialias --hintstyle <style> --subpixel <rgb>"
+		write_information "  - kde::apply_window_rules"
+	fi
+	return 0
 }
 
 dependency::os_linux() {
@@ -12584,6 +12698,445 @@ kde::set_wallpaper() {
 	hash qdbus || ${_qdbus="/usr/bin/qdbus-qt5" } && ${_qdbus="qdbus" }
 	${_qdbus} org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "${wallpaper_set_script}"
 	kwriteconfig5 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key Image "file://$full_image_path"
+}
+
+
+######################
+# KDE Plasma helpers #
+######################
+
+kde::_kwriteconfig_cmd() {
+	# Return kwriteconfig6 when present, otherwise kwriteconfig5.
+	if command -v kwriteconfig6 >/dev/null 2>&1; then
+		printf '%s' "kwriteconfig6"
+	else
+		printf '%s' "kwriteconfig5"
+	fi
+}
+
+kde::_apply_lnf_cmd() {
+	if command -v plasma-apply-lookandfeel >/dev/null 2>&1; then
+		printf '%s' "plasma-apply-lookandfeel"
+	else
+		printf '%s' "lookandfeeltool"
+	fi
+}
+
+kde::_plasma_version_major() {
+	local ver
+	if command -v plasmashell >/dev/null 2>&1; then
+		ver="$(plasmashell --version 2>/dev/null | sed -n 's/[^0-9]*\([0-9]\+\).*/\1/p' | head -n1)"
+	fi
+	printf '%s' "${ver:-5}"
+}
+
+kde::_reload_shell() {
+	local major
+	major="$(kde::_plasma_version_major)"
+	if command -v kquitapp6 >/dev/null 2>&1; then
+		kquitapp6 plasmashell >/dev/null 2>&1 || true
+	elif command -v kquitapp5 >/dev/null 2>&1; then
+		kquitapp5 plasmashell >/dev/null 2>&1 || true
+	fi
+
+	if [[ "$major" -ge 6 ]] && command -v plasmashell >/dev/null 2>&1; then
+		nohup plasmashell >/dev/null 2>&1 &
+	elif command -v plasmashell >/dev/null 2>&1; then
+		nohup plasmashell --replace >/dev/null 2>&1 &
+	fi
+}
+
+kde::set_global_look_and_feel() {
+	# Description:
+	#   Apply a KDE Plasma Look & Feel package (LNF). Non-interactive by default.
+	# Arguments:
+	#   --package <id>     : LNF package id (default: org.kde.breezedark.desktop)
+	#   --interactive      : Prompt with dialog/menu for package selection.
+	# Outputs: Status messages.
+	# Returns: 0 on success, non-zero on failure.
+	local pkg="org.kde.breezedark.desktop"
+	local interactive=0
+	local apply_cmd
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--package) pkg="$2"; shift 2 ;;
+		--interactive) interactive=1; shift ;;
+		*) shift ;;
+		esac
+	done
+
+	apply_cmd="$(kde::_apply_lnf_cmd)"
+	if ! dependency::command_exists "$apply_cmd"; then
+		write_error "Look & Feel apply tool not found (lookandfeeltool/plasma-apply-lookandfeel)."
+		return 1
+	fi
+
+	if [[ $interactive -eq 1 ]] && dependency::command_exists dialog; then
+		local choices=(
+			"org.kde.breeze.desktop" "Breeze (light)"
+			"org.kde.breezedark.desktop" "Breeze Dark"
+			"org.kde.breezetwilight.desktop" "Breeze Twilight"
+		)
+		exec 3>&1
+		local sel
+		sel=$(dialog --backtitle "${BRANDING:-RTD Power Tools}" \
+			--title "KDE Look & Feel" \
+			--menu "Select a Look & Feel package" 15 70 5 "${choices[@]}" 2>&1 1>&3)
+		exec 3>&-
+		[[ -n "$sel" ]] && pkg="$sel"
+	fi
+
+	write_status "Applying KDE Look & Feel: $pkg"
+	if [[ "$apply_cmd" == "plasma-apply-lookandfeel" ]]; then
+		if ! "$apply_cmd" --apply "$pkg"; then
+			write_error "Failed to apply Look & Feel: $pkg"
+			return 1
+		fi
+	elif ! "$apply_cmd" -a "$pkg"; then
+		write_error "Failed to apply Look & Feel: $pkg"
+		return 1
+	fi
+	return 0
+}
+
+kde::set_color_scheme() {
+	# Description:
+	#   Apply a KDE color scheme. Non-interactive unless --interactive is set.
+	# Arguments:
+	#   --scheme <id>      : Color scheme name (default: BreezeDark).
+	#   --interactive      : Choose scheme via dialog if available.
+	# Outputs: Status messages.
+	# Returns: 0 on success, non-zero on failure.
+	local scheme="BreezeDark"
+	local interactive=0
+	local apply_cmd="plasma-apply-colorscheme"
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--scheme) scheme="$2"; shift 2 ;;
+		--interactive) interactive=1; shift ;;
+		*) shift ;;
+		esac
+	done
+
+	if [[ $interactive -eq 1 ]] && dependency::command_exists dialog; then
+		local choices=(
+			"Breeze" "Breeze (light)"
+			"BreezeDark" "Breeze Dark"
+			"Oxygen" "Oxygen"
+		)
+		exec 3>&1
+		local sel
+		sel=$(dialog --backtitle "${BRANDING:-RTD Power Tools}" \
+			--title "KDE Color Scheme" \
+			--menu "Select a color scheme" 15 70 5 "${choices[@]}" 2>&1 1>&3)
+		exec 3>&-
+		[[ -n "$sel" ]] && scheme="$sel"
+	fi
+
+	if dependency::command_exists "$apply_cmd"; then
+		write_status "Applying KDE color scheme: $scheme"
+		"$apply_cmd" "$scheme" || { write_error "Failed to apply color scheme: $scheme"; return 1; }
+	else
+		local kwc
+		kwc="$(kde::_kwriteconfig_cmd)"
+		write_status "Setting KDE color scheme via config: $scheme"
+		"$kwc" --file kdeglobals --group General --key ColorScheme "$scheme" || return 1
+	fi
+	return 0
+}
+
+kde::set_icon_theme() {
+	# Description:
+	#   Apply an icon theme. Non-interactive unless --interactive is set.
+	# Arguments:
+	#   --theme <name>     : Icon theme name (default: breeze-dark).
+	#   --interactive      : Choose icon theme via dialog if available.
+	# Outputs: Status messages.
+	# Returns: 0 on success, non-zero on failure.
+	local theme="breeze-dark"
+	local interactive=0
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--theme) theme="$2"; shift 2 ;;
+		--interactive) interactive=1; shift ;;
+		*) shift ;;
+		esac
+	done
+
+	if [[ $interactive -eq 1 ]] && dependency::command_exists dialog; then
+		local choices=(
+			"breeze" "Breeze"
+			"breeze-dark" "Breeze Dark"
+			"Papirus-Dark" "Papirus Dark"
+		)
+		exec 3>&1
+		local sel
+		sel=$(dialog --backtitle "${BRANDING:-RTD Power Tools}" \
+			--title "KDE Icon Theme" \
+			--menu "Select an icon theme" 15 70 6 "${choices[@]}" 2>&1 1>&3)
+		exec 3>&-
+		[[ -n "$sel" ]] && theme="$sel"
+	fi
+
+	if dependency::command_exists plasma-apply-icon-theme; then
+		write_status "Applying KDE icon theme: $theme"
+		plasma-apply-icon-theme "$theme" || { write_error "Failed to apply icon theme: $theme"; return 1; }
+	else
+		local kwc
+		kwc="$(kde::_kwriteconfig_cmd)"
+		write_status "Setting icon theme via config: $theme"
+		"$kwc" --file kdeglobals --group Icons --key Theme "$theme" || return 1
+	fi
+	return 0
+}
+
+kde::set_cursor_theme() {
+	# Description:
+	#   Apply a cursor theme. Non-interactive unless --interactive is set.
+	# Arguments:
+	#   --theme <name>     : Cursor theme (default: breeze_cursors).
+	#   --size <px>        : Cursor size (default: 24).
+	#   --interactive      : Prompt to choose theme/size if dialog available.
+	# Outputs: Status messages.
+	# Returns: 0 on success, non-zero on failure.
+	local theme="breeze_cursors"
+	local size="24"
+	local interactive=0
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--theme) theme="$2"; shift 2 ;;
+		--size) size="$2"; shift 2 ;;
+		--interactive) interactive=1; shift ;;
+		*) shift ;;
+		esac
+	done
+
+	if [[ $interactive -eq 1 ]] && dependency::command_exists dialog; then
+		local choices=(
+			"breeze_cursors" "Breeze"
+			"breeze_cursors_dark" "Breeze Dark"
+			"Bibata-Modern-Classic" "Bibata Classic"
+		)
+		exec 3>&1
+		local sel
+		sel=$(dialog --backtitle "${BRANDING:-RTD Power Tools}" \
+			--title "KDE Cursor Theme" \
+			--menu "Select a cursor theme" 15 70 6 "${choices[@]}" 2>&1 1>&3)
+		exec 3>&-
+		[[ -n "$sel" ]] && theme="$sel"
+		local sz
+		exec 3>&1
+		sz=$(dialog --backtitle "${BRANDING:-RTD Power Tools}" --title "Cursor Size" --inputbox "Enter cursor size (px)" 8 60 "$size" 2>&1 1>&3)
+		exec 3>&-
+		[[ -n "$sz" ]] && size="$sz"
+	fi
+
+	local kwc
+	kwc="$(kde::_kwriteconfig_cmd)"
+	write_status "Applying cursor theme: $theme (size ${size}px)"
+	"$kwc" --file kcminputrc --group Mouse --key cursorTheme "$theme" || return 1
+	"$kwc" --file kcminputrc --group Mouse --key cursorSize "$size" || true
+	"$kwc" --file kdeglobals --group General --key XcursorTheme "$theme" || true
+	"$kwc" --file kdeglobals --group General --key XcursorSize "$size" || true
+	kde::_reload_shell
+	return 0
+}
+
+kde::set_layout_panel() {
+	# Description:
+	#   Apply a Plasma layout file (JS/JSON). Non-interactive by default.
+	# Arguments:
+	#   --layout <path>    : Path to layout file (required).
+	#   --interactive      : Prompt for layout path.
+	# Outputs: Status messages.
+	# Returns: 0 on success, non-zero on failure.
+	local layout=""
+	local interactive=0
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--layout) layout="$2"; shift 2 ;;
+		--interactive) interactive=1; shift ;;
+		*) shift ;;
+		esac
+	done
+
+	if [[ $interactive -eq 1 ]] && dependency::command_exists dialog; then
+		exec 3>&1
+		layout=$(dialog --backtitle "${BRANDING:-RTD Power Tools}" \
+			--title "Plasma Layout" \
+			--fselect "${HOME}/" 12 70 2>&1 1>&3)
+		exec 3>&-
+	fi
+
+	if [[ -z "$layout" || ! -f "$layout" ]]; then
+		write_error "Layout file not found: ${layout:-<none>}"
+		return 1
+	fi
+
+	write_status "Applying Plasma layout: $layout"
+	if command -v plasmashell >/dev/null 2>&1; then
+		kde::_reload_shell
+		nohup plasmashell --replace --layout "$layout" >/dev/null 2>&1 &
+		return 0
+	fi
+
+	write_error "plasmashell not available; cannot apply layout."
+	return 1
+}
+
+kde::tune_fonts_antialias() {
+	# Description:
+	#   Set font hinting/subpixel options for KDE.
+	# Arguments:
+	#   --hintstyle <none|slight|medium|full> (default: hintmedium)
+	#   --subpixel <none|rgb|bgr|vrgb|vbgr>   (default: rgb)
+	#   --dpi <int>                           (default: inherit)
+	# Outputs: Status messages.
+	# Returns: 0 on success, non-zero on failure.
+	local hint="hintmedium"
+	local subpixel="rgb"
+	local dpi=""
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--hintstyle) hint="$2"; shift 2 ;;
+		--subpixel) subpixel="$2"; shift 2 ;;
+		--dpi) dpi="$2"; shift 2 ;;
+		*) shift ;;
+		esac
+	done
+
+	local kwc
+	kwc="$(kde::_kwriteconfig_cmd)"
+	write_status "Applying font antialiasing: hint=$hint subpixel=$subpixel dpi=${dpi:-inherit}"
+	"$kwc" --file kdeglobals --group General --key XftAntialias true || return 1
+	"$kwc" --file kdeglobals --group General --key XftHintStyle "$hint" || return 1
+	"$kwc" --file kdeglobals --group General --key XftSubPixel "$subpixel" || return 1
+	if [[ -n "$dpi" ]]; then
+		"$kwc" --file kdeglobals --group General --key forceFontDPI "$dpi" || return 1
+	fi
+	kde::_reload_shell
+	return 0
+}
+
+kde::apply_window_rules() {
+	# Description:
+	#   Write a minimal kwinrulesrc with sensible defaults (e.g., no borders on maximized windows).
+	# Arguments:
+	#   --rules-file <path> : Use an existing kwinrulesrc snippet.
+	#   --interactive       : Prompt for rules file path.
+	# Outputs: Status messages.
+	# Returns: 0 on success, non-zero on failure.
+	local rules_file=""
+	local interactive=0
+	local target="${HOME}/.config/kwinrulesrc"
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--rules-file) rules_file="$2"; shift 2 ;;
+		--interactive) interactive=1; shift ;;
+		*) shift ;;
+		esac
+	done
+
+	if [[ $interactive -eq 1 ]] && dependency::command_exists dialog; then
+		exec 3>&1
+		rules_file=$(dialog --backtitle "${BRANDING:-RTD Power Tools}" \
+			--title "kwinrulesrc" \
+			--fselect "${HOME}/" 12 70 2>&1 1>&3)
+		exec 3>&-
+	fi
+
+	if [[ -n "$rules_file" && -f "$rules_file" ]]; then
+		write_status "Installing kwin rules from $rules_file"
+		cp -f "$rules_file" "$target" || return 1
+	else
+		write_status "Writing default kwin rules to $target"
+		cat >"$target" <<'EOF'
+[1]
+Description=No borders on maximized windows
+noborder=true
+noborderrule=2
+maximizehoriz=true
+maximizehorizrule=2
+maximizevert=true
+maximizevertrule=2
+
+[2]
+Description=Focus follows mouse (sloppy focus)
+focus=1
+focusrule=2
+clickraise=false
+clickraiserule=2
+
+[General]
+count=2
+EOF
+	fi
+
+	if command -v qdbus >/dev/null 2>&1; then
+		qdbus org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
+	elif command -v qdbus-qt5 >/dev/null 2>&1; then
+		qdbus-qt5 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
+	fi
+	return 0
+}
+
+kde::set_startup_apps() {
+	# Description:
+	#   Create or update an autostart entry for the current user.
+	# Arguments:
+	#   --name <Name>       : Display name (required).
+	#   --exec <command>    : Command to run (required).
+	#   --icon <icon>       : Icon name/path (optional).
+	#   --interactive       : Prompt for fields via dialog if available.
+	# Outputs: Status messages.
+	# Returns: 0 on success, non-zero on failure.
+	local name=""
+	local exec_cmd=""
+	local icon=""
+	local interactive=0
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--name) name="$2"; shift 2 ;;
+		--exec) exec_cmd="$2"; shift 2 ;;
+		--icon) icon="$2"; shift 2 ;;
+		--interactive) interactive=1; shift ;;
+		*) shift ;;
+		esac
+	done
+
+	if [[ $interactive -eq 1 ]] && dependency::command_exists dialog; then
+		exec 3>&1
+		name=$(dialog --backtitle "${BRANDING:-RTD Power Tools}" --title "Autostart Name" --inputbox "Name:" 8 60 "$name" 2>&1 1>&3)
+		exec_cmd=$(dialog --backtitle "${BRANDING:-RTD Power Tools}" --title "Autostart Exec" --inputbox "Command to run:" 8 60 "$exec_cmd" 2>&1 1>&3)
+		icon=$(dialog --backtitle "${BRANDING:-RTD Power Tools}" --title "Autostart Icon" --inputbox "Icon name/path (optional):" 8 60 "$icon" 2>&1 1>&3)
+		exec 3>&-
+	fi
+
+	if [[ -z "$name" || -z "$exec_cmd" ]]; then
+		write_error "Autostart requires --name and --exec."
+		return 1
+	fi
+
+	local dest="${HOME}/.config/autostart/${name// /_}.desktop"
+	mkdir -p "${HOME}/.config/autostart"
+	cat >"$dest" <<EOF
+[Desktop Entry]
+Type=Application
+Name=$name
+Exec=$exec_cmd
+Icon=${icon:-system-run}
+X-KDE-AutostartEnabled=true
+EOF
+	write_status "Autostart entry created: $dest"
+	return 0
 }
 
 

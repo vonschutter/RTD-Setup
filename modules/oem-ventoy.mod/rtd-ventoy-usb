@@ -1,0 +1,153 @@
+#!/bin/bash
+#::             RTD Ventoy USB Creator
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:: Author(s):   RTD Team
+#:: Version:     1.1.0
+#:: Purpose:     Guided creation of a Ventoy USB with RTD branding and folders.
+#:: Warning:     ALL DATA ON THE SELECTED DEVICE WILL BE ERASED.
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SCRIPT_VERSION="1.1.0"
+
+dependency::_rtd_library() {
+    local script_dir lib tmp _src_url
+
+    script_dir="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+    _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/_rtd_library"
+
+    for lib in \
+        "$script_dir/../../core/_rtd_library" \
+        "$script_dir/../core/_rtd_library" \
+        "/opt/${_TLA:-rtd}/core/_rtd_library" \
+        "/opt/rtd/core/_rtd_library"; do
+        if [[ -r "$lib" ]]; then
+            # shellcheck source=/dev/null
+            if source "$lib"; then
+                write_information "Using RTD library: $lib"
+                return 0
+            fi
+        fi
+    done
+
+    lib="$(find /opt -name _rtd_library 2>/dev/null | head -n 1)"
+    if [[ -n "$lib" ]]; then
+        # shellcheck source=/dev/null
+        if source "$lib"; then
+            write_information "Using RTD library: $lib"
+            return 0
+        fi
+    fi
+
+    tmp="$(mktemp /tmp/_rtd_library.XXXXXX 2>/dev/null || echo /tmp/_rtd_library.$$)"
+    if curl -fsSL "$_src_url" -o "$tmp" || wget -q -O "$tmp" "$_src_url"; then
+        # shellcheck source=/dev/null
+        if source "$tmp"; then
+            write_information "Using downloaded RTD library from $_src_url"
+            return 0
+        fi
+    fi
+
+    echo "RTD functions NOT found!" >&2
+    return 1
+}
+
+usage() {
+    cat <<'EOF'
+Usage: rtd-ventoy-usb [options]
+
+Create a fresh Ventoy USB drive with RTD defaults. The script will download Ventoy,
+install it onto the selected USB device (destructive), format the data partition
+as ext4, prepare standard folders, copy any discovered ISOs, and apply RTD branding.
+
+Options:
+  --device <path>    Target USB block device (e.g., /dev/sdb). Prompts if omitted.
+  --version <ver>    Ventoy version to install (default: latest release).
+  --dest <dir>       Cache directory for Ventoy downloads (default: /var/lib/rtd/ventoy).
+  --overwrite        Overwrite existing ISOs when copying to the Ventoy drive.
+  -h, --help         Show this help text and exit.
+  -V, --script-version  Print script wrapper version.
+
+Examples:
+  rtd-ventoy-usb                # Guided flow, choose USB device interactively
+  rtd-ventoy-usb --device /dev/sdb --overwrite
+  rtd-ventoy-usb --version 1.0.99 --dest /tmp/ventoy
+
+ALL DATA ON THE TARGET DEVICE WILL BE ERASED.
+EOF
+}
+
+require_dialog() {
+    HAVE_DIALOG=0
+    if dependency::command_exists dialog && software::check_native_package_dependency dialog; then
+        HAVE_DIALOG=1
+    fi
+}
+
+ui_notice() {
+    local msg="$1"
+    if [[ ${HAVE_DIALOG:-0} -eq 1 ]]; then
+        dialog --backtitle "${BRANDING:-RTD Power Tools}" --title "Ventoy USB Creator" --msgbox "$msg" 12 70
+    else
+        printf '%s\n\n' "$msg"
+    fi
+}
+
+ui_confirm() {
+    local msg="$1"
+    if [[ ${HAVE_DIALOG:-0} -eq 1 ]]; then
+        dialog --backtitle "${BRANDING:-RTD Power Tools}" --title "Confirm" --yesno "$msg" 12 70
+        return $?
+    fi
+    read -r -p "$msg [y/N]: " resp
+    [[ "$resp" =~ ^[Yy]$ ]]
+}
+
+main() {
+    dependency::_rtd_library || exit 1
+
+    local -a forward_args=()
+    local show_help=0
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+        -h|--help)
+            show_help=1
+            shift
+            continue
+            ;;
+        -V|--script-version)
+            echo "$SCRIPT_VERSION"
+            return 0
+            ;;
+        *)
+            forward_args+=("$1")
+            shift
+            ;;
+        esac
+    done
+
+    if [[ $show_help -eq 1 ]]; then
+        usage
+        return 0
+    fi
+
+    require_dialog
+    ui_notice "This tool will:\n\n  • Download Ventoy (latest by default)\n  • Install it to the selected USB device (destructive)\n  • Create ext4 data partition + standard RTD folders\n  • Copy discovered ISOs and apply RTD branding\n\nMake sure the correct USB drive is plugged in."
+    if ! ui_confirm "Proceed with Ventoy USB creation now?"; then
+        write_information "Ventoy creation canceled by user."
+        return 0
+    fi
+
+    oem::ventoy::setup_usb "${forward_args[@]}"
+    local status=$?
+
+    if [[ $status -eq 0 ]]; then
+        ui_notice "✅ Ventoy USB setup complete."
+    else
+        ui_notice "💥 Ventoy USB setup failed. Check logs for details."
+    fi
+
+    return $status
+}
+
+main "$@"
