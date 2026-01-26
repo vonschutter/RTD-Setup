@@ -76,6 +76,8 @@
 : ${_SCRIPTNAME="$(basename $0)"}
 : ${_TLA:="${_SCRIPTNAME:0:3}"}
 : ${_LOG_DIR:="/var/log/rtd"} ; mkdir -p ${_LOG_DIR}
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${_SCRIPT_DIR}/_rtd_library" || { echo "Failed to source _rtd_library"; exit 1; }
 
 # Determine log file directory
 _LOGFILE=${_LOG_DIR}/$( basename $0).log

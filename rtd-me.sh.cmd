@@ -117,7 +117,7 @@ YELLOW="$(tput setaf 3 2>/dev/null || printf '')"
 NO_COLOR="$(tput sgr0 2>/dev/null || printf '')"
 
 # Ensure administrative privileges.
-[ "$UID" -eq 0 ] || { printf -e $YELLOW "This script needs administrative access..." $NO_COLOR ; exec sudo -E bash "$0" "$@" ; }
+[ "$UID" -eq 0 ] || { printf "%b" "${YELLOW}This script needs administrative access...${NO_COLOR}"; exec sudo -E bash "$0" "$@" ; }
 
 # Put a convenient link to the logs where logs are normally found...
 # capture the 3 first letters as org TLA (Three Letter Acronym)
