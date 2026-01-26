@@ -8850,8 +8850,39 @@ system::set_oem_elevated_privilege_gui() {
 	#
 	# End of documentation
 
-	local user_bashrc="/home/${_OEM_USER:-"tangarora"}/.bashrc"
 	local root_bashrc="/root/.bashrc"
+	local _default_oem_user="tangarora"
+	local _requested_user="${_OEM_USER:-}"
+	local _target_user=""
+	local _home_dir=""
+	local _candidate
+
+	# Resolve target user/home without assuming a fixed OEM user
+	local -a _candidates=()
+	[[ -n "${_requested_user}" ]] && _candidates+=("${_requested_user}")
+	[[ -n "${SUDO_USER:-}" ]] && _candidates+=("${SUDO_USER}")
+	[[ -n "${USER:-}" ]] && _candidates+=("${USER}")
+
+	if command -v getent >/dev/null 2>&1; then
+		for _candidate in "${_candidates[@]}"; do
+			if getent passwd "${_candidate}" >/dev/null 2>&1; then
+				_target_user="${_candidate}"
+				_home_dir=$(getent passwd "${_candidate}" | cut -d: -f6)
+				break
+			fi
+		done
+	fi
+
+	if [[ -z "${_target_user}" ]]; then
+		_target_user="${USER:-${_requested_user}}"
+		if [[ -n "${HOME}" && -d "${HOME}" ]]; then
+			_home_dir="${HOME}"
+		elif command -v getent >/dev/null 2>&1 && getent passwd "${_target_user}" >/dev/null 2>&1; then
+			_home_dir=$(getent passwd "${_target_user}" | cut -d: -f6)
+		fi
+	fi
+
+	local user_bashrc="${_home_dir}/.bashrc"
 
 	case $1 in
 	--help | -h)
@@ -8862,27 +8893,33 @@ system::set_oem_elevated_privilege_gui() {
 		write_status "🚧 Enabling GUI elevated privileges..."
 
 		# Ensure the commands are idempotent: don't add lines if they already exist
-		if [[ ! -f "${user_bashrc}" ]]; then
-			touch "${user_bashrc}"
+		if [[ -n "${_home_dir}" && -d "${_home_dir}" ]]; then
+			[[ -f "${user_bashrc}" ]] || touch "${user_bashrc}"
+			grep -qxF 'xhost local:root' "${user_bashrc}" || echo "xhost local:root" >>"${user_bashrc}"
+		else
+			write_warning "Cannot resolve home directory for user ${_target_user}; skipping user .bashrc update."
 		fi
-		grep -qxF 'xhost local:root' "${user_bashrc}" || echo "xhost local:root" >>"${user_bashrc}"
-		grep -qxF "export XAUTHORITY=/home/${_OEM_USER:-"tangarora"}/.Xauthority" "${root_bashrc}" || echo "export XAUTHORITY=/home/${_OEM_USER:-"tangarora"}/.Xauthority" >>"${root_bashrc}"
+		if [[ -n "${_home_dir}" ]]; then
+			grep -qxF "export XAUTHORITY=${_home_dir}/.Xauthority" "${root_bashrc}" || echo "export XAUTHORITY=${_home_dir}/.Xauthority" >>"${root_bashrc}"
+		fi
 
 		write_information "🚧 Editing bashrc: xhost local:root in ${user_bashrc}"
-		write_information "🚧 Editing bashrc: export XAUTHORITY=/home/${_OEM_USER:-"tangarora"}/.Xauthority in ${root_bashrc}"
+		write_information "🚧 Editing bashrc: export XAUTHORITY=${_home_dir}/.Xauthority in ${root_bashrc}"
 		;;
 	--disable | -d)
 		write_status "🚧 Disabling GUI elevated privileges..."
-		if [[ ! -f "${user_bashrc}" ]]; then
-			write_error "⛔ Error: ${user_bashrc} does not exist."
-			return 1
-		fi
 		# Use sed to remove the specific lines added during the enable step
-		sed -i '/xhost local:root/d' "${user_bashrc}"
-		sed -i "/export XAUTHORITY=\/home\/${_OEM_USER:-"tangarora"}\/.Xauthority/d" "${root_bashrc}"
+		if [[ -f "${user_bashrc}" ]]; then
+			sed -i '/xhost local:root/d' "${user_bashrc}"
+			write_information "🚧 Removed xhost command from ${user_bashrc}"
+		else
+			write_warning "⛔ ${user_bashrc} does not exist; skipping user bashrc cleanup."
+		fi
+		if [[ -n "${_home_dir}" ]]; then
+			sed -i "/export XAUTHORITY=\\/${_home_dir//\//\\/}\\/\\.Xauthority/d" "${root_bashrc}"
+			write_information "🚧 Removed XAUTHORITY export from ${root_bashrc}"
+		fi
 
-		write_information "🚧 Removed xhost command from ${user_bashrc}"
-		write_information "🚧 Removed XAUTHORITY export from ${root_bashrc}"
 		;;
 	*)
 		write_status "👽 Un-known option. Use --enable to enable or --disable to disable GUI elevated privileges."
@@ -8987,7 +9024,35 @@ system::toggle_oem_auto_elevated_privilege() {
 
 	security::ensure_admin 
 
-	: ${_OEM_USER:="${SUDO_USER}"}
+	local _default_oem_user="tangarora"
+	local _requested_user="${_OEM_USER:-}"
+	local _target_user=""
+	local _candidate
+
+	# Resolve target user; prefer requested OEM user if it exists, else fall back to sudo/user
+	local -a _candidates=()
+	[[ -n "${_requested_user}" ]] && _candidates+=("${_requested_user}")
+	[[ -n "${SUDO_USER:-}" ]] && _candidates+=("${SUDO_USER}")
+	[[ -n "${USER:-}" ]] && _candidates+=("${USER}")
+
+	if command -v getent >/dev/null 2>&1; then
+		for _candidate in "${_candidates[@]}"; do
+			if getent passwd "${_candidate}" >/dev/null 2>&1; then
+				_target_user="${_candidate}"
+				break
+			fi
+		done
+	fi
+
+	if [[ -z "${_target_user}" ]]; then
+		_target_user="${SUDO_USER:-${USER}}"
+	fi
+
+	if [[ -n "${_requested_user}" && "${_requested_user}" != "${_target_user}" && "${_requested_user}" != "${_default_oem_user}" ]]; then
+		write_warning "User ${_requested_user} not found; using ${_target_user} instead"
+	fi
+
+	: ${_OEM_USER:="${_target_user}"}
 	local sudoers_file="/etc/sudoers.d/99_sudo_include_file"
 
 	if [[ -z "${_OEM_USER}" ]]; then
