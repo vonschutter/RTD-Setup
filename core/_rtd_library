@@ -10227,21 +10227,43 @@ oem::register_all_tools() {
 	#
 	# End of Documentation
 	# Resolve the target user's home reliably instead of assuming tangarora
-	local _target_user="${_OEM_USER:-${SUDO_USER:-${USER}}}"
+	local _default_oem_user="tangarora"
+	local _target_user=""
 	local _home_dir=""
+	local _requested_user="${_OEM_USER:-}"
+	local _candidate
+	local _warn_missing_oem=0
 
-	# Prefer passwd database; fall back to current user's $HOME if unknown user is supplied
-	if getent passwd "${_target_user}" >/dev/null 2>&1; then
-		_home_dir=$(getent passwd "${_target_user}" | cut -d: -f6)
-	elif [[ "${_target_user}" == "${USER}" && -n "${HOME}" && -d "${HOME}" ]]; then
-		_home_dir="${HOME}"
-	else
-		write_warning "User ${_target_user} not found; falling back to current user ${USER}"
-		_target_user="${USER}"
+	if [[ -n "${_requested_user}" && "${_requested_user}" != "${_default_oem_user}" ]]; then
+		_warn_missing_oem=1
+	fi
+
+	# Build a candidate list: OEM user (if set), then sudo user, then current user
+	local -a _candidates=()
+	[[ -n "${_requested_user}" ]] && _candidates+=("${_requested_user}")
+	[[ -n "${SUDO_USER:-}" ]] && _candidates+=("${SUDO_USER}")
+	[[ -n "${USER:-}" ]] && _candidates+=("${USER}")
+
+	if command -v getent >/dev/null 2>&1; then
+		for _candidate in "${_candidates[@]}"; do
+			if getent passwd "${_candidate}" >/dev/null 2>&1; then
+				_target_user="${_candidate}"
+				_home_dir=$(getent passwd "${_candidate}" | cut -d: -f6)
+				break
+			fi
+		done
+	fi
+
+	# Fall back to HOME if we still don't have a valid target
+	if [[ -z "${_target_user}" ]]; then
+		_target_user="${USER:-${_requested_user}}"
 		if [[ -n "${HOME}" && -d "${HOME}" ]]; then
 			_home_dir="${HOME}"
-		else
-			_home_dir=$(getent passwd "${USER}" | cut -d: -f6)
+		elif command -v getent >/dev/null 2>&1 && getent passwd "${_target_user}" >/dev/null 2>&1; then
+			_home_dir=$(getent passwd "${_target_user}" | cut -d: -f6)
+		fi
+		if [[ -n "${_requested_user}" && "${_requested_user}" != "${_target_user}" && ${_warn_missing_oem} -eq 1 ]]; then
+			write_warning "User ${_requested_user} not found; using ${_target_user} instead"
 		fi
 	fi
 
