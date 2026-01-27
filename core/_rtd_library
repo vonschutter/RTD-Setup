@@ -8392,9 +8392,18 @@ system::add_or_remove_login_script() {
 
 	security::ensure_admin
 
-	if [[ -z "$script_path" || ! -f "$script_path" ]]; then
-		write_error "🚫 Script not found: ${script_path}"
-		return 1
+	if [[ "$action" == "--remove" ]]; then
+		# Allow removing a .desktop file directly without requiring the script path.
+		if [[ -n "$script_path" && -z "$3" && "$script_path" == *.desktop ]]; then
+			file_path="$script_path"
+		elif [[ -n "$script_path" && ! -f "$script_path" ]]; then
+			write_warning "🚫 Script not found: ${script_path} (continuing removal of ${file_path})"
+		fi
+	else
+		if [[ -z "$script_path" || ! -f "$script_path" ]]; then
+			write_error "🚫 Script not found: ${script_path}"
+			return 1
+		fi
 	fi
 
 	system::log_item "📜 Action [$action] on login script (${script_path}), target: ${file_path}"
@@ -9998,7 +10007,7 @@ oem::rtd_reset_default_environment_config() {
 		mv /etc/sudoers.d/99_sudo_include_file "${_OEM_DIR:-"/opt/rtd"}/cache/"
 		write_status "📄 Custom sudoers file has been backed up and removed."
 	else
-		write_error "📄 No custom sudoers file found to remove."
+		write_warning "📄 No custom sudoers file found to remove."
 	fi
 
 	# Backup the current .bashrc for SUDO_USER
