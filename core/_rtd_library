@@ -98,15 +98,15 @@ function.
 	Functions defined in this library:
 
 global:
-1  add_gnome3_favorite_app                                      ;           Function to add a new favorite app to the gnome favorites bar.
-2  announce.py                                                  ;           Write out the Minecraft LAN announce helper (announce.py) into the target directory.
-3  create_physical_media_from_iso                               ;           Function to automatically write ISO (virtual DVD/CD/BlueRay) to a thumb drive. No argumenst are
-4  display_gui                                                  ;           Displays a GUI dialog box with the given message.
-5  display_software_installation_choices_gtk                    ;           Function to display the software install otions. All software option are listed in.
-6  eula.txt                                                     ;           Write out an accepted Minecraft eula.txt into the target directory.
-7  InstallSoftwareFromRepo                                      ;           Function to simplify the installation of software by including all display and
-8  main                                                         ;           Entry point when running the library as a script.
-9  rtd_oem_turn_on_gui_network_management                       ;           Function to set NetworkManager by default to manage networking.
+1  add_gnome3_favorite_app                                       ;           Function to add a new favorite app to the gnome favorites bar.
+2  announce.py                                                   ;           Write out the Minecraft LAN announce helper (announce.py) into the target directory.
+3  create_physical_media_from_iso                                ;           Function to automatically write ISO (virtual DVD/CD/BlueRay) to a thumb drive. No argumenst are
+4  display_gui                                                   ;           Displays a GUI dialog box with the given message.
+5  display_software_installation_choices_gtk                     ;           Function to display the software install otions. All software option are listed in.
+6  eula.txt                                                      ;           Write out an accepted Minecraft eula.txt into the target directory.
+7  InstallSoftwareFromRepo                                       ;           Function to simplify the installation of software by including all display and
+8  main                                                          ;           Entry point when running the library as a script.
+9  rtd_oem_turn_on_gui_network_management                        ;           Function to set NetworkManager by default to manage networking.
 10  rtd_oem_ubuntu_auto_install_iso_builder                      ;           Legacy entrypoint; use the OEM task implementation.
 11  rtd_server_setup_choices_productivity                        ;           Function to display terminal software installation options. This will install
 12  rtd_server_setup_choices_services                            ;           Function to display server installation options. This will install software that is usefull
@@ -700,6 +700,7 @@ dialog::display_cmd_output() {
 dialog::copy_file_progress() {
 	# Description: Displays a file copy progress dialog.
 	# This function shows a progress bar while copying files from a source directory to a destination directory.
+	# It uses rsync so interrupted copies can be resumed on a later run.
 	#
 	# Globals:
 	#   - dialog
@@ -720,44 +721,125 @@ dialog::copy_file_progress() {
 	# Details:
 	#   - This function takes two arguments: the source directory containing the files to be copied,
 	#     and the destination directory where the files will be copied to.
-	#   - It creates a progress bar dialog using the 'dialog' command and updates it as each file is copied.
-	#   - The progress bar shows the percentage of files copied and the name of the current file being copied.
+	#   - It creates a progress bar dialog using the 'dialog' command and updates it using rsync progress output.
+	#   - The progress bar shows the overall percentage copied and the current file being transferred.
 	#   - The function returns 0 if the copying process completes successfully, or ESC if the user cancels the operation.
 	#
-	# Note: The 'dialog' command must be installed for this function to work.
+	# Note: The 'dialog' and 'rsync' commands must be installed for this function to work.
 	#
 	# End of Documentation
-	_dirs=(${1}/*)
 
-	# Destination directory
-	_dest="${2}"
+	local source_dir="$1"
+	local destination_dir="$2"
+	local status_file dialog_rc rsync_rc=1
 
-	[ ! -d "${_dest}" ] && mkdir -p "${_dest}"
+	# Validate input parameters
+	if [[ -z "${source_dir}" || -z "${destination_dir}" ]]; then
+		write_error "Usage: dialog::copy_file_progress \"source\" \"destination\""
+		return 1
+	fi
 
-	dialog --title "Copying files" --gauge "Copying file..." 10 75 < <(
-		# Get total number of files in array
-		n=${#_dirs[*]}
-		i=0
+	if [[ ! -d "${source_dir}" ]]; then
+		write_error "Source directory not found: ${source_dir}"
+		return 1
+	fi
 
-		for f in "${_dirs[@]}"; do
-			# calculate progress
-			_pct=$((100 * (++i) / n))
+	if [[ -e "${destination_dir}" && ! -d "${destination_dir}" ]]; then
+		write_error "Destination exists and is not a directory: ${destination_dir}"
+		return 1
+	fi
 
-			# update dialog box
-			cat <<EOF
-XXX
-${_pct}
-Copying file "${f}"...
-XXX
-EOF
-			# copy file $f to $_dest
-			/bin/cp "${f}" "${_dest}" &>/dev/null
-		done
+	# Check for required dependencies
+	software::check_native_package_dependency dialog rsync || return 1
+
+	if ! mkdir -p "${destination_dir}"; then
+		write_error "Unable to create destination directory: ${destination_dir}"
+		return 1
+	fi
+
+	status_file="$(mktemp)" || {
+		write_error "Unable to create temporary status file."
+		return 1
+	}
+
+	dialog --title "Copying files" --gauge "Preparing copy..." 10 75 0 < <(
+		_current_item="Preparing copy..."
+		_last_pct=0
+		_rsync_rc=1
+
+		cat <<-EOF
+	XXX
+	0
+	Preparing copy from "${source_dir}" to "${destination_dir}"...
+	XXX
+	EOF
+
+		while IFS= read -r _line; do
+			[[ -z "${_line}" ]] && continue
+
+			case "${_line}" in
+				"sending incremental file list"|created\ directory*|sent\ *|total\ size\ is*|receiving\ incremental\ file\ list)
+					continue
+					;;
+			esac
+
+			if [[ "${_line}" =~ ([0-9]{1,3})% ]]; then
+				_last_pct="${BASH_REMATCH[1]}"
+				(( _last_pct > 100 )) && _last_pct=100
+				cat <<-EOF
+	XXX
+	${_last_pct}
+	Copying: ${_current_item}
+	XXX
+	EOF
+			else
+				_current_item="${_line}"
+			fi
+		done < <(
+			rsync \
+				--archive \
+				--partial \
+				--append-verify \
+				--human-readable \
+				--out-format='%n' \
+				--info=progress2 \
+				"${source_dir%/}/" \
+				"${destination_dir%/}/" 2>&1 | tr '\r' '\n'
+			printf '%s\n' "${PIPESTATUS[0]}" > "${status_file}"
+		)
+
+		if [[ -s "${status_file}" ]]; then
+			read -r _rsync_rc < "${status_file}"
+		fi
+
+		if [[ "${_rsync_rc}" -eq 0 ]]; then
+			cat <<-EOF
+	XXX
+	100
+	Copy complete.
+	XXX
+	EOF
+		else
+			cat <<-EOF
+	XXX
+	${_last_pct}
+	Copy failed while processing: ${_current_item}
+	XXX
+	EOF
+		fi
 	)
 
-	unset _dirs
-	unset _dest
-	unset _pct
+	dialog_rc=$?
+
+	if [[ -s "${status_file}" ]]; then
+		read -r rsync_rc < "${status_file}"
+	fi
+
+	rm -f "${status_file}" &>/dev/null
+
+	[[ ${dialog_rc} -ne 0 ]] && return "${dialog_rc}"
+
+	return "${rsync_rc}"
 
 }
 
