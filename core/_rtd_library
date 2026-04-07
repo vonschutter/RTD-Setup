@@ -299,18 +299,20 @@ oem:
 177  oem::task::iso::tweak_autoinstall_menu_labels                ;           Replace "Try or Install" menu labels with "Autoinstall" in boot configs.
 178  oem::task::iso::update_md5sum_entries                        ;           Update md5sum.txt entries for provided ISO-relative paths.
 185  oem::task::ubuntu::inject_cloud_config                       ;           Generate NoCloud cloud-init data and inject it into the ISO, updating boot configs and md5sums.
-186  oem::ventoy::brand_media                                     ;           Create Ventoy theme and config files with RTD branding.
+186  oem::ventoy::brand_media                                     ;           Write the Ventoy config, menu title theme, and RTD title marker.
 187  oem::ventoy::classify_iso                                    ;           Classify ISO by filename and return target folder and prefix.
 188  oem::ventoy::copy_isos                                       ;           Copy ISO files to the Ventoy data partition with logical grouping.
 189  oem::ventoy::create_ext4_data_partition                      ;           Format the Ventoy data partition as ext4.
 190  oem::ventoy::create_usb                                      ;           Install Ventoy to a selected USB device.
 191  oem::ventoy::detect_data_partition                           ;           Detect the Ventoy data partition on a device.
 192  oem::ventoy::download                                        ;           Download and extract Ventoy for Linux.
-193  oem::ventoy::find_brand_wallpaper                            ;           Locate a wallpaper image to use for Ventoy branding.
-194  oem::ventoy::prepare_folders                                 ;           Create standard ISO folders on the Ventoy data partition.
-195  oem::ventoy::resolve_latest_version                          ;           Resolve the latest Ventoy version using the GitHub API.
-196  oem::ventoy::select_usb_device                               ;           Prompt the user to select a removable USB block device.
-197  oem::ventoy::setup_usb                                       ;           Full Ventoy setup: download, install, format data partition, create folders, copy ISOs, and brand.
+193  oem::ventoy::prepare_folders                                 ;           Create the standard RTD folder structure on the Ventoy data partition.
+194  oem::ventoy::resolve_latest_version                          ;           Resolve the latest Ventoy version using the GitHub API.
+195  oem::ventoy::select_usb_device                               ;           Prompt the user to select a removable USB block device.
+196  oem::ventoy::setup_usb                                       ;           Full Ventoy setup: download, install, format data partition, create folders, copy ISOs, and configure.
+197  oem::ventoy::write_control_config                            ;           Write the Ventoy configuration file.
+198  oem::ventoy::write_menu_theme                                ;           Write a minimal Ventoy theme used only for the menu title.
+199  oem::ventoy::write_partition_title                           ;           Write a simple RTD title marker file to the Ventoy partition.
 
 pause:
 198  pause::a_given_time                                          ;           Simple function to pause for a given number of seconds whle showing a count down
@@ -880,13 +882,26 @@ dialog::copy_with_progress() {
 	local mount_point="$3"
 	local gauge_pid
 	local rc=0
+	local use_dialog=0
+	local use_pv=0
 
-	# Ensure required tools are available
-	if ! software::check_native_package_dependency dialog; then
-		return 1
+	hash dialog 2>/dev/null && use_dialog=1
+	hash pv 2>/dev/null && use_pv=1
+
+	if [[ $use_dialog -eq 0 ]]; then
+		write_information "Copying $(basename "$iso_file") to $destination"
+		if [[ $use_pv -eq 1 ]]; then
+			pv "$iso_file" >"$destination"
+		else
+			cp -f "$iso_file" "$destination"
+		fi
+		return $?
 	fi
-	if ! software::check_native_package_dependency pv; then
-		return 1
+
+	if [[ $use_pv -eq 0 ]]; then
+		write_warning "pv is not available; copying $(basename "$iso_file") without progress dialog."
+		cp -f "$iso_file" "$destination"
+		return $?
 	fi
 
 	# Get the size of the ISO file
@@ -7137,12 +7152,21 @@ system::generate_ks_cfg_file() {
 	# Get vm config standard options
 	kvm::get_vm_config_preferences
 
-	# Determine if special handling (like EPEL) is required based on the caller.
-	if [[ "${FUNCNAME[1]}" == "kvm::make_vm_now_from_redhat_com" ]]; then
-		_kickstart_enable_epel="true"
-	else
-		unset _kickstart_enable_epel
-	fi
+	# Determine distro-specific repo handling from the caller.
+	case "${FUNCNAME[1]}" in
+		kvm::make_vm_now_from_redhat_com)
+			_kickstart_enable_epel="true"
+			_kickstart_repo_family="almalinux"
+			;;
+		kvm::make_vm_now_from_fedora_org)
+			unset _kickstart_enable_epel
+			_kickstart_repo_family="fedora"
+			;;
+		*)
+			unset _kickstart_enable_epel
+			_kickstart_repo_family="${_kickstart_repo_family:-generic}"
+			;;
+	esac
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
@@ -7253,6 +7277,7 @@ system::generate_ks_cfg_file() {
 
 	unset _kickstart_install_source
 	unset _kickstart_enable_epel
+	unset _kickstart_repo_family
 
 	system::log_item "Kickstart file created: ${_ks_file}"
 	system::log_item "Containing DATA:
@@ -13817,20 +13842,46 @@ oem::ventoy::resolve_latest_version() {
 	#   0 on success; non-zero on failure.
 	# End of documentation
 	local api_url="https://api.github.com/repos/ventoy/Ventoy/releases/latest"
+	local release_url="https://github.com/ventoy/Ventoy/releases/latest"
 	local tag
+	local response=""
+	local redirect_url=""
 
-	if ! software::check_native_package_dependency curl; then
-		software::check_native_package_dependency wget || {
+	system::log_item "Resolving latest Ventoy version from ${api_url}"
+
+	if ! hash curl 2>/dev/null && ! hash wget 2>/dev/null; then
+		software::check_native_package_dependency curl || software::check_native_package_dependency wget || {
 			write_error "curl or wget is required to resolve the latest Ventoy version."
 			return 1
 		}
 	fi
 
-	tag="$(oem::task::iso::fetch_url "$api_url" 2>/dev/null | sed -n 's/.*\"tag_name\": *\"v\\{0,1\\}\\([^\"]*\\)\".*/\\1/p' | head -n 1)"
+	if command -v curl >/dev/null 2>&1; then
+		response="$(curl --silent --show-error --fail \
+			-H 'Accept: application/vnd.github+json' \
+			-H 'User-Agent: rtd-ventoy-usb' \
+			"$api_url" 2>>"${_LOGFILE}")" || response=""
+	elif command -v wget >/dev/null 2>&1; then
+		response="$(wget -qO- --header='Accept: application/vnd.github+json' --user-agent='rtd-ventoy-usb' "$api_url" 2>>"${_LOGFILE}")" || response=""
+	fi
+
+	tag="$(printf '%s' "$response" | sed -n 's/.*\"tag_name\": *\"v\\{0,1\\}\\([^\"]*\\)\".*/\\1/p' | head -n 1)"
 	if [[ -z "$tag" ]]; then
+		system::log_item "GitHub API tag parsing failed; trying release redirect fallback"
+		if command -v curl >/dev/null 2>&1; then
+			redirect_url="$(curl --silent --show-error --fail --location --output /dev/null --write-out '%{url_effective}' "$release_url" 2>>"${_LOGFILE}")" || redirect_url=""
+		elif command -v wget >/dev/null 2>&1; then
+			redirect_url="$(wget -qSO- --max-redirect=10 "$release_url" 2>&1 | awk '/^  Location: / {print $2}' | tr -d '\r' | tail -n 1)" || redirect_url=""
+		fi
+		tag="$(printf '%s' "$redirect_url" | sed -n 's#.*/tag/v\{0,1\}\([^/?#]*\).*#\1#p' | head -n 1)"
+	fi
+	if [[ -z "$tag" ]]; then
+		system::log_item "GitHub latest release lookup failed. Response bytes=$(printf '%s' "$response" | wc -c) redirect=${redirect_url:-unset}"
 		write_error "Unable to resolve the latest Ventoy version."
 		return 1
 	fi
+
+	system::log_item "Resolved Ventoy version: ${tag}"
 
 	printf '%s' "$tag"
 	return 0
@@ -13880,14 +13931,16 @@ oem::ventoy::download() {
 		esac
 	done
 
-	if ! software::check_native_package_dependency tar; then
-		return 1
+	system::log_item "Ventoy download requested: version=${version} dest=${dest_dir} force=${force}"
+
+	if ! hash tar 2>/dev/null; then
+		software::check_native_package_dependency tar || return 1
 	fi
-	if ! software::check_native_package_dependency gzip; then
-		return 1
+	if ! hash gzip 2>/dev/null; then
+		software::check_native_package_dependency gzip || return 1
 	fi
-	if ! software::check_native_package_dependency curl; then
-		software::check_native_package_dependency wget || return 1
+	if ! hash curl 2>/dev/null && ! hash wget 2>/dev/null; then
+		software::check_native_package_dependency curl || software::check_native_package_dependency wget || return 1
 	fi
 
 	if [[ "$version" == "latest" || -z "$version" ]]; then
@@ -13903,6 +13956,7 @@ oem::ventoy::download() {
 	extract_dir="$dest_dir/ventoy-${version#v}"
 
 	if [[ $force -eq 0 && -d "$extract_dir" && -x "$extract_dir/Ventoy2Disk.sh" ]]; then
+		system::log_item "Using cached Ventoy directory: ${extract_dir}"
 		printf '%s' "$extract_dir"
 		return 0
 	fi
@@ -13911,8 +13965,9 @@ oem::ventoy::download() {
 		rm -f "$tarball_path"
 	fi
 
-	write_status "Downloading Ventoy ${version#v}..."
-	if ! oem::task::iso::download_url "$url" "$tarball_path"; then
+	write_status "Downloading Ventoy ${version#v}..." >&2
+	system::log_item "Downloading Ventoy archive from ${url} to ${tarball_path}"
+	if ! oem::task::iso::download_url "$url" "$tarball_path" >&2; then
 		write_error "Failed to download Ventoy from: $url"
 		return 1
 	fi
@@ -13927,6 +13982,8 @@ oem::ventoy::download() {
 		write_error "Ventoy install script not found: $extract_dir/Ventoy2Disk.sh"
 		return 1
 	fi
+
+	system::log_item "Ventoy extracted successfully to ${extract_dir}"
 
 	printf '%s' "$extract_dir"
 	return 0
@@ -13946,41 +14003,252 @@ oem::ventoy::select_usb_device() {
 	local device_list=()
 	local selection
 	local exit_status
+	local use_dialog=0
+	local selection_index
+	local max_index
+	local tty_available=0
 
-	if ! software::check_native_package_dependency dialog; then
+	if ! dependency::command_exists lsblk; then
 		return 1
 	fi
-	if ! dependency::command_exists lsblk awk sed grep; then
-		return 1
+	if [[ -r /dev/tty ]]; then
+		tty_available=1
 	fi
+	if hash dialog 2>/dev/null && [[ $tty_available -eq 1 ]] && [[ -n "${TERM:-}" && "${TERM:-}" != "dumb" ]]; then
+		use_dialog=1
+	fi
+	system::log_item "Selecting USB device (dialog=${use_dialog})"
 
 	oem::ventoy::select_usb_device::build_list() {
-		local devname size model tran rm
+		local line devname size vendor model tran rm hotplug description transport
 		device_list=()
-		while read -r devname size model tran rm; do
-			[[ "$tran" == "usb" || "$rm" == "1" ]] || continue
-			device_list+=("/dev/$devname" "${model:-Unknown} ${size}")
-		done < <(lsblk -d -o NAME,SIZE,MODEL,TRAN,RM -n)
+		while IFS= read -r line; do
+			devname=""
+			size=""
+			vendor=""
+			model=""
+			tran=""
+			rm=""
+			hotplug=""
+			[[ "$line" =~ NAME=\"([^\"]*)\" ]] && devname="${BASH_REMATCH[1]}"
+			[[ "$line" =~ SIZE=\"([^\"]*)\" ]] && size="${BASH_REMATCH[1]}"
+			[[ "$line" =~ VENDOR=\"([^\"]*)\" ]] && vendor="${BASH_REMATCH[1]}"
+			[[ "$line" =~ MODEL=\"([^\"]*)\" ]] && model="${BASH_REMATCH[1]}"
+			[[ "$line" =~ TRAN=\"([^\"]*)\" ]] && tran="${BASH_REMATCH[1]}"
+			[[ "$line" =~ RM=\"([^\"]*)\" ]] && rm="${BASH_REMATCH[1]}"
+			[[ "$line" =~ HOTPLUG=\"([^\"]*)\" ]] && hotplug="${BASH_REMATCH[1]}"
+
+			[[ -n "$devname" ]] || continue
+			[[ "$tran" == "usb" || "$rm" == "1" || "$hotplug" == "1" ]] || continue
+
+			description="${vendor:+$vendor }${model}"
+			description="${description#"${description%%[![:space:]]*}"}"
+			description="${description%"${description##*[![:space:]]}"}"
+			[[ -n "$description" ]] || description="Unknown device"
+
+			if [[ "$tran" == "usb" ]]; then
+				transport="usb"
+			elif [[ "$rm" == "1" ]]; then
+				transport="removable"
+			else
+				transport="hotplug"
+			fi
+
+			device_list+=("/dev/$devname" "${description} ${size} [${transport}]")
+		done < <(lsblk -P -d -o NAME,SIZE,VENDOR,MODEL,TRAN,RM,HOTPLUG -n)
 	}
 
 	oem::ventoy::select_usb_device::build_list
+	system::log_item "USB device candidates found: $((${#device_list[@]} / 2))"
 	while [[ ${#device_list[@]} -eq 0 ]]; do
-		dialog::display_notice "No removable USB drives detected. Insert a USB drive and press OK."
+		if [[ $use_dialog -eq 1 ]]; then
+			dialog::display_notice "No removable USB drives detected. Insert a USB drive and press OK."
+		else
+			printf '%s\n' "No removable USB drives detected. Insert a USB drive and press ENTER to retry." >&2
+			read -r selection_index < /dev/tty || return 1
+		fi
 		oem::ventoy::select_usb_device::build_list
 	done
 
-	exec 3>&1
-	selection=$(dialog --backtitle "$BRANDING" --title "Select USB device" --menu "Choose a USB device for Ventoy installation:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" "${device_list[@]}" 2>&1 1>&3)
-	exit_status=$?
-	exec 3>&-
+	if [[ ${#device_list[@]} -eq 2 ]]; then
+		selection="${device_list[0]}"
+		system::log_item "Only one USB device candidate found; auto-selecting ${selection}"
+		printf '%s' "$selection"
+		return 0
+	fi
 
-	if [[ $exit_status -ne 0 || -z "$selection" ]]; then
-		write_error "No USB device selected."
+	if [[ $use_dialog -eq 1 ]]; then
+		exec 3>&1
+		selection=$(dialog --backtitle "$BRANDING" --title "Select USB device" --menu "Choose a USB device for Ventoy installation:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" "${device_list[@]}" 2>&1 1>&3)
+		exit_status=$?
+		exec 3>&-
+
+		if [[ $exit_status -ne 0 || -z "$selection" ]]; then
+			write_error "No USB device selected."
+			return 1
+		fi
+	else
+		max_index=$(( ${#device_list[@]} / 2 ))
+		printf '\n%s\n' "Available USB devices:" >&2
+		for ((selection_index = 0; selection_index < ${#device_list[@]}; selection_index += 2)); do
+			printf '  %d) %s  %s\n' "$((selection_index / 2 + 1))" "${device_list[selection_index]}" "${device_list[selection_index + 1]}" >&2
+		done
+		while :; do
+			printf 'Select device number [1-%d] (blank to cancel): ' "$max_index" >&2
+			read -r selection_index < /dev/tty || return 1
+			if [[ -z "$selection_index" ]]; then
+				write_error "No USB device selected."
+				return 1
+			fi
+			if [[ "$selection_index" =~ ^[0-9]+$ ]] && (( selection_index >= 1 && selection_index <= max_index )); then
+				selection="${device_list[(selection_index - 1) * 2]}"
+				break
+			fi
+			printf '%s\n' "Invalid selection." >&2
+		done
+	fi
+
+	system::log_item "Selected USB device: ${selection}"
+	printf '%s' "$selection"
+	return 0
+}
+
+oem::ventoy::wipe_device() {
+	# Description:
+	#   Wipe partition signatures and partition table on a USB device before Ventoy install.
+	# Globals: None
+	# Arguments:
+	#   $1 - Block device (e.g. /dev/sdb)
+	# Outputs: Status and log messages.
+	# Returns:
+	#   0 on success; non-zero on failure.
+	local device="$1"
+	local tran rm hotplug
+
+	system::log_item "Requested destructive wipe of ${device}"
+
+	security::ensure_admin || return 1
+	if [[ -z "$device" || ! -b "$device" ]]; then
+		write_error "Invalid device for wipe: $device"
+		return 1
+	fi
+	if ! dependency::command_exists lsblk umount sync dd; then
 		return 1
 	fi
 
-	printf '%s' "$selection"
+	read -r tran rm hotplug < <(lsblk -dn -o TRAN,RM,HOTPLUG "$device")
+	if [[ "$tran" != "usb" && "$rm" != "1" && "$hotplug" != "1" ]]; then
+		write_error "Refusing to wipe non-USB device: $device"
+		return 1
+	fi
+
+	oem::ventoy::unmount_device_partitions "$device" || return 1
+
+	if hash wipefs 2>/dev/null; then
+		system::log_item "Running wipefs on ${device}"
+		wipefs -af "$device" >>"${_LOGFILE}" 2>&1 || return 1
+	fi
+	if hash sgdisk 2>/dev/null; then
+		system::log_item "Running sgdisk --zap-all on ${device}"
+		sgdisk --zap-all "$device" >>"${_LOGFILE}" 2>&1 || return 1
+	fi
+
+	system::log_item "Zeroing first MiB of ${device}"
+	dd if=/dev/zero of="$device" bs=1M count=8 conv=fsync,notrunc status=none >>"${_LOGFILE}" 2>&1 || return 1
+	sync
 	return 0
+}
+
+oem::ventoy::unmount_device_partitions() {
+	# Description:
+	#   Unmount all mounted partitions on a device.
+	# Globals: _LOGFILE
+	# Arguments:
+	#   $1 - Block device (e.g. /dev/sdb)
+	# Returns:
+	#   0 on success; non-zero on failure.
+	local device="$1"
+	local part mountpoint unmount_rc
+
+	if [[ -z "$device" || ! -b "$device" ]]; then
+		write_error "Invalid device for unmount: $device"
+		return 1
+	fi
+
+	while read -r part mountpoint; do
+		[[ -n "$part" ]] || continue
+		[[ "$part" == "$device" ]] && continue
+		if [[ -n "$mountpoint" ]]; then
+			system::log_item "Unmounting ${part} mounted at ${mountpoint}"
+			unmount_rc=0
+			umount "$part" >>"${_LOGFILE}" 2>&1 || unmount_rc=$?
+			if [[ $unmount_rc -ne 0 ]]; then
+				system::log_item "umount ${part} failed with rc=${unmount_rc}; trying mountpoint ${mountpoint}"
+				umount "$mountpoint" >>"${_LOGFILE}" 2>&1 || unmount_rc=$?
+			fi
+			if [[ $unmount_rc -ne 0 ]] && hash udisksctl 2>/dev/null; then
+				system::log_item "udisksctl unmount fallback for ${part}"
+				if udisksctl unmount -b "$part" >>"${_LOGFILE}" 2>&1; then
+					unmount_rc=0
+				else
+					unmount_rc=$?
+				fi
+			fi
+			if [[ $unmount_rc -ne 0 ]]; then
+				system::log_item "lazy umount fallback for ${part}"
+				if umount -l "$part" >>"${_LOGFILE}" 2>&1 || umount -l "$mountpoint" >>"${_LOGFILE}" 2>&1; then
+					unmount_rc=0
+				else
+					unmount_rc=$?
+				fi
+			fi
+			if [[ $unmount_rc -ne 0 ]]; then
+				write_error "Failed to unmount ${part} from ${mountpoint}"
+				return 1
+			fi
+			sync
+		fi
+	done < <(lsblk -ln -o PATH,MOUNTPOINT "$device")
+
+	return 0
+}
+
+oem::ventoy::refresh_device_partitions() {
+	# Description:
+	#   Ask the kernel to rescan a device and wait for partition nodes to appear.
+	# Globals: None
+	# Arguments:
+	#   $1 - Block device (e.g. /dev/sdb)
+	# Returns:
+	#   0 when one or more partitions are visible; non-zero otherwise.
+	local device="$1"
+	local attempt part_count snapshot
+
+	system::log_item "Refreshing partition table for ${device}"
+
+	hash blockdev 2>/dev/null && blockdev --rereadpt "$device" >>"${_LOGFILE}" 2>&1 || true
+	hash partprobe 2>/dev/null && partprobe "$device" >>"${_LOGFILE}" 2>&1 || true
+	hash partx 2>/dev/null && partx -u "$device" >>"${_LOGFILE}" 2>&1 || true
+	hash udevadm 2>/dev/null && udevadm trigger --action=change "$device" >>"${_LOGFILE}" 2>&1 || true
+	hash udevadm 2>/dev/null && udevadm settle >>"${_LOGFILE}" 2>&1 || true
+
+	for attempt in $(seq 1 10); do
+		part_count="$(lsblk -nr -o TYPE "$device" | awk '$1=="part"{count++} END{print count+0}')"
+		snapshot="$(lsblk -P -o NAME,TYPE,SIZE,FSTYPE,LABEL,PARTLABEL "$device" 2>/dev/null | tr '\n' ';')"
+		system::log_item "Partition refresh attempt ${attempt}: found ${part_count} partitions on ${device}"
+		[[ -n "$snapshot" ]] && system::log_item "Partition refresh state: ${snapshot}"
+		if (( part_count > 0 )); then
+			return 0
+		fi
+		hash blockdev 2>/dev/null && blockdev --rereadpt "$device" >>"${_LOGFILE}" 2>&1 || true
+		hash partprobe 2>/dev/null && partprobe "$device" >>"${_LOGFILE}" 2>&1 || true
+		hash partx 2>/dev/null && partx -u "$device" >>"${_LOGFILE}" 2>&1 || true
+		hash udevadm 2>/dev/null && udevadm settle >>"${_LOGFILE}" 2>&1 || true
+		sleep 1
+	done
+
+	write_error "No partitions appeared on ${device} after Ventoy install."
+	return 1
 }
 
 oem::ventoy::create_usb() {
@@ -14001,7 +14269,12 @@ oem::ventoy::create_usb() {
 	local device=""
 	local ventoy_dir=""
 	local use_gpt=1
+	local reserve_mib=0
 	local force=0
+	local update_only=0
+	local use_dialog=0
+	local reply
+	local ventoy_log
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
@@ -14021,8 +14294,16 @@ oem::ventoy::create_usb() {
 			use_gpt=0
 			shift
 			;;
+		--reserve-mib)
+			reserve_mib="$2"
+			shift 2
+			;;
 		--force)
 			force=1
+			shift
+			;;
+		--update)
+			update_only=1
 			shift
 			;;
 		*)
@@ -14031,10 +14312,17 @@ oem::ventoy::create_usb() {
 		esac
 	done
 
+	system::log_item "Create Ventoy USB requested: device=${device:-auto} ventoy_dir=${ventoy_dir} use_gpt=${use_gpt} reserve_mib=${reserve_mib} force=${force} update_only=${update_only}"
+
 	security::ensure_admin || return 1
 	if ! dependency::command_exists lsblk grep; then
 		return 1
 	fi
+	[[ "$reserve_mib" =~ ^[0-9]+$ ]] || {
+		write_error "Invalid reserve_mib value: $reserve_mib"
+		return 1
+	}
+	hash dialog 2>/dev/null && use_dialog=1
 
 	if [[ -z "$ventoy_dir" || ! -x "$ventoy_dir/Ventoy2Disk.sh" ]]; then
 		write_error "Invalid Ventoy directory: $ventoy_dir"
@@ -14046,49 +14334,97 @@ oem::ventoy::create_usb() {
 	fi
 
 	if [[ -b "$device" ]]; then
-		if lsblk -no PKNAME "$device" &>/dev/null; then
-			device="/dev/$(lsblk -no PKNAME "$device")"
+		if lsblk -dn -o PKNAME "$device" &>/dev/null; then
+			local parent_device
+			parent_device="$(lsblk -dn -o PKNAME "$device" | head -n 1)"
+			[[ -n "$parent_device" ]] && device="/dev/${parent_device}"
 		fi
 	else
 		write_error "Device not found: $device"
 		return 1
 	fi
 
-	local tran rm
-	read -r tran rm < <(lsblk -dn -o TRAN,RM "$device")
-	if [[ "$tran" != "usb" && "$rm" != "1" ]]; then
-		if ! dialog --backtitle "$BRANDING" --title "Non-USB Device" --yesno "Selected device does not appear to be a removable USB drive:\n\n  $device\n\nContinue anyway?" "$HEIGHT" "$WIDTH"; then
+	local tran rm hotplug
+	read -r tran rm hotplug < <(lsblk -dn -o TRAN,RM,HOTPLUG "$device")
+	system::log_item "Ventoy target normalized to ${device} transport=${tran:-unknown} rm=${rm:-?} hotplug=${hotplug:-?}"
+	if [[ "$tran" != "usb" && "$rm" != "1" && "$hotplug" != "1" ]]; then
+		if [[ $use_dialog -eq 1 ]]; then
+			dialog --backtitle "$BRANDING" --title "Non-USB Device" --yesno "Selected device does not appear to be a removable USB drive:\n\n  $device\n\nContinue anyway?" "$HEIGHT" "$WIDTH"
+		else
+			printf '%b' "Selected device does not appear to be a removable USB drive:\n\n  $device\n\nContinue anyway? [y/N]: " >&2
+			read -r reply < /dev/tty || return 1
+			[[ "$reply" =~ ^[Yy]$ ]]
+		fi
+		if [[ $? -ne 0 ]]; then
 			write_information "Ventoy installation canceled."
 			return 1
 		fi
 	fi
 
-	if lsblk -nr -o MOUNTPOINT "$device" | grep -q "/"; then
-		write_error "Device appears to have mounted partitions. Unmount before proceeding: $device"
+	if [[ $use_dialog -eq 1 ]]; then
+		if [[ $update_only -eq 1 ]]; then
+			dialog --backtitle "$BRANDING" --title "Confirm Ventoy Update" --yesno "Update Ventoy on:\n\n  $device\n\nExisting ISO files will be left in place.\n\nContinue?" "$HEIGHT" "$WIDTH"
+		else
+			dialog --backtitle "$BRANDING" --title "Confirm Ventoy Install" --yesno "Install Ventoy to:\n\n  $device\n\nALL DATA ON THIS DEVICE WILL BE LOST.\n\nContinue?" "$HEIGHT" "$WIDTH"
+		fi
+	else
+		if [[ $update_only -eq 1 ]]; then
+			printf '%b' "Update Ventoy on:\n\n  $device\n\nExisting ISO files will be left in place.\n\nContinue? [y/N]: " >&2
+		else
+			printf '%b' "Install Ventoy to:\n\n  $device\n\nALL DATA ON THIS DEVICE WILL BE LOST.\n\nContinue? [y/N]: " >&2
+		fi
+		read -r reply < /dev/tty || return 1
+		[[ "$reply" =~ ^[Yy]$ ]]
+	fi
+	if [[ $? -ne 0 ]]; then
+		write_information "Ventoy operation canceled."
 		return 1
 	fi
 
-	if ! software::check_native_package_dependency dialog; then
-		return 1
-	fi
-
-	if ! dialog --backtitle "$BRANDING" --title "Confirm Ventoy Install" --yesno "Install Ventoy to:\n\n  $device\n\nALL DATA ON THIS DEVICE WILL BE LOST.\n\nContinue?" "$HEIGHT" "$WIDTH"; then
-		write_information "Ventoy installation canceled."
-		return 1
+	if [[ $update_only -eq 0 ]]; then
+		oem::ventoy::wipe_device "$device" || return 1
+	else
+		oem::ventoy::unmount_device_partitions "$device" || return 1
 	fi
 
 	local -a args
-	args=(-i)
-	[[ $force -eq 1 ]] && args=(-I)
-	[[ $use_gpt -eq 1 ]] && args+=(-g)
+	if [[ $update_only -eq 1 ]]; then
+		args=(-u)
+	else
+		args=(-i)
+		[[ $force -eq 1 ]] && args=(-I)
+		[[ $use_gpt -eq 1 ]] && args+=(-g)
+		[[ ${reserve_mib:-0} -gt 0 ]] && args+=(-r "$reserve_mib")
+	fi
 
-	write_status "Installing Ventoy to $device..."
-	if ! "$ventoy_dir/Ventoy2Disk.sh" "${args[@]}" "$device"; then
+	if [[ $update_only -eq 1 ]]; then
+		write_status "Updating Ventoy on $device..."
+	else
+		write_status "Installing Ventoy to $device..."
+	fi
+	system::log_item "Running Ventoy2Disk.sh on ${device} with args: ${args[*]}"
+	ventoy_log="${_LOGFILE:-/tmp/rtd-ventoy-usb.log}"
+	system::log_item "Ventoy subprocess log: ${ventoy_log}"
+	if ! (
+		cd "$ventoy_dir" &&
+		printf 'y\ny\n' | ./Ventoy2Disk.sh "${args[@]}" "$device"
+	) >>"${ventoy_log}" 2>&1; then
 		write_error "Ventoy installation failed on $device"
 		return 1
 	fi
+	system::log_item "Ventoy subprocess completed on ${device}"
+	if ! oem::ventoy::refresh_device_partitions "$device"; then
+		write_error "Ventoy reported success but no partitions are visible on $device"
+		return 1
+	fi
 
-	write_status "Ventoy installed successfully on $device"
+	if [[ $update_only -eq 1 ]]; then
+		write_status "Ventoy updated successfully on $device"
+		system::log_item "Ventoy updated successfully on ${device}"
+	else
+		write_status "Ventoy installed successfully on $device"
+		system::log_item "Ventoy installed successfully on ${device}"
+	fi
 	return 0
 }
 
@@ -14106,33 +14442,71 @@ oem::ventoy::detect_data_partition() {
 	local device="$1"
 	local best_part=""
 	local best_size=0
-	local name size type label partlabel
+	local best_score=-9999
+	local attempt line name size type fstype label partlabel score
+
+	system::log_item "Detecting Ventoy data partition on ${device}"
 
 	if [[ -z "$device" || ! -b "$device" ]]; then
 		write_error "Invalid device: $device"
 		return 1
 	fi
 
-	if ! dependency::command_exists lsblk awk; then
+	if ! dependency::command_exists lsblk; then
 		return 1
 	fi
 
-	while read -r name size type label partlabel; do
-		[[ "$type" == "part" ]] || continue
-		if [[ "$label" == "Ventoy" || "$partlabel" == "Ventoy" ]]; then
-			best_part="/dev/$name"
+	for attempt in $(seq 1 10); do
+		best_part=""
+		best_size=0
+		best_score=-9999
+
+		while IFS= read -r line; do
+			name=""
+			size="0"
+			type=""
+			fstype=""
+			label=""
+			partlabel=""
+			[[ "$line" =~ NAME=\"([^\"]*)\" ]] && name="${BASH_REMATCH[1]}"
+			[[ "$line" =~ SIZE=\"([^\"]*)\" ]] && size="${BASH_REMATCH[1]}"
+			[[ "$line" =~ TYPE=\"([^\"]*)\" ]] && type="${BASH_REMATCH[1]}"
+			[[ "$line" =~ FSTYPE=\"([^\"]*)\" ]] && fstype="${BASH_REMATCH[1]}"
+			[[ "$line" =~ LABEL=\"([^\"]*)\" ]] && label="${BASH_REMATCH[1]}"
+			[[ "$line" =~ PARTLABEL=\"([^\"]*)\" ]] && partlabel="${BASH_REMATCH[1]}"
+
+			[[ "$type" == "part" && -n "$name" ]] || continue
+
+			score=0
+			[[ "$label" == "Ventoy" ]] && score=$((score + 100))
+			[[ "$partlabel" == "Ventoy" ]] && score=$((score + 80))
+			[[ "$label" =~ VTOYEFI|EFI|BIOS ]] && score=$((score - 200))
+			[[ "$partlabel" =~ VTOYEFI|EFI|BIOS ]] && score=$((score - 200))
+			[[ "$fstype" =~ ^(vfat|fat|fat16|fat32)$ ]] && score=$((score - 150))
+			(( size >= 67108864 )) && score=$((score + 10)) || score=$((score - 100))
+
+			system::log_item "Partition candidate: /dev/${name} size=${size} fstype=${fstype:-none} label=${label:-none} partlabel=${partlabel:-none} score=${score}"
+			if (( score > best_score || (score == best_score && size > best_size) )); then
+				best_part="/dev/$name"
+				best_size="$size"
+				best_score="$score"
+			fi
+		done < <(lsblk -P -b -n -o NAME,SIZE,TYPE,FSTYPE,LABEL,PARTLABEL "$device" 2>>"${_LOGFILE}")
+
+		if [[ -n "$best_part" && "$best_score" -gt -100 ]]; then
 			break
 		fi
-		if [[ "$size" -gt "$best_size" ]]; then
-			best_size="$size"
-			best_part="/dev/$name"
-		fi
-	done < <(lsblk -b -nr -o NAME,SIZE,TYPE,LABEL,PARTLABEL "$device")
 
-	if [[ -z "$best_part" ]]; then
+		system::log_item "Data partition not ready on ${device}; retry ${attempt}/10"
+		oem::ventoy::refresh_device_partitions "$device" || true
+	done
+
+	if [[ -z "$best_part" || "$best_score" -le -100 ]]; then
 		write_error "Unable to detect Ventoy data partition on $device"
 		return 1
 	fi
+
+	system::log_item "Detected Ventoy data partition: ${best_part}"
 
 	printf '%s' "$best_part"
 	return 0
@@ -14150,6 +14524,8 @@ oem::ventoy::create_ext4_data_partition() {
 	# End of documentation
 	local data_part="$1"
 
+	system::log_item "Formatting Ventoy data partition requested: ${data_part}"
+
 	security::ensure_admin || return 1
 
 	if [[ -z "$data_part" || ! -b "$data_part" ]]; then
@@ -14165,6 +14541,7 @@ oem::ventoy::create_ext4_data_partition() {
 	fi
 
 	if findmnt -n "$data_part" >/dev/null 2>&1; then
+		system::log_item "Unmounting ${data_part} before formatting"
 		umount "$data_part" || return 1
 	fi
 
@@ -14174,12 +14551,69 @@ oem::ventoy::create_ext4_data_partition() {
 		return 1
 	fi
 
+	system::log_item "Formatted ${data_part} as ext4 with label Ventoy"
+
+	return 0
+}
+
+oem::ventoy::install_legacy_bios_fallback() {
+	# Description:
+	#   Copy Ventoy's fallback disk image into the first partition so older BIOS
+	#   firmware can access it from the data partition.
+	# Arguments:
+	#   --mount <path>       : Mounted Ventoy data partition.
+	#   --ventoy-dir <path>  : Extracted Ventoy directory.
+	local mount_point=""
+	local ventoy_dir=""
+	local source_image
+	local target_image
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--mount)
+			mount_point="$2"
+			shift 2
+			;;
+		--ventoy-dir)
+			ventoy_dir="$2"
+			shift 2
+			;;
+		*)
+			shift
+			;;
+		esac
+	done
+
+	if [[ -z "$mount_point" || ! -d "$mount_point" ]]; then
+		write_error "Invalid mount point for legacy BIOS fallback: $mount_point"
+		return 1
+	fi
+	if [[ -z "$ventoy_dir" || ! -d "$ventoy_dir" ]]; then
+		write_error "Invalid Ventoy directory for legacy BIOS fallback: $ventoy_dir"
+		return 1
+	fi
+
+	source_image="$ventoy_dir/ventoy/ventoy.disk.img.xz"
+	target_image="$mount_point/ventoy/ventoy.disk.img.xz"
+
+	if [[ ! -f "$source_image" ]]; then
+		write_warning "Ventoy legacy BIOS fallback image not found: $source_image"
+		return 0
+	fi
+
+	mkdir -p "$mount_point/ventoy" || return 1
+	cp -f "$source_image" "$target_image" || {
+		write_error "Failed to copy Ventoy legacy BIOS fallback image."
+		return 1
+	}
+	sync -f "$target_image" &>/dev/null || sync "$mount_point" &>/dev/null || sync
+	system::log_item "Installed Ventoy legacy BIOS fallback image: ${target_image}"
 	return 0
 }
 
 oem::ventoy::prepare_folders() {
 	# Description:
-	#   Create standard ISO folders on the Ventoy data partition.
+	#   Create the standard RTD folder structure on the Ventoy data partition.
 	# Globals: None
 	# Arguments:
 	#   $1 - Mount point of the data partition.
@@ -14190,53 +14624,53 @@ oem::ventoy::prepare_folders() {
 	local mount_point="$1"
 	local base_dir="$mount_point"
 
+	system::log_item "Preparing Ventoy folders under ${mount_point}"
+
 	if [[ -z "$mount_point" || ! -d "$mount_point" ]]; then
 		write_error "Invalid mount point: $mount_point"
 		return 1
 	fi
 
-	mkdir -p "$base_dir/OEM_Images" \
-		"$base_dir/Tool_Images" \
-		"$base_dir/OSS_images" \
-		"$base_dir/Commercial_Images" \
-		"$base_dir/ventoy" || return 1
+	mkdir -p "$base_dir/ventoy" \
+		"$base_dir/Images/OEM" \
+		"$base_dir/Images/Commercial" \
+		"$base_dir/Images/OSS" \
+		"$base_dir/Images/Tools" \
+		"$base_dir/Data" || return 1
+
+	system::log_item "Prepared Ventoy folder structure under ${mount_point}"
 
 	return 0
 }
 
 oem::ventoy::classify_iso() {
 	# Description:
-	#   Classify ISO by filename and return target folder and prefix.
+	#   Classify ISO by filename and return the target folder.
 	# Globals: None
 	# Arguments:
 	#   $1 - ISO path or filename.
 	# Outputs:
-	#   STDOUT: "<folder>|<prefix>"
+	#   STDOUT: "<folder>"
 	# Returns:
 	#   0
 	# End of documentation
 	local name
-	local folder="Tool_Images"
-	local prefix="04_TOOLS"
+	local folder="Images/Tools"
 
 	name="$(basename "$1")"
 	name="${name,,}"
 
 	if [[ "$name" =~ autoinstall|unattend|unattended|preseed|kickstart ]]; then
-		folder="OEM_Images"
-		prefix="01_OEM"
+		folder="Images/OEM"
 	elif [[ "$name" =~ windows|win10|win11|win7|win8|winpe|winserver|server20|server202 ]]; then
-		folder="Commercial_Images"
-		prefix="03_COMM"
-	elif [[ "$name" =~ ubuntu|debian|fedora|centos|rocky|alma|opensuse|suse|arch|manjaro|mint|kali|zorin|popos|elementary|mx|endeavouros|gentoo|void|slackware|nixos ]]; then
-		folder="OSS_images"
-		prefix="02_OSS"
+		folder="Images/Commercial"
+	elif [[ "$name" =~ ubuntu|xubuntu|kubuntu|lubuntu|ubuntumate|ubuntu-mate|ubuntucinnamon|ubuntu-budgie|ubuntu_studio|ubuntu-studio|debian|fedora|centos|rocky|alma|rhel|redhat|opensuse|open-suse|suse|arch|manjaro|endeavouros|endeavour|garuda|mint|kali|zorin|elementary|mx|gentoo|void|slackware|nixos|deepin|neon|tails|popos|pop-os|pop_os|pop!_os ]]; then
+		folder="Images/OSS"
 	elif [[ "$name" =~ rescue|clonezilla|gparted|systemrescue|hiren|ubcd|ultimateboot|memtest|partedmagic|kaspersky|avira|eset ]]; then
-		folder="Tool_Images"
-		prefix="04_TOOLS"
+		folder="Images/Tools"
 	fi
 
-	printf '%s|%s' "$folder" "$prefix"
+	printf '%s' "$folder"
 	return 0
 }
 
@@ -14256,6 +14690,9 @@ oem::ventoy::copy_isos() {
 	local overwrite=0
 	local -a sources=()
 	local src
+	local copied=0
+	local skipped=0
+	local failed=0
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
@@ -14297,26 +14734,23 @@ oem::ventoy::copy_isos() {
 		)
 	fi
 
+	system::log_item "Copying ISOs to ${mount_point} overwrite=${overwrite} sources=${#sources[@]}"
+
 	for src in "${sources[@]}"; do
 		[[ -d "$src" ]] || continue
+		system::log_item "Scanning ISO source: ${src}"
 		while IFS= read -r iso; do
 			[[ -f "$iso" ]] || continue
 			if [[ "$iso" == "$mount_point"* ]]; then
 				continue
 			fi
 
-			local classification folder prefix base dest_dir dest_name dest_path src_size dest_size
-			classification="$(oem::ventoy::classify_iso "$iso")"
-			folder="${classification%%|*}"
-			prefix="${classification##*|}"
+			local folder base dest_dir dest_name dest_path src_size dest_size
+			folder="$(oem::ventoy::classify_iso "$iso")"
 
 			base="$(basename "$iso")"
 			base="${base// /_}"
-			if [[ "$base" != ${prefix}_* ]]; then
-				dest_name="${prefix}_${base}"
-			else
-				dest_name="$base"
-			fi
+			dest_name="$base"
 
 			dest_dir="$mount_point/$folder"
 			dest_path="$dest_dir/$dest_name"
@@ -14327,6 +14761,7 @@ oem::ventoy::copy_isos() {
 				dest_size=$(stat -c%s "$dest_path" 2>/dev/null || echo 0)
 				if [[ "$src_size" -eq "$dest_size" ]]; then
 					write_information "Skipping existing ISO: $dest_path"
+					((skipped++))
 					continue
 				fi
 			fi
@@ -14334,63 +14769,24 @@ oem::ventoy::copy_isos() {
 			write_status "Copying ISO: $iso -> $dest_path"
 			if ! dialog::copy_with_progress "$iso" "$dest_path" "$mount_point"; then
 				write_warning "Failed to copy ISO: $iso"
+				((failed++))
 				continue
 			fi
+			((copied++))
 			sync -f "$dest_path" &>/dev/null || sync "$mount_point" &>/dev/null || sync
 		done < <(find "$src" -maxdepth 2 -type f \( -iname "*.iso" -o -iname "*.ISO" \))
 	done
 
+	system::log_item "ISO copy summary: copied=${copied} skipped=${skipped} failed=${failed}"
+
 	return 0
 }
 
-oem::ventoy::find_brand_wallpaper() {
+oem::ventoy::write_partition_title() {
 	# Description:
-	#   Locate a wallpaper image to use for Ventoy branding.
+	#   Write a simple RTD title marker file to the Ventoy partition.
 	# Globals:
-	#   _WALLPAPER_DIR, _DEFAULT_WALLPAPER, _TLA
-	# Arguments: None
-	# Outputs:
-	#   STDOUT: Path to wallpaper image.
-	# Returns:
-	#   0 if found; non-zero otherwise.
-	# End of documentation
-	local script_dir
-	local candidates=()
-	local file
-
-	script_dir="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
-
-	if [[ -n "${_WALLPAPER_DIR:-}" ]]; then
-		candidates+=("${_WALLPAPER_DIR}")
-	fi
-	candidates+=(
-		"/opt/${_TLA,,}/wallpaper"
-		"/opt/rtd/wallpaper"
-		"${script_dir}/../wallpaper"
-	)
-
-	for dir in "${candidates[@]}"; do
-		[[ -d "$dir" ]] || continue
-		for file in \
-			"$dir/${_DEFAULT_WALLPAPER:-wayland.png}" \
-			"$dir/Wayland.jpg" \
-			"$dir/Wayland-dark.jpg" \
-			"$dir/wayland.png"; do
-			if [[ -f "$file" ]]; then
-				printf '%s' "$file"
-				return 0
-			fi
-		done
-	done
-
-	return 1
-}
-
-oem::ventoy::brand_media() {
-	# Description:
-	#   Create Ventoy theme and config files with RTD branding.
-	# Globals:
-	#   _FULLNAME, _TLA
+	#   _FULLNAME
 	# Arguments:
 	#   $1 - Mount point of the Ventoy data partition.
 	# Outputs: Status messages.
@@ -14398,57 +14794,179 @@ oem::ventoy::brand_media() {
 	#   0 on success; non-zero on failure.
 	# End of documentation
 	local mount_point="$1"
-	local ventoy_dir
-	local theme_dir
-	local wallpaper
-	local theme_file
-	local config_file
+	local title_file
+
+	system::log_item "Writing Ventoy title marker at ${mount_point}"
 
 	if [[ -z "$mount_point" || ! -d "$mount_point" ]]; then
 		write_error "Invalid mount point: $mount_point"
 		return 1
 	fi
 
-	ventoy_dir="$mount_point/ventoy"
-	theme_dir="$ventoy_dir/themes/rtd"
-	mkdir -p "$theme_dir" || return 1
+	title_file="$mount_point/ventoy/TITLE.txt"
+	mkdir -p "$mount_point/ventoy" || return 1
 
-	wallpaper="$(oem::ventoy::find_brand_wallpaper || true)"
-	if [[ -n "$wallpaper" ]]; then
-		cp -f "$wallpaper" "$theme_dir/background.jpg" || write_warning "Failed to copy wallpaper: $wallpaper"
-	fi
+	cat >"$title_file" <<EOF
+RRRRR  TTTTT  DDDD
+R   R    T    D   D
+RRRRR    T    D   D
+R  R     T    D   D
+R   R    T    DDDD
 
-	theme_file="$theme_dir/theme.txt"
-	cat >"$theme_file" <<EOF
-title-text: "${_FULLNAME:-RunTime Data}"
-title-color: "#FFFFFF"
-title-font: "DejaVu Sans Bold 24"
-desktop-image: "/ventoy/themes/rtd/background.jpg"
-message-color: "#E0E0E0"
-terminal-font: "DejaVu Sans Mono 16"
-terminal-color: "#FFFFFF"
-terminal-box: "black"
+${_FULLNAME:-RunTime Data}
+Ventoy root: /Images
 EOF
 
-	config_file="$ventoy_dir/ventoy.json"
+	system::log_item "Ventoy title marker written: ${title_file}"
+	return 0
+}
+
+oem::ventoy::write_menu_theme() {
+	# Description:
+	#   Write a minimal Ventoy theme file used only to show a top menu title.
+	# Globals:
+	#   _FULLNAME
+	# Arguments:
+	#   $1 - Mount point of the Ventoy data partition.
+	# Outputs: Status messages.
+	# Returns:
+	#   0 on success; non-zero on failure.
+	# End of documentation
+	local mount_point="$1"
+	local theme_file
+
+	system::log_item "Writing Ventoy menu title theme at ${mount_point}"
+
+	if [[ -z "$mount_point" || ! -d "$mount_point" ]]; then
+		write_error "Invalid mount point: $mount_point"
+		return 1
+	fi
+
+	mkdir -p "$mount_point/ventoy" || return 1
+	theme_file="$mount_point/ventoy/theme.txt"
+	cat >"$theme_file" <<EOF
+title-text: "${_FULLNAME:-RunTime Data}"
+title-font: "DejaVu Sans Bold 24"
+title-color: "#FFFFFF"
+desktop-color: "#101820"
+
++ boot_menu {
+  left = 8%
+  top = 14%
+  width = 84%
+  height = 66%
+  item_font = "DejaVu Sans 16"
+  selected_item_font = "DejaVu Sans Bold 16"
+  item_color = "#D8DDE3"
+  selected_item_color = "#59B7FF"
+  item_height = 34
+  item_padding = 12
+  item_icon_space = 8
+  item_spacing = 4
+  scrollbar = true
+}
+
++ label {
+  id = "__timeout__"
+  text = "@TIMEOUT_NOTIFICATION_SHORT@"
+  color = "#AAB4BE"
+  align = "center"
+  left = 8%
+  top = 83%
+  width = 84%
+  height = 20
+}
+
++ label {
+  text = "@KEYMAP_SHORT@"
+  color = "#7F8C99"
+  align = "center"
+  left = 8%
+  top = 88%
+  width = 84%
+  height = 20
+}
+
++ hbox{
+  left = 8%
+  top = 93%
+  width = 84%
+  height = 20
+  + label {text = "@VTOY_GRUB2_MODE@" color = "#FF6B6B" align = "left"}
+}
+EOF
+
+	system::log_item "Ventoy menu title theme written: ${theme_file}"
+	return 0
+}
+
+oem::ventoy::write_control_config() {
+	# Description:
+	#   Write the Ventoy configuration file.
+	# Globals: None
+	# Arguments:
+	#   $1 - Mount point of the Ventoy data partition.
+	# Outputs: Status messages.
+	# Returns:
+	#   0 on success; non-zero on failure.
+	# End of documentation
+	local mount_point="$1"
+	local config_file
+
+	system::log_item "Writing Ventoy control config at ${mount_point}"
+
+	if [[ -z "$mount_point" || ! -d "$mount_point" ]]; then
+		write_error "Invalid mount point: $mount_point"
+		return 1
+	fi
+
+	mkdir -p "$mount_point/ventoy" || return 1
+	config_file="$mount_point/ventoy/ventoy.json"
 	cat >"$config_file" <<EOF
 {
   "theme": {
-    "file": "/ventoy/themes/rtd/theme.txt"
+    "file": "/ventoy/theme.txt"
   },
   "control": [
-    { "VTOY_DEFAULT_MENU_MODE": "1" }
+    { "VTOY_DEFAULT_MENU_MODE": "1" },
+    { "VTOY_DEFAULT_SEARCH_ROOT": "/Images" }
   ]
 }
 EOF
 
-	write_status "Ventoy branding applied (theme + config)."
+	system::log_item "Ventoy control config written: ${config_file}"
+	return 0
+}
+
+oem::ventoy::brand_media() {
+	# Description:
+	#   Write the minimal Ventoy config, menu title theme, and RTD title marker.
+	# Globals: None
+	# Arguments:
+	#   $1 - Mount point of the Ventoy data partition.
+	# Outputs: Status messages.
+	# Returns:
+	#   0 on success; non-zero on failure.
+	# End of documentation
+	local mount_point="$1"
+
+	if [[ -z "$mount_point" || ! -d "$mount_point" ]]; then
+		write_error "Invalid mount point: $mount_point"
+		return 1
+	fi
+
+	oem::ventoy::write_partition_title "$mount_point" || return 1
+	oem::ventoy::write_menu_theme "$mount_point" || return 1
+	oem::ventoy::write_control_config "$mount_point" || return 1
+
+	write_status "Ventoy configuration applied."
+	system::log_item "Ventoy media configured under ${mount_point}"
 	return 0
 }
 
 oem::ventoy::setup_usb() {
 	# Description:
-	#   Full Ventoy setup: download, install, format data partition, create folders, copy ISOs, and brand.
+	#   Full Ventoy setup: update or install Ventoy, then refresh the RTD files.
 	# Globals:
 	#   BRANDING, HEIGHT, WIDTH, LIST_HEIGHT
 	# Arguments:
@@ -14463,11 +14981,16 @@ oem::ventoy::setup_usb() {
 	local device=""
 	local version="latest"
 	local download_dir="/var/lib/rtd/ventoy"
+	local action="recreate"
+	local partition_style="mbr"
+	local reserve_mib=0
 	local overwrite=0
+	local -a sources=()
 	local ventoy_dir
 	local data_part
 	local mount_point
 	local mounted_by_script=0
+	local -a copy_args
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
@@ -14483,6 +15006,30 @@ oem::ventoy::setup_usb() {
 			download_dir="$2"
 			shift 2
 			;;
+		--update)
+			action="update"
+			shift
+			;;
+		--recreate)
+			action="recreate"
+			shift
+			;;
+		--gpt)
+			partition_style="gpt"
+			shift
+			;;
+		--mbr)
+			partition_style="mbr"
+			shift
+			;;
+		--reserve-mib)
+			reserve_mib="$2"
+			shift 2
+			;;
+		--source)
+			sources+=("$2")
+			shift 2
+			;;
 		--overwrite)
 			overwrite=1
 			shift
@@ -14493,23 +15040,37 @@ oem::ventoy::setup_usb() {
 		esac
 	done
 
+	system::log_item "Ventoy USB setup requested: action=${action} device=${device:-auto} version=${version} dest=${download_dir} style=${partition_style} reserve_mib=${reserve_mib} overwrite=${overwrite} sources=${#sources[@]}"
+
 	if ! dependency::command_exists lsblk mount umount mktemp sync; then
 		return 1
 	fi
+	[[ "$reserve_mib" =~ ^[0-9]+$ ]] || {
+		write_error "Invalid reserve_mib value: $reserve_mib"
+		return 1
+	}
 
 	if [[ -z "$device" ]]; then
 		device="$(oem::ventoy::select_usb_device)" || return 1
 	fi
 	ventoy_dir="$(oem::ventoy::download --version "$version" --dest "$download_dir")" || return 1
-	oem::ventoy::create_usb --device "$device" --ventoy-dir "$ventoy_dir" --gpt --force || return 1
+	system::log_item "Using Ventoy directory: ${ventoy_dir}"
+	if [[ "$action" == "update" ]]; then
+		oem::ventoy::create_usb --device "$device" --ventoy-dir "$ventoy_dir" --update || return 1
+	elif [[ "$partition_style" == "gpt" ]]; then
+		oem::ventoy::create_usb --device "$device" --ventoy-dir "$ventoy_dir" --gpt --reserve-mib "$reserve_mib" --force || return 1
+	else
+		oem::ventoy::create_usb --device "$device" --ventoy-dir "$ventoy_dir" --mbr --reserve-mib "$reserve_mib" --force || return 1
+	fi
 	if [[ -b "$device" ]]; then
-		if lsblk -no PKNAME "$device" &>/dev/null; then
-			device="/dev/$(lsblk -no PKNAME "$device")"
+		if lsblk -dn -o PKNAME "$device" &>/dev/null; then
+			local parent_device
+			parent_device="$(lsblk -dn -o PKNAME "$device" | head -n 1)"
+			[[ -n "$parent_device" ]] && device="/dev/${parent_device}"
 		fi
 	fi
 
 	data_part="$(oem::ventoy::detect_data_partition "$device")" || return 1
-	oem::ventoy::create_ext4_data_partition "$data_part" || return 1
 
 	mount_point="$(lsblk -n -o MOUNTPOINT "$data_part")"
 	if [[ -z "$mount_point" ]]; then
@@ -14522,8 +15083,17 @@ oem::ventoy::setup_usb() {
 		mounted_by_script=1
 	fi
 
-	oem::ventoy::prepare_folders "$mount_point" || return 1
-	oem::ventoy::copy_isos --mount "$mount_point" ${overwrite:+--overwrite} || return 1
+	copy_args=(--mount "$mount_point")
+	[[ $overwrite -eq 1 ]] && copy_args+=(--overwrite)
+	for src in "${sources[@]}"; do
+		copy_args+=(--source "$src")
+	done
+
+	oem::ventoy::install_legacy_bios_fallback --mount "$mount_point" --ventoy-dir "$ventoy_dir" || return 1
+	if [[ "$action" == "recreate" ]]; then
+		oem::ventoy::prepare_folders "$mount_point" || return 1
+		oem::ventoy::copy_isos "${copy_args[@]}" || return 1
+	fi
 	oem::ventoy::brand_media "$mount_point" || return 1
 	sync -f "$mount_point" &>/dev/null || sync
 
@@ -14532,7 +15102,13 @@ oem::ventoy::setup_usb() {
 		rmdir "$mount_point" || true
 	fi
 
-	write_status "Ventoy USB setup complete."
+	if [[ "$action" == "update" ]]; then
+		write_status "Ventoy USB update complete."
+		system::log_item "Ventoy USB update completed successfully for ${device}"
+	else
+		write_status "Ventoy USB setup complete."
+		system::log_item "Ventoy USB setup completed successfully for ${device}"
+	fi
 	return 0
 }
 
@@ -18998,11 +19574,31 @@ system::determine_logfile() {
 	#   
 	# End of documentation
 
-	local scriptname=$(basename "${BASH_SOURCE[0]}")
-	local tla=${_TLA} ; if [[ -z "$tla" ]]; then tla=$(echo "${scriptname}" | cut -c 1-3); fi
+	local source_count=${#BASH_SOURCE[@]}
+	local source_index=0
+	local script_source=""
+	local scriptname
+	local tla="${_TLA:-}"
 	local logfile
 	local log_dir
 	local tmpfile
+
+	if [[ -n "${0:-}" && "$(basename "$0")" != "bash" && "$(basename "$0")" != "sh" ]]; then
+		script_source="$0"
+	elif (( source_count > 0 )); then
+		for ((source_index = source_count - 1; source_index >= 0; source_index--)); do
+			script_source="${BASH_SOURCE[$source_index]}"
+			[[ -n "$script_source" ]] || continue
+			if [[ "$(basename "$script_source")" != "_rtd_library" ]]; then
+				break
+			fi
+		done
+	fi
+	[[ -n "$script_source" ]] || script_source="$0"
+	scriptname="$(basename "$script_source")"
+	if [[ -z "$tla" ]]; then
+		tla="$(echo "${scriptname}" | cut -c 1-3)"
+	fi
 
 	# If already determined, reuse cached value to avoid repeated mktemp checks.
 	if [[ -n "${_LOGFILE:-}" ]]; then
@@ -20786,6 +21382,7 @@ kvm::util::read_distro_options() {
 					;;
 				--source | --URL | --url)
 					_repo_url="${2}"
+					_source_url="${2}"
 					write_status "🌐 Using URL: ${_repo_url}"
 					shift 2
 					;;
@@ -21042,6 +21639,7 @@ kvm::util::read_distro_options() {
 					;;
 				--source | --URL | --url)
 					_repo_url="${2}"
+					_source_url="${2}"
 					write_status "🌐 Using URL: ${_repo_url}"
 					shift 2
 					;;
@@ -22638,6 +23236,7 @@ kvm::make_vm_now_from_fedora_org() {
 
 	: "${_os_version:="${_DEFAULT_FEDORA_VER}"}"
 	: "${_preseed_file="$(mktemp -d)/ks.cfg"}"
+	: "${_source_url:="https://dl.fedoraproject.org/pub/fedora/linux/releases/${_os_version}/Everything/x86_64/os/"}"
 	
 	# Get Fedora media if not already present:
 	if kvm::get_fedora_workstation_iso --version ${_os_version} ; then 
@@ -26145,16 +26744,75 @@ template::kickstart_cfg() {
 
 	local _kickstart_epel_repo=""
 	local _kickstart_baseos_repo=""
-	read -r -d '' _kickstart_baseos_repo <<-'KS_BASEOS'
-	repo --name=baseos --baseurl=https://repo.almalinux.org/almalinux/$releasever/BaseOS/$basearch/os/
-	KS_BASEOS
-
 	local _kickstart_appstream_repo=""
-	read -r -d '' _kickstart_appstream_repo <<-'KS_APPSTREAM'
-	repo --name=appstream --baseurl=https://repo.almalinux.org/almalinux/$releasever/AppStream/$basearch/os/
-	KS_APPSTREAM
+	local _kickstart_post_repo_bootstrap=""
+	local _kickstart_password_value="${Preference_InitialUserPassword:-}"
+	local _kickstart_password_flag="--plaintext"
+	local _kickstart_workstation_selection="${_UserDesktopEnvironmentSelection:-"@^workstation-product-environment"}"
+	local _kickstart_server_environment="@^server-product-environment"
+	local _kickstart_server_selection="${_UserServerEnvironemtSelection:-"@network-server"}"
 
-	local _kickstart_epel_repo=""
+	case "${_kickstart_workstation_selection}" in
+		@*-environment)
+			_kickstart_workstation_selection="@^${_kickstart_workstation_selection#@}"
+			;;
+		-@*-environment)
+			_kickstart_workstation_selection="-@^${_kickstart_workstation_selection#-@}"
+			;;
+	esac
+
+	case "${_kickstart_server_selection}" in
+		@*-environment)
+			_kickstart_server_selection="@^${_kickstart_server_selection#@}"
+			;;
+		-@*-environment)
+			_kickstart_server_selection="-@^${_kickstart_server_selection#-@}"
+			;;
+	esac
+
+	if [[ -n "${_kickstart_password_value}" ]]; then
+		case "${_kickstart_password_value}" in
+			\$*)
+				_kickstart_password_flag="--iscrypted"
+				;;
+			*)
+				if command -v mkpasswd >/dev/null 2>&1; then
+					_kickstart_password_value=$(printf "%s" "${_kickstart_password_value}" | mkpasswd -s -m sha-512)
+					_kickstart_password_flag="--iscrypted"
+				elif command -v openssl >/dev/null 2>&1; then
+					_kickstart_password_value=$(printf "%s" "${_kickstart_password_value}" | openssl passwd -6 -stdin)
+					_kickstart_password_flag="--iscrypted"
+				fi
+				;;
+		esac
+	fi
+
+	case "${_kickstart_repo_family:-fedora}" in
+	almalinux | redhat | rhel)
+		read -r -d '' _kickstart_baseos_repo <<-'KS_BASEOS'
+		repo --name=baseos --baseurl=https://repo.almalinux.org/almalinux/$releasever/BaseOS/$basearch/os/
+		KS_BASEOS
+
+		read -r -d '' _kickstart_appstream_repo <<-'KS_APPSTREAM'
+		repo --name=appstream --baseurl=https://repo.almalinux.org/almalinux/$releasever/AppStream/$basearch/os/
+		KS_APPSTREAM
+
+		read -r -d '' _kickstart_post_repo_bootstrap <<-'KS_POST'
+				if command -v dnf >/dev/null 2>&1; then
+					dnf -y install epel-release
+					dnf -y install ansible
+				fi
+		KS_POST
+		;;
+	*)
+		read -r -d '' _kickstart_post_repo_bootstrap <<-'KS_POST'
+				if command -v dnf >/dev/null 2>&1; then
+					dnf -y install ansible
+				fi
+		KS_POST
+		;;
+	esac
+
 	if [[ "${_kickstart_enable_epel:-}" == "true" ]]; then
 		read -r -d '' _kickstart_epel_repo <<-'KS_EPEL'
 		repo --name=epel --baseurl=https://dl.fedoraproject.org/pub/epel/$releasever/Everything/$basearch/
@@ -26175,8 +26833,8 @@ template::kickstart_cfg() {
 			lang en_US.UTF-8
 			timezone ${Preference_InitialTimeZone:-"Etc/UTC"} --utc
 			network --onboot=yes --bootproto=dhcp
-			rootpw ${Preference_InitialUserPassword} --iscrypted
-			user --groups=wheel --name=tangarora --password=${Preference_InitialUserPassword} --iscrypted
+			rootpw ${_kickstart_password_flag} ${_kickstart_password_value}
+			user --groups=wheel --name=tangarora --password=${_kickstart_password_value} ${_kickstart_password_flag}
 			zerombr
 			clearpart --all
 			autopart --nohome ${Preference_DiskEncryption_RH}
@@ -26186,23 +26844,20 @@ template::kickstart_cfg() {
 			reboot --eject
 
 			%packages --retries 5 --timeout 20
-			@server-product-environment
+			${_kickstart_server_environment}
 			@guest-agents
 			openssh-server
 			spice-vdagent
 			git
 			curl
 			dialog
-			${_UserServerEnvironemtSelection}
+			${_kickstart_server_selection}
 			%end
 
 			# Post-installation Script
 			%post --interpreter=/bin/bash
 			# Ensure EPEL repository and Ansible are present for automation tooling.
-			if command -v dnf >/dev/null 2>&1; then
-				dnf -y install epel-release
-				dnf -y install ansible
-			fi
+			${_kickstart_post_repo_bootstrap}
 			git clone --depth 1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}
 			chmod 755 ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
 			bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
@@ -26223,8 +26878,8 @@ template::kickstart_cfg() {
 			lang en_US.UTF-8
 			timezone ${Preference_InitialTimeZone:-"Etc/UTC"} --utc
 			network --onboot=yes --bootproto=dhcp
-			rootpw ${Preference_InitialUserPassword} --iscrypted
-			user --groups=wheel --name=tangarora --password=${Preference_InitialUserPassword} --iscrypted
+			rootpw ${_kickstart_password_flag} ${_kickstart_password_value}
+			user --groups=wheel --name=tangarora --password=${_kickstart_password_value} ${_kickstart_password_flag}
 			zerombr
 			clearpart --all
 			autopart --nohome ${Preference_DiskEncryption_RH}
@@ -26234,8 +26889,7 @@ template::kickstart_cfg() {
 			reboot --eject
 
 			%packages --retries 5 --timeout 20
-				${_UserDesktopEnvironmentSelection:-"@^workstation-product-environment"}
-				@graphical-admin-tools
+				${_kickstart_workstation_selection}
 				@fonts
 				openssh-server
 				spice-vdagent
@@ -26248,10 +26902,7 @@ template::kickstart_cfg() {
 			%end
 
 			%post --interpreter=/bin/bash
-				if command -v dnf >/dev/null 2>&1; then
-					dnf -y install epel-release
-					dnf -y install ansible
-				fi
+				${_kickstart_post_repo_bootstrap}
 				git clone --depth 1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}
 				chmod 755 ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
 				bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh

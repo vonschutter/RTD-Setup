@@ -1,153 +1,480 @@
 #!/bin/bash
-#::             RTD Ventoy USB Creator
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#:: Author(s):   RTD Team
-#:: Version:     1.1.0
-#:: Purpose:     Guided creation of a Ventoy USB with RTD branding and folders.
-#:: Warning:     ALL DATA ON THE SELECTED DEVICE WILL BE ERASED.
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+#::                                       A D M I N   T O O L
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:::::::::::::::::::::::::::::::::::::::// RTD Ventoy USB Creator //::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Author(s):   	RTD Team
+:	${RTD_Version:=1.3.0}
+:	${_GIT_PROFILE:=vonschutter}
+#::
+#::
+#::	Purpose: Create a Ventoy USB drive with the RTD folder layout and minimal Ventoy control settings.
+#::		 WARNING: ALL DATA ON THE SELECTED DEVICE WILL BE ERASED.
+#::
+#::	Usage: rtd-ventoy-usb [options]
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-SCRIPT_VERSION="1.1.0"
+SCRIPT_VERSION="${RTD_Version}"
+APP_DEVICE=""
+APP_VERSION="latest"
+APP_DEST=""
+APP_PARTITION_STYLE="mbr"
+APP_RESERVE_MIB=0
+APP_OVERWRITE=0
+APP_ACTION=""
+APP_SHOW_HELP=0
+APP_SHOW_VERSION=0
+TARGET_DEVICE=""
+HAVE_DIALOG=0
+declare -a APP_SOURCES=()
+declare -a SETUP_ARGS=()
 
 dependency::_rtd_library() {
-    local script_dir lib tmp _src_url
+	local script_dir lib tmp src_url
 
-    script_dir="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
-    _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/_rtd_library"
+	script_dir="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+	src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/_rtd_library"
 
-    for lib in \
-        "$script_dir/../../core/_rtd_library" \
-        "$script_dir/../core/_rtd_library" \
-        "/opt/${_TLA:-rtd}/core/_rtd_library" \
-        "/opt/rtd/core/_rtd_library"; do
-        if [[ -r "$lib" ]]; then
-            # shellcheck source=/dev/null
-            if source "$lib"; then
-                write_information "Using RTD library: $lib"
-                return 0
-            fi
-        fi
-    done
+	for lib in \
+		"$script_dir/../../core/_rtd_library" \
+		"$script_dir/../core/_rtd_library" \
+		"/opt/${_TLA:-rtd}/core/_rtd_library" \
+		"/opt/rtd/core/_rtd_library"; do
+		if [[ -r "$lib" ]]; then
+			# shellcheck source=/dev/null
+			if source "$lib"; then
+				write_information "Using RTD library: $lib"
+				return 0
+			fi
+		fi
+	done
 
-    lib="$(find /opt -name _rtd_library 2>/dev/null | head -n 1)"
-    if [[ -n "$lib" ]]; then
-        # shellcheck source=/dev/null
-        if source "$lib"; then
-            write_information "Using RTD library: $lib"
-            return 0
-        fi
-    fi
+	lib="$(find /opt -name _rtd_library 2>/dev/null | head -n 1)"
+	if [[ -n "$lib" ]]; then
+		# shellcheck source=/dev/null
+		if source "$lib"; then
+			write_information "Using RTD library: $lib"
+			return 0
+		fi
+	fi
 
-    tmp="$(mktemp /tmp/_rtd_library.XXXXXX 2>/dev/null || echo /tmp/_rtd_library.$$)"
-    if curl -fsSL "$_src_url" -o "$tmp" || wget -q -O "$tmp" "$_src_url"; then
-        # shellcheck source=/dev/null
-        if source "$tmp"; then
-            write_information "Using downloaded RTD library from $_src_url"
-            return 0
-        fi
-    fi
+	tmp="$(mktemp /tmp/_rtd_library.XXXXXX 2>/dev/null || echo /tmp/_rtd_library.$$)"
+	if curl -fsSL "$src_url" -o "$tmp" || wget -q -O "$tmp" "$src_url"; then
+		# shellcheck source=/dev/null
+		if source "$tmp"; then
+			write_information "Using downloaded RTD library from $src_url"
+			return 0
+		fi
+	fi
 
-    echo "RTD functions NOT found!" >&2
-    return 1
+	echo "RTD functions NOT found!" >&2
+	return 1
 }
 
 usage() {
-    cat <<'EOF'
+	cat <<'EOF'
 Usage: rtd-ventoy-usb [options]
 
 Create a fresh Ventoy USB drive with RTD defaults. The script will download Ventoy,
-install it onto the selected USB device (destructive), format the data partition
-as ext4, prepare standard folders, copy any discovered ISOs, and apply RTD branding.
+either update Ventoy in place or recreate the selected USB device, keep the Ventoy
+data partition in its native layout, and write the RTD Ventoy configuration.
 
 Options:
   --device <path>    Target USB block device (e.g., /dev/sdb). Prompts if omitted.
   --version <ver>    Ventoy version to install (default: latest release).
-  --dest <dir>       Cache directory for Ventoy downloads (default: /var/lib/rtd/ventoy).
+  --dest <dir>       Cache directory for Ventoy downloads.
+                     Default: /var/lib/rtd/ventoy as root, otherwise ~/.cache/rtd/ventoy.
+  --update           Update Ventoy in place and refresh /ventoy files without copying ISOs.
+  --recreate         Wipe the USB device and recreate the full Ventoy USB layout.
+  --mbr              Install Ventoy using MBR partition style (default, best for old BIOS).
+  --gpt              Install Ventoy using GPT partition style.
+  --reserve-mib <n>  Preserve MiB at end of disk to improve old BIOS compatibility.
+  --source <path>    Extra ISO source directory to scan. Repeatable.
   --overwrite        Overwrite existing ISOs when copying to the Ventoy drive.
   -h, --help         Show this help text and exit.
-  -V, --script-version  Print script wrapper version.
+  -V, --script-version
+                     Print script wrapper version.
 
 Examples:
-  rtd-ventoy-usb                # Guided flow, choose USB device interactively
-  rtd-ventoy-usb --device /dev/sdb --overwrite
-  rtd-ventoy-usb --version 1.0.99 --dest /tmp/ventoy
+  rtd-ventoy-usb
+  rtd-ventoy-usb --device /dev/sdb --update
+  rtd-ventoy-usb --device /dev/sdb --source /var/lib/libvirt/boot --overwrite
 
 ALL DATA ON THE TARGET DEVICE WILL BE ERASED.
 EOF
 }
 
+trace() {
+	system::log_item "rtd-ventoy-usb: $*"
+}
+
+require_value() {
+	local option="$1"
+	local value="${2:-}"
+
+	if [[ -z "$value" ]]; then
+		write_error "Option $option requires a value."
+		return 1
+	fi
+	return 0
+}
+
+set_default_dest() {
+	if [[ -n "$APP_DEST" ]]; then
+		return 0
+	fi
+
+	if [[ ${EUID:-1} -eq 0 ]]; then
+		APP_DEST="/var/lib/rtd/ventoy"
+	else
+		APP_DEST="${HOME:-${TMPDIR:-/tmp}}/.cache/${_TLA:-rtd}/ventoy"
+	fi
+}
+
 require_dialog() {
-    HAVE_DIALOG=0
-    if dependency::command_exists dialog && software::check_native_package_dependency dialog; then
-        HAVE_DIALOG=1
-    fi
+	HAVE_DIALOG=0
+	if hash dialog 2>/dev/null && [[ -r /dev/tty ]] && [[ -n "${TERM:-}" && "${TERM:-}" != "dumb" ]]; then
+		HAVE_DIALOG=1
+	fi
+	trace "dialog available=${HAVE_DIALOG}"
 }
 
 ui_notice() {
-    local msg="$1"
-    if [[ ${HAVE_DIALOG:-0} -eq 1 ]]; then
-        dialog --backtitle "${BRANDING:-RTD Power Tools}" --title "Ventoy USB Creator" --msgbox "$msg" 12 70
-    else
-        printf '%s\n\n' "$msg"
-    fi
+	local msg="$1"
+
+	if [[ $HAVE_DIALOG -eq 1 ]]; then
+		dialog --backtitle "${BRANDING:-RTD Power Tools}" --title "Ventoy USB Creator" --msgbox "$msg" 18 78
+	else
+		printf '%b\n\n' "$msg"
+	fi
 }
 
 ui_confirm() {
-    local msg="$1"
-    if [[ ${HAVE_DIALOG:-0} -eq 1 ]]; then
-        dialog --backtitle "${BRANDING:-RTD Power Tools}" --title "Confirm" --yesno "$msg" 12 70
-        return $?
-    fi
-    read -r -p "$msg [y/N]: " resp
-    [[ "$resp" =~ ^[Yy]$ ]]
+	local msg="$1"
+	local resp
+
+	if [[ $HAVE_DIALOG -eq 1 ]]; then
+		dialog --backtitle "${BRANDING:-RTD Power Tools}" --title "Confirm Ventoy USB Setup" --yesno "$msg" 22 78
+		return $?
+	fi
+
+	printf '%b [y/N]: ' "$msg"
+	read -r resp < /dev/tty
+	[[ "$resp" =~ ^[Yy]$ ]]
+}
+
+normalize_device() {
+	local device="$1"
+	local parent
+
+	[[ -b "$device" ]] || return 1
+	parent="$(lsblk -dn -o PKNAME "$device" 2>/dev/null | head -n 1)"
+	if [[ -n "$parent" ]]; then
+		printf '/dev/%s' "$parent"
+	else
+		printf '%s' "$device"
+	fi
+}
+
+device_summary() {
+	local device="$1"
+	local line size vendor model tran rm hotplug description
+
+	[[ -n "$device" && -b "$device" ]] || return 1
+
+	line="$(lsblk -P -d -o SIZE,VENDOR,MODEL,TRAN,RM,HOTPLUG "$device" 2>/dev/null | head -n 1)"
+	[[ -n "$line" ]] || return 1
+
+	size=""
+	vendor=""
+	model=""
+	tran=""
+	rm=""
+	hotplug=""
+	[[ "$line" =~ SIZE=\"([^\"]*)\" ]] && size="${BASH_REMATCH[1]}"
+	[[ "$line" =~ VENDOR=\"([^\"]*)\" ]] && vendor="${BASH_REMATCH[1]}"
+	[[ "$line" =~ MODEL=\"([^\"]*)\" ]] && model="${BASH_REMATCH[1]}"
+	[[ "$line" =~ TRAN=\"([^\"]*)\" ]] && tran="${BASH_REMATCH[1]}"
+	[[ "$line" =~ RM=\"([^\"]*)\" ]] && rm="${BASH_REMATCH[1]}"
+	[[ "$line" =~ HOTPLUG=\"([^\"]*)\" ]] && hotplug="${BASH_REMATCH[1]}"
+
+	description="${vendor:+$vendor }${model}"
+	description="${description#"${description%%[![:space:]]*}"}"
+	description="${description%"${description##*[![:space:]]}"}"
+	[[ -n "$description" ]] || description="Unknown device"
+
+	printf '%s\n' \
+		"Target device: $device" \
+		"Device info:   $description" \
+		"Capacity:      ${size:-unknown}" \
+		"Transport:     ${tran:-unknown} (rm=${rm:-?}, hotplug=${hotplug:-?})"
+}
+
+init_logging() {
+	_LOGFILE="$(system::determine_logfile)" || return 1
+	export _LOGFILE
+	write_information "Logging to: ${_LOGFILE}"
+	trace "script version=${SCRIPT_VERSION}"
+	trace "cwd=$(pwd)"
+	trace "user=${USER:-unknown} euid=${EUID:-unknown}"
+}
+
+parse_args() {
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		-h|--help)
+			APP_SHOW_HELP=1
+			shift
+			;;
+		-V|--script-version)
+			APP_SHOW_VERSION=1
+			shift
+			;;
+		--device)
+			require_value "$1" "${2:-}" || return 1
+			APP_DEVICE="$2"
+			shift 2
+			;;
+		--version)
+			require_value "$1" "${2:-}" || return 1
+			APP_VERSION="$2"
+			shift 2
+			;;
+		--dest)
+			require_value "$1" "${2:-}" || return 1
+			APP_DEST="$2"
+			shift 2
+			;;
+		--update)
+			APP_ACTION="update"
+			shift
+			;;
+		--recreate)
+			APP_ACTION="recreate"
+			shift
+			;;
+		--mbr)
+			APP_PARTITION_STYLE="mbr"
+			shift
+			;;
+		--gpt)
+			APP_PARTITION_STYLE="gpt"
+			shift
+			;;
+		--reserve-mib)
+			require_value "$1" "${2:-}" || return 1
+			[[ "$2" =~ ^[0-9]+$ ]] || {
+				write_error "Option $1 requires a non-negative integer."
+				return 1
+			}
+			APP_RESERVE_MIB="$2"
+			shift 2
+			;;
+		--source)
+			require_value "$1" "${2:-}" || return 1
+			APP_SOURCES+=("$2")
+			shift 2
+			;;
+		--overwrite)
+			APP_OVERWRITE=1
+			shift
+			;;
+		*)
+			write_error "Unknown option: $1"
+			return 1
+			;;
+		esac
+	done
+
+	set_default_dest
+	trace "args action=${APP_ACTION:-prompt} device=${APP_DEVICE:-auto} version=${APP_VERSION} dest=${APP_DEST} style=${APP_PARTITION_STYLE} reserve_mib=${APP_RESERVE_MIB} overwrite=${APP_OVERWRITE} sources=${#APP_SOURCES[@]}"
+	return 0
+}
+
+ui_select_action() {
+	local selection
+	local -a choices
+	local checked=0
+	local item
+	local resp
+
+	[[ -n "$APP_ACTION" ]] && return 0
+
+	if [[ $HAVE_DIALOG -eq 1 ]]; then
+		exec 3>&1
+		selection=$(dialog --backtitle "${BRANDING:-RTD Power Tools}" \
+			--title "Ventoy Action" \
+			--checklist "Select exactly one action:" 18 86 4 \
+			"update" "Update Ventoy and refresh /ventoy files. Leave ISO files alone." off \
+			"recreate" "Wipe the USB and recreate Ventoy, folders, and ISO copy layout." on \
+			2>&1 1>&3)
+		resp=$?
+		exec 3>&-
+		[[ $resp -eq 0 ]] || return 1
+
+		for item in $selection; do
+			item="${item%\"}"
+			item="${item#\"}"
+			case "$item" in
+			update|recreate)
+				APP_ACTION="$item"
+				((checked++))
+				;;
+			esac
+		done
+
+		if [[ $checked -ne 1 ]]; then
+			write_error "Select exactly one action."
+			return 1
+		fi
+		return 0
+	fi
+
+	printf '%s\n' "Choose Ventoy action:" >&2
+	printf '%s\n' "  1) update   - refresh Ventoy and /ventoy files only" >&2
+	printf '%s\n' "  2) recreate - wipe USB and rebuild Ventoy media" >&2
+	printf '%s' "Selection [1/2]: " >&2
+	read -r resp < /dev/tty || return 1
+	case "$resp" in
+	1) APP_ACTION="update" ;;
+	2|"") APP_ACTION="recreate" ;;
+	*) write_error "Invalid action selection."; return 1 ;;
+	esac
+	return 0
+}
+
+resolve_target_device() {
+	if [[ -n "$APP_DEVICE" ]]; then
+		[[ -b "$APP_DEVICE" ]] || {
+			write_error "Specified device not found: $APP_DEVICE"
+			return 1
+		}
+	TARGET_DEVICE="$(normalize_device "$APP_DEVICE")" || return 1
+	write_information "Using requested device: ${TARGET_DEVICE}"
+	trace "requested device=${APP_DEVICE} normalized=${TARGET_DEVICE}"
+	trace "$(device_summary "$TARGET_DEVICE" | tr '\n' ';')"
+	return 0
+	fi
+
+	write_status "Selecting target USB device..."
+	TARGET_DEVICE="$(oem::ventoy::select_usb_device)" || return 1
+	TARGET_DEVICE="$(normalize_device "$TARGET_DEVICE")" || return 1
+	write_information "Selected device: ${TARGET_DEVICE}"
+	trace "selected device=${TARGET_DEVICE}"
+	trace "$(device_summary "$TARGET_DEVICE" | tr '\n' ';')"
+	return 0
+}
+
+build_setup_args() {
+	local src
+
+	SETUP_ARGS=(--device "$TARGET_DEVICE" --version "$APP_VERSION" --dest "$APP_DEST" "--${APP_PARTITION_STYLE}")
+	[[ "$APP_ACTION" == "update" ]] && SETUP_ARGS+=(--update)
+	[[ "$APP_ACTION" == "recreate" ]] && SETUP_ARGS+=(--recreate)
+	[[ ${APP_RESERVE_MIB} -gt 0 ]] && SETUP_ARGS+=(--reserve-mib "$APP_RESERVE_MIB")
+	[[ $APP_OVERWRITE -eq 1 ]] && SETUP_ARGS+=(--overwrite)
+	for src in "${APP_SOURCES[@]}"; do
+		SETUP_ARGS+=(--source "$src")
+	done
+	trace "setup args=$(printf '%q ' "${SETUP_ARGS[@]}")"
+}
+
+build_confirm_message() {
+	local summary
+	local overwrite_text="no"
+	local reserve_text="none"
+	local source_text=$'\n  - Use default ISO discovery paths'
+	local style_text
+	local action_text
+	local src
+
+	[[ $APP_OVERWRITE -eq 1 ]] && overwrite_text="yes"
+	[[ ${APP_RESERVE_MIB} -gt 0 ]] && reserve_text="${APP_RESERVE_MIB} MiB"
+	style_text="${APP_PARTITION_STYLE^^}"
+	if [[ ${#APP_SOURCES[@]} -gt 0 ]]; then
+		source_text=""
+		for src in "${APP_SOURCES[@]}"; do
+			source_text+=$'\n'"  - Scan ISO source: $src"
+		done
+	fi
+
+	summary="$(device_summary "$TARGET_DEVICE" 2>/dev/null || printf 'Target device: %s' "$TARGET_DEVICE")"
+	if [[ "$APP_ACTION" == "update" ]]; then
+		action_text="  - Update Ventoy in place on the selected device\n  - Leave existing ISO files and folders alone\n  - Refresh /ventoy files on the Ventoy data partition\n  - Refresh Ventoy legacy BIOS fallback boot files\n  - Do not recopy ISO files"
+	else
+		action_text="  - CLEAR the USB device and recreate the Ventoy partition layout\n  - Install Ventoy to the selected device using ${style_text}\n  - Preserve space at disk end: ${reserve_text}\n  - ERASE ALL DATA on the target device\n  - Keep the Ventoy data partition in Ventoy's native filesystem/layout\n  - Create standard RTD folders:\n      /ventoy\n      /Images/OEM\n      /Images/Commercial\n      /Images/OSS\n      /Images/Tools\n      /Data${source_text}\n  - Copy discovered ISO files to the Ventoy drive\n  - Overwrite existing copied ISOs: ${overwrite_text}"
+	fi
+	printf '%s' "Selected USB device:\n\n${summary}\n\nThis will:\n  - Download Ventoy (${APP_VERSION}) to ${APP_DEST}\n${action_text}\n  - Write /ventoy/ventoy.json with TreeView mode enabled\n  - Set the Ventoy search root to /Images\n\nProceed?"
+}
+
+run_setup() {
+	local preserve_env
+
+	write_status "Starting Ventoy USB setup..."
+	if [[ ${EUID:-1} -ne 0 ]]; then
+		hash sudo 2>/dev/null || {
+			write_error "sudo is required to install Ventoy to a USB device."
+			return 1
+		}
+		trace "re-executing as root for privileged Ventoy setup"
+		preserve_env="DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,WAYLAND_DISPLAY"
+		sudo --preserve-env="${preserve_env}" -H env RTD_VENTOY_CONFIRMED=1 SUDO_USER="${USER:-${SUDO_USER:-unknown}}" bash "$(readlink -f "$0")" "${SETUP_ARGS[@]}"
+		return $?
+	fi
+	oem::ventoy::setup_usb "${SETUP_ARGS[@]}"
 }
 
 main() {
-    dependency::_rtd_library || exit 1
+	local confirm_message
+	local status
 
-    local -a forward_args=()
-    local show_help=0
+	dependency::_rtd_library || exit 1
+	init_logging || exit 1
+	trap 'trace "script exit status=$?"' EXIT
+	parse_args "$@" || {
+		usage
+		return 1
+	}
 
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-        -h|--help)
-            show_help=1
-            shift
-            continue
-            ;;
-        -V|--script-version)
-            echo "$SCRIPT_VERSION"
-            return 0
-            ;;
-        *)
-            forward_args+=("$1")
-            shift
-            ;;
-        esac
-    done
+	if [[ $APP_SHOW_VERSION -eq 1 ]]; then
+		echo "$SCRIPT_VERSION"
+		return 0
+	fi
 
-    if [[ $show_help -eq 1 ]]; then
-        usage
-        return 0
-    fi
+	if [[ $APP_SHOW_HELP -eq 1 ]]; then
+		usage
+		return 0
+	fi
 
-    require_dialog
-    ui_notice "This tool will:\n\n  • Download Ventoy (latest by default)\n  • Install it to the selected USB device (destructive)\n  • Create ext4 data partition + standard RTD folders\n  • Copy discovered ISOs and apply RTD branding\n\nMake sure the correct USB drive is plugged in."
-    if ! ui_confirm "Proceed with Ventoy USB creation now?"; then
-        write_information "Ventoy creation canceled by user."
-        return 0
-    fi
+	require_dialog
+	resolve_target_device || return 1
+	ui_select_action || return 1
+	build_setup_args
 
-    oem::ventoy::setup_usb "${forward_args[@]}"
-    local status=$?
+	if [[ "${RTD_VENTOY_CONFIRMED:-0}" != "1" ]]; then
+		confirm_message="$(build_confirm_message)"
+		trace "confirmation prepared for device=${TARGET_DEVICE}"
+		if ! ui_confirm "$confirm_message"; then
+			write_information "Ventoy creation canceled by user."
+			return 0
+		fi
+	else
+		trace "confirmation previously completed"
+	fi
 
-    if [[ $status -eq 0 ]]; then
-        ui_notice "✅ Ventoy USB setup complete."
-    else
-        ui_notice "💥 Ventoy USB setup failed. Check logs for details."
-    fi
+	run_setup
+	status=$?
+	trace "setup finished status=${status}"
 
-    return $status
+	if [[ $status -eq 0 ]]; then
+		ui_notice "Ventoy USB setup complete.\n\nLog file: ${_LOGFILE}"
+	else
+		ui_notice "Ventoy USB setup failed.\n\nReview log file:\n${_LOGFILE}"
+	fi
+
+	return $status
 }
 
 main "$@"

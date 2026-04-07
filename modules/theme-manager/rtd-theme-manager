@@ -52,17 +52,50 @@ theme_path() {
 	return 1
 }
 
-find_theme_wallpaper() {
+find_theme_wallpapers() {
 	local theme="$1"
 	local tpath
 	tpath=$(theme_path "$theme") || return 1
 	find "$tpath" -maxdepth 3 -type f \( -iname 'wallpaper.*' -o -iname 'background.*' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) \
-		-print -quit 2>/dev/null
+		-print0 2>/dev/null | sort -z
 }
+
+pick_wallpaper() {
+	local theme="$1"
+	local selected
+	local -a wallpapers
+	mapfile -d '' wallpapers < <(find_theme_wallpapers "$theme")
+
+	if ((${#wallpapers[@]} == 0)); then
+		return 0
+	fi
+
+	local options=(TRUE "None" "Don't change wallpaper")
+	for wallpaper in "${wallpapers[@]}"; do
+		options+=(FALSE "$(basename "$wallpaper")" "$wallpaper")
+	done
+
+	selected=$(zenity --list \
+		--title="Wallpaper Selection" \
+		--text="Select a wallpaper to apply" \
+		--radiolist \
+		--column="Select" --column="Wallpaper" --column="Path" \
+		--height=400 --width=500 \
+		--print-column=3 \
+		"${options[@]}") || return 1
+
+	if [[ "$selected" == "Don't change wallpaper" ]]; then
+		echo "None"
+	else
+		echo "$selected"
+	fi
+}
+
 
 pick_theme() {
 	local themes
 	themes=$(find_themes) || return 1
+
 	[[ -z "$themes" ]] && die "No themes found in ~/.themes or /usr/share/themes."
 
 	zenity --list \
@@ -128,10 +161,10 @@ ensure_dependencies() {
 	# Allow user extensions to load
 	gsettings set org.gnome.shell disable-user-extensions false 2>/dev/null || true
 
-	# Ensure key extensions are present and enabled
-	ensure_extension "user-theme@gnome-shell-extensions.gcampax.github.com" "19"
-	ensure_extension "dash-to-dock@micxgx.gmail.com" "307"
-	ensure_extension "dash-to-panel@jderose9.github.com" "1160"
+	# Ensure key extensions are present and enabled (best effort)
+	ensure_extension "user-theme@gnome-shell-extensions.gcampax.github.com" "19" || warn "Could not ensure User Themes extension."
+	ensure_extension "dash-to-dock@micxgx.gmail.com" "307" || warn "Could not ensure Dash-to-Dock extension."
+	ensure_extension "dash-to-panel@jderose9.github.com" "1160" || warn "Could not ensure Dash-to-Panel extension."
 }
 
 enable_extension_uuid() {
@@ -176,7 +209,16 @@ apply_theme() {
 	fi
 }
 
+show_help() {
+	zenity --info --title="About RTD Theme Manager" --width=400 --no-wrap --text="<span size='large'><b>RTD GNOME Theme Manager</b></span>\n\nA simple graphical tool to apply GNOME themes.\n\n<b>Usage:</b>\n  - Run without arguments to launch the theme selector.\n  - Use <b>--help</b> or <b>-h</b> to show this message.\n\n<b>How it works:</b>\n1. It finds themes in <b>~/.themes</b> and <b>/usr/share/themes</b>.\n2. You select a theme from the list.\n3. It applies the GTK, Shell, Icon, and Cursor themes.\n4. If a wallpaper is found in the theme's folder, it will be set."
+}
+
 main() {
+	if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+		show_help
+		exit 0
+	fi
+
 	local theme wallpaper
 
 	ensure_dependencies
@@ -184,7 +226,10 @@ main() {
 	theme=$(pick_theme) || exit 1
 	[[ -z "$theme" ]] && exit 0
 
-	wallpaper=$(find_theme_wallpaper "$theme" || true)
+	wallpaper=$(pick_wallpaper "$theme" || true)
+	if [[ "$wallpaper" == "None" ]]; then
+		wallpaper=""
+	fi
 
 	apply_theme "$theme" "$wallpaper"
 

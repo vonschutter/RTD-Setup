@@ -1,0 +1,957 @@
+#!/bin/bash
+#
+# RTD OEM GNOME Tweaks
+# Presents a GTK checklist (zenity) to apply selected GNOME tweak functions
+# from the RTD library.
+
+VERSION="1.11"
+PUBLICATION="RTD OEM Tweaks"
+LAST_TWEAK_LABEL=""
+DEFAULT_BUTTON_LAYOUT="appmenu:minimize,maximize,close"
+
+declare -a MENU_KEYS=(
+	"core"
+	"common"
+	"usability"
+	"nautilus"
+	"overlay"
+	"extensions"
+	"power"
+	"font"
+	"tilix"
+	"terminal"
+	"dock"
+	"panel"
+	"buttons_default"
+	"buttons_custom"
+	"gtk4_custom"
+	"reset_theme"
+	"reload_shell"
+	"startup_on"
+	"startup_off"
+)
+
+declare -A MENU_STATE=()
+declare -A MENU_SELECTION=()
+declare -A MENU_TEXT=(
+	["core"]="Apply core OEM GNOME tweak bundle"
+	["common"]="Apply common UI tweaks alias"
+	["usability"]="Apply general GNOME usability defaults"
+	["nautilus"]="Apply Nautilus usability defaults"
+	["overlay"]="Organize app grid folders in GNOME overview"
+	["extensions"]="Enable baseline GNOME extensions"
+	["power"]="Apply desktop power/interface defaults"
+	["font"]="Apply improved GNOME font smoothing"
+	["tilix"]="Apply Tilix and GNOME Terminal tweaks"
+	["terminal"]="Apply GNOME Terminal profile preferences"
+	["dock"]="Configure Dash-to-Dock defaults"
+	["panel"]="Configure Dash-to-Panel defaults"
+	["buttons_default"]="Ensure window buttons are visible (default layout)"
+	["buttons_custom"]="Set custom window buttons layout"
+	["gtk4_custom"]="Apply custom GTK4 theme file (advanced)"
+	["reset_theme"]="Reset GNOME theme settings and GTK4 overrides"
+	["reload_shell"]="Reload GNOME Shell theme"
+	["startup_on"]="Enable GNOME startup sound from a selected file"
+	["startup_off"]="Disable GNOME startup sound"
+)
+load_rtd_library() {
+	local script_dir
+	local src_url
+	local -a candidates
+	local candidate
+
+	script_dir="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+	src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/_rtd_library"
+
+	candidates=(
+		"${script_dir}/../../core/_rtd_library"
+		"${script_dir}/../core/_rtd_library"
+		"$(find /opt -name _rtd_library 2>/dev/null | grep -v bakup | head -n1)"
+	)
+
+	for candidate in "${candidates[@]}"; do
+		[[ -z "${candidate}" ]] && continue
+		if [[ -f "${candidate}" ]]; then
+			# shellcheck source=/dev/null
+			source "${candidate}" && return 0
+		fi
+	done
+
+	local remote_library
+	remote_library="$(curl -fsSL "${src_url}" 2>/dev/null || true)"
+	if [[ -n "${remote_library}" ]]; then
+		if source /dev/stdin <<<"${remote_library}"; then
+			return 0
+		fi
+	fi
+
+	return 1
+}
+
+checkbox_state() {
+	if [[ "$1" == "TRUE" ]]; then
+		return 0
+	fi
+
+	return 1
+}
+
+gtk4_settings_file() {
+	printf '%s\n' "${XDG_CONFIG_HOME:-${HOME}/.config}/gtk-4.0/settings.ini"
+}
+
+startup_sound_autostart_file() {
+	printf '%s\n' "${XDG_CONFIG_HOME:-${HOME}/.config}/autostart/rtd-startup-sound.desktop"
+}
+
+startup_sound_state_file() {
+	printf '%s\n' "${XDG_CONFIG_HOME:-${HOME}/.config}/rtd/startup-sound.state"
+}
+
+gsettings_value_is() {
+	local schema="$1"
+	local key="$2"
+	local expected="$3"
+	local current
+
+	current="$(gsettings get "${schema}" "${key}" 2>/dev/null)" || return 1
+	[[ "${current}" == "${expected}" ]]
+}
+
+compact_gvariant() {
+	printf '%s' "$1" | tr -d '[:space:]'
+}
+
+gsettings_compact_value_is() {
+	local schema="$1"
+	local key="$2"
+	local expected="$3"
+	local current
+
+	current="$(gsettings get "${schema}" "${key}" 2>/dev/null)" || return 1
+	[[ "$(compact_gvariant "${current}")" == "$(compact_gvariant "${expected}")" ]]
+}
+
+gsettings_value_contains() {
+	local schema="$1"
+	local key="$2"
+	local needle="$3"
+	local current
+
+	current="$(gsettings get "${schema}" "${key}" 2>/dev/null)" || return 1
+	[[ "${current}" == *"${needle}"* ]]
+}
+
+gtk4_setting_is() {
+	local key="$1"
+	local expected="$2"
+	local gtk4_file current
+
+	gtk4_file="$(gtk4_settings_file)"
+	[[ -f "${gtk4_file}" ]] || return 1
+
+	current="$(grep -E "^${key}=" "${gtk4_file}" 2>/dev/null | tail -n1 | cut -d= -f2-)"
+	[[ "${current}" == "${expected}" ]]
+}
+
+gtk4_custom_theme_present() {
+	local gtk4_file
+
+	gtk4_file="$(gtk4_settings_file)"
+	[[ -f "${gtk4_file}" ]] || return 1
+	grep -q '^gtk-theme-name=' "${gtk4_file}" &&
+		grep -q '^gtk-icon-theme-name=' "${gtk4_file}" &&
+		grep -q '^gtk-application-prefer-dark-theme=' "${gtk4_file}"
+}
+
+dconf_key_unset() {
+	local key_path="$1"
+
+	command -v dconf >/dev/null 2>&1 || return 1
+	[[ -z "$(dconf read "${key_path}" 2>/dev/null)" ]]
+}
+
+terminal_profiles() {
+	gsettings get org.gnome.Terminal.ProfilesList list 2>/dev/null | tr -d "[]',"
+}
+
+default_terminal_profile() {
+	local default_uuid profiles
+
+	default_uuid="$(gsettings get org.gnome.Terminal.ProfilesList default 2>/dev/null | tr -d "'")"
+	if [[ -n "${default_uuid}" && "${default_uuid}" != "''" ]]; then
+		printf '%s\n' "${default_uuid}"
+		return 0
+	fi
+
+	profiles="$(terminal_profiles)"
+	printf '%s\n' "${profiles%% *}"
+}
+
+terminal_profile_schema() {
+	local uuid="$1"
+
+	printf 'org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:%s/\n' "${uuid}"
+}
+
+tilix_expected_terminal_font() {
+	if command -v fc-list >/dev/null 2>&1 && fc-list | grep -qi "SauceCodePro"; then
+		printf "'%s'\n" "SauceCodePro Nerd Font 12"
+	else
+		printf "'%s'\n" "Monospace 12"
+	fi
+}
+
+terminal_profile_matches_defaults() {
+	local schema="$1"
+
+	gsettings_value_is "${schema}" font "'Monospace 10'" &&
+		gsettings_value_is "${schema}" use-system-font "false" &&
+		gsettings_value_is "${schema}" audible-bell "false" &&
+		gsettings_value_is "${schema}" use-theme-colors "false" &&
+		gsettings_value_is "${schema}" background-color "'#000000'" &&
+		gsettings_value_is "${schema}" foreground-color "'#AFAFAF'" &&
+		gsettings_value_is "${schema}" use-transparent-background "true" &&
+		gsettings_value_is "${schema}" background-transparency-percent "20" &&
+		gsettings_value_is "${schema}" bold-is-bright "true"
+}
+
+tilix_terminal_defaults_applied() {
+	local default_uuid schema expected_font
+
+	default_uuid="$(default_terminal_profile)"
+	[[ -n "${default_uuid}" ]] || return 1
+	schema="$(terminal_profile_schema "${default_uuid}")"
+	expected_font="$(tilix_expected_terminal_font)"
+
+	gsettings_value_is "${schema}" use-transparent-background "true" &&
+		gsettings_value_is "${schema}" background-transparency-percent "20" &&
+		gsettings_value_is "${schema}" default-size-columns "100" &&
+		gsettings_value_is "${schema}" use-theme-transparency "false" &&
+		gsettings_value_is "${schema}" scrollback-lines "10000" &&
+		gsettings_value_is "${schema}" font "${expected_font}" &&
+		gsettings_value_is "${schema}" use-system-font "false" &&
+		gsettings_value_is "${schema}" bold-is-bright "true"
+}
+
+terminal_preferences_applied() {
+	local profiles uuid schema
+
+	profiles="$(terminal_profiles)"
+	[[ -n "${profiles}" ]] || return 1
+
+	for uuid in ${profiles}; do
+		schema="$(terminal_profile_schema "${uuid}")"
+		terminal_profile_matches_defaults "${schema}" || return 1
+	done
+
+	return 0
+}
+
+expected_extensions_list() {
+	local distro_type
+	local -a extensions_to_enable
+	local gsettings_list_format
+
+	distro_type="$(system::distribution_type 2>/dev/null || true)"
+	extensions_to_enable=(
+		'user-theme@gnome-shell-extensions.gcampax.github.com'
+		'caffeine@patapon.info'
+		'apps-menu@gnome-shell-extensions.gcampax.github.com'
+	)
+
+	case "${distro_type}" in
+	ubuntu|pop|mint|zorin|elementary)
+		extensions_to_enable+=(
+			'tiling-assistant@ubuntu.com'
+			'ubuntu-appindicators@ubuntu.com'
+		)
+		;;
+	*)
+		extensions_to_enable+=(
+			'gTile@vibou'
+			'TopIcons@phocean.net'
+			'trayIconsReloaded@selfmade.pl'
+			'desktop-icons@csoriano'
+		)
+		;;
+	esac
+
+	gsettings_list_format="$(printf "'%s', " "${extensions_to_enable[@]}")"
+	printf '[%s]\n' "${gsettings_list_format%, }"
+}
+
+startup_sound_enabled() {
+	local autostart_file
+
+	autostart_file="$(startup_sound_autostart_file)"
+	[[ -f "${autostart_file}" ]] || return 1
+	gsettings_value_is org.gnome.desktop.sound event-sounds "true"
+}
+
+startup_sound_source_matches() {
+	local requested_file="$1"
+	local state_file source_path requested_realpath
+
+	state_file="$(startup_sound_state_file)"
+	[[ -f "${state_file}" ]] || return 1
+
+	requested_realpath="${requested_file}"
+	if command -v realpath >/dev/null 2>&1; then
+		requested_realpath="$(realpath -m "${requested_file}" 2>/dev/null || printf '%s' "${requested_file}")"
+	elif command -v readlink >/dev/null 2>&1; then
+		requested_realpath="$(readlink -f "${requested_file}" 2>/dev/null || printf '%s' "${requested_file}")"
+	fi
+
+	source_path="$(grep '^SOURCE_PATH=' "${state_file}" 2>/dev/null | tail -n1 | cut -d= -f2- | sed 's/^"//; s/"$//')"
+	[[ -n "${source_path}" && "${source_path}" == "${requested_realpath}" ]]
+}
+
+overlay_folder_matches() {
+	local folder_schema="$1"
+	local expected_name="$2"
+	local expected_categories="$3"
+
+	gsettings_value_is "${folder_schema}" name "'${expected_name}'" &&
+		gsettings_compact_value_is "${folder_schema}" categories "${expected_categories}"
+}
+
+set_last_tweak_label() {
+	case "$1" in
+	core) LAST_TWEAK_LABEL="Core OEM GNOME tweak bundle" ;;
+	common) LAST_TWEAK_LABEL="Common UI tweaks alias" ;;
+	usability) LAST_TWEAK_LABEL="GNOME usability defaults" ;;
+	nautilus) LAST_TWEAK_LABEL="Nautilus usability defaults" ;;
+	overlay) LAST_TWEAK_LABEL="GNOME overlay app folders" ;;
+	extensions) LAST_TWEAK_LABEL="Baseline GNOME extensions" ;;
+	power) LAST_TWEAK_LABEL="Desktop power/interface defaults" ;;
+	font) LAST_TWEAK_LABEL="GNOME font smoothing defaults" ;;
+	tilix) LAST_TWEAK_LABEL="Tilix and GNOME Terminal tweaks" ;;
+	terminal) LAST_TWEAK_LABEL="GNOME Terminal profile preferences" ;;
+	dock) LAST_TWEAK_LABEL="Dash-to-Dock defaults" ;;
+	panel) LAST_TWEAK_LABEL="Dash-to-Panel defaults" ;;
+	buttons_default) LAST_TWEAK_LABEL="Window buttons visible (default layout)" ;;
+	buttons_custom) LAST_TWEAK_LABEL="Window buttons visible (custom layout)" ;;
+	gtk4_custom) LAST_TWEAK_LABEL="Custom GTK4 settings.ini theme" ;;
+	reset_theme) LAST_TWEAK_LABEL="Reset GNOME theme settings and GTK4 overrides" ;;
+	reload_shell) LAST_TWEAK_LABEL="Reload GNOME Shell theme" ;;
+	startup_on) LAST_TWEAK_LABEL="Enable startup sound" ;;
+	startup_off) LAST_TWEAK_LABEL="Disable startup sound" ;;
+	win10_light) LAST_TWEAK_LABEL="Windows 10 style (Light)" ;;
+	win10_dark) LAST_TWEAK_LABEL="Windows 10 style (Dark)" ;;
+	mac_light) LAST_TWEAK_LABEL="macOS style (Light)" ;;
+	mac_dark) LAST_TWEAK_LABEL="macOS style (Dark)" ;;
+	corp_light) LAST_TWEAK_LABEL="Corporate Crisp style (Light)" ;;
+	corp_dark) LAST_TWEAK_LABEL="Corporate Crisp style (Dark)" ;;
+	moca) LAST_TWEAK_LABEL="Moca style" ;;
+	ui_media_prompt) LAST_TWEAK_LABEL="Theme media recovery prompt" ;;
+	*) LAST_TWEAK_LABEL="Unknown tweak ($1)" ;;
+	esac
+}
+
+tweak_is_applied() {
+	local key="$1"
+	local default_uuid
+	local gtk4_file
+
+	case "${key}" in
+	core | common)
+		tweak_is_applied tilix &&
+			tweak_is_applied usability &&
+			tweak_is_applied nautilus &&
+			tweak_is_applied overlay &&
+			tweak_is_applied extensions
+		;;
+	usability)
+		gsettings_value_is org.gnome.desktop.peripherals.mouse accel-profile "'adaptive'" &&
+			gsettings_value_is org.gnome.desktop.sound allow-volume-above-100-percent "false" &&
+			gsettings_value_is org.gnome.desktop.calendar show-weekdate "true" &&
+			gsettings_value_is org.gnome.desktop.wm.preferences resize-with-right-button "true" &&
+			gsettings_value_is org.gnome.desktop.wm.preferences button-layout "'${DEFAULT_BUTTON_LAYOUT}'" &&
+			gsettings_value_is org.gnome.shell.overrides workspaces-only-on-primary "false"
+		;;
+	nautilus)
+		gsettings_value_is org.gnome.nautilus.icon-view default-zoom-level "'standard'" &&
+			gsettings_value_is org.gnome.nautilus.preferences executable-text-activation "'ask'" &&
+			gsettings_value_is org.gtk.Settings.FileChooser sort-directories-first "true" &&
+			gsettings_value_is org.gnome.nautilus.list-view use-tree-view "true" &&
+			gsettings_value_is org.gnome.nautilus.list-view default-zoom-level "'small'"
+		;;
+	overlay)
+		gsettings_compact_value_is org.gnome.desktop.app-folders folder-children "['accessories', 'chrome-apps', 'games', 'graphics', 'internet', 'office', 'programming', 'science', 'sound---video', 'system-tools', 'universal-access', 'wine', 'OEM', '3D-Printing', 'Cloud']" &&
+			overlay_folder_matches org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/accessories/ "Accessories" "['Utility']" &&
+			overlay_folder_matches org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/chrome-apps/ "Chrome Apps" "['chrome-apps']" &&
+			overlay_folder_matches org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/games/ "Games" "['Game']" &&
+			overlay_folder_matches org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/graphics/ "Graphics" "['Graphics']" &&
+			overlay_folder_matches org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/internet/ "Internet" "['Network', 'WebBrowser', 'Email']" &&
+			overlay_folder_matches org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/office/ "Office" "['Office']" &&
+			overlay_folder_matches org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/programming/ "Programming" "['Development']" &&
+			overlay_folder_matches org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/science/ "Science" "['Science']" &&
+			overlay_folder_matches org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/sound---video/ "Sound & Video" "['AudioVideo', 'Audio', 'Video']" &&
+			overlay_folder_matches org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/system-tools/ "System Tools" "['System', 'Settings']" &&
+			overlay_folder_matches org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/universal-access/ "Universal Access" "['Accessibility']" &&
+			overlay_folder_matches org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/wine/ "Wine" "['Wine', 'X-Wine', 'Wine-Programs-Accessories']" &&
+			overlay_folder_matches org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/OEM/ "OEM" "['OEM']" &&
+			overlay_folder_matches org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/3D-Printing/ "3D-Printing" "['3D-Printing', 'CAD', '3D', '3DGraphics']" &&
+			overlay_folder_matches org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/Cloud/ "Cloud" "['Cloud-Management', 'Cloud', 'aws', 'azure', 'gcp']"
+		;;
+	extensions)
+		gsettings_value_is org.gnome.shell disable-user-extensions "false" &&
+			gsettings_compact_value_is org.gnome.shell enabled-extensions "$(expected_extensions_list)"
+		;;
+	power)
+		gsettings_value_is org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout "0" &&
+			gsettings_value_is org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type "'nothing'" &&
+			gsettings_value_is org.gnome.settings-daemon.plugins.power sleep-inactive-battery-timeout "0" &&
+			gsettings_value_is org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type "'nothing'" &&
+			gsettings_value_is org.freedesktop.Tracker.Miner.Files index-on-battery "false" &&
+			gsettings_value_is org.freedesktop.Tracker.Miner.Files index-on-battery-first-time "false" &&
+			gsettings_value_is org.freedesktop.Tracker.Miner.Files throttle "15" &&
+			gsettings_value_is org.gnome.desktop.interface show-battery-percentage "true" &&
+			gsettings_value_is org.gnome.desktop.interface clock-show-date "true" &&
+			gsettings_value_is org.gnome.desktop.interface clock-show-seconds "true" &&
+			gsettings_value_is org.gnome.desktop.interface enable-hot-corners "true"
+		;;
+	font)
+		gsettings_value_is org.gnome.settings-daemon.plugins.xsettings hinting "'slight'" &&
+			gsettings_value_is org.gnome.settings-daemon.plugins.xsettings antialiasing "'rgba'" &&
+			gsettings_value_is org.gnome.settings-daemon.plugins.xsettings rgba-order "'rgb'"
+		;;
+	tilix)
+		gsettings_value_is com.gexperts.Tilix.Settings theme-variant "'dark'" &&
+			gsettings_value_is com.gexperts.Tilix.Settings font "'SauceCodePro Nerd Font 12'" &&
+			gsettings_value_is com.gexperts.Tilix.Settings use-system-font "false" &&
+			gsettings_value_is com.gexperts.Tilix.Settings bold-is-bright "true" &&
+			tilix_terminal_defaults_applied &&
+			[[ -f "${HOME}/.config/rtd/gconf-tilix-settings.ini" ]]
+		;;
+	terminal)
+		terminal_preferences_applied
+		;;
+	dock)
+		gsettings_value_is org.gnome.shell.extensions.dash-to-dock click-action "'minimize'" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-dock dock-position "'BOTTOM'" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-dock apply-custom-theme "false" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-dock custom-background-color "false" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-dock custom-theme-customize-running-dots "true" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-dock custom-theme-running-dots-color "'#729fcf'" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-dock custom-theme-shrink "true" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-dock dock-fixed "false" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-dock extend-height "false" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-dock force-straight-corner "false" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-dock icon-size-fixed "true" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-dock intellihide-mode "'ALL_WINDOWS'" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-dock isolate-workspaces "true" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-dock show-apps-at-top "true" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-dock unity-backlit-items "false" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-dock transparency-mode "'FIXED'" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-dock running-indicator-style "'SEGMENTED'" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-dock background-opacity "0.70000000000000000"
+		;;
+	panel)
+		gsettings_value_is org.gnome.shell.extensions.dash-to-panel click-action "'minimize'" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel dash-max-icon-size "32" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel appicon-margin "4" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel appicon-padding "4" &&
+			gsettings_compact_value_is org.gnome.shell.extensions.dash-to-panel available-monitors "[0]" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel dot-color-1 "'#5294e2'" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel dot-color-2 "'#5294e2'" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel dot-color-3 "'#5294e2'" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel dot-color-4 "'#5294e2'" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel dot-color-dominant "false" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel dot-color-override "true" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel dot-color-unfocused-1 "'#5294e2'" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel dot-color-unfocused-2 "'#5294e2'" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel dot-color-unfocused-3 "'#5294e2'" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel dot-color-unfocused-4 "'#5294e2'" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel dot-color-unfocused-different "false" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel dot-style-focused "'METRO'" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel dot-style-unfocused "'SEGMENTED'" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel focus-highlight-color "'#eeeeee'" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel focus-highlight-dominant "true" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel force-check-update "true" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel group-apps "true" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel hotkeys-overlay-combo "'TEMPORARILY'" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel isolate-monitors "false" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel isolate-workspaces "false" &&
+			gsettings_value_contains org.gnome.shell.extensions.dash-to-panel panel-element-positions '"showAppsButton"' &&
+			gsettings_value_contains org.gnome.shell.extensions.dash-to-panel panel-element-positions '"systemMenu"' &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel secondarymenu-contains-showdetails "true" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel show-appmenu "false" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel show-favorites "true" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel show-favorites-all-monitors "false" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel stockgs-keep-dash "false" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel stockgs-keep-top-panel "false" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel trans-use-custom-bg "false" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel trans-use-custom-opacity "true" &&
+			gsettings_value_is org.gnome.shell.extensions.dash-to-panel tray-size "0"
+		;;
+	buttons_default)
+		gsettings_value_is org.gnome.desktop.wm.preferences button-layout "'${DEFAULT_BUTTON_LAYOUT}'"
+		;;
+	buttons_custom)
+		default_uuid="$(gsettings get org.gnome.desktop.wm.preferences button-layout 2>/dev/null | tr -d "'")"
+		[[ -n "${default_uuid}" && "${default_uuid}" != "${DEFAULT_BUTTON_LAYOUT}" ]]
+		;;
+	gtk4_custom)
+		gtk4_custom_theme_present
+		;;
+	reset_theme)
+		gtk4_file="$(gtk4_settings_file)"
+		[[ ! -e "${gtk4_file}" ]] &&
+			[[ ! -d "${gtk4_file%/settings.ini}" ]] &&
+			dconf_key_unset /org/gnome/desktop/interface/gtk-theme &&
+			dconf_key_unset /org/gnome/desktop/interface/icon-theme &&
+			dconf_key_unset /org/gnome/desktop/interface/color-scheme &&
+			dconf_key_unset /org/gnome/shell/extensions/user-theme/name
+		;;
+	reload_shell)
+		return 1
+		;;
+	startup_on)
+		startup_sound_enabled
+		;;
+	startup_off)
+		[[ ! -f "$(startup_sound_autostart_file)" ]]
+		;;
+	*)
+		return 1
+		;;
+	esac
+}
+
+initialize_menu_state() {
+	local key
+
+	for key in "${MENU_KEYS[@]}"; do
+		if tweak_is_applied "${key}"; then
+			MENU_STATE["${key}"]="TRUE"
+		else
+			MENU_STATE["${key}"]="FALSE"
+		fi
+	done
+}
+
+capture_menu_selection() {
+	local selection="$1"
+	local -a selected_keys
+	local key
+
+	for key in "${MENU_KEYS[@]}"; do
+		MENU_SELECTION["${key}"]="FALSE"
+	done
+
+	[[ -n "${selection}" ]] || return 0
+	IFS='|' read -r -a selected_keys <<< "${selection}"
+
+	for key in "${selected_keys[@]}"; do
+		[[ -n "${key}" ]] || continue
+		MENU_SELECTION["${key}"]="TRUE"
+	done
+}
+
+sync_menu_state_from_selection() {
+	local key
+
+	for key in "${MENU_KEYS[@]}"; do
+		MENU_STATE["${key}"]="${MENU_SELECTION[${key}]:-FALSE}"
+	done
+}
+
+show_gtk_menu() {
+	local -a cmd options
+	local key
+
+	cmd=(
+		zenity
+		--list
+		--checklist
+		--title "${PUBLICATION} v${VERSION}"
+		--width 1160
+		--height 700
+		--separator "|"
+		--print-column 2
+		--ok-label "APPLY"
+		--cancel-label "EXIT"
+		--text "Checked items are armed for apply.\n\nThe initial state is read from your live GNOME settings. Already-applied tweaks are skipped unless you uncheck them, apply once, then check them again to force a reapply."
+		--column "Apply"
+		--column "ID"
+		--column "Tweak"
+	)
+
+	for key in "${MENU_KEYS[@]}"; do
+		options+=(
+			"${MENU_STATE[${key}]:-FALSE}"
+			"${key}"
+			"${MENU_TEXT[${key}]}"
+		)
+	done
+
+	"${cmd[@]}" "${options[@]}"
+}
+
+prompt_custom_gtk4_theme() {
+	local input theme_name icon_name prefer_dark
+
+	input="$(zenity --forms \
+		--title "${PUBLICATION} - Custom GTK4 Theme" \
+		--width 640 \
+		--height 320 \
+		--separator "|" \
+		--text "Enter GTK4 settings.ini values to write." \
+		--add-entry "GTK theme name" \
+		--add-entry "Icon theme name" \
+		--add-entry "Prefer dark (0 or 1)")" || return 1
+
+	IFS='|' read -r theme_name icon_name prefer_dark <<< "${input}"
+
+	if [[ -z "${theme_name}" || -z "${icon_name}" ]]; then
+		zenity --error --title "${PUBLICATION}" --text "Theme and icon names are required."
+		return 1
+	fi
+
+	if [[ ! "${prefer_dark}" =~ ^[01]$ ]]; then
+		zenity --error --title "${PUBLICATION}" --text "Prefer dark must be 0 or 1."
+		return 1
+	fi
+
+	echo "${theme_name}|${icon_name}|${prefer_dark}"
+}
+
+prompt_window_buttons_layout() {
+	local layout
+
+	layout="$(zenity --entry \
+		--title "${PUBLICATION} - Window Buttons Layout" \
+		--width 680 \
+		--text "Set custom button layout (example: appmenu:minimize,maximize,close)." \
+		--entry-text "appmenu:minimize,maximize,close")" || return 1
+
+	[[ -n "${layout}" ]] || {
+		zenity --error --title "${PUBLICATION}" --text "Layout cannot be empty."
+		return 1
+	}
+
+	echo "${layout}"
+}
+
+prompt_startup_sound_file() {
+	local sound_file
+
+	sound_file="$(zenity --file-selection \
+		--title "${PUBLICATION} - Select Startup Sound" \
+		--file-filter "Audio files | *.ogg *.oga *.wav *.mp3 *.flac" \
+		--file-filter "All files | *")" || return 1
+
+	[[ -f "${sound_file}" ]] || {
+		zenity --error --title "${PUBLICATION}" --text "Selected sound file is invalid."
+		return 1
+	}
+
+	echo "${sound_file}"
+}
+
+run_function_checked() {
+	local func="$1"
+	shift || true
+
+	if ! declare -F "${func}" >/dev/null 2>&1; then
+		write_error "Function not found in loaded library: ${func}"
+		return 1
+	fi
+
+	"${func}" "$@"
+}
+
+execute_tweak() {
+	local key="$1"
+	local force_apply="${2:-0}"
+	local func=""
+	local gtk4_values theme_name icon_name prefer_dark
+	local layout
+	local sound_file
+
+	set_last_tweak_label "${key}"
+
+	case "${key}" in
+		core)
+			func="gnome::set_ui_tweaks_for_user"
+			;;
+		common)
+			func="gnome::set_ui_common_tweaks_for_user"
+			;;
+		usability)
+			func="gnome::set_better_usability_for_user"
+			;;
+		nautilus)
+			func="gnome::configure_nautilus"
+			;;
+		overlay)
+			func="gnome::organize_overlay_menu"
+			;;
+		extensions)
+			func="gnome::set_basic_extensions_enabled"
+			;;
+		power)
+			func="gnome::set_power_configuraton_for_user"
+			;;
+		font)
+			func="gnome::set_better_font_smoothing_for_user"
+			;;
+		tilix)
+			func="gnome::set_tilix_ui_tweaks_for_user"
+			;;
+		terminal)
+			func="gnome::_apply_terminal_preferences"
+			;;
+		dock)
+			func="gnome::configure_dash_to_dock"
+			;;
+		panel)
+			func="gnome::configure_dash_to_panel"
+			;;
+		buttons_default)
+			func="gnome::ensure_window_buttons_visible"
+			if [[ "${force_apply}" != "1" ]] && tweak_is_applied buttons_default; then
+				return 2
+			fi
+			if run_function_checked "${func}" "appmenu:minimize,maximize,close"; then
+				return 0
+			fi
+			return 1
+			;;
+		buttons_custom)
+			layout="$(prompt_window_buttons_layout)" || return 2
+			func="gnome::ensure_window_buttons_visible"
+			if [[ "${force_apply}" != "1" ]] && gsettings_value_is org.gnome.desktop.wm.preferences button-layout "'${layout}'"; then
+				return 2
+			fi
+			if run_function_checked "${func}" "${layout}"; then
+				return 0
+			fi
+			return 1
+			;;
+		gtk4_custom)
+			gtk4_values="$(prompt_custom_gtk4_theme)" || return 2
+			IFS='|' read -r theme_name icon_name prefer_dark <<< "${gtk4_values}"
+			func="gnome::_apply_gtk4_theme"
+			if [[ "${force_apply}" != "1" ]] &&
+				gtk4_setting_is gtk-theme-name "${theme_name}" &&
+				gtk4_setting_is gtk-icon-theme-name "${icon_name}" &&
+				gtk4_setting_is gtk-application-prefer-dark-theme "${prefer_dark}"; then
+				return 2
+			fi
+			if run_function_checked "${func}" "${theme_name}" "${icon_name}" "${prefer_dark}"; then
+				return 0
+			fi
+			return 1
+			;;
+		reset_theme)
+			func="gnome::_reset_ui_theme_settings"
+			;;
+		reload_shell)
+			func="gnome::_reload_shell_theme"
+			;;
+		startup_on)
+			func="gnome::set_startup_sound"
+			if [[ "${force_apply}" != "1" ]] && startup_sound_enabled; then
+				return 2
+			fi
+			sound_file="$(prompt_startup_sound_file)" || return 2
+			if run_function_checked "${func}" on "${sound_file}"; then
+				return 0
+			fi
+			return 1
+			;;
+		startup_off)
+			func="gnome::set_startup_sound"
+			if [[ "${force_apply}" != "1" ]] && tweak_is_applied startup_off; then
+				return 2
+			fi
+			if run_function_checked "${func}" off /dev/null; then
+				return 0
+			fi
+			return 1
+			;;
+		win10_light)
+			func="gnome::set_ui_win10_tweaks_for_user"
+			if run_function_checked "${func}" Light; then
+				return 0
+			fi
+			return 1
+			;;
+		win10_dark)
+			func="gnome::set_ui_win10_tweaks_for_user"
+			if run_function_checked "${func}" Dark; then
+				return 0
+			fi
+			return 1
+			;;
+		mac_light)
+			func="gnome::set_ui_mac_tweaks_for_user"
+			if run_function_checked "${func}" Light; then
+				return 0
+			fi
+			return 1
+			;;
+		mac_dark)
+			func="gnome::set_ui_mac_tweaks_for_user"
+			if run_function_checked "${func}" Dark; then
+				return 0
+			fi
+			return 1
+			;;
+		corp_light)
+			func="gnome::set_ui_corporate_crisp_tweaks_for_user"
+			if run_function_checked "${func}" Light; then
+				return 0
+			fi
+			return 1
+			;;
+		corp_dark)
+			func="gnome::set_ui_corporate_crisp_tweaks_for_user"
+			if run_function_checked "${func}" Dark; then
+				return 0
+			fi
+			return 1
+			;;
+		moca)
+			func="gnome::set_ui_moca_tweaks_for_user"
+			;;
+		ui_media_prompt)
+			func="gnome::set_ui_tweak_no_media_error"
+			;;
+		*)
+			return 2
+			;;
+	esac
+
+	if [[ "${force_apply}" != "1" ]] && tweak_is_applied "${key}"; then
+		return 2
+	fi
+
+	run_function_checked "${func}"
+}
+
+run_selected_tweaks() {
+	local -a success_list failure_list skipped_list
+	local key
+	local rc=0
+	local run_rc
+	local force_apply
+	local selected_count=0
+
+	for key in "${MENU_KEYS[@]}"; do
+		checkbox_state "${MENU_SELECTION[${key}]:-FALSE}" || continue
+		selected_count=$((selected_count + 1))
+		force_apply=0
+		if ! checkbox_state "${MENU_STATE[${key}]:-FALSE}"; then
+			force_apply=1
+		fi
+
+		execute_tweak "${key}" "${force_apply}"
+		run_rc=$?
+
+		case "${run_rc}" in
+		0)
+			success_list+=("${LAST_TWEAK_LABEL}")
+			;;
+		2)
+			skipped_list+=("${LAST_TWEAK_LABEL}")
+			;;
+		*)
+			failure_list+=("${LAST_TWEAK_LABEL}")
+			rc=1
+			;;
+		esac
+	done
+
+	if (( selected_count == 0 )); then
+		zenity --info --title "${PUBLICATION}" --text "No tweaks selected. Nothing changed."
+		return 0
+	fi
+
+	local summary
+	summary="GNOME tweaks execution completed."
+
+	if (( ${#success_list[@]} > 0 )); then
+		summary+=$'\n\nApplied successfully:'
+		for key in "${success_list[@]}"; do
+			summary+=$'\n'"- ${key}"
+		done
+	fi
+
+	if (( ${#skipped_list[@]} > 0 )); then
+		summary+=$'\n\nSkipped:'
+		for key in "${skipped_list[@]}"; do
+			summary+=$'\n'"- ${key}"
+		done
+	fi
+
+	if (( ${#failure_list[@]} > 0 )); then
+		summary+=$'\n\nFailed:'
+		for key in "${failure_list[@]}"; do
+			summary+=$'\n'"- ${key}"
+		done
+		zenity --warning --title "${PUBLICATION}" --width 860 --height 620 --text "${summary}"
+	else
+		zenity --info --title "${PUBLICATION}" --width 860 --height 620 --text "${summary}"
+	fi
+
+	return "${rc}"
+}
+
+main() {
+	local selection
+	local menu_rc
+
+	if ! load_rtd_library; then
+		echo "Failed to load _rtd_library." >&2
+		exit 1
+	fi
+
+	if ! dependency::os_linux; then
+		write_error "This module is intended for Linux systems only."
+		exit 1
+	fi
+
+	if [[ "${UID}" -eq 0 ]]; then
+		write_error "Run this tool as the desktop user, not as root."
+		exit 1
+	fi
+
+	if ! dependency::desktop gnome; then
+		if command -v zenity >/dev/null 2>&1; then
+			zenity --error --title "${PUBLICATION}" --text "GNOME desktop session not detected."
+		else
+			write_error "GNOME desktop session not detected."
+		fi
+		exit 1
+	fi
+
+	command -v zenity >/dev/null 2>&1 || software::check_native_package_dependency zenity || exit 1
+	command -v gsettings >/dev/null 2>&1 || {
+		zenity --error --title "${PUBLICATION}" --text "Required command missing: gsettings"
+		exit 1
+	}
+
+	initialize_menu_state
+
+	while true; do
+		selection="$(show_gtk_menu 2>/dev/null)"
+		menu_rc=$?
+
+		case "${menu_rc}" in
+		0)
+			capture_menu_selection "${selection}"
+			run_selected_tweaks
+			sync_menu_state_from_selection
+			;;
+		*)
+			exit 0
+			;;
+		esac
+	done
+}
+
+main "$@"
