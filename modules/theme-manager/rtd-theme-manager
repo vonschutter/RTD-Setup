@@ -1,10 +1,27 @@
 #!/usr/bin/env bash
 #
-# RTD GNOME Theme Manager (simple GUI)
-# Lists themes found in ~/.themes and /usr/share/themes, lets the user pick one,
-# and applies GTK 3/4 + GNOME Shell theme plus an optional wallpaper.
-#
-# Requirements: gsettings, zenity, gnome-extensions (optional for enabling shell theme)
+#::                                       A D M I N   T O O L
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:::::::::::::::::::::::::::::::::::::::// RTD GNOME Theme Manager //::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Author(s):    RTD
+#:: Version:      1.00
+#::
+#:: Purpose:      Discover available GNOME themes, let the user choose one, and
+#::               apply GTK, Shell, icon, cursor, and optional wallpaper changes.
+#::
+#:: Value:        Simplifies theme switching and reduces the manual GNOME and
+#::               extension setup usually required to fully apply a desktop theme.
+#::
+#:: Usage:        Run without arguments to launch the selector GUI, or use
+#::               --help to show the built-in help dialog.
+#::
+#:: Examples:
+#::               rtd-theme-manager
+#::               rtd-theme-manager --help
+#::
+#:: Requirements: gsettings, zenity, gnome-extensions
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 set -euo pipefail
 
@@ -26,17 +43,6 @@ find_themes() {
 
 	# Keep unique names in order
 	printf '%s\n' "${themes[@]}" | awk '!seen[$0]++'
-}
-
-find_wallpapers() {
-	local -a roots=(
-		"$HOME/.themes"
-		"$HOME/Pictures/Wallpapers"
-		"$HOME/Pictures"
-	)
-	while IFS= read -r -d '' img; do
-		printf '%s\n' "$img"
-	done < <(find "${roots[@]}" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) -print0 2>/dev/null | sort -z)
 }
 
 theme_path() {

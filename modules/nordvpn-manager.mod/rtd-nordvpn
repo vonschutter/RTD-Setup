@@ -10,6 +10,16 @@ RTD_Version="1.00"
 #::	Purpose: 	- The purpose of the script is to setup nordvpn if required, display a list of countries,and connect.
 #::		 	- You must setup an account with the VPN vendor to use the service.
 #::
+#::	Value: 	- Useful for quickly installing NordVPN and connecting to a target
+#::		  country from a menu-driven flow instead of using the vendor CLI directly.
+#::
+#::	Usage: 	- Run the script, allow it to install NordVPN if needed, then
+#::		  choose the destination country from the menu.
+#::
+#::	Examples:
+#::		  rtd-nordvpn
+#::		  sudo rtd-nordvpn
+#::
 #::	Dependencies: 	None required up front. You must be running linux that uses either the RPM or DEB package
 #::	 		managment software for the automatic software install to work as well as dialog or whiptial for menus.
 #::
@@ -240,6 +250,16 @@ run_nordvpn() {
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+	cat <<EOF
+Usage:
+  $(basename "$0") [--help|-h]
+
+Description:
+  Install NordVPN if needed and open the country-selection flow for connecting.
+EOF
+	exit 0
+fi
 
 check_menu_availability
 check_if_first_run

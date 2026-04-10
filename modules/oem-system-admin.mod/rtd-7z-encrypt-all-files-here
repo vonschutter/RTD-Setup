@@ -86,24 +86,74 @@ Script_Documentation
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-dependency_library ()
-{
-	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/${LIBFILE}
+rtd::bootstrap_library() {
+	local library_name="${1:-_rtd_library}"
+	local minimum_version="${2:-}"
+	local loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
+	local script_dir path src_url tmp
 
-	# Try to source the library from relative path, ~/bin, and finally from the /opt directory.
-	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/${LIBFILE} ; then
-		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/${LIBFILE}
-	elif source "$(find ${HOME}/bin -name ${LIBFILE} |grep -v bakup )" ; then
-		write_information "${FUNCNAME[0]} 1 Using:  $(find ${HOME}/bin -name ${LIBFILE} |grep -v bakup )"
-	elif source $(find /opt -name ${LIBFILE} |grep -v bakup ) ; then
-		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name ${LIBFILE} |grep -v bakup )"
-	elif wget ${_src_url} ; then
-                write_information "${FUNCNAME[0]} 4 Using: ${_src_url}"
-		source ./${LIBFILE}
+	if [[ "$library_name" == "_rtd_library" && -n "$loaded_version" ]]; then
+		if [[ -z "$minimum_version" ]] || [[ "$(printf '%s\n%s\n' "$minimum_version" "$loaded_version" | sort -V | tail -n 1)" == "$loaded_version" ]]; then
+			return 0
+		fi
+	fi
+
+	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	for path in \
+		"${script_dir}/${library_name}" \
+		"${script_dir}/../core/${library_name}" \
+		"${script_dir}/../../core/${library_name}" \
+		"/opt/${_TLA:-${_tla:-rtd}}/core/${library_name}" \
+		"/opt/rtd/core/${library_name}" \
+		"${HOME:-}/GIT/RTD-Setup/core/${library_name}" \
+		"${HOME:-}/RTD-Setup/core/${library_name}"; do
+		if [[ -r "$path" ]]; then
+			# shellcheck source=/dev/null
+			source "$path" ""
+			return $?
+		fi
+	done
+
+	src_url="https://github.com/${_GIT_PROFILE:-${GIT_Profile:-vonschutter}}/RTD-Setup/raw/main/core/${library_name}"
+	tmp="$(mktemp "/tmp/${library_name}.XXXXXX" 2>/dev/null || echo "/tmp/${library_name}.$$")"
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL "$src_url" -o "$tmp" || return 1
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO "$tmp" "$src_url" || return 1
 	else
-		echo -e "RTD functions NOT found!"
 		return 1
 	fi
+
+	# shellcheck source=/dev/null
+	source "$tmp" ""
+	local rc=$?
+	rm -f "$tmp"
+	return $rc
+}
+
+local_help() {
+	cat <<EOF
+Usage:
+  $(basename "$0") [--noprompt] [--help|-h]
+
+Description:
+  Compress each non-hidden file and folder in the current directory into its own
+  encrypted .7z archive. Existing .7z files are skipped.
+
+Behavior:
+  - Prompts for a passphrase before compression starts
+  - Uses the shared RTD compression logic from _rtd_library
+  - Runs compression in parallel where useful
+  - Stores already-compressed media and archive formats without recompressing them
+  - Displays the total compression time in the result output
+  - --noprompt skips the initial confirmation prompt and prints the result to stdout
+
+Examples:
+  cd /path/to/folder
+  $(basename "$0")
+  $(basename "$0") --noprompt
+  $(basename "$0") --help
+EOF
 }
 
 
@@ -114,8 +164,13 @@ dependency_library ()
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
+if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+	local_help
+	exit 0
+fi
+
 # Ensure access to the rtd library functions:
-dependency_library || { echo "Library not found!" ; exit 1 ; }
+rtd::bootstrap_library "_rtd_library" || { echo "Failed to load _rtd_library"; exit 1; }
 
 # Call compression function with encryption option; function will prompt for pasphrase...
-tool::compress_all_items_here --encrypt || { write_error -e "Compression failed!"; exit 1; }
+tool::compress_all_items_here --encrypt "$@" || { write_error -e "Compression failed!"; exit 1; }

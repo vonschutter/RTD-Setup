@@ -31,42 +31,42 @@ HAVE_DIALOG=0
 declare -a APP_SOURCES=()
 declare -a SETUP_ARGS=()
 
-dependency::_rtd_library() {
-	local script_dir lib tmp src_url
+	rtd::bootstrap_library() {
+	local library_name="${1:-_rtd_library}"
+	local minimum_version="${2:-}"
+	local loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
+	local script_dir path src_url tmp
 
-	script_dir="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
-	src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/_rtd_library"
-
-	for lib in \
-		"$script_dir/../../core/_rtd_library" \
-		"$script_dir/../core/_rtd_library" \
-		"/opt/${_TLA:-rtd}/core/_rtd_library" \
-		"/opt/rtd/core/_rtd_library"; do
-		if [[ -r "$lib" ]]; then
-			# shellcheck source=/dev/null
-			if source "$lib"; then
-				write_information "Using RTD library: $lib"
-				return 0
-			fi
-		fi
-	done
-
-	lib="$(find /opt -name _rtd_library 2>/dev/null | head -n 1)"
-	if [[ -n "$lib" ]]; then
-		# shellcheck source=/dev/null
-		if source "$lib"; then
-			write_information "Using RTD library: $lib"
+	if [[ "$library_name" == "_rtd_library" && -n "$loaded_version" ]]; then
+		if [[ -z "$minimum_version" ]] || [[ "$(printf '%s\n%s\n' "$minimum_version" "$loaded_version" | sort -V | tail -n 1)" == "$loaded_version" ]]; then
 			return 0
 		fi
 	fi
 
-	tmp="$(mktemp /tmp/_rtd_library.XXXXXX 2>/dev/null || echo /tmp/_rtd_library.$$)"
+	script_dir="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+	for path in \
+		"$script_dir/$library_name" \
+		"$script_dir/../core/$library_name" \
+		"$script_dir/../../core/$library_name" \
+		"/opt/${_TLA:-rtd}/core/$library_name" \
+		"/opt/rtd/core/$library_name" \
+		"${HOME:-}/GIT/RTD-Setup/core/$library_name" \
+		"${HOME:-}/RTD-Setup/core/$library_name"; do
+		if [[ -r "$path" ]]; then
+			# shellcheck source=/dev/null
+			source "$path" ""
+			return $?
+		fi
+	done
+
+	src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/$library_name"
+	tmp="$(mktemp "/tmp/${library_name}.XXXXXX" 2>/dev/null || echo "/tmp/${library_name}.$$")"
 	if curl -fsSL "$src_url" -o "$tmp" || wget -q -O "$tmp" "$src_url"; then
 		# shellcheck source=/dev/null
-		if source "$tmp"; then
-			write_information "Using downloaded RTD library from $src_url"
-			return 0
-		fi
+		source "$tmp" ""
+		local rc=$?
+		rm -f "$tmp"
+		return $rc
 	fi
 
 	echo "RTD functions NOT found!" >&2
@@ -430,7 +430,10 @@ main() {
 	local confirm_message
 	local status
 
-	dependency::_rtd_library || exit 1
+	rtd::bootstrap_library "_rtd_library" || {
+		echo "Failed to load _rtd_library"
+		exit 1
+	}
 	init_logging || exit 1
 	trap 'trace "script exit status=$?"' EXIT
 	parse_args "$@" || {

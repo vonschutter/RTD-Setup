@@ -8,6 +8,16 @@
 #::
 #:: Purpose: The purpose of the script is to perform management tasks on Linux systems
 #::
+#:: Value:   Useful for standing up or managing a Minecraft server environment
+#::          with less manual setup, especially on Debian- or Ubuntu-based hosts.
+#::
+#:: Usage:   Run the script on the server host and follow the task flow for
+#::          dependency installation, setup, or server management operations.
+#::
+#:: Examples:
+#::          rtd-minecraft-server
+#::          sudo rtd-minecraft-server
+#::
 #:: This is a script that will start Minecraft Server on an Ubuntu or Debian (Ubuntu) based server. It will start
 #:: multiple panes using "byobu", and start the server etc there...
 #::
@@ -414,6 +424,20 @@ filetowrite.txt () {
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+	cat <<EOF
+Usage:
+  $(basename "$0") [update] [--help|-h]
+
+Description:
+  Set up and launch the RTD Minecraft server management environment.
+
+Options:
+  update    Prompt to download the latest Minecraft server release before launch
+EOF
+	exit 0
+fi
+
 # Check that the software components of this script are available.
 # iff they are not, attempt to install them.
 for i in byobu speedometer htop python3 dialog
@@ -442,6 +466,4 @@ check_java
 # Start the server and monitor the server performance
 find_active_network_interface
 run_minecraft_server_manager
-
-
 

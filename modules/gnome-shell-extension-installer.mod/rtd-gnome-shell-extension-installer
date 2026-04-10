@@ -1,4 +1,28 @@
 #!/bin/bash
+#
+#::                                   A D M I N   C O M M A N D
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::// GNOME Extension Installer //::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Author(s):    Ian Brunelli, integrated by RTD
+#:: Version:      1.6.2
+#::
+#:: Purpose:      Search, download, install, update, and optionally enable
+#::               GNOME Shell extensions from the terminal.
+#::
+#:: Value:        Useful when a workstation needs repeatable extension setup
+#::               without relying on a browser workflow or manual ZIP handling.
+#::
+#:: Usage:        Run with one or more extension IDs, or use --search for an
+#::               interactive search-driven install flow.
+#::
+#:: Examples:
+#::               rtd-gnome-shell-extension-installer 307
+#::               rtd-gnome-shell-extension-installer -s "User Themes"
+#::               rtd-gnome-shell-extension-installer 19 --yes
+#::
+#:: Note:         The original upstream header and license are preserved below.
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
    #################################################################
    #                                                               #
@@ -105,19 +129,34 @@ download_version() {
 
 check_version_availability() {
   unset SELECTED_VERSION
+  local TARGET_MINOR="" LATEST_MINOR=""
+  local TARGET_MAJOR="${1%%.*}"
+  local LATEST_MAJOR="${EXTENSION_VERSIONS[0]%%.*}"
   for VERSION in ${EXTENSION_VERSIONS[@]}; do
     [ "$1" == "$VERSION" ] &&
     SELECTED_VERSION="$1"
   done
   [[ ! $SELECTED_VERSION ]] &&
-  { TARGET=$( sed -n "s/^3\.\([0-9]\+\).*$/\1/p" <<< "$1" )
-    LATEST=$( sed -n "s/^3\.\([0-9]\+\).*$/\1/p" <<< "${EXTENSION_VERSIONS[0]}" )
-    [[ ${1%%\.*} == ${EXTENSION_VERSIONS[0]%%\.*} ]] &&
-    [[ $TARGET -gt $LATEST ]] &&
-    [[ $LATEST -gt 20 ]] &&
-    SELECTED_VERSION="${EXTENSION_VERSIONS[0]}" &&
+  {
+    if [[ "$TARGET_MAJOR" == "3" && "$LATEST_MAJOR" == "3" ]]; then
+      TARGET_MINOR=$( sed -n "s/^3\.\([0-9]\+\).*$/\1/p" <<< "$1" )
+      LATEST_MINOR=$( sed -n "s/^3\.\([0-9]\+\).*$/\1/p" <<< "${EXTENSION_VERSIONS[0]}" )
+      [[ -n $TARGET_MINOR ]] &&
+      [[ -n $LATEST_MINOR ]] &&
+      [[ $TARGET_MINOR -gt $LATEST_MINOR ]] &&
+      SELECTED_VERSION="${EXTENSION_VERSIONS[0]}"
+    elif [[ $TARGET_MAJOR =~ ^[0-9]+$ ]] &&
+         [[ $LATEST_MAJOR =~ ^[0-9]+$ ]] &&
+         [[ $TARGET_MAJOR -ge 40 ]] &&
+         [[ $LATEST_MAJOR -ge 40 ]] &&
+         [[ $TARGET_MAJOR -gt $LATEST_MAJOR ]]; then
+      SELECTED_VERSION="${EXTENSION_VERSIONS[0]}"
+    fi
+
+    [[ $SELECTED_VERSION ]] &&
     [[ ! $UPDATE_MODE ]] &&
-    echo -e "\e[0;33mWARNING\e[0m: Extension not available for GNOME Shell $1, using $SELECTED_VERSION instead" >&2; }
+    echo -e "\e[0;33mWARNING\e[0m: Extension not available for GNOME Shell $1, using $SELECTED_VERSION instead" >&2
+  }
 }
 
 select_version() {
@@ -314,7 +353,7 @@ interactive_search() {
       done
     elif [[ $COMMAND =~ ^c( )*[0-9]+$ ]]; then
       if [[ ${COMMAND:1} -lt $TOTAL ]]; then
-        command -v gnome-shell > /dev/null ||
+        command -v perl > /dev/null ||
         { echo -e "\e[0;31mERROR\e[0m: Comments can't be parsed, perl is not installed." >&2
           continue; }
         extract_info "${EXTENSIONS_QUERY[${COMMAND:1}]}"
@@ -445,6 +484,14 @@ get_extension() {
     install_version
 }
 
+SCRIPT_NAME=$( basename "$0" )
+for ARG in "$@"; do
+  if [[ "$ARG" =~ ^-(h|-help)$ ]]; then
+    usage_guide
+    exit 0
+  fi
+done
+
 for CMD in curl dbus-send
 do
     command -v "$CMD" > /dev/null ||
@@ -470,7 +517,6 @@ INSTALL="install" ||
 { INSTALL="download"
   echo -e "\e[0;33mWARNING\e[0m: Install is not available" >&2; }
 [[ -w "/tmp" ]] && TMP_DIR="/tmp" || TMP_DIR="."
-SCRIPT_NAME=$( basename "$0" )
 RESTART=0
 PAGES=-1
 TOTAL=-1

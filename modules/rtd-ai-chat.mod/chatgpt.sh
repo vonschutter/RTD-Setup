@@ -1,4 +1,28 @@
 #!/bin/bash
+#
+#::                                       A D M I N   T O O L
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:::::::::::::::::::::::::::::::::::::::// RTD OpenAI Chat CLI //:::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Author(s):    Upstream chatGPT-shell-cli, integrated by RTD
+#:: Version:      Upstream bundled script
+#::
+#:: Purpose:      Provide an interactive OpenAI CLI for chat, command generation,
+#::               model inspection, and image generation from a terminal session.
+#::
+#:: Value:        Useful when a fast terminal-first AI assistant is preferred
+#::               over a browser workflow, especially for shell tasks, quick
+#::               drafting, or API-backed prompt experiments.
+#::
+#:: Usage:        Requires OPENAI_KEY to be set in the environment before use.
+#::               Run with no arguments for chat mode, or use prompt/model/image
+#::               options directly from the CLI.
+#::
+#:: Examples:
+#::               export OPENAI_KEY=YOUR_KEY_HERE
+#::               chatgpt.sh --prompt "Explain journald rate limiting"
+#::               chatgpt.sh --list
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 GLOBIGNORE="*"
 

@@ -271,6 +271,17 @@ oem_linux_config ()
 	fi
 }
 
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+	cat <<EOF
+Usage:
+  $(basename "$0") [--help|-h]
+
+Description:
+  Run the RTD OEM Linux configuration and software setup workflow.
+EOF
+	exit 0
+fi
+
 oem_linux_config $zstatus
 
 exit

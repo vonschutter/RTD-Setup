@@ -1,8 +1,27 @@
 #!/bin/bash
 #
-# RTD OEM GNOME Tweaks
-# Presents a GTK checklist (zenity) to apply selected GNOME tweak functions
-# from the RTD library.
+#::                                       A D M I N   T O O L
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:::::::::::::::::::::::::::::::::::::::// RTD OEM GNOME Tweaks //::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Author(s):    RTD
+#:: Version:      1.11
+#::
+#:: Purpose:      Apply a curated set of GNOME desktop tweaks from the RTD library
+#::               through a checklist-style GUI.
+#::
+#:: Value:        Makes it faster to bring a workstation to a known-good OEM
+#::               desktop state without manually changing many GNOME settings.
+#::               This is especially useful when preparing new systems or
+#::               reapplying a standard desktop configuration after reinstall.
+#::
+#:: Usage:        Run the script with no arguments to open the tweak selector.
+#::               Choose one or more actions, then apply them from the menu.
+#::
+#:: Examples:
+#::               rtd-oem-tweaks
+#::               sudo rtd-oem-tweaks
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 VERSION="1.11"
 PUBLICATION="RTD OEM Tweaks"
@@ -54,38 +73,49 @@ declare -A MENU_TEXT=(
 	["startup_on"]="Enable GNOME startup sound from a selected file"
 	["startup_off"]="Disable GNOME startup sound"
 )
-load_rtd_library() {
-	local script_dir
-	local src_url
-	local -a candidates
-	local candidate
+rtd::bootstrap_library() {
+	local library_name="${1:-_rtd_library}"
+	local minimum_version="${2:-}"
+	local loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
+	local script_dir path src_url tmp
 
-	script_dir="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
-	src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/_rtd_library"
-
-	candidates=(
-		"${script_dir}/../../core/_rtd_library"
-		"${script_dir}/../core/_rtd_library"
-		"$(find /opt -name _rtd_library 2>/dev/null | grep -v bakup | head -n1)"
-	)
-
-	for candidate in "${candidates[@]}"; do
-		[[ -z "${candidate}" ]] && continue
-		if [[ -f "${candidate}" ]]; then
-			# shellcheck source=/dev/null
-			source "${candidate}" && return 0
-		fi
-	done
-
-	local remote_library
-	remote_library="$(curl -fsSL "${src_url}" 2>/dev/null || true)"
-	if [[ -n "${remote_library}" ]]; then
-		if source /dev/stdin <<<"${remote_library}"; then
+	if [[ "$library_name" == "_rtd_library" && -n "$loaded_version" ]]; then
+		if [[ -z "$minimum_version" ]] || [[ "$(printf '%s\n%s\n' "$minimum_version" "$loaded_version" | sort -V | tail -n 1)" == "$loaded_version" ]]; then
 			return 0
 		fi
 	fi
 
-	return 1
+	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	for path in \
+		"${script_dir}/${library_name}" \
+		"${script_dir}/../core/${library_name}" \
+		"${script_dir}/../../core/${library_name}" \
+		"/opt/${_TLA:-${_tla:-rtd}}/core/${library_name}" \
+		"/opt/rtd/core/${library_name}" \
+		"${HOME:-}/GIT/RTD-Setup/core/${library_name}" \
+		"${HOME:-}/RTD-Setup/core/${library_name}"; do
+		if [[ -r "$path" ]]; then
+			# shellcheck source=/dev/null
+			source "$path" ""
+			return $?
+		fi
+	done
+
+	src_url="https://github.com/${_GIT_PROFILE:-${GIT_Profile:-vonschutter}}/RTD-Setup/raw/main/core/${library_name}"
+	tmp="$(mktemp "/tmp/${library_name}.XXXXXX" 2>/dev/null || echo "/tmp/${library_name}.$$")"
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL "$src_url" -o "$tmp" || return 1
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO "$tmp" "$src_url" || return 1
+	else
+		return 1
+	fi
+
+	# shellcheck source=/dev/null
+	source "$tmp" ""
+	local rc=$?
+	rm -f "$tmp"
+	return $rc
 }
 
 checkbox_state() {
@@ -102,10 +132,6 @@ gtk4_settings_file() {
 
 startup_sound_autostart_file() {
 	printf '%s\n' "${XDG_CONFIG_HOME:-${HOME}/.config}/autostart/rtd-startup-sound.desktop"
-}
-
-startup_sound_state_file() {
-	printf '%s\n' "${XDG_CONFIG_HOME:-${HOME}/.config}/rtd/startup-sound.state"
 }
 
 gsettings_value_is() {
@@ -287,24 +313,6 @@ startup_sound_enabled() {
 	autostart_file="$(startup_sound_autostart_file)"
 	[[ -f "${autostart_file}" ]] || return 1
 	gsettings_value_is org.gnome.desktop.sound event-sounds "true"
-}
-
-startup_sound_source_matches() {
-	local requested_file="$1"
-	local state_file source_path requested_realpath
-
-	state_file="$(startup_sound_state_file)"
-	[[ -f "${state_file}" ]] || return 1
-
-	requested_realpath="${requested_file}"
-	if command -v realpath >/dev/null 2>&1; then
-		requested_realpath="$(realpath -m "${requested_file}" 2>/dev/null || printf '%s' "${requested_file}")"
-	elif command -v readlink >/dev/null 2>&1; then
-		requested_realpath="$(readlink -f "${requested_file}" 2>/dev/null || printf '%s' "${requested_file}")"
-	fi
-
-	source_path="$(grep '^SOURCE_PATH=' "${state_file}" 2>/dev/null | tail -n1 | cut -d= -f2- | sed 's/^"//; s/"$//')"
-	[[ -n "${source_path}" && "${source_path}" == "${requested_realpath}" ]]
 }
 
 overlay_folder_matches() {
@@ -905,7 +913,18 @@ main() {
 	local selection
 	local menu_rc
 
-	if ! load_rtd_library; then
+	if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+		cat <<EOF
+Usage:
+  $(basename "$0") [--help|-h]
+
+Description:
+  Open the RTD OEM GNOME tweaks selector and apply one or more desktop tweaks.
+EOF
+		exit 0
+	fi
+
+	if ! rtd::bootstrap_library "_rtd_library"; then
 		echo "Failed to load _rtd_library." >&2
 		exit 1
 	fi

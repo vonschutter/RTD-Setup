@@ -86,6 +86,20 @@ system::ensure_directory_exists "$_LOG_DIR" || exit 1 # Exit if log dir can't be
 system::ensure_directory_exists "$_CONFIG_DIR" || exit 1
 
 main() {
+	if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+		cat <<EOF
+Usage:
+  $(basename "$0") [--help|-h]
+
+Description:
+  Enable the RTD OEM post-build configuration flow on the current Linux system.
+
+Notes:
+  This script is intended to run as root during OEM setup.
+EOF
+		exit 0
+	fi
+
 	# --- OEM Auto-Configuration Tasks (Relying on Library Functions) ---
 
 	write_status "🚀 Preparing system for automated OEM post-build tasks..."

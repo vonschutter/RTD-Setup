@@ -13,6 +13,17 @@ VERSION="1.00"
 #::	Purpose: The purpose of the script is to backup a users setings
 #::              and dokuments to some useful location.
 #::
+#::	Value: Useful when preserving user-specific desktop settings, credentials,
+#::	       documents, and related profile data before reinstall, migration,
+#::	       repair work, or major system changes.
+#::
+#::	Usage: Run the script and follow the prompts to choose what should be
+#::	       backed up and where the resulting archive set should be written.
+#::
+#::	Examples:
+#::	       rtd-oem-backup-linux-config
+#::	       sudo rtd-oem-backup-linux-config
+#::
 #:: This system configuration and installation script was originally developed
 #:: for RuntimeData, a small OEM in Buffalo Center, IA.
 #::
@@ -69,30 +80,50 @@ option_14="Backup All Virtual Machines (KVM)"
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-check_rtd_library ()
-{
-	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+rtd::bootstrap_library() {
+	local library_name="${1:-_rtd_library}"
+	local minimum_version="${2:-}"
+	local loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
+	local script_dir path src_url tmp
 
-	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
-		# Library found in relative path...
-		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library
-	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
-		# Library not found in relative path: search the typical location...
-		write_information "${FUNCNAME[0]} 2 Using: $(find /opt -name _rtd_library |grep -v bakup )"
-	elif wget ${_src_url} ; then
-		# Critical failure: downloaded copy from github.com
-		source ./_rtd_library
-	else
-		# Abot condition: No mitigation steps worked.
-		echo -e "RTD functions NOT loaded!"
-		echo -e " "
-		echo -e "Cannot ensure that the correct functionality is available"
-		echo -e "Quiting rather than cause potential damage..."
-		exit 1
+	if [[ "$library_name" == "_rtd_library" && -n "$loaded_version" ]]; then
+		if [[ -z "$minimum_version" ]] || [[ "$(printf '%s\n%s\n' "$minimum_version" "$loaded_version" | sort -V | tail -n 1)" == "$loaded_version" ]]; then
+			return 0
+		fi
 	fi
+
+	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	for path in \
+		"${script_dir}/${library_name}" \
+		"${script_dir}/../core/${library_name}" \
+		"${script_dir}/../../core/${library_name}" \
+		"/opt/${_TLA:-${_tla:-rtd}}/core/${library_name}" \
+		"/opt/rtd/core/${library_name}" \
+		"${HOME:-}/GIT/RTD-Setup/core/${library_name}" \
+		"${HOME:-}/RTD-Setup/core/${library_name}"; do
+		if [[ -r "$path" ]]; then
+			# shellcheck source=/dev/null
+			source "$path" ""
+			return $?
+		fi
+	done
+
+	src_url="https://github.com/${_GIT_PROFILE:-${GIT_Profile:-vonschutter}}/RTD-Setup/raw/main/core/${library_name}"
+	tmp="$(mktemp "/tmp/${library_name}.XXXXXX" 2>/dev/null || echo "/tmp/${library_name}.$$")"
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL "$src_url" -o "$tmp" || return 1
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO "$tmp" "$src_url" || return 1
+	else
+		return 1
+	fi
+
+	# shellcheck source=/dev/null
+	source "$tmp" ""
+	local rc=$?
+	rm -f "$tmp"
+	return $rc
 }
-
-
 
 
 # Function to request an encryption phrase.
@@ -258,8 +289,19 @@ do_instructions_from_choices (){
 
 # "dialog" will be used to request interactive configuration...
 # Ensure that it is available:
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+	cat <<EOF
+Usage:
+  $(basename "$0") [--help|-h]
+
+Description:
+  Open the RTD Linux configuration backup workflow and guide you through the backup selections.
+EOF
+	exit 0
+fi
+
 trap "passtoken=nonsense" 0 1 2 5 15
-check_rtd_library
+rtd::bootstrap_library "_rtd_library" || { echo "Failed to load _rtd_library"; exit 1; }
 rtd_oem_user_backup_info_notice
 zenity_ask_for_encryption_pass_phrase
 zenity_show_list_of_user_backup_choices
@@ -276,39 +318,6 @@ rtd_oem_user_backup_info_notice_complete
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 rtd_oem_cleanup
 exit
-
-
-
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          deprecated...                   ::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-
-function fallback_show_list_of_user_backup_choices () {
-	check_rtd_library
-        software::check_native_package_dependency whiptail
-        cmd=(whiptail --separate-output --backtitle "$BACKTITLE" --title "What to backup" --checklist "Please Select what you want to backup below:" 22 85 18 )
-        optionlist=( 1 "Gnome Setings" ON
-                     2 "Gnome Credentials Manager" ON
-                     3 "Remmina Configuration" ON
-                     4 "Users Private Themes" ON
-                     5 "Users Private Icons" ON
-                     6 "Users Private Fonts " ON
-                     7 "Users Private Documents" ON
-                     8 "Users Private Pictures" ON
-                     9 "Firefox Settings" ON
-                     10 "Chrome Settings"  ON
-                     11 "VirtualBox VM's (may be really large files and take time)" ON
-                     12 "Teamviewer Configuration" ON
-		     12 "Entire HOME Folder" ON
-                     )
-}
-
-
-
-
 
 
 

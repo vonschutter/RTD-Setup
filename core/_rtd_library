@@ -5,7 +5,12 @@ if [[ -z "${BASH_VERSINFO[0]:-}" ]]; then
 	echo "SHELL ENV ERROR: You must use a BASH Shell to load this library. Exiting..."
 	exit 255
 fi
-export RTD_VERSION="2.54"
+_RTD_LIBRARY_SELF_VERSION="2.54"
+if [[ -n "${RTDFUNCTIONS:-}" && "${RTDFUNCTIONS}" == "${_RTD_LIBRARY_SELF_VERSION}" ]]; then
+	return 0 2>/dev/null || exit 0
+fi
+export RTD_VERSION="${_RTD_LIBRARY_SELF_VERSION}"
+unset _RTD_LIBRARY_SELF_VERSION
 : <<'Library_Documentation'
 ::              R T D   F u n c t i o n   L i b r a r y
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -98,404 +103,404 @@ function.
 	Functions defined in this library:
 
 global:
-1  add_gnome3_favorite_app                                       ;           Function to add a new favorite app to the gnome favorites bar.
-2  announce.py                                                   ;           Write out the Minecraft LAN announce helper (announce.py) into the target directory.
-3  create_physical_media_from_iso                                ;           Function to automatically write ISO (virtual DVD/CD/BlueRay) to a thumb drive. No argumenst are
-4  display_gui                                                   ;           Displays a GUI dialog box with the given message.
-5  display_software_installation_choices_gtk                     ;           Function to display the software install otions. All software option are listed in.
-6  eula.txt                                                      ;           Write out an accepted Minecraft eula.txt into the target directory.
-7  InstallSoftwareFromRepo                                       ;           Function to simplify the installation of software by including all display and
-8  main                                                          ;           Entry point when running the library as a script.
-9  rtd_oem_turn_on_gui_network_management                        ;           Function to set NetworkManager by default to manage networking.
-10  rtd_oem_ubuntu_auto_install_iso_builder                      ;           Legacy entrypoint; use the OEM task implementation.
-11  rtd_server_setup_choices_productivity                        ;           Function to display terminal software installation options. This will install
-12  rtd_server_setup_choices_services                            ;           Function to display server installation options. This will install software that is usefull
-13  server.properties                                            ;           Write out a default Minecraft server.properties file into the target directory.
-14  start.sh                                                     ;           Write out the Minecraft server start script (start.sh) into the target directory.
-15  write_error                                                  ;           is a simplified and consistent way to write output to the screen.
-16  write_host                                                   ;           This is a simplified and consistent way to write output to the screen.
-17  write_information                                            ;           This is a simplified and consistent way to write output to the screen.
-18  write_status                                                 ;           This is a simplified and consistent way to write output to the screen.
-19  write_warning                                                ;           This is a simplified and consistent way to write output to the screen.
+1    add_gnome3_favorite_app                                     ;           Function to add a new favorite app to the gnome favorites bar.
+2    announce.py                                                 ;           Write out the Minecraft LAN announce helper (announce.py) into the target directory.
+3    create_physical_media_from_iso                              ;           Function to automatically write ISO (virtual DVD/CD/BlueRay) to a thumb drive. No argumenst are
+4    display_gui                                                 ;           Displays a GUI dialog box with the given message.
+5    display_software_installation_choices_gtk                   ;           Function to display the software install otions. All software option are listed in.
+6    eula.txt                                                    ;           Write out an accepted Minecraft eula.txt into the target directory.
+7    InstallSoftwareFromRepo                                     ;           Function to simplify the installation of software by including all display and
+8    main                                                        ;           Entry point when running the library as a script.
+9    rtd_oem_turn_on_gui_network_management                      ;           Function to set NetworkManager by default to manage networking.
+10   rtd_oem_ubuntu_auto_install_iso_builder                     ;           Legacy entrypoint; use the OEM task implementation.
+11   rtd_server_setup_choices_productivity                       ;           Function to display terminal software installation options. This will install
+12   rtd_server_setup_choices_services                           ;           Function to display server installation options. This will install software that is usefull
+13   server.properties                                           ;           Write out a default Minecraft server.properties file into the target directory.
+14   start.sh                                                    ;           Write out the Minecraft server start script (start.sh) into the target directory.
+15   write_error                                                 ;           is a simplified and consistent way to write output to the screen.
+16   write_host                                                  ;           This is a simplified and consistent way to write output to the screen.
+17   write_information                                           ;           This is a simplified and consistent way to write output to the screen.
+18   write_status                                                ;           This is a simplified and consistent way to write output to the screen.
+19   write_warning                                               ;           This is a simplified and consistent way to write output to the screen.
 
 dependency:
-20  dependency::check_hardware_virtualization_support            ;           Checks if the hardware supports virtualization (VT-x or AMD-V).
-21  dependency::check_if_running_in_vm                           ;           Checks if the system is running inside a virtual machine.
-22  dependency::command_exists                                   ;           Checks if specified commands exist on the system and installs missing ones.
-23  dependency::desktop                                          ;           Identifies the currently running desktop environment.
-24  dependency::file                                             ;           Checks for a Bash library or script file and sources it.
-25  dependency::os_linux                                         ;           Checks if the current operating system is Linux.
-26  dependency::search_local                                     ;           This function searches a predetermined set of paths for a given file and sources it if found.
-27  dependency::virtualization                                   ;           Checks for required components for making virtual machines and verifies hardware support for virtualization.
+20   dependency::check_hardware_virtualization_support           ;           Checks if the hardware supports virtualization (VT-x or AMD-V).
+21   dependency::check_if_running_in_vm                          ;           Checks if the system is running inside a virtual machine.
+22   dependency::command_exists                                  ;           Checks if specified commands exist on the system and installs missing ones.
+23   dependency::desktop                                         ;           Identifies the currently running desktop environment.
+24   dependency::file                                            ;           Checks for a Bash library or script file and sources it.
+25   dependency::os_linux                                        ;           Checks if the current operating system is Linux.
+26   dependency::search_local                                    ;           This function searches a predetermined set of paths for a given file and sources it if found.
+27   dependency::virtualization                                  ;           Checks for required components for making virtual machines and verifies hardware support for virtualization.
 
 desktop:
-28  desktop::apply_user_tweaks                                   ;           Dispatch user-facing tweaks depending on the active desktop environment.
-29  desktop::enable_firefox_pip_global                           ;           Ensures Firefox Picture-in-Picture windows stay on top and across workspaces by configuring devilspie2.
+28   desktop::apply_user_tweaks                                  ;           Dispatch user-facing tweaks depending on the active desktop environment.
+29   desktop::enable_firefox_pip_global                          ;           Ensures Firefox Picture-in-Picture windows stay on top and across workspaces by configuring devilspie2.
 
 dialog:
-30  dialog::check_menu_availability                              ;           First discover what menu system is installed. Some systems use "dialog" and
-31  dialog::copy_file_progress                                   ;           Displays a file copy progress dialog.
-32  dialog::copy_with_progress                                   ;           Function to display a progress bar while copying a large file to a destination.
-33  dialog::display_cmd_output                                   ;           Displays the output of a command in a dialog box.
-34  dialog::display_error                                        ;           Displays an error notice using a dialog box.
-35  dialog::display_notice                                       ;           Displays an information notice using a dialog box.
-36  dialog::display_result                                       ;           Displays the contents of the variable "result" in a message box.
-37  dialog::display_summary_message                              ;           Function to read a variable "result" and display its contents. The purpose of this function
-38  dialog::prompt_yes_no                                        ;           Displays a Yes/No prompt using a dialog box.
+30   dialog::check_menu_availability                             ;           First discover what menu system is installed. Some systems use "dialog" and
+31   dialog::copy_file_progress                                  ;           Displays a file copy progress dialog.
+32   dialog::copy_with_progress                                  ;           Function to display a progress bar while copying a large file to a destination.
+33   dialog::display_cmd_output                                  ;           Displays the output of a command in a dialog box.
+34   dialog::display_error                                       ;           Displays an error notice using a dialog box.
+35   dialog::display_notice                                      ;           Displays an information notice using a dialog box.
+36   dialog::display_result                                      ;           Displays the contents of the variable "result" in a message box.
+37   dialog::display_summary_message                             ;           Function to read a variable "result" and display its contents. The purpose of this function
+38   dialog::prompt_yes_no                                       ;           Displays a Yes/No prompt using a dialog box.
 
 disk:
-39  disk::reencrypt_device                                       ;           Securely encrypts an existing unencrypted block device using LUKS.
+39   disk::reencrypt_device                                      ;           Securely encrypts an existing unencrypted block device using LUKS.
 
 fedora:
-40  fedora::get_fedora_netinst_iso_url                           ;           Retrieves the full download URL for the Fedora "Everything" NetInstall ISO
-41  fedora::get_latest_release_version                           ;           Retrieves the latest available Fedora release version from the official Fedora project.
+40   fedora::get_fedora_netinst_iso_url                          ;           Retrieves the full download URL for the Fedora "Everything" NetInstall ISO
+41   fedora::get_latest_release_version                          ;           Retrieves the latest available Fedora release version from the official Fedora project.
 
 github:
-42  github::clone_repo_user                                      ;           Function to CLONE all github.com repositories for a specified user.
-43  github::list_all_user_repositories                           ;           Function to LIST all github.com repositories for a specified user.
+42   github::clone_repo_user                                     ;           Function to CLONE all github.com repositories for a specified user.
+43   github::list_all_user_repositories                          ;           Function to LIST all github.com repositories for a specified user.
 
 gnome:
-44  gnome::_apply_gtk4_theme                                     ;           Write a GTK4 settings.ini with the requested theme/icon and dark
-45  gnome::_apply_terminal_preferences                           ;           Apply consistent GNOME Terminal profile settings across the default
-46  gnome::_reload_shell_theme                                   ;           Request a GNOME Shell reload so theme changes take effect. No-op
-47  gnome::_reset_ui_theme_settings                              ;           Reset GNOME theme-related settings and remove GTK4 overrides to
-48  gnome::configure_dash_to_dock                                ;           Configure Dash-to-Dock with OEM defaults (layout, indicators,
-49  gnome::configure_dash_to_panel                               ;           Configure Dash-to-Panel with OEM defaults including icon sizing
-50  gnome::configure_nautilus                                    ;           Apply Nautilus usability defaults (zoom level, executable prompts,
-51  gnome::ensure_window_buttons_visible                         ;           Force-enable window controls (minimize/maximize/close) and allow
-52  gnome::organize_overlay_menu                                 ;           Organize the GNOME application grid into OEM categories following
-53  gnome::set_basic_extensions_enabled                          ;           - Enables a curated list of GNOME Shell extensions for the current user.
-54  gnome::set_better_font_smoothing_for_user                    ;           Tune GNOME font smoothing (hinting, antialiasing, subpixel order)
-55  gnome::set_better_usability_for_user                         ;           Apply general GNOME usability tweaks (mouse acceleration, volume,
-56  gnome::set_power_configuraton_for_user                       ;           Apply OEM power and interface defaults (sleep, tracker indexer,
-57  gnome::set_startup_sound                                     ;           Configure the GNOME startup sound for the current user by
-58  gnome::set_tilix_ui_tweaks_for_user                          ;           Configure Tilix and GNOME Terminal with OEM defaults and import
-59  gnome::set_ui_common_tweaks_for_user                         ;           Convenience alias that forwards to gnome::set_ui_tweaks_for_user.
-60  gnome::set_ui_corporate_crisp_tweaks_for_user                ;           Apply a clean corporate-inspired GNOME theme (Arc) for the
-61  gnome::set_ui_mac_tweaks_for_user                            ;           Apply a macOS-inspired GNOME theme (WhiteSur) for the current
-62  gnome::set_ui_moca_tweaks_for_user                           ;           Apply an eye-friendly mocha-inspired GNOME theme (Vimix/Flatery)
-63  gnome::set_ui_tweak_no_media_error                           ;           Notify the user that theme assets are missing and optionally
-64  gnome::set_ui_tweaks_for_user                                ;           Apply the core OEM GNOME tweaks for the current desktop user
-65  gnome::set_ui_win10_tweaks_for_user                          ;           Apply a Windows 10-inspired GNOME theme for the current desktop
+44   gnome::_apply_gtk4_theme                                    ;           Write a GTK4 settings.ini with the requested theme/icon and dark
+45   gnome::_apply_terminal_preferences                          ;           Apply consistent GNOME Terminal profile settings across the default
+46   gnome::_reload_shell_theme                                  ;           Request a GNOME Shell reload so theme changes take effect. No-op
+47   gnome::_reset_ui_theme_settings                             ;           Reset GNOME theme-related settings and remove GTK4 overrides to
+48   gnome::configure_dash_to_dock                               ;           Configure Dash-to-Dock with OEM defaults (layout, indicators,
+49   gnome::configure_dash_to_panel                              ;           Configure Dash-to-Panel with OEM defaults including icon sizing
+50   gnome::configure_nautilus                                   ;           Apply Nautilus usability defaults (zoom level, executable prompts,
+51   gnome::ensure_window_buttons_visible                        ;           Force-enable window controls (minimize/maximize/close) and allow
+52   gnome::organize_overlay_menu                                ;           Organize the GNOME application grid into OEM categories following
+53   gnome::set_basic_extensions_enabled                         ;           Enables a curated list of GNOME Shell extensions for the current user.
+54   gnome::set_better_font_smoothing_for_user                   ;           Tune GNOME font smoothing (hinting, antialiasing, subpixel order)
+55   gnome::set_better_usability_for_user                        ;           Apply general GNOME usability tweaks (mouse acceleration, volume,
+56   gnome::set_power_configuraton_for_user                      ;           Apply OEM power and interface defaults (sleep, tracker indexer,
+57   gnome::set_startup_sound                                    ;           Configure the GNOME startup sound for the current user by
+58   gnome::set_tilix_ui_tweaks_for_user                         ;           Configure Tilix and GNOME Terminal with OEM defaults and import
+59   gnome::set_ui_common_tweaks_for_user                        ;           Convenience alias that forwards to gnome::set_ui_tweaks_for_user.
+60   gnome::set_ui_corporate_crisp_tweaks_for_user               ;           Apply a clean corporate-inspired GNOME theme (Arc) for the
+61   gnome::set_ui_mac_tweaks_for_user                           ;           Apply a macOS-inspired GNOME theme (WhiteSur) for the current
+62   gnome::set_ui_moca_tweaks_for_user                          ;           Apply an eye-friendly mocha-inspired GNOME theme (Vimix/Flatery)
+63   gnome::set_ui_tweak_no_media_error                          ;           Notify the user that theme assets are missing and optionally
+64   gnome::set_ui_tweaks_for_user                               ;           Apply the core OEM GNOME tweaks for the current desktop user
+65   gnome::set_ui_win10_tweaks_for_user                         ;           Apply a Windows 10-inspired GNOME theme for the current desktop
 
 kde:
-66  kde::_apply_lnf_cmd                                          ;           Apply lnf cmd.
-67  kde::_kwriteconfig_cmd                                       ;           Return kwriteconfig6 when present, otherwise kwriteconfig5.
-68  kde::_plasma_version_major                                   ;           Plasma version major.
-69  kde::_reload_shell                                           ;           Reload shell.
-70  kde::apply_window_rules                                      ;           Write a minimal kwinrulesrc with sensible defaults (e.g., no borders on maximized windows).
-71  kde::set_color_scheme                                        ;           Apply a KDE color scheme. Non-interactive unless --interactive is set.
-72  kde::set_cursor_theme                                        ;           Apply a cursor theme. Non-interactive unless --interactive is set.
-73  kde::set_global_look_and_feel                                ;           Apply a KDE Plasma Look & Feel package (LNF). Non-interactive by default.
-74  kde::set_icon_theme                                          ;           Apply an icon theme. Non-interactive unless --interactive is set.
-75  kde::set_layout_panel                                        ;           Apply a Plasma layout file (JS/JSON). Non-interactive by default.
-76  kde::set_startup_apps                                        ;           Create or update an autostart entry for the current user.
-77  kde::set_wallpaper                                           ;           Function to set KDE Plasma wallpaper from a script. this function expects one variable
-78  kde::tune_fonts_antialias                                    ;           Set font hinting/subpixel options for KDE.
+66   kde::_apply_lnf_cmd                                         ;           Apply lnf cmd.
+67   kde::_kwriteconfig_cmd                                      ;           Return kwriteconfig6 when present, otherwise kwriteconfig5.
+68   kde::_plasma_version_major                                  ;           Plasma version major.
+69   kde::_reload_shell                                          ;           Reload shell.
+70   kde::apply_window_rules                                     ;           Write a minimal kwinrulesrc with sensible defaults (e.g., no borders on maximized windows).
+71   kde::set_color_scheme                                       ;           Apply a KDE color scheme. Non-interactive unless --interactive is set.
+72   kde::set_cursor_theme                                       ;           Apply a cursor theme. Non-interactive unless --interactive is set.
+73   kde::set_global_look_and_feel                               ;           Apply a KDE Plasma Look & Feel package (LNF). Non-interactive by default.
+74   kde::set_icon_theme                                         ;           Apply an icon theme. Non-interactive unless --interactive is set.
+75   kde::set_layout_panel                                       ;           Apply a Plasma layout file (JS/JSON). Non-interactive by default.
+76   kde::set_startup_apps                                       ;           Create or update an autostart entry for the current user.
+77   kde::set_wallpaper                                          ;           Function to set KDE Plasma wallpaper from a script. this function expects one variable
+78   kde::tune_fonts_antialias                                   ;           Set font hinting/subpixel options for KDE.
 
 kvm:
-79  kvm::backup_all_running_vm                                   ;           This function backs up all running virtual machines on the host system. It checks for necessary components
-80  kvm::cicd::_create_nocloud_iso                               ;           Create a NoCloud ISO from provided user-data and meta-data files.
-81  kvm::cicd::_render_extra_vars                                ;           Render an extra-vars YAML file for ansible-pull based on provided inputs.
-82  kvm::cicd::_render_meta_data                                 ;           Build a minimal NoCloud meta-data file with instance and hostname.
-83  kvm::cicd::_render_user_data                                 ;           Build cloud-init user-data that installs ansible and runs ansible-pull with prepared extra vars.
-84  kvm::cicd::configure_vm_with_ansible_pull                    ;           Create a NoCloud ISO containing ansible-pull instructions and attach it to a VM, then start the VM.
-85  kvm::cleanup_unused_qcow_images                              ;           Removes qcow/qcow2 disk images in /var/lib/libvirt/images (or a supplied directory) that are not
-86  kvm::cleanup_virtual_floppy_images                           ;           Removes virtual floppy disk images generated by RTD tooling (files named win*.img) from
-87  kvm::clone_server_template_vm                                ;           Display available server template VMs (Template*server*) and clone the selected entry.
-88  kvm::clone_template_vm::_build_customize_args                ;           Helper function to split a virt-customize option string into an array.
-89  kvm::clone_template_vm::_clone_from_category                 ;           Internal helper that drives the template clone dialog for a VM category.
-90  kvm::clone_template_vm::_display_template_label              ;           Build a human-friendly label for a template entry (e.g., "Source: Ubuntu Server").
-91  kvm::clone_template_vm::_format_name_component               ;           Convert a raw string into Title_Case components joined by a delimiter (underscore by default).
-92  kvm::clone_vdi_template_vm                                   ;           Display available VDI template VMs (Template*VDI*) and clone the selected entry.
-93  kvm::create_expanding_vm_hardisk                             ;           Creates a non-preallocated, dynamically expanding qcow2 disk image for a VM.
-94  kvm::get_almalinux_boot_iso                                  ;           Download the AlmaLinux network boot ISO for a specific version into
-95  kvm::get_fedora_workstation_iso                              ;           Downloads the specified or latest Fedora Workstation x86_64 ISO.
-96  kvm::get_kali_iso                                            ;           Fetches the newest Kali Linux installer ISO (64-bit) from cdimage.kali.org
-99  kvm::get_vm_config_preferences                               ;           Retrieves VM configuration values from a configuration file or defaults.
-100  kvm::get_vm_size_preferences                                 ;           Loads VM sizing defaults from _locations.info or internal fallbacks and
-101  kvm::get_zorin_iso                                           ;           Downloads the latest Zorin OS ISO file for KVM if not already present.
-102  kvm::make_vm_now_from_debian_org                             ;           Function to create a Debian KVM virtual michine disk and define a VM. This function should be
-103  kvm::make_vm_now_from_fedora_org                             ;           Function to create a Fedora KVM virtual machine disk and define a VM. This function should be
-104  kvm::make_vm_now_from_kali_org                               ;           Function to create a Debian KVM virtual michine disk and define a VM. This function should be
-105  kvm::make_vm_now_from_microsoft                              ;           Function to create a KVM virtual michine disk and define a VM. This function should be
-107  kvm::make_vm_now_from_opensuse_org                           ;           Creates a SUSE KVM virtual machine disk and defines a VM. This function is intended to be
-108  kvm::make_vm_now_from_redhat_com                             ;           Function to create a Alma Linux KVM virtual michine disk and define a VM. This function should be
-109  kvm::make_vm_now_from_ubuntu_com                             ;           Automates the creation of a KVM-based Ubuntu VM, ideal for quickly setting up virtual
-110  kvm::make_vm_now_from_zorin                                  ;           Creates a KVM virtual machine template using a Zorin OS ISO.
-111  kvm::mount_local_folder_to_guest                             ;           Mounts a local host folder into a running KVM virtual machine (guest)
-112  kvm::util::config_label                                      ;           Build a human-friendly configuration label (e.g. "Minecraft-Server") from a raw token.
-113  kvm::util::read_common_options                               ;           Function to read common options for KVM virtual machine creation. This function processes
-114  kvm::util::read_distro_options                               ;           Function to read distribution specific options for KVM virtual machine creation. This function processes
-115  kvm::util::set_vm_name                                       ;           Set the VM name consistently across functions.
-116  kvm::util::validate_vm_name                                  ;           Validate a VM name according to hostname rules.
-117  kvm::wait_for_domain_definition                              ;           Polls libvirt until the specified domain is defined (or a timeout expires). Useful after
-118  kvm::wait_for_domain_start                                   ;           Blocks until the specified libvirt domain emits a lifecycle "Started" event or until a timeout
+79   kvm::backup_all_running_vm                                  ;           This function backs up all running virtual machines on the host system. It checks for necessary components
+80   kvm::cicd::_create_nocloud_iso                              ;           Create a NoCloud ISO from provided user-data and meta-data files.
+81   kvm::cicd::_render_extra_vars                               ;           Render an extra-vars YAML file for ansible-pull based on provided inputs.
+82   kvm::cicd::_render_meta_data                                ;           Build a minimal NoCloud meta-data file with instance and hostname.
+83   kvm::cicd::_render_user_data                                ;           Build cloud-init user-data that installs ansible and runs ansible-pull with prepared extra vars.
+84   kvm::cicd::configure_vm_with_ansible_pull                   ;           Create a NoCloud ISO containing ansible-pull instructions and attach it to a VM, then start the VM.
+85   kvm::cleanup_unused_qcow_images                             ;           Removes qcow/qcow2 disk images in /var/lib/libvirt/images (or a supplied directory) that are not
+86   kvm::cleanup_virtual_floppy_images                          ;           Removes virtual floppy disk images generated by RTD tooling (files named win*.img) from
+87   kvm::clone_server_template_vm                               ;           Display available server template VMs (Template*server*) and clone the selected entry.
+88   kvm::clone_template_vm::_build_customize_args               ;           Helper function to split a virt-customize option string into an array.
+89   kvm::clone_template_vm::_clone_from_category                ;           Internal helper that drives the template clone dialog for a VM category.
+90   kvm::clone_template_vm::_display_template_label             ;           Build a human-friendly label for a template entry (e.g., "Source: Ubuntu Server").
+91   kvm::clone_template_vm::_format_name_component              ;           Convert a raw string into Title_Case components joined by a delimiter (underscore by default).
+92   kvm::clone_vdi_template_vm                                  ;           Display available VDI template VMs (Template*VDI*) and clone the selected entry.
+93   kvm::create_expanding_vm_hardisk                            ;           Creates a non-preallocated, dynamically expanding qcow2 disk image for a VM.
+94   kvm::get_almalinux_boot_iso                                 ;           Download the AlmaLinux network boot ISO for a specific version into
+95   kvm::get_fedora_workstation_iso                             ;           Downloads the specified or latest Fedora Workstation x86_64 ISO.
+96   kvm::get_kali_iso                                           ;           Fetches the newest Kali Linux installer ISO (64-bit) from cdimage.kali.org
+99   kvm::get_vm_config_preferences                              ;           Retrieves VM configuration values from a configuration file or defaults.
+100  kvm::get_vm_size_preferences                                ;           Loads VM sizing defaults from _locations.info or internal fallbacks and
+101  kvm::get_zorin_iso                                          ;           Downloads the latest Zorin OS ISO file for KVM if not already present.
+102  kvm::make_vm_now_from_debian_org                            ;           Function to create a Debian KVM virtual michine disk and define a VM. This function should be
+103  kvm::make_vm_now_from_fedora_org                            ;           Function to create a Fedora KVM virtual machine disk and define a VM. This function should be
+104  kvm::make_vm_now_from_kali_org                              ;           Function to create a Debian KVM virtual michine disk and define a VM. This function should be
+105  kvm::make_vm_now_from_microsoft                             ;           Function to create a KVM virtual michine disk and define a VM. This function should be
+107  kvm::make_vm_now_from_opensuse_org                          ;           Creates a SUSE KVM virtual machine disk and defines a VM. This function is intended to be
+108  kvm::make_vm_now_from_redhat_com                            ;           Function to create a Alma Linux KVM virtual michine disk and define a VM. This function should be
+109  kvm::make_vm_now_from_ubuntu_com                            ;           Automates the creation of a KVM-based Ubuntu VM, ideal for quickly setting up virtual
+110  kvm::make_vm_now_from_zorin                                 ;           Creates a KVM virtual machine template using a Zorin OS ISO.
+111  kvm::mount_local_folder_to_guest                            ;           Mounts a local host folder into a running KVM virtual machine (guest)
+112  kvm::util::config_label                                     ;           Build a human-friendly configuration label (e.g. "Minecraft-Server") from a raw token.
+113  kvm::util::read_common_options                              ;           Function to read common options for KVM virtual machine creation. This function processes
+114  kvm::util::read_distro_options                              ;           Function to read distribution specific options for KVM virtual machine creation. This function processes
+115  kvm::util::set_vm_name                                      ;           Set the VM name consistently across functions.
+116  kvm::util::validate_vm_name                                 ;           Validate a VM name according to hostname rules.
+117  kvm::wait_for_domain_definition                             ;           Polls libvirt until the specified domain is defined (or a timeout expires). Useful after
+118  kvm::wait_for_domain_start                                  ;           Blocks until the specified libvirt domain emits a lifecycle "Started" event or until a timeout
 
 library:
-119  library::__build_header_desc_map                             ;           Populate an associative array mapping function names -> header descriptions
-120  library::__cache_dir                                         ;           Resolve and create the cache directory used by RTD helper caches.
-121  library::__desc_cache_file                                   ;           Return the cache file path used to persist function descriptions.
-122  library::__get_function_description                          ;           Resolve a one-line description for a function by first reading its inline
-123  library::__load_desc_cache                                   ;           Load cached header/description maps when the cache is newer than this script.
-124  library::__load_zformat_cache                                ;           Emit cached --zformat lines when the cache is fresh.
-125  library::__save_desc_cache                                   ;           Persist header/description maps to disk for faster subsequent runs.
-126  library::__save_zformat_cache                                ;           Persist the most recent --zformat lines to disk for reuse.
-127  library::__zformat_cache_file                                ;           Return the cache file path for cached --zformat output.
-128  library::apply_rtd_defaults                                  ;           Apply sane default values to core RTD paths and URLs using precedence.
-129  library::check_status                                        ;           Function to check how the library was loaded (sourced or executed directly)
-130  library::envcheck_report                                     ;           Display how and where the library was loaded for support/debugging.
-131  library::list_loaded_internal_functions                      ;           Function to list all internal library functions currently loaded. This function can be used
-132  library::list_loaded_software_functions                      ;           Function to list all software (_rtd_recipes) functions loaded... for debugging/support purposes.
+119  library::__build_header_desc_map                            ;           Populate an associative array mapping function names -> header descriptions
+120  library::__cache_dir                                        ;           Resolve and create the cache directory used by RTD helper caches.
+121  library::__desc_cache_file                                  ;           Return the cache file path used to persist function descriptions.
+122  library::__get_function_description                         ;           Resolve a one-line description for a function by first reading its inline
+123  library::__load_desc_cache                                  ;           Load cached header/description maps when the cache is newer than this script.
+124  library::__load_zformat_cache                               ;           Emit cached --zformat lines when the cache is fresh.
+125  library::__save_desc_cache                                  ;           Persist header/description maps to disk for faster subsequent runs.
+126  library::__save_zformat_cache                               ;           Persist the most recent --zformat lines to disk for reuse.
+127  library::__zformat_cache_file                               ;           Return the cache file path for cached --zformat output.
+128  library::apply_rtd_defaults                                 ;           Apply sane default values to core RTD paths and URLs using precedence.
+129  library::check_status                                       ;           Function to check how the library was loaded (sourced or executed directly)
+130  library::envcheck_report                                    ;           Display how and where the library was loaded for support/debugging.
+131  library::list_loaded_internal_functions                     ;           Function to list all internal library functions currently loaded. This function can be used
+132  library::list_loaded_software_functions                     ;           Function to list all software (_rtd_recipes) functions loaded... for debugging/support purposes.
 
 mint:
-133  mint::get_mint_lmde_iso                                      ;           Retrieve the latest Linux Mint Debian Edition (LMDE) Cinnamon 64-bit ISO and
+133  mint::get_mint_lmde_iso                                     ;           Retrieve the latest Linux Mint Debian Edition (LMDE) Cinnamon 64-bit ISO and
 
 network:
-134  network::check_inet_access                                   ;           Verifies internet connectivity by pinging known public IPs.
-135  network::get_oem_test_ips                                    ;           Return test IPs as newline-separated list honoring _OEM_TEST_IPS override.
-136  network::rsync_download                                      ;           Download files or directories from a remote host using rsync over SSH,
-137  network::rsync_upload                                        ;           Transfer files or directories to a remote host using rsync over SSH,
-138  network::whats_my_external_ip                                ;           Retrieves the system's external IP address using multiple fallback services.
-139  network::whats_my_ipinfo                                     ;           Attempts to retrieve public IP and geolocation data using multiple external services.
+134  network::check_inet_access                                  ;           Verifies internet connectivity by pinging known public IPs.
+135  network::get_oem_test_ips                                   ;           Return test IPs as newline-separated list honoring _OEM_TEST_IPS override.
+136  network::rsync_download                                     ;           Download files or directories from a remote host using rsync over SSH,
+137  network::rsync_upload                                       ;           Transfer files or directories to a remote host using rsync over SSH,
+138  network::whats_my_external_ip                               ;           Retrieves the system's external IP address using multiple fallback services.
+139  network::whats_my_ipinfo                                    ;           Attempts to retrieve public IP and geolocation data using multiple external services.
 
 oem:
-140  oem::check_boot_splash_screen_enable                         ;           OEM function to enable splash screen on boot if desktop is indicated in
-141  oem::create_single_launcher                                  ;           Function to create a single .desktop file for an application.
-142  oem::deploy_themes                                           ;           Downloads and deploys themes from GitHub.
-143  oem::distro_release_upgrade                                  ;           Attempts an OS release upgrade on Ubuntu, Pop!_OS, Debian, SUSE, or Fedora.
-144  oem::register_all_tools                                      ;           Function to register all OEM scripts on the current device.
-145  oem::register_wallpapers_for_gnome                           ;           Validate the input directory.
-146  oem::remove_non_western_latin_fonts                          ;           a simple function to remove known
-147  oem::rtd_reset_default_environment_config                    ;           Function to reset temporary configurations to their original settings as provided by the distributor.
-148  oem::rtd_tools_make_launchers                                ;           Legacy entry point that now delegates to the launcher definitions stored in _locations.info.
-149  oem::rtd_tools_make_launchers_from_locations                 ;           Function that creates RTD launchers based on the definitions stored in _locations.info (LAUNCHER_DATA).
-150  oem::setup_brand_splash_screen                               ;           Brands the installer splash screen for a customized installer downloaded from a given vendor.
-151  oem::setup_choices_server                                    ;           Function to display legacy installation options. This will install software that is usefull
-152  oem::task::auto_install_iso_debian                           ;           Build a branded Debian autoinstall ISO using preseed and initrd injection.
-154  oem::task::auto_install_iso_ubuntu                           ;           Build a branded Ubuntu autoinstall ISO using cloud-config (>= 22) or preseed (older).
-155  oem::task::auto_install_iso_windows                          ;           Build a Windows autounattend ISO by injecting autounattend.xml and OEM scripts.
-156  oem::task::auto_install_iso_zorin                            ;           Build a branded Zorin autoinstall ISO using the Zorin ISO downloader and preseed automation.
-157  oem::task::debian::inject_initrd                             ;           Append preseed and custom files into a Debian installer initrd.
-158  oem::task::debian::tweak_boot_cfg                            ;           Update Debian isolinux/grub configs for autoinstall labels and gfx defaults.
-159  oem::task::iso::collect_boot_cfg_paths                       ;           Collect bootloader config files to edit (isolinux/grub/loopback) from an ISO tree.
-160  oem::task::iso::detect_boot_args                             ;           Detect bootloader files in an ISO tree and populate OEM_ISO_BOOT_ARGS.
-161  oem::task::iso::download_url                                 ;           Download a URL to a destination path (reuses cached file if present).
-162  oem::task::iso::ensure_grub_splash_fallback                  ;           Ensure /splash.png exists by copying or converting an available splash image.
-163  oem::task::iso::extract_iso                                  ;           Extract an ISO to a destination directory using xorriso and make it writable.
-164  oem::task::iso::extract_efi_boot_image                       ;           Extract hidden EFI/Bios El Torito boot images from a source ISO into the ISO root.
-165  oem::task::iso::fetch_url                                    ;           Fetch the content at a URL to STDOUT using curl or wget.
-166  oem::task::iso::find_cached_iso                              ;           Search provided cache directories for a named ISO file and return the first match.
-167  oem::task::iso::force_ubiquity_preseed                       ;           Ensure Ubiquity uses a supplied preseed by staging /cdrom/preseed/ubuntu.seed
-168  oem::task::iso::format_output_name                           ;           Build an Autoinstall-prefixed output name from label parts.
-169  oem::task::iso::inject_initrd                                ;           Inject preseed payloads into a compressed initrd or raw CPIO archive.
-170  oem::task::iso::inject_preseed_boot_params                   ;           Add preseed boot parameters to isolinux and GRUB configs for live installers.
-171  oem::task::iso::post_build_menu                              ;           Present a post-build menu to create USB media, add to Ventoy, show the ISO path, or test in QEMU.
-172  oem::task::iso::rebuild_initrd_simple                        ;           Rebuild initrd from the main initramfs stream (drops early microcode blobs),
-173  oem::task::iso::repack_iso                                   ;           Repack an extracted ISO directory into a bootable hybrid ISO.
-174  oem::task::iso::resolve_debian_netinst                       ;           Resolve the current Debian netinst ISO name and URL.
-175  oem::task::iso::sanitize_label                               ;           Sanitize a label for use in ISO filenames (lowercase, safe characters).
-176  oem::task::iso::sanitize_volume_id                           ;           Sanitize a volume ID for ISO creation (ASCII, trimmed, length-limited).
-177  oem::task::iso::tweak_autoinstall_menu_labels                ;           Replace "Try or Install" menu labels with "Autoinstall" in boot configs.
-178  oem::task::iso::update_md5sum_entries                        ;           Update md5sum.txt entries for provided ISO-relative paths.
-185  oem::task::ubuntu::inject_cloud_config                       ;           Generate NoCloud cloud-init data and inject it into the ISO, updating boot configs and md5sums.
-186  oem::ventoy::brand_media                                     ;           Write the Ventoy config, menu title theme, and RTD title marker.
-187  oem::ventoy::classify_iso                                    ;           Classify ISO by filename and return target folder and prefix.
-188  oem::ventoy::copy_isos                                       ;           Copy ISO files to the Ventoy data partition with logical grouping.
-189  oem::ventoy::create_ext4_data_partition                      ;           Format the Ventoy data partition as ext4.
-190  oem::ventoy::create_usb                                      ;           Install Ventoy to a selected USB device.
-191  oem::ventoy::detect_data_partition                           ;           Detect the Ventoy data partition on a device.
-192  oem::ventoy::download                                        ;           Download and extract Ventoy for Linux.
-193  oem::ventoy::prepare_folders                                 ;           Create the standard RTD folder structure on the Ventoy data partition.
-194  oem::ventoy::resolve_latest_version                          ;           Resolve the latest Ventoy version using the GitHub API.
-195  oem::ventoy::select_usb_device                               ;           Prompt the user to select a removable USB block device.
-196  oem::ventoy::setup_usb                                       ;           Full Ventoy setup: download, install, format data partition, create folders, copy ISOs, and configure.
-197  oem::ventoy::write_control_config                            ;           Write the Ventoy configuration file.
-198  oem::ventoy::write_menu_theme                                ;           Write a minimal Ventoy theme used only for the menu title.
-199  oem::ventoy::write_partition_title                           ;           Write a simple RTD title marker file to the Ventoy partition.
+140  oem::check_boot_splash_screen_enable                        ;           OEM function to enable splash screen on boot if desktop is indicated in
+141  oem::create_single_launcher                                 ;           Function to create a single .desktop file for an application.
+142  oem::deploy_themes                                          ;           Downloads and deploys themes from GitHub.
+143  oem::distro_release_upgrade                                 ;           Attempts an OS release upgrade on Ubuntu, Pop!_OS, Debian, SUSE, or Fedora.
+144  oem::register_all_tools                                     ;           Function to register all OEM scripts on the current device.
+145  oem::register_wallpapers_for_gnome                          ;           Validate the input directory.
+146  oem::remove_non_western_latin_fonts                         ;           a simple function to remove known
+147  oem::rtd_reset_default_environment_config                   ;           Function to reset temporary configurations to their original settings as provided by the distributor.
+148  oem::rtd_tools_make_launchers                               ;           Legacy entry point that now delegates to the launcher definitions stored in _locations.info.
+149  oem::rtd_tools_make_launchers_from_locations                ;           Function that creates RTD launchers based on the definitions stored in _locations.info (LAUNCHER_DATA).
+150  oem::setup_brand_splash_screen                              ;           Brands the installer splash screen for a customized installer downloaded from a given vendor.
+151  oem::setup_choices_server                                   ;           Function to display legacy installation options. This will install software that is usefull
+152  oem::task::auto_install_iso_debian                          ;           Build a branded Debian autoinstall ISO using preseed and initrd injection.
+154  oem::task::auto_install_iso_ubuntu                          ;           Build a branded Ubuntu autoinstall ISO using cloud-config (>= 22) or preseed (older).
+155  oem::task::auto_install_iso_windows                         ;           Build a Windows autounattend ISO by injecting autounattend.xml and OEM scripts.
+156  oem::task::auto_install_iso_zorin                           ;           Build a branded Zorin autoinstall ISO using the Zorin ISO downloader and preseed automation.
+157  oem::task::debian::inject_initrd                            ;           Append preseed and custom files into a Debian installer initrd.
+158  oem::task::debian::tweak_boot_cfg                           ;           Update Debian isolinux/grub configs for autoinstall labels and gfx defaults.
+159  oem::task::iso::collect_boot_cfg_paths                      ;           Collect bootloader config files to edit (isolinux/grub/loopback) from an ISO tree.
+160  oem::task::iso::detect_boot_args                            ;           Detect bootloader files in an ISO tree and populate OEM_ISO_BOOT_ARGS.
+161  oem::task::iso::download_url                                ;           Download a URL to a destination path (reuses cached file if present).
+162  oem::task::iso::ensure_grub_splash_fallback                 ;           Ensure /splash.png exists by copying or converting an available splash image.
+163  oem::task::iso::extract_iso                                 ;           Extract an ISO to a destination directory using xorriso and make it writable.
+164  oem::task::iso::extract_efi_boot_image                      ;           Extract hidden EFI/Bios El Torito boot images from a source ISO into the ISO root.
+165  oem::task::iso::fetch_url                                   ;           Fetch the content at a URL to STDOUT using curl or wget.
+166  oem::task::iso::find_cached_iso                             ;           Search provided cache directories for a named ISO file and return the first match.
+167  oem::task::iso::force_ubiquity_preseed                      ;           Ensure Ubiquity uses a supplied preseed by staging /cdrom/preseed/ubuntu.seed
+168  oem::task::iso::format_output_name                          ;           Build an Autoinstall-prefixed output name from label parts.
+169  oem::task::iso::inject_initrd                               ;           Inject preseed payloads into a compressed initrd or raw CPIO archive.
+170  oem::task::iso::inject_preseed_boot_params                  ;           Add preseed boot parameters to isolinux and GRUB configs for live installers.
+171  oem::task::iso::post_build_menu                             ;           Present a post-build menu to create USB media, add to Ventoy, show the ISO path, or test in QEMU.
+172  oem::task::iso::rebuild_initrd_simple                       ;           Rebuild initrd from the main initramfs stream (drops early microcode blobs),
+173  oem::task::iso::repack_iso                                  ;           Repack an extracted ISO directory into a bootable hybrid ISO.
+174  oem::task::iso::resolve_debian_netinst                      ;           Resolve the current Debian netinst ISO name and URL.
+175  oem::task::iso::sanitize_label                              ;           Sanitize a label for use in ISO filenames (lowercase, safe characters).
+176  oem::task::iso::sanitize_volume_id                          ;           Sanitize a volume ID for ISO creation (ASCII, trimmed, length-limited).
+177  oem::task::iso::tweak_autoinstall_menu_labels               ;           Replace "Try or Install" menu labels with "Autoinstall" in boot configs.
+178  oem::task::iso::update_md5sum_entries                       ;           Update md5sum.txt entries for provided ISO-relative paths.
+185  oem::task::ubuntu::inject_cloud_config                      ;           Generate NoCloud cloud-init data and inject it into the ISO, updating boot configs and md5sums.
+186  oem::ventoy::brand_media                                    ;           Write the Ventoy config, menu title theme, and RTD title marker.
+187  oem::ventoy::classify_iso                                   ;           Classify ISO by filename and return target folder and prefix.
+188  oem::ventoy::copy_isos                                      ;           Copy ISO files to the Ventoy data partition with logical grouping.
+189  oem::ventoy::create_ext4_data_partition                     ;           Format the Ventoy data partition as ext4.
+190  oem::ventoy::create_usb                                     ;           Install Ventoy to a selected USB device.
+191  oem::ventoy::detect_data_partition                          ;           Detect the Ventoy data partition on a device.
+192  oem::ventoy::download                                       ;           Download and extract Ventoy for Linux.
+193  oem::ventoy::prepare_folders                                ;           Create the standard RTD folder structure on the Ventoy data partition.
+194  oem::ventoy::resolve_latest_version                         ;           Resolve the latest Ventoy version using the GitHub API.
+195  oem::ventoy::select_usb_device                              ;           Prompt the user to select a removable USB block device.
+196  oem::ventoy::setup_usb                                      ;           Full Ventoy setup: download, install, format data partition, create folders, copy ISOs, and configure.
+197  oem::ventoy::write_control_config                           ;           Write the Ventoy configuration file.
+198  oem::ventoy::write_menu_theme                               ;           Write a minimal Ventoy theme used only for the menu title.
+199  oem::ventoy::write_partition_title                          ;           Write a simple RTD title marker file to the Ventoy partition.
 
 pause:
-198  pause::a_given_time                                          ;           Simple function to pause for a given number of seconds whle showing a count down
-199  pause::for_input                                             ;           A simple function to pause and wait for end user input.
+198  pause::a_given_time                                         ;           Simple function to pause for a given number of seconds whle showing a count down
+199  pause::for_input                                            ;           A simple function to pause and wait for end user input.
 
 security:
-200  security::change_disk_pass                                   ;           Function to change the passphrase fo an encrypted storage device.
-201  security::check_if_password_pOwned                           ;           Function to query a user for a password suggestion and check it against P0wned data base online.
-202  security::configure_auditd                                   ;           Function to install and configure auditd for system auditing.
-203  security::configure_clamav                                   ;           Installs and securely configures ClamAV only if not already installed.
-204  security::configure_fail2ban                                 ;           Installs and configures Fail2Ban with a secure default jail for SSH protection.
-205  security::configure_rkhunter                                 ;           Function to install and configure RKHunter (Rootkit Hunter) for system security.
-206  security::enable_firewall                                    ;           Enables and configures the system firewall using either UFW (Uncomplicated Firewall) or firewalld.
-207  security::encrypt_disk_with_luks                             ;           Securely encrypts a block device using LUKS2 with hardened parameters.
-208  security::ensure_admin                                       ;           Ensures the script is executed with administrative (root) privileges, allowing
-209  security::harden_ubuntu                                      ;           Presents an interactive dialog with checkboxes to select hardening functions for Ubuntu.
-210  security::install_AIDE                                       ;           Function to install and configure AIDE (Advanced Intrusion Detection Environment).
-211  security::scan_for_malware                                   ;           Scans a given directory for malware using ClamAV and moves infected files to a quarantine directory.
-212  security::secure_password_policy                             ;           Function to enforce a secure password policy on the system.
-213  security::sysctl_hardening                                   ;           Applies hardened sysctl settings to improve system security.
+200  security::change_disk_pass                                  ;           Function to change the passphrase fo an encrypted storage device.
+201  security::check_if_password_pOwned                          ;           Function to query a user for a password suggestion and check it against P0wned data base online.
+202  security::configure_auditd                                  ;           Function to install and configure auditd for system auditing.
+203  security::configure_clamav                                  ;           Installs and securely configures ClamAV only if not already installed.
+204  security::configure_fail2ban                                ;           Installs and configures Fail2Ban with a secure default jail for SSH protection.
+205  security::configure_rkhunter                                ;           Function to install and configure RKHunter (Rootkit Hunter) for system security.
+206  security::enable_firewall                                   ;           Enables and configures the system firewall using either UFW (Uncomplicated Firewall) or firewalld.
+207  security::encrypt_disk_with_luks                            ;           Securely encrypts a block device using LUKS2 with hardened parameters.
+208  security::ensure_admin                                      ;           Ensures the script is executed with administrative (root) privileges, allowing
+209  security::harden_ubuntu                                     ;           Presents an interactive dialog with checkboxes to select hardening functions for Ubuntu.
+210  security::install_AIDE                                      ;           Function to install and configure AIDE (Advanced Intrusion Detection Environment).
+211  security::scan_for_malware                                  ;           Scans a given directory for malware using ClamAV and moves infected files to a quarantine directory.
+212  security::secure_password_policy                            ;           Function to enforce a secure password policy on the system.
+213  security::sysctl_hardening                                  ;           Applies hardened sysctl settings to improve system security.
 
 software:
-214  software::add_gnome_extensions                               ;           Description:
-215  software::add_native_package                                 ;           Installs one or more native packages individually using the system's package manager.
-216  software::add_software_task                                  ;           Display executed task and echo ON/NOK based on sucess
-217  software::check_native_package_dependency                    ;           Ensures that all provided native software package dependencies are installed.
-218  software::determine_package_name_from_cmd                    ;           Function to determine the package name from the command line.
-219  software::display_bundle_install_choices_gtk                 ;           Function to display the software install otions. All software option are listed in.
-220  software::display_bundle_removal_choices_gtk                 ;           Function to display the Software Prodictivity Bundles removal otions. All software options are listed in.
-221  software::ensure_flatpak_package_managment                   ;           Function to ensure that flatpak is installed and flathup enabled.
-222  software::ensure_gnome_software_store_available              ;           Function to ensure that flatpak is installed and flathup enabled.
-223  software::ensure_restricted_codecs                           ;           simple function to ensure that restricted codecs are available on the system.
-224  software::ensure_snap_package_managment                      ;           Function to ensure that snap is installed.
-225  software::from_flathub.org                                   ;           Function to simplify and streamline the installation and removal of flatpaks.
-226  software::from_snapcraft.io                                  ;           Function to ensure that snap is installed.
-227  software::is_native_package_available                        ;           Function to chek if a package is available in whetever repository, and
-228  software::is_native_package_installed                        ;           Function to check if a piece of software is installed. This function will first check
-229  software::list_bundles                                       ;           Function to list all software bundles defined in _rtd_recipes that are either installable or removable.
-230  software::native_management_availability_check               ;           Detects the native package manager and checks if it's currently locked or in use.
-231  software::package_kit::add_package                           ;           Function to simplify the installation of software by including all display and
-232  software::package_kit::remove_package                        ;           Function to simplify the installation of software by including all display and
-233  software::remove_native_software_package                     ;           Removes a specified software package using the native package management
-234  software::rtd_ppa_checker                                    ;           Function to check status of Ubuntu and derivatives' PPA aarchives.
-235  software::set_install_command                                ;           add global install command for portability and convenience. This function
-236  software::update_all_ui                                      ;           Update all ui.
-237  software::update_system                                      ;           System update function. The purpose of this function is to update installed software from
-238  software::update_system_txt                                  ;           System update function. The purpose of this function is to update installed software from
-239  software::vendor_download_and_install                        ;           Function by Nate Beaken to ease and make consistent the downloading of the non repository
-240  software::zypper_add_repo                                    ;           Adds a Zypper repository safely and logs reults accordingly.
+214  software::add_gnome_extensions                              ;           Description:
+215  software::add_native_package                                ;           Installs one or more native packages individually using the system's package manager.
+216  software::add_software_task                                 ;           Display executed task and echo ON/NOK based on sucess
+217  software::check_native_package_dependency                   ;           Ensures that all provided native software package dependencies are installed.
+218  software::determine_package_name_from_cmd                   ;           Function to determine the package name from the command line.
+219  software::display_bundle_install_choices_gtk                ;           Function to display the software install otions. All software option are listed in.
+220  software::display_bundle_removal_choices_gtk                ;           Function to display the Software Prodictivity Bundles removal otions. All software options are listed in.
+221  software::ensure_flatpak_package_managment                  ;           Function to ensure that flatpak is installed and flathup enabled.
+222  software::ensure_gnome_software_store_available             ;           Function to ensure that flatpak is installed and flathup enabled.
+223  software::ensure_restricted_codecs                          ;           simple function to ensure that restricted codecs are available on the system.
+224  software::ensure_snap_package_managment                     ;           Function to ensure that snap is installed.
+225  software::from_flathub.org                                  ;           Function to simplify and streamline the installation and removal of flatpaks.
+226  software::from_snapcraft.io                                 ;           Function to ensure that snap is installed.
+227  software::is_native_package_available                       ;           Function to chek if a package is available in whetever repository, and
+228  software::is_native_package_installed                       ;           Function to check if a piece of software is installed. This function will first check
+229  software::list_bundles                                      ;           Function to list all software bundles defined in _rtd_recipes that are either installable or removable.
+230  software::native_management_availability_check              ;           Detects the native package manager and checks if it's currently locked or in use.
+231  software::package_kit::add_package                          ;           Function to simplify the installation of software by including all display and
+232  software::package_kit::remove_package                       ;           Function to simplify the installation of software by including all display and
+233  software::remove_native_software_package                    ;           Removes a specified software package using the native package management
+234  software::rtd_ppa_checker                                   ;           Function to check status of Ubuntu and derivatives' PPA aarchives.
+235  software::set_install_command                               ;           add global install command for portability and convenience. This function
+236  software::update_all_ui                                     ;           Update all ui.
+237  software::update_system                                     ;           System update function. The purpose of this function is to update installed software from
+238  software::update_system_txt                                 ;           System update function. The purpose of this function is to update installed software from
+239  software::vendor_download_and_install                       ;           Function by Nate Beaken to ease and make consistent the downloading of the non repository
+240  software::zypper_add_repo                                   ;           Adds a Zypper repository safely and logs reults accordingly.
 
 ssh:
-241  ssh::ensure_key_installed_on_remote                          ;           Verifies if the user's SSH public key is installed on a specified remote host.
-242  ssh::ensure_user_ssh_key                                     ;           Check if the current user has a valid SSH keypair (ed25519 preferred).
+241  ssh::ensure_key_installed_on_remote                         ;           Verifies if the user's SSH public key is installed on a specified remote host.
+242  ssh::ensure_user_ssh_key                                    ;           Check if the current user has a valid SSH keypair (ed25519 preferred).
 
 system:
-243  system::_disable_service                                     ;           Disables and stops a service across multiple init systems (systemd, SysVinit, OpenRC).
-244  system::_enable_service                                      ;           Function to enable and start a systemd service.
-245  system::_turn_on_gui_network_management                      ;           Configures the system to use NetworkManager for network configuration,
-246  system::add_or_remove_login_script                           ;           Adds, removes, or toggles a .desktop launcher to execute a script at login.
-247  system::check_file_limits                                    ;           This function is designed to check and display the current usage of file descriptors against
-248  system::check_required_variables                             ;           Function to check for the presence and non-emptiness of a list of variables.
-249  system::cleanup_and_finish                                   ;           Function to remove all temporary file locations left over from building
-250  system::create_iso_image_debian                              ;           Function to generate the new ISO file from the extracted and
-251  system::create_physical_media_from_ubuntu_iso                ;           Courtesy of 'covertsh':  ubuntu-autoinstall-generator
-252  system::create_swapfile                                      ;           Function to create a swapfile and enable it automatically.
-253  system::detect_session                                       ;           Detects the current session type (TTY, SSH, GUI, Wayland).
-254  system::determine_logfile                                    ;           Determines the path to a log file for the current script based on:
-255  system::display_spinner                                      ;           Simple function to display a spinner in the terminal.
-256  system::distribution_type                                    ;           This function determines the Linux distribution type of the system on which it is run. It identifies the
-257  system::download_and_manipulate_iso_debian                   ;           Legacy entrypoint; use the OEM task implementation.
-258  system::ensure_directory_exists                              ;           Function to ensure a directory exists, creating it if necessary.
-259  system::find_download_ubuntu_iso                             ;           Find download ubuntu iso.
-260  system::find_vm_bridge                                       ;           Locate a usable network for VM networking. Prefer a host bridge with a physical member; otherwise fall back to a libvirt network (preferring "default"). Logs diagnostics, returning 1 only when nothing usable is found.
-261  system::find_vm_bridge_gemini                                ;           Locate a usable network for VM networking. Prefer a host bridge with a physical member; otherwise fall back to a libvirt network (preferring "default"). Logs diagnostics, returning 1 only when nothing usable is found.
-262  system::generate_autoyast_file                               ;           This function dynamically generates an AutoYaST XML file for automated SUSE Linux installations.
-263  system::generate_cloudconfig                                 ;           Generates a cloud-config and meta-data ISO (CIDATA.iso) for automated Ubuntu deployments
-264  system::generate_ks_cfg_file                                 ;           Generates an installation configuration file (kickstart) for Fedora/Red Hat.
-265  system::generate_report_disk_space_used_by_directory         ;           Function to generate a report for folders' disk space use.
-266  system::get_Windows_Product_Key                              ;           Function to retrieve a Windows product key from the BIOS. This assumes that the OEM
-267  system::install_missing_commands                             ;           Installs missing commands based on the distribution type.
-268  system::io_on_notify_wait                                    ;           Function that, when called, will wait for a disk change
-269  system::keyboard_set_layout                                  ;           Configure and persist keyboard layout for both GUI and TTY across major Linux distributions.
-270  system::laptop_detect                                        ;           Determine if the current system appears to be a laptop without relying on the laptop-detect utility.
-271  system::log_item                                             ;           The purpose of this function is to consistently write script output to the right log file.
-272  system::make_preseed_cfg                                     ;           Function to write out a debina preeseed file to a location requested by the first parameter.
-273  system::make_system_recovery_partition                       ;           Incomplete function to build an OEM rescue partition...
-274  system::oem_autounlock_disk                                  ;           Setup automatic unlocking of the encrypted system disk.
-275  system::optimize_harddrive                                   ;           Detect mounted block devices and apply basic performance-oriented tunables
-276  system::optimize_startup                                     ;           Apply lightweight boot/runtime tunables to improve responsiveness: ensure trim timer,
-277  system::prepare_environment_for_iso_creation                 ;           Function to check that all dependencies are available for manipulating the
-278  system::preseed_to_ubuntu_ks_cfg                             ;           Generates a preseed section [Ubuntu only] (ks.cfg).
-279  system::preserve_graphical_session_environment               ;           Ensure graphical environment variables are set when running as root after escalation.
-280  system::process_vm_opt_args                                  ;           Function to evaluate input fiven to a VM build finction and set configuration override variables.
-281  system::read_config                                          ;           This function reads a configuration file with key-value pairs.
-282  system::remove_old_kernel                                    ;           Purge older Linux kernel packages, keeping the currently running kernel.
-283  system::restart_sound                                        ;           Restarts the user's sound server (PipeWire or PulseAudio).
-284  system::rtd_oem_find_live_release                            ;           This function will return the URL for the version of Debian, Ubuntu server or Destktop requested.
-285  system::rtd_oem_reseal                                       ;           Function to reseal a newly installed system for delivery to end user.
-286  system::rtd_oem_reseal::_finalize_shutdown                   ;           Logs the shutdown context and powers the system off.
-287  system::rtd_oem_reseal::_install_guest_additions             ;           Ensures guest integration packages are installed regardless of distro.
-288  system::rtd_oem_reseal::_prepare_debian                      ;           Performs Debian-specific reseal tasks (cloud-init cleanup, host keys, etc.).
-289  system::rtd_oem_reseal::_prepare_fedora                      ;           Enables the Fedora/RHEL initial-setup workflow and guest tools.
-290  system::rtd_oem_reseal::_prepare_suse                        ;           Enables YaST firstboot and guest tools on SUSE-based distributions.
-291  system::rtd_oem_reseal::_prepare_ubuntu_like                 ;           Runs OEM reseal prep for Ubuntu-like distributions.
-292  system::rtd_oem_reseal::_virtualization_context              ;           Detects whether the current system is running as a virtual guest.
-293  system::run_command_in_gnome_user_session                    ;           Function to do a reverse sudo back to teh original Gnome user who called upon sudo.
-294  system::set_oem_elevated_privilege_gui                       ;           This function configures the local X environment to allow root to display GUI applications.
-295  system::toggle_oem_auto_elevated_privilege                   ;           Toggles passwordless sudo privileges for a specified user.
-296  system::toggle_oem_auto_login                                ;           Toggles auto-login for major display managers and TTY on Debian, Ubuntu, Fedora, SUSE-based distros.
-297  system::tune_system_power_profile                            ;           Tuned is a Linux feature that monitors a system and optimizes its performance
-298  system::update_config                                        ;           This function updates a configuration file with key-value pairs.
-299  system::validate_parameters                                  ;           Function to validate that all parameters match the pattern --option "value".
-300  system::wait_for_internet_availability                       ;           Waits for an active internet connection before proceeding.
+243  system::_disable_service                                    ;           Disables and stops a service across multiple init systems (systemd, SysVinit, OpenRC).
+244  system::_enable_service                                     ;           Function to enable and start a systemd service.
+245  system::_turn_on_gui_network_management                     ;           Configures the system to use NetworkManager for network configuration,
+246  system::add_or_remove_login_script                          ;           Adds, removes, or toggles a .desktop launcher to execute a script at login.
+247  system::check_file_limits                                   ;           This function is designed to check and display the current usage of file descriptors against
+248  system::check_required_variables                            ;           Function to check for the presence and non-emptiness of a list of variables.
+249  system::cleanup_and_finish                                  ;           Function to remove all temporary file locations left over from building
+250  system::create_iso_image_debian                             ;           Function to generate the new ISO file from the extracted and
+251  system::create_physical_media_from_ubuntu_iso               ;           Courtesy of 'covertsh':  ubuntu-autoinstall-generator
+252  system::create_swapfile                                     ;           Function to create a swapfile and enable it automatically.
+253  system::detect_session                                      ;           Detects the current session type (TTY, SSH, GUI, Wayland).
+254  system::determine_logfile                                   ;           Determines the path to a log file for the current script based on:
+255  system::display_spinner                                     ;           Simple function to display a spinner in the terminal.
+256  system::distribution_type                                   ;           This function determines the Linux distribution type of the system on which it is run. It identifies the
+257  system::download_and_manipulate_iso_debian                  ;           Legacy entrypoint; use the OEM task implementation.
+258  system::ensure_directory_exists                             ;           Function to ensure a directory exists, creating it if necessary.
+259  system::find_download_ubuntu_iso                            ;           Find download ubuntu iso.
+260  system::find_vm_bridge                                      ;           Locate a usable network for VM networking. Prefer a host bridge with a physical member; otherwise fall back to a libvirt network (preferring "default"). Logs diagnostics, returning 1 only when nothing usable is found.
+261  system::find_vm_bridge_gemini                               ;           Locate a usable network for VM networking. Prefer a host bridge with a physical member; otherwise fall back to a libvirt network (preferring "default"). Logs diagnostics, returning 1 only when nothing usable is found.
+262  system::generate_autoyast_file                              ;           This function dynamically generates an AutoYaST XML file for automated SUSE Linux installations.
+263  system::generate_cloudconfig                                ;           Generates a cloud-config and meta-data ISO (CIDATA.iso) for automated Ubuntu deployments
+264  system::generate_ks_cfg_file                                ;           Generates an installation configuration file (kickstart) for Fedora/Red Hat.
+265  system::generate_report_disk_space_used_by_directory        ;           Function to generate a report for folders' disk space use.
+266  system::get_Windows_Product_Key                             ;           Function to retrieve a Windows product key from the BIOS. This assumes that the OEM
+267  system::install_missing_commands                            ;           Installs missing commands based on the distribution type.
+268  system::io_on_notify_wait                                   ;           Function that, when called, will wait for a disk change
+269  system::keyboard_set_layout                                 ;           Configure and persist keyboard layout for both GUI and TTY across major Linux distributions.
+270  system::laptop_detect                                       ;           Determine if the current system appears to be a laptop without relying on the laptop-detect utility.
+271  system::log_item                                            ;           The purpose of this function is to consistently write script output to the right log file.
+272  system::make_preseed_cfg                                    ;           Function to write out a debina preeseed file to a location requested by the first parameter.
+273  system::make_system_recovery_partition                      ;           Incomplete function to build an OEM rescue partition...
+274  system::oem_autounlock_disk                                 ;           Setup automatic unlocking of the encrypted system disk.
+275  system::optimize_harddrive                                  ;           Detect mounted block devices and apply basic performance-oriented tunables
+276  system::optimize_startup                                    ;           Apply lightweight boot/runtime tunables to improve responsiveness: ensure trim timer,
+277  system::prepare_environment_for_iso_creation                ;           Function to check that all dependencies are available for manipulating the
+278  system::preseed_to_ubuntu_ks_cfg                            ;           Generates a preseed section [Ubuntu only] (ks.cfg).
+279  system::preserve_graphical_session_environment              ;           Ensure graphical environment variables are set when running as root after escalation.
+280  system::process_vm_opt_args                                 ;           Function to evaluate input fiven to a VM build finction and set configuration override variables.
+281  system::read_config                                         ;           This function reads a configuration file with key-value pairs.
+282  system::remove_old_kernel                                   ;           Purge older Linux kernel packages, keeping the currently running kernel.
+283  system::restart_sound                                       ;           Restarts the user's sound server (PipeWire or PulseAudio).
+284  system::rtd_oem_find_live_release                           ;           This function will return the URL for the version of Debian, Ubuntu server or Destktop requested.
+285  system::rtd_oem_reseal                                      ;           Function to reseal a newly installed system for delivery to end user.
+286  system::rtd_oem_reseal::_finalize_shutdown                  ;           Logs the shutdown context and powers the system off.
+287  system::rtd_oem_reseal::_install_guest_additions            ;           Ensures guest integration packages are installed regardless of distro.
+288  system::rtd_oem_reseal::_prepare_debian                     ;           Performs Debian-specific reseal tasks (cloud-init cleanup, host keys, etc.).
+289  system::rtd_oem_reseal::_prepare_fedora                     ;           Enables the Fedora/RHEL initial-setup workflow and guest tools.
+290  system::rtd_oem_reseal::_prepare_suse                       ;           Enables YaST firstboot and guest tools on SUSE-based distributions.
+291  system::rtd_oem_reseal::_prepare_ubuntu_like                ;           Runs OEM reseal prep for Ubuntu-like distributions.
+292  system::rtd_oem_reseal::_virtualization_context             ;           Detects whether the current system is running as a virtual guest.
+293  system::run_command_in_gnome_user_session                   ;           Function to do a reverse sudo back to teh original Gnome user who called upon sudo.
+294  system::set_oem_elevated_privilege_gui                      ;           This function configures the local X environment to allow root to display GUI applications.
+295  system::toggle_oem_auto_elevated_privilege                  ;           Toggles passwordless sudo privileges for a specified user.
+296  system::toggle_oem_auto_login                               ;           Toggles auto-login for major display managers and TTY on Debian, Ubuntu, Fedora, SUSE-based distros.
+297  system::tune_system_power_profile                           ;           Tuned is a Linux feature that monitors a system and optimizes its performance
+298  system::update_config                                       ;           This function updates a configuration file with key-value pairs.
+299  system::validate_parameters                                 ;           Function to validate that all parameters match the pattern --option "value".
+300  system::wait_for_internet_availability                      ;           Waits for an active internet connection before proceeding.
 
 template:
-301  template::Agama_json                                         ;           Generates an Agama JSON profile for automated SUSE Linux installations using the new
-302  template::autounattend_xml                                   ;           Generates an unattended installation XML file (autounattend.xml) for automated Windows setup.
-303  template::AutoYast_xml                                       ;           Generates an AutoYaST XML file for automated SUSE Linux installation.
-304  template::cloud_config                                       ;           Appends specialized cloud-config YAML to an existing user-data file for an Ubuntu VM.
-305  template::config_menu_cmd                                    ;           Writes the Windows configuration and activation menu script (_config_menu.cmd) to the specified
-306  template::kickstart_cfg                                      ;           Generates a Kickstart configuration file for automated Red Hat-based Linux installations.
-307  template::minecraft_server_launcher                          ;           Minecraft server launcher.
-308  template::preseed_cfg::auto_disk_layout                      ;           Generates the disk layout section of a preseed configuration file for Debian-based installations.
-309  template::preseed_cfg::early_command                         ;           Generates the early command section of a preseed configuration file for Debian-based installations.
-310  template::preseed_cfg::expert_recipe                         ;           Generates an expert partitioning recipe for a Debian-based system installation, to be included in a preseed configuration file.
-311  template::preseed_cfg::late_command                          ;           Generates the late command section of a preseed configuration file for Debian-based installations.
-312  template::preseed_cfg::main                                  ;           Generates the main configuration section of a preseed file for automated Debian-based installations.
-313  template::rtd_me_sh_cmd                                      ;           Generates a Windows batch script (rtd_me.sh.cmd) to perform initial setup and configuration
+301  template::Agama_json                                        ;           Generates an Agama JSON profile for automated SUSE Linux installations using the new
+302  template::autounattend_xml                                  ;           Generates an unattended installation XML file (autounattend.xml) for automated Windows setup.
+303  template::AutoYast_xml                                      ;           Generates an AutoYaST XML file for automated SUSE Linux installation.
+304  template::cloud_config                                      ;           Appends specialized cloud-config YAML to an existing user-data file for an Ubuntu VM.
+305  template::config_menu_cmd                                   ;           Writes the Windows configuration and activation menu script (_config_menu.cmd) to the specified
+306  template::kickstart_cfg                                     ;           Generates a Kickstart configuration file for automated Red Hat-based Linux installations.
+307  template::minecraft_server_launcher                         ;           Minecraft server launcher.
+308  template::preseed_cfg::auto_disk_layout                     ;           Generates the disk layout section of a preseed configuration file for Debian-based installations.
+309  template::preseed_cfg::early_command                        ;           Generates the early command section of a preseed configuration file for Debian-based installations.
+310  template::preseed_cfg::expert_recipe                        ;           Generates an expert partitioning recipe for a Debian-based system installation, to be included in a preseed configuration file.
+311  template::preseed_cfg::late_command                         ;           Generates the late command section of a preseed configuration file for Debian-based installations.
+312  template::preseed_cfg::main                                 ;           Generates the main configuration section of a preseed file for automated Debian-based installations.
+313  template::rtd_me_sh_cmd                                     ;           Generates a Windows batch script (rtd_me.sh.cmd) to perform initial setup and configuration
 
 term:
-314  term::animate_while_command                                  ;           Displays an animation during the execution of a silent command.
-315  term::err_no_menu_system_found                               ;           Function to handle the error condition if a manu system is not found on the system.
-316  term::set_colors                                             ;           Set colors for prompting on screen in human readable variables. These will be set globally
-317  term::start_animation                                        ;           A simple function to display and animation during a silent acton
-318  term::stop_animation                                         ;           A simple function to STOP display and animation during a silent acton
-319  term::task_exec_list_output                                  ;           Task exec list output.
+314  term::animate_while_command                                 ;           Displays an animation during the execution of a silent command.
+315  term::err_no_menu_system_found                              ;           Function to handle the error condition if a manu system is not found on the system.
+316  term::set_colors                                            ;           Set colors for prompting on screen in human readable variables. These will be set globally
+317  term::start_animation                                       ;           A simple function to display and animation during a silent acton
+318  term::stop_animation                                        ;           A simple function to STOP display and animation during a silent acton
+319  term::task_exec_list_output                                 ;           Task exec list output.
 
 tool:
-320  tool::compress_all_items_here                                ;           Function to compress the contents of the present working directory.
-321  tool::compress_provided_items                                ;           Function to compress the contents of the present working directory.
-322  tool::recompress_all_items_in_folder                         ;           Function to recompress all archive files in the current directory to a specified format.
-323  tool::recompress_provided_items                              ;           Function to recompress specified files to a target compression format.
-324  tool::test_iso_boot_media                                    ;           Function to test a created ISO file by booting it in a temporary VM using QEMU.
-325  tool::up_2_date                                              ;           Function to simplify updating system completely. At present this function sets the
+320  tool::compress_all_items_here                               ;           Function to compress the contents of the present working directory.
+321  tool::compress_provided_items                               ;           Function to compress the contents of the present working directory.
+322  tool::recompress_all_items_in_folder                        ;           Function to recompress all archive files in the current directory to a specified format.
+323  tool::recompress_provided_items                             ;           Function to recompress specified files to a target compression format.
+324  tool::test_iso_boot_media                                   ;           Function to test a created ISO file by booting it in a temporary VM using QEMU.
+325  tool::up_2_date                                             ;           Function to simplify updating system completely. At present this function sets the
 
 ubuntu:
-326  ubuntu::download_iso                                         ;           Downloads the specified Ubuntu ISO (Desktop or Server) based on the provided flavor, version, and type.
-327  ubuntu::enable_plymouth_theme                                ;           Detects the Ubuntu spin (flavor) and ensures the appropriate
-328  ubuntu::get_latest_release_version                           ;           Retrieves the latest available Ubuntu release version from the official archive.
-329  ubuntu::get_target_version                                   ;           Interactively or non-interactively determine which Ubuntu version to use for installation.
+326  ubuntu::download_iso                                        ;           Downloads the specified Ubuntu ISO (Desktop or Server) based on the provided flavor, version, and type.
+327  ubuntu::enable_plymouth_theme                               ;           Detects the Ubuntu spin (flavor) and ensures the appropriate
+328  ubuntu::get_latest_release_version                          ;           Retrieves the latest available Ubuntu release version from the official archive.
+329  ubuntu::get_target_version                                  ;           Interactively or non-interactively determine which Ubuntu version to use for installation.
 
 util:
-330  util::add_iso_to_ventoy                                      ;           Function to add an ISO file to a Ventoy USB drive for multiple boot options.
-331  util::validate_heredoc_tabs_only                             ;           Scans a script file for here-documents declared with <<-EOF
+330  util::add_iso_to_ventoy                                     ;           Function to add an ISO file to a Ventoy USB drive for multiple boot options.
+331  util::validate_heredoc_tabs_only                            ;           Scans a script file for here-documents declared with <<-EOF
 
 whonix:
-332  whonix::add_extra_workstation                                ;           Create an additional workstation VM overlaying an existing base disk.
-333  whonix::current_vm_version                                   ;           Extract the Whonix version from an existing VM disk path.
-334  whonix::define_vms                                           ;           Define or refresh Whonix Gateway/Workstation VMs against target images.
-335  whonix::detect_image_owner                                   ;           Determine the appropriate owner:group for libvirt images.
-336  whonix::discover_bundle                                      ;           Discover the latest Whonix libvirt bundle (prefers GUI/LXQt) and checksum.
-337  whonix::download_bundle                                      ;           Fetch the Whonix bundle if not already present locally.
-338  whonix::download_with_verify                                 ;           Download a file with retries and optional SHA-512 verification.
-339  whonix::ensure_networks_defined                              ;           Define Whonix virtual networks idempotently.
-340  whonix::ensure_networks_running                              ;           Start Whonix virtual networks if they are not active.
-341  whonix::extract_archive                                      ;           Extract the Whonix libvirt archive only when images/XMLs are missing.
-342  whonix::init_context                                         ;           Initialize Whonix-related globals with sane defaults so downstream functions
-343  whonix::maybe_skip_install                                   ;           Skip all work when existing VMs are already at/above the target version unless refresh/add is requested.
-344  whonix::prepare_workdir                                      ;           Ensure the working directory is ready for the target bundle and clear stale bundles.
-345  whonix::stage_images                                         ;           Move or reuse Whonix qcow2/raw images in the libvirt images directory.
-346  whonix::version_ge                                           ;           Compare two dotted version strings and succeed if the first is >= the second.
+332  whonix::add_extra_workstation                               ;           Create an additional workstation VM overlaying an existing base disk.
+333  whonix::current_vm_version                                  ;           Extract the Whonix version from an existing VM disk path.
+334  whonix::define_vms                                          ;           Define or refresh Whonix Gateway/Workstation VMs against target images.
+335  whonix::detect_image_owner                                  ;           Determine the appropriate owner:group for libvirt images.
+336  whonix::discover_bundle                                     ;           Discover the latest Whonix libvirt bundle (prefers GUI/LXQt) and checksum.
+337  whonix::download_bundle                                     ;           Fetch the Whonix bundle if not already present locally.
+338  whonix::download_with_verify                                ;           Download a file with retries and optional SHA-512 verification.
+339  whonix::ensure_networks_defined                             ;           Define Whonix virtual networks idempotently.
+340  whonix::ensure_networks_running                             ;           Start Whonix virtual networks if they are not active.
+341  whonix::extract_archive                                     ;           Extract the Whonix libvirt archive only when images/XMLs are missing.
+342  whonix::init_context                                        ;           Initialize Whonix-related globals with sane defaults so downstream functions
+343  whonix::maybe_skip_install                                  ;           Skip all work when existing VMs are already at/above the target version unless refresh/add is requested.
+344  whonix::prepare_workdir                                     ;           Ensure the working directory is ready for the target bundle and clear stale bundles.
+345  whonix::stage_images                                        ;           Move or reuse Whonix qcow2/raw images in the libvirt images directory.
+346  whonix::version_ge                                          ;           Compare two dotted version strings and succeed if the first is >= the second.
 
 yad:
-347  yad::display_cmd_output                                      ;           Displays the output of a command in a YAD box.
-348  yad::display_file                                            ;           Displays the content of a text file in a Zenity window.
-349  yad::display_info                                            ;           Displays an information notice using a Zenity info box.
-350  yad::display_progressbar_pulsating                           ;           Displays the output of a command in a pulsating progress box.
-351  yad::display_url                                             ;           Displays the content of a URL in a GUI using Zenity.
+347  yad::display_cmd_output                                     ;           Displays the output of a command in a YAD box.
+348  yad::display_file                                           ;           Displays the content of a text file in a Zenity window.
+349  yad::display_info                                           ;           Displays an information notice using a Zenity info box.
+350  yad::display_progressbar_pulsating                          ;           Displays the output of a command in a pulsating progress box.
+351  yad::display_url                                            ;           Displays the content of a URL in a GUI using Zenity.
 
 zenity:
-352  zenity::display_file                                         ;           Displays the content of a text file in a Zenity window.
-353  zenity::display_info                                         ;           Displays an information notice using a Zenity info box.
-354  zenity::display_url                                          ;           Displays the content of a URL in a GUI using Zenity.
+352  zenity::display_file                                        ;           Displays the content of a text file in a Zenity window.
+353  zenity::display_info                                        ;           Displays an information notice using a Zenity info box.
+354  zenity::display_url                                         ;           Displays the content of a URL in a GUI using Zenity.
 Library_Documentation
 
 ################################################################################################
@@ -2738,23 +2743,37 @@ dependency::search_local() {
 	# End of Documentation
 
 	system::log_item "Requested dependency file: ${1} ..."
-	local script_path="$(readlink -f "$0")"
-	local script_dir="$(dirname "$script_path")"
-	local _tla="${_TLA,,}"
-	local _tla="${_tla:-"rtd"}"
-	local paths=(
-		"$(dirname "$(find /opt/${_tla} -name ${1} 2>/dev/null | head -n 1)")/${1}"
-		"$(dirname "$(find /home/${SUDO_USER}/GIT -name ${1} 2>/dev/null | head -n 1)")/${1}"
-		"$(dirname "$(find /home/${SUDO_USER}/bin -name ${1} 2>/dev/null | head -n 1)")/${1}"
-		"${script_dir}/${1}"
-		"./${1}"
-	)
+	local requested_file="${1:-}"
+	local script_ref="${BASH_SOURCE[2]:-${BASH_SOURCE[1]:-$0}}"
+	local script_dir=""
+	local tla="${_TLA:-${_tla:-rtd}}"
+	local user_home="${HOME:-}"
+	local path
 
-	for path in "${paths[@]}"; do
-		system::log_item "Searching for ${path} ..."
-		if [[ -e "${path}" ]]; then
+	if command -v readlink >/dev/null 2>&1; then
+		script_ref="$(readlink -f "${script_ref}" 2>/dev/null || printf '%s' "${script_ref}")"
+	fi
+	script_dir="$(cd "$(dirname "${script_ref}")" 2>/dev/null && pwd)"
+	tla="${tla,,}"
+
+	if [[ -n "${SUDO_USER:-}" ]] && command -v getent >/dev/null 2>&1; then
+		user_home="$(getent passwd "${SUDO_USER}" 2>/dev/null | awk -F: 'NR==1 {print $6}')"
+		user_home="${user_home:-${HOME:-}}"
+	fi
+
+	for path in \
+		"${script_dir}/${requested_file}" \
+		"${script_dir}/../core/${requested_file}" \
+		"${script_dir}/../../core/${requested_file}" \
+		"./${requested_file}" \
+		"/opt/${tla}/core/${requested_file}" \
+		"/opt/rtd/core/${requested_file}" \
+		"${user_home}/GIT/RTD-Setup/core/${requested_file}" \
+		"${user_home}/RTD-Setup/core/${requested_file}"; do
+		if [[ -r "${path}" ]]; then
 			system::log_item "Found ${path}"
-			source "${path}"
+			# shellcheck source=/dev/null
+			source "${path}" ""
 			return 0
 		fi
 	done
@@ -2795,26 +2814,67 @@ dependency::file() {
 	#
 	# End of Documentation
 
-	local _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
-	local _tgt="${1}"
+	local requested_file="${1:-}"
+	local minimum_version="${2:-}"
 
-	if dependency::search_local "${1}"; then
-		return 0
-	else
-		system::log_item "$(date) failure to find $1 on the local computer, now searching online..."
-		local tmpdir=$(mktemp -d)
-		if curl -sL "$_src_url" -o "${tmpdir}/${1}"; then
-			system::log_item "Using: ${_src_url} directly from URL..."
-			source "${tmpdir}/${1}"
-		elif wget "${_src_url}" -O "${tmpdir}/${1}" &>/dev/null; then
-			source "${tmpdir}/${1}"
-			system::log_item "Using: ${_src_url} downloaded..."
-		else
-			system::log_item "Failed to find  ${1} "
-			return 1
-		fi
-		rm -rf "${tmpdir}"
+	if [[ -z "$requested_file" ]]; then
+		system::log_item "dependency::file: missing file name"
+		return 1
 	fi
+
+	if [[ "$requested_file" == "_rtd_library" ]] && [[ -n "${RTDFUNCTIONS:-}" ]]; then
+		local loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
+		if [[ -z "${minimum_version}" ]] || [[ "$(printf '%s\n%s\n' "${minimum_version}" "${loaded_version}" | sort -V | tail -n 1)" == "${loaded_version}" ]]; then
+			system::log_item "dependency::file: _rtd_library already loaded, skipping re-source"
+			return 0
+		fi
+	fi
+
+	if dependency::search_local "${requested_file}"; then
+		return 0
+	fi
+
+	system::log_item "$(date) failure to find ${requested_file} on the local computer, now searching online..."
+	local src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${requested_file}"
+	local tmp_file
+	tmp_file="$(mktemp "/tmp/${requested_file}.XXXXXX" 2>/dev/null || echo "/tmp/${requested_file}.$$")"
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL "${src_url}" -o "${tmp_file}" || return 1
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO "${tmp_file}" "${src_url}" || return 1
+	else
+		system::log_item "dependency::file: curl and wget are unavailable"
+		return 1
+	fi
+
+	system::log_item "dependency::file: loaded ${requested_file} from ${src_url}"
+	# shellcheck source=/dev/null
+	source "${tmp_file}" ""
+	rm -f "${tmp_file}"
+}
+
+dialog::build_backtitle() {
+	# Description:
+	#   Build a standard RTD dialog backtitle that includes RunTime Data branding,
+	#   the current script label, and the loaded RTD library version.
+	# Globals:
+	#   HOSTNAME, RTD_VERSION, RTDFUNCTIONS
+	# Arguments:
+	#   $1: Script or product label.
+	#   $2: Script version (optional).
+	#   $3: Host label override (optional).
+	# Outputs:
+	#   Writes the formatted backtitle to STDOUT.
+	# Returns:
+	#   0 on success.
+
+	local label="${1:-${BRANDING:-${0##*/}}}"
+	local script_version="${2:-${RTD_Version:-${SCRIPT_VERSION:-unknown}}}"
+	local host_label="${3:-${HOSTNAME:-$(hostname 2>/dev/null)}}"
+	local library_version="${RTD_VERSION:-${RTDFUNCTIONS:-unknown}}"
+
+	printf 'RunTime Data | %s | Script %s | Library %s | %s' \
+		"$label" "$script_version" "$library_version" "$host_label"
 }
 
 
@@ -14848,7 +14908,7 @@ oem::ventoy::write_menu_theme() {
 title-text: "${_FULLNAME:-RunTime Data}"
 title-font: "DejaVu Sans Bold 24"
 title-color: "#FFFFFF"
-desktop-color: "#101820"
+desktop-color: "#2B2B2B"
 
 + boot_menu {
   left = 8%
@@ -15534,6 +15594,182 @@ system::create_physical_media_from_ubuntu_iso() {
 	die "✅ Completed." 0
 }
 
+tool::_compress_7z_items() {
+	# Description: Compress items to individual 7z archives with safe filename handling.
+	#
+	# Purpose:    Run a bounded number of 7z jobs in parallel while keeping per-archive
+	#             threading low enough to avoid CPU oversubscription.
+	#
+	# Arguments:
+	#   $1   - Optional passphrase. Leave empty for unencrypted archives.
+	#   $@   - Items to compress.
+	#
+	# Outputs:
+	#   Populates RTD_COMPRESS_CREATED_ARCHIVES and RTD_COMPRESS_FAILED_ITEMS arrays.
+	#
+	# Returns:
+	#   0 when all items were compressed successfully, 1 if one or more items failed.
+	#
+	# End of documentation
+
+	local passphrase="${1:-}"
+	shift || true
+
+	local -a items=("$@")
+	local -a batch_pids=()
+	local -a batch_items=()
+	local item cpu_count=1 max_jobs=1 threads_per_job=1 batch_index=0
+	local item_count=0 store_count=0
+	local failed=0
+
+	RTD_COMPRESS_CREATED_ARCHIVES=()
+	RTD_COMPRESS_FAILED_ITEMS=()
+
+	if [[ ${#items[@]} -eq 0 ]]; then
+		return 0
+	fi
+
+	item_count=${#items[@]}
+
+	if command -v nproc >/dev/null 2>&1; then
+		cpu_count=$(nproc)
+	elif command -v getconf >/dev/null 2>&1; then
+		cpu_count=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
+	fi
+
+	[[ "$cpu_count" =~ ^[0-9]+$ ]] || cpu_count=1
+
+	if (( item_count <= 2 )); then
+		max_jobs=$item_count
+	elif (( item_count >= 8 && cpu_count >= 8 )); then
+		max_jobs=4
+	elif (( item_count >= 4 && cpu_count >= 4 )); then
+		max_jobs=2
+	fi
+
+	(( max_jobs > cpu_count )) && max_jobs=$cpu_count
+	(( max_jobs < 1 )) && max_jobs=1
+
+	threads_per_job=$(( cpu_count / max_jobs ))
+	(( threads_per_job < 1 )) && threads_per_job=1
+
+	for item in "${items[@]}"; do
+		if tool::_compress_7z_item_should_store "$item"; then
+			(( store_count++ ))
+		fi
+	done
+
+	if [[ -n "$passphrase" ]]; then
+		write_information "Compressing ${item_count} item(s) with ${max_jobs} parallel job(s) and ${threads_per_job} thread(s) per archive; ${store_count} already-compressed item(s) will be stored and encrypted without recompression..."
+	else
+		write_information "Compressing ${item_count} item(s) with ${max_jobs} parallel job(s) and ${threads_per_job} thread(s) per archive; ${store_count} already-compressed item(s) will be stored without recompression..."
+	fi
+
+	for item in "${items[@]}"; do
+		(
+			local -a seven_zip_args=(-t7z "-mmt=${threads_per_job}")
+			if tool::_compress_7z_item_should_store "$item"; then
+				seven_zip_args+=(-mx=0)
+			else
+				seven_zip_args+=(-m0=lzma2 -mx=1 -mfb=16 -md=8m -ms=off)
+			fi
+
+			if [[ -n "$passphrase" ]]; then
+				seven_zip_args+=(-mhe=on "-p${passphrase}")
+			fi
+
+			7z a "${seven_zip_args[@]}" "${item}.7z" "$item"
+		) &
+		batch_pids+=("$!")
+		batch_items+=("$item")
+
+		if (( ${#batch_pids[@]} >= max_jobs )); then
+			for batch_index in "${!batch_pids[@]}"; do
+				if wait "${batch_pids[$batch_index]}"; then
+					RTD_COMPRESS_CREATED_ARCHIVES+=("${batch_items[$batch_index]}.7z")
+				else
+					RTD_COMPRESS_FAILED_ITEMS+=("${batch_items[$batch_index]}")
+					failed=1
+				fi
+			done
+			batch_pids=()
+			batch_items=()
+		fi
+	done
+
+	for batch_index in "${!batch_pids[@]}"; do
+		if wait "${batch_pids[$batch_index]}"; then
+			RTD_COMPRESS_CREATED_ARCHIVES+=("${batch_items[$batch_index]}.7z")
+		else
+			RTD_COMPRESS_FAILED_ITEMS+=("${batch_items[$batch_index]}")
+			failed=1
+		fi
+	done
+
+	return "$failed"
+}
+
+tool::_compress_7z_item_should_store() {
+	# Description: Identify files that are already compressed or effectively incompressible.
+	#
+	# Purpose:    Avoid wasting CPU recompressing media and archive formats where 7z gains
+	#             are negligible compared to the time spent.
+	#
+	# Arguments:
+	#   $1 - Item path.
+	#
+	# Returns:
+	#   0 if the item should be stored without compression, 1 otherwise.
+	#
+	# End of documentation
+
+	local item_path="${1:-}"
+	local item_name="${item_path##*/}"
+	local extension="${item_name##*.}"
+
+	[[ -f "$item_path" ]] || return 1
+	[[ "$item_name" == *.* ]] || return 1
+
+	extension="${extension,,}"
+
+	case "$extension" in
+	7z | zip | rar | gz | gzip | bz2 | xz | zst | zstd | lz4 | cab | iso | dmg | jar | war | ear | apk | whl | deb | rpm | msi | exe | pdf | jpg | jpeg | png | gif | webp | avif | heic | heif | mp3 | m4a | aac | ogg | opus | flac | wma | mp4 | m4v | mkv | mov | avi | webm | wmv | flv)
+		return 0
+		;;
+	esac
+
+	return 1
+}
+
+tool::_format_elapsed_time() {
+	# Description: Format an elapsed duration in seconds for display.
+	#
+	# Arguments:
+	#   $1 - Elapsed seconds.
+	#
+	# Outputs:
+	#   Writes a compact human-readable duration to STDOUT.
+	#
+	# End of documentation
+
+	local total_seconds="${1:-0}"
+	local hours=0 minutes=0 seconds=0
+
+	[[ "$total_seconds" =~ ^[0-9]+$ ]] || total_seconds=0
+
+	hours=$(( total_seconds / 3600 ))
+	minutes=$(( (total_seconds % 3600) / 60 ))
+	seconds=$(( total_seconds % 60 ))
+
+	if (( hours > 0 )); then
+		printf '%dh %02dm %02ds' "$hours" "$minutes" "$seconds"
+	elif (( minutes > 0 )); then
+		printf '%dm %02ds' "$minutes" "$seconds"
+	else
+		printf '%ds' "$seconds"
+	fi
+}
+
 tool::compress_all_items_here() {
 	# Description: Function to compress the contents of the present working directory.
 	#
@@ -15554,8 +15790,31 @@ tool::compress_all_items_here() {
 
 
 	dependency::command_exists 7z
+	local -a items=()
+	local encrypt_requested=0
+	local no_prompt=0
+	local archive_report="None"
+	local failed_report=""
+	local start_epoch=0
+	local end_epoch=0
+	local elapsed_seconds=0
+	local elapsed_report="0s"
 
-	if [[ ! "$1" == "--noprompt" ]]; then
+	for arg in "$@"; do
+		case "$arg" in
+		--encrypt | encrypt) encrypt_requested=1 ;;
+		--noprompt) no_prompt=1 ;;
+		esac
+	done
+
+	mapfile -d '' -t items < <(find . -maxdepth 1 -mindepth 1 ! -name ".*" ! -name "*.7z" -printf '%P\0')
+
+	if [[ ${#items[@]} -eq 0 ]]; then
+		write_information "There are no files or folders here that need to be compressed."
+		return 0
+	fi
+
+	if (( ! no_prompt )); then
 		if hash dialog 2>/dev/null; then
 			if (dialog --backtitle "${BRANDING:-"${FUNCNAME[0]}"} ${1}" --title "Compress Content Here" --colors --cr-wrap --no-collapse --no-button "NO: Quit" --yes-button "YES: Compress" --yesno "Hello ${USER}... I am going to compress each file or folder that I find here: $(pwd) These are: \Z5 \n$(ls -h1 -F -I "*.7z")" 20 90); then
 				clear
@@ -15573,23 +15832,36 @@ tool::compress_all_items_here() {
 		fi
 	fi
 
-	if echo ${*} | grep "encrypt"; then
+	if (( encrypt_requested )); then
 		passtoken=$(dialog --title "${Title:="$(basename $0)"}" --backtitle "${BRANDING:-"${FUNCNAME[0]}"}" --stdout --insecure --passwordbox "\n Please provide a passphrase for the encryption. \n Please do not forget it!" 10 90)
 		ret=$?
 		clear
 		case $ret in
 		0)
-			SAVEIFS=$IFS
-			IFS=$(echo -en "\n\b")
-			for line in $(ls -I "*.7z"); do
-				7z a -t7z -m0=lzma2 -mx=5 -mfb=64 -md=64m -ms=on -mhe=on -p$passtoken $line.7z $line
-			done
-			IFS=$SAVEIFS
+			start_epoch=$(date +%s 2>/dev/null || echo 0)
+			if tool::_compress_7z_items "$passtoken" "${items[@]}"; then
+				:
+			fi
+			end_epoch=$(date +%s 2>/dev/null || echo "$start_epoch")
+			elapsed_seconds=$(( end_epoch - start_epoch ))
+			(( elapsed_seconds < 0 )) && elapsed_seconds=0
+			elapsed_report=$(tool::_format_elapsed_time "$elapsed_seconds")
+			if [[ ${#RTD_COMPRESS_CREATED_ARCHIVES[@]} -gt 0 ]]; then
+				archive_report=$(printf '%s\n' "${RTD_COMPRESS_CREATED_ARCHIVES[@]}")
+			fi
+			if [[ ${#RTD_COMPRESS_FAILED_ITEMS[@]} -gt 0 ]]; then
+				failed_report="\n Failed to create archives for:\n$(printf '%s\n' "${RTD_COMPRESS_FAILED_ITEMS[@]}")"
+			fi
 			result="
 				\n Created the following archives encrypted with a pass-phrase:
 
-				\n \Z1  $(ls *.7z)"
-			dialog::display_result "Done creating encrypted archives"
+				\n \Z1  ${archive_report}${failed_report}
+				\n Time spent compressing: ${elapsed_report}"
+			if (( no_prompt )); then
+				printf '%b\n' "$result"
+			else
+				dialog::display_result "Done creating encrypted archives"
+			fi
 			;;
 		1)
 			echo "Request cancelled"
@@ -15602,17 +15874,30 @@ tool::compress_all_items_here() {
 		*) exit 1 ;;
 		esac
 	else
-		SAVEIFS=$IFS
-		IFS=$(echo -en "\n\b")
-		for line in $(ls -I "*.7z"); do
-			7z a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=64m -ms=on -mhe=on $line.7z $line
-		done
-		IFS=$SAVEIFS
+		start_epoch=$(date +%s 2>/dev/null || echo 0)
+		if tool::_compress_7z_items "" "${items[@]}"; then
+			:
+		fi
+		end_epoch=$(date +%s 2>/dev/null || echo "$start_epoch")
+		elapsed_seconds=$(( end_epoch - start_epoch ))
+		(( elapsed_seconds < 0 )) && elapsed_seconds=0
+		elapsed_report=$(tool::_format_elapsed_time "$elapsed_seconds")
+		if [[ ${#RTD_COMPRESS_CREATED_ARCHIVES[@]} -gt 0 ]]; then
+			archive_report=$(printf '%s\n' "${RTD_COMPRESS_CREATED_ARCHIVES[@]}")
+		fi
+		if [[ ${#RTD_COMPRESS_FAILED_ITEMS[@]} -gt 0 ]]; then
+			failed_report="\n Failed to create archives for:\n$(printf '%s\n' "${RTD_COMPRESS_FAILED_ITEMS[@]}")"
+		fi
 		result="
 		Created the following archives un-encrypted:
 
-		\n \Z1  $(ls *.7z)"
-		dialog::display_result "Done Compressing"
+		\n \Z1  ${archive_report}${failed_report}
+		\n Time spent compressing: ${elapsed_report}"
+		if (( no_prompt )); then
+			printf '%b\n' "$result"
+		else
+			dialog::display_result "Done Compressing"
+		fi
 	fi
 }
 
@@ -15636,8 +15921,32 @@ tool::compress_provided_items() {
 	
 	dependency::command_exists 7z
 
-	list="$*"
-	if echo "${@}" | grep "--encrypt"; then
+	local passtoken=""
+	local ret=0
+	local encrypt_requested=0
+	local no_prompt=0
+	local archive_report="None"
+	local failed_report=""
+	local start_epoch=0
+	local end_epoch=0
+	local elapsed_seconds=0
+	local elapsed_report="0s"
+	local -a items=()
+
+	for arg in "$@"; do
+		case "$arg" in
+		--encrypt) encrypt_requested=1 ;;
+		--noprompt) no_prompt=1 ;;
+		*) items+=("$arg") ;;
+		esac
+	done
+
+	if [[ ${#items[@]} -eq 0 ]]; then
+		write_error "No files or folders were provided for compression."
+		return 1
+	fi
+
+	if (( encrypt_requested )); then
 		passtoken=$(dialog --title "${Title:="$(basename $0)"}" \
 			--backtitle "${BRANDING:-"${FUNCNAME[0]}"}" \
 			--stdout \
@@ -15647,27 +15956,32 @@ tool::compress_provided_items() {
 		ret=$?
 		case $ret in
 		0)
-
 			echo "☕ Please be patient, Large sets of files may take serious time..."
-			list="${list:9:1000}"
-			SAVEIFS=$IFS
-			IFS=$(echo -en "\n\b")
-			for line in $list; do
-				7z a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=64m -ms=on -mhe=on -p$passtoken $line.7z $line
-			done
-			IFS=$SAVEIFS
+			start_epoch=$(date +%s 2>/dev/null || echo 0)
+			if tool::_compress_7z_items "$passtoken" "${items[@]}"; then
+				:
+			fi
+			end_epoch=$(date +%s 2>/dev/null || echo "$start_epoch")
+			elapsed_seconds=$(( end_epoch - start_epoch ))
+			(( elapsed_seconds < 0 )) && elapsed_seconds=0
+			elapsed_report=$(tool::_format_elapsed_time "$elapsed_seconds")
+			if [[ ${#RTD_COMPRESS_CREATED_ARCHIVES[@]} -gt 0 ]]; then
+				archive_report=$(printf '%s\n' "${RTD_COMPRESS_CREATED_ARCHIVES[@]}")
+			fi
+			if [[ ${#RTD_COMPRESS_FAILED_ITEMS[@]} -gt 0 ]]; then
+				failed_report="\n Failed to create archives for:\n$(printf '%s\n' "${RTD_COMPRESS_FAILED_ITEMS[@]}")"
+			fi
 
 			result="
 				\n♹ Created the following archive(s) encrypted: \n
-				\n STATUS	FILENAME
-				$(
-				echo \\n
-				for d in $list; do
-					[[ -e $d.7z ]] && echo "Confirmed	:  $d.z7 \\n" || echo " Failed!	:  $d.z7 \\n"
-				done
-			)
+				\n ${archive_report}${failed_report}
+				\n Time spent compressing: ${elapsed_report}
 				\n Please review the above: ⏫"
-			dialog::display_result "Done creating encrypted archives"
+			if (( no_prompt )); then
+				printf '%b\n' "$result"
+			else
+				dialog::display_result "Done creating encrypted archives"
+			fi
 			;;
 		1)
 			echo "Request cancelled"
@@ -15680,35 +15994,30 @@ tool::compress_provided_items() {
 		*) exit 1 ;;
 		esac
 	else
-		SAVEIFS=$IFS
-		IFS=$(echo -en "\n\b")
 		write_information "☕ Please be patient, Large sets of files may take serious time..."
-
-		for item in ${list}; do
-			case $item in
-			--noprompt) echo skipp >/dev/null ;;
-			*) 7z a -t7z -m0=lzma2 -mx=5 -mfb=64 -md=64m -ms=on -mhe=on $item.7z $item ;;
-			esac
-		done
-
-		IFS=$SAVEIFS
+		start_epoch=$(date +%s 2>/dev/null || echo 0)
+		if tool::_compress_7z_items "" "${items[@]}"; then
+			:
+		fi
+		end_epoch=$(date +%s 2>/dev/null || echo "$start_epoch")
+		elapsed_seconds=$(( end_epoch - start_epoch ))
+		(( elapsed_seconds < 0 )) && elapsed_seconds=0
+		elapsed_report=$(tool::_format_elapsed_time "$elapsed_seconds")
+		if [[ ${#RTD_COMPRESS_CREATED_ARCHIVES[@]} -gt 0 ]]; then
+			archive_report=$(printf '%s\n' "${RTD_COMPRESS_CREATED_ARCHIVES[@]}")
+		fi
+		if [[ ${#RTD_COMPRESS_FAILED_ITEMS[@]} -gt 0 ]]; then
+			failed_report="\n Failed to create archives for:\n$(printf '%s\n' "${RTD_COMPRESS_FAILED_ITEMS[@]}")"
+		fi
 		result="
 		Created the following archive(s): \n
-		\n STATUS	FILENAME
-		$(
-			echo \\n
-			for d in ${list}; do
-				case $d in
-				--noprompt) echo skipp >/dev/null ;;
-				*) [[ -e $d.7z ]] && echo "Confirmed	:  $d.z7 \\n" || echo " Failed!	:  $d.z7 \\n" ;;
-				esac
-			done
-		)
+		\n ${archive_report}${failed_report}
+		\n Time spent compressing: ${elapsed_report}
 		\n Please review the above: ⏫"
-		if echo ${*} | grep "--noprompt"; then
-			echo $result
+		if (( no_prompt )); then
+			printf '%b\n' "$result"
 		else
-			dialog::display_result "Done creating encrypted archives"
+			dialog::display_result "Done Compressing"
 		fi
 	fi
 }

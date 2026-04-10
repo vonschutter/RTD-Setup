@@ -1,5 +1,6 @@
 #!/bin/bash
 #
+_scr_version="1.02"
 #::                                        A D M I N   C O M M A N D
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::// Simple bootable CD/DVD creation Tool //:::::::::::::::::::::// Linux //::::::::
@@ -40,32 +41,211 @@
 # This script is intended to live in the ~/bin/ or /bin/ folder, alternatively in the $PATH.
 #
 
+_scriptname="$( basename "$0" )"
+
+
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::          Script Functions                ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-dependency_library ()
-{
-	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+rtd::bootstrap_library() {
+	local library_name="${1:-_rtd_library}"
+	local minimum_version="${2:-}"
+	local loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
+	local script_dir path src_url tmp
 
-	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library ; then
-		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
-	elif source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
-		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
-	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
-		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name _rtd_library |grep -v bakup )"
-	elif wget ${_src_url} ; then
-                write_information "${FUNCNAME[0]} 4 Using: ${_src_url}"
-		source ./_rtd_library
+	if [[ "$library_name" == "_rtd_library" && -n "$loaded_version" ]]; then
+		if [[ -z "$minimum_version" ]] || [[ "$(printf '%s\n%s\n' "$minimum_version" "$loaded_version" | sort -V | tail -n 1)" == "$loaded_version" ]]; then
+			return 0
+		fi
+	fi
+
+	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	for path in \
+		"${script_dir}/${library_name}" \
+		"${script_dir}/../core/${library_name}" \
+		"${script_dir}/../../core/${library_name}" \
+		"/opt/${_TLA:-${_tla:-rtd}}/core/${library_name}" \
+		"/opt/rtd/core/${library_name}" \
+		"${HOME:-}/GIT/RTD-Setup/core/${library_name}" \
+		"${HOME:-}/RTD-Setup/core/${library_name}"; do
+		if [[ -r "$path" ]]; then
+			# shellcheck source=/dev/null
+			source "$path" ""
+			return $?
+		fi
+	done
+
+	src_url="https://github.com/${_GIT_PROFILE:-${GIT_Profile:-vonschutter}}/RTD-Setup/raw/main/core/${library_name}"
+	tmp="$(mktemp "/tmp/${library_name}.XXXXXX" 2>/dev/null || echo "/tmp/${library_name}.$$")"
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL "$src_url" -o "$tmp" || return 1
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO "$tmp" "$src_url" || return 1
 	else
-		echo -e "RTD functions NOT found!"
 		return 1
 	fi
+
+	# shellcheck source=/dev/null
+	source "$tmp" ""
+	local rc=$?
+	rm -f "$tmp"
+	return $rc
+}
+
+cancelled() {
+	echo "Operation cancelled by user."
+	exit 1
+}
+
+exit_on_error() {
+	write_error "$1"
+	exit 1
+}
+
+expand_user_path() {
+	local path="${1:-}"
+
+	case "$path" in
+		"~")
+			printf '%s\n' "${HOME:-~}"
+			;;
+		"~/"*)
+			printf '%s\n' "${HOME:-~}/${path#~/}"
+			;;
+		*)
+			printf '%s\n' "$path"
+			;;
+	esac
+}
+
+prompt_yes_no_or_exit() {
+	local title="$1"
+	local message="$2"
+	local rc
+
+	dialog::prompt_yes_no --back-title "${BRANDING:-"$_BACK_TITLE"}" --title "$title" --message "$message"
+	rc=$?
+	clear
+	[[ $rc -eq 0 ]] || cancelled
+}
+
+prompt_input() {
+	local prompt_message="$1"
+	local default_value="${2:-}"
+	local rc
+
+	dialog --title "${Title:="$( basename "$0" )"}" \
+		--backtitle "${_BACK_TITLE:-"$( basename "$0" )"}" \
+		--stdout \
+		--inputbox "$prompt_message" 10 90 "$default_value"
+	rc=$?
+	[[ $rc -eq 0 ]]
+}
+
+directory_has_entries() {
+	local dir_path="$1"
+
+	find "$dir_path" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q .
+}
+
+require_file() {
+	local relative_path="$1"
+
+	[[ -f "${RH_BUILD_DIR}/${relative_path}" ]] || exit_on_error "The folder ${RH_BUILD_DIR:-"(none provided)"} does not contain the required file ${relative_path}! Please try again."
 }
 
 
+check_environment() {
+	local required_file
+
+	if ! command -v mkisofs &>/dev/null; then
+		prompt_yes_no_or_exit "Software Missing" "mkisofs is not installed. \n\n Do you want to attempt to install mkisofs now?"
+		software::check_native_package_dependency mkisofs || exit_on_error "mkisofs is not installed. Please install it and try again."
+		command -v mkisofs &>/dev/null || exit_on_error "mkisofs could not be found after installation. Please install it and try again."
+	fi
+
+	if [[ -f "${ISO_IMAGE}" ]]; then
+		prompt_yes_no_or_exit "File Exists" "The file ${ISO_IMAGE} already exists. Do you want to overwrite it?"
+	fi
+
+	if [[ -d "${ISO_IMAGE}" ]]; then
+		exit_on_error "The path ${ISO_IMAGE} is a directory! Please choose a different name for the ISO file."
+	fi
+
+	if [[ -z "${ISO_IMAGE:-}" ]]; then
+		exit_on_error "The ISO image path is empty! Please try again."
+	fi
+
+	if [[ -z "${CD_LABEL:-}" ]]; then
+		exit_on_error "The CD label is empty! Please try again."
+	fi
+
+	if [[ -z "${RH_BUILD_DIR:-}" ]]; then
+		exit_on_error "The source folder is empty! Please try again."
+	fi
+
+	if [[ ! -d "${RH_BUILD_DIR}" ]]; then
+		exit_on_error "${RH_BUILD_DIR} does not exist! Please try again."
+	fi
+
+	if [[ ! -r "${RH_BUILD_DIR}" ]]; then
+		exit_on_error "The folder ${RH_BUILD_DIR:-"(none provided)"} is not readable! Please try again."
+	fi
+
+	if [[ ! -x "${RH_BUILD_DIR}" ]]; then
+		exit_on_error "The folder ${RH_BUILD_DIR:-"(none provided)"} is not accessible! Please try again."
+	fi
+
+	if ! directory_has_entries "${RH_BUILD_DIR}"; then
+		exit_on_error "The folder ${RH_BUILD_DIR:-"(none provided)"} is empty! Please try again."
+	fi
+
+	for required_file in \
+		"isolinux/isolinux.bin" \
+		"isolinux/isolinux.cfg" \
+		"isolinux/ldlinux.c32" \
+		"isolinux/libcom32.c32" \
+		"isolinux/linux.conf" \
+		"isolinux/logo.png"; do
+		require_file "$required_file"
+	done
+
+
+}
+
+get_task_information() {
+	# the name of and where to put th ISO file:
+	if [[ -z "${ISO_IMAGE:-}" ]]; then
+		ISO_IMAGE="$(prompt_input "\n Please enter the path/name of the ISO file to be created. \n For example: ~/MY-BOOT-CD.iso")" || cancelled
+		clear
+	fi
+	ISO_IMAGE="$(expand_user_path "${ISO_IMAGE}")"
+
+	# The label of the CD/DVD/BueRay
+	if [[ -z "${CD_LABEL:-}" ]]; then
+		CD_LABEL="$(prompt_input "\n Please enter the CD label for the new CD. \n For example: BOOT_MEDIA")" || cancelled
+		clear
+	fi
+
+	# The folder where the files are:
+	if [[ -z "${RH_BUILD_DIR:-}" ]]; then
+		RH_BUILD_DIR="$(prompt_input "\n Please enter the folder containing the files to be contained in the CD \n For example: ~/SLSBOOTCD")" || cancelled
+		clear
+	fi
+	RH_BUILD_DIR="$(expand_user_path "${RH_BUILD_DIR}")"
+
+	dialog --title "Confirm Information" --backtitle "${_BACK_TITLE:-"$( basename "$0" )"}" --stdout --yesno "\n Please confirm the following information: \n\n ISO Image: ${ISO_IMAGE:-"(none provided)"} \n CD Label: ${CD_LABEL:-"(none provided)"} \n Source Folder: ${RH_BUILD_DIR:-"(none provided)"}" 15 90
+	local rc=$?
+	clear
+	[[ $rc -eq 0 ]] || cancelled
+}
+
+warn_deprecated() {
+	prompt_yes_no_or_exit "NOTICE" "Burning CD's or DVD's is almost never done now a days, specially to make them bootable. \n... Just so you know. Choose OK to proceed."
+}
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -74,23 +254,25 @@ dependency_library ()
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-# Ensure access to the rtd library functions:
-dependency_library || { echo "Library not found!" ; exit 1 ; }
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+	cat <<EOF
+Usage:
+  $(basename "$0") [--help|-h]
 
-# the name of and where to put th ISO file:
-ISO_IMAGE=$(dialog --title "${Title:="$( basename $0 )"}" --backtitle "${BRANDING:-"$( basename $0 )"}" --stdout --inputbox "\n Please enter the path/name of the ISO file to be created. \n For example: ~/MY-BOOT-CD.iso" 10 90 ) ; clear
-
-# The label of the CD/DVD/BueRay
-CD_LABEL=$(dialog --title "${Title:="$( basename $0 )"}" --backtitle "${BRANDING:-"$( basename $0 )"}" --stdout --inputbox "\n Please enter the CD label for the new CD. \n For example: BOOT_MEDIA" 10 90 ); clear
-
-# The folder where the files are:
-RH_BUILD_DIR=$(dialog --title "${Title:="$( basename $0 )"}" --backtitle "${BRANDING:-"$( basename $0 )"}" --stdout --inputbox "\n Please enter the fileder containging the files to be contained in the CD \n For example: ~/SLSBOOTCD" 10 90 ); clear
-
-software::check_native_package_dependency mkisofs || write_error "mkisofs is not installed. Please install it and try again." ; exit 1
-
-if ! -f  "${RH_BUILD_DIR}"; then
-        write_error  "${RH_BUILD_DIR} does not exist! Please try again." ; exit 1
+Description:
+  Build a bootable ISO image from a source directory and prompt for the required details.
+EOF
+	exit 0
 fi
+
+# Ensure access to the rtd library functions:
+rtd::bootstrap_library "_rtd_library" || { echo "Failed to load _rtd_library"; exit 1; }
+
+command -v dialog &>/dev/null || exit_on_error "dialog is not installed. Please install it and try again."
+
+warn_deprecated
+get_task_information
+check_environment
 
 mkisofs -r -J -T \
         -b isolinux/isolinux.bin \
@@ -99,6 +281,4 @@ mkisofs -r -J -T \
         -boot-info-table \
         -o "${ISO_IMAGE}" \
         -V "${CD_LABEL}" \
-        "${RH_BUILD_DIR}" || { write_error "Failed to create the ISO file!" ; exit 1 ; }
-
-
+        "${RH_BUILD_DIR}" || { write_error "Failed to create the ISO file!"; exit 1; }

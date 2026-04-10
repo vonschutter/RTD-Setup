@@ -71,46 +71,49 @@ EOF
 }
 
 ##############  locate and source RTD library  ##############################
-load_rtd_library(){
-	local -a saved_args=("$@")
-	local script_dir candidates tmp
-	script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-	candidates=(
-		"/opt/rtd/core/_rtd_library"
-		"${PWD}/_rtd_library"
-		"${script_dir}/_rtd_library"
-		"${script_dir}/../core/_rtd_library"
-		"${HOME}/RTD-Setup/core/_rtd_library"
-		"${HOME}/GIT/RTD-Setup/core/_rtd_library"
-	)
-	for path in "${candidates[@]}"; do
-		if [[ -f $path ]]; then
-			set --
-			source "$path"
-			set -- "${saved_args[@]}"
-			return
+rtd::bootstrap_library() {
+	local library_name="${1:-_rtd_library}"
+	local minimum_version="${2:-}"
+	local loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
+	local script_dir path src_url tmp
+
+	if [[ "$library_name" == "_rtd_library" && -n "$loaded_version" ]]; then
+		if [[ -z "$minimum_version" ]] || [[ "$(printf '%s\n%s\n' "$minimum_version" "$loaded_version" | sort -V | tail -n 1)" == "$loaded_version" ]]; then
+			return 0
+		fi
+	fi
+
+	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	for path in \
+		"${script_dir}/${library_name}" \
+		"${script_dir}/../core/${library_name}" \
+		"${script_dir}/../../core/${library_name}" \
+		"/opt/${_TLA:-${_tla:-rtd}}/core/${library_name}" \
+		"/opt/rtd/core/${library_name}" \
+		"${HOME:-}/GIT/RTD-Setup/core/${library_name}" \
+		"${HOME:-}/RTD-Setup/core/${library_name}"; do
+		if [[ -r "$path" ]]; then
+			# shellcheck source=/dev/null
+			source "$path" ""
+			return $?
 		fi
 	done
 
-	tmp=$(mktemp -d)
-	if command -v git &>/dev/null; then
-		if git clone --depth 1 "$RTD_SETUP_CLONE_URL" "$tmp/RTD-Setup" &>/dev/null; then
-			if [[ -f $tmp/RTD-Setup/core/_rtd_library ]]; then
-				set --
-				source "$tmp/RTD-Setup/core/_rtd_library"
-				set -- "${saved_args[@]}"
-				return
-			fi
-		fi
+	src_url="https://github.com/${_GIT_PROFILE:-${GIT_Profile:-vonschutter}}/RTD-Setup/raw/main/core/${library_name}"
+	tmp="$(mktemp "/tmp/${library_name}.XXXXXX" 2>/dev/null || echo "/tmp/${library_name}.$$")"
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL "$src_url" -o "$tmp" || return 1
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO "$tmp" "$src_url" || return 1
+	else
+		return 1
 	fi
-	if wget -qO "$tmp/_rtd_library" "${RTD_SETUP_RAW_BASE}/core/_rtd_library"; then
-		set --
-		source "$tmp/_rtd_library"
-		set -- "${saved_args[@]}"
-		return
-	fi
-	set -- "${saved_args[@]}"
-	die "Unable to locate or download _rtd_library"
+
+	# shellcheck source=/dev/null
+	source "$tmp" ""
+	local rc=$?
+	rm -f "$tmp"
+	return $rc
 }
 
 check_rtd_version(){
@@ -168,7 +171,7 @@ sanity_check(){
 ##############  main  #######################################################
 main(){
 	parse_args "$@"
-	load_rtd_library "$@"
+	rtd::bootstrap_library "_rtd_library" || die "Unable to locate or download _rtd_library"
 	check_rtd_version
 	set_source_urls
 	init_paths

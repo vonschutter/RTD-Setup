@@ -20,13 +20,13 @@
   - Set secure password policy via `security::secure_password_policy`
   - Install AIDE via `security::install_AIDE`
 - Uses RTD `write_*` helpers and RTD branding/version strings.
-- Auto-fetches `_rtd_library` with `dependency::file _rtd_library`; exits if not found.
+- Auto-fetches `_rtd_library` with `rtd::bootstrap_library "_rtd_library"`; exits if not found.
 
 ## Requirements
 
 - Bash shell.
 - `dialog` installed (`rtd-security-tool` exits if missing).
-- `_rtd_library` available (auto-located or downloaded via `dependency::file _rtd_library`).
+- `_rtd_library` available (auto-located or downloaded via `rtd::bootstrap_library "_rtd_library"`).
 - Appropriate privileges for security operations (firewall, auditd, etc.).
 
 ## Usage
@@ -46,7 +46,7 @@ rtd-security-tool
 ## Flow
 
 1. Ensure `dialog` is available.
-2. Load `_rtd_library` via `dependency::file _rtd_library` (auto-fetch from GitHub if missing locally).
+2. Load `_rtd_library` via `rtd::bootstrap_library "_rtd_library"` (auto-fetch from GitHub if missing locally).
 3. Present the Security Tools menu; user selects a task.
 4. Execute the selected `security::` function.
 

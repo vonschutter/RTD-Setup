@@ -1,5 +1,32 @@
 #!/bin/bash
 #
+#::                                   A D M I N   C O M M A N D
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::// RTD Security Inspection Tool //::::::::::::::::::::::::::::// Linux //::::::::
+#:: Author(s):    Tobias Klein, integrated by RTD
+#:: Version:      1.5
+#::
+#:: Purpose:      Inspect ELF binaries, processes, and the running kernel for
+#::               common exploit-mitigation features such as RELRO, NX, PIE,
+#::               stack canaries, ASLR, and related hardening indicators.
+#::
+#:: Value:        Useful for quickly checking whether compiled software and the
+#::               host kernel are taking advantage of baseline Linux hardening
+#::               features before deployment or security review.
+#::
+#:: Usage:        Run with one of the supported checksec options such as
+#::               --file, --dir, --proc, --proc-all, or --kernel.
+#::
+#:: Examples:
+#::               rtd-check-sec --file /usr/bin/ssh
+#::               rtd-check-sec --dir /usr/bin
+#::               rtd-check-sec --kernel
+#::
+#:: Note:         The original upstream BSD license and attribution are kept
+#::               below because this file includes upstream checksec content.
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
 # The BSD License (http://www.opensource.org/licenses/bsd-license.php)
 # specifies the terms and conditions of use for checksec.sh:
 #
@@ -110,15 +137,6 @@ help() {
 # check if command exists
 command_exists () {
     type $1  > /dev/null 2>&1;
-}
-
-# check if directory exists
-dir_exists () {
-    if [ -d $1 ] ; then
-        return 0
-    else
-        return 1
-    fi
 }
 
 # check user privileges

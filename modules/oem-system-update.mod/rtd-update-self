@@ -1,6 +1,7 @@
 #!/bin/bash
 VERSION=1.01
-PUBLICATION="$(basename "$0") | OEM Power Tools Updater          Version: ${VERSION}    $(hostnamectl |grep Operating) on $(hostnamectl |grep "Hardware Model")"
+_HOST_INFO="$(command -v hostnamectl >/dev/null 2>&1 && hostnamectl 2>/dev/null | grep -E 'Operating System|Hardware Model' | paste -sd ' ' - || true)"
+PUBLICATION="$(basename "$0") | OEM Power Tools Updater          Version: ${VERSION}    ${_HOST_INFO}"
 GIT_Profile=${GIT_Profile:-vonschutter}
 #::
 #::
@@ -18,6 +19,16 @@ GIT_Profile=${GIT_Profile:-vonschutter}
 #::
 #::		This task sequence should be executed on a PC with the the RTD OEM installation or configuration
 #::
+#:: Value:        Useful for refreshing an installed RTD environment without
+#::               manually cloning, replacing, or relinking the toolset.
+#::
+#:: Usage:        Run the script on a system with an existing RTD installation.
+#::               Use --autoconfirm for unattended execution.
+#::
+#:: Examples:
+#::               rtd-update-self
+#::               sudo rtd-update-self --autoconfirm
+#::
 #::
 #::
 #:: Background: This system configuration and installation script was created to facilitate geting the latest simple
@@ -29,11 +40,6 @@ GIT_Profile=${GIT_Profile:-vonschutter}
 #
 #
 #
-#	RTD admin scrips are placed in /opt/rtd/scripts. Optionally scripts may use the common
-#	functions in _rtd_functions and _rtd_recipies.
-#	  _rtd_functions -- contain usefull admin functions for scripts, such as "how to install software" on different systems.
-#	  _rtd_recipies  -- contain software installation and configuration "recipies".
-#	Scripts may also be stand-alone if there is a reason for this.
 
 
 
@@ -51,6 +57,20 @@ export _log_dir=/var/log/${_tla,,}
 mkdir -p ${_log_dir}
 autoconfirm=${1}
 export _theme_dir="/opt/${_tla,,}/themes"
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+	cat <<EOF
+Usage:
+  $(basename "$0") [--autoconfirm] [--help|-h]
+
+Description:
+  Update the installed RTD toolset on the current system.
+
+Options:
+  --autoconfirm    Run without the interactive confirmation prompt
+EOF
+	exit 0
+fi
 
 
 # Set the GIT profile name to be used if not set elsewhere:
@@ -76,47 +96,50 @@ mkdir -p ${_bakup_dir}
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-dependency::file ()
-{
-	local _src_url="https://github.com/${_git_profile}/RTD-Setup/raw/main/core/${1}"
-	local _tgt="${1}"
+rtd::bootstrap_library() {
+	local library_name="${1:-_rtd_library}"
+	local minimum_version="${2:-}"
+	local loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
+	local script_dir path src_url tmp
 
-	dependency::search_local ()
-	{
-		echo "${FUNCNAME[0]}: Requested dependency file: ${1} ..."
-
-		for i in "./${1}" "../core/${1}" \
-		"../../core/${1}" \
-		"${0%/*}/../core/${1}" \
-		"${0%/*}/../../core/${1}" \
-		"$(find /opt -name ${1} |grep -v bakup )" ; do
-			echo "${FUNCNAME[0]}: Searching for ${i} ..."
-			if [[ -e "${i}" ]] ; then 
-				echo "${FUNCNAME[0]}: Found ${i}"
-				source "${i}" ""
-				return 0
-			fi
-		done
-		return 1
-	}
-
-	if dependency::search_local "${1}" ; then
-		return 0
-	else
-		echo "$(date) failure to find $1 on the local comuter, now searching online..."
-		if curl -sL $_src_url | source /dev/stdin ; then 
-			echo "${FUNCNAME[0]} Using: ${_src_url} directly from URL..."
-		elif wget ${_src_url} &>/dev/null ; then
-			source ./"${1}"
-			echo "${FUNCNAME[0]} Using: ${_src_url} downloaded..."
-		else 
-			echo "${FUNCNAME[0]} Failed to find  ${1} "
-			exit 1
+	if [[ "$library_name" == "_rtd_library" && -n "$loaded_version" ]]; then
+		if [[ -z "$minimum_version" ]] || [[ "$(printf '%s\n%s\n' "$minimum_version" "$loaded_version" | sort -V | tail -n 1)" == "$loaded_version" ]]; then
+			return 0
 		fi
-	fi 
+	fi
+
+	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	for path in \
+		"${script_dir}/${library_name}" \
+		"${script_dir}/../core/${library_name}" \
+		"${script_dir}/../../core/${library_name}" \
+		"/opt/${_TLA:-${_tla:-rtd}}/core/${library_name}" \
+		"/opt/rtd/core/${library_name}" \
+		"${HOME:-}/GIT/RTD-Setup/core/${library_name}" \
+		"${HOME:-}/RTD-Setup/core/${library_name}"; do
+		if [[ -r "$path" ]]; then
+			# shellcheck source=/dev/null
+			source "$path" ""
+			return $?
+		fi
+	done
+
+	src_url="https://github.com/${_GIT_PROFILE:-${GIT_Profile:-vonschutter}}/RTD-Setup/raw/main/core/${library_name}"
+	tmp="$(mktemp "/tmp/${library_name}.XXXXXX" 2>/dev/null || echo "/tmp/${library_name}.$$")"
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL "$src_url" -o "$tmp" || return 1
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO "$tmp" "$src_url" || return 1
+	else
+		return 1
+	fi
+
+	# shellcheck source=/dev/null
+	source "$tmp" ""
+	local rc=$?
+	rm -f "$tmp"
+	return $rc
 }
-
-
 
 system::perform_powertools_update_linux ()
 {
@@ -255,8 +278,12 @@ do_update ()
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 # Using the common function library to elevate priviledges... This is only useful
-# is the script is not run via sudo to begin with...
-dependency::file _rtd_library
+# if the script is not run via sudo to begin with...
+
+rtd::bootstrap_library "_rtd_library" || {
+	echo "Failed to load _rtd_library"
+	exit 1
+}
 
 
 if [[ ${UID} -eq 0 ]] ; then

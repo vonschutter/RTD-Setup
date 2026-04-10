@@ -9,8 +9,16 @@
 #::
 #:: Purpose: To search a folder structure and move a requested file type to a target folder.
 #::
-#:: 
-#:: 
+#:: Value:   Useful when collecting scattered files of one type into a single
+#::          destination directory without overwriting existing files.
+#::
+#:: Usage:   Provide a file pattern, a source tree, and a destination folder.
+#::          The script will preview the count and ask for confirmation.
+#::
+#:: Examples:
+#::          rtd-mv '*.mp4' /media/camera ~/Videos
+#::          rtd-mv '*.jpg' ~/Downloads ~/Pictures/imported
+#::
 #::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -36,23 +44,49 @@ BRANDING="RTD Simple Support Tool: File type mover/collector "
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-dependency_library ()
-{
-	_src_url=https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/_rtd_library
+rtd::bootstrap_library() {
+	local library_name="${1:-_rtd_library}"
+	local minimum_version="${2:-}"
+	local loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
+	local script_dir path src_url tmp
 
-	if source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library ; then
-		write_information "${FUNCNAME[0]} 1 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
-	elif source "$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../../core/_rtd_library ; then
-		write_information "${FUNCNAME[0]} 2 Using:  $( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )"/../core/_rtd_library
-	elif source $(find /opt -name _rtd_library |grep -v bakup ) ; then
-		write_information "${FUNCNAME[0]} 3 Using: $(find /opt -name _rtd_library |grep -v bakup )"
-	elif wget ${_src_url} ; then
-                write_information "${FUNCNAME[0]} 4 Using: ${_src_url}"
-		source ./_rtd_library
+	if [[ "$library_name" == "_rtd_library" && -n "$loaded_version" ]]; then
+		if [[ -z "$minimum_version" ]] || [[ "$(printf '%s\n%s\n' "$minimum_version" "$loaded_version" | sort -V | tail -n 1)" == "$loaded_version" ]]; then
+			return 0
+		fi
+	fi
+
+	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	for path in \
+		"${script_dir}/${library_name}" \
+		"${script_dir}/../core/${library_name}" \
+		"${script_dir}/../../core/${library_name}" \
+		"/opt/${_TLA:-${_tla:-rtd}}/core/${library_name}" \
+		"/opt/rtd/core/${library_name}" \
+		"${HOME:-}/GIT/RTD-Setup/core/${library_name}" \
+		"${HOME:-}/RTD-Setup/core/${library_name}"; do
+		if [[ -r "$path" ]]; then
+			# shellcheck source=/dev/null
+			source "$path" ""
+			return $?
+		fi
+	done
+
+	src_url="https://github.com/${_GIT_PROFILE:-${GIT_Profile:-vonschutter}}/RTD-Setup/raw/main/core/${library_name}"
+	tmp="$(mktemp "/tmp/${library_name}.XXXXXX" 2>/dev/null || echo "/tmp/${library_name}.$$")"
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL "$src_url" -o "$tmp" || return 1
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO "$tmp" "$src_url" || return 1
 	else
-		echo -e "RTD functions NOT found!"
 		return 1
 	fi
+
+	# shellcheck source=/dev/null
+	source "$tmp" ""
+	local rc=$?
+	rm -f "$tmp"
+	return $rc
 }
 
 
@@ -168,18 +202,13 @@ display_help () {
 if [ "$1" = "--help" ]; then display_help ; fi
 if [ "$1" = "" ]; then display_help ; fi
 
-exec_task () {
-	dependency_library || { echo "Library not found!" ; exit 1 ; }
-	build_file_list
+rtd::bootstrap_library "_rtd_library" || { echo "Failed to load _rtd_library"; exit 1; }
+build_file_list
 
-	if ($rtd_menu --fb  --title "$BRANDING" --yesno "I found $number_of_files_to_move files for $filetype type to move. Do you want to proceed?  $todo" 15 95); then
-		move_file_list && echo "$prog %: $number of files moved to $target" || echo "someting may have gone wrong: $prog % ($number) of files were moved. Please check."
-	else
-		echo Skipping move of $number_of_files_to_move files
-	fi
+if ($rtd_menu --fb  --title "$BRANDING" --yesno "I found $number_of_files_to_move files for $filetype type to move. Do you want to proceed?  $todo" 15 95); then
+	move_file_list && echo "$prog %: $number of files moved to $target" || echo "someting may have gone wrong: $prog % ($number) of files were moved. Please check."
+else
+	echo Skipping move of $number_of_files_to_move files
+fi
 
-	#Cleanup
-	IFS=$SAVEIFS
-	return
-}
-
+IFS=$SAVEIFS
