@@ -264,8 +264,8 @@ display_notice () {
 	- Display system information and resource usage
 
 	To use this tool simply execute it: $( basename $0 )
-	This tool is usefull for support staff that do not live on the command line daily, and
-	can be used over ssh. If you do get disconnected the tool will remain active remotley
+	This tool is useful for support staff that do not live on the command line daily, and
+	can be used over ssh. If you do get disconnected the tool will remain active remotely
 	and you can easily reconnect to it by re-establishing your ssh connection and typing
 	the word: byobu in the terminal. "  $HEIGHT $WIDTH
 	clear
@@ -277,7 +277,7 @@ show_notice_on_fist_run () {
 		echo $RTD_Version has been used already and terms reviewed...
 	else
 		show_notice_on_fist_run_TEXT="
-This looks like the first time you run this vesion of the RTD tools. Please note that these tools are provided as-is and for modification.
+This looks like the first time you run this version of the RTD tools. Please note that these tools are provided as-is and for modification.
 
 The RTD tools run in a separate terminal that you can re connect to if you should get disconnected; for example if you are
 remotely connecting through SSH. This can be done by:
@@ -304,7 +304,7 @@ rtd_setup_choices_cli_workstation () {
 		 2 "Alpine email client" off
 		 3 "Vim text editor" on
 		 4 "Finch multi protocol chat" off
-		 5 "Word Grinder word precessor" off
+		 5 "Word Grinder word processor" off
 		 6 "Spreadsheet Calculator" off
 		 7 "TPP Presentation Program" off
 		 8 "Midnight Commander file manager (Norton Commander)" on
@@ -455,330 +455,59 @@ show_make_media_gui_desktop () {
 
 
 
+rtd::find_vm_tool() {
+	local script_dir candidate command_path
+
+	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+	for candidate in \
+		"${RTD_VM_TOOL:-}" \
+		"${script_dir}/../vm-tool.mod/rtd-vm-tool" \
+		"${script_dir}/rtd-vm-tool" \
+		"/opt/${_TLA:-rtd}/modules/vm-tool.mod/rtd-vm-tool" \
+		"/opt/rtd/modules/vm-tool.mod/rtd-vm-tool" \
+		"/opt/${_TLA:-rtd}/modules/rtd-vm-tool" \
+		"${HOME:-}/bin/rtd-vm-tool" \
+		"${HOME:-}/GIT/RTD-Setup/modules/vm-tool.mod/rtd-vm-tool" \
+		"${HOME:-}/RTD-Setup/modules/vm-tool.mod/rtd-vm-tool"; do
+		if [[ -n "$candidate" && -r "$candidate" ]]; then
+			printf '%s\n' "$candidate"
+			return 0
+		fi
+	done
+
+	command_path="$(command -v rtd-vm-tool 2>/dev/null || true)"
+	if [[ -n "$command_path" ]]; then
+		printf '%s\n' "$command_path"
+		return 0
+	fi
+
+	return 1
+}
+
+
 show_manage_vm_gui () {
-	# List Options to be available for choice in the RTD System Configurator...
-	while true; do
-		exec 3>&1
-		selection=$($RTD_GUI \
-		--backtitle "$BRANDING" \
-		--title "VM Managment Menu"  \
-		--menu "Please select what you would like to do below:"  "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
-		"1" "List all virtual machines on this system" \
-		"2" "Backup all running virtual machines on this server" \
-		"3" "Monitor VM's on this system "\
-		"4" "Create a VM template on this server" \
-		2>&1 1>&3 )
-		exit_status=$?
-		exec 3>&-
-		clear
+	local vm_tool exit_status
 
-		case $exit_status in
-			"$DIALOG_CANCEL") return ;;
-			"$DIALOG_ESC") return ;;
-		esac
+	if ! vm_tool="$(rtd::find_vm_tool)"; then
+		dialog::display_error "The RTD VM Tool could not be found. Install rtd-vm-tool or set RTD_VM_TOOL to its full path."
+		return 1
+	fi
 
-		case $selection in
-		0 )
-			echo "Program terminated by user..."
-		;;
-		1 )
-			if hash virsh ; then
-				result=$(virsh list --all )
-				dialog::display_result "Virtual Machines on this system:"
-			else
-				echo KVM Virtualization is not installed on this machine.
-			fi
-		;;
-		2 )
-			kvm::backup_running_vm
-		;;
-		3)
-			echo "VM Status on This HOST: Press [Q] to quit."
-			software::check_native_package_dependency virt-top
-			virt-top
-		;;
-		4 )
-			while true; do
-				exec 3>&1
-				subselection2=$($RTD_GUI --backtitle "$BRANDING" --title "Make Virtual Machine" --menu "    "  $HEIGHT $WIDTH $LIST_HEIGHT \
-				"1" "Make a SERVER VM (Minimal single purpose system)" \
-				"2" "Make a VDI VM (chose desktop and distribution)" \
-				2>&1 1>&3)
-				exit_status=$?
-				exec 3>&-
-				clear
+	clear
+	if [[ -x "$vm_tool" ]]; then
+		RTD_GUI="${RTD_GUI:-dialog}" "$vm_tool"
+	else
+		RTD_GUI="${RTD_GUI:-dialog}" bash "$vm_tool"
+	fi
+	exit_status=$?
+	clear
 
-				case $exit_status in
-					"$DIALOG_CANCEL") return	;;
-					"$DIALOG_ESC") return ;;
-				esac
+	if [[ "$exit_status" -ne 0 ]]; then
+		dialog::display_error "The RTD VM Tool exited with status $exit_status."
+	fi
 
-				case $subselection2 in
-					0) echo "Program terminated."
-					;;
-					1) show_deploy_server_VM_now_menu
-					;;
-					2) show_deploy_VDI_VM_now_menu
-					;;
-				esac
-			done
-		;;
-		esac
-	done
-}
-
-
-show_deploy_server_VM_now_menu()
-{
-
-		while true; do
-		exec 3>&1
-		selection=$($RTD_GUI \
-		--backtitle "$BRANDING" --title "Create Template VM Server"  --menu "Please select which type of VM to create:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
-		"1" "🐧 Ubuntu Server" \
-		"2" "🐧 Ubuntu LAMP Server" \
-		"3" "🐧 Ubuntu Postfix Server" \
-		"4" "🐧 Ubuntu Bind9 Server" \
-		"5" "🐧 Ubuntu DHCP Server" \
-		"6" "🐧 Ubuntu Samba Server" \
-		"7" "🐧 Ubuntu Print Server" \
-		"8" "🐧 Ubuntu Graphical Server" \
-		"9" "🌀 Debian Print Server" \
-		"10" "🌀 Debian Minimal Server" \
-		"11" "⛏️ Minecraft Server" \
-		"12" "🎩 Fedora Minimal Server" \
-		"13" "🎩 Fedora Ansible Server" \
-		2>&1 1>&3)
-		exit_status=$?
-		exec 3>&-
-		clear
-
-		case $exit_status in
-			"$DIALOG_CANCEL") return ;;
-			"$DIALOG_ESC") return ;;
-		esac
-
-		case $selection in
-		0 )
-			clear
-			write_information "Program terminated by user..."
-		;;
-		1 )
-			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app ubuntu-server --ask YES
-			cleanup_and_finish nomessage
-		;;
-		2 )
-			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app lamp-server --ask YES
-			cleanup_and_finish nomessage
-		;;
-		3 )
-			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app postfix --ask YES
-			cleanup_and_finish nomessage
-		;;
-		4 )
-			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app bind9 --ask YES
-			cleanup_and_finish nomessage
-		;;
-		5 ) 
-			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app dhcp-server --ask YES
-			cleanup_and_finish nomessage
-		;;
-		6 ) 
-			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app samba --ask YES
-			cleanup_and_finish nomessage
-		;;
-		7 ) 
-			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app print-server --ask YES
-			cleanup_and_finish nomessage
-		;;
-		8 )
-			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app server-desktop --DE xubuntu-desktop --ask YES
-			cleanup_and_finish nomessage
-		;;
-		9 )
-			kvm::make_vm_now_from_debian_org --role server --server_role print-server
-			cleanup_and_finish nomessage
-		;;
-		10 )
-			kvm::make_vm_now_from_debian_org --role server --server_role openssh-server
-			cleanup_and_finish nomessage
-		;;
-		11 )
-			kvm::make_vm_now_from_ubuntu_com --role server --pre-config minecraft --tshirt-size medium
-			cleanup_and_finish nomessage
-		;;
-		12 )
-			PRESEED_FILE="$(mktemp)"
-			generate_fedora_ks_cfg_file "${PRESEED_FILE}" ssh-server
-			kvm::make_vm_now_from_fedora_org fedora30
-			cleanup_and_finish nomessage
-		;;
-		13 )
-			PRESEED_FILE="$(mktemp)"
-			generate_fedora_ks_cfg_file "${PRESEED_FILE}" ansible-server
-			kvm::make_vm_now_from_fedora_org fedora30
-			cleanup_and_finish nomessage
-		;;
-		esac
-
-	done
-}
-
-
-show_deploy_VDI_VM_now_menu ()
-{
-	while true; do
-		exec 3>&1
-		selection=$($RTD_GUI --backtitle "$BRANDING" --title "Create a Virtual Desktop (VDI) Template"  --menu "Please select which VDI Template to create on this server:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
-		"1"  "🐧 Ubuntu Standard Desktop       (more MAC like)" \
-		"2"  "🐧 Ubuntu KDE Desktop            (more Windows like)" \
-		"3"  "🐧 Ubuntu Xubuntu Desktop        (light weight server VDI)" \
-		"4"  "🐧 Ubuntu Mate Desktop           (light weight Server VDI)" \
-		"5"  "🐧 Ubuntu Lubuntu Desktop        (light weight Server VDI)" \
-		"6"  "🐧 Ubuntu Cinnamon Desktop       (Convenient features)" \
-		"7"  "🌀 Debian Default Desktop        (reseal manually)" \
-		"8"  "🌀 Debian Cinnamon Desktop       (reseal manually)" \
-		"9"  "🌀 Debian Plasma Desktop         (reseal manually)" \
-		"10"  "🌀 Debian Light Weight Desktop   (reseal manually)" \
-		"11"  "🎩 Fedora Workstation VDI        (reseal manually)" \
-		"12"  "🎩 Fedora Plasma (KDE) VDI       (reseal manually)" \
-		"13"  "🎩 Fedora Mate Desktop VDI       (reseal manually)" \
-		"14"  "🎩 Fedora Cinnamon Desktop VDI   (reseal manually)" \
-		"15"  "🎩 Fedora Budgie Desktop VDI     (reseal manually)" \
-		"16"  "🎩 Fedora i3 Desktop VDI         (tiling wm)" \
-		"17"  "🎩 Fedora Sway Desktop VDI       (tiling wm)" \
-		"18"  "🦎 SUSE Default (KDE) VDI        (reseal manually)" \
-		"19"  "🦎 SUSE Gnome VDI                (reseal manually)" \
-		"20"  "🦎 SUSE XFCE VDI                 (light weight)" \
-		"21"  "🦎 SUSE LXDE VDI                 (light weight)" \
-		"22"  "🦎 SUSE Mate VDI                 (light weight)" \
-		"23"  "🦎 SUSE Cinnamon VDI             (light weight)" \
-		"24"  "🪟 Windows 10 VDI                (reseal manually)" \
-		"25"  "🪟 Windows 11 VDI                (reseal manually)" \
-		"26"  "🐧 Zorin VDI                     (reseal manually)" \
-		"27"  "🐉 Kali Security Suite VDI       (Penetration testing etc.)" \
-		2>&1 1>&3)
-		exit_status=$?
-		exec 3>&-
-		clear
-
-		case $exit_status in
-			"$DIALOG_CANCEL") return ;;
-			"$DIALOG_ESC") return ;;
-		esac
-
-		case $selection in
-		0 )
-			echo "Program terminated by user..."
-		;;
-		1 )
-			kvm::make_vm_now_from_ubuntu_com --role VDI --server-app ubuntu-desktop --ask YES --tshirt-size medium 
-			cleanup_and_finish nomessage
-		;;
-		2 )
-			kvm::make_vm_now_from_ubuntu_com --role VDI --server-app kubuntu-desktop --ask YES --tshirt-size medium 
-			cleanup_and_finish nomessage
-		;;
-		3 )
-			kvm::make_vm_now_from_ubuntu_com --role VDI --server-app xubuntu-desktop --ask YES --tshirt-size medium
-			cleanup_and_finish nomessage
-		;;
-		4 )
-			kvm::make_vm_now_from_ubuntu_com --role VDI --server-app ubuntu-mate-desktop --ask YES --tshirt-size medium
-			cleanup_and_finish nomessage
-		;;
-		5 )
-			kvm::make_vm_now_from_ubuntu_com --role VDI --server-app lubuntu-desktop --ask YES
-			cleanup_and_finish nomessage
-		;;
-		6 )
-			kvm::make_vm_now_from_ubuntu_com --role VDI --server-app cinnamon-desktop-environment --ask YES
-			cleanup_and_finish nomessage
-		;;
-		7 )
-			kvm::make_vm_now_from_debian_org --role workstation --DE gnome-desktop --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		8 )
-			kvm::make_vm_now_from_debian_org --role workstation --DE cinnamon-desktop --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		9 )
-			kvm::make_vm_now_from_debian_org --role workstation --DE kde-desktop --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		10 )
-			kvm::make_vm_now_from_debian_org --role workstation --DE lxde-desktop --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		11 )
-			kvm::make_vm_now_from_fedora_org --role workstation --DE "@workstation-product-environment" --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		12 )
-			kvm::make_vm_now_from_fedora_org --role workstation --DE "@kde-desktop-environment" --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		13 )
-			kvm::make_vm_now_from_fedora_org --role workstation --DE "@mate-desktop-environment" --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		14 )
-			kvm::make_vm_now_from_fedora_org --role workstation --DE "@cinnamon-desktop-environment" --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		15 )
-			kvm::make_vm_now_from_fedora_org --role workstation --DE "@budgie-desktop-environment" --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		16 )
-			kvm::make_vm_now_from_fedora_org --role workstation --DE "@i3-desktop-environment" --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		17 )
-			kvm::make_vm_now_from_fedora_org --role workstation --DE "@sway-desktop-environment" --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		18 )
-			kvm::make_vm_now_from_opensuse_org --DE kde --product Leap --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		19 )
-			kvm::make_vm_now_from_opensuse_org --DE gnome --product Leap --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		20 )
-			kvm::make_vm_now_from_opensuse_org --DE xfce --product Leap --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		21 )
-			kvm::make_vm_now_from_opensuse_org --DE lxde --product Leap --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		22 )
-			kvm::make_vm_now_from_opensuse_org --DE mate --product Leap --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		23 )
-			kvm::make_vm_now_from_opensuse_org --DE cinnamon --product Leap --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		24 )
-			kvm::make_vm_now_from_microsoft --winver win10 --tshirt-size medium
-		;;
-		25 )
-			kvm::make_vm_now_from_microsoft --winver win11 --tshirt-size medium
-		;;
-		26 )
-			kvm::make_vm_now_from_zorin --role desktop --flavor ubuntu --DE gnome-desktop --tshirt-size small
-		;;
-		27 )
-			kvm::make_vm_now_from_kali_org --role workstation --DE standard --tshirt-size medium
-			cleanup_and_finish nomessage
-		;;
-		esac 
-
-	done
+	return 0
 }
 
 

@@ -31,15 +31,6 @@
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # Variables that govern the behavior or the script and location of files are
 
-# Identify
-	echo -e $GREEN"$PUBLICATION: Version $VERSION" $ENDCOLOR
-	echo -e $GREEN"--------------------------------------------------------" $ENDCOLOR
-
-# Set self-update source.
-	:	${RTD_UPDATE_SOURCE_BRANCH:="main"}
-	:	${RTD_UPDATE_SOURCE_MODULE:="modules/oem-system-update.mod"}
-	:	${RTD_UPDATE_SOURCE_BASE_URL:="https://github.com/${GIT_Profile}/RTD-Setup/raw/${RTD_UPDATE_SOURCE_BRANCH}/${RTD_UPDATE_SOURCE_MODULE}"}
-
 # Set colors for prompting on screen.
 	YELLOW="\033[1;33m"
 	RED="\033[1;31m"
@@ -48,13 +39,20 @@
 	BLUE="\033[1;34m"
 	BOLD="\033[1m"
 
+# Set self-update source.
+	:	${RTD_UPDATE_SOURCE_BRANCH:="main"}
+	:	${RTD_UPDATE_SOURCE_MODULE:="modules/oem-system-update.mod"}
+	:	${RTD_UPDATE_SOURCE_BASE_URL:="https://github.com/${GIT_Profile}/RTD-Setup/raw/${RTD_UPDATE_SOURCE_BRANCH}/${RTD_UPDATE_SOURCE_MODULE}"}
+
+
+# Define help text for the script in a colorful and organized way. 
 script::help ()
 {
 	local script_name
-
+	script::show_banner
 	script_name=$(basename "$0")
 
-	printf "%b\n" "${GREEN} "HELP" ${ENDCOLOR}
+	printf "%b\n" "${GREEN} HELP ${ENDCOLOR}
 ${GREEN}--------------------------------------------------------${ENDCOLOR}
 
   This tool makes it simple to update software from all channels
@@ -96,41 +94,38 @@ ${BLUE}${BOLD}Examples:${ENDCOLOR}
 "
 }
 
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script initialization           ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 script::config_notice ()
 {
 	printf "%b\n" "${YELLOW}::There is nothing to configure at this time!::${ENDCOLOR}"
 }
 
-# Validate input parameters and display help if needed.
-case "${1:-}" in
-	--help | -h)
-		script::help
-		exit 0
-		;;
-	config | --config)
-		script::config_notice
-		exit 0
-		;;
-	--update | --setup | --noui)
-		;;
-	--*)
-		printf "%b\n" "${RED}Unknown option: $1${ENDCOLOR}"
-		printf "%b\n" "Use ${YELLOW}--help${ENDCOLOR} to see supported options."
-		exit 2
-		;;
-esac
+script::initialize_runtime ()
+{
+	# Put a convenient link to the logs where logs are normally found.
+	export _SCRIPTNAME
+	export _TLA
+	export _LOG_DIR
+	export LOGFILE
 
+	_SCRIPTNAME=$(basename "$0")
+	_TLA=${_SCRIPTNAME:0:3}
+	_LOG_DIR=/var/log/${_TLA}
+	mkdir -p "${_LOG_DIR}" || return 1
+	LOGFILE=${_LOG_DIR}/${_SCRIPTNAME}.log
+}
 
-	
-# Put a convenient link to the logs where logs are normally found...
-# capture the 3 first letters as org TLA (Three Letter Acronym)
-export _SCRIPTNAME=$(basename $0)
-export _TLA=${_SCRIPTNAME:0:3}
-export _LOG_DIR=/var/log/${_TLA}
-mkdir -p ${_LOG_DIR}
-
-# Determine log file names for this session
-export LOGFILE=${_LOG_DIR}/${_SCRIPTNAME}.log
+script::show_banner ()
+{
+	echo -e "${GREEN}${PUBLICATION}: Version ${VERSION}${ENDCOLOR}"
+	echo -e "${GREEN}--------------------------------------------------------${ENDCOLOR}"
+}
 
 
 
@@ -143,8 +138,28 @@ export LOGFILE=${_LOG_DIR}/${_SCRIPTNAME}.log
 
 main ()
 {
+	case "${1:-}" in
+		--help | -h)
+			script::help
+			exit 0
+			;;
+		config | --config)
+			script::config_notice
+			exit 0
+			;;
+		--update | --setup | --noui)
+			;;
+		--*)
+			printf "%b\n" "${RED}Unknown option: $1${ENDCOLOR}"
+			printf "%b\n" "Use ${YELLOW}--help${ENDCOLOR} to see supported options."
+			exit 2
+			;;
+	esac
 
 	become_root "$@" || pause::for_input 1 "$0: $* Failed to elevate privileges!"
+
+	script::initialize_runtime || pause::for_input 1 "$0: $* Failed to initialize runtime!"
+	script::show_banner
 
 	# Check if the RTD library is loaded
 	rtd::bootstrap_library "_rtd_library" || pause::for_input 1 "$0: $* Failed to load RTD Library!"
@@ -154,10 +169,6 @@ main ()
 			log_item "The instruction update_me was given..."
 			update_me
 			;;
-		config | --config)
-			log_item "The instruction config_me was given..."
-			config_me
-			;;
 		setup | --setup)
 			log_item "The instruction setup_me was given..."
 			setup_me "${@:2}"
@@ -165,11 +176,6 @@ main ()
 		--noui)
 			write_status "Updating installed software text display only..."
 			software::update_system_txt 
-			;;
-		--*)
-			write_error "Unknown option: $1"
-			write_information "Use --help to see supported options."
-			return 2
 			;;
 		*)
 			if [[ -n "${1:-}" ]]; then
