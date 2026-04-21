@@ -180,22 +180,21 @@ rtd::bootstrap_library() {
 
 rtd_oem_check_inet_access ()
 {
-# Function to verrify internet availabiltiy.
-# The funciton will pause for 10 seconds by default, and will accept
-# an integer to indicate a non-deault time to pause.
+# Function to verify internet availability.
+# The function will pause for 10 seconds by default, and will accept
+# an integer to indicate a non-default time to pause.
+	local timeout="${1:-10}"
 
-	_ARG=$1
-	if [[ -z "$_ARG" ]]; then
-		ping -c 1  8.8.8.8 &>/dev/null || ( read -p "N O T I C E ! -- NO INTERNET ACCESS: This script may require access to the internet to work properly! Press [ENTER] to continue and [CTRL] + [C] to exit!  " )
-	else
-		ping -c 1  8.8.8.8 &>/dev/null || ( read -t ${1:-10} -p "N O T I C E ! -- NO INTERNET ACCESS: This script may require access to the internet to work properly! Press [ENTER] to continue and [CTRL] + [C] to exit!  Continuing in ${1:-10} seconds..." )
+	if ! [[ "$timeout" =~ ^[0-9]+$ ]]; then
+		timeout=10
 	fi
+
+	ping -c 1 -W 2 8.8.8.8 &>/dev/null && return 0
+
+	read -r -t "$timeout" -p "N O T I C E ! -- NO INTERNET ACCESS: This script may require access to the internet to work properly! Press [ENTER] to continue and [CTRL] + [C] to exit! Continuing in $timeout seconds... "
+	echo
+	return 0
 }
-
-
-
-
-
 
 
 
@@ -292,13 +291,13 @@ remotely connecting through SSH. This can be done by:
 
 
 rtd_setup_choices_cli_workstation () {
-	# Function to display legacy installation options. This will install software that is usefull
+	# Function to display legacy installation options. This will install software that is useful
 	# on a really old system, or a remote system only accessible via SSH. This may be a good
-	# usecase if you happen to be in an opressed geographic locaiton where your only option is
-	# to ssh to a remote server and access email and web that way. Perfomance in these cases
+	# use case if you happen to be in an oppressed geographic location where your only option is
+	# to ssh to a remote server and access email and web that way. Performance in these cases
 	# may be very poor over the internet (as for example with the great firewall of China). In
-	# Such a case it would be usefull to have the good old CLI software! :)
-	# List Options to be available for choice in the RTD System Configurator...
+	# Such a case it would be useful to have the good old CLI software! :)
+	# List Options to be available for choice in the RTD System Confgurator...
 	cmd=( $RTD_GUI --backtitle "$BRANDING" --title "Terminal Software add on Options Menu" --separate-output --checklist "You can be productive in the cli environment. Please Select Software titles below that you want to add to this system:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" )
 	options=(1 "Base RTD OEM Software (basic admin tools usually needed)" on
 		 2 "Alpine email client" off
@@ -516,7 +515,7 @@ show_view_informaion_about_this_system () {
 		exec 3>&1
 		selection=$($RTD_GUI --keep-tite --backtitle "$BRANDING" --title "System Information Menu" --menu "" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
 		"1" "Show system summary" \
-		"2" "Display OS Informaton" \
+		"2" "Display OS Information" \
 		"3" "View Windows Product KEY in system BIOS (if present)" \
 		"4" "Show storage device space utilization" \
 		"5" "Show users HOME folder storage use" \
@@ -526,7 +525,7 @@ show_view_informaion_about_this_system () {
 		"9" "List PCI Devices" \
 		"10" "List USB devices" \
 		"11" "Show systems physical location (city, county etc.)" \
-		"12" "Show the weather forcast at the location of this system" \
+		"12" "Show the weather forecast at the location of this system" \
 		"13" "Check file limits on this system" \
 		2>&1 1>&3)
 		exit_status=$?
@@ -723,8 +722,8 @@ show_manage_software_gui () {
 		clear
 
 		case $exit_status in
-			$DIALOG_CANCEL) return	;;
-			$DIALOG_ESC) return ;;
+			"$DIALOG_CANCEL") return	;;
+			"$DIALOG_ESC") return ;;
 		esac
 
 		case $selection in
@@ -736,10 +735,10 @@ show_manage_software_gui () {
 		;;
 		2 )
 			dist_info="$(hostnamectl)"
-			if echo $dist_info |grep ".*buntu" &>/dev/null ; then
-				result="$(oftware::rtd_ppa_checker)"
+			if echo "$dist_info" |grep ".*buntu" &>/dev/null ; then
+				result="$(software::rtd_ppa_checker)"
 				dialog::display_result "Packages Installed from Personal Package Archives"
-			elif echo $dist_info |grep "Pop!_OS" 2>/dev/null ; then
+			elif echo "$dist_info" |grep "Pop!_OS" 2>/dev/null ; then
 				result="$(oftware::rtd_ppa_checker)"
 				dialog::display_result "Packages Installed from Personal Package Archives"
 			else
@@ -749,10 +748,10 @@ show_manage_software_gui () {
 		;;
 		3 )
 			dist_info="$(hostnamectl)"
-			if echo $dist_info |grep ".*buntu" &>/dev/null ; then
-				oftware::rtd_ppa_checker --delete | $RTD_GUI --programbox "Personal Package Archive Check:" $HEIGHT $WIDTH
-			elif echo $dist_info |grep "Pop!_OS" 2>/dev/null ; then
-				oftware::rtd_ppa_checker --delete | $RTD_GUI --programbox "Personal Package Archive Check:" $HEIGHT $WIDTH
+			if echo "$dist_info" |grep ".*buntu" &>/dev/null ; then
+				software::rtd_ppa_checker --delete | $RTD_GUI --programbox "Personal Package Archive Check:" "$HEIGHT" "$WIDTH"
+			elif echo "$dist_info" |grep "Pop!_OS" 2>/dev/null ; then
+				software::rtd_ppa_checker --delete | $RTD_GUI --programbox "Personal Package Archive Check:" "$HEIGHT" "$WIDTH"
 			else
 				result="Non Ubuntu based distributions do not Support the use of Personal Package Archives \n Press [ OK ] to return to the prevous menu."
 				dialog::display_result "Functionality Not Supported"
@@ -791,12 +790,12 @@ show_main_menu () {
 		clear
 
 		case $exit_status in
-			$DIALOG_CANCEL)
+			"$DIALOG_CANCEL")
 				clear
 				echo "Program terminated."
 				exit 0
 			;;
-			$DIALOG_ESC)
+			"$DIALOG_ESC")
 				clear
 				echo "Program aborted." >&2
 				exit 0
@@ -829,8 +828,8 @@ show_main_menu () {
 				clear
 
 				case $exit_status in
-					$DIALOG_CANCEL) show_main_menu ;;
-					$DIALOG_ESC) return ;;
+					"$DIALOG_CANCEL") show_main_menu ;;
+					"$DIALOG_ESC") return ;;
 				esac
 
 				case $subselection1 in
@@ -861,18 +860,19 @@ show_manage_crypt_sec () {
 		selection=$($RTD_GUI \
 			--backtitle "$BRANDING" \
 			--title "Manage encryption phrases and passwords" \
-			--menu "" $HEIGHT $WIDTH $LIST_HEIGHT \
+			--cancel-button "Back" \
+			--menu "Select a security task:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
 			"1" "Check if a password is stolen" \
 			"2" "Change systems disk encrytion pass phrase" \
-			"3" "Change "$SUDO_USER" password" \
+			"3" "Change \"$SUDO_USER\" password" \
 			2>&1 1>&3)
 		exit_status=$?
 		exec 3>&-
 		clear
 
 		case $exit_status in
-			$DIALOG_CANCEL) return ;;
-			$DIALOG_ESC) return ;;
+			"$DIALOG_CANCEL") return ;;
+			"$DIALOG_ESC") return ;;
 		esac
 
 		case $selection in
@@ -886,7 +886,7 @@ show_manage_crypt_sec () {
 				security::change_disk_pass
 			;;
 			3 )
-				passwd $SUDO_USER
+				passwd "$SUDO_USER"
 			;;
 		esac
 	done
