@@ -10,7 +10,7 @@
 #:: Version:    1.0
 #:: Purpose:    Whonix-KVM fully automatic installer with error handling and auto-discovery.
 #:: Usage:      sudo bash rtd-setup-whonix.sh [--refresh] [--add]
-#:: Requires:   RTD library > 2.04, admin privileges, and KVM/libvirt stack (qemu, libvirt, dnsmasq, virt-manager, xz-utils, wget).
+#:: Requires:   RTD library >= 2.05, admin privileges, and KVM/libvirt stack (qemu, libvirt, dnsmasq, virt-manager, xz-utils, wget).
 #:: Notes:      Downloads the latest Whonix libvirt bundle, verifies, defines networks, and stages/defines the Gateway + Workstation VMs.
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -72,18 +72,37 @@ EOF
 
 ##############  locate and source RTD library  ##############################
 rtd::bootstrap_library() {
-	local library_name="${1:-_rtd_library}"
-	local minimum_version="${2:-}"
-	local loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
-	local script_dir path src_url tmp
+	local library_name="${1:-_rtd_library}" minimum_version="" loaded_version path script_dir src_url tmp rc check
+	local -a checks=()
 
-	if [[ "$library_name" == "_rtd_library" && -n "$loaded_version" ]]; then
-		if { [[ -z "$minimum_version" ]] || [[ "$(printf '%s\n%s\n' "$minimum_version" "$loaded_version" | sort -V | tail -n 1)" == "$loaded_version" ]]; } &&
-			declare -F system::log_item >/dev/null 2>&1 &&
-			declare -F library::apply_rtd_defaults >/dev/null 2>&1; then
-			return 0
+	[[ $# -gt 0 && "${1:-}" != --* ]] && { library_name="$1"; shift; }
+	[[ $# -gt 0 && "${1:-}" != --* ]] && { minimum_version="$1"; shift; }
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--version|--check)
+				[[ -n "${2:-}" ]] || { echo "Missing value for $1" >&2; return 1; }
+				[[ "$1" == "--version" ]] && minimum_version="$2" || checks+=("$2")
+				shift 2
+			;;
+			*)
+				echo "Unknown rtd::bootstrap_library option: $1" >&2
+				return 1
+			;;
+		esac
+	done
+
+	[[ "$library_name" == "_rtd_library" && ${#checks[@]} -eq 0 ]] && checks=(system::log_item library::apply_rtd_defaults)
+
+	rtd::bootstrap_library::ok() {
+		loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
+		if [[ "$library_name" == "_rtd_library" && -n "$minimum_version" ]]; then
+			[[ -n "$loaded_version" ]] || return 1
+			[[ "$(printf '%s\n%s\n' "$minimum_version" "$loaded_version" | sort -V | tail -n 1)" == "$loaded_version" ]] || return 1
 		fi
-	fi
+		for check in "${checks[@]}"; do declare -F "$check" >/dev/null 2>&1 || return 1; done
+	}
+
+	[[ "$library_name" == "_rtd_library" && -n "$loaded_version" ]] && rtd::bootstrap_library::ok && return 0
 
 	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 	for path in \
@@ -94,40 +113,34 @@ rtd::bootstrap_library() {
 		"/opt/rtd/core/${library_name}" \
 		"${HOME:-}/GIT/RTD-Setup/core/${library_name}" \
 		"${HOME:-}/RTD-Setup/core/${library_name}"; do
-		if [[ -r "$path" ]]; then
-			# shellcheck source=/dev/null
-			source "$path" ""
-			return $?
-		fi
+		[[ -r "$path" ]] || continue
+		# shellcheck source=/dev/null
+		source "$path" ""
+		rc=$?
+		[[ $rc -eq 0 ]] && rtd::bootstrap_library::ok && return 0
 	done
 
 	src_url="https://github.com/${_GIT_PROFILE:-${GIT_Profile:-vonschutter}}/RTD-Setup/raw/main/core/${library_name}"
 	tmp="$(mktemp "/tmp/${library_name}.XXXXXX" 2>/dev/null || echo "/tmp/${library_name}.$$")"
+	rc=0
 	if command -v curl >/dev/null 2>&1; then
-		curl -fsSL "$src_url" -o "$tmp" || return 1
+		curl -fsSL "$src_url" -o "$tmp" || rc=$?
 	elif command -v wget >/dev/null 2>&1; then
-		wget -qO "$tmp" "$src_url" || return 1
+		wget -qO "$tmp" "$src_url" || rc=$?
 	else
-		return 1
+		rc=1
 	fi
+	[[ ${rc:-0} -eq 0 ]] || { rm -f "$tmp"; return "$rc"; }
 
 	# shellcheck source=/dev/null
 	source "$tmp" ""
-	local rc=$?
+	rc=$?
 	rm -f "$tmp"
-	return $rc
-}
+	[[ $rc -eq 0 ]] || return "$rc"
+	rtd::bootstrap_library::ok && return 0
 
-check_rtd_version(){
-	local min="2.04"
-	if [ -z "${RTD_VERSION:-}" ]; then
-		die "_rtd_library not loaded correctly (RTD_VERSION missing)"
-	fi
-	local max
-	max=$(printf '%s\n%s\n' "$RTD_VERSION" "$min" | sort -V | tail -1)
-	if [[ $max != "$RTD_VERSION" || $RTD_VERSION == "$min" ]]; then
-		die "_rtd_library version $RTD_VERSION is unsupported; require > $min"
-	fi
+	echo "Loaded $library_name, but the requested version/functions are not available." >&2
+	return 1
 }
 
 ##############  install distro packages  ####################################
@@ -173,8 +186,7 @@ sanity_check(){
 ##############  main  #######################################################
 main(){
 	parse_args "$@"
-	rtd::bootstrap_library "_rtd_library" || die "Unable to locate or download _rtd_library"
-	check_rtd_version
+	rtd::bootstrap_library "_rtd_library" --version 2.05 --check software::check_native_package_dependency || die "Unable to locate or download a compatible _rtd_library"
 	set_source_urls
 	init_paths
 	security::ensure_admin || die "Failed to obtain admin privileges"
