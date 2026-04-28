@@ -2,11 +2,12 @@
 
 ![RTD VM Tool](Media_files/header-time.jpg)
 
-This module ships `rtd-vm-tool`, a menu-driven Bash utility for managing KVM/libvirt virtual machines in the RTD stack. It helps with routine VM tasks from a single TUI and **requires** the shared `_rtd_library` (auto-fetched if not already loaded). The tool calls `rtd::bootstrap_library "_rtd_library"` on startup and exits if the library cannot be sourced.
+This module ships `rtd-vm-tool`, a menu-driven Bash utility for managing KVM/libvirt virtual machines in the RTD stack, and `rtd-vm-tool-gtk`, a Zenity-based GTK front-end that mirrors the same menu tree. Both tools **require** the shared `_rtd_library` (auto-fetched if not already loaded). The tools call `rtd::bootstrap_library "_rtd_library"` on startup and exit if the library cannot be sourced.
 
 ## Features
 
 - Dialog (Text GUI) based interface for common VM operations.
+- Zenity/GTK launcher for the same main/template/settings/maintenance menu tree.
 - Server VM deploy: clone server templates with optional post-clone Ansible pull (via `vmtool::post_clone_ansible_pull`).
 - Virtual desktop deploy: clone VDI templates.
 - Create VM templates: guided creation for server roles (Ubuntu, Debian, Fedora, etc.) and VDI desktops.
@@ -25,6 +26,12 @@ This module ships `rtd-vm-tool`, a menu-driven Bash utility for managing KVM/lib
 
 ```bash
 bash rtd-vm-tool
+```
+
+GTK front-end:
+
+```bash
+bash rtd-vm-tool-gtk
 ```
 
 If installed on your `$PATH`, simply run:

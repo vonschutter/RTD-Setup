@@ -1,0 +1,367 @@
+#!/usr/bin/env bash
+#
+#::                                       A D M I N   T O O L
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:::::::::::::::::::::::::::::::::::::::::::::// RTD VM Tool GTK //::::::::::::::::::::::::::::::::::::// Linux //:::::::
+#:: Author(s):    RTD
+#:: Version:      0.1
+#::
+#:: Purpose:      Provide a GTK front-end for the RTD VM Tool menu tree.
+#::               Menu navigation is handled through Zenity and the selected
+#::               task is executed in a terminal-backed TUI/backend session.
+#::
+#:: Usage:        Run without arguments to open the GTK VM menu.
+#::               Use --help to display a short help text.
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+set -u
+
+: "${VMTOOLGTK_VERSION:=0.1}"
+: "${VMTOOLGTK_TITLE:=RunTime Data: VM Tool GTK}"
+
+RTD_VM_TUI_SCRIPT=""
+RTD_VM_TOOL_TRACE=0
+
+vmtoolgtk::find_tui_script() {
+	local script_dir candidate
+
+	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	for candidate in \
+		"${script_dir}/rtd-vm-tool" \
+		"/opt/rtd/modules/vm-tool.mod/rtd-vm-tool" \
+		"${HOME:-}/GIT/RTD-Setup/modules/vm-tool.mod/rtd-vm-tool" \
+		"${HOME:-}/RTD-Setup/modules/vm-tool.mod/rtd-vm-tool"
+	do
+		if [[ -r "${candidate}" ]]; then
+			printf '%s\n' "${candidate}"
+			return 0
+		fi
+	done
+
+	return 1
+}
+
+vmtoolgtk::show_error() {
+	local message="$1"
+	if command -v zenity >/dev/null 2>&1; then
+		zenity --error --title "${VMTOOLGTK_TITLE}" --width 640 --text "${message}"
+	else
+		printf 'ERROR: %s\n' "${message}" >&2
+	fi
+}
+
+vmtoolgtk::show_info() {
+	local message="$1"
+	zenity --info --title "${VMTOOLGTK_TITLE}" --width 720 --text "${message}"
+}
+
+vmtoolgtk::show_about() {
+	zenity --info \
+		--title "${VMTOOLGTK_TITLE}" \
+		--width 760 \
+		--height 520 \
+		--no-wrap \
+		--text "<span size='large'><b>${VMTOOLGTK_TITLE}</b></span>
+
+A GTK menu front-end for the RTD VM tool.
+
+This interface mirrors the main menu tree from the terminal VM tool:
+- Deploy Server VM's
+- Deploy Virtual Desktop VM's
+- Create VM Templates
+- Start / Stop VM's
+- Tool Settings
+- Maintenance
+
+Selected tasks are executed through the existing RTD VM backend in a terminal window so the existing installer and VM workflows remain intact."
+}
+
+vmtoolgtk::show_menu() {
+	local title="$1"
+	local text="$2"
+	local width="${3:-980}"
+	local height="${4:-640}"
+	shift 4
+
+	zenity --list \
+		--title "${title}" \
+		--text "${text}" \
+		--width "${width}" \
+		--height "${height}" \
+		--column "ID" \
+		--column "Action" \
+		--column "Details" \
+		--hide-column=1 \
+		--print-column=1 \
+		"$@"
+}
+
+vmtoolgtk::find_terminal_emulator() {
+	local candidate
+	for candidate in x-terminal-emulator gnome-terminal kgx tilix xfce4-terminal mate-terminal konsole xterm; do
+		if command -v "${candidate}" >/dev/null 2>&1; then
+			printf '%s\n' "${candidate}"
+			return 0
+		fi
+	done
+
+	return 1
+}
+
+vmtoolgtk::launch_terminal_payload() {
+	local title="$1"
+	local payload="$2"
+	local terminal
+
+	terminal="$(vmtoolgtk::find_terminal_emulator)" || {
+		vmtoolgtk::show_error "No supported terminal emulator was found. Install x-terminal-emulator, gnome-terminal, kgx, tilix, xfce4-terminal, mate-terminal, konsole, or xterm."
+		return 1
+	}
+
+	case "${terminal}" in
+		gnome-terminal|tilix|xfce4-terminal|mate-terminal)
+			"${terminal}" --title="${title}" -- bash -lc "${payload}"
+			;;
+		kgx)
+			"${terminal}" --title="${title}" bash -lc "${payload}"
+			;;
+		konsole)
+			"${terminal}" --new-tab -p tabtitle="${title}" -e bash -lc "${payload}"
+			;;
+		x-terminal-emulator)
+			"${terminal}" -e bash -lc "${payload}"
+			;;
+		xterm)
+			"${terminal}" -T "${title}" -e bash -lc "${payload}"
+			;;
+		*)
+			"${terminal}" -e bash -lc "${payload}"
+			;;
+	esac
+}
+
+vmtoolgtk::launch_tui_action() {
+	local title="$1"
+	local action_snippet="$2"
+	local payload
+
+	printf -v payload 'source %q; RTD_GUI=dialog; export RTD_GUI RTD_VM_TOOL_TRACE; rtd::bootstrap_library %q || exit 1; vmtool::refresh_backtitle; %s; rc=$?; printf "\\nExit status: %%s\\n" "$rc"; if [[ -t 0 ]]; then read -r -p "Press Enter to close..." _; fi; exit "$rc"' \
+		"${RTD_VM_TUI_SCRIPT}" \
+		"_rtd_library" \
+		"${action_snippet}"
+
+	vmtoolgtk::launch_terminal_payload "${title}" "${payload}"
+}
+
+vmtoolgtk::show_template_menu() {
+	while true; do
+		local selection
+		selection="$(vmtoolgtk::show_menu \
+			"${VMTOOLGTK_TITLE} - Templates" \
+			"Choose which VM template area to manage." \
+			940 420 \
+			"server" "🦾 Create Server VM Templates" "Open the server template catalog." \
+			"vdi" "🦾 Create Virtual Desktop VM Templates" "Open the desktop/VDI template catalog.")" || return 0
+
+		case "${selection}" in
+			server) vmtoolgtk::show_server_template_menu ;;
+			vdi) vmtoolgtk::show_vdi_template_menu ;;
+		esac
+	done
+}
+
+vmtoolgtk::show_server_template_menu() {
+	while true; do
+		local selection
+		selection="$(vmtoolgtk::show_menu \
+			"${VMTOOLGTK_TITLE} - Server Templates" \
+			"Select the server template to create. The selected workflow opens in a terminal session." \
+			1040 700 \
+			"1" "🐧 Ubuntu Server" "Base Ubuntu server template." \
+			"2" "🐧 Ubuntu LAMP Server" "Ubuntu server with LAMP stack." \
+			"3" "🐧 Ubuntu Postfix Server" "Ubuntu server with Postfix." \
+			"4" "🐧 Ubuntu Bind9 Server" "Ubuntu server with Bind9." \
+			"5" "🐧 Ubuntu DHCP Server" "Ubuntu server with DHCP services." \
+			"6" "🐧 Ubuntu Samba Server" "Ubuntu server with Samba." \
+			"7" "🐧 Ubuntu Print Server" "Ubuntu server with print services." \
+			"8" "🐧 Ubuntu Graphical Server" "Ubuntu server with a lightweight desktop." \
+			"9" "🐧 Ubuntu Docker Server" "Ubuntu server prepared for Docker." \
+			"10" "🌀 Debian Print Server" "Debian server with print services." \
+			"11" "🌀 Debian Minimal Server" "Minimal Debian server template." \
+			"12" "⛏️ Minecraft Server" "Ubuntu-based Minecraft server template." \
+			"13" "🎩 Fedora Minimal Server" "Minimal Fedora server template." \
+			"14" "🎩 Fedora Ansible Server" "Fedora server template for Ansible/network tasks.")" || return 0
+
+		vmtoolgtk::launch_tui_action \
+			"RTD VM Tool - Server Template ${selection}" \
+			"vmtool::run_server_template_action ${selection@Q}"
+	done
+}
+
+vmtoolgtk::show_vdi_template_menu() {
+	while true; do
+		local selection
+		selection="$(vmtoolgtk::show_menu \
+			"${VMTOOLGTK_TITLE} - VDI Templates" \
+			"Select the virtual desktop template to create. The selected workflow opens in a terminal session." \
+			1080 760 \
+			"1" "🐧 Ubuntu Standard Desktop" "Ubuntu desktop, more Mac-like." \
+			"2" "🐧 Ubuntu KDE Desktop" "Ubuntu KDE, more Windows-like." \
+			"3" "🐧 Ubuntu Xubuntu Desktop" "Lightweight Ubuntu desktop." \
+			"4" "🐧 Ubuntu Mate Desktop" "Ubuntu MATE desktop." \
+			"5" "🐧 Ubuntu Lubuntu Desktop" "Ubuntu Lubuntu desktop." \
+			"6" "🐧 Ubuntu Cinnamon Desktop" "Ubuntu Cinnamon desktop." \
+			"7" "🌀 Debian Default Desktop" "Debian GNOME desktop." \
+			"8" "🌀 Debian Cinnamon Desktop" "Debian Cinnamon desktop." \
+			"9" "🌀 Debian Plasma Desktop" "Debian KDE Plasma desktop." \
+			"10" "🌀 Debian Light Weight Desktop" "Debian LXDE desktop." \
+			"11" "🎩 Fedora Workstation VDI" "Fedora Workstation desktop." \
+			"12" "🎩 Fedora Plasma (KDE) VDI" "Fedora KDE Plasma desktop." \
+			"13" "🎩 Fedora Mate Desktop VDI" "Fedora MATE desktop." \
+			"14" "🎩 Fedora Cinnamon Desktop VDI" "Fedora Cinnamon desktop." \
+			"15" "🎩 Fedora Budgie Desktop VDI" "Fedora Budgie desktop." \
+			"16" "🎩 Fedora i3 Desktop VDI" "Fedora i3 tiling desktop." \
+			"17" "🎩 Fedora Sway Desktop VDI" "Fedora Sway tiling desktop." \
+			"18" "🦎 SUSE Default (KDE) VDI" "OpenSUSE KDE desktop." \
+			"19" "🦎 SUSE Gnome VDI" "OpenSUSE GNOME desktop." \
+			"20" "🦎 SUSE XFCE VDI" "OpenSUSE XFCE desktop." \
+			"21" "🦎 SUSE LXDE VDI" "OpenSUSE LXDE desktop." \
+			"22" "🦎 SUSE Mate VDI" "OpenSUSE MATE desktop." \
+			"23" "🦎 SUSE Cinnamon VDI" "OpenSUSE Cinnamon desktop." \
+			"24" "🪟 Windows 10 VDI" "Windows 10 virtual desktop." \
+			"25" "🪟 Windows 11 VDI" "Windows 11 virtual desktop." \
+			"26" "🐧 Zorin VDI" "Zorin desktop." \
+			"27" "🐉 Kali Security Suite VDI" "Kali workstation." \
+			"28" "🎩 RedHat Enterprise Linux VDI" "RHEL workstation.")" || return 0
+
+		vmtoolgtk::launch_tui_action \
+			"RTD VM Tool - VDI Template ${selection}" \
+			"vmtool::run_vdi_template_action ${selection@Q}"
+	done
+}
+
+vmtoolgtk::show_settings_menu() {
+	while true; do
+		local selection
+		selection="$(vmtoolgtk::show_menu \
+			"${VMTOOLGTK_TITLE} - Settings" \
+			"Choose which VM preference area to edit. The selected workflow opens in a terminal session." \
+			940 420 \
+			"1" "🔧 Manage VM T-Shirt sizes and defaults" "Edit default CPU, memory, and disk sizes." \
+			"2" "🦾 Manage VM Unattended install preferences" "Edit unattended-install defaults and user settings.")" || return 0
+
+		vmtoolgtk::launch_tui_action \
+			"RTD VM Tool - Settings ${selection}" \
+			"vmtool::run_settings_action ${selection@Q}"
+	done
+}
+
+vmtoolgtk::show_maintenance_menu() {
+	while true; do
+		local selection
+		selection="$(vmtoolgtk::show_menu \
+			"${VMTOOLGTK_TITLE} - Maintenance" \
+			"Choose a maintenance task to run. The selected workflow opens in a terminal session." \
+			980 460 \
+			"1" "🔍 Dry run: list unused QCOW images" "Preview removable qcow images." \
+			"2" "🧹 Remove unused QCOW images" "Delete unused qcow images." \
+			"3" "🔍 Dry run: list virtual floppy images" "Preview removable floppy images." \
+			"4" "🧹 Remove virtual floppy images" "Delete virtual floppy images.")" || return 0
+
+		vmtoolgtk::launch_tui_action \
+			"RTD VM Tool - Maintenance ${selection}" \
+			"vmtool::run_maintenance_action ${selection@Q}"
+	done
+}
+
+vmtoolgtk::show_main_menu() {
+	while true; do
+		local selection
+		selection="$(vmtoolgtk::show_menu \
+			"${VMTOOLGTK_TITLE} v${VMTOOLGTK_VERSION}" \
+			"Select a VM management task. Terminal-backed workflows open in a new terminal window." \
+			1020 560 \
+			"1" "✨ Deploy Server VM's" "Clone a server template into a working VM." \
+			"2" "✨ Deploy Virtual Desktop VM's" "Clone a VDI template into a working VM." \
+			"3" "💿 Create VM Templates" "Open server and VDI template menus." \
+			"4" "⚡ Start / Stop VM's" "Manage VM power state." \
+			"5" "📐 Tool Settings" "Edit VM build and unattended-install preferences." \
+			"6" "🧹 Maintenance" "Run qcow and floppy cleanup helpers." \
+			"7" "❓ About this tool" "Display information about this GTK front-end.")" || return 0
+
+		case "${selection}" in
+			1)
+				vmtoolgtk::launch_tui_action \
+					"RTD VM Tool - Deploy Server VM" \
+					"vmtool::run_main_action 1"
+				;;
+			2)
+				vmtoolgtk::launch_tui_action \
+					"RTD VM Tool - Deploy Virtual Desktop VM" \
+					"vmtool::run_main_action 2"
+				;;
+			3)
+				vmtoolgtk::show_template_menu
+				;;
+			4)
+				vmtoolgtk::launch_tui_action \
+					"RTD VM Tool - Start / Stop VMs" \
+					"vmtool::run_main_action 4"
+				;;
+			5)
+				vmtoolgtk::show_settings_menu
+				;;
+			6)
+				vmtoolgtk::show_maintenance_menu
+				;;
+			7)
+				vmtoolgtk::show_about
+				;;
+		esac
+	done
+}
+
+main() {
+	if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+		cat <<EOF
+Usage:
+  $(basename "$0") [--help|-h]
+
+Description:
+  Open the GTK front-end for the RTD VM Tool. Menu navigation uses Zenity and
+  selected workflows execute through the existing terminal VM backend.
+EOF
+		exit 0
+	fi
+
+	command -v zenity >/dev/null 2>&1 || {
+		printf 'Missing required command: zenity\n' >&2
+		exit 1
+	}
+
+	RTD_VM_TUI_SCRIPT="$(vmtoolgtk::find_tui_script)" || {
+		vmtoolgtk::show_error "Unable to locate the companion rtd-vm-tool script."
+		exit 1
+	}
+
+	# shellcheck source=/dev/null
+	source "${RTD_VM_TUI_SCRIPT}"
+
+	if ! rtd::bootstrap_library "_rtd_library"; then
+		vmtoolgtk::show_error "Failed to load _rtd_library."
+		exit 1
+	fi
+
+	security::ensure_admin
+
+	if [[ -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
+		vmtoolgtk::show_error "No graphical session detected."
+		exit 1
+	fi
+
+	vmtool::refresh_backtitle
+	vmtoolgtk::show_main_menu
+}
+
+main "$@"

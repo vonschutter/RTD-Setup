@@ -84,7 +84,7 @@ fi
 : ${WIDTH:="90"}
 : ${LIST_HEIGHT:="12"}
 : ${_GIT_PROFILE:="vonschutter"}
-: ${_GIT_REPO:="RTD-Setup"}
+: ${RTD_REQUIRED_LIBRARY_VERSION:="2.54"}
 
 # Show backtitle and version in UI
 : ${BACKTITLE:="💻 ${BRANDING}                       Managing VM's on:  ${HOSTNAME}                   Version: ${RTD_Version}"}
@@ -100,9 +100,9 @@ fi
 
 # Set the background color of the tool. The appearance of the menu system may
 # look different on different systems depending on their default settings.
-# Here we define the bacground color for consistency by seting the NEWT_COLORS= option. If "dialog"
-# is the desired front end then you may set the DIALOG_COLORS= optoin for preferred colors.
-# You may select a front end to the rtd tool below by seting the RTD_GUI= option. This will
+# Here we define the background color for consistency by setting the NEWT_COLORS= option. If "dialog"
+# is the desired front end then you may set the DIALOG_COLORS= option for preferred colors.
+# You may select a front end to the rtd tool below by setting the RTD_GUI= option. This will
 # override what is detected and preferred!
 # Valid choices are: "dialog", "whiptail".
 # RTD_GUI=dialog
@@ -122,20 +122,19 @@ declare -a RTD_VM_CLONE_ARGS=()
 # Set location to where to log information:
 # in the system log directory in a file named the same as this script.
 # The global variable _LOGFILE is used by _rtd_library to log information.
-: ${_LOG_DIR:="/var/log/rtd"}
-_LOGFILE="${_LOG_DIR}/$( basename $0 ).log"
+
+_LOGFILE="/var/log/rtd/$( basename $0 ).log"
+export _LOGFILE
+touch "$_LOGFILE" 2>/dev/null || {
+	echo "ERROR: Failed to create log file at $_LOGFILE. Please check permissions and try again."
+	exit 1
+}
 
 rtd::bootstrap_library() {
 	local library_name="${1:-_rtd_library}"
 	local minimum_version="${2:-}"
 	local loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
-	local script_dir path src_url tmp
-
-	if [[ "$library_name" == "_rtd_library" && -n "$loaded_version" ]]; then
-		if [[ -z "$minimum_version" ]] || [[ "$(printf '%s\n%s\n' "$minimum_version" "$loaded_version" | sort -V | tail -n 1)" == "$loaded_version" ]]; then
-			return 0
-		fi
-	fi
+	local script_dir path src_url tmp rc answer
 
 	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 	for path in \
@@ -149,30 +148,60 @@ rtd::bootstrap_library() {
 		if [[ -r "$path" ]]; then
 			# shellcheck source=/dev/null
 			source "$path" ""
-			return $?
+			rc=$?
+			[[ $rc -eq 0 ]] || return "$rc"
+			loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
+			if [[ "$library_name" != "_rtd_library" ]] ||
+				{ { [[ -z "$minimum_version" ]] || [[ "$(printf '%s\n%s\n' "$minimum_version" "$loaded_version" | sort -V | tail -n 1)" == "$loaded_version" ]]; } &&
+					declare -F system::log_item >/dev/null 2>&1 &&
+					declare -F library::apply_rtd_defaults >/dev/null 2>&1; }; then
+				return 0
+			fi
+			break
 		fi
 	done
+
+	if [[ "$library_name" == "_rtd_library" ]]; then
+		if ! { declare -F system::log_item >/dev/null 2>&1 && declare -F library::apply_rtd_defaults >/dev/null 2>&1; }; then
+			echo "The $library_name version marker is present, but required library functions are not available." >&2
+			read -r -p "Fetch the current ${library_name} from GitHub and continue? [y/N] " answer
+			[[ "$answer" =~ ^[Yy]([Ee][Ss])?$ ]] || return 1
+		elif [[ -n "$minimum_version" && -n "$loaded_version" &&
+			"$(printf '%s\n%s\n' "$minimum_version" "$loaded_version" | sort -V | tail -n 1)" != "$loaded_version" ]]; then
+			echo "The loaded $library_name version is $loaded_version, but this tool requires at least $minimum_version." >&2
+			read -r -p "Fetch the current ${library_name} from GitHub and continue? [y/N] " answer
+			[[ "$answer" =~ ^[Yy]([Ee][Ss])?$ ]] || return 1
+		fi
+	fi
 
 	src_url="https://github.com/${_GIT_PROFILE:-${GIT_Profile:-vonschutter}}/RTD-Setup/raw/main/core/${library_name}"
 	tmp="$(mktemp "/tmp/${library_name}.XXXXXX" 2>/dev/null || echo "/tmp/${library_name}.$$")"
 	if command -v curl >/dev/null 2>&1; then
-		curl -fsSL "$src_url" -o "$tmp" || return 1
+		curl -fsSL "$src_url" -o "$tmp" || rc=$?
 	elif command -v wget >/dev/null 2>&1; then
-		wget -qO "$tmp" "$src_url" || return 1
+		wget -qO "$tmp" "$src_url" || rc=$?
 	else
-		return 1
+		rc=1
 	fi
+	[[ ${rc:-0} -eq 0 ]] || { rm -f "$tmp"; return "$rc"; }
 
 	# shellcheck source=/dev/null
 	source "$tmp" ""
-	local rc=$?
+	rc=$?
 	rm -f "$tmp"
-	return $rc
-}
+	[[ $rc -eq 0 ]] || return "$rc"
 
-vmtool::refresh_backtitle() {
-	if declare -F dialog::build_backtitle >/dev/null 2>&1; then
-		BACKTITLE="$(dialog::build_backtitle "${PRODUCT}" "${RTD_Version}")"
+	loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
+	if [[ "$library_name" == "_rtd_library" && -n "$minimum_version" &&
+		"$(printf '%s\n%s\n' "$minimum_version" "$loaded_version" | sort -V | tail -n 1)" != "$loaded_version" ]]; then
+		echo "Fetched $library_name version ${loaded_version:-unknown}, but at least $minimum_version is required." >&2
+		return 1
+	fi
+
+	if [[ "$library_name" == "_rtd_library" ]] &&
+		! { declare -F system::log_item >/dev/null 2>&1 && declare -F library::apply_rtd_defaults >/dev/null 2>&1; }; then
+		echo "Fetched $library_name, but required library functions are not available." >&2
+		return 1
 	fi
 }
 
@@ -191,15 +220,8 @@ vmtool::refresh_backtitle() {
 main() {
 	# This is the main function of this script. It is called when the script is executed
 
-	local -a original_cli=("$@")
-	local -a rerun_cmd=("$0")
-	rerun_cmd+=("${original_cli[@]}")
-	local rerun_cmd_string
-	rerun_cmd_string=$(printf '%q ' "${rerun_cmd[@]}")
-	rerun_cmd_string=${rerun_cmd_string% }
-
-	rtd::bootstrap_library "_rtd_library" || {
-		echo "Failed to load _rtd_library"
+	rtd::bootstrap_library "_rtd_library" "$RTD_REQUIRED_LIBRARY_VERSION" || {
+		echo "Failed to load _rtd_library version ${RTD_REQUIRED_LIBRARY_VERSION} or newer"
 		exit 1
 	}
 	vmtool::refresh_backtitle
@@ -245,26 +267,9 @@ main() {
 			exit
 		;;
 		* )
-			if [[ "$TERM" == screen* ]]; then
-				security::ensure_admin
-				if [ "$UID" -eq 0 ]; then
-					show_notice_on_fist_run
-					vmtool::show_main_menu
-				fi
-				exit
-			else
-				if hash byobu &>/dev/null; then
-					byobu new-session -s "RunTime Data VM Tool" "$rerun_cmd_string"
-				else
-					security::ensure_admin
-					if [ "$UID" -eq 0 ]; then
-						software::check_native_package_dependency byobu && echo -e "$RED" "A critical component needed for this script to work properly was attempted to be added... Attempting to run the script again"
-						su -c "$rerun_cmd_string" "$SUDO_USER"
-						clear
-					fi
-					exit
-				fi
-			fi
+			write_status "Starting ${BRANDING}..."
+			launch_byobu "$@"
+
 		;;
 	esac
 }
@@ -283,7 +288,57 @@ main() {
 
 
 
+launch_byobu() {
 
+	write_status "Checking if running inside a byobu or screen session..."
+	write_information "Session context before byobu check: TERM=${TERM:-unset} TMUX=${TMUX:-unset} STY=${STY:-unset} SHELL=${SHELL:-unset} PWD=${PWD:-unset}"
+	if [[ "$TERM" == screen* ]]; then
+		write_status "Already running inside a byobu or screen session. Continuing with script execution..."
+		write_information "Session context inside byobu/screen branch: TERM=${TERM:-unset} TMUX=${TMUX:-unset} STY=${STY:-unset} SHELL=${SHELL:-unset} PWD=${PWD:-unset}"
+		if [ "$UID" -eq 0 ]; then
+			write_information "Showing first-run notice if needed before opening VM Tool main menu..."
+			show_notice_on_fist_run
+			write_information "Opening VM Tool main menu..."
+			vmtool::show_main_menu
+		else
+			write_error "VM Tool byobu child is not running as root (UID=${UID}); cannot open the VM management menu."
+			return 1
+		fi
+		exit
+	fi
+	
+	write_status "Not running inside a byobu or screen session. Attempting to launch a new byobu session for better stability over remote connections..."
+	if ! hash byobu &>/dev/null; then
+		write_warning "Byobu is not installed. It is highly recommended to run this script in a byobu session for better stability over remote connections. Attempting to install byobu now..."
+		software::check_native_package_dependency byobu && echo -e "$RED" "A critical component needed for this script to work properly was attempted to be added... Attempting to run the script again"
+	fi
+
+	write_information "Re-launching the script in a new byobu session for better remote stability..."
+	write_information "Launching child via byobu for script $(readlink -f "$0") with args: ${*:-<none>}"
+
+	byobu new-session -s "RunTime Data VM Tool" \
+		env RTD_VM_TOOL_BYOBU_LOG="${_LOGFILE}" \
+		bash -ilc '
+			printf "%s --- 🛈  : INFO :  🛈  launch_byobu child pre-exec: pid=%s ppid=%s term=%s tmux=%s sty=%s shell=%s pwd=%s script=%q args=%q\n" \
+				"$(date "+%Y/%m/%d %H:%M")" \
+				"$$" "${PPID:-unset}" "${TERM:-unset}" "${TMUX:-unset}" "${STY:-unset}" "${SHELL:-unset}" "${PWD:-unset}" "$0" "$*" >>"${RTD_VM_TOOL_BYOBU_LOG:-/tmp/rtd-vm-tool-byobu.log}"
+			exec "$0" "$@"
+		' "$0" "$@" 2>>"${_LOGFILE}" || {
+		write_error "Failed to launch byobu session. Please check if byobu is installed and try again. You can also run the script without byobu, but it is not recommended for remote use."
+		exit 1
+	}
+	exit
+}
+
+
+vmtool::refresh_backtitle() {
+	if declare -F dialog::build_backtitle >/dev/null 2>&1; then
+		BACKTITLE="$(dialog::build_backtitle "${PRODUCT:-VM Tool}" "${RTD_Version}")"
+	else
+		BACKTITLE="💻 ${BRANDING}                       Managing VM's on:  ${HOSTNAME}                   Version: ${RTD_Version}"
+	fi
+	export BACKTITLE
+}
 
 
 display_notice() {
@@ -313,7 +368,7 @@ display_notice() {
 
 show_notice_on_fist_run() {
 
-	if [ -f ~/.config/rtd/rtd-first-run-${SCRIPTNAME}-${RTD_Version} ]; then
+	if [ -f ~/.config/rtd/rtd-first-run-${_SCRIPTNAME}-${RTD_Version} ]; then
 		write_status "$RTD_Version has been used already and terms reviewed..."
 		return 0
 	fi
@@ -353,11 +408,307 @@ show_notice_on_fist_run() {
 
 	rm -f "$tmpfile" 
 	
-	mkdir -p ~/.config/rtd ; touch ~/.config/rtd/rtd-first-run-${SCRIPTNAME}-${RTD_Version}
+	mkdir -p ~/.config/rtd ; touch ~/.config/rtd/rtd-first-run-${_SCRIPTNAME}-${RTD_Version}
 	clear
 }
 
 
+
+
+vmtool::run_server_template_action() {
+	local selection="$1"
+
+	case "$selection" in
+		0 )
+			clear
+			write_information "Program terminated by user..."
+			;;
+		1 )
+			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app ubuntu-server --ask YES
+			system::cleanup_and_finish nomessage
+			;;
+		2 )
+			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app lamp-server --ask YES
+			system::cleanup_and_finish nomessage
+			;;
+		3 )
+			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app postfix --ask YES
+			system::cleanup_and_finish nomessage
+			;;
+		4 )
+			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app bind9 --ask YES
+			system::cleanup_and_finish nomessage
+			;;
+		5 )
+			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app dhcp-server --ask YES
+			system::cleanup_and_finish nomessage
+			;;
+		6 )
+			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app samba --ask YES
+			system::cleanup_and_finish nomessage
+			;;
+		7 )
+			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app print-server --ask YES
+			system::cleanup_and_finish nomessage
+			;;
+		8 )
+			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app server-desktop --DE xubuntu-desktop --ask YES
+			system::cleanup_and_finish nomessage
+			;;
+		9 )
+			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app docker.io --tshirt-size medium
+			system::cleanup_and_finish nomessage
+			;;
+		10 )
+			kvm::make_vm_now_from_debian_org --role server --server_role print-server
+			system::cleanup_and_finish nomessage
+			;;
+		11 )
+			kvm::make_vm_now_from_debian_org --role server --server_role openssh-server
+			system::cleanup_and_finish nomessage
+			;;
+		12 )
+			kvm::make_vm_now_from_ubuntu_com --role server --pre-config minecraft --tshirt-size medium
+			system::cleanup_and_finish nomessage
+			;;
+		13 )
+			kvm::make_vm_now_from_fedora_org --role server --tshirt-size small
+			system::cleanup_and_finish nomessage
+			;;
+		14 )
+			kvm::make_vm_now_from_fedora_org --role server --server_role @network-server --tshirt-size small --tshirt-size small
+			system::cleanup_and_finish nomessage
+			;;
+	esac
+}
+
+
+vmtool::run_vdi_template_action() {
+	local selection="$1"
+
+	case "$selection" in
+		0 )
+			echo "Program terminated by user..."
+			;;
+		1 )
+			if kvm::make_vm_now_from_ubuntu_com --role VDI --DE ubuntu-desktop --ask YES --tshirt-size medium; then
+				system::cleanup_and_finish nomessage
+			else
+				dialog::display_error "Ubuntu GNOME VDI template creation failed. Review the on-screen error and log output before retrying."
+			fi
+			;;
+		2 )
+			if kvm::make_vm_now_from_ubuntu_com --role VDI --DE kubuntu-desktop --ask YES --tshirt-size medium; then
+				system::cleanup_and_finish nomessage
+			else
+				dialog::display_error "Ubuntu KDE VDI template creation failed. Review the on-screen error and log output before retrying."
+			fi
+			;;
+		3 )
+			if kvm::make_vm_now_from_ubuntu_com --role VDI --DE xubuntu-desktop --ask YES --tshirt-size medium; then
+				system::cleanup_and_finish nomessage
+			else
+				dialog::display_error "Ubuntu XFCE VDI template creation failed. Review the on-screen error and log output before retrying."
+			fi
+			;;
+		4 )
+			if kvm::make_vm_now_from_ubuntu_com --role VDI --DE ubuntu-mate-desktop --ask YES --tshirt-size medium; then
+				system::cleanup_and_finish nomessage
+			else
+				dialog::display_error "Ubuntu MATE VDI template creation failed. Review the on-screen error and log output before retrying."
+			fi
+			;;
+		5 )
+			if kvm::make_vm_now_from_ubuntu_com --role VDI --DE lubuntu-desktop --ask YES; then
+				system::cleanup_and_finish nomessage
+			else
+				dialog::display_error "Ubuntu LXQt VDI template creation failed. Review the on-screen error and log output before retrying."
+			fi
+			;;
+		6 )
+			if kvm::make_vm_now_from_ubuntu_com --role VDI --DE cinnamon-desktop-environment --ask YES; then
+				system::cleanup_and_finish nomessage
+			else
+				dialog::display_error "Ubuntu Cinnamon VDI template creation failed. Review the on-screen error and log output before retrying."
+			fi
+			;;
+		7 )
+			if kvm::make_vm_now_from_debian_org --role workstation --DE gnome-desktop --tshirt-size small; then
+				system::cleanup_and_finish nomessage
+			else
+				dialog::display_error "Debian GNOME VDI template creation failed. Review the on-screen error and log output before retrying."
+			fi
+			;;
+		8 )
+			if kvm::make_vm_now_from_debian_org --role workstation --DE cinnamon-desktop --tshirt-size small; then
+				system::cleanup_and_finish nomessage
+			else
+				dialog::display_error "Debian Cinnamon VDI template creation failed. Review the on-screen error and log output before retrying."
+			fi
+			;;
+		9 )
+			if kvm::make_vm_now_from_debian_org --role workstation --DE kde-desktop --tshirt-size small; then
+				system::cleanup_and_finish nomessage
+			else
+				dialog::display_error "Debian KDE VDI template creation failed. Review the on-screen error and log output before retrying."
+			fi
+			;;
+		10 )
+			if kvm::make_vm_now_from_debian_org --role workstation --DE lxde-desktop --tshirt-size small; then
+				system::cleanup_and_finish nomessage
+			else
+				dialog::display_error "Debian LXDE VDI template creation failed. Review the on-screen error and log output before retrying."
+			fi
+			;;
+		11 )
+			kvm::make_vm_now_from_fedora_org --role workstation --DE "@workstation-product-environment" --tshirt-size medium
+			system::cleanup_and_finish nomessage
+			;;
+		12 )
+			kvm::make_vm_now_from_fedora_org --role workstation --DE "@kde-desktop-environment" --tshirt-size small
+			system::cleanup_and_finish nomessage
+			;;
+		13 )
+			kvm::make_vm_now_from_fedora_org --role workstation --DE "@mate-desktop-environment" --tshirt-size small
+			system::cleanup_and_finish nomessage
+			;;
+		14 )
+			kvm::make_vm_now_from_fedora_org --role workstation --DE "@cinnamon-desktop-environment" --tshirt-size small
+			system::cleanup_and_finish nomessage
+			;;
+		15 )
+			kvm::make_vm_now_from_fedora_org --role workstation --DE "@budgie-desktop-environment" --tshirt-size small
+			system::cleanup_and_finish nomessage
+			;;
+		16 )
+			kvm::make_vm_now_from_fedora_org --role workstation --DE "@i3-desktop-environment" --tshirt-size small
+			system::cleanup_and_finish nomessage
+			;;
+		17 )
+			kvm::make_vm_now_from_fedora_org --role workstation --DE "@sway-desktop-environment" --tshirt-size small
+			system::cleanup_and_finish nomessage
+			;;
+		18 )
+			kvm::make_vm_now_from_opensuse_org --DE kde --product Tumbleweed --tshirt-size small
+			system::cleanup_and_finish nomessage
+			;;
+		19 )
+			kvm::make_vm_now_from_opensuse_org --DE gnome --product Tumbleweed --tshirt-size small
+			system::cleanup_and_finish nomessage
+			;;
+		20 )
+			kvm::make_vm_now_from_opensuse_org --DE xfce --product Tumbleweed --tshirt-size small
+			system::cleanup_and_finish nomessage
+			;;
+		21 )
+			kvm::make_vm_now_from_opensuse_org --DE lxde --product Tumbleweed --tshirt-size small
+			system::cleanup_and_finish nomessage
+			;;
+		22 )
+			kvm::make_vm_now_from_opensuse_org --DE mate --product Tumbleweed --tshirt-size small
+			system::cleanup_and_finish nomessage
+			;;
+		23 )
+			kvm::make_vm_now_from_opensuse_org --DE cinnamon --product Tumbleweed --tshirt-size small
+			system::cleanup_and_finish nomessage
+			;;
+		24 )
+			kvm::make_vm_now_from_microsoft --winver win10 --tshirt-size medium
+			;;
+		25 )
+			kvm::make_vm_now_from_microsoft --winver win11 --tshirt-size medium
+			;;
+		26 )
+			kvm::make_vm_now_from_zorin --edition Core --version latest --tshirt-size small
+			;;
+		27 )
+			kvm::make_vm_now_from_kali_org --role workstation --DE standard --tshirt-size medium
+			system::cleanup_and_finish nomessage
+			;;
+		28 )
+			kvm::make_vm_now_from_redhat_com --role workstation --DE "@workstation-product" --tshirt-size small
+			system::cleanup_and_finish nomessage
+			;;
+	esac
+}
+
+
+vmtool::run_settings_action() {
+	local selection="$1"
+
+	case "$selection" in
+		0 )
+			clear
+			write_information "Program terminated by user..."
+			;;
+		1 )
+			kvm::get_vm_size_preferences --ask
+			;;
+		2 )
+			kvm::get_vm_config_preferences --ask
+			;;
+	esac
+}
+
+
+vmtool::run_maintenance_action() {
+	local selection="$1"
+
+	write_status "Maintenance menu selection: $selection"
+	case "$selection" in
+		1 ) vmtool::run_qcow_cleanup --dry-run ;;
+		2 ) vmtool::run_qcow_cleanup ;;
+		3 ) vmtool::run_floppy_cleanup --dry-run ;;
+		4 ) vmtool::run_floppy_cleanup ;;
+	esac
+}
+
+
+vmtool::run_main_action() {
+	local selection="$1"
+
+	case "$selection" in
+		0 )
+			echo "Program Quit."
+			;;
+		1 )
+			vmtool::prompt_cicd_options
+			write_status "Starting server template clone..."
+			if ! kvm::clone_server_template_vm --post-clone-handler vmtool::post_clone_ansible_pull "${RTD_VM_CLONE_ARGS[@]}"; then
+				write_warning "Clone cancelled or failed. No VM created."
+			else
+				if [[ -n "${RTD_LAST_CLONED_VM:-}" ]]; then
+					write_information "Clone workflow finished. Last VM: ${RTD_LAST_CLONED_VM}"
+					if virsh dominfo "${RTD_LAST_CLONED_VM}" &>/dev/null; then
+						write_information "Verified VM exists: ${RTD_LAST_CLONED_VM}"
+					else
+						write_warning "VM ${RTD_LAST_CLONED_VM} not found after clone; please check libvirt logs."
+					fi
+				else
+					write_warning "Clone reported success but RTD_LAST_CLONED_VM is empty."
+				fi
+			fi
+			;;
+		2 )
+			kvm::clone_vdi_template_vm "${RTD_VM_CLONE_ARGS[@]}"
+			;;
+		3 )
+			show_manage_VM_template_menu
+			;;
+		4 )
+			vmtool::start_stop_vm_menu
+			;;
+		5 )
+			show_settings_menu
+			;;
+		6 )
+			show_maintenance_menu
+			;;
+		7 )
+			display_notice
+			;;
+	esac
+}
 
 
 manage_server_vm_templates() {
@@ -389,74 +740,14 @@ manage_server_vm_templates() {
 			"$DIALOG_ESC") return ;;
 		esac
 
-		case $selection in
-			0 )
-				clear
-				write_information "Program terminated by user..."
-			;;
-			1 )
-				kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app ubuntu-server --ask YES
-				cleanup_and_finish nomessage
-			;;
-			2 )
-				kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app lamp-server --ask YES
-				cleanup_and_finish nomessage
-			;;
-			3 )
-				kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app postfix --ask YES
-				cleanup_and_finish nomessage
-			;;
-			4 )
-				kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app bind9 --ask YES
-				cleanup_and_finish nomessage
-			;;
-			5 ) 
-				kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app dhcp-server --ask YES
-				cleanup_and_finish nomessage
-			;;
-			6 ) 
-				kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app samba --ask YES
-				cleanup_and_finish nomessage
-			;;
-			7 ) 
-				kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app print-server --ask YES
-				cleanup_and_finish nomessage
-			;;
-			8 )
-				kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app server-desktop --DE xubuntu-desktop --ask YES
-				cleanup_and_finish nomessage
-			;;
-			9 )
-				kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app docker.io --tshirt-size medium
-				cleanup_and_finish nomessage
-			;;
-			10 )
-				kvm::make_vm_now_from_debian_org --role server --server_role print-server
-				cleanup_and_finish nomessage
-			;;
-			11 )
-				kvm::make_vm_now_from_debian_org --role server --server_role openssh-server
-				cleanup_and_finish nomessage
-			;;
-			12 )
-				kvm::make_vm_now_from_ubuntu_com --role server --pre-config minecraft --tshirt-size medium
-				cleanup_and_finish nomessage
-			;;
-			13 )
-				kvm::make_vm_now_from_fedora_org --role server --tshirt-size small
-				cleanup_and_finish nomessage
-			;;
-			14 )
-				kvm::make_vm_now_from_fedora_org --role server --server_role @network-server --tshirt-size small --tshirt-size small
-				cleanup_and_finish nomessage
-			;;
-		esac
+		vmtool::run_server_template_action "$selection"
 	done
 }
 
 
 manage_vdi_vm_templates() {
 	# Description:
+	local selection exit_status
 
 	while true; do
 		exec 3>&1
@@ -487,135 +778,20 @@ manage_vdi_vm_templates() {
 		"24"  "🪟 Windows 10 VDI                (reseal manually)" \
 		"25"  "🪟 Windows 11 VDI                (reseal manually)" \
 		"26"  "🐧 Zorin VDI                     (reseal manually)" \
-		"27"  "🐉 Kali Security Suite VDI       (Penetration testing etc.)" \
-		"28"  "🎩 RedHat Enterprise Linux VDI   (reseal manually)" \
-		2>&1 1>&3)
+			"27"  "🐉 Kali Security Suite VDI       (Penetration testing etc.)" \
+			"28"  "🎩 RedHat Enterprise Linux VDI   (reseal manually)" \
+			2>&1 1>&3)
 		exit_status=$?
 		exec 3>&-
-		clear
 
 		case $exit_status in
 			"$DIALOG_CANCEL") return ;;
 			"$DIALOG_ESC") return ;;
 		esac
 
-		case $selection in
-		0 )
-			echo "Program terminated by user..."
-		;;
-		1 )
-			kvm::make_vm_now_from_ubuntu_com --role VDI --server-app ubuntu-desktop --ask YES --tshirt-size medium 
-			cleanup_and_finish nomessage
-		;;
-		2 )
-			kvm::make_vm_now_from_ubuntu_com --role VDI --server-app kubuntu-desktop --ask YES --tshirt-size medium 
-			cleanup_and_finish nomessage
-		;;
-		3 )
-			kvm::make_vm_now_from_ubuntu_com --role VDI --server-app xubuntu-desktop --ask YES --tshirt-size medium
-			cleanup_and_finish nomessage
-		;;
-		4 )
-			kvm::make_vm_now_from_ubuntu_com --role VDI --server-app ubuntu-mate-desktop --ask YES --tshirt-size medium
-			cleanup_and_finish nomessage
-		;;
-		5 )
-			kvm::make_vm_now_from_ubuntu_com --role VDI --server-app lubuntu-desktop --ask YES
-			cleanup_and_finish nomessage
-		;;
-		6 )
-			kvm::make_vm_now_from_ubuntu_com --role VDI --server-app cinnamon-desktop-environment --ask YES
-			cleanup_and_finish nomessage
-		;;
-		7 )
-			kvm::make_vm_now_from_debian_org --role workstation --DE gnome-desktop --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		8 )
-			kvm::make_vm_now_from_debian_org --role workstation --DE cinnamon-desktop --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		9 )
-			kvm::make_vm_now_from_debian_org --role workstation --DE kde-desktop --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		10 )
-			kvm::make_vm_now_from_debian_org --role workstation --DE lxde-desktop --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		11 )
-			kvm::make_vm_now_from_fedora_org --role workstation --DE "@workstation-product-environment" --tshirt-size medium
-			cleanup_and_finish nomessage
-		;;
-		12 )
-			kvm::make_vm_now_from_fedora_org --role workstation --DE "@kde-desktop-environment" --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		13 )
-			kvm::make_vm_now_from_fedora_org --role workstation --DE "@mate-desktop-environment" --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		14 )
-			kvm::make_vm_now_from_fedora_org --role workstation --DE "@cinnamon-desktop-environment" --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		15 )
-			kvm::make_vm_now_from_fedora_org --role workstation --DE "@budgie-desktop-environment" --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		16 )
-			kvm::make_vm_now_from_fedora_org --role workstation --DE "@i3-desktop-environment" --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		17 )
-			kvm::make_vm_now_from_fedora_org --role workstation --DE "@sway-desktop-environment" --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		18 )
-			kvm::make_vm_now_from_opensuse_org --DE kde --product Tumbleweed --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		19 )
-			kvm::make_vm_now_from_opensuse_org --DE gnome --product Tumbleweed --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		20 )
-			kvm::make_vm_now_from_opensuse_org --DE xfce --product Tumbleweed --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		21 )
-			kvm::make_vm_now_from_opensuse_org --DE lxde --product Tumbleweed --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		22 )
-			kvm::make_vm_now_from_opensuse_org --DE mate --product Tumbleweed --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		23 )
-			kvm::make_vm_now_from_opensuse_org --DE cinnamon --product Tumbleweed --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		24 )
-			kvm::make_vm_now_from_microsoft --winver win10 --tshirt-size medium
-		;;
-		25 )
-			kvm::make_vm_now_from_microsoft --winver win11 --tshirt-size medium
-		;;
-		26 )
-			kvm::make_vm_now_from_zorin --edition Core --version latest --tshirt-size small
-		;;
-		27 )
-			kvm::make_vm_now_from_kali_org --role workstation --DE standard --tshirt-size medium
-			cleanup_and_finish nomessage
-		;;
-		28 )
-			kvm::make_vm_now_from_redhat_com --role workstation --DE "@workstation-product" --tshirt-size small
-			cleanup_and_finish nomessage
-		;;
-		esac 
-
-	done
-}
+		vmtool::run_vdi_template_action "$selection"
+		done
+	}
 
 show_settings_menu() {
 	while true; do
@@ -633,18 +809,7 @@ show_settings_menu() {
 			"$DIALOG_ESC") return ;;
 		esac
 
-		case $selection in
-			0 )
-				clear
-				write_information "Program terminated by user..."
-			;;
-			1 )
-				kvm::get_vm_size_preferences --ask
-			;;
-			2 )
-				kvm::get_vm_config_preferences --ask
-			;;
-		esac
+		vmtool::run_settings_action "$selection"
 	done
 	
 
@@ -668,13 +833,7 @@ show_maintenance_menu() {
 			"$DIALOG_CANCEL"|"$DIALOG_ESC") return ;;
 		esac
 
-		write_status "Maintenance menu selection: $selection"
-		case $selection in
-			1 ) vmtool::run_qcow_cleanup --dry-run ;;
-			2 ) vmtool::run_qcow_cleanup ;;
-			3 ) vmtool::run_floppy_cleanup --dry-run ;;
-			4 ) vmtool::run_floppy_cleanup ;;
-		esac
+		vmtool::run_maintenance_action "$selection"
 	done
 }
 
@@ -770,12 +929,14 @@ vmtool::run_floppy_cleanup() {
 
 
 show_manage_VM_template_menu() {
+	local selection exit_status
+
 	while true; do
 		exec 3>&1
 		selection=$( $RTD_GUI --backtitle "$BACKTITLE" --cancel-button "Back" --title "Manage VM Templates"  --menu "Please select which VM Template to manage:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
 		"1" "🦾 Create Server VM Templates" \
 		"2" "🦾 Create Virtual Desktop VM Templates" \
-		2>&1 1>&3)
+			2>&1 1>&3)
 		exit_status=$?
 		exec 3>&-
 		clear
@@ -815,44 +976,6 @@ vmtool::map_role_to_server_task() {
 		postgresql) echo "postgresql-server" ;;
 		ubuntu) echo "ubuntu-server" ;;
 		*) echo "$short" ;;
-	esac
-}
-
-vmtool::derive_service_label() {
-	# Create a human-friendly service label for VM naming based on the first selected task or LLM variant.
-	local tasks_csv="$1"
-	local llm_variant="$2"
-
-	if [[ -n "$llm_variant" && "$llm_variant" != "none" ]]; then
-		echo "LLM_Server"
-		return
-	fi
-
-	local first_task="${tasks_csv%%,*}"
-	first_task=${first_task//\"/}
-	[[ -z "$first_task" ]] && { echo "Server"; return; }
-
-	case "$first_task" in
-		openssh-server) echo "SSH_Server" ;;
-		lamp-server) echo "LAMP_Server" ;;
-		dns-server) echo "DNS_Server" ;;
-		mail-server) echo "Mail_Server" ;;
-		samba-server) echo "Samba_Server" ;;
-		print-server) echo "Print_Server" ;;
-		postgresql-server) echo "PostgreSQL_Server" ;;
-		ubuntu-server) echo "Ubuntu_Server" ;;
-		*)
-			local label="${first_task//-/_}"
-			label="${label// /_}"
-			local out=""
-			IFS='_' read -ra parts <<<"$label"
-			for part in "${parts[@]}"; do
-				[[ -z "$part" ]] && continue
-				out+="${part^}_"
-			done
-			out=${out%_}
-			echo "${out:-Server}"
-		;;
 	esac
 }
 
@@ -920,12 +1043,11 @@ vmtool::prompt_cicd_options() {
 # Collect CI/CD options up front. Stores selections in globals:
 #   RTD_CICD_ENABLE, RTD_CICD_REPO, RTD_CICD_PLAYBOOK, RTD_CICD_TASKS, RTD_CICD_LLM_VARIANT, RTD_CICD_LLM_MODELS
 RTD_CICD_ENABLE=0
-RTD_CICD_REPO="${RTD_ANSIBLE_REPO:-https://github.com/vonschutter/RTD-Ansible.git}"
-RTD_CICD_PLAYBOOK="${RTD_ANSIBLE_PLAYBOOK:-playbooks/server-auto-config.yml}"
-RTD_CICD_TASKS="openssh-server"
-RTD_CICD_LLM_VARIANT="none"
-RTD_CICD_LLM_MODELS=""
-RTD_VM_SERVICE_LABEL="Server"
+	RTD_CICD_REPO="${RTD_ANSIBLE_REPO:-https://github.com/vonschutter/RTD-Ansible.git}"
+	RTD_CICD_PLAYBOOK="${RTD_ANSIBLE_PLAYBOOK:-playbooks/server-auto-config.yml}"
+	RTD_CICD_TASKS="openssh-server"
+	RTD_CICD_LLM_VARIANT="none"
+	RTD_CICD_LLM_MODELS=""
 
 	if ! dialog::prompt_yes_no --title "CI/CD" --message "Seed cloned VM with CI/CD ISO and auto-run ansible-pull?"; then
 		write_information "CI/CD seeding disabled for this run."
@@ -989,8 +1111,6 @@ RTD_VM_SERVICE_LABEL="Server"
 	else
 		RTD_CICD_LLM_MODELS=""
 	fi
-
-	RTD_VM_SERVICE_LABEL=$(vmtool::derive_service_label "${mapped_tasks[*]}" "$RTD_CICD_LLM_VARIANT")
 }
 
 vmtool::post_clone_ansible_pull() {
@@ -1131,6 +1251,8 @@ vmtool::start_stop_vm_menu() {
 }
 
 vmtool::show_main_menu() {
+	local selection exit_status
+
 	while true; do
 		exec 3>&1
 		selection=$( $RTD_GUI --backtitle "$BACKTITLE" --cancel-button "EXIT" --title "$_TLA VM Tool" --menu "" $HEIGHT $WIDTH $LIST_HEIGHT \
@@ -1159,40 +1281,7 @@ vmtool::show_main_menu() {
 			;;
 		esac
 
-			case $selection in
-				0 ) echo "Program Quit."
-				;;
-				1 )
-					vmtool::prompt_cicd_options
-					write_status "Starting server template clone..."
-					if ! kvm::clone_server_template_vm --post-clone-handler vmtool::post_clone_ansible_pull "${RTD_VM_CLONE_ARGS[@]}"; then
-						write_warning "Clone cancelled or failed. No VM created."
-					else
-						if [[ -n "${RTD_LAST_CLONED_VM:-}" ]]; then
-							write_information "Clone workflow finished. Last VM: ${RTD_LAST_CLONED_VM}"
-							if virsh dominfo "${RTD_LAST_CLONED_VM}" &>/dev/null; then
-								write_information "Verified VM exists: ${RTD_LAST_CLONED_VM}"
-							else
-								write_warning "VM ${RTD_LAST_CLONED_VM} not found after clone; please check libvirt logs."
-							fi
-						else
-							write_warning "Clone reported success but RTD_LAST_CLONED_VM is empty."
-						fi
-					fi
-				;;
-				2 ) kvm::clone_vdi_template_vm "${RTD_VM_CLONE_ARGS[@]}"
-				;;
-				3 ) show_manage_VM_template_menu
-				;;
-				4 ) vmtool::start_stop_vm_menu
-				;;
-				5 ) show_settings_menu
-				;;
-				6 ) show_maintenance_menu
-				;;
-				7 ) display_notice
-				;;
-		esac
+		vmtool::run_main_action "$selection"
 	done
 }
 
@@ -1216,4 +1305,6 @@ vmtool::show_main_menu() {
 # terminal.
 
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+	main "$@"
+fi

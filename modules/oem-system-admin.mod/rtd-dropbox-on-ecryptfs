@@ -41,7 +41,9 @@ rtd::bootstrap_library() {
 	local script_dir path src_url tmp
 
 	if [[ "$library_name" == "_rtd_library" && -n "$loaded_version" ]]; then
-		if [[ -z "$minimum_version" ]] || [[ "$(printf '%s\n%s\n' "$minimum_version" "$loaded_version" | sort -V | tail -n 1)" == "$loaded_version" ]]; then
+		if { [[ -z "$minimum_version" ]] || [[ "$(printf '%s\n%s\n' "$minimum_version" "$loaded_version" | sort -V | tail -n 1)" == "$loaded_version" ]]; } &&
+			declare -F system::log_item >/dev/null 2>&1 &&
+			declare -F library::apply_rtd_defaults >/dev/null 2>&1; then
 			return 0
 		fi
 	fi

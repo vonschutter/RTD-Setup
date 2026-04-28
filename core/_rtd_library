@@ -1,16 +1,12 @@
 #!/bin/bash
 # shellcheck shell=bash
 
+# Library early safety check...
 if [[ -z "${BASH_VERSINFO[0]:-}" ]]; then
 	echo "SHELL ENV ERROR: You must use a BASH Shell to load this library. Exiting..."
 	exit 255
 fi
-_RTD_LIBRARY_SELF_VERSION="2.54"
-if [[ -n "${RTDFUNCTIONS:-}" && "${RTDFUNCTIONS}" == "${_RTD_LIBRARY_SELF_VERSION}" ]]; then
-	return 0 2>/dev/null || exit 0
-fi
-export RTD_VERSION="${_RTD_LIBRARY_SELF_VERSION}"
-unset _RTD_LIBRARY_SELF_VERSION
+
 : <<'Library_Documentation'
 ::              R T D   F u n c t i o n   L i b r a r y
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -105,16 +101,16 @@ function.
 global:
 1    add_gnome3_favorite_app                                     ;           Function to add a new favorite app to the gnome favorites bar.
 2    announce.py                                                 ;           Write out the Minecraft LAN announce helper (announce.py) into the target directory.
-3    create_physical_media_from_iso                              ;           Function to automatically write ISO (virtual DVD/CD/BlueRay) to a thumb drive. No argumenst are
+3    create_physical_media_from_iso                              ;           Function to automatically write ISO (virtual DVD/CD/BlueRay) to a thumb drive. No arguments are
 4    display_gui                                                 ;           Displays a GUI dialog box with the given message.
-5    display_software_installation_choices_gtk                   ;           Function to display the software install otions. All software option are listed in.
+5    display_software_installation_choices_gtk                   ;           Function to display the software install options. All software options are listed in.
 6    eula.txt                                                    ;           Write out an accepted Minecraft eula.txt into the target directory.
 7    InstallSoftwareFromRepo                                     ;           Function to simplify the installation of software by including all display and
 8    main                                                        ;           Entry point when running the library as a script.
 9    rtd_oem_turn_on_gui_network_management                      ;           Function to set NetworkManager by default to manage networking.
 10   rtd_oem_ubuntu_auto_install_iso_builder                     ;           Legacy entrypoint; use the OEM task implementation.
 11   rtd_server_setup_choices_productivity                       ;           Function to display terminal software installation options. This will install
-12   rtd_server_setup_choices_services                           ;           Function to display server installation options. This will install software that is usefull
+12   rtd_server_setup_choices_services                           ;           Function to display server installation options. This will install software that is useful
 13   server.properties                                           ;           Write out a default Minecraft server.properties file into the target directory.
 14   start.sh                                                    ;           Write out the Minecraft server start script (start.sh) into the target directory.
 15   write_error                                                 ;           is a simplified and consistent way to write output to the screen.
@@ -152,7 +148,7 @@ disk:
 39   disk::reencrypt_device                                      ;           Securely encrypts an existing unencrypted block device using LUKS.
 
 fedora:
-40   fedora::get_fedora_netinst_iso_url                          ;           Retrieves the full download URL for the Fedora "Everything" NetInstall ISO
+40   fedora::get_fedora_netinst_iso_url                          ;           Resolve the full download URL for the Fedora Everything NetInstall ISO via the shared ISO resolver.
 41   fedora::get_latest_release_version                          ;           Retrieves the latest available Fedora release version from the official Fedora project.
 
 github:
@@ -220,12 +216,12 @@ kvm:
 99   kvm::get_vm_config_preferences                              ;           Retrieves VM configuration values from a configuration file or defaults.
 100  kvm::get_vm_size_preferences                                ;           Loads VM sizing defaults from _locations.info or internal fallbacks and
 101  kvm::get_zorin_iso                                          ;           Downloads the latest Zorin OS ISO file for KVM if not already present.
-102  kvm::make_vm_now_from_debian_org                            ;           Function to create a Debian KVM virtual michine disk and define a VM. This function should be
+102  kvm::make_vm_now_from_debian_org                            ;           Function to create a Debian KVM virtual machine disk and define a VM. This function should be
 103  kvm::make_vm_now_from_fedora_org                            ;           Function to create a Fedora KVM virtual machine disk and define a VM. This function should be
-104  kvm::make_vm_now_from_kali_org                              ;           Function to create a Debian KVM virtual michine disk and define a VM. This function should be
-105  kvm::make_vm_now_from_microsoft                             ;           Function to create a KVM virtual michine disk and define a VM. This function should be
+104  kvm::make_vm_now_from_kali_org                              ;           Function to create a Debian KVM virtual machine disk and define a VM. This function should be
+105  kvm::make_vm_now_from_microsoft                             ;           Function to create a KVM virtual machine disk and define a VM. This function should be
 107  kvm::make_vm_now_from_opensuse_org                          ;           Creates a SUSE KVM virtual machine disk and defines a VM. This function is intended to be
-108  kvm::make_vm_now_from_redhat_com                            ;           Function to create a Alma Linux KVM virtual michine disk and define a VM. This function should be
+108  kvm::make_vm_now_from_redhat_com                            ;           Function to create an Alma Linux KVM virtual machine disk and define a VM. This function should be
 109  kvm::make_vm_now_from_ubuntu_com                            ;           Automates the creation of a KVM-based Ubuntu VM, ideal for quickly setting up virtual
 110  kvm::make_vm_now_from_zorin                                 ;           Creates a KVM virtual machine template using a Zorin OS ISO.
 111  kvm::mount_local_folder_to_guest                            ;           Mounts a local host folder into a running KVM virtual machine (guest)
@@ -276,7 +272,7 @@ oem:
 148  oem::rtd_tools_make_launchers                               ;           Legacy entry point that now delegates to the launcher definitions stored in _locations.info.
 149  oem::rtd_tools_make_launchers_from_locations                ;           Function that creates RTD launchers based on the definitions stored in _locations.info (LAUNCHER_DATA).
 150  oem::setup_brand_splash_screen                              ;           Brands the installer splash screen for a customized installer downloaded from a given vendor.
-151  oem::setup_choices_server                                   ;           Function to display legacy installation options. This will install software that is usefull
+151  oem::setup_choices_server                                   ;           Function to display legacy installation options. This will install software that is useful
 152  oem::task::auto_install_iso_debian                          ;           Build a branded Debian autoinstall ISO using preseed and initrd injection.
 154  oem::task::auto_install_iso_ubuntu                          ;           Build a branded Ubuntu autoinstall ISO using cloud-config (>= 22) or preseed (older).
 155  oem::task::auto_install_iso_windows                         ;           Build a Windows autounattend ISO by injecting autounattend.xml and OEM scripts.
@@ -320,12 +316,12 @@ oem:
 199  oem::ventoy::write_partition_title                          ;           Write a simple RTD title marker file to the Ventoy partition.
 
 pause:
-198  pause::a_given_time                                         ;           Simple function to pause for a given number of seconds whle showing a count down
+198  pause::a_given_time                                         ;           Simple function to pause for a given number of seconds while showing a count down
 199  pause::for_input                                            ;           A simple function to pause and wait for end user input.
 
 security:
-200  security::change_disk_pass                                  ;           Function to change the passphrase fo an encrypted storage device.
-201  security::check_if_password_pOwned                          ;           Function to query a user for a password suggestion and check it against P0wned data base online.
+200  security::change_disk_pass                                  ;           Function to change the passphrase for an encrypted storage device.
+201  security::check_if_password_pOwned                          ;           Function to query a user for a password suggestion and check it against P0wned database online.
 202  security::configure_auditd                                  ;           Function to install and configure auditd for system auditing.
 203  security::configure_clamav                                  ;           Installs and securely configures ClamAV only if not already installed.
 204  security::configure_fail2ban                                ;           Installs and configures Fail2Ban with a secure default jail for SSH protection.
@@ -342,18 +338,18 @@ security:
 software:
 214  software::add_gnome_extensions                              ;           Description:
 215  software::add_native_package                                ;           Installs one or more native packages individually using the system's package manager.
-216  software::add_software_task                                 ;           Display executed task and echo ON/NOK based on sucess
+216  software::add_software_task                                 ;           Display executed task and echo ON/NOK based on success
 217  software::check_native_package_dependency                   ;           Ensures that all provided native software package dependencies are installed.
 218  software::determine_package_name_from_cmd                   ;           Function to determine the package name from the command line.
-219  software::display_bundle_install_choices_gtk                ;           Function to display the software install otions. All software option are listed in.
-220  software::display_bundle_removal_choices_gtk                ;           Function to display the Software Prodictivity Bundles removal otions. All software options are listed in.
-221  software::ensure_flatpak_package_managment                  ;           Function to ensure that flatpak is installed and flathup enabled.
-222  software::ensure_gnome_software_store_available             ;           Function to ensure that flatpak is installed and flathup enabled.
+219  software::display_bundle_install_choices_gtk                ;           Function to display the software install options. All software options are listed in.
+220  software::display_bundle_removal_choices_gtk                ;           Function to display the Software Productivity Bundles removal options. All software options are listed in.
+221  software::ensure_flatpak_package_managment                  ;           Function to ensure that Flatpak is installed and Flathub enabled.
+222  software::ensure_gnome_software_store_available             ;           Function to ensure that Flatpak is installed and Flathub enabled.
 223  software::ensure_restricted_codecs                          ;           simple function to ensure that restricted codecs are available on the system.
 224  software::ensure_snap_package_managment                     ;           Function to ensure that snap is installed.
 225  software::from_flathub.org                                  ;           Function to simplify and streamline the installation and removal of flatpaks.
 226  software::from_snapcraft.io                                 ;           Function to ensure that snap is installed.
-227  software::is_native_package_available                       ;           Function to chek if a package is available in whetever repository, and
+227  software::is_native_package_available                       ;           Function to check if a package is available in whatever repository, and
 228  software::is_native_package_installed                       ;           Function to check if a piece of software is installed. This function will first check
 229  software::list_bundles                                      ;           Function to list all software bundles defined in _rtd_recipes that are either installable or removable.
 230  software::native_management_availability_check              ;           Detects the native package manager and checks if it's currently locked or in use.
@@ -381,7 +377,7 @@ system:
 248  system::check_required_variables                            ;           Function to check for the presence and non-emptiness of a list of variables.
 249  system::cleanup_and_finish                                  ;           Function to remove all temporary file locations left over from building
 250  system::create_iso_image_debian                             ;           Function to generate the new ISO file from the extracted and
-251  system::create_physical_media_from_ubuntu_iso               ;           Courtesy of 'covertsh':  ubuntu-autoinstall-generator
+251  system::create_physical_media_from_ubuntu_iso               ;           Build an Ubuntu autoinstall ISO and acquire the source installer through the shared Ubuntu ISO helpers when needed.
 252  system::create_swapfile                                     ;           Function to create a swapfile and enable it automatically.
 253  system::detect_session                                      ;           Detects the current session type (TTY, SSH, GUI, Wayland).
 254  system::determine_logfile                                   ;           Determines the path to a log file for the current script based on:
@@ -389,7 +385,7 @@ system:
 256  system::distribution_type                                   ;           This function determines the Linux distribution type of the system on which it is run. It identifies the
 257  system::download_and_manipulate_iso_debian                  ;           Legacy entrypoint; use the OEM task implementation.
 258  system::ensure_directory_exists                             ;           Function to ensure a directory exists, creating it if necessary.
-259  system::find_download_ubuntu_iso                            ;           Find download ubuntu iso.
+259  system::find_download_ubuntu_iso                            ;           Legacy Ubuntu ISO picker/downloader wrapper backed by the shared Ubuntu ISO helpers.
 260  system::find_vm_bridge                                      ;           Locate a usable network for VM networking. Prefer a host bridge with a physical member; otherwise fall back to a libvirt network (preferring "default"). Logs diagnostics, returning 1 only when nothing usable is found.
 261  system::find_vm_bridge_gemini                               ;           Locate a usable network for VM networking. Prefer a host bridge with a physical member; otherwise fall back to a libvirt network (preferring "default"). Logs diagnostics, returning 1 only when nothing usable is found.
 262  system::generate_autoyast_file                              ;           This function dynamically generates an AutoYaST XML file for automated SUSE Linux installations.
@@ -402,7 +398,7 @@ system:
 269  system::keyboard_set_layout                                 ;           Configure and persist keyboard layout for both GUI and TTY across major Linux distributions.
 270  system::laptop_detect                                       ;           Determine if the current system appears to be a laptop without relying on the laptop-detect utility.
 271  system::log_item                                            ;           The purpose of this function is to consistently write script output to the right log file.
-272  system::make_preseed_cfg                                    ;           Function to write out a debina preeseed file to a location requested by the first parameter.
+272  system::make_preseed_cfg                                    ;           Function to write out a Debian preseed file to a location requested by the first parameter.
 273  system::make_system_recovery_partition                      ;           Incomplete function to build an OEM rescue partition...
 274  system::oem_autounlock_disk                                 ;           Setup automatic unlocking of the encrypted system disk.
 275  system::optimize_harddrive                                  ;           Detect mounted block devices and apply basic performance-oriented tunables
@@ -410,11 +406,11 @@ system:
 277  system::prepare_environment_for_iso_creation                ;           Function to check that all dependencies are available for manipulating the
 278  system::preseed_to_ubuntu_ks_cfg                            ;           Generates a preseed section [Ubuntu only] (ks.cfg).
 279  system::preserve_graphical_session_environment              ;           Ensure graphical environment variables are set when running as root after escalation.
-280  system::process_vm_opt_args                                 ;           Function to evaluate input fiven to a VM build finction and set configuration override variables.
+280  system::process_vm_opt_args                                 ;           Function to evaluate input given to a VM build function and set configuration override variables.
 281  system::read_config                                         ;           This function reads a configuration file with key-value pairs.
 282  system::remove_old_kernel                                   ;           Purge older Linux kernel packages, keeping the currently running kernel.
 283  system::restart_sound                                       ;           Restarts the user's sound server (PipeWire or PulseAudio).
-284  system::rtd_oem_find_live_release                           ;           This function will return the URL for the version of Debian, Ubuntu server or Destktop requested.
+284  system::rtd_oem_find_live_release                           ;           Legacy ISO URL resolver wrapper backed by the shared Debian and Ubuntu ISO resolvers.
 285  system::rtd_oem_reseal                                      ;           Function to reseal a newly installed system for delivery to end user.
 286  system::rtd_oem_reseal::_finalize_shutdown                  ;           Logs the shutdown context and powers the system off.
 287  system::rtd_oem_reseal::_install_guest_additions            ;           Ensures guest integration packages are installed regardless of distro.
@@ -423,7 +419,7 @@ system:
 290  system::rtd_oem_reseal::_prepare_suse                       ;           Enables YaST firstboot and guest tools on SUSE-based distributions.
 291  system::rtd_oem_reseal::_prepare_ubuntu_like                ;           Runs OEM reseal prep for Ubuntu-like distributions.
 292  system::rtd_oem_reseal::_virtualization_context             ;           Detects whether the current system is running as a virtual guest.
-293  system::run_command_in_gnome_user_session                   ;           Function to do a reverse sudo back to teh original Gnome user who called upon sudo.
+293  system::run_command_in_gnome_user_session                   ;           Function to do a reverse sudo back to the original Gnome user who called upon sudo.
 294  system::set_oem_elevated_privilege_gui                      ;           This function configures the local X environment to allow root to display GUI applications.
 295  system::toggle_oem_auto_elevated_privilege                  ;           Toggles passwordless sudo privileges for a specified user.
 296  system::toggle_oem_auto_login                               ;           Toggles auto-login for major display managers and TTY on Debian, Ubuntu, Fedora, SUSE-based distros.
@@ -449,10 +445,10 @@ template:
 
 term:
 314  term::animate_while_command                                 ;           Displays an animation during the execution of a silent command.
-315  term::err_no_menu_system_found                              ;           Function to handle the error condition if a manu system is not found on the system.
+315  term::err_no_menu_system_found                              ;           Function to handle the error condition if a menu system is not found on the system.
 316  term::set_colors                                            ;           Set colors for prompting on screen in human readable variables. These will be set globally
-317  term::start_animation                                       ;           A simple function to display and animation during a silent acton
-318  term::stop_animation                                        ;           A simple function to STOP display and animation during a silent acton
+317  term::start_animation                                       ;           A simple function to display an animation during a silent action
+318  term::stop_animation                                        ;           A simple function to STOP display an animation during a silent action
 319  term::task_exec_list_output                                 ;           Task exec list output.
 
 tool:
@@ -464,7 +460,7 @@ tool:
 325  tool::up_2_date                                             ;           Function to simplify updating system completely. At present this function sets the
 
 ubuntu:
-326  ubuntu::download_iso                                        ;           Downloads the specified Ubuntu ISO (Desktop or Server) based on the provided flavor, version, and type.
+326  ubuntu::download_iso                                        ;           Download an Ubuntu release ISO through the shared resolver, cache lookup, and verification flow.
 327  ubuntu::enable_plymouth_theme                               ;           Detects the Ubuntu spin (flavor) and ensures the appropriate
 328  ubuntu::get_latest_release_version                          ;           Retrieves the latest available Ubuntu release version from the official archive.
 329  ubuntu::get_target_version                                  ;           Interactively or non-interactively determine which Ubuntu version to use for installation.
@@ -550,6 +546,18 @@ Library_Documentation
 #                                                Y8b d88P
 #                                                 "Y88P"
 ################################################################################################
+
+# If the vars exist but the functions do not, we clear the stale vars and loads normally.
+# That is the right defensive behavior for re-exec, byobu/tmux, sudo, and similar process-boundary cases.
+_RTD_LIBRARY_SELF_VERSION="2.54"
+if [[ -n "${RTDFUNCTIONS:-}" && "${RTDFUNCTIONS}" == "${_RTD_LIBRARY_SELF_VERSION}" ]]; then
+	if declare -F system::log_item >/dev/null 2>&1 && declare -F library::apply_rtd_defaults >/dev/null 2>&1; then
+		return 0 2>/dev/null || exit 0
+	fi
+	unset RTDFUNCTIONS RTD_VERSION
+fi
+export RTD_VERSION="${_RTD_LIBRARY_SELF_VERSION}"
+unset _RTD_LIBRARY_SELF_VERSION
 
 # Disable unset variable error checking because we are using default values :-"default_value"
 set +u
@@ -664,14 +672,14 @@ dialog::check_menu_availability() {
 			--title "System Information Menu" \
 			--no-button "NO: Use whiptail" \
 			--yes-button "YES: Install dialog" \
-			--yesno "Please NOTE that we are using WHIPTAIL as a terminal menu system, which is missing several features compared to the default: DIALOG menu system. There are a few reasons we may be using WHIPTAIL instead: I was forced to use it or it is the only terminal menu system available... If you continue with the current WHIPTAIL some things might not work. \n \n May I please try to install the dialog system in stead? . \n  " \
+			--yesno "Please NOTE that we are using WHIPTAIL as a terminal menu system, which is missing several features compared to the default: DIALOG menu system. There are a few reasons we may be using WHIPTAIL instead: I was forced to use it or it is the only terminal menu system available... If you continue with the current WHIPTAIL some things might not work. \n \n May I please try to install the dialog system instead? . \n  " \
 			20 90); then
 			RTD_GUI=dialog
 			term::err_no_menu_system_found
 		else
 			echo "User selected No, exit status was $?."
 		fi
-	else
+	else 
 		term::err_no_menu_system_found dialog && return 1 || exit 1
 	fi
 }
@@ -1546,7 +1554,7 @@ term::animate_while_command() {
 
 term::start_animation() {
 	# Description:
-	# A simple function to display and animation during a silent acton
+	# A simple function to display an animation during a silent action
 	#
 	# Globals:
 	# Arguments:
@@ -1605,7 +1613,7 @@ term::start_animation() {
 
 term::stop_animation() {
 	# Description:
-	# A simple function to STOP display and animation during a silent acton
+	# A simple function to STOP display an animation during a silent action
 	#
 	# Globals:
 	# Arguments:
@@ -1687,8 +1695,8 @@ term::task_exec_list_output() {
 }
 
 term::err_no_menu_system_found() {
-	# Description: Function to handle the error condition if a manu system is not found on the system.
-	# On occasion it may be neede to display dialog boxes and selection menus even in a terminal.
+	# Description: Function to handle the error condition if a menu system is not found on the system.
+	# On occasion it may be needed to display dialog boxes and selection menus even in a terminal.
 	# for these cases; dialog, whiptail (newt), or zenity may be needed.
 	# This function will attempt to install the desired menu system and if it cannot or the user
 	# opts out it will error and exit the script.
@@ -1701,8 +1709,8 @@ term::err_no_menu_system_found() {
 	# term::err_no_menu_system_found
 	# End of documentation
 
-	write_error " ______________________________________________________________________ \n There is eiter no way to display menus on this system or you have told me \n to install the default  menu system! \n This is required to display the administrative menus... \n \n     ¯\_( ͡👁️ ͜ʖ ͡👁️)_/¯ \n ______________________________________________________________________ \n"
-	write_warning "May I attepmpt to install this ability to your system? \a "
+	write_error " ______________________________________________________________________ \n There is either no way to display menus on this system or you have told me \n to install the default  menu system! \n This is required to display the administrative menus... \n \n     ¯\_( ͡👁️ ͜ʖ ͡👁️)_/¯ \n ______________________________________________________________________ \n"
+	write_warning "May I attempt to install this ability to your system? \a "
 	read -p "Add software: (y/n)?" choice
 	case "$choice" in
 	y | Y)
@@ -1873,7 +1881,7 @@ network::whats_my_ipinfo() {
 	#   network::whats_my_ipinfo --timeout 10
 	#
 	# Example:
-	#   - Get IP info and print to console immediatley:
+	#   - Get IP info and print to console immediately:
 	#     network::whats_my_ipinfo
 	#
 	#   - Get IP info and display in a dialog box:
@@ -2736,9 +2744,9 @@ dependency::search_local() {
 	# Notes:
 	#	- Ensure that the paths to be searched are correct and accessible.
 	#	- This function is designed to be used internally and may not be useful when called directly.
-	#   - The predetermined paths are: /opt/${_TLA:-"rtd"} (calue of _TLA if set, otherwise "rtd"),
+	#   - The predetermined paths are: /opt/${_TLA:-"rtd"} (value of _TLA if set, otherwise "rtd"),
 	#     /home/${SUDO_USER}/GIT, /home/${SUDO_USER}/bin, and the script directory (location of calling script ).
-	#	- I all esle fails, the function will search the user's entire home directory.
+	#	- If all else fails, the function will search the user's entire home directory.
 	#
 	# End of Documentation
 
@@ -2824,7 +2832,9 @@ dependency::file() {
 
 	if [[ "$requested_file" == "_rtd_library" ]] && [[ -n "${RTDFUNCTIONS:-}" ]]; then
 		local loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
-		if [[ -z "${minimum_version}" ]] || [[ "$(printf '%s\n%s\n' "${minimum_version}" "${loaded_version}" | sort -V | tail -n 1)" == "${loaded_version}" ]]; then
+		if { [[ -z "${minimum_version}" ]] || [[ "$(printf '%s\n%s\n' "${minimum_version}" "${loaded_version}" | sort -V | tail -n 1)" == "${loaded_version}" ]]; } &&
+			declare -F system::log_item >/dev/null 2>&1 &&
+			declare -F library::apply_rtd_defaults >/dev/null 2>&1; then
 			system::log_item "dependency::file: _rtd_library already loaded, skipping re-source"
 			return 0
 		fi
@@ -3299,7 +3309,7 @@ system::prepare_environment_for_iso_creation() {
 			: "${isohdpfx_bin:="/usr/lib/ISOLINUX/isohdpfx.bin"}"
 			write_information "Found: $isohdpfx_bin"
 		else
-			write_warning "An important file (isohdpfx.bin) was not found in the expected location. Attepting to workaround the issue..."
+			write_warning "An important file (isohdpfx.bin) was not found in the expected location. Attempting to work around the issue..."
 			if hash locate 2>/dev/null; then
 				locate isohdpfx.bin || (
 					write_error "The file isohdpfx.bin could not be found or fetched. Please correct manually!"
@@ -3403,7 +3413,7 @@ system::prepare_environment_for_iso_creation() {
 # -----------------------------------------------------------------------------
 oem::task::iso::fetch_url() {
 	# Description:
-	#   Fetch the content at a URL to STDOUT using curl or wget.
+	#   Fetch the content at a URL to STDOUT using curl or wget with retries.
 	# Globals: None
 	# Arguments:
 	#   $1 - URL to fetch.
@@ -3417,9 +3427,9 @@ oem::task::iso::fetch_url() {
 	# End of documentation
 	local url="$1"
 	if command -v curl >/dev/null 2>&1; then
-		curl --silent --fail "$url"
+		curl --connect-timeout 10 --retry 3 --retry-delay 2 --retry-connrefused --max-time 120 --silent --show-error --fail --location "$url"
 	elif command -v wget >/dev/null 2>&1; then
-		wget -qO- "$url"
+		wget -qO- --tries=3 --timeout=30 --read-timeout=120 "$url"
 	else
 		write_error "Neither curl nor wget is available to fetch: $url"
 		return 1
@@ -3534,6 +3544,73 @@ oem::task::iso::find_cached_iso() {
 	done
 
 	return 1
+}
+
+oem::task::iso::escape_ere() {
+	# Description:
+	#   Escape a string for safe literal use inside an extended regular expression.
+	# Globals: None
+	# Arguments:
+	#   $1 - Raw string to escape.
+	# Outputs:
+	#   STDOUT: Escaped string.
+	# Returns:
+	#   0
+	# Usage:
+	#   pattern=$(oem::task::iso::escape_ere "ubuntu-24.04.1")
+	# End of documentation
+	sed -E 's/[][(){}.^$*+?|\\]/\\&/g' <<< "${1:-}"
+}
+
+oem::task::iso::prepare_keyring() {
+	# Description:
+	#   Ensure a GPG keyring file exists, downloading it when needed.
+	# Globals: None
+	# Arguments:
+	#   $1 - Source URL for the key material.
+	#   $2 - Destination keyring path (.gpg).
+	#   $3 - Key format: binary or armored. Defaults to binary.
+	# Outputs:
+	#   Status messages on STDOUT/STDERR.
+	# Returns:
+	#   0 on success; non-zero on failure.
+	# Usage:
+	#   oem::task::iso::prepare_keyring "https://example/key.asc" "/tmp/keyring.gpg" armored
+	# End of documentation
+	local source_url="$1"
+	local keyring_path="$2"
+	local key_format="${3:-binary}"
+	local armored_path
+
+	if [[ -z "$source_url" || -z "$keyring_path" ]]; then
+		write_error "Missing key source URL or destination keyring path."
+		return 1
+	fi
+
+	if [[ -s "$keyring_path" ]]; then
+		return 0
+	fi
+
+	mkdir -p "$(dirname "$keyring_path")" || return 1
+
+	case "$key_format" in
+		binary)
+			oem::task::iso::download_url "$source_url" "$keyring_path"
+			;;
+		armored)
+			armored_path="${keyring_path%.gpg}.asc"
+			oem::task::iso::download_url "$source_url" "$armored_path" || return 1
+			if ! command -v gpg >/dev/null 2>&1; then
+				write_error "gpg is required to convert armored key material into a keyring."
+				return 1
+			fi
+			gpg --batch --yes --dearmor -o "$keyring_path" "$armored_path"
+			;;
+		*)
+			write_error "Unsupported key format '$key_format'."
+			return 1
+			;;
+	esac
 }
 
 oem::task::iso::update_md5sum_entries() {
@@ -4877,7 +4954,7 @@ oem::task::iso::force_ubiquity_preseed() {
 
 oem::task::iso::download_url() {
 	# Description:
-	#   Download a URL to a destination path (reuses cached file if present).
+	#   Download a URL to a destination path with retries (reuses cached file if present).
 	# Globals: None
 	# Arguments:
 	#   $1 - URL to download.
@@ -4907,9 +4984,11 @@ oem::task::iso::download_url() {
 	write_information "Download: $url"
 
 	if command -v curl >/dev/null 2>&1; then
-		curl -fL --retry 3 --output "$dest" "$url"
+		curl -fL --retry 3 --retry-delay 2 --retry-connrefused \
+			--connect-timeout 10 --speed-limit 1024 --speed-time 60 \
+			--continue-at - --output "$dest" "$url"
 	elif command -v wget >/dev/null 2>&1; then
-		wget -q --show-progress "$url" -O "$dest"
+		wget --tries=3 --timeout=30 --read-timeout=120 --show-progress "$url" -O "$dest"
 	else
 		write_error "Neither curl nor wget is available to download: $url"
 		return 1
@@ -4922,6 +5001,521 @@ oem::task::iso::download_url() {
 
 	write_information "Retrieved: $dest"
 	return 0
+}
+
+oem::task::iso::resolve_ubuntu_iso() {
+	# Description:
+	#   Resolve an Ubuntu ISO name, URL, version, and verification metadata.
+	# Globals:
+	#   OEM_ISO_NAME (w)
+	#   OEM_ISO_URL (w)
+	#   OEM_ISO_VERSION (w)
+	#   OEM_ISO_CHECKSUM_URL (w)
+	#   OEM_ISO_SIGNATURE_URL (w)
+	#   OEM_ISO_KEYRING_PATH (w)
+	#   OEM_ISO_KEYRING_URL (w)
+	# Arguments:
+	#   --mirror <url>                Optional releases mirror. Defaults to releases.ubuntu.com.
+	#   --meta-release-url <url>      Optional stable release metadata URL.
+	#   --version <version>           Optional explicit Ubuntu version.
+	#   --media-type <desktop|server> Optional media type. Defaults to desktop.
+	#   --architecture <arch>         Optional architecture. Defaults to amd64.
+	#   --include-prerelease          Allow pre-release filenames and highest release directory.
+	# Outputs:
+	#   Populates OEM_ISO_* globals for the resolved Ubuntu ISO.
+	# Returns:
+	#   0 on success; non-zero on failure.
+	# Usage:
+	#   oem::task::iso::resolve_ubuntu_iso --media-type server --version 24.04.2
+	# End of documentation
+	local mirror_url="https://releases.ubuntu.com"
+	local meta_release_url="https://changelogs.ubuntu.com/meta-release"
+	local version=""
+	local media_type="desktop"
+	local arch="amd64"
+	local include_prerelease=0
+	local release_url dir_listing meta_release iso_name pattern escaped_arch escaped_version
+
+	unset OEM_ISO_NAME OEM_ISO_URL OEM_ISO_VERSION OEM_ISO_DIR OEM_ISO_CHECKSUM_URL \
+		OEM_ISO_SIGNATURE_URL OEM_ISO_CHECKSUM_FILE OEM_ISO_SIGNATURE_FILE \
+		OEM_ISO_CHECKSUM_ALGO OEM_ISO_KEYRING_PATH OEM_ISO_KEYRING_URL OEM_ISO_KEY_FORMAT
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--mirror)
+				mirror_url="$2"
+				shift 2
+				;;
+			--meta-release-url)
+				meta_release_url="$2"
+				shift 2
+				;;
+			--version)
+				version="$2"
+				shift 2
+				;;
+			--media-type|--type|--iso-type)
+				media_type="${2,,}"
+				shift 2
+				;;
+			--architecture|--arch)
+				arch="$2"
+				shift 2
+				;;
+			--include-prerelease)
+				include_prerelease=1
+				shift
+				;;
+			*)
+				write_error "Unknown argument for ${FUNCNAME[0]}: $1"
+				return 1
+				;;
+		esac
+	done
+
+	case "$mirror_url" in
+		http://*|https://*) ;;
+		*)
+			write_error "Unsupported Ubuntu mirror URL: $mirror_url"
+			return 1
+			;;
+	esac
+
+	case "$media_type" in
+		live) media_type="desktop" ;;
+		desktop|server|live-server) ;;
+		*)
+			write_error "Unsupported Ubuntu media type '$media_type'. Use desktop or server."
+			return 1
+			;;
+	esac
+
+	if [[ ! "$arch" =~ ^[A-Za-z0-9_-]+$ ]]; then
+		write_error "Unsupported Ubuntu architecture '$arch'."
+		return 1
+	fi
+
+	if [[ -z "$version" ]]; then
+		if [[ $include_prerelease -ne 1 ]]; then
+			meta_release=$(oem::task::iso::fetch_url "$meta_release_url") || meta_release=""
+			if [[ -n "$meta_release" ]]; then
+				version=$(
+					awk '
+						BEGIN { RS = ""; FS = "\n" }
+						/Supported:[[:space:]]*1/ {
+							for (i = 1; i <= NF; i++) {
+								if ($i ~ /^Version:[[:space:]]*/) {
+									value = $i
+									sub(/^Version:[[:space:]]*/, "", value)
+									sub(/[[:space:]]+LTS$/, "", value)
+									print value
+								}
+							}
+						}
+					' <<< "$meta_release" | sort -V | tail -n 1
+				)
+			fi
+		fi
+
+		if [[ -z "$version" ]]; then
+			dir_listing=$(oem::task::iso::fetch_url "${mirror_url%/}/") || return 1
+			version=$(
+				printf '%s\n' "$dir_listing" |
+					grep -Eo 'href="[0-9]+\.[0-9]+(\.[0-9]+)?/"' |
+					sed -E 's#href="([^"]+)/"#\1#' |
+					sort -V |
+					tail -n 1
+			)
+		fi
+	fi
+
+	[[ -n "$version" ]] || {
+		write_error "Failed to determine an Ubuntu release version."
+		return 1
+	}
+
+	release_url="${mirror_url%/}/${version}"
+	dir_listing=$(oem::task::iso::fetch_url "${release_url}/") || return 1
+	escaped_arch=$(oem::task::iso::escape_ere "$arch")
+	escaped_version=$(oem::task::iso::escape_ere "$version")
+
+	case "$media_type" in
+		desktop)
+			if [[ $include_prerelease -eq 1 ]]; then
+				pattern="ubuntu-${escaped_version}(-[A-Za-z0-9._-]+)?-desktop-${escaped_arch}[.]iso"
+			else
+				pattern="ubuntu-${escaped_version}-desktop-${escaped_arch}[.]iso"
+			fi
+			;;
+		server|live-server)
+			media_type="server"
+			if [[ $include_prerelease -eq 1 ]]; then
+				pattern="ubuntu-${escaped_version}(-[A-Za-z0-9._-]+)?-live-server-${escaped_arch}[.]iso"
+			else
+				pattern="ubuntu-${escaped_version}-live-server-${escaped_arch}[.]iso"
+			fi
+			;;
+	esac
+
+	iso_name=$(
+		printf '%s\n' "$dir_listing" |
+			grep -Eo 'href="[^"]+[.]iso"' |
+			sed -E 's#href="([^"]+)"#\1#' |
+			grep -E "^${pattern}$" |
+			sort -V |
+			tail -n 1
+	)
+
+	[[ -n "$iso_name" ]] || {
+		write_error "Could not find an Ubuntu ${media_type} ISO for version ${version}."
+		return 1
+	}
+
+	OEM_ISO_NAME="$iso_name"
+	OEM_ISO_URL="${release_url}/${iso_name}"
+	OEM_ISO_VERSION="$version"
+	OEM_ISO_DIR="$release_url"
+	OEM_ISO_CHECKSUM_URL="${release_url}/SHA256SUMS"
+	OEM_ISO_SIGNATURE_URL="${release_url}/SHA256SUMS.gpg"
+	OEM_ISO_CHECKSUM_FILE="SHA256SUMS"
+	OEM_ISO_SIGNATURE_FILE="SHA256SUMS.gpg"
+	OEM_ISO_CHECKSUM_ALGO="sha256"
+	OEM_ISO_KEYRING_PATH="/usr/share/keyrings/ubuntu-archive-keyring.gpg"
+	OEM_ISO_KEYRING_URL="https://archive.ubuntu.com/ubuntu/project/ubuntu-archive-keyring.gpg"
+	OEM_ISO_KEY_FORMAT="binary"
+	return 0
+}
+
+oem::task::iso::verify_ubuntu_iso() {
+	# Description:
+	#   Verify an Ubuntu ISO against SHA256SUMS and SHA256SUMS.gpg.
+	# Globals:
+	#   OEM_ISO_* resolver metadata (r)
+	# Arguments:
+	#   $1 - Full path to the ISO file.
+	# Outputs:
+	#   Status messages on STDOUT/STDERR.
+	# Returns:
+	#   0 on success or skipped verification; non-zero on verification failure.
+	# Usage:
+	#   oem::task::iso::verify_ubuntu_iso "/var/lib/libvirt/boot/ubuntu-24.04.2-live-server-amd64.iso"
+	# End of documentation
+	local iso_path="$1"
+	local iso_dir iso_name sums_file signature_file keyring_file
+
+	[[ -f "$iso_path" ]] || {
+		write_error "Ubuntu ISO path is missing: $iso_path"
+		return 1
+	}
+
+	iso_dir=$(dirname "$iso_path")
+	iso_name=$(basename "$iso_path")
+	sums_file="$iso_dir/${OEM_ISO_CHECKSUM_FILE:-SHA256SUMS}"
+	signature_file="$iso_dir/${OEM_ISO_SIGNATURE_FILE:-SHA256SUMS.gpg}"
+	keyring_file="${OEM_ISO_KEYRING_PATH:-/usr/share/keyrings/ubuntu-archive-keyring.gpg}"
+
+	if ! oem::task::iso::download_url "${OEM_ISO_CHECKSUM_URL}" "$sums_file"; then
+		write_warning "Could not download Ubuntu SHA256SUMS. Skipping checksum verification."
+		return 0
+	fi
+
+	if oem::task::iso::download_url "${OEM_ISO_SIGNATURE_URL}" "$signature_file"; then
+		if command -v gpgv >/dev/null 2>&1; then
+			if [[ ! -s "$keyring_file" ]]; then
+				keyring_file="$iso_dir/ubuntu-archive-keyring.gpg"
+				if ! oem::task::iso::prepare_keyring "${OEM_ISO_KEYRING_URL}" "$keyring_file" "${OEM_ISO_KEY_FORMAT:-binary}"; then
+					write_warning "Could not prepare Ubuntu keyring. Skipping signature verification."
+					keyring_file=""
+				fi
+			fi
+			if [[ -n "$keyring_file" ]]; then
+				if ! gpgv --keyring "$keyring_file" "$signature_file" "$sums_file"; then
+					write_error "Ubuntu SHA256SUMS signature verification failed."
+					return 1
+				fi
+			fi
+		else
+			write_warning "gpgv is not installed. Skipping Ubuntu signature verification."
+		fi
+	else
+		write_warning "Could not download Ubuntu SHA256SUMS.gpg. Skipping signature verification."
+	fi
+
+	if ! grep -Fq " *$iso_name" "$sums_file"; then
+		write_warning "Ubuntu SHA256SUMS does not contain $iso_name. Skipping checksum verification."
+		return 0
+	fi
+
+	if (
+		cd "$iso_dir" || exit 1
+		grep -F " *$iso_name" "${OEM_ISO_CHECKSUM_FILE:-SHA256SUMS}" | sha256sum --check -
+	); then
+		write_information "Ubuntu checksum verification passed for $iso_name"
+		return 0
+	fi
+
+	write_error "Ubuntu checksum verification failed for $iso_name"
+	return 1
+}
+
+oem::task::iso::resolve_debian_iso() {
+	# Description:
+	#   Resolve a Debian ISO name, URL, version, and verification metadata.
+	# Globals:
+	#   OEM_ISO_* metadata globals (w)
+	#   _DEB_ISO_NAME (w)
+	#   _DEB_ISO_URL (w)
+	# Arguments:
+	#   --mirror <url>                Optional mirror. Defaults to cdimage.debian.org/debian-cd.
+	#   --version <version>           Optional explicit Debian version (e.g. 13.4.0).
+	#   --iso-type <netinst|dvd|live> Optional media type. Defaults to netinst.
+	#   --live-flavor <name>          Optional live flavor. Defaults to gnome.
+	#   --architecture <arch>         Optional architecture. Defaults to amd64.
+	# Outputs:
+	#   Populates OEM_ISO_* globals and Debian compatibility globals.
+	# Returns:
+	#   0 on success; non-zero on failure.
+	# Usage:
+	#   oem::task::iso::resolve_debian_iso --iso-type live --live-flavor xfce
+	# End of documentation
+	local mirror_url="https://cdimage.debian.org/debian-cd"
+	local version=""
+	local iso_type="netinst"
+	local live_flavor="gnome"
+	local arch="amd64"
+	local version_dir iso_dir dir_listing iso_name escaped_arch escaped_version
+
+	unset OEM_ISO_NAME OEM_ISO_URL OEM_ISO_VERSION OEM_ISO_DIR OEM_ISO_CHECKSUM_URL \
+		OEM_ISO_SIGNATURE_URL OEM_ISO_CHECKSUM_FILE OEM_ISO_SIGNATURE_FILE \
+		OEM_ISO_CHECKSUM_ALGO OEM_ISO_KEYRING_PATH OEM_ISO_KEYRING_URL OEM_ISO_KEY_FORMAT
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--mirror)
+				mirror_url="$2"
+				shift 2
+				;;
+			--version)
+				version="$2"
+				shift 2
+				;;
+			--iso-type|--type)
+				iso_type="${2,,}"
+				shift 2
+				;;
+			--live-flavor|--desktop)
+				live_flavor="${2,,}"
+				shift 2
+				;;
+			--architecture|--arch)
+				arch="$2"
+				shift 2
+				;;
+			*)
+				write_error "Unknown argument for ${FUNCNAME[0]}: $1"
+				return 1
+				;;
+		esac
+	done
+
+	case "$live_flavor" in
+		junior) live_flavor="debian-junior" ;;
+	esac
+
+	case "$iso_type" in
+		netinst|dvd|live) ;;
+		*)
+			write_error "Unsupported Debian ISO type '$iso_type'."
+			return 1
+			;;
+	esac
+
+	if [[ "$iso_type" == "live" ]]; then
+		case "$live_flavor" in
+			cinnamon|debian-junior|gnome|kde|lxde|lxqt|mate|standard|xfce) ;;
+			*)
+				write_error "Unsupported Debian live flavor '$live_flavor'."
+				return 1
+				;;
+		esac
+	fi
+
+	case "$mirror_url" in
+		http://*|https://*) ;;
+		*)
+			write_error "Unsupported Debian mirror URL: $mirror_url"
+			return 1
+			;;
+	esac
+
+	if [[ ! "$arch" =~ ^[A-Za-z0-9_-]+$ ]]; then
+		write_error "Unsupported Debian architecture '$arch'."
+		return 1
+	fi
+
+	if [[ -z "$version" ]]; then
+		dir_listing=$(oem::task::iso::fetch_url "${mirror_url%/}/") || return 1
+		version=$(
+			printf '%s\n' "$dir_listing" |
+				grep -Eo 'href="[0-9]+[.][0-9]+[.][0-9]+/"' |
+				sed -E 's#href="([^"]+)/"#\1#' |
+				sort -V |
+				tail -n 1
+		)
+		[[ -n "$version" ]] || {
+			write_error "Failed to determine the latest Debian version."
+			return 1
+		}
+		version_dir="current"
+	else
+		version_dir="$version"
+	fi
+
+	case "$iso_type" in
+		netinst)
+			iso_dir="${mirror_url%/}/${version_dir}/${arch}/iso-cd"
+			;;
+		dvd)
+			iso_dir="${mirror_url%/}/${version_dir}/${arch}/iso-dvd"
+			;;
+		live)
+			if [[ "$version_dir" == "current" ]]; then
+				iso_dir="${mirror_url%/}/current-live/${arch}/iso-hybrid"
+			else
+				iso_dir="${mirror_url%/}/${version}-live/${arch}/iso-hybrid"
+			fi
+			;;
+	esac
+
+	dir_listing=$(oem::task::iso::fetch_url "${iso_dir}/") || return 1
+	escaped_arch=$(oem::task::iso::escape_ere "$arch")
+	escaped_version=$(oem::task::iso::escape_ere "$version")
+
+	case "$iso_type" in
+		netinst)
+			iso_name=$(
+				printf '%s\n' "$dir_listing" |
+					grep -Eo 'href="[^"]+[.]iso"' |
+					sed -E 's#href="([^"]+)"#\1#' |
+					grep -E "^debian-${escaped_version}-${escaped_arch}-netinst[.]iso$" |
+					sort -V |
+					tail -n 1
+			)
+			;;
+		dvd)
+			iso_name=$(
+				printf '%s\n' "$dir_listing" |
+					grep -Eo 'href="[^"]+[.]iso"' |
+					sed -E 's#href="([^"]+)"#\1#' |
+					grep -E "^debian-${escaped_version}-${escaped_arch}-DVD-1[.]iso$" |
+					sort -V |
+					tail -n 1
+			)
+			;;
+		live)
+			iso_name=$(
+				printf '%s\n' "$dir_listing" |
+					grep -Eo 'href="[^"]+[.]iso"' |
+					sed -E 's#href="([^"]+)"#\1#' |
+					grep -E "^debian-live-${escaped_version}-${escaped_arch}-${live_flavor}[.]iso$" |
+					sort -V |
+					tail -n 1
+			)
+			;;
+	esac
+
+	[[ -n "$iso_name" ]] || {
+		write_error "Could not find a Debian ${iso_type} ISO for version ${version}."
+		return 1
+	}
+
+	OEM_ISO_NAME="$iso_name"
+	OEM_ISO_URL="${iso_dir}/${iso_name}"
+	OEM_ISO_VERSION="$version"
+	OEM_ISO_DIR="$iso_dir"
+	OEM_ISO_CHECKSUM_URL="${iso_dir}/SHA256SUMS"
+	OEM_ISO_SIGNATURE_URL="${iso_dir}/SHA256SUMS.sign"
+	OEM_ISO_CHECKSUM_FILE="SHA256SUMS"
+	OEM_ISO_SIGNATURE_FILE="SHA256SUMS.sign"
+	OEM_ISO_CHECKSUM_ALGO="sha256"
+	OEM_ISO_KEYRING_PATH="/usr/share/keyrings/debian-role-keys.gpg"
+	OEM_ISO_KEYRING_URL="https://www.debian.org/CD/key-DA87E80D6294BE9B.txt"
+	OEM_ISO_KEY_FORMAT="armored"
+	_DEB_ISO_NAME="$iso_name"
+	_DEB_ISO_URL="${iso_dir}/${iso_name}"
+	return 0
+}
+
+oem::task::iso::verify_debian_iso() {
+	# Description:
+	#   Verify a Debian ISO against SHA256SUMS and SHA256SUMS.sign.
+	# Globals:
+	#   OEM_ISO_* resolver metadata (r)
+	# Arguments:
+	#   $1 - Full path to the ISO file.
+	# Outputs:
+	#   Status messages on STDOUT/STDERR.
+	# Returns:
+	#   0 on success or skipped verification; non-zero on verification failure.
+	# Usage:
+	#   oem::task::iso::verify_debian_iso "/var/lib/libvirt/boot/debian-13.4.0-amd64-netinst.iso"
+	# End of documentation
+	local iso_path="$1"
+	local iso_dir iso_name sums_file signature_file keyring_file
+
+	[[ -f "$iso_path" ]] || {
+		write_error "Debian ISO path is missing: $iso_path"
+		return 1
+	}
+
+	iso_dir=$(dirname "$iso_path")
+	iso_name=$(basename "$iso_path")
+	sums_file="$iso_dir/${OEM_ISO_CHECKSUM_FILE:-SHA256SUMS}"
+	signature_file="$iso_dir/${OEM_ISO_SIGNATURE_FILE:-SHA256SUMS.sign}"
+	keyring_file="${OEM_ISO_KEYRING_PATH:-/usr/share/keyrings/debian-role-keys.gpg}"
+
+	if ! oem::task::iso::download_url "${OEM_ISO_CHECKSUM_URL}" "$sums_file"; then
+		write_warning "Could not download Debian SHA256SUMS. Skipping checksum verification."
+		return 0
+	fi
+
+	if oem::task::iso::download_url "${OEM_ISO_SIGNATURE_URL}" "$signature_file"; then
+		if command -v gpgv >/dev/null 2>&1; then
+			if [[ ! -s "$keyring_file" ]]; then
+				keyring_file="$iso_dir/debian-cd-signing-key.gpg"
+				if ! oem::task::iso::prepare_keyring "${OEM_ISO_KEYRING_URL}" "$keyring_file" "${OEM_ISO_KEY_FORMAT:-armored}"; then
+					write_warning "Could not prepare Debian keyring. Skipping signature verification."
+					keyring_file=""
+				fi
+			fi
+			if [[ -n "$keyring_file" ]]; then
+				if ! gpgv --keyring "$keyring_file" "$signature_file" "$sums_file"; then
+					write_error "Debian SHA256SUMS signature verification failed."
+					return 1
+				fi
+			fi
+		else
+			write_warning "gpgv is not installed. Skipping Debian signature verification."
+		fi
+	else
+		write_warning "Could not download Debian SHA256SUMS.sign. Skipping signature verification."
+	fi
+
+	if ! grep -Fq "  $iso_name" "$sums_file"; then
+		write_warning "Debian SHA256SUMS does not contain $iso_name. Skipping checksum verification."
+		return 0
+	fi
+
+	if (
+		cd "$iso_dir" || exit 1
+		grep -F "  $iso_name" "${OEM_ISO_CHECKSUM_FILE:-SHA256SUMS}" | sha256sum --check -
+	); then
+		write_information "Debian checksum verification passed for $iso_name"
+		return 0
+	fi
+
+	write_error "Debian checksum verification failed for $iso_name"
+	return 1
 }
 
 oem::task::iso::resolve_debian_netinst() {
@@ -4938,20 +5532,7 @@ oem::task::iso::resolve_debian_netinst() {
 	# Usage:
 	#   oem::task::iso::resolve_debian_netinst
 	# End of documentation
-	local base_url="https://cdimage.debian.org/debian-cd/current/amd64/iso-cd"
-	local sums iso_name
-
-	sums=$(oem::task::iso::fetch_url "$base_url/SHA256SUMS") || return 1
-	iso_name=$(printf '%s\n' "$sums" | grep -Eo "debian-[0-9.]+-amd64-netinst\\.iso" | grep -v -E "mac|edu" | head -n 1)
-
-	if [[ -z "$iso_name" ]]; then
-		write_error "Failed to determine Debian netinst ISO name."
-		return 1
-	fi
-
-	_DEB_ISO_NAME="$iso_name"
-	_DEB_ISO_URL="$base_url/$iso_name"
-	return 0
+	oem::task::iso::resolve_debian_iso --iso-type netinst --architecture amd64 "$@"
 }
 
 oem::task::iso::extract_iso() {
@@ -5791,16 +6372,15 @@ oem::task::auto_install_iso_debian() {
 		tmp_initrd_dir=$(mktemp -d "${initrd_base%/}/initrd.XXXXXX")
 	fi
 
-	local cached_iso=""
-	if cached_iso=$(oem::task::iso::find_cached_iso "$_DEB_ISO_NAME" "/var/lib/libvirt/boot" "$put_iso_file_here_when_done/Downloaded" "${permanent_download_dir:-}"); then
-		iso_store="$cached_iso"
-		write_information "Using cached ISO: $iso_store"
-	else
-		if ! oem::task::iso::download_url "$_DEB_ISO_URL" "$iso_store"; then
-			system::prepare_environment_for_iso_creation --cleanup
-			return 1
-		fi
+	if ! debian::download_iso \
+		--dir "$put_iso_file_here_when_done/Downloaded" \
+		--version "${OEM_ISO_VERSION:-}" \
+		--iso-type netinst \
+		--architecture amd64; then
+		system::prepare_environment_for_iso_creation --cleanup
+		return 1
 	fi
+	iso_store="$iso"
 
 	if ! oem::task::iso::extract_iso "$iso_store" "$tmp_disc_dir"; then
 		system::prepare_environment_for_iso_creation --cleanup
@@ -5951,20 +6531,10 @@ oem::task::auto_install_iso_ubuntu() {
 		system::prepare_environment_for_iso_creation --cleanup
 		return 1
 	fi
-	if [[ -n "$ubuntu_version" ]]; then
-		local iso_filename cached_iso
-		if [[ "${media_type,,}" == "server" ]]; then
-			iso_filename="ubuntu-${ubuntu_version}-live-server-amd64.iso"
-		else
-			iso_filename="ubuntu-${ubuntu_version}-desktop-amd64.iso"
-		fi
-		if cached_iso=$(oem::task::iso::find_cached_iso "$iso_filename" "/var/lib/libvirt/boot" "$download_dir" "${permanent_download_dir:-}"); then
-			iso="$cached_iso"
-			write_information "Using cached ISO: $iso"
-		fi
-	fi
-	if [[ -z "${iso:-}" ]]; then
-		ubuntu::download_iso --dir "$download_dir" --flavor ubuntu --version "${ubuntu_version}" --media-type "${media_type,,}"
+	if ! ubuntu::download_iso --dir "$download_dir" --flavor ubuntu --version "${ubuntu_version}" --media-type "${media_type,,}"; then
+		write_error "Unable to download or locate the Ubuntu source ISO."
+		system::prepare_environment_for_iso_creation --cleanup
+		return 1
 	fi
 	if [[ -z "${iso:-}" || ! -f "$iso" ]]; then
 		write_error "Ubuntu ISO is missing after download attempt (iso=${iso:-unset})"
@@ -6876,12 +7446,12 @@ system::preseed_to_ubuntu_ks_cfg() {
 	#
 	# End of Documentation
 
-	system::log_item "Saving preeseed file as $1/ks.cfg for legacy Ubuntu installs..."
+	system::log_item "Saving preseed file as $1/ks.cfg for legacy Ubuntu installs..."
 	cat $1/preseed.cfg >$1/ks.cfg
 }
 
 system::make_preseed_cfg() {
-	# Description: Function to write out a debina preeseed file to a location requested by the first parameter.
+	# Description: Function to write out a Debian preseed file to a location requested by the first parameter.
 	# Other parameters accepted are CONFIG (multiselect de), SRVFUNC (task "Minecraft" "Tasks")
 	# some parameters have defaults.
 	# Globals:
@@ -7000,7 +7570,7 @@ system::make_preseed_cfg() {
 	system::preseed_to_ubuntu_ks_cfg "${_saveto}"
 	system::log_item "Preseed file created: ${PRESEED_FILE}"
 	
-	system::log_item "Containging DATA:
+	system::log_item "Containing DATA:
 	$(cat ${PRESEED_FILE})"
 
 }
@@ -7101,6 +7671,17 @@ system::generate_cloudconfig() {
 	# Ask the user for VM config options if required...
 	kvm::util::read_distro_options --distribution ubuntu ${all_params}
 
+	case "${role,,}" in
+		vdi | desktop | workstation)
+			role="VDI"
+			server_app="${_UserDesktopEnvironmentSelection:-${server_app:-ubuntu-desktop}}"
+			;;
+		server)
+			role="server"
+			server_app="${_UserServerEnvironemtSelection:-${server_app:-openssh-server}}"
+			;;
+	esac
+
 	# -----------------------------------------------------------------------------------------
 	# Directory for cloud config files, if not set, create a temporary directory and use that.
 	# -----------------------------------------------------------------------------------------
@@ -7127,7 +7708,13 @@ system::generate_cloudconfig() {
 	# Write out the user-data file
 	# -----------------------------------------------------------------------------------------
 	system::log_item "Writing out the user-data file..."
-	template::cloud_config --write "${cloud_config_dir}/user-data" ${all_params} || {
+	template::cloud_config \
+		--write "${cloud_config_dir}/user-data" \
+		--CloudConfigDir "${cloud_config_dir}" \
+		--role "${role}" \
+		--server-app "${server_app}" \
+		--vmname "${vm_name:-${vm_hostname:-}}" \
+		${all_params} || {
 		system::log_item "Failed to write out the user-data file."
 		return 1
 	}
@@ -8433,7 +9020,7 @@ system::oem_autounlock_disk() {
 	# volume will be located on an unencrypted location on the same system as the encrypted volume.
 	# This is the same as locking your door and leaving the key by the door outside.
 	#
-	# The intention behind this is to be able to complete all build activites without manual intervention
+	# The intention behind this is to be able to complete all build activities without manual intervention
 	# of any kind. The intention is to remove the key file after all administrative tasks are complete.
 	#
 	# 1. Back up your initramfs disk
@@ -8997,8 +9584,8 @@ system::read_config() {
 
 system::generate_report_disk_space_used_by_directory() {
 	# Description: Function to generate a report for folders' disk space use.
-	# This function requres one argument; what root folder to analyse the directories in.
-	# This functio will return a report contained in the variable $return that may then be used.
+	# This function requires one argument: what root folder to analyze the directories in.
+	# This function will return a report contained in the variable $return that may then be used.
 	# Globals:
 	# Arguments: None
 	# Outputs:
@@ -9572,8 +10159,8 @@ system::make_system_recovery_partition() {
 }
 
 system::run_command_in_gnome_user_session() {
-	# Description: Function to do a reverse sudo back to teh original Gnome user who called upon sudo.
-	# This functon expects any number of parameters that would make up the command or commands
+	# Description: Function to do a reverse sudo back to the original Gnome user who called upon sudo.
+	# This function expects any number of parameters that would make up the command or commands
 	# to be run in the users session. For example:
 	# 	system::run_command_in_gnome_user_session script_name.sh parameter one two etc
 	#
@@ -9876,10 +10463,10 @@ system::create_swapfile() {
 		write_host --cyan "Welcome to Swap setup script! This script will automatically setup a swap file and enable it."
 
 		fallocate -l "${SWAP_SIZE}" "${SWAP_PATH}" && write_information "Allocated ${SWAP_SIZE} swap file: ${SWAP_PATH}" || (
-			write_error "Error creting actual swapfile using fallocate! "
+			write_error "Error creating actual swapfile using fallocate! "
 			exit 1
 		)
-		chmod 600 "${SWAP_PATH}" && write_information "Sucessfully modified permissions on $SWAP_PATH" || (
+		chmod 600 "${SWAP_PATH}" && write_information "Successfully modified permissions on $SWAP_PATH" || (
 			write_error "Error changing premissions"
 			exit 1
 		)
@@ -9967,118 +10554,113 @@ system::tune_system_power_profile() {
 
 
 system::rtd_oem_find_live_release() {
-	# Description: This function will return the URL for the version of Debian, Ubuntu server or Destktop requested.
-	# 3 parameters are required for this function to know what to do: distro_version/distro_flavor/live_or_not
-	#
+	# Description:
+	#   Legacy wrapper that resolves Debian or Ubuntu ISO URLs through the shared ISO resolver helpers.
 	# Globals:
-	# Arguments: None
+	#   OEM_ISO_URL (w)
+	# Arguments:
+	#   Positional compatibility form:
+	#     $1 - distro_version
+	#     $2 - distro_flavor
+	#     $3 - live_or_not
+	#     $4 - desktop_env (Debian live only)
+	#   Option form:
+	#     --distribution <debian|ubuntu>
+	#     --version <version>
+	#     --server | --desktop | --netinst | --mini
 	# Outputs:
-	# Returns: Return a URL to the desired release ISO of Ubuntu or Debian.
+	#   STDOUT: Full ISO URL.
+	# Returns:
+	#   0 on success; non-zero on failure.
 	# Usage:
-	# Example:
-	# Function name 		: distro_version : distro_flavor : live_or_not : desktop_env (only Debian)
-	# system::rtd_oem_find_live_release 	      10              debian         live           kde
-	# system::rtd_oem_find_live_release 	      10              debian         live           cinnamon
-	# system::rtd_oem_find_live_release 	      10              debian         net            ssh-server
-	# system::rtd_oem_find_live_release 	      19.04.2         ubuntu         live
+	#   system::rtd_oem_find_live_release 24.04.2 ubuntu desktop
+	#   system::rtd_oem_find_live_release 13.1.0 debian live xfce
 	# End of documentation
-	# local distro_version="${1:-12}"
-	# local distro_flavor="${2:-debian}"
-	# local live_or_not="${3:-live}"
-	# local desktop_env="${4:-standard}"
+	local distro_version=""
+	local distro_flavor="debian"
+	local live_or_not="live"
+	local desktop_env="standard"
+	local -a positional=()
+	local -a resolve_args=()
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 		--server | -s)
 			live_or_not="server"
-			system::log_item "🐧 Requested [server]..."
 			shift
 			;;
 		--netinst | -n)
 			live_or_not="netinst"
-			system::log_item "🐧 Requested [netinst]..."
 			shift
 			;;
 		--mini | -m)
 			live_or_not="mini"
-			system::log_item "🐧 Requested [mini]..."
 			shift
 			;;
 		--desktop | -d)
 			live_or_not="desktop"
-			system::log_item "🐧 Requested [desktop]..."
 			shift
 			;;
 		--distribution | -dist)
 			distro_flavor="$2"
-			system::log_item "🐧 Requested distribution [$2]..."
-			shift
+			shift 2
 			;;
 		--version | -v)
 			distro_version="$2"
-			system::log_item "🐧 Requested version [$2]..."
-			shift
+			shift 2
 			;;
 		--help | -h)
-			echo "Usage: system::rtd_oem_find_live_release --distribution <debian|ubuntu> --version <version number> --server --desktop "
+			echo "Usage: system::rtd_oem_find_live_release --distribution <debian|ubuntu> [--version <version>] [--server|--desktop|--netinst|--mini]"
 			return 0
 			;;
 		*)
+			positional+=("$1")
 			shift
 			;;
 		esac
 	done
 
-	case "$distro_flavor" in
-	Ubuntu | ubuntu | ubuntu-desktop | Ubuntu-desktop)
-		case "$live_or_not" in
-		desktop | live)
-			system::log_item "🌐 Providing requested URL: http://releases.ubuntu.com/${distro_version}/$(curl --silent http://releases.ubuntu.com/${distro_version}/SHA256SUMS | grep -o 'ubuntu-.*-desktop-amd64.iso')"
-			echo "http://releases.ubuntu.com/${distro_version}/$(curl --silent http://releases.ubuntu.com/${distro_version}/SHA256SUMS | grep -o 'ubuntu-.*-desktop-amd64.iso')"
-			;;
-		server | server-desktop)
-			# 18.04 and later need to use the alternative installer
-			# since the switch to subiquity
-			system::log_item "🌐 Providing requested URL: http://releases.ubuntu.com/${distro_version}/ubuntu-${distro_version}-live-server-amd64.iso"
-			echo "http://releases.ubuntu.com/${distro_version}/ubuntu-${distro_version}-live-server-amd64.iso"
+	[[ -z "$distro_version" && ${#positional[@]} -ge 1 ]] && distro_version="${positional[0]}"
+	[[ ${#positional[@]} -ge 2 ]] && distro_flavor="${positional[1]}"
+	[[ ${#positional[@]} -ge 3 ]] && live_or_not="${positional[2]}"
+	[[ ${#positional[@]} -ge 4 ]] && desktop_env="${positional[3]}"
 
-			;;
+	case "${distro_flavor,,}" in
+	ubuntu | ubuntu-desktop)
+		case "${live_or_not,,}" in
+		live | desktop | current-live) resolve_args=(--media-type desktop) ;;
+		server | server-desktop) resolve_args=(--media-type server) ;;
 		*)
-			system::log_item "⛔ Encountered an error: The 4th parameter should be either of: Live | live | current-live | server | netinst | net | mini! Not $live_or_not"
-			$RTD_GUI --backtitle "$BRANDING" --title "ERROR!" --msgbox "You passed the function ${FUNCNAME[0]} the parameters $*. The 4th parameter should be either of: Live | live | current-live | server | netinst | net | mini! Not $live_or_not" 10 60
+			write_error "Unsupported Ubuntu media selection '$live_or_not'."
+			return 1
 			;;
 		esac
+		[[ -n "$distro_version" ]] && resolve_args+=(--version "$distro_version")
+		oem::task::iso::resolve_ubuntu_iso "${resolve_args[@]}" || return 1
 		;;
-	Debian | debian)
-		case "$live_or_not" in
-		Live | live | current-live)
-			# Debian renames the current iso images for each release. To get around this when downloading
-			# the vesion number must be ignored and the desired flavor of the iso should be grabed.
-			case "$desktop_env" in
-			kde | gnome | xfce | cinnamon | lxde | lxqt | mate | standard)
-				rel=https://cdimage.debian.org/debian-cd/current-live/amd64/iso-hybrid/
-				echo "$rel/$(curl --silent $rel/MD5SUMS | \grep -o "debian-.*$desktop_env*.iso")"
-				;;
-			*)
-				system::log_item "⛔ Encountered an error: The 4th parameter should be wither of: kde | gnome | xfce | cinnamon | lxde | lxqt | mate | standard! Not $live_or_not "
-				$RTD_GUI --backtitle "$BRANDING" --title "ERROR!" --msgbox "You passed the function ${FUNCNAME[0]} the parameters $*. The 4th parameter should be wither of: kde | gnome | xfce | cinnamon | lxde | lxqt | mate | standard! Not $live_or_not " 10 60
-				;;
-			esac
+	debian)
+		case "${live_or_not,,}" in
+		live | current-live)
+			resolve_args=(--iso-type live --live-flavor "${desktop_env,,}" --architecture amd64)
 			;;
 		netinst | net | mini)
-			# Find and download mini iso...
-			system::log_item "⛔ Encountered an error: The 2nd parameter netinst  debian is not logical. Please use the kernel params instead."
+			resolve_args=(--iso-type netinst --architecture amd64)
 			;;
 		*)
-			system::log_item "⛔ Encountered an error: The 2nd parameter should be either of: Live | live | current-live | netinst | net | mini ! not $live_or_not"
-			$RTD_GUI --backtitle "$BRANDING" --title "ERROR!" --msgbox "You passed the function ${FUNCNAME[0]} the parameters $*. The 2nd parameter should be either of: Live | live | current-live | netinst | net | mini ! not $live_or_not" 10 60
+			write_error "Unsupported Debian media selection '$live_or_not'."
+			return 1
 			;;
 		esac
+		[[ -n "$distro_version" ]] && resolve_args+=(--version "$distro_version")
+		oem::task::iso::resolve_debian_iso "${resolve_args[@]}" || return 1
 		;;
 	*)
-		$RTD_GUI --backtitle "$BRANDING" --title "⛔ ERROR!" --msgbox "You passed the function ${FUNCNAME[0]} the parameters $*. The 2nd parameter should be either of: Ubuntu | ubuntu Debian | debian! not $distro_flavor" 10 60
+		write_error "Unsupported distribution '$distro_flavor'."
+		return 1
 		;;
 	esac
+
+	printf '%s\n' "$OEM_ISO_URL"
 }
 
 system::validate_parameters() {
@@ -10574,7 +11156,7 @@ oem::remove_non_western_latin_fonts() {
 	# non-western (latin) fonts from a distribution. Notably, Ubuntu provides too many fonts
 	# of all kinds by default, even if the user will never need the fonts. However, the fonts
 	# may cause unexpected font tool behavior and crashes, due to the large number of fonts
-	# and their features. It is there fore a good Idea to remove these fonts if they are not needed.
+	# and their features. It is therefore a good idea to remove these fonts if they are not needed.
 	# Globals:
 	# Arguments: None
 	# Outputs:
@@ -10583,7 +11165,7 @@ oem::remove_non_western_latin_fonts() {
 	#	Simply call this function by stating its name:
 	# 	oem::remove_non_western_latin_fonts
 	#
-	# The function will not return any sucess or failure codes. It will do its best and exit.
+	# The function will not return any success or failure codes. It will do its best and exit.
 	# End of documentation
 	security::ensure_admin
 	local font_list=$NON_WESTERN_FONTS_LIST
@@ -10815,7 +11397,7 @@ oem::create_single_launcher() {
 	# Globals:
 	# 	- _MODS_DIR: The base directory where the modules are located.
 	# Arguments:
-	# 	1: Filename base (e.g., "rtd", "rtd-user-bakup")
+	# 	1: Filename base (e.g., "rtd", "rtd-user-backup")
 	# 	2: Name field (e.g., "RTD", "RTD-Backup")
 	# 	3: Comment field
 	# 	4: Module directory name (e.g., "simple-support-tool.mod")
@@ -12728,7 +13310,7 @@ rtd_oem_turn_on_gui_network_management() {
 	if ls /usr/bin/*session; then
 		system::_turn_on_gui_network_management
 	else
-		write_error "No graphical session appear to be availabl in this system! Skipping netconfig..."
+		write_error "No graphical session appears to be available in this system! Skipping netconfig..."
 	fi
 }
 
@@ -13608,7 +14190,7 @@ EOF
 
 create_physical_media_from_iso() {
 	# Description:
-	# Function to automatically write ISO (virtual DVD/CD/BlueRay) to a thumb drive. No argumenst are
+	# Function to automatically write ISO (virtual DVD/CD/BlueRay) to a thumb drive. No arguments are
 	# required, but a source ISO file location can may be provided when calling the function.
 	# If information is required, but not provided, the end user will be interactively prompted.
 	# This function requires elevated priviledges to be able to write media to a thumb drive
@@ -15183,7 +15765,7 @@ rtd_oem_ubuntu_auto_install_iso_builder() {
 
 system::process_vm_opt_args() {
 	# Description:
-	# Function to evaluate input fiven to a VM build finction and set configuration override variables.
+	# Function to evaluate input given to a VM build function and set configuration override variables.
 	#
 	# Globals:
 	# Arguments: No[-c <#CPU>, -m <MB RAM>, -d <GB Disk>, -r <server|desktop>, -t <task>]ne
@@ -15248,71 +15830,74 @@ system::process_vm_opt_args() {
 }
 
 system::find_download_ubuntu_iso() {
+	# Description:
+	#   Legacy wrapper that prompts for an Ubuntu release and downloads it through ubuntu::download_iso.
+	# Globals:
+	#   iso, tgt_ubuntu_ver, _tgt_ubuntu_ver
+	# Arguments:
+	#   $1 - Optional Ubuntu flavor label. Only 'ubuntu' is supported by the shared downloader.
+	# Outputs:
+	#   Sets the global variable 'iso' to the downloaded or cached ISO path.
+	# Returns:
+	#   0 on success; non-zero on failure.
+	# End of documentation
+	local ubuntu_flavor="${1:-ubuntu}"
+	local permanent_download_dir="${permanent_download_dir:-/var/lib/libvirt/boot}"
+	local saved_role="${_role:-}"
+	local saved_ask="${_ask:-}"
+	local saved_target="${_tgt_ubuntu_ver:-}"
 
-	ubuntu_flavor="${1}"
-	write_information "🔎 Retreive list of available $ubuntu_flavor versions..."
-	case "$ubuntu_flavor" in
-	ubuntu)
-		declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
-		dist_logo="$ubuntulogo"
-		;;
-	kubuntu)
-		declare -a all_lts_versions=($(wget -O- cdimage.ubuntu.com/kubuntu/releases -q | perl -ne '/ (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
-		dist_logo="$kubuntulogo"
-		;;
-	*)
-		declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
-		dist_logo="$ubuntulogo"
-		;;
-	esac
-
-	tgt_ubuntu_ver=$($RTD_GUI --colors --title "Select Release Version of $ubuntu_flavor " --inputbox "\n 👍 Please pick an available \Z1 $ubuntu_flavor \Zn version by entering it below.
-	Long Term Support Versions to choose from are the following:\Z4 ${all_lts_versions[*]} \Zn You may also enter an inbetween release version
-	by typing its release number below as well. If you are not sure just let me choose intelligently for you... \n \Z1 ${dist_logo} \Zn" 30 90 "${all_lts_versions[-1]}" 3>&1 1>&2 2>&3)
-	case $? in
-	"$DIALOG_CANCEL") return ;;
-	"$DIALOG_ESC") return ;;
-	esac
-	clear
-
-	[ "$tgt_ubuntu_ver" ] || tgt_ubuntu_ver=${all_lts_versions[-1]}
-
-	: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release $tgt_ubuntu_ver $ubuntu_flavor live)}
-	: ${iso_filename:="$(basename $ubuntu_iso_url)"}
-	: ${permanent_download_dir:="/var/lib/libvirt/boot/"}
-
-	write_status "Checking if $iso_filename already downloaded..."
-	iso=$(find "$permanent_download_dir" -name "$iso_filename")
-	if [ ! -e "$iso" ]; then
-		write_warning "$iso_filename is not in cache, downloading..."
-		wget -nc $ubuntu_iso_url -P "$permanent_download_dir" || read -p "Failure to download ISO file"
-		iso="$permanent_download_dir/$iso_filename"
+	if [[ "${ubuntu_flavor,,}" != "ubuntu" ]]; then
+		write_warning "Flavor '${ubuntu_flavor}' is not supported by the shared Ubuntu downloader. Falling back to ubuntu."
+		ubuntu_flavor="ubuntu"
 	fi
 
+	_role="desktop"
+	_ask="YES"
+	unset _tgt_ubuntu_ver tgt_ubuntu_ver
+
+	if ! ubuntu::get_target_version; then
+		[[ -n "$saved_role" ]] && _role="$saved_role" || unset _role
+		[[ -n "$saved_ask" ]] && _ask="$saved_ask" || unset _ask
+		[[ -n "$saved_target" ]] && _tgt_ubuntu_ver="$saved_target" || unset _tgt_ubuntu_ver
+		return 1
+	fi
+
+	if ! ubuntu::download_iso --dir "$permanent_download_dir" --flavor ubuntu --version "${tgt_ubuntu_ver:-${_tgt_ubuntu_ver:-}}" --media-type desktop; then
+		[[ -n "$saved_role" ]] && _role="$saved_role" || unset _role
+		[[ -n "$saved_ask" ]] && _ask="$saved_ask" || unset _ask
+		[[ -n "$saved_target" ]] && _tgt_ubuntu_ver="$saved_target" || unset _tgt_ubuntu_ver
+		return 1
+	fi
+
+	[[ -n "$saved_role" ]] && _role="$saved_role" || unset _role
+	[[ -n "$saved_ask" ]] && _ask="$saved_ask" || unset _ask
+	[[ -n "$saved_target" ]] && _tgt_ubuntu_ver="$saved_target" || unset _tgt_ubuntu_ver
+	return 0
 }
 
 system::create_physical_media_from_ubuntu_iso() {
 	# Description:
-	# Courtesy of 'covertsh':  ubuntu-autoinstall-generator
-	# Function to automatically write ISO (virtual DVD/CD/BlueRay) to a thumb drive. No argumenst are
-	# required, but a source ISO file location can may be provided when calling the function.
-	# If information is required, but not provided, the end user will be interactively prompted.
-	# This function requires elevated priviledges to be able to write media to a thumb drive
-	# (boot sector) and other system restrictied activities. If the function is NOT called in a
-	# script with elevated priviledges, it will attempt to elevate priviledges and prompt for a password.
-	# Since writing a new bootable thumb drive is inherrently an interactive activity; a prompt will
-	# be displayed asking what media to write to. If no media is present, a warning error
-	# message will be displayed.
-	#
+	#   Build an Ubuntu autoinstall ISO from a supplied source ISO or a release ISO fetched through
+	#   the shared Ubuntu ISO download and verification helpers.
 	# Globals:
-	# Arguments: None
+	#   None
+	# Arguments:
+	#   --all-in-one, --use-hwe-kernel, --no-md5, --no-verify, --use-release-iso,
+	#   --user-data <file>, --meta-data <file>, --source <iso>, --destination <iso>,
+	#   --version <YY.MM[.P]>
 	# Outputs:
+	#   Writes the generated autoinstall ISO.
 	# Returns:
+	#   0 on success; non-zero on failure.
 	# Usage:
-	#
-	# "system::create_physical_media_from_ubuntu_iso" or "create_physical_media_from_iso path/to/file.iso"
-	#
+	#   system::create_physical_media_from_ubuntu_iso --version 24.04.2
 	# End of documentation
+	local script_dir today tmpdir source_iso destination_iso
+	local user_data_file meta_data_file requested_version inferred_version
+	local auto_downloaded_source=0
+	local gpg_verify=1 all_in_one=0 use_hwe_kernel=0 md5_checksum=1 use_release_iso=0
+	local saved_role="${_role:-}" saved_ask="${_ask:-}" saved_target="${_tgt_ubuntu_ver:-}"
 
 	cleanup() {
 		trap - SIGINT SIGTERM ERR EXIT
@@ -15322,28 +15907,23 @@ system::create_physical_media_from_ubuntu_iso() {
 		fi
 	}
 
-	trap cleanup SIGINT SIGTERM ERR EXIT
-	script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
-	[[ ! -x "$(command -v date)" ]] && echo "💥 date command not found." && exit 1
-	today=$(date +"%Y-%m-%d")
-
 	log() {
 		write_host --cyan "[$(date +"%Y-%m-%d %H:%M:%S")] ${1-}"
 	}
 
 	die() {
 		local msg=$1
-		local code=${2-1} # Bash parameter expansion - default exit status 1. See https://wiki.bash-hackers.org/syntax/pe#use_a_default_value
+		local code=${2-1}
+		[[ -n "$saved_role" ]] && _role="$saved_role" || unset _role
+		[[ -n "$saved_ask" ]] && _ask="$saved_ask" || unset _ask
+		[[ -n "$saved_target" ]] && _tgt_ubuntu_ver="$saved_target" || unset _tgt_ubuntu_ver
 		log "$msg"
 		exit "$code"
 	}
 
 	usage() {
-		create_physical_media_from_ubuntu_iso_usage="
-
-		Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] [-a] [-e] [-u user-data-file] [-m meta-data-file] [-k] [-c] [-r] [-s source-iso-file] [-d destination-iso-file]
-
-		💁 This script will create fully-automated Ubuntu 20.04 Focal Fossa installation media.
+		local text="
+		Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] [-a] [-e] [-u user-data-file] [-m meta-data-file] [-k] [-c] [-r] [--version <YY.MM[.P]>] [-s source-iso-file] [-d destination-iso-file]
 
 		Available options:
 
@@ -15352,118 +15932,94 @@ system::create_physical_media_from_ubuntu_iso() {
 		-a, --all-in-one        Bake user-data and meta-data into the generated ISO. By default you will
 					need to boot systems with a CIDATA volume attached containing your
 					autoinstall user-data and meta-data files.
-					For more information see: https://ubuntu.com/server/docs/install/autoinstall-quickstart
-		-e, --use-hwe-kernel    Force the generated ISO to boot using the hardware enablement (HWE) kernel. Not supported
-					by early Ubuntu 20.04 release ISOs.
+		-e, --use-hwe-kernel    Force the generated ISO to boot using the hardware enablement (HWE) kernel when present.
 		-u, --user-data         Path to user-data file. Required if using -a
 		-m, --meta-data         Path to meta-data file. Will be an empty file if not specified and using -a
-		-k, --no-verify         Disable GPG verification of the source ISO file. By default SHA256SUMS-$today and
-					SHA256SUMS-$today.gpg in ${script_dir} will be used to verify the authenticity and integrity
-					of the source ISO file. If they are not present the latest daily SHA256SUMS will be
-					downloaded and saved in ${script_dir}. The Ubuntu signing key will be downloaded and
-					saved in a new keyring in ${script_dir}
+		-k, --no-verify         Skip verification when downloading the source ISO automatically.
 		-c, --no-md5            Disable MD5 checksum on boot
-		-r, --use-release-iso   Use the current release ISO instead of the daily ISO. The file will be used if it already
-					exists.
-		-s, --source            Source ISO file. By default the latest daily ISO for Ubuntu 20.04 will be downloaded
-					and saved as ${script_dir}/ubuntu-original-$today.iso
-					That file will be used by default if it already exists.
-		-d, --destination       Destination ISO file. By default ${script_dir}/ubuntu-autoinstall-$today.iso will be
-					created, overwriting any existing file."
-		echo $create_physical_media_from_ubuntu_iso_usage
+		-r, --use-release-iso   Backward-compatible no-op. Release media is used automatically.
+		--version               Ubuntu release to download when --source is not provided.
+		-s, --source            Source ISO file. When omitted, a release server ISO is downloaded to ${script_dir}.
+		-d, --destination       Destination ISO file. Defaults to ${script_dir}/ubuntu-autoinstall-${today}.iso"
+		printf '%b\n' "$text"
 	}
 
-	parse_params() {
-		# default values of variables set from params
-		user_data_file=''
-		meta_data_file=''
-		ubuntu_flavor="ubuntu"
-		dist_logo="$ubuntulogo"
-		tgt_ubuntu_ver=$($RTD_GUI --colors --title "Select Release Version of $ubuntu_flavor " --inputbox "\n 👍 Please pick an available \Z1 $ubuntu_flavor \Zn version by entering it below.
-		Long Term Support Versions to choose from are the following:\Z4 ${all_lts_versions[*]} \Zn You may also enter an inbetween release version
-		by typing its release number below as well. If you are not sure just let me choose intelligently for you... \n \Z1 ${dist_logo} \Zn" 30 90 "${all_lts_versions[-1]}" 3>&1 1>&2 2>&3)
-		case $? in
-		"$DIALOG_CANCEL") return ;;
-		"$DIALOG_ESC") return ;;
-		esac
-		clear
-		: ${ubuntu_iso_url=$(system::rtd_oem_find_live_release $tgt_ubuntu_ver $ubuntu_flavor live)}
-		download_url="https://cdimage.ubuntu.com/ubuntu-server/focal/daily-live/current"
-		download_iso="focal-live-server-amd64.iso"
-		original_iso="ubuntu-original-$today.iso"
-		source_iso="${script_dir}/${original_iso}"
-		destination_iso="${script_dir}/ubuntu-autoinstall-$today.iso"
-		sha_suffix="${today}"
-		gpg_verify=1
-		all_in_one=0
-		use_hwe_kernel=0
-		md5_checksum=1
-		use_release_iso=0
+	trap cleanup SIGINT SIGTERM ERR EXIT
+	script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+	[[ ! -x "$(command -v date)" ]] && echo "💥 date command not found." && exit 1
+	today=$(date +"%Y-%m-%d")
+	destination_iso="${script_dir}/ubuntu-autoinstall-$today.iso"
 
-		while :; do
-			case "${1-}" in
-			-h | --help) usage ;;
-			-v | --verbose) set -x ;;
-			-a | --all-in-one) all_in_one=1 ;;
-			-e | --use-hwe-kernel) use_hwe_kernel=1 ;;
-			-c | --no-md5) md5_checksum=0 ;;
-			-k | --no-verify) gpg_verify=0 ;;
-			-r | --use-release-iso) use_release_iso=1 ;;
-			-u | --user-data)
-				user_data_file="${2-}"
-				shift
-				;;
-			-s | --source)
-				source_iso="${2-}"
-				shift
-				;;
-			-d | --destination)
-				destination_iso="${2-}"
-				shift
-				;;
-			-m | --meta-data)
-				meta_data_file="${2-}"
-				shift
-				;;
-			-?*) die "Unknown option: $1" ;;
-			*) break ;;
-			esac
+	while :; do
+		case "${1-}" in
+		-h | --help) usage; return 0 ;;
+		-v | --verbose) set -x ;;
+		-a | --all-in-one) all_in_one=1 ;;
+		-e | --use-hwe-kernel) use_hwe_kernel=1 ;;
+		-c | --no-md5) md5_checksum=0 ;;
+		-k | --no-verify) gpg_verify=0 ;;
+		-r | --use-release-iso) use_release_iso=1 ;;
+		--version)
+			requested_version="${2-}"
 			shift
-		done
+			;;
+		-u | --user-data)
+			user_data_file="${2-}"
+			shift
+			;;
+		-s | --source)
+			source_iso="${2-}"
+			shift
+			;;
+		-d | --destination)
+			destination_iso="${2-}"
+			shift
+			;;
+		-m | --meta-data)
+			meta_data_file="${2-}"
+			shift
+			;;
+		-?*) die "Unknown option: $1" ;;
+		*) break ;;
+		esac
+		shift
+	done
 
-		log "👶 Starting up..."
+	log "👶 Starting up..."
 
-		# check required params and arguments
-		if [ ${all_in_one} -ne 0 ]; then
-			[[ -z "${user_data_file}" ]] && die "💥 user-data file was not specified."
-			[[ ! -f "$user_data_file" ]] && die "💥 user-data file could not be found."
-			[[ -n "${meta_data_file}" ]] && [[ ! -f "$meta_data_file" ]] && die "💥 meta-data file could not be found."
+	if [ ${all_in_one} -ne 0 ]; then
+		[[ -z "${user_data_file}" ]] && die "💥 user-data file was not specified."
+		[[ ! -f "$user_data_file" ]] && die "💥 user-data file could not be found."
+		[[ -n "${meta_data_file}" ]] && [[ ! -f "$meta_data_file" ]] && die "💥 meta-data file could not be found."
+	fi
+
+	if [[ -z "${source_iso:-}" ]]; then
+		if [[ -z "${requested_version:-}" ]]; then
+			_role="server"
+			_ask="YES"
+			unset _tgt_ubuntu_ver tgt_ubuntu_ver
+			ubuntu::get_target_version || die "💥 No Ubuntu version was selected."
+			requested_version="${tgt_ubuntu_ver:-${_tgt_ubuntu_ver:-}}"
 		fi
 
-		if [ "${source_iso}" != "${script_dir}/${original_iso}" ]; then
-			[[ ! -f "${source_iso}" ]] && die "💥 Source ISO file could not be found."
-		fi
+		[[ -n "$requested_version" ]] || die "💥 No Ubuntu version was provided for the source ISO."
 
-		if [ "${use_release_iso}" -eq 1 ]; then
-			download_url="https://releases.ubuntu.com/focal"
-			log "🔎 Checking for current release..."
-			download_iso=$(curl -sSL "${download_url}" | grep -oP 'ubuntu-20\.04\.\d*-live-server-amd64\.iso' | head -n 1)
-			original_iso="${download_iso}"
-			source_iso="${script_dir}/${download_iso}"
-			current_release=$(echo "${download_iso}" | cut -f2 -d-)
-			sha_suffix="${current_release}"
-			log "💿 Current release is ${current_release}"
-		fi
+		local -a download_args=(--dir "$script_dir" --flavor ubuntu --version "$requested_version" --media-type server)
+		[[ ${gpg_verify} -eq 0 ]] && download_args+=(--no-verify)
+		ubuntu::download_iso "${download_args[@]}" || die "💥 Failed to obtain the Ubuntu source ISO for ${requested_version}."
+		source_iso="$iso"
+		auto_downloaded_source=1
+		log "☑️ Using ${source_iso} as the source installer image."
+	elif [[ ! -f "$source_iso" ]]; then
+		die "💥 Source ISO file could not be found."
+	fi
 
-		destination_iso=$(realpath "${destination_iso}")
-		source_iso=$(realpath "${source_iso}")
+	if [[ ${use_release_iso} -eq 1 ]]; then
+		log "ℹ️ --use-release-iso is retained for compatibility; release media is already used when downloading automatically."
+	fi
 
-		return 0
-	}
-
-	ubuntu_gpg_key_id="843938DF228D22F7B3742BC0D94AA3F0EFE21092"
-
-	parse_params "$@"
+	destination_iso=$(realpath -m "${destination_iso}")
+	source_iso=$(realpath "${source_iso}")
 
 	tmpdir=$(mktemp -d)
 
@@ -15474,61 +16030,21 @@ system::create_physical_media_from_ubuntu_iso() {
 	fi
 
 	log "🔎 Checking for required utilities..."
-	[[ ! -x "$(command -v xorriso)" ]] && die "💥 xorriso is not installed. On Ubuntu, install  the 'xorriso' package."
+	[[ ! -x "$(command -v xorriso)" ]] && die "💥 xorriso is not installed. On Ubuntu, install the 'xorriso' package."
 	[[ ! -x "$(command -v sed)" ]] && die "💥 sed is not installed. On Ubuntu, install the 'sed' package."
-	[[ ! -x "$(command -v curl)" ]] && die "💥 curl is not installed. On Ubuntu, install the 'curl' package."
-	[[ ! -x "$(command -v gpg)" ]] && die "💥 gpg is not installed. On Ubuntu, install the 'gpg' package."
 	[[ ! -f "/usr/lib/ISOLINUX/isohdpfx.bin" ]] && die "💥 isolinux is not installed. On Ubuntu, install the 'isolinux' package."
 	log "👍 All required utilities are installed."
 
-	if [ ! -f "${source_iso}" ]; then
-		log "🌎 Downloading ISO image for Ubuntu 20.04 Focal Fossa..."
-		curl -NsSL "${download_url}/${download_iso}" -o "${source_iso}"
-		log "👍 Downloaded and saved to ${source_iso}"
-	else
-		log "☑️ Using existing ${source_iso} file."
-		if [ ${gpg_verify} -eq 1 ]; then
-			if [ "${source_iso}" != "${script_dir}/${original_iso}" ]; then
-				log "⚠️ Automatic GPG verification is enabled. If the source ISO file is not the latest daily or release image, verification will fail!"
+	if [[ ${gpg_verify} -eq 1 && ${auto_downloaded_source} -eq 0 && -n "${source_iso:-}" ]]; then
+		if [[ "$(basename "$source_iso")" =~ ^ubuntu-([0-9]{2}[.][0-9]{2}([.][0-9]+)?)-live-server-[A-Za-z0-9_-]+[.]iso$ ]]; then
+			inferred_version="${BASH_REMATCH[1]}"
+			if oem::task::iso::resolve_ubuntu_iso --version "$inferred_version" --media-type server; then
+				oem::task::iso::verify_ubuntu_iso "$source_iso" || die "👿 Verification of the supplied ISO failed."
 			fi
-		fi
-	fi
-
-	if [ ${gpg_verify} -eq 1 ]; then
-		if [ ! -f "${script_dir}/SHA256SUMS-${sha_suffix}" ]; then
-			log "🌎 Downloading SHA256SUMS & SHA256SUMS.gpg files..."
-			curl -NsSL "${download_url}/SHA256SUMS" -o "${script_dir}/SHA256SUMS-${sha_suffix}"
-			curl -NsSL "${download_url}/SHA256SUMS.gpg" -o "${script_dir}/SHA256SUMS-${sha_suffix}.gpg"
 		else
-			log "☑️ Using existing SHA256SUMS-${sha_suffix} & SHA256SUMS-${sha_suffix}.gpg files."
+			log "⚠️ Skipping verification for the supplied source ISO because its filename does not match a standard Ubuntu release server image."
 		fi
-
-		if [ ! -f "${script_dir}/${ubuntu_gpg_key_id}.keyring" ]; then
-			log "🌎 Downloading and saving Ubuntu signing key..."
-			gpg -q --no-default-keyring --keyring "${script_dir}/${ubuntu_gpg_key_id}.keyring" --keyserver "hkp://keyserver.ubuntu.com" --recv-keys "${ubuntu_gpg_key_id}"
-			log "👍 Downloaded and saved to ${script_dir}/${ubuntu_gpg_key_id}.keyring"
-		else
-			log "☑️ Using existing Ubuntu signing key saved in ${script_dir}/${ubuntu_gpg_key_id}.keyring"
-		fi
-
-		log "🔐 Verifying ${source_iso} integrity and authenticity..."
-		gpg -q --keyring "${script_dir}/${ubuntu_gpg_key_id}.keyring" --verify "${script_dir}/SHA256SUMS-${sha_suffix}.gpg" "${script_dir}/SHA256SUMS-${sha_suffix}" 2>/dev/null
-		if [ $? -ne 0 ]; then
-			rm -f "${script_dir}/${ubuntu_gpg_key_id}.keyring~"
-			die "👿 Verification of SHA256SUMS signature failed."
-		fi
-
-		rm -f "${script_dir}/${ubuntu_gpg_key_id}.keyring~"
-		digest=$(sha256sum "${source_iso}" | cut -f1 -d ' ')
-		set +e
-		grep -Fq "$digest" "${script_dir}/SHA256SUMS-${sha_suffix}"
-		if [ $? -eq 0 ]; then
-			log "👍 Verification succeeded."
-			set -e
-		else
-			die "👿 Verification of ISO digest failed."
-		fi
-	else
+	elif [[ ${gpg_verify} -eq 0 ]]; then
 		log "🤞 Skipping verification of source ISO."
 	fi
 	log "🔧 Extracting ISO image..."
@@ -16170,7 +16686,7 @@ tool::recompress_provided_items() {
 tool::up_2_date() {
 	# Description: Function to simplify updating system completely. At present this function sets the
 	# highest preference to use "pkcon", the command line interface of "Package Kit" since
-	# this is the most consistent across different distrbutions. It may even work on BSD.
+	# this is the most consistent across different distributions. It may even work on BSD.
 	# Only if "pkcon" is not available, will the function use the identified distro native
 	# software manager: apt, yum, zypper etc. This is to maintain stability since a distro may
 	# alias another distributions command (like SuSE does with apt) to be helpfull.
@@ -16178,7 +16694,7 @@ tool::up_2_date() {
 	# Globals:
 	# Arguments: None
 	# Outputs:
-	# Returns: 0/1/3 where 1/0 = sucess/fail and 3 = package manager NOT found
+	# Returns: 0/1/3 where 1/0 = success/fail and 3 = package manager NOT found
 	# Usage: tool::up_2_date
 	# End of documentation
 
@@ -16949,7 +17465,7 @@ security::enable_firewall() {
 
 security::check_if_password_pOwned() {
 	# Description:
-	# Function to query a user for a password suggestion and check it against P0wned data base online.
+	# Function to query a user for a password suggestion and check it against P0wned database online.
 	# Globals: $RTD_GUI
 	# Arguments: None
 	# Outputs: dialog box
@@ -17072,7 +17588,7 @@ security::scan_for_malware() {
 
 
 security::change_disk_pass() {
-	# Description: Function to change the passphrase fo an encrypted storage device.
+	# Description: Function to change the passphrase for an encrypted storage device.
 	# It will offer to change the first encrypted volume found by blockid.
 	# It is unclear how this will work if there are multiple encrypted volumes found.
 	# The function does not expect an argument. It will prompt for a password.
@@ -17976,16 +18492,16 @@ software::package_kit::add_package() {
 	: ${_LOGFILE:="/var/log/rtd/$(basename "$0".log)"}
 
 	if pkcon resolve "${1}" --filter installed | grep "${1}" &>/dev/null; then
-		write_status "The software package ${1} is Allready installed... "
-		system::log_item "The software package ${1} is Allready installed... "
+		write_status "The software package ${1} is already installed... "
+		system::log_item "The software package ${1} is already installed... "
 	else
 		if pkcon resolve "${1}" | grep "${1}" &>/dev/null; then
 			write_status "The software package ${1} found in repository, installing... "
 			system::log_item "The software package ${1} found in repository, installing... "
 			pkcon install "${1}" --noninteractive --cache-age 5000
 			if [ $? = 0 ]; then
-				write_status "The software package ${1} transaction appears to have been sucessful..."
-				system::log_item "The software package ${1} transaction appears to have been sucessful..."
+				write_status "The software package ${1} transaction appears to have been successful..."
+				system::log_item "The software package ${1} transaction appears to have been successful..."
 			else
 				write_warning "There appears to have been some problem installing the package ${1}..."
 				system::log_item "There appears to have been some problem installing the package ${1}..."
@@ -18015,7 +18531,7 @@ software::package_kit::remove_package() {
 			write_status " ✓ The software package ${1} is installed, removing as requested... "
 			pkcon remove "${1}" --noninteractive
 			if [ $? = 0 ]; then
-				write_status "The software package ${1} transaction appears to have been sucessful..."
+				write_status "The software package ${1} transaction appears to have been successful..."
 			else
 				write_warning "There appears to have been some problem removing the package ${1}..."
 			fi
@@ -18090,9 +18606,9 @@ software::list_bundles() {
 }
 
 software::ensure_gnome_software_store_available() {
-	# Description: Function to ensure that flatpak is installed and flathup enabled.
+	# Description: Function to ensure that Flatpak is installed and Flathub enabled.
 	# Globals: none
-	# Dependencies: [distro pakcage managment] [function: software::check_native_package_dependency] [Internet access]
+	# Dependencies: [distro package management] [function: software::check_native_package_dependency] [Internet access]
 	# Arguments: None
 	# Outputs:
 	# Returns: Standard return codes 1/0
@@ -18149,9 +18665,9 @@ software::ensure_gnome_software_store_available() {
 }
 
 software::ensure_flatpak_package_managment() {
-	# Description: Function to ensure that flatpak is installed and flathup enabled.
+	# Description: Function to ensure that Flatpak is installed and Flathub enabled.
 	# Globals: none
-	# Dependencies: [distro pakcage managment] [function: software::check_native_package_dependency] [Internet access]
+	# Dependencies: [distro package management] [function: software::check_native_package_dependency] [Internet access]
 	# Arguments: None
 	# Outputs:
 	# Returns: Standard return codes 1/0
@@ -18313,7 +18829,7 @@ software::update_system_txt() {
 				apt-get clean
 			fi
 		else
-			write_error "❌ This system does not seem to have a software managment system"
+			write_error "❌ This system does not seem to have a software management system"
 			return 1
 		fi
 	) #| tee -a "$_LOGFILE"
@@ -18406,7 +18922,7 @@ software::update_all_ui() {
 				pkcon -y update --autoremove
 				write_information "📦 Update task complete."
 			else
-				write_error "❌ This system does not seem to have a software managment system"
+				write_error "❌ This system does not seem to have a software management system"
 				return 1
 			fi
 		) | tee -a "$_LOGFILE" | $dialog_ui --backtitle "\Zb$PUBLICATION             $VERSION\ZB" --progressbox "Updating all natively installed software..." 25 120
@@ -18496,10 +19012,10 @@ software::update_all_ui() {
 software::from_flathub.org() {
 	# Description: Function to simplify and streamline the installation and removal of flatpaks.
 	# Globals: none
-	# Dependencies: [distro pakage managment] [function: software::check_native_package_dependency] [Internet access]
+	# Dependencies: [distro package management] [function: software::check_native_package_dependency] [Internet access]
 	# Arguments:
 	# -- Default action is to add software title matching passed parameter.
-	# -- An optioin "--remove" may be passed to atempt removal of the software title.
+	# -- An option "--remove" may be passed to attempt removal of the software title.
 	#
 	# Outputs:
 	# Returns: Standard return codes 1/0
@@ -18627,7 +19143,7 @@ software::from_flathub.org() {
 software::from_snapcraft.io() {
 	# Description: Function to ensure that snap is installed.
 	# Globals: none
-	# Dependencies: [distro pakcage managment] [function: software::check_native_package_dependency] [Internet access]
+	# Dependencies: [distro package management] [function: software::check_native_package_dependency] [Internet access]
 	# Arguments: None
 	# Outputs: stdout
 	# Returns: Standard return codes 1/0
@@ -18786,7 +19302,7 @@ software::from_snapcraft.io() {
 }
 
 software::add_software_task() {
-	# Description: Display executed task and echo ON/NOK based on sucess
+	# Description: Display executed task and echo ON/NOK based on success
 	# This function is created to reduce the terminal output and create a more poliched output of
 	# the tasks executed. This function has no idea shat it is doing, it will simply call the function
 	# it was asked to call or execute the command ist was asked to, and echo OK or FAIL based on the
@@ -18865,10 +19381,10 @@ software::vendor_download_and_install() {
 
 
 software::is_native_package_available() {
-	# Description: Function to chek if a package is available in whetever repository, and
+	# Description: Function to check if a package is available in whatever repository, and
 	# if there return a "0" and if not return a "1" or a "3" if there is no recognizable
 	# package manager found. the function expects the name of the package
-	# to be a parameter passed to this fuction. Call this function by:
+	# to be a parameter passed to this function. Call this function by:
 	# software::is_native_package_installed "package name"
 	#                 or
 	# software::is_native_package_installed "$1" if calling this function from a script
@@ -18958,7 +19474,7 @@ software::determine_package_name_from_cmd() {
 		write_warning "command_not_found_handle not found. Attempting to install command-not-found package..."
 		software::add_native_package command-not-found || { 
 			write_error "Unable to install command-not-found package, unable to determine package name from command"
-			write_error "Please determine the name of the required package to satify the $cmd dependency, and use the software::add_native_package to install the missing package instead"
+			write_error "Please determine the name of the required package to satisfy the $cmd dependency, and use the software::add_native_package to install the missing package instead"
 			return 1 
 			}
 	fi
@@ -18991,7 +19507,7 @@ software::add_native_package() {
 	# This is a global install command for portability and convenience. This function
 	# allows for scripts to add software across many systems.
 	# Primarily for Linux: this function will look for the common package managers
-	# apt (all debina and ubuntu based distributions), dnf (RedHat, Fedora, Mandriva, and others)
+	# apt (all Debian and Ubuntu based distributions), dnf (RedHat, Fedora, Mandriva, and others)
 	# zypper (SuSE and Open SUSE) or alternatively pkcon (PackageKit) which is a wrapper for
 	# the package manager. 	
 	#
@@ -19199,7 +19715,7 @@ software::native_management_availability_check() {
 software::ensure_snap_package_managment() {
 	# Description: Function to ensure that snap is installed.
 	# Globals: none
-	# Dependencies: [distro pakcage managment] [function: software::check_native_package_dependency] [Internet access]
+	# Dependencies: [distro package management] [function: software::check_native_package_dependency] [Internet access]
 	# Arguments: None
 	# Outputs: stdout
 	# Returns: Standard return codes 1/0
@@ -19307,7 +19823,7 @@ software::ensure_snap_package_managment() {
 			systemctl enable --now snapd.apparmor
 			systemctl start --now snapd
 			systemctl is-active --quiet snapd || (
-				write_error "Service snapd not started sucessfully!"
+				write_error "Service snapd not started successfully!"
 				return 1
 			)
 			ln -s /var/lib/snapd/snap /snap
@@ -19457,7 +19973,7 @@ software::set_install_command() {
 	# add global install command for portability and convenience. This function
 	# allows for scripts to add software across many systems.
 	# Primarily for Linux: this function will look for the common package managers
-	# apt (all debina and ubuntu based distributions), dnf (RedHat, Fedora, Mandriva, and others)
+	# apt (all Debian and Ubuntu based distributions), dnf (RedHat, Fedora, Mandriva, and others)
 	# zypper (SuSE and Open SUSE). If neither of those package manages are available many systems
 	# use package kit; and this will be registered as an sinstall option.
 	#
@@ -19471,7 +19987,7 @@ software::set_install_command() {
 	#
 	# Return Codes:
 	# software::set_install_command will return a global variable ${_INSTCMD}
-	# ${_INSTCMD} will expand to teh appropriate install cmmand including options
+	# ${_INSTCMD} will expand to the appropriate install command including options
 	# for non interactive install of a package. ${_INSTCMD} package.name will install said pacakge.
 	#
 	# A return code of "1" will be returned the function was not able to set the install command.
@@ -19498,7 +20014,7 @@ software::set_install_command() {
 			write_status "Setting install options for Package Kit"
 			export _INSTCMD="sudo pkcon -y  install"
 		else
-			write_error "This system does not seem to have a software managment system"
+			write_error "This system does not seem to have a software management system"
 			return 1
 		fi
 
@@ -20109,7 +20625,7 @@ software::update_system() {
 		term::task_exec_list_output pkcon get-updates
 		term::task_exec_list_output pkcon -y update --autoremove
 	else
-		write_error "This system does not seem to have a software managment system"
+		write_error "This system does not seem to have a software management system"
 		return 1
 	fi
 
@@ -20132,9 +20648,9 @@ software::update_system() {
 
 
 display_software_installation_choices_gtk() {
-	# Function to display the software install otions. All software option are listed in
-	# the _rtd_recipes recipe book. Leveraging all the useful function in _rtd_library.
-	# NOTE: adding a function in _rtd_recipes named "recipes_* ()" will automaticall populete
+	# Function to display the software install options. All software options are listed in
+	# the _rtd_recipes recipe book. Leveraging all the useful functions in _rtd_library.
+	# NOTE: adding a function in _rtd_recipes named "recipes_* ()" will automatically populate
 	# the menu displayed to the user.
 	#
 	# Globals: ${_BACKTITLE} ${zstatus}
@@ -20157,15 +20673,15 @@ display_software_installation_choices_gtk() {
 	choices=$("${DisplayMenu[@]}" "${MenuOptions[@]}" 2>/dev/null)
 
 	for choice in ${choices}; do
-		# call each chosen software install (by function) & add recepie (removed for display purposes)
+		# call each chosen software install (by function) & add recipe (removed for display purposes)
 		software::add_software_task recipe_${choice}
 	done
 }
 
 software::display_bundle_install_choices_gtk() {
-	# Function to display the software install otions. All software option are listed in
-	# the _rtd_recipes recipe book. Leveraging all the useful function in _rtd_library.
-	# NOTE: adding a function in _rtd_recipes named "recipes_* ()" will automaticall populete
+	# Function to display the software install options. All software options are listed in
+	# the _rtd_recipes recipe book. Leveraging all the useful functions in _rtd_library.
+	# NOTE: adding a function in _rtd_recipes named "recipes_* ()" will automatically populate
 	# the menu displayed to the user.
 	#
 	# Globals: ${_BACK_TITLE} ${zstatus}
@@ -20293,7 +20809,7 @@ software::display_bundle_install_choices_gtk() {
 			}
 
 			run_bundle_install | ${DisplayGUI} --progress --no-cancel --auto-close \
-				--title="Installing Software Prodictivity Bundles" \
+				--title="Installing Software Productivity Bundles" \
 				--text="Please wait for the bundle installs to complete..." \
 				--percentage=10 --height=200 --width=600
 
@@ -20329,9 +20845,9 @@ software::display_bundle_install_choices_gtk() {
 }
 
 software::display_bundle_removal_choices_gtk() {
-	# Function to display the Software Prodictivity Bundles removal otions. All software options are listed in
-	# the _rtd_recipes recipe book. Leveraging all the useful function in _rtd_library.
-	# NOTE: adding a function in _rtd_recipes named "recipes_* ()" will automaticall populste
+	# Function to display the Software Productivity Bundles removal options. All software options are listed in
+	# the _rtd_recipes recipe book. Leveraging all the useful functions in _rtd_library.
+	# NOTE: adding a function in _rtd_recipes named "recipes_* ()" will automatically populate
 	# the menu displayed to the user.
 	#
 	# Globals: ${_BACK_TITLE} ${zstatus}
@@ -20403,9 +20919,9 @@ software::display_bundle_removal_choices_gtk() {
 			total_count=${#selection_list[@]}
 			removed_bundle_list="$(mktemp)" || removed_bundle_list="/tmp/rtd-removed-bundles.$$"
 			run_bundle_uninstall() {
-				system::log_item "Removing Software Prodictivity Bundle(s): ${selection}"
+				system::log_item "Removing Software Productivity Bundle(s): ${selection}"
 				for i in ${selection}; do
-					system::log_item "Removing Software Prodictivity Bundles: ${i}"
+					system::log_item "Removing Software Productivity Bundles: ${i}"
 					current_bundle="${i}"
 					((c = c + 1))
 					echo "# Removing bundle ${c} of ${total_count}: ${current_bundle}..."
@@ -20417,7 +20933,7 @@ software::display_bundle_removal_choices_gtk() {
 				done
 			}
 			run_bundle_uninstall | ${DisplayGUI} --progress --no-cancel --auto-close \
-				--title="Removing Software Prodictivity Bundles" \
+				--title="Removing Software Productivity Bundles" \
 				--text="Please wait for the bundle removals to complete..." \
 				--percentage=10 --height=200 --width=600
 
@@ -20440,7 +20956,7 @@ software::display_bundle_removal_choices_gtk() {
 }
 
 rtd_server_setup_choices_services() {
-	# Description: Function to display server installation options. This will install software that is usefull
+	# Description: Function to display server installation options. This will install software that is useful
 	# on a server, or a remote system only accessible via SSH.
 	#
 	# Globals:
@@ -20506,7 +21022,7 @@ rtd_server_setup_choices_services() {
 
 rtd_server_setup_choices_productivity() {
 	# Description: Function to display terminal software installation options. This will install
-	# software that is usefull on a server, or a remote system only accessible via SSH.
+	# software that is useful on a server, or a remote system only accessible via SSH.
 	#
 	# Globals:
 	# Arguments: None
@@ -20520,7 +21036,7 @@ rtd_server_setup_choices_productivity() {
 	# This may be a good usecase if you happen to be in an opressed geographic locaiton where
 	# your only option is to ssh to a remote server and access email and web that way.
 	# Perfomance in these cases may be very poor over the internet (as for example with
-	# the great firewall of China). In Such a case it would be usefull to have the good
+	# the great firewall of China). In such a case it would be useful to have the good
 	# old CLI software! :)
 	# End of documentation
 
@@ -20572,12 +21088,12 @@ rtd_server_setup_choices_productivity() {
 }
 
 oem::setup_choices_server() {
-	# Description: Function to display legacy installation options. This will install software that is usefull
+	# Description: Function to display legacy installation options. This will install software that is useful
 	# on a really old system, or a remote system only accessible via SSH. This may be a good
 	# usecase if oyu happen to be in an opressed geographic locaiton where your only option is
 	# to ssh to a remote server and access email and web that way. Perfomance in these cases
 	# may be very poor over the internet (as for example with the great firewall of China). In
-	# Such a case it would be usefull to have the good old CLI software! :)
+	# Such a case it would be useful to have the good old CLI software! :)
 	# Globals:
 	# Arguments: None
 	# Outputs:
@@ -20602,134 +21118,531 @@ oem::setup_choices_server() {
 	done
 }
 
-fedora::get_fedora_netinst_iso_url() {
+debian::download_iso() {
 	# Description:
-	#
-	# Retrieves the full download URL for the Fedora "Everything" NetInstall ISO
-	# for a specific version and x86_64 architecture.
-	#
-	# This function validates the version format, constructs the expected download
-	# directory URL, fetches the directory listing using curl, extracts the
-	# latest NetInstall ISO filename, and prepends the directory URL to create
-	# the full download link.
-	#
+	#   Download a Debian ISO using the shared RTD ISO resolver and verifier.
 	# Globals:
-	#   None
-	#
+	#   iso (w)
+	#   OEM_ISO_* resolver metadata (w)
 	# Arguments:
-	#   --version <version>  Required. The Fedora release version number (e.g., 40).
-	#
+	#   --dir <path>                  Destination/cache directory. Defaults to /var/lib/libvirt/boot.
+	#   --mirror <url>                Optional Debian mirror URL.
+	#   --version <version>           Optional explicit Debian version.
+	#   --iso-type <netinst|dvd|live> ISO type. Defaults to netinst.
+	#   --live-flavor <name>          Debian live flavor when --iso-type live is used.
+	#   --architecture <arch>         Architecture. Defaults to amd64.
+	#   --no-verify                   Skip signature/checksum verification.
 	# Outputs:
-	#   STDOUT: Full URL to the latest Fedora Everything NetInstall ISO for the
-	#           specified version if found.
-	#   STDERR: Error messages, warnings, and informational logs (via system::log_item).
-	#
+	#   Sets and exports the global variable 'iso' to the resolved local ISO path.
 	# Returns:
-	#   0: If the URL was successfully found and printed to STDOUT.
-	#   1: If any error occurred (e.g., invalid arguments, failed download, ISO not found).
-	#
-	# Dependencies:
-	#   curl, grep, sort, awk, mktemp
-	#
-	# Usage Example:
-	#   local latest_ver
-	#   latest_ver=$(fedora::get_latest_release_version) # Assuming this function exists
-	#   local iso_url
-	#   if ! iso_url=$(fedora::get_fedora_netinst_iso_url --version "${latest_ver}"); then
-	#     printf "ERROR: Failed to get Fedora %s netinstall ISO URL.\n" "${latest_ver}" >&2
-	#     # Handle error appropriately
-	#   fi
-	#   printf "Latest ISO URL: %s\n" "${iso_url}"
-	# End of Documentation
-
+	#   0 on success; non-zero on failure.
+	# Usage:
+	#   debian::download_iso --dir /var/lib/libvirt/boot --iso-type netinst
+	# End of documentation
+	local permanent_download_dir="/var/lib/libvirt/boot"
+	local mirror_url=""
 	local version=""
-	local -r base_url="https://download.fedoraproject.org/pub/fedora/linux/releases"
-	local iso_page_url=""
-	local temp_output="" # Initialize for trap safety
-	local http_code=""
-	local iso_page_content=""
+	local iso_type="netinst"
+	local live_flavor="gnome"
+	local arch="amd64"
+	local verify=1
 	local iso_filename=""
-	local iso_full_url=""
+	local cached_iso=""
+	local -a cache_dirs=()
+	local -a resolve_args=()
 
 	while [[ $# -gt 0 ]]; do
-		local arg="$1"
-		case "${arg}" in
+		case "$1" in
+			--dir)
+				permanent_download_dir="$2"
+				shift 2
+				;;
+			--mirror)
+				mirror_url="$2"
+				shift 2
+				;;
 			--version)
-				if [[ -z "${2-}" ]]; then # Check if $2 exists
-					system::log_item "ERROR: --version flag requires an argument."
-					return 1
-				fi
 				version="$2"
-				shift # past argument
-				shift # past value
+				shift 2
+				;;
+			--iso-type|--type)
+				iso_type="$2"
+				shift 2
+				;;
+			--live-flavor|--desktop)
+				live_flavor="$2"
+				shift 2
+				;;
+			--architecture|--arch)
+				arch="$2"
+				shift 2
+				;;
+			--no-verify)
+				verify=0
+				shift
 				;;
 			*)
-				# Unknown option
-				system::log_item "ERROR: Unknown argument: ${arg}"
-				system::log_item "Usage: ${FUNCNAME[0]} --version <version_number>" 
+				write_error "Unknown argument for ${FUNCNAME[0]}: $1"
 				return 1
 				;;
 		esac
 	done
 
-	if [[ -z "${version}" ]]; then
-		system::log_item "ERROR: Missing required argument: --version"
-		system::log_item "Usage: ${FUNCNAME[0]} --version <version_number>" 
+	[[ -n "$mirror_url" ]] && resolve_args+=(--mirror "$mirror_url")
+	[[ -n "$version" ]] && resolve_args+=(--version "$version")
+	resolve_args+=(--iso-type "$iso_type" --live-flavor "$live_flavor" --architecture "$arch")
+
+	oem::task::iso::resolve_debian_iso "${resolve_args[@]}" || return 1
+
+	iso_filename="$OEM_ISO_NAME"
+	cache_dirs=("$permanent_download_dir")
+	[[ "$permanent_download_dir" != "/var/lib/libvirt/boot" ]] && cache_dirs+=("/var/lib/libvirt/boot")
+
+	if cached_iso=$(oem::task::iso::find_cached_iso "$iso_filename" "${cache_dirs[@]}"); then
+		iso="$cached_iso"
+		write_information "Using cached ISO: $iso"
+	else
+		if ! oem::task::iso::download_url "$OEM_ISO_URL" "$permanent_download_dir/$iso_filename"; then
+			return 1
+		fi
+		iso="$permanent_download_dir/$iso_filename"
+	fi
+
+	if [[ $verify -eq 1 ]]; then
+		oem::task::iso::verify_debian_iso "$iso" || return 1
+	fi
+
+	export iso
+	return 0
+}
+
+oem::task::iso::resolve_fedora_iso() {
+	# Description:
+	#   Resolve a Fedora ISO name, URL, version, and verification metadata.
+	# Globals:
+	#   OEM_ISO_* metadata globals (w)
+	# Arguments:
+	#   --mirror <url>                Optional mirror. Defaults to download.fedoraproject.org.
+	#   --version <version>           Optional Fedora release version.
+	#   --edition <name>              workstation, kde, server, spins, or everything.
+	#   --spin <name>                 Spin name when edition is spins.
+	#   --iso-type <name>             live, dvd, or netinst depending on edition.
+	#   --architecture <arch>         Architecture. Defaults to x86_64.
+	# Outputs:
+	#   Populates OEM_ISO_* globals.
+	# Returns:
+	#   0 on success; non-zero on failure.
+	# Usage:
+	#   oem::task::iso::resolve_fedora_iso --edition everything --iso-type netinst
+	# End of documentation
+	local mirror_url="https://download.fedoraproject.org/pub/fedora/linux/releases"
+	local version=""
+	local edition="workstation"
+	local iso_type="live"
+	local spin="xfce"
+	local arch="x86_64"
+	local iso_dir dir_listing iso_name checksum_name escaped_arch escaped_version
+
+	unset OEM_ISO_NAME OEM_ISO_URL OEM_ISO_VERSION OEM_ISO_DIR OEM_ISO_CHECKSUM_URL \
+		OEM_ISO_SIGNATURE_URL OEM_ISO_CHECKSUM_FILE OEM_ISO_SIGNATURE_FILE \
+		OEM_ISO_CHECKSUM_ALGO OEM_ISO_KEYRING_PATH OEM_ISO_KEYRING_URL OEM_ISO_KEY_FORMAT
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--mirror)
+				mirror_url="$2"
+				shift 2
+				;;
+			--version)
+				version="$2"
+				shift 2
+				;;
+			--edition)
+				edition="${2,,}"
+				shift 2
+				;;
+			--spin)
+				spin="${2,,}"
+				shift 2
+				;;
+			--iso-type|--type)
+				iso_type="${2,,}"
+				shift 2
+				;;
+			--architecture|--arch)
+				arch="$2"
+				shift 2
+				;;
+			*)
+				write_error "Unknown argument for ${FUNCNAME[0]}: $1"
+				return 1
+				;;
+		esac
+	done
+
+	case "$edition" in
+		spin) edition="spins" ;;
+	esac
+	case "$spin" in
+		mate-compiz) spin="mate" ;;
+		kde|kde-desktop|plasma)
+			[[ "$edition" == "spins" ]] && edition="kde"
+			;;
+		kde_mobile|kdemobile) spin="kde-mobile" ;;
+		miracle-wm|miracle_wm) spin="miraclewm" ;;
+	esac
+
+	case "$edition" in
+		workstation|kde|server|spins|everything) ;;
+		*)
+			write_error "Unsupported Fedora edition '$edition'."
+			return 1
+			;;
+	esac
+
+	case "$edition:$iso_type" in
+		workstation:live|kde:live|spins:live|server:dvd|server:netinst|everything:netinst) ;;
+		*)
+			write_error "Unsupported Fedora edition/type combination: ${edition}:${iso_type}"
+			return 1
+			;;
+	esac
+
+	if [[ "$edition" == "spins" ]]; then
+		case "$spin" in
+			budgie|cinnamon|cosmic|i3|kde-mobile|lxde|lxqt|mate|miraclewm|soas|sway|xfce) ;;
+			*)
+				write_error "Unsupported Fedora Spin '$spin'."
+				return 1
+				;;
+		esac
+	fi
+
+	case "$mirror_url" in
+		http://*|https://*) ;;
+		*)
+			write_error "Unsupported Fedora mirror URL: $mirror_url"
+			return 1
+			;;
+	esac
+
+	if [[ ! "$arch" =~ ^[A-Za-z0-9_-]+$ ]]; then
+		write_error "Unsupported Fedora architecture '$arch'."
 		return 1
 	fi
 
-	if [[ ! "${version}" =~ ^[0-9]+$ ]]; then
-		system::log_item "ERROR: Invalid version format: '${version}'. Must be a number."
-		return 1
+	if [[ -z "$version" ]]; then
+		dir_listing=$(oem::task::iso::fetch_url "${mirror_url%/}/") || return 1
+		version=$(
+			printf '%s\n' "$dir_listing" |
+				grep -Eo 'href="[0-9]+/"' |
+				sed -E 's#href="([0-9]+)/"#\1#' |
+				sort -n |
+				tail -n 1
+		)
 	fi
 
-	iso_page_url="${base_url}/${version}/Everything/x86_64/iso/"
-
-	temp_output=$(mktemp) || {
-		system::log_item "ERROR: Failed to create temporary file."
+	[[ -n "$version" ]] || {
+		write_error "Failed to determine a Fedora release version."
 		return 1
 	}
-	trap 'rm -f -- "$temp_output"' EXIT INT TERM HUP &>/dev/null # Ensure cleanup on exit
 
-	system::log_item "INFO: Fetching Fedora ISO directory index: ${iso_page_url}"
-	http_code=$(curl --connect-timeout 10 -sL -w "%{http_code}" -o "${temp_output}" "${iso_page_url}")
-	local curl_exit_code=$? 
+	case "$edition" in
+		workstation) iso_dir="${mirror_url%/}/${version}/Workstation/${arch}/iso" ;;
+		kde) iso_dir="${mirror_url%/}/${version}/KDE/${arch}/iso" ;;
+		server) iso_dir="${mirror_url%/}/${version}/Server/${arch}/iso" ;;
+		spins) iso_dir="${mirror_url%/}/${version}/Spins/${arch}/iso" ;;
+		everything) iso_dir="${mirror_url%/}/${version}/Everything/${arch}/iso" ;;
+	esac
 
-	if [[ ${curl_exit_code} -ne 0 ]]; then
-		system::log_item "ERROR: curl command failed with exit code ${curl_exit_code} while fetching ${iso_page_url}"
+	dir_listing=$(oem::task::iso::fetch_url "${iso_dir}/") || return 1
+	escaped_arch=$(oem::task::iso::escape_ere "$arch")
+	escaped_version=$(oem::task::iso::escape_ere "$version")
+
+	case "$edition:$iso_type" in
+		workstation:live)
+			iso_name=$(
+				printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+[.]iso"' | sed -E 's#href="([^"]+)"#\1#' |
+					grep -E "^Fedora-Workstation-Live-${escaped_version}-.*[.]${escaped_arch}[.]iso$" | sort -V | tail -n 1
+			)
+			checksum_name=$(
+				printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+CHECKSUM"' | sed -E 's#href="([^"]+)"#\1#' |
+					grep -E "^Fedora-Workstation-${escaped_version}-.*-${escaped_arch}-CHECKSUM$" | sort -V | tail -n 1
+			)
+			;;
+		kde:live)
+			iso_name=$(
+				printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+[.]iso"' | sed -E 's#href="([^"]+)"#\1#' |
+					grep -E "^Fedora-KDE-Desktop-Live-${escaped_version}-.*[.]${escaped_arch}[.]iso$" | sort -V | tail -n 1
+			)
+			checksum_name=$(
+				printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+CHECKSUM"' | sed -E 's#href="([^"]+)"#\1#' |
+					grep -E "^Fedora-KDE-${escaped_version}-.*-${escaped_arch}-CHECKSUM$" | sort -V | tail -n 1
+			)
+			;;
+		spins:live)
+			case "$spin" in
+				budgie) iso_name=$(printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+[.]iso"' | sed -E 's#href="([^"]+)"#\1#' | grep -E "^Fedora-Budgie-Live-${escaped_version}-.*[.]${escaped_arch}[.]iso$" | sort -V | tail -n 1) ;;
+				cinnamon) iso_name=$(printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+[.]iso"' | sed -E 's#href="([^"]+)"#\1#' | grep -E "^Fedora-Cinnamon-Live-${escaped_arch}-${escaped_version}-.*[.]iso$" | sort -V | tail -n 1) ;;
+				cosmic) iso_name=$(printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+[.]iso"' | sed -E 's#href="([^"]+)"#\1#' | grep -E "^Fedora-COSMIC-Live-${escaped_version}-.*[.]${escaped_arch}[.]iso$" | sort -V | tail -n 1) ;;
+				i3) iso_name=$(printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+[.]iso"' | sed -E 's#href="([^"]+)"#\1#' | grep -E "^Fedora-i3-Live-${escaped_version}-.*[.]${escaped_arch}[.]iso$" | sort -V | tail -n 1) ;;
+				kde-mobile) iso_name=$(printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+[.]iso"' | sed -E 's#href="([^"]+)"#\1#' | grep -E "^Fedora-KDE-Mobile-Live-${escaped_version}-.*[.]${escaped_arch}[.]iso$" | sort -V | tail -n 1) ;;
+				lxde) iso_name=$(printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+[.]iso"' | sed -E 's#href="([^"]+)"#\1#' | grep -E "^Fedora-LXDE-Live-${escaped_arch}-${escaped_version}-.*[.]iso$" | sort -V | tail -n 1) ;;
+				lxqt) iso_name=$(printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+[.]iso"' | sed -E 's#href="([^"]+)"#\1#' | grep -E "^Fedora-LXQt-Live-${escaped_version}-.*[.]${escaped_arch}[.]iso$" | sort -V | tail -n 1) ;;
+				mate) iso_name=$(printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+[.]iso"' | sed -E 's#href="([^"]+)"#\1#' | grep -E "^Fedora-MATE_Compiz-Live-${escaped_arch}-${escaped_version}-.*[.]iso$" | sort -V | tail -n 1) ;;
+				miraclewm) iso_name=$(printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+[.]iso"' | sed -E 's#href="([^"]+)"#\1#' | grep -E "^Fedora-MiracleWM-Live-${escaped_version}-.*[.]${escaped_arch}[.]iso$" | sort -V | tail -n 1) ;;
+				soas) iso_name=$(printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+[.]iso"' | sed -E 's#href="([^"]+)"#\1#' | grep -E "^Fedora-SoaS-Live-${escaped_version}-.*[.]${escaped_arch}[.]iso$" | sort -V | tail -n 1) ;;
+				sway) iso_name=$(printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+[.]iso"' | sed -E 's#href="([^"]+)"#\1#' | grep -E "^Fedora-Sway-Live-${escaped_arch}-${escaped_version}-.*[.]iso$" | sort -V | tail -n 1) ;;
+				xfce) iso_name=$(printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+[.]iso"' | sed -E 's#href="([^"]+)"#\1#' | grep -E "^Fedora-Xfce-Live-${escaped_version}-.*[.]${escaped_arch}[.]iso$" | sort -V | tail -n 1) ;;
+			esac
+			checksum_name=$(
+				printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+CHECKSUM"' | sed -E 's#href="([^"]+)"#\1#' |
+					grep -E "^Fedora-Spins-${escaped_version}-.*-${escaped_arch}-CHECKSUM$" | sort -V | tail -n 1
+			)
+			;;
+		server:dvd)
+			iso_name=$(
+				printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+[.]iso"' | sed -E 's#href="([^"]+)"#\1#' |
+					grep -E "^Fedora-Server-dvd-${escaped_arch}-${escaped_version}-.*[.]iso$" | sort -V | tail -n 1
+			)
+			checksum_name=$(
+				printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+CHECKSUM"' | sed -E 's#href="([^"]+)"#\1#' |
+					grep -E "^Fedora-Server-${escaped_version}-.*-${escaped_arch}-CHECKSUM$" | sort -V | tail -n 1
+			)
+			;;
+		server:netinst)
+			iso_name=$(
+				printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+[.]iso"' | sed -E 's#href="([^"]+)"#\1#' |
+					grep -E "^Fedora-Server-netinst-${escaped_arch}-${escaped_version}-.*[.]iso$" | sort -V | tail -n 1
+			)
+			checksum_name=$(
+				printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+CHECKSUM"' | sed -E 's#href="([^"]+)"#\1#' |
+					grep -E "^Fedora-Server-${escaped_version}-.*-${escaped_arch}-CHECKSUM$" | sort -V | tail -n 1
+			)
+			;;
+		everything:netinst)
+			iso_name=$(
+				printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+[.]iso"' | sed -E 's#href="([^"]+)"#\1#' |
+					grep -E "^Fedora-Everything-netinst-${escaped_arch}-${escaped_version}-.*[.]iso$" | sort -V | tail -n 1
+			)
+			checksum_name=$(
+				printf '%s\n' "$dir_listing" | grep -Eo 'href="[^"]+CHECKSUM"' | sed -E 's#href="([^"]+)"#\1#' |
+					grep -E "^Fedora-Everything-${escaped_version}-.*-${escaped_arch}-CHECKSUM$" | sort -V | tail -n 1
+			)
+			;;
+	esac
+
+	[[ -n "$iso_name" ]] || {
+		write_error "Could not find a Fedora ${edition}/${iso_type} ISO for version ${version}."
 		return 1
+	}
+
+	OEM_ISO_NAME="$iso_name"
+	OEM_ISO_URL="${iso_dir}/${iso_name}"
+	OEM_ISO_VERSION="$version"
+	OEM_ISO_DIR="$iso_dir"
+	OEM_ISO_CHECKSUM_URL=""
+	OEM_ISO_SIGNATURE_URL=""
+	OEM_ISO_CHECKSUM_FILE="$checksum_name"
+	OEM_ISO_SIGNATURE_FILE=""
+	OEM_ISO_CHECKSUM_ALGO="sha256"
+	OEM_ISO_KEYRING_PATH=""
+	OEM_ISO_KEYRING_URL="https://fedoraproject.org/fedora.gpg"
+	OEM_ISO_KEY_FORMAT="binary"
+	[[ -n "$checksum_name" ]] && OEM_ISO_CHECKSUM_URL="${iso_dir}/${checksum_name}"
+	return 0
+}
+
+oem::task::iso::verify_fedora_iso() {
+	# Description:
+	#   Verify a Fedora ISO using the signed CHECKSUM file.
+	# Globals:
+	#   OEM_ISO_* resolver metadata (r)
+	# Arguments:
+	#   $1 - Full path to the ISO file.
+	# Outputs:
+	#   Status messages on STDOUT/STDERR.
+	# Returns:
+	#   0 on success or skipped verification; non-zero on verification failure.
+	# Usage:
+	#   oem::task::iso::verify_fedora_iso "/var/lib/libvirt/boot/Fedora-Everything-netinst-x86_64-43-1.6.iso"
+	# End of documentation
+	local iso_path="$1"
+	local iso_dir iso_name checksum_file keyring_file expected_hash actual_hash
+
+	[[ -f "$iso_path" ]] || {
+		write_error "Fedora ISO path is missing: $iso_path"
+		return 1
+	}
+
+	if [[ -z "${OEM_ISO_CHECKSUM_URL:-}" || -z "${OEM_ISO_CHECKSUM_FILE:-}" ]]; then
+		write_warning "No Fedora CHECKSUM file was resolved. Skipping checksum verification."
+		return 0
 	fi
 
-	if [[ "${http_code}" -ne 200 ]]; then
-		system::log_item "ERROR: Failed to access ISO directory. HTTP status: ${http_code}. URL: ${iso_page_url}"
-		return 1
+	iso_dir=$(dirname "$iso_path")
+	iso_name=$(basename "$iso_path")
+	checksum_file="$iso_dir/${OEM_ISO_CHECKSUM_FILE}"
+	keyring_file="${OEM_ISO_KEYRING_PATH:-$iso_dir/fedora.gpg}"
+
+	if ! oem::task::iso::download_url "${OEM_ISO_CHECKSUM_URL}" "$checksum_file"; then
+		write_warning "Could not download Fedora CHECKSUM file. Skipping checksum verification."
+		return 0
 	fi
 
-	iso_page_content=$(<"${temp_output}")
-	rm -f -- "${temp_output}" &>/dev/null 
-	trap - EXIT INT TERM HUP   &>/dev/null # Remove the trap
-
-	if [[ -z "${iso_page_content}" ]]; then
-		system::log_item "ERROR: ISO directory listing was empty. URL: ${iso_page_url}"
-		return 1
+	if command -v gpgv >/dev/null 2>&1; then
+		if ! oem::task::iso::prepare_keyring "${OEM_ISO_KEYRING_URL}" "$keyring_file" "${OEM_ISO_KEY_FORMAT:-binary}"; then
+			write_warning "Could not prepare Fedora keyring. Skipping signature verification."
+			keyring_file=""
+		fi
+		if [[ -n "$keyring_file" ]]; then
+			if ! gpgv --keyring "$keyring_file" "$checksum_file"; then
+				write_error "Fedora CHECKSUM signature verification failed."
+				return 1
+			fi
+		fi
+	else
+		write_warning "gpgv is not installed. Skipping Fedora signature verification."
 	fi
 
-	iso_filename=$(
-		echo "${iso_page_content}" | \
-		grep -Eo "Fedora-Everything-netinst-x86_64-${version}-[0-9.]+\.iso" | \
-		sort -V | \
-		tail -n 1
-	)
-
-	if [[ -z "${iso_filename}" ]]; then
-		system::log_item "ERROR: Could not find NetInstall ISO filename for version ${version} matching pattern in ${iso_page_url}."
-		return 1
+	expected_hash=$(awk -v file="$iso_name" 'index($0, "SHA256 (" file ") = ") == 1 { print $4; exit }' "$checksum_file")
+	if [[ -z "$expected_hash" ]]; then
+		write_warning "Fedora CHECKSUM file does not contain $iso_name. Skipping checksum verification."
+		return 0
 	fi
 
-	iso_full_url="${iso_page_url}${iso_filename}"
-	system::log_item "INFO: Found Fedora NetInstall ISO URL: ${iso_full_url}"
-	echo "${iso_full_url}"
-	return 0 
+	actual_hash=$(sha256sum "$iso_path" | awk '{ print $1 }')
+	if [[ "$actual_hash" == "$expected_hash" ]]; then
+		write_information "Fedora checksum verification passed for $iso_name"
+		return 0
+	fi
+
+	write_error "Fedora checksum verification failed for $iso_name"
+	return 1
+}
+
+fedora::download_iso() {
+	# Description:
+	#   Download a Fedora ISO using the shared RTD ISO resolver and verifier.
+	# Globals:
+	#   iso (w)
+	#   OEM_ISO_* resolver metadata (w)
+	# Arguments:
+	#   --dir <path>                  Destination/cache directory. Defaults to /var/lib/libvirt/boot.
+	#   --mirror <url>                Optional Fedora mirror URL.
+	#   --version <version>           Optional Fedora release version.
+	#   --edition <name>              workstation, kde, server, spins, or everything.
+	#   --spin <name>                 Spin name when edition is spins.
+	#   --iso-type <name>             live, dvd, or netinst.
+	#   --architecture <arch>         Architecture. Defaults to x86_64.
+	#   --no-verify                   Skip signature/checksum verification.
+	# Outputs:
+	#   Sets and exports the global variable 'iso' to the resolved local ISO path.
+	# Returns:
+	#   0 on success; non-zero on failure.
+	# Usage:
+	#   fedora::download_iso --edition everything --iso-type netinst --version 43
+	# End of documentation
+	local permanent_download_dir="/var/lib/libvirt/boot"
+	local mirror_url=""
+	local version=""
+	local edition="workstation"
+	local spin="xfce"
+	local iso_type="live"
+	local arch="x86_64"
+	local verify=1
+	local iso_filename=""
+	local cached_iso=""
+	local -a cache_dirs=()
+	local -a resolve_args=()
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--dir)
+				permanent_download_dir="$2"
+				shift 2
+				;;
+			--mirror)
+				mirror_url="$2"
+				shift 2
+				;;
+			--version)
+				version="$2"
+				shift 2
+				;;
+			--edition)
+				edition="$2"
+				shift 2
+				;;
+			--spin)
+				spin="$2"
+				shift 2
+				;;
+			--iso-type|--type|--media-type)
+				iso_type="$2"
+				shift 2
+				;;
+			--architecture|--arch)
+				arch="$2"
+				shift 2
+				;;
+			--no-verify)
+				verify=0
+				shift
+				;;
+			*)
+				write_error "Unknown argument for ${FUNCNAME[0]}: $1"
+				return 1
+				;;
+		esac
+	done
+
+	[[ -n "$mirror_url" ]] && resolve_args+=(--mirror "$mirror_url")
+	[[ -n "$version" ]] && resolve_args+=(--version "$version")
+	resolve_args+=(--edition "$edition" --spin "$spin" --iso-type "$iso_type" --architecture "$arch")
+
+	oem::task::iso::resolve_fedora_iso "${resolve_args[@]}" || return 1
+
+	iso_filename="$OEM_ISO_NAME"
+	cache_dirs=("$permanent_download_dir")
+	[[ "$permanent_download_dir" != "/var/lib/libvirt/boot" ]] && cache_dirs+=("/var/lib/libvirt/boot")
+
+	if cached_iso=$(oem::task::iso::find_cached_iso "$iso_filename" "${cache_dirs[@]}"); then
+		iso="$cached_iso"
+		write_information "Using cached ISO: $iso"
+	else
+		if ! oem::task::iso::download_url "$OEM_ISO_URL" "$permanent_download_dir/$iso_filename"; then
+			return 1
+		fi
+		iso="$permanent_download_dir/$iso_filename"
+	fi
+
+	if [[ $verify -eq 1 ]]; then
+		oem::task::iso::verify_fedora_iso "$iso" || return 1
+	fi
+
+	export iso
+	return 0
+}
+
+fedora::get_fedora_netinst_iso_url() {
+	# Description:
+	#   Retrieve the full download URL for the Fedora Everything NetInstall ISO.
+	# Globals:
+	#   OEM_ISO_URL (w)
+	# Arguments:
+	#   --version <version>  Optional Fedora release version number.
+	# Outputs:
+	#   STDOUT: Full URL to the resolved Fedora Everything NetInstall ISO.
+	# Returns:
+	#   0 on success; non-zero on failure.
+	# Usage Example:
+	#   local iso_url
+	#   iso_url=$(fedora::get_fedora_netinst_iso_url --version 43)
+	# End of Documentation
+	oem::task::iso::resolve_fedora_iso --edition everything --iso-type netinst "$@" || return 1
+	printf '%s\n' "$OEM_ISO_URL"
+	return 0
 }
 
 fedora::get_latest_release_version() {
@@ -20761,22 +21674,11 @@ fedora::get_latest_release_version() {
 	# End of Documentation:
 
 	local url="https://download.fedoraproject.org/pub/fedora/linux/releases/"
-	local http_code
 	local dir_listing
 	local latest_version
-	local temp_output
 
 	system::log_item "Fetching directory listing from $url..."
-	temp_output=$(mktemp)
-
-	http_code=$(curl --connect-timeout 10 -sL -w "%{http_code}" -o "$temp_output" "$url")
-	dir_listing=$(<"$temp_output")
-	rm "$temp_output" &>/dev/null
-
-	if [[ "$http_code" -ne 200 ]]; then
-		system::log_item "Error: Failed to fetch Fedora release directory (HTTP code: $http_code)"
-		return 1
-	fi
+	dir_listing=$(oem::task::iso::fetch_url "$url") || return 1
 
 	if [[ -z "$dir_listing" ]]; then
 		system::log_item "Error: Empty directory listing retrieved from $url"
@@ -20800,6 +21702,377 @@ fedora::get_latest_release_version() {
 	fi
 }
 
+oem::task::iso::resolve_opensuse_iso() {
+	# Description:
+	#   Resolve an openSUSE ISO name, URL, version, and verification metadata.
+	# Globals:
+	#   OEM_ISO_* metadata globals (w)
+	# Arguments:
+	#   --mirror <url>                Optional mirror. Defaults to download.opensuse.org.
+	#   --edition <tumbleweed|leap>   openSUSE edition. Defaults to tumbleweed.
+	#   --version <version>           Optional explicit Leap version.
+	#   --iso-type <type>             DVD/net/live/etc depending on edition.
+	#   --architecture <arch>         Architecture. Defaults to x86_64.
+	# Outputs:
+	#   Populates OEM_ISO_* globals.
+	# Returns:
+	#   0 on success; non-zero on failure.
+	# Usage:
+	#   oem::task::iso::resolve_opensuse_iso --edition leap --iso-type net
+	# End of documentation
+	local mirror_url="https://download.opensuse.org"
+	local edition="tumbleweed"
+	local version=""
+	local iso_type=""
+	local arch="x86_64"
+	local iso_dir dir_listing iso_name checksum_url signature_url checksum_algo checksum_filename token checksum_text
+
+	unset OEM_ISO_NAME OEM_ISO_URL OEM_ISO_VERSION OEM_ISO_DIR OEM_ISO_CHECKSUM_URL \
+		OEM_ISO_SIGNATURE_URL OEM_ISO_CHECKSUM_FILE OEM_ISO_SIGNATURE_FILE \
+		OEM_ISO_CHECKSUM_ALGO OEM_ISO_KEYRING_PATH OEM_ISO_KEYRING_URL OEM_ISO_KEY_FORMAT
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--mirror)
+				mirror_url="$2"
+				shift 2
+				;;
+			--edition)
+				edition="${2,,}"
+				shift 2
+				;;
+			--version)
+				version="$2"
+				shift 2
+				;;
+			--iso-type|--type)
+				iso_type="${2,,}"
+				shift 2
+				;;
+			--architecture|--arch)
+				arch="$2"
+				shift 2
+				;;
+			*)
+				write_error "Unknown argument for ${FUNCNAME[0]}: $1"
+				return 1
+				;;
+		esac
+	done
+
+	case "$edition" in
+		tumbleweed) : "${iso_type:=dvd}" ;;
+		leap) : "${iso_type:=offline}" ;;
+		*)
+			write_error "Unsupported openSUSE edition '$edition'."
+			return 1
+			;;
+	esac
+
+	case "$mirror_url" in
+		http://*|https://*) ;;
+		*)
+			write_error "Unsupported openSUSE mirror URL: $mirror_url"
+			return 1
+			;;
+	esac
+
+	if [[ ! "$arch" =~ ^[A-Za-z0-9_-]+$ ]]; then
+		write_error "Unsupported openSUSE architecture '$arch'."
+		return 1
+	fi
+
+	if [[ "$edition" == "tumbleweed" ]]; then
+		case "$iso_type" in
+			dvd) token="DVD" ;;
+			net) token="NET" ;;
+			gnome-live) token="GNOME-Live" ;;
+			kde-live) token="KDE-Live" ;;
+			rescue) token="Rescue-CD" ;;
+			*)
+				write_error "Unsupported Tumbleweed ISO type '$iso_type'."
+				return 1
+				;;
+		esac
+
+		iso_name="openSUSE-Tumbleweed-${token}-${arch}-Current.iso"
+		checksum_url="${mirror_url%/}/tumbleweed/iso/${iso_name}.sha256"
+		checksum_text=$(oem::task::iso::fetch_url "$checksum_url") || checksum_text=""
+		if [[ -n "$checksum_text" ]]; then
+			iso_name=$(awk '{ print $2; exit }' <<< "$checksum_text")
+		fi
+		if [[ "$iso_name" =~ Snapshot([0-9]+) ]]; then
+			version="${BASH_REMATCH[1]}"
+		else
+			version="${version:-current}"
+		fi
+		iso_dir="${mirror_url%/}/tumbleweed/iso"
+		checksum_url="${iso_dir}/${iso_name}.sha256"
+		signature_url="${checksum_url}.asc"
+		checksum_algo="sha256"
+		checksum_filename="${iso_name}.sha256"
+	else
+		if [[ -z "$version" ]]; then
+			dir_listing=$(oem::task::iso::fetch_url "${mirror_url%/}/distribution/leap/") || return 1
+			version=$(
+				printf '%s\n' "$dir_listing" |
+					grep -Eo 'href="[.]/[0-9]+[.][0-9]+/"|href="[0-9]+[.][0-9]+/"' |
+					sed -E 's#href="[.]/([^"]+)/"#\1#; s#href="([^"]+)/"#\1#' |
+					awk -F. '$1 < 40' |
+					sort -V |
+					tail -n 1
+			)
+		fi
+
+		[[ -n "$version" ]] || {
+			write_error "Failed to determine an openSUSE Leap version."
+			return 1
+		}
+
+		if [[ "$version" =~ ^15[.] ]] && [[ "$iso_type" == "dvd" || "$iso_type" == "net" ]]; then
+			iso_dir="${mirror_url%/}/distribution/leap/${version}/iso"
+			dir_listing=$(oem::task::iso::fetch_url "${iso_dir}/") || return 1
+			case "$iso_type" in
+				dvd)
+					iso_name=$(printf '%s\n' "$dir_listing" | grep -Eo 'href="[.]/[^"]+[.]iso"|href="[^"]+[.]iso"' | sed -E 's#href="[.]/([^"]+)"#\1#; s#href="([^"]+)"#\1#' | grep -E "^openSUSE-Leap-$(oem::task::iso::escape_ere "$version")-DVD-$(oem::task::iso::escape_ere "$arch")-Build.*-Media[.]iso$" | sort -V | tail -n 1)
+					;;
+				net)
+					iso_name=$(printf '%s\n' "$dir_listing" | grep -Eo 'href="[.]/[^"]+[.]iso"|href="[^"]+[.]iso"' | sed -E 's#href="[.]/([^"]+)"#\1#; s#href="([^"]+)"#\1#' | grep -E "^openSUSE-Leap-$(oem::task::iso::escape_ere "$version")-NET-$(oem::task::iso::escape_ere "$arch")-Build.*-Media[.]iso$" | sort -V | tail -n 1)
+					;;
+			esac
+		else
+			iso_dir="${mirror_url%/}/distribution/leap/${version}/offline"
+			dir_listing=$(oem::task::iso::fetch_url "${iso_dir}/") || return 1
+			case "$iso_type" in
+				offline|dvd)
+					iso_name=$(printf '%s\n' "$dir_listing" | grep -Eo 'href="[.]/[^"]+[.]iso"|href="[^"]+[.]iso"' | sed -E 's#href="[.]/([^"]+)"#\1#; s#href="([^"]+)"#\1#' | grep -E "^Leap-$(oem::task::iso::escape_ere "$version")-offline-installer-$(oem::task::iso::escape_ere "$arch")-Build.*[.]install[.]iso$" | sort -V | tail -n 1)
+					;;
+				online|net)
+					iso_name=$(printf '%s\n' "$dir_listing" | grep -Eo 'href="[.]/[^"]+[.]iso"|href="[^"]+[.]iso"' | sed -E 's#href="[.]/([^"]+)"#\1#; s#href="([^"]+)"#\1#' | grep -E "^Leap-$(oem::task::iso::escape_ere "$version")-online-installer-$(oem::task::iso::escape_ere "$arch")-Build.*[.]install[.]iso$" | sort -V | tail -n 1)
+					;;
+				*)
+					write_error "Unsupported Leap ISO type '$iso_type'."
+					return 1
+					;;
+			esac
+		fi
+
+		[[ -n "$iso_name" ]] || {
+			write_error "Could not find an openSUSE Leap ${iso_type} ISO for version ${version}."
+			return 1
+		}
+
+		checksum_url=""
+		signature_url=""
+		checksum_filename=""
+		checksum_algo=""
+		if grep -Fq "href=\"$iso_name.sha256\"" <<< "$dir_listing" || grep -Fq "href=\"./$iso_name.sha256\"" <<< "$dir_listing"; then
+			checksum_algo="sha256"
+			checksum_filename="$iso_name.sha256"
+		elif grep -Fq "href=\"$iso_name.sha512\"" <<< "$dir_listing" || grep -Fq "href=\"./$iso_name.sha512\"" <<< "$dir_listing"; then
+			checksum_algo="sha512"
+			checksum_filename="$iso_name.sha512"
+		fi
+		if [[ -n "$checksum_filename" ]]; then
+			checksum_url="${iso_dir}/${checksum_filename}"
+			if grep -Fq "href=\"$checksum_filename.asc\"" <<< "$dir_listing" || grep -Fq "href=\"./$checksum_filename.asc\"" <<< "$dir_listing"; then
+				signature_url="${iso_dir}/${checksum_filename}.asc"
+			fi
+		fi
+	fi
+
+	OEM_ISO_NAME="$iso_name"
+	OEM_ISO_URL="${iso_dir}/${iso_name}"
+	OEM_ISO_VERSION="$version"
+	OEM_ISO_DIR="$iso_dir"
+	OEM_ISO_CHECKSUM_URL="$checksum_url"
+	OEM_ISO_SIGNATURE_URL="$signature_url"
+	OEM_ISO_CHECKSUM_FILE="${checksum_filename:-}"
+	OEM_ISO_SIGNATURE_FILE="${signature_url:+$(basename "$signature_url")}"
+	OEM_ISO_CHECKSUM_ALGO="${checksum_algo:-}"
+	OEM_ISO_KEYRING_PATH=""
+	OEM_ISO_KEYRING_URL="https://download.opensuse.org/tumbleweed/repo/oss/gpg-pubkey-29b700a4-62b07e22.asc"
+	OEM_ISO_KEY_FORMAT="armored"
+	return 0
+}
+
+oem::task::iso::verify_opensuse_iso() {
+	# Description:
+	#   Verify an openSUSE ISO using the resolved checksum and signature metadata.
+	# Globals:
+	#   OEM_ISO_* resolver metadata (r)
+	# Arguments:
+	#   $1 - Full path to the ISO file.
+	# Outputs:
+	#   Status messages on STDOUT/STDERR.
+	# Returns:
+	#   0 on success or skipped verification; non-zero on verification failure.
+	# Usage:
+	#   oem::task::iso::verify_opensuse_iso "/var/lib/libvirt/boot/openSUSE-Tumbleweed-DVD-x86_64-Snapshot20260420-Media.iso"
+	# End of documentation
+	local iso_path="$1"
+	local iso_dir iso_name checksum_file signature_file keyring_file expected_hash actual_hash sum_cmd
+
+	[[ -f "$iso_path" ]] || {
+		write_error "openSUSE ISO path is missing: $iso_path"
+		return 1
+	}
+
+	if [[ -z "${OEM_ISO_CHECKSUM_URL:-}" || -z "${OEM_ISO_CHECKSUM_FILE:-}" || -z "${OEM_ISO_CHECKSUM_ALGO:-}" ]]; then
+		write_warning "No openSUSE checksum metadata was resolved. Skipping checksum verification."
+		return 0
+	fi
+
+	iso_dir=$(dirname "$iso_path")
+	iso_name=$(basename "$iso_path")
+	checksum_file="$iso_dir/${OEM_ISO_CHECKSUM_FILE}"
+	signature_file="$iso_dir/${OEM_ISO_SIGNATURE_FILE:-}"
+	keyring_file="${OEM_ISO_KEYRING_PATH:-$iso_dir/opensuse-signing-key.gpg}"
+	sum_cmd="${OEM_ISO_CHECKSUM_ALGO}sum"
+
+	if ! oem::task::iso::download_url "${OEM_ISO_CHECKSUM_URL}" "$checksum_file"; then
+		write_warning "Could not download openSUSE checksum file. Skipping checksum verification."
+		return 0
+	fi
+
+	if [[ -n "${OEM_ISO_SIGNATURE_URL:-}" ]] && oem::task::iso::download_url "${OEM_ISO_SIGNATURE_URL}" "$signature_file"; then
+		if command -v gpgv >/dev/null 2>&1; then
+			if ! oem::task::iso::prepare_keyring "${OEM_ISO_KEYRING_URL}" "$keyring_file" "${OEM_ISO_KEY_FORMAT:-armored}"; then
+				write_warning "Could not prepare openSUSE keyring. Skipping signature verification."
+				keyring_file=""
+			fi
+			if [[ -n "$keyring_file" ]]; then
+				if ! gpgv --keyring "$keyring_file" "$signature_file" "$checksum_file"; then
+					write_error "openSUSE checksum signature verification failed."
+					return 1
+				fi
+			fi
+		else
+			write_warning "gpgv is not installed. Skipping openSUSE signature verification."
+		fi
+	else
+		write_warning "Could not download openSUSE checksum signature. Skipping signature verification."
+	fi
+
+	expected_hash=$(awk -v file="$iso_name" '($2 == file || $2 == "./" file) { print $1; exit }' "$checksum_file")
+	if [[ -z "$expected_hash" ]]; then
+		write_warning "openSUSE checksum file does not contain $iso_name. Skipping checksum verification."
+		return 0
+	fi
+
+	if ! command -v "$sum_cmd" >/dev/null 2>&1; then
+		write_warning "${sum_cmd} is not installed. Skipping openSUSE checksum verification."
+		return 0
+	fi
+
+	actual_hash=$("$sum_cmd" "$iso_path" | awk '{ print $1 }')
+	if [[ "$actual_hash" == "$expected_hash" ]]; then
+		write_information "openSUSE checksum verification passed for $iso_name"
+		return 0
+	fi
+
+	write_error "openSUSE checksum verification failed for $iso_name"
+	return 1
+}
+
+opensuse::download_iso() {
+	# Description:
+	#   Download an openSUSE ISO using the shared RTD ISO resolver and verifier.
+	# Globals:
+	#   iso (w)
+	#   OEM_ISO_* resolver metadata (w)
+	# Arguments:
+	#   --dir <path>                  Destination/cache directory. Defaults to /var/lib/libvirt/boot.
+	#   --mirror <url>                Optional openSUSE mirror URL.
+	#   --edition <tumbleweed|leap>   openSUSE edition. Defaults to tumbleweed.
+	#   --version <version>           Optional explicit Leap version.
+	#   --iso-type <type>             DVD/net/live/etc depending on edition.
+	#   --architecture <arch>         Architecture. Defaults to x86_64.
+	#   --no-verify                   Skip signature/checksum verification.
+	# Outputs:
+	#   Sets and exports the global variable 'iso' to the resolved local ISO path.
+	# Returns:
+	#   0 on success; non-zero on failure.
+	# Usage:
+	#   opensuse::download_iso --edition tumbleweed --iso-type dvd
+	# End of documentation
+	local permanent_download_dir="/var/lib/libvirt/boot"
+	local mirror_url=""
+	local edition="tumbleweed"
+	local version=""
+	local iso_type=""
+	local arch="x86_64"
+	local verify=1
+	local iso_filename=""
+	local cached_iso=""
+	local -a cache_dirs=()
+	local -a resolve_args=()
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--dir)
+				permanent_download_dir="$2"
+				shift 2
+				;;
+			--mirror)
+				mirror_url="$2"
+				shift 2
+				;;
+			--edition)
+				edition="$2"
+				shift 2
+				;;
+			--version)
+				version="$2"
+				shift 2
+				;;
+			--iso-type|--type)
+				iso_type="$2"
+				shift 2
+				;;
+			--architecture|--arch)
+				arch="$2"
+				shift 2
+				;;
+			--no-verify)
+				verify=0
+				shift
+				;;
+			*)
+				write_error "Unknown argument for ${FUNCNAME[0]}: $1"
+				return 1
+				;;
+		esac
+	done
+
+	[[ -n "$mirror_url" ]] && resolve_args+=(--mirror "$mirror_url")
+	[[ -n "$version" ]] && resolve_args+=(--version "$version")
+	[[ -n "$iso_type" ]] && resolve_args+=(--iso-type "$iso_type")
+	resolve_args+=(--edition "$edition" --architecture "$arch")
+
+	oem::task::iso::resolve_opensuse_iso "${resolve_args[@]}" || return 1
+
+	iso_filename="$OEM_ISO_NAME"
+	cache_dirs=("$permanent_download_dir")
+	[[ "$permanent_download_dir" != "/var/lib/libvirt/boot" ]] && cache_dirs+=("/var/lib/libvirt/boot")
+
+	if cached_iso=$(oem::task::iso::find_cached_iso "$iso_filename" "${cache_dirs[@]}"); then
+		iso="$cached_iso"
+		write_information "Using cached ISO: $iso"
+	else
+		if ! oem::task::iso::download_url "$OEM_ISO_URL" "$permanent_download_dir/$iso_filename"; then
+			return 1
+		fi
+		iso="$permanent_download_dir/$iso_filename"
+	fi
+
+	if [[ $verify -eq 1 ]]; then
+		oem::task::iso::verify_opensuse_iso "$iso" || return 1
+	fi
+
+	export iso
+	return 0
+}
 
 ubuntu::enable_plymouth_theme() {
 	# Description: Detects the Ubuntu spin (flavor) and ensures the appropriate
@@ -20899,7 +22172,7 @@ ubuntu::get_target_version() {
 	#
 	# End of Documentation:
 	# Determine available versions of Ubuntu to offer...
-	system::log_item "🔎 Retreive list of available $ubuntu_flavor $_role versions..."
+	system::log_item "🔎 Retrieve list of available $ubuntu_flavor $_role versions..."
 	declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
 	declare -a all_normal_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+)/ && print "$1\n"' | sort -Vu))
 	dist_logo="${ubuntulogo}"
@@ -20996,9 +22269,7 @@ ubuntu::get_target_version() {
 
 ubuntu::get_latest_release_version() {
 	# Description:
-	#   Retrieves the latest available Ubuntu release version from the official archive.
-	#   This function scans the Ubuntu archive index, detects release version numbers,
-	#   and extracts the highest valid version number using LTS and regular versions.
+	#   Retrieve the latest supported Ubuntu release version.
 	#
 	# Globals:
 	#   None
@@ -21022,34 +22293,32 @@ ubuntu::get_latest_release_version() {
 	#
 	# End of Documentation
 
-	local url="https://releases.ubuntu.com"
+	local url="https://changelogs.ubuntu.com/meta-release"
 	local latest_version=""
 	local output
-	local -a all_lts_versions
-	local -a all_normal_versions
-	local -a all_versions
-
-	dependency::command_exists wget perl sort tail
-
-	if ! output=$(wget -q -O- "$url"); then
-		system::log_item "ERROR: Failed to retrieve directory listing from $url"
+	if ! output=$(oem::task::iso::fetch_url "$url"); then
+		system::log_item "ERROR: Failed to retrieve release metadata from $url"
 		return 1
 	fi
 
-	mapfile -t all_lts_versions < <(printf '%s\n' "$output" | perl -ne '/Ubuntu (\d+\.\d+\.\d+)/ && print "$1\n"' | sort -Vu)
-	mapfile -t all_normal_versions < <(printf '%s\n' "$output" | perl -ne '/Ubuntu (\d+\.\d+)/ && print "$1\n"' | sort -Vu)
-
-	all_versions=("${all_lts_versions[@]}" "${all_normal_versions[@]}")
-
-	if [[ ${#all_versions[@]} -eq 0 ]]; then
-		system::log_item "ERROR: No versions found in the Ubuntu archive."
-		return 1
-	fi
-
-	latest_version=$(printf '%s\n' "${all_versions[@]}" | sort -V | tail -n 1)
+	latest_version=$(
+		awk '
+			BEGIN { RS = ""; FS = "\n" }
+			/Supported:[[:space:]]*1/ {
+				for (i = 1; i <= NF; i++) {
+					if ($i ~ /^Version:[[:space:]]*/) {
+						value = $i
+						sub(/^Version:[[:space:]]*/, "", value)
+						sub(/[[:space:]]+LTS$/, "", value)
+						print value
+					}
+				}
+			}
+		' <<< "$output" | sort -V | tail -n 1
+	)
 
 	if [[ -z "$latest_version" ]]; then
-		system::log_item "ERROR: No valid version found in the Ubuntu archive."
+		system::log_item "ERROR: No valid supported Ubuntu release found."
 		return 1
 	fi
 
@@ -21069,96 +22338,73 @@ ubuntu::get_latest_release_version() {
 }
 
 ubuntu::download_iso() {
-	# Description: Downloads the specified Ubuntu ISO (Desktop or Server) based on the provided flavor, version, and type.
-	#
-	# This function allows you to download various Ubuntu ISOs, including Ubuntu Desktop, Ubuntu Server,
-	# Kubuntu, and Xubuntu. You can specify the directory to save the ISO, the flavor of Ubuntu,
-	# the version, and whether you want the Desktop or Server ISO.
-	#
+	# Description:
+	#   Download an Ubuntu ISO using the shared RTD ISO resolver and verifier.
 	# Globals:
-	#   None
-	#
+	#   iso (w)
+	#   OEM_ISO_* resolver metadata (w)
 	# Arguments:
-	#   --dir [directory]: The directory where the ISO should be saved. Defaults to /var/lib/libvirt/boot.
-	#   --flavor [ubuntu|kubuntu|xubuntu]: The flavor of Ubuntu to download. Defaults to 'ubuntu'.
-	#   --version [version]: The version of Ubuntu to download (e.g., 20.04.2). Defaults to 20.04.2.
-	#   --type [server|desktop]: The type of Ubuntu ISO to download. Valid only for Ubuntu flavor. Defaults to 'server'.
-	#
+	#   --dir <path>               Destination/cache directory. Defaults to /var/lib/libvirt/boot.
+	#   --flavor <ubuntu>          Supported flavor. Defaults to ubuntu.
+	#   --version <version>        Optional explicit Ubuntu version.
+	#   --media-type <desktop|server>
+	#   --mirror <url>             Optional Ubuntu mirror URL.
+	#   --include-prerelease       Allow pre-release image names.
+	#   --no-verify                Skip signature/checksum verification.
 	# Outputs:
-	#   - Downloads the specified ISO to the specified directory.
-	#   - Logs status messages regarding the progress and success of the download.
-	#
+	#   Sets and exports the global variable 'iso' to the resolved local ISO path.
 	# Returns:
-	#   - 0 on success.
-	#   - 1 on error (e.g., invalid arguments, failure to download ISO).
-	#
+	#   0 on success; non-zero on failure.
 	# Usage:
-	#   ubuntu::download_iso --dir /path/to/save --flavor ubuntu --version 22.04.1 --type desktop
-	#
-	# Example:
-	#   To download the Ubuntu 22.04.1 Desktop ISO to /var/lib/libvirt/boot:
-	#   ubuntu::download_iso --dir /var/lib/libvirt/boot --flavor ubuntu --version 22.04.1 --type desktop
-	#
-	# Details:
-	#   - The function constructs the appropriate ISO filename and download URL based on the provided
-	#     flavor, version, and type.
-	#   - If the ISO is already present in the specified directory, the function logs a message and
-	#     skips the download.
-	#   - The downloaded ISO path is exported as the variable 'iso' for use in other scripts or commands.
-	#
+	#   ubuntu::download_iso --dir /var/lib/libvirt/boot --version 24.04.2 --media-type desktop
 	# End of Documentation
+	local permanent_download_dir="/var/lib/libvirt/boot"
+	local media_type="server"
+	local tgt_ubuntu_ver=""
+	local ubuntu_flavor="ubuntu"
+	local mirror_url=""
+	local include_prerelease=0
+	local verify=1
+	local iso_filename=""
+	local cached_iso=""
+	local -a cache_dirs=()
+	local -a resolve_args=()
 
-	# Initialize default values
-	local permanent_download_dir="/var/lib/libvirt/boot"	# where to put the downloaded media
-	local media_type="server"				# Default to server, can be overridden by --media-type parameter
-	local tgt_ubuntu_ver="20.04.2"				# Default version, can be overridden by --version parameter
-	local ubuntu_flavor="ubuntu"				# Default flavor, can be overridden by --flavor
-
-	# Parse arguments
 	while [[ "$#" -gt 0 ]]; do
-		case $1 in
-		--flavor)
-			if [[ -n $2 && $2 != --* ]]; then
+		case "$1" in
+			--flavor)
 				ubuntu_flavor="$2"
-				shift
-			else
-				system::log_item "Error: --flavor requires a non-empty argument."
-				return 1
-			fi
-			;;
-		--dir)
-			if [[ -n $2 && $2 != --* ]]; then
+				shift 2
+				;;
+			--dir)
 				permanent_download_dir="$2"
-				shift
-			else
-				system::log_item "Error: --dir requires a non-empty argument."
-				return 1
-			fi
-			;;
-		--version)
-			if [[ -n $2 && $2 != --* ]]; then
+				shift 2
+				;;
+			--version)
 				tgt_ubuntu_ver="$2"
-				shift
-			else
-				system::log_item "Error: --version requires a non-empty argument."
-				return 1
-			fi
-			;;
-		--media-type | --type | --iso-type)
-			if [[ -n $2 && $2 != --* ]]; then
+				shift 2
+				;;
+			--media-type|--type|--iso-type)
 				media_type="$2"
+				shift 2
+				;;
+			--mirror)
+				mirror_url="$2"
+				shift 2
+				;;
+			--include-prerelease)
+				include_prerelease=1
 				shift
-			else
-				system::log_item "Error: --media-type requires a non-empty argument."
+				;;
+			--no-verify)
+				verify=0
+				shift
+				;;
+			*)
+				system::log_item "Unknown parameter passed: $1"
 				return 1
-			fi
-			;;
-		*)
-			system::log_item "Unknown parameter passed: $1"
-			return 1
-			;;
+				;;
 		esac
-		shift
 	done
 
 	if [[ "$ubuntu_flavor" != "ubuntu" ]]; then
@@ -21166,43 +22412,30 @@ ubuntu::download_iso() {
 		return 1
 	fi
 
-	case $media_type in
-	server)
-		iso_filename="ubuntu-${tgt_ubuntu_ver}-live-server-amd64.iso"
-		ubuntu_iso_url="http://releases.ubuntu.com/${tgt_ubuntu_ver}/ubuntu-${tgt_ubuntu_ver}-live-server-amd64.iso"
-		;;
-	desktop)
-		iso_filename="ubuntu-${tgt_ubuntu_ver}-desktop-amd64.iso"
-		ubuntu_iso_url="http://releases.ubuntu.com/${tgt_ubuntu_ver}/ubuntu-${tgt_ubuntu_ver}-desktop-amd64.iso"
-		;;
-	*)
-		system::log_item "Invalid media type specified. Valid options for Ubuntu are: server, desktop."
-		return 1
-		;;
-	esac
+	[[ -n "$mirror_url" ]] && resolve_args+=(--mirror "$mirror_url")
+	[[ -n "$tgt_ubuntu_ver" ]] && resolve_args+=(--version "$tgt_ubuntu_ver")
+	resolve_args+=(--media-type "$media_type")
+	[[ $include_prerelease -eq 1 ]] && resolve_args+=(--include-prerelease)
 
-	# Ensure that the file is available for VM creation...
-	system::log_item "Checking if $iso_filename is already downloaded in $permanent_download_dir..."
-	iso=$(find "$permanent_download_dir" -name "$iso_filename")
-	if [[ ! -e "$iso" ]]; then
-		system::log_item "$iso_filename is not in cache, downloading..."
-		if command -v curl >/dev/null 2>&1; then
-			curl -fL --retry 3 -o "$permanent_download_dir/$iso_filename" "$ubuntu_iso_url" || {
-				system::log_item "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
-				return 1
-			}
-		elif command -v wget >/dev/null 2>&1; then
-			wget -q --show-progress "$ubuntu_iso_url" -O "$permanent_download_dir/$iso_filename" || {
-				system::log_item "FATAL Problem: Failure to download ISO file $ubuntu_iso_url"
-				return 1
-			}
-		else
-			system::log_item "FATAL Problem: Neither curl nor wget is available to download ISO files."
+	oem::task::iso::resolve_ubuntu_iso "${resolve_args[@]}" || return 1
+
+	iso_filename="$OEM_ISO_NAME"
+	cache_dirs=("$permanent_download_dir")
+	[[ "$permanent_download_dir" != "/var/lib/libvirt/boot" ]] && cache_dirs+=("/var/lib/libvirt/boot")
+
+	if cached_iso=$(oem::task::iso::find_cached_iso "$iso_filename" "${cache_dirs[@]}"); then
+		iso="$cached_iso"
+		system::log_item "💿 - $iso_filename already in cache, using it for greenfield creation..."
+	else
+		if ! oem::task::iso::download_url "$OEM_ISO_URL" "$permanent_download_dir/$iso_filename"; then
+			system::log_item "FATAL Problem: Failure to download ISO file $OEM_ISO_URL"
 			return 1
 		fi
 		iso="$permanent_download_dir/$iso_filename"
-	else
-		system::log_item "💿 - $iso_filename already in cache, using it for greenfield creation..."
+	fi
+
+	if [[ $verify -eq 1 ]]; then
+		oem::task::iso::verify_ubuntu_iso "$iso" || return 1
 	fi
 
 	system::log_item "Exporting ISO value: iso = $iso"
@@ -21616,7 +22849,7 @@ kvm::util::read_distro_options() {
 	# Ensure that the parameters are in a valid format
 	system::validate_parameters "${ALL_PARAMS[@]}"
 
-	# process each argument passed to the function and find the distributoin option if it exists
+	# process each argument passed to the function and find the distribution option if it exists
 	system::log_item "Reading if distribution has been explicitly requested..."
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
@@ -22039,7 +23272,7 @@ kvm::get_vm_config_preferences() {
 	Preference_Role="${_role:-"default"}"
 	Preference_CopySSHKey="${_OEM_COPY_SSH_KEY:-"NO"}"
 
-	system::log_item "Load saved preferences from the config file everriding the _branding global config or defaults for preseed file..."
+	system::log_item "Load saved preferences from the config file overriding the _branding global config or defaults for preseed file..."
 	[[ -f "${_config_file}" ]] && system::read_config "${_config_file}" || system::log_item "Failed to load config file: ${_config_file}"
 
 	# If OS Role is set (by function for auto install), then override the config file with the role:
@@ -22071,14 +23304,14 @@ kvm::get_vm_config_preferences() {
 
 		case $exit_status in
 		0)
-			system::log_item "Save coices and continue..."
+			system::log_item "Save choices and continue..."
 			;;
 		1)
 			system::log_item "[Cancel] pressed; not updating or changing any configuration items..."
 			return 1
 			;;
 		255)
-			system::log_item "[ESC] pressed, exiting the dialog immediatley..."
+			system::log_item "[ESC] pressed, exiting the dialog immediately..."
 			return 1
 			;;
 		*)
@@ -22087,7 +23320,7 @@ kvm::get_vm_config_preferences() {
 			;;
 		esac
 
-		# Convert the dialog output to an array and asign the variables:
+		# Convert the dialog output to an array and assign the variables:
 		IFS=$'\n' read -r -d '' -a input_array <<<"$preseed_choices"
 		Preference_DiskEncryption=${input_array[0]}
 		Preference_Disk_Password=${input_array[1]}
@@ -22571,45 +23804,20 @@ kvm::get_almalinux_boot_iso() {
 
 kvm::get_fedora_workstation_iso() {
 	# Description:
-	#   Downloads the specified or latest Fedora Workstation x86_64 ISO.
-	#   Stores under /var/lib/libvirt/boot/, skips download if already present.
-	#
+	#   Legacy wrapper that downloads the Fedora Everything NetInstall ISO used by the RTD KVM flow.
+	#   The historical function name is preserved for compatibility.
 	# Usage:
 	#   kvm::get_fedora_workstation_iso [--version <number>]
-	#
-	# Dependencies:
-	#   - curl
-	#   - wget
-	#   - system::log_item
-	#
 	# Outputs:
-	#   - Echos the local ISO path.
-	#   - Sets global `iso` to the local file path.
-	#
+	#   Echoes the local ISO path and sets the global variable `iso`.
 	# Returns:
-	#   - 0 if successful or already present, 1 on error.
-	#
-	# Notes:
-	#   - If --version is provided, that version is used.
-	#   - Otherwise, the highest available release is selected.
-	#   - ISO format is: Fedora-Workstation-Live-<version>-1.1.x86_64.iso
-	#   - The function logs progress and errors using system::log_item.
-	#
-	# Example:
-	#   kvm::get_fedora_workstation_iso --version 38
-	#
-	#   kvm::get_fedora_workstation_iso
-	#   # Automatically detects the latest version and downloads it.
+	#   0 on success, 1 on error.
 	# End of documentation
-
-	system::log_item "Fetching Fedora Workstation ISO..."
-
-	local BASE_URL="https://dl.fedoraproject.org/pub/fedora/linux/releases"
-	local DEST_DIR="/var/lib/libvirt/boot"
 	local VERSION=""
-	iso=""
+	local -a download_args=(--dir /var/lib/libvirt/boot --edition everything --iso-type netinst)
 
-	# Parse arguments
+	system::log_item "Fetching Fedora installation ISO..."
+
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 			--version)
@@ -22624,56 +23832,18 @@ kvm::get_fedora_workstation_iso() {
 		shift
 	done
 
-	# Auto-detect version if not specified
-	if [[ -z "$VERSION" ]]; then
-		system::log_item "No version provided, auto-detecting latest release..."
-		VERSION="$(curl -s "${BASE_URL}/" | grep -Eo 'href="[0-9]+/' | grep -Eo '[0-9]+' | sort -rV | head -n1)"
-		if [[ -z "$VERSION" ]]; then
-			system::log_item "Failed to detect latest Fedora release version." >&2
-			return 1
-		fi
-		system::log_item "Detected version: $VERSION"
+	if [[ -n "$VERSION" ]]; then
+		system::log_item "Using specified Fedora version: $VERSION"
+		download_args+=(--version "$VERSION")
 	else
-		system::log_item "Using specified version: $VERSION"
+		system::log_item "No Fedora version provided, using the latest available release."
 	fi
 
-	local ISO_DIR_URL="${BASE_URL}/${VERSION}/Everything/x86_64/iso/"
-
-	system::log_item "Looking up ISO in: ${ISO_DIR_URL}"
-	local ISO_NAME
-
-	ISO_NAME=$(
-		curl -fsSL "$ISO_DIR_URL" |
-		grep -Eo 'href="Fedora-Everything-netinst-x86_64-'"${VERSION}"'-[0-9]+\.[0-9]+\.iso"' |
-		sed -E 's/^href="//; s/"$//' |
-		sort -Vu | tail -n1
-	)
-
-	write_information "Found ISO: ${ISO_NAME}"  
-
-	if [[ -z "$ISO_NAME" ]]; then
-		system::log_item "Could not find ISO for version $VERSION in $ISO_DIR_URL" >&2
+	if ! fedora::download_iso "${download_args[@]}"; then
+		system::log_item "Failed to download the Fedora installation ISO." >&2
 		return 1
 	fi
 
-	local ISO_URL="${ISO_DIR_URL}${ISO_NAME}"
-	local DEST="${DEST_DIR}/${ISO_NAME}"
-
-	if [[ -f "$DEST" ]]; then
-		system::log_item "ISO already exists: $DEST"
-		iso=$DEST
-		write_information "$iso"
-		return 0
-	fi
-
-	system::log_item "Downloading ${ISO_URL} -> ${DEST}"
-	wget -q --show-progress -O "$DEST" "$ISO_URL" || {
-		system::log_item "Failed to download ISO: $ISO_URL" >&2
-		return 1
-	}
-
-	system::log_item "Download completed."
-	iso=$DEST
 	write_information "$iso"
 	return 0
 }
@@ -23642,7 +24812,7 @@ kvm::make_vm_now_from_fedora_org() {
 	unset _preseed_file vm_kernel vm_initrd _source_url _config _mirrorlist_url _os_version _summary_message _UserServerEnvironemtSelection _UserDesktopEnvironmentSelection _role _service disk_path
 }
 kvm::make_vm_now_from_redhat_com() {
-	# Description: Function to create a Alma Linux KVM virtual michine disk and define a VM. This function should be
+	# Description: Function to create an Alma Linux KVM virtual machine disk and define a VM. This function should be
 	# used on a Qemu/KVM virtual host that the virtual guest is to be used on.
 	# NOTE: QCOW2 is a storage format for virtual .
 	# machine disk images QCOW stands for QEMU copy on write. The QCOW2 format decouples the physical storage
@@ -23891,7 +25061,7 @@ kvm::make_vm_now_from_opensuse_org() {
 	🖥️ - CPU's: ${_cpu} \n
 	🖥️ - Disk Size: ${_dsk} \n
 
-	NOTE: You may connecct to the VM and see the progress at IP: $(hostname -I) \n
+	NOTE: You may connect to the VM and see the progress at IP: $(hostname -I) \n
 	      After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
 
 	write_status "Creating virtual machine (${vm_name})"
@@ -23921,7 +25091,7 @@ kvm::make_vm_now_from_opensuse_org() {
 }
 
 kvm::make_vm_now_from_debian_org() {
-	# Description: Function to create a Debian KVM virtual michine disk and define a VM. This function should be
+	# Description: Function to create a Debian KVM virtual machine disk and define a VM. This function should be
 	# used on a Qemu/KVM virtual host that the virtual guest is to be used on.
 	# NOTE: QCOW2 is a storage format for virtual .
 	# machine disk images QCOW stands for QEMU copy on write. The QCOW2 format decouples the physical storage
@@ -23952,13 +25122,13 @@ kvm::make_vm_now_from_debian_org() {
 	: ${ui_diplay_style:="theme=light"}
 
 	# Set default values for VM T-Shirts sizes...
-	kvm::util::read_common_options ${*}
+	kvm::util::read_common_options "$@" || return 1
 
 	# Set specific options for Debian...
-	kvm::util::read_distro_options --distribution debian ${*}
+	kvm::util::read_distro_options --distribution debian "$@" || return 1
 
 	# Check that virtualization is supported on the host
-	dependency::virtualization
+	dependency::virtualization || return 1
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet, and set variables.
 	: "${bin_virt_install:=$(type -p virt-install)}"
@@ -23975,6 +25145,7 @@ kvm::make_vm_now_from_debian_org() {
 	: "${_DEBIAN_FRONTEND_DEFAULT_INITRD:="${_DEBIAN_SOURCE_URL}/current/images/netboot/debian-installer/amd64/initrd.gz"}"
 
 	# Set the default source URL for the Debian version if not already set... and add some options depending on the role.
+	local preseed_workdir=""
 	case "${_role}" in
 	desktop | Desktop | VDI | vdi | workstation | Workstation)
 		write_status "🖥️ 	- Using a desktop environment: ${_UserDesktopEnvironmentSelection}"
@@ -23986,7 +25157,11 @@ kvm::make_vm_now_from_debian_org() {
 		de_label=$(kvm::util::config_label "${_UserDesktopEnvironmentSelection}" "${_role}")
 		_vm_name_parts=("Template_Debian" "${vm_usecase}" "${de_label:-${_UserDesktopEnvironmentSelection}}")
 		write_status "🖥️ 	- Using Variables: \n ${vm_kernel}, \n ${vm_initrd}"
-		system::make_preseed_cfg --role "${_role}" --desktop_environment "${_UserDesktopEnvironmentSelection}" --saveto "$(mktemp -d)"
+		preseed_workdir=$(mktemp -d) || return 1
+		if ! system::make_preseed_cfg --role "${_role}" --desktop_environment "${_UserDesktopEnvironmentSelection}" --saveto "${preseed_workdir}"; then
+			write_error "❌ Failed to create the Debian preseed file."
+			return 1
+		fi
 		;;
 	*)
 		write_status "🖥️ 	- Using a environment: ${_role}"
@@ -23998,7 +25173,11 @@ kvm::make_vm_now_from_debian_org() {
 		task_label=$(kvm::util::config_label "${_task}" "server")
 		_vm_name_parts=("Template_Debian" "${task_label:-${_task}}")
 		write_status "🖥️ 	- Using Variables: \n ${vm_kernel}, \n ${vm_initrd}"
-		system::make_preseed_cfg --role "${_role}" --server_role "${_UserServerEnvironemtSelection}" --saveto "$(mktemp -d)"
+		preseed_workdir=$(mktemp -d) || return 1
+		if ! system::make_preseed_cfg --role "${_role}" --server_role "${_UserServerEnvironemtSelection}" --saveto "${preseed_workdir}"; then
+			write_error "❌ Failed to create the Debian preseed file."
+			return 1
+		fi
 		;;
 	esac
 
@@ -24041,7 +25220,7 @@ kvm::make_vm_now_from_debian_org() {
 	🖥️ - CPU's: ${_cpu} \n
 	🖥️ - Disk Size: ${_dsk} \n
 
-	NOTE: You may connecct to the VM and see the progress at IP: $(hostname -I) \n
+	NOTE: You may connect to the VM and see the progress at IP: $(hostname -I) \n
 	      After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
 
 	write_status "🔧 - Creating the VM... Please Wait..."
@@ -24064,8 +25243,8 @@ kvm::make_vm_now_from_debian_org() {
 	disown "${virt_pid}"
 
 	kvm::wait_for_domain_definition "${vm_name}" 60 20 || true
-	virsh set-lifecycle-action "${vm_name}" on_reboot restart
-	virsh set-lifecycle-action "${vm_name}" on_poweroff restart  # Debian installer now powers off after build; restart instead
+	virsh set-lifecycle-action "${vm_name}" reboot restart --config --live || true
+	virsh set-lifecycle-action "${vm_name}" poweroff restart --config --live || true  # Debian installer now powers off after build; restart instead
 
 	if ! kvm::wait_for_domain_start --domain "${vm_name}"; then
 		write_warning "Domain '${vm_name}' did not emit a start event within the expected window."
@@ -24080,7 +25259,7 @@ kvm::make_vm_now_from_debian_org() {
 
 
 kvm::make_vm_now_from_kali_org() {
-	# Description: Function to create a Debian KVM virtual michine disk and define a VM. This function should be
+	# Description: Function to create a Debian KVM virtual machine disk and define a VM. This function should be
 	# used on a Qemu/KVM virtual host that the virtual guest is to be used on.
 	# NOTE: QCOW2 is a storage format for virtual .
 	# machine disk images QCOW stands for QEMU copy on write. The QCOW2 format decouples the physical storage
@@ -24167,7 +25346,7 @@ kvm::make_vm_now_from_kali_org() {
 	🖥️ - CPU's: ${_cpu} \n
 	🖥️ - Disk Size: ${_dsk} \n
 
-	NOTE: You may connecct to the VM and see the progress at IP: $(hostname -I) \n
+	NOTE: You may connect to the VM and see the progress at IP: $(hostname -I) \n
 	      After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
 
 	write_status "🔧 - Creating the VM..."
@@ -24362,7 +25541,7 @@ kvm::make_vm_now_from_zorin() {
 	🖥️ - CPU's: ${_cpu} \n
 	🖥️ - Disk Size: ${_dsk} \n
 
-	NOTE: You may connecct to the VM and see the progress at IP: \n
+	NOTE: You may connect to the VM and see the progress at IP: \n
 	$(hostname -I) \n
 	After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
 
@@ -24505,13 +25684,19 @@ kvm::make_vm_now_from_ubuntu_com() {
 	: ${_ask="NO"}                                        # This is the default for interactive mode for manual input during setup.
 
 	system::log_item "Read/Set default values for VM T-Shirts sizes..."
-	kvm::util::read_common_options ${all_params}
+	if ! kvm::util::read_common_options "$@"; then
+		return 1
+	fi
 
 	system::log_item  "Set specific options for Ubuntu..."
-	kvm::util::read_distro_options --distro ubuntu ${all_params}
+	if ! kvm::util::read_distro_options --distro ubuntu "$@"; then
+		return 1
+	fi
 
 	system::log_item  "Check that virtualization is supported on the host..."DS
-	dependency::virtualization
+	if ! dependency::virtualization; then
+		return 1
+	fi
 
 	system::log_item  "Get the version of Ubuntu to use; sets variable _tgt_ubuntu_ver..."
 	if [[ -z "${_tgt_ubuntu_ver}" ]]; then
@@ -24526,9 +25711,17 @@ kvm::make_vm_now_from_ubuntu_com() {
 
 	system::log_item  "Get VM configuration preferences..."
 	if [[ "${_ask}" == "YES" ]]; then
-		kvm::get_vm_config_preferences --ask
+		if ! kvm::get_vm_config_preferences --ask; then
+			return 1
+		fi
 	else
-		kvm::get_vm_config_preferences
+		if ! kvm::get_vm_config_preferences; then
+			return 1
+		fi
+	fi
+
+	if [[ "${_role}" == "VDI" && -z "${_UserDesktopEnvironmentSelection:-}" && -n "${server_app:-}" ]]; then
+		_UserDesktopEnvironmentSelection="${server_app}"
 	fi
 
 	system::log_item  "Format the name of the VM to be created..."
@@ -24557,6 +25750,9 @@ kvm::make_vm_now_from_ubuntu_com() {
 		kvm::util::set_vm_name --var vm_name "${_name_parts[@]}" --timestamp-format "%Y-%m-%d-%s" || return 1
 	fi
 
+	local guest_hostname="${vm_hostname:-$vm_name}"
+	[[ -z "${guest_hostname}" ]] && guest_hostname="${vm_name}"
+
 	system::log_item  "Ensure that the QCOW2 disk image is created for the VM in expandable format..."
 	disk_path=$(kvm::create_expanding_vm_hardisk "$vm_name" "$_dsk") || {
 		write_error "❌ Failed to create VM disk image. Aborting VM creation."
@@ -24579,7 +25775,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 	
 	write_status "🔧 - Creating the VM... Please Wait..."
 	case "${_role}" in
-	workstation | desktop )
+	workstation | Workstation | desktop | Desktop )
 		write_status "🖥️ 	- Using a desktop environment: ${_UserDesktopEnvironmentSelection}"
 		if [[ ${_tgt_ubuntu_ver::2} -lt 16 ]]; then
 
@@ -24588,9 +25784,18 @@ kvm::make_vm_now_from_ubuntu_com() {
 			# we use a different option to install the VM."
 
 			system::log_item "Downloading the Ubuntu ISO if not already present to ${permanent_download_dir} for media-type desktop version ${_tgt_ubuntu_ver}"
-			ubuntu::download_iso --dir ${permanent_download_dir} --media-type desktop --version ${_tgt_ubuntu_ver} 
-			: ${iso:="$permanent_download_dir/$iso_filename"}
-			system::make_preseed_cfg ${all_params}
+			if ! ubuntu::download_iso --dir "${permanent_download_dir}" --media-type desktop --version "${_tgt_ubuntu_ver}"; then
+				write_error "Failed to download the Ubuntu desktop ISO for ${_tgt_ubuntu_ver}."
+				return 1
+			fi
+			if [[ -z "${iso:-}" || ! -f "${iso}" ]]; then
+				write_error "Ubuntu desktop ISO missing after download."
+				return 1
+			fi
+			if ! system::make_preseed_cfg "$@"; then
+				write_error "Failed to create the Ubuntu preseed file."
+				return 1
+			fi
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: is less than 16, so using debian installer (d-i) and desktop media..."
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Running install options for debian installer (d-i)..."
 			{
@@ -24623,9 +25828,18 @@ kvm::make_vm_now_from_ubuntu_com() {
 
 			system::log_item "For interim Ubuntu builds (less than 23) use the debian installer (d-i) using DVD ISO but still PRESEED.cfg..."
 			system::log_item "Downloading the Ubuntu ISO if not already present to ${permanent_download_dir} for media-type desktop version ${_tgt_ubuntu_ver}"
-			ubuntu::download_iso --dir ${permanent_download_dir} --media-type desktop --version ${_tgt_ubuntu_ver} 
-			: ${iso:="$permanent_download_dir/$iso_filename"}
-			system::make_preseed_cfg ${all_params}
+			if ! ubuntu::download_iso --dir "${permanent_download_dir}" --media-type desktop --version "${_tgt_ubuntu_ver}"; then
+				write_error "Failed to download the Ubuntu desktop ISO for ${_tgt_ubuntu_ver}."
+				return 1
+			fi
+			if [[ -z "${iso:-}" || ! -f "${iso}" ]]; then
+				write_error "Ubuntu desktop ISO missing after download."
+				return 1
+			fi
+			if ! system::make_preseed_cfg "$@"; then
+				write_error "Failed to create the Ubuntu preseed file."
+				return 1
+			fi
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: is less than 23, so using debian installer (d-i) and desktop media..."
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Running install options for debian installer (d-i)..."
 			{
@@ -24669,13 +25883,21 @@ kvm::make_vm_now_from_ubuntu_com() {
 			However, this seems to be half baked... Hope it actually works for you..."
 			
 			system::log_item "Downloading the Ubuntu ISO if not already present to ${permanent_download_dir} for media-type desktop version ${_tgt_ubuntu_ver}"
-			ubuntu::download_iso --dir ${permanent_download_dir} --media-type desktop --version ${_tgt_ubuntu_ver}
-
-			: ${iso:="$permanent_download_dir/$iso_filename"}
+			if ! ubuntu::download_iso --dir "${permanent_download_dir}" --media-type desktop --version "${_tgt_ubuntu_ver}"; then
+				write_error "Failed to download the Ubuntu desktop ISO for ${_tgt_ubuntu_ver}."
+				return 1
+			fi
+			if [[ -z "${iso:-}" || ! -f "${iso}" ]]; then
+				write_error "Ubuntu desktop ISO missing after download."
+				return 1
+			fi
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using MODERN installer..."
-			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --vmname "${vm_name}" ${all_params}
+			if ! system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --vmname "${vm_name}" "$@"; then
+				write_error "Failed to generate the Ubuntu cloud-init configuration."
+				return 1
+			fi
 
-			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greated than 24, so using cloud config and desktop media to build desktop..."
+			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than 24, so using cloud config and desktop media to build desktop..."
 			{
 				"${bin_virt_install}" --name ${vm_name} \
 					--vcpus "${_cpu}" \
@@ -24700,7 +25922,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 			dialog::display_summary_message "NOTICE!"
 		fi
 	;;
-	VDI )
+	VDI | vdi )
 		if [[ ${_tgt_ubuntu_ver::2} -lt 22 ]]; then
 			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than less than 23, VDI build is deprecated. "
 			_summary_message="
@@ -24711,12 +25933,20 @@ kvm::make_vm_now_from_ubuntu_com() {
 			return
 		else
 			system::log_item "Downloading the Ubuntu ISO if not already present to ${permanent_download_dir} for media-type server version ${_tgt_ubuntu_ver}"
-			ubuntu::download_iso --dir ${permanent_download_dir} --media-type server --version ${_tgt_ubuntu_ver}
-
-			: ${iso:="$permanent_download_dir/$iso_filename"}
+			if ! ubuntu::download_iso --dir "${permanent_download_dir}" --media-type desktop --version "${_tgt_ubuntu_ver}"; then
+				write_error "Failed to download the Ubuntu server ISO for ${_tgt_ubuntu_ver}."
+				return 1
+			fi
+			if [[ -z "${iso:-}" || ! -f "${iso}" ]]; then
+				write_error "Ubuntu server ISO missing after download."
+				return 1
+			fi
 			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than 23, so using cloud config to build server..."
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using SERVER installer as requested..."
-			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --vmname "${vm_name}" ${all_params}
+			if ! system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --vmname "${vm_name}" "$@"; then
+				write_error "Failed to generate the Ubuntu cloud-init configuration."
+				return 1
+			fi
 					
 			{
 				"${bin_virt_install}" --name  ${vm_name:-"Ubuntu-Server-${_tgt_ubuntu_ver}-$(date +%Y-%m-%d-%s)"}  \
@@ -24738,6 +25968,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 
 			if ! kvm::wait_for_domain_start --domain "${vm_name}"; then
 				write_warning "Domain '${vm_name}' did not emit a start event within the expected window."
+				
 			fi
 
 			dialog::display_summary_message "NOTICE!"
@@ -24759,9 +25990,18 @@ kvm::make_vm_now_from_ubuntu_com() {
 			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using SERVER installer as requested..."
 
 			system::log_item "Downloading the Ubuntu ISO if not already present to ${permanent_download_dir} for media-type server version ${_tgt_ubuntu_ver}"
-			ubuntu::download_iso --dir ${permanent_download_dir} --media-type server --version ${_tgt_ubuntu_ver} 
-			: ${iso:="$permanent_download_dir/$iso_filename"}
-			system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --vmname "${vm_name}" ${all_params}
+			if ! ubuntu::download_iso --dir "${permanent_download_dir}" --media-type server --version "${_tgt_ubuntu_ver}"; then
+				write_error "Failed to download the Ubuntu server ISO for ${_tgt_ubuntu_ver}."
+				return 1
+			fi
+			if [[ -z "${iso:-}" || ! -f "${iso}" ]]; then
+				write_error "Ubuntu server ISO missing after download."
+				return 1
+			fi
+			if ! system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --vmname "${vm_name}" "$@"; then
+				write_error "Failed to generate the Ubuntu cloud-init configuration."
+				return 1
+			fi
 		
 			{
 				"${bin_virt_install}" --name  ${vm_name:-"Ubuntu-Server-${_tgt_ubuntu_ver}-$(date +%Y-%m-%d-%s)"}  \
@@ -24796,10 +26036,10 @@ kvm::make_vm_now_from_ubuntu_com() {
 
 kvm::make_vm_now_from_microsoft() {
 	# Description:
-	# Function to create a KVM virtual michine disk and define a VM. This function should be
+	# Function to create a KVM virtual machine disk and define a VM. This function should be
 	# used on a Qemu/KVM virtual host that the virtual guest is to be used on. In the future
 	# scripting will be added to allow for acting on remote machines directly...
-	# At this time this functio takes no arguments but will prompt for what it needs if it is not available.
+	# At this time this function takes no arguments but will prompt for what it needs if it is not available.
 	#
 	# Globals:
 	# Arguments: [ win11 | win10 | win8 | win7 ]
@@ -24988,7 +26228,7 @@ kvm::make_vm_now_from_microsoft() {
 	🖥️ - CPU's: ${_cpu} \n
 	🖥️ - Disk Size: ${_dsk} \n
 
-	NOTE: You may connecct to the VM and see the progress at IP: $(hostname -I) \n
+	NOTE: You may connect to the VM and see the progress at IP: $(hostname -I) \n
 	      After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
 
 	write_status "Creating and starting Virtual machine... "
@@ -26398,7 +27638,7 @@ fi
 ###########################################################################################
 #
 # Below please find the internally stored and maintained configuration cards.
-# When creating Linux installation configurations for use in a virtual envoironment
+# When creating Linux installation configurations for use in a virtual environment
 # or for transferring to physical media to install on a laptop or PC; require
 # the creation of preseed and kick start configuration files that "answer" the
 # installer's questions. These pieces of configuration files are stored below
@@ -26666,8 +27906,8 @@ template::preseed_cfg::main() {
 		# lubuntu-desktop, ubuntu-mate-desktop, gnome-desktop,
 		# kde-desktop, cinnamon-desktop, mate-desktop, lxde-desktop,
 		# web-server, ssh-server, print-server.
-		# The "OEM" line below ist to make it simple to replace the
-		# line with a relevant chice of debian role using "sed" or similar.
+		# The "OEM" line below is to make it simple to replace the
+		# line with a relevant choice of Debian role using "sed" or similar.
 		tasksel tasksel/first multiselect ${_task}
 		# d-i pkgsel/include string ${_task}  
 		${pkgsel_include_string}
@@ -26918,7 +28158,7 @@ template::preseed_cfg::late_command() {
 			# Answer the last question
 			d-i debian-installer/splash boolean true
 
-			# Option to try to greacefully eject the installation media:
+			# Option to try to gracefully eject the installation media:
 			d-i cdrom-detect/eject boolean true
 
 			# Shutdown machine
@@ -27438,7 +28678,7 @@ template::rtd_me_sh_cmd() {
 
 	echo Detected %* ...
 	echo executing PRE Windows 7 instructions...
-	:: Assuming wget is in teh path...
+	:: Assuming wget is in the path...
 	wget -O %TEMP%\%_STAGE2FILE% %_STAGE2LOC%/%_STAGE2FILE%
 	powershell -ExecutionPolicy UnRestricted -File %TEMP%\%_STAGE2FILE%
 
@@ -27537,7 +28777,7 @@ template::config_menu_cmd() {
 ::		- Run KMS activation for Windows and Office 180 day trial
 ::
 ::
-:: Background: This script is shared in the hopes that someone will find it usefull. To encourage sharing changes
+:: Background: This script is shared in the hopes that someone will find it useful. To encourage sharing changes
 :: 		 back to the source this script is released under the GPL v3. (see source location for details)
 ::		 https://github.com/vonschutter/RTD-Setup/raw/master/LICENSE.md
 ::
@@ -28021,7 +29261,7 @@ template::AutoYast_xml() {
 	#
 	# Note:
 	#   Ensure that the output file path is correctly specified and that the function's global variables are properly set.
-	#   Most valuse are set in the kvm::get_vm_config_preferences function, but defould valuse are provided in the function.
+	#   Most values are set in the kvm::get_vm_config_preferences function, but default values are provided in the function.
 	#
 	# End of Documentation
 
@@ -28559,7 +29799,7 @@ template::cloud_config() {
 			shift 2 # Remove argument name from processing
 			;;
 		*)
-			system::log_item "Warnig: Unknown parameter '$1'"
+			system::log_item "Warning: Unknown parameter '$1'"
 			shift 2
 			;;
 		esac
@@ -28909,7 +30149,7 @@ template::minecraft_server_launcher() {
 #:: Version:	1.03
 #::
 #::
-#:: Purpose: The purpose of the script is to perform managment tasks on Linux systems
+#:: Purpose: The purpose of the script is to perform management tasks on Linux systems
 #::
 #:: This is a script that will start Minecraft Server on an Ubuntu or Debian (Ubuntu) based server. It will start
 #:: multiple panes using "byobu", and start the server etc there...
@@ -28951,7 +30191,7 @@ MINECRAFT_JAR=server.jar
 
 function software::check_native_package_dependency (){
 	# Simple function to check if software is available and take action
-	# if it is not. Software name must match command to envoke it.
+	# if it is not. Software name must match command to invoke it.
 	#---------------------------------------------------------------
 	echo "Checking for script dependencies and install if not there..."
 	#---------------------------------------------------------------
@@ -28984,7 +30224,7 @@ function install_software (){
 		export DEBIAN_FRONTEND=noninteractive
 		sudo apt-get -y -qq --allow-change-held-packages --ignore-missing install "$@"
 	else
-		echo -e $YELLOW "This system does not seem to have a software managment system" $ENDCOLOR
+		echo -e $YELLOW "This system does not seem to have a software management system" $ENDCOLOR
 		_cleanup
 		exit 1
 	fi
@@ -28993,7 +30233,7 @@ function install_software (){
 function setup_minecraft_root (){
 	# Setup and initiate the location of the mincraft server.
 	# For us i likes to live in /home/$USER/bin/minecraft.server/Minecraft.$VERSION
-	# This tests if the script files are available and downloades them if not.
+	# This tests if the script files are available and downloads them if not.
 	mkdir -p $MINECRAFT_HOME
 
 	for i in start.sh announce.py server.properties eula.txt
@@ -29022,12 +30262,12 @@ function run_minecraft_server_manager (){
 	byobu split-window -v
 	byobu send-keys "htop " C-m
 
-	# Split the "htop" window in 2, and start spedometer there.
+	# Split the "htop" window in 2, and start speedometer there.
 	byobu split-window -h
 	byobu send-keys "speedometer -r $NETINT  -t $NETINT" C-m
 
 	# Create new window...
-	byobu new-window -t $USER:1 -n 'Anouncing on Network (Press F4 to switch between windows)'
+	byobu new-window -t $USER:1 -n 'Announcing on Network (Press F4 to switch between windows)'
 	byobu send-keys "python3 $MINECRAFT_HOME/announce.py" C-m
 
 	# Set default window as the dev split plane
@@ -29180,7 +30420,7 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
 print("Broadcasting Minecraft servers to LAN on: " + os.environ['NETINT'])
-print("Local IP adress: ")
+print("Local IP address: ")
 print((([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")] or [[(s.connect(("8.8.8.8", 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) + ["no IP found"])[0])
 
 print("External IP address visible on the internet: ")
@@ -29350,7 +30590,7 @@ do
 done
 
 if echo "$@" | grep "update" ;then
-	dialog --title "Update to latest Minecraft?"  --yesno "You have requested that I try to get the latest verion of Minecraft from Mojang. This means that the people playing in the server also will need the latest version. Is this OK?" 0 0
+	dialog --title "Update to latest Minecraft?"  --yesno "You have requested that I try to get the latest version of Minecraft from Mojang. This means that the people playing in the server also will need the latest version. Is this OK?" 0 0
 		case $? in
 		0)
 		minecraft_update ;;
@@ -29451,7 +30691,7 @@ term::set_colors() {
 	# Usage: echo -e $yellow "text to display" or echo -e $picachu
 	#
 	# "🔴  🔵 "
-	# The function will not return any sucess or failure codes. It will do its best and exit.
+	# The function will not return any success or failure codes. It will do its best and exit.
 	#
 	# Num  Colour    #define         R G B
 	# 0    black     COLOR_BLACK     0,0,0
@@ -29608,7 +30848,7 @@ term::set_colors() {
 	darkpurple="${ecode}0;35"
 	magenta="${ecode}1;35m"
 
-	# Back compatability w. old scripts
+	# Back compatibility w. old scripts
 	export YELLOW="$yellow"
 	export RED="$red"
 	export ENDCOLOR="$endcolor"
@@ -29664,7 +30904,7 @@ pause::for_input() {
 
 pause::a_given_time() {
 	# Description:
-	# Simple function to pause for a given number of seconds whle showing a count down
+	# Simple function to pause for a given number of seconds while showing a count down
 	# in seconds. If only a pause and no output is needed then it would be simpler to
 	# use the 'pause' built in command.
 	#
@@ -29719,8 +30959,8 @@ write_host() {
 	# Description:
 	# This is a simplified and consistent way to write output to the screen.
 	# This function will print a message to the standard out in a color specified.
-	# Specified colors can be colord defined in the function "term::set_colors"
-	# If no color option is specified this cunctio simply works like the echo command.
+	# Specified colors can be defined in the function "term::set_colors"
+	# If no color option is specified this function simply works like the echo command.
 	#
 	# Globals:
 	# Arguments: [color option]
@@ -29744,8 +30984,8 @@ write_host() {
 	# --purple            Prints message in PURPLE
 	# --darkpurple        Prints message in  DARK PURPLE
 	#
-	# NOTE: this function uses the "tput" mechanisms to set colors, and gice a convenient
-	# and simple uman way to access them. The target system must have "tput" aavailable.
+	# NOTE: this function uses the "tput" mechanisms to set colors, and gives a convenient
+	# and simple human way to access them. The target system must have "tput" available.
 	#
 	#
 	# End of documentation
@@ -29812,7 +31052,7 @@ write_error() {
 		write_host --red "💥 ${FUNCNAME[1]}: ${text}"
 	fi
 
-	# Tell the loging function to log the message requested...
+	# Tell the logging function to log the message requested...
 
 	[ -n "${text}" ] && system::log_item " 💥 ${FUNCNAME[1]}: ${text}"
 }
@@ -29842,7 +31082,7 @@ write_warning() {
 		write_host --yellow "⚠ ${FUNCNAME[1]}: ${text}"
 	fi
 
-	# Tell the loging function to log the message requested...
+	# Tell the logging function to log the message requested...
 
 	[ -n "${text}" ] && system::log_item " ⚠ ${FUNCNAME[1]}: ${text}"
 }
@@ -29872,7 +31112,7 @@ write_status() {
 		write_host --green "✓  ${FUNCNAME[1]}: ${text}"
 	fi
 
-	# Tell the loging function to log the message requested...
+	# Tell the logging function to log the message requested...
 
 	[ -n "${text}" ] && system::log_item " ✓  ${FUNCNAME[1]}: ${text}"
 }
@@ -29902,7 +31142,7 @@ write_information() {
 		write_host --blue "🛈  ${FUNCNAME[1]}: ${text}"
 	fi
 
-	# Tell the loging function to log the message requested...
+	# Tell the logging function to log the message requested...
 
 	system::log_item " 🛈  ${FUNCNAME[1]}: ${text}"
 }
@@ -30140,7 +31380,7 @@ library::list_loaded_internal_functions() {
 	#   Function to list all internal library functions currently loaded. This function can be used
 	#   for debugging, support, and documentation purposes. It allows for different output formats
 	#   based on the input argument. This function is used to facilitate managing this library by
-	#   helping to output documentation or providinig a list of loaded functions for information.
+	#   helping to output documentation or providing a list of loaded functions for information.
 	#
 	# Globals:
 	#   __RTD_DEVHELP_LIST (array scratch, w)
@@ -30433,7 +31673,7 @@ library::list_loaded_software_functions() {
 	# Description: Function to list all software (_rtd_recipes) functions loaded... for debugging/support purposes.
 	# Globals:
 	# Arguments: none or [--nonum]
-	# Outputs: Standard out, list of functions either numerated or not.
+	# Outputs: Standard out, list of functions either numbered or not.
 	# Returns:
 	# Usage: library::list_loaded_software_functions [] [--nonum]
 	# End of documentation
@@ -30459,7 +31699,7 @@ library::list_loaded_software_functions() {
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # The following section launches the internal functions if given arguments
 # request this. If no arguments are provided, then all the functions in this
-# library will simply be loaded in to memory.
+# library will simply be loaded into memory.
 
 # Load base color scheme for use in the library...
 term::set_colors
@@ -30539,7 +31779,7 @@ main() {
 
 			;;
 		all) (echo -e $YELLOW "Software Recipes: $ENDCOLOR" && library::list_loaded_software_functions && echo -e $YELLOW "INTERNAL Functions: $ENDCOLOR" && library::list_loaded_internal_functions) ;;
-		*) echo "USAGE: The --list option requires a (what option). Valid option are: software, internal, all." ;;
+		*) echo "USAGE: The --list option requires a valid option. Valid options are: software, internal, all." ;;
 		esac
 		return
 		;;
@@ -30550,7 +31790,7 @@ main() {
 		write_status "Library read OK, launching dialog now..."
 		while true; do
 			exec 3>&1
-			selection=$(dialog --clear --no-collapse --backtitle "${BRANDING:-" RunTime Data : Function library : Script Development Support"}" --title "RTD Library Loaded Functions:" --menu "\n Chose a function below to see more details about the function." "${HEIGHT:-0}" "${WIDTH:-90}" "${LIST_HEIGHT:-0}" ${DisplayList} 2>&1 1>&3)
+			selection=$(dialog --clear --no-collapse --backtitle "${BRANDING:-" RunTime Data : Function library : Script Development Support"}" --title "RTD Library Loaded Functions:" --menu "\n Choose a function below to see more details about the function." "${HEIGHT:-0}" "${WIDTH:-90}" "${LIST_HEIGHT:-0}" ${DisplayList} 2>&1 1>&3)
 			exit_status=$?
 			exec 3>&-
 
@@ -30680,8 +31920,8 @@ main() {
 
 					# If the printline flag is set, print the line...
 					if [[ "$printline" == "yes" ]]; then
-						# Flip the sucess flag if the function was found...
-						local _req_sucess=true
+						# Flip the success flag if the function was found...
+						local _req_success=true
 						if [[ "$line" == "# End of documentation"* || "$line" == *"# End of documentation"* || "$line" == *End*of*Documentation* ]]; then
 							# If the end of documentation is found, stop printing...
 							system::log_item "End of Documentation found: $line"
@@ -30693,10 +31933,10 @@ main() {
 					fi
 				done <"${0}")
 
-				if [[ ! "$_req_sucess" == "true" ]]; then
+				if [[ ! "$_req_success" == "true" ]]; then
 					# If the function is not found, log it...
 					system::log_item "Selection not found: [${selection}]: $line"
-					unset _req_sucess
+					unset _req_success
 				fi
 				system::log_item "Displaying [${selection}] in a [${ZHEIGHT:-600}]x[${ZWIDTH:-1024}]: \n $result"
 				echo -e "$result" | zenity --text-info --font=monospace --modal --ok-label=BACK --title "Function Documentation: [${selection}]" --height="${ZHEIGHT:-600}" --width="${ZWIDTH:-1024}" 2>/dev/null
