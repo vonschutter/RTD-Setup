@@ -4968,6 +4968,7 @@ oem::task::iso::download_url() {
 	# End of documentation
 	local url="$1"
 	local dest="$2"
+	local tmp_dest
 
 	if [[ -z "$url" || -z "$dest" ]]; then
 		write_error "Missing URL or destination for download."
@@ -4982,22 +4983,30 @@ oem::task::iso::download_url() {
 	mkdir -p "$(dirname "$dest")"
 	write_status "Getting install image..."
 	write_information "Download: $url"
+	tmp_dest="${dest}.part"
 
 	if command -v curl >/dev/null 2>&1; then
-		curl -fL --retry 3 --retry-delay 2 --retry-connrefused \
+		if ! curl -fL --retry 3 --retry-delay 2 --retry-connrefused \
 			--connect-timeout 10 --speed-limit 1024 --speed-time 60 \
-			--continue-at - --output "$dest" "$url"
+			--continue-at - --output "$tmp_dest" "$url"; then
+			write_error "Failed to download: $url"
+			return 1
+		fi
 	elif command -v wget >/dev/null 2>&1; then
-		wget --tries=3 --timeout=30 --read-timeout=120 --show-progress "$url" -O "$dest"
+		if ! wget --tries=3 --timeout=30 --read-timeout=120 --show-progress "$url" -O "$tmp_dest"; then
+			write_error "Failed to download: $url"
+			return 1
+		fi
 	else
 		write_error "Neither curl nor wget is available to download: $url"
 		return 1
 	fi
 
-	if [[ ! -s "$dest" ]]; then
-		write_error "Downloaded ISO is missing or empty: $dest"
+	if [[ ! -s "$tmp_dest" ]]; then
+		write_error "Downloaded ISO is missing or empty: $tmp_dest"
 		return 1
 	fi
+	mv -f "$tmp_dest" "$dest" || return 1
 
 	write_information "Retrieved: $dest"
 	return 0
@@ -21222,7 +21231,7 @@ oem::task::iso::resolve_fedora_iso() {
 	# Globals:
 	#   OEM_ISO_* metadata globals (w)
 	# Arguments:
-	#   --mirror <url>                Optional mirror. Defaults to download.fedoraproject.org.
+	#   --mirror <url>                Optional mirror. Defaults to dl.fedoraproject.org.
 	#   --version <version>           Optional Fedora release version.
 	#   --edition <name>              workstation, kde, server, spins, or everything.
 	#   --spin <name>                 Spin name when edition is spins.
@@ -21235,7 +21244,7 @@ oem::task::iso::resolve_fedora_iso() {
 	# Usage:
 	#   oem::task::iso::resolve_fedora_iso --edition everything --iso-type netinst
 	# End of documentation
-	local mirror_url="https://download.fedoraproject.org/pub/fedora/linux/releases"
+	local mirror_url="https://dl.fedoraproject.org/pub/fedora/linux/releases"
 	local version=""
 	local edition="workstation"
 	local iso_type="live"
@@ -21553,6 +21562,7 @@ fedora::download_iso() {
 	local verify=1
 	local iso_filename=""
 	local cached_iso=""
+	local was_cached=0
 	local -a cache_dirs=()
 	local -a resolve_args=()
 
@@ -21609,6 +21619,7 @@ fedora::download_iso() {
 
 	if cached_iso=$(oem::task::iso::find_cached_iso "$iso_filename" "${cache_dirs[@]}"); then
 		iso="$cached_iso"
+		was_cached=1
 		write_information "Using cached ISO: $iso"
 	else
 		if ! oem::task::iso::download_url "$OEM_ISO_URL" "$permanent_download_dir/$iso_filename"; then
@@ -21618,7 +21629,19 @@ fedora::download_iso() {
 	fi
 
 	if [[ $verify -eq 1 ]]; then
-		oem::task::iso::verify_fedora_iso "$iso" || return 1
+		if ! oem::task::iso::verify_fedora_iso "$iso"; then
+			if [[ $was_cached -eq 1 ]]; then
+				write_warning "Cached Fedora ISO failed verification; removing and downloading a fresh copy: $iso"
+				rm -f -- "$iso" || return 1
+				if ! oem::task::iso::download_url "$OEM_ISO_URL" "$permanent_download_dir/$iso_filename"; then
+					return 1
+				fi
+				iso="$permanent_download_dir/$iso_filename"
+				oem::task::iso::verify_fedora_iso "$iso" || return 1
+			else
+				return 1
+			fi
+		fi
 	fi
 
 	export iso
@@ -21673,7 +21696,7 @@ fedora::get_latest_release_version() {
 	#
 	# End of Documentation:
 
-	local url="https://download.fedoraproject.org/pub/fedora/linux/releases/"
+	local url="https://dl.fedoraproject.org/pub/fedora/linux/releases/"
 	local dir_listing
 	local latest_version
 
