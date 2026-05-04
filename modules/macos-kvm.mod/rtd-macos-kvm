@@ -1,0 +1,274 @@
+#!/usr/bin/env bash
+#
+#::                          RTD macOS KVM Tool
+#::                     S O F T W A R E    C O N F I G U R A T I O N
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Module:     macos-kvm.mod
+#:: Script:     rtd-macos-kvm
+#:: Author(s):  RTD Team (vonschutter)
+#:: Version:    1.0
+#:: Purpose:    Prepares KVM/libvirt, firmware, OpenCore ESP, and macOS recovery installer media.
+#:: Usage:      sudo rtd-macos-kvm [prepare] [--version latest-supported|--n-1]
+#:: Requires:   RTD library >= 2.54, admin privileges, python3, curl/wget, dmg2img, and KVM/QEMU tools.
+#:: Notes:      Installer images are generated under /var/lib/libvirt/boot and are not stored in Git.
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+set -euo pipefail
+
+: "${RTD_REQUIRED_LIBRARY_VERSION:=2.54}"
+: "${_GIT_PROFILE:=vonschutter}"
+
+die() {
+	if declare -F write_error >/dev/null 2>&1; then
+		write_error "$*"
+	else
+		printf 'ERROR: %s\n' "$*" >&2
+	fi
+	exit 1
+}
+
+rtd::bootstrap_library() {
+	local library_name="${1:-_rtd_library}" minimum_version="" loaded_version path script_dir src_url tmp rc check
+	local -a checks=()
+
+	[[ $# -gt 0 && "${1:-}" != --* ]] && { library_name="$1"; shift; }
+	[[ $# -gt 0 && "${1:-}" != --* ]] && { minimum_version="$1"; shift; }
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--version|--check)
+				[[ -n "${2:-}" ]] || { printf 'Missing value for %s\n' "$1" >&2; return 1; }
+				[[ "$1" == "--version" ]] && minimum_version="$2" || checks+=("$2")
+				shift 2
+				;;
+			*)
+				printf 'Unknown rtd::bootstrap_library option: %s\n' "$1" >&2
+				return 1
+				;;
+		esac
+	done
+
+	rtd::bootstrap_library::ok() {
+		loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
+		if [[ "$library_name" == "_rtd_library" && -n "$minimum_version" ]]; then
+			[[ -n "$loaded_version" ]] || return 1
+			[[ "$(printf '%s\n%s\n' "$minimum_version" "$loaded_version" | sort -V | tail -n 1)" == "$loaded_version" ]] || return 1
+		fi
+		for check in "${checks[@]}"; do
+			declare -F "$check" >/dev/null 2>&1 || return 1
+		done
+	}
+
+	[[ "$library_name" == "_rtd_library" && -n "${RTD_VERSION:-${RTDFUNCTIONS:-}}" ]] && rtd::bootstrap_library::ok && return 0
+
+	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	for path in \
+		"${script_dir}/${library_name}" \
+		"${script_dir}/../core/${library_name}" \
+		"${script_dir}/../../core/${library_name}" \
+		"/opt/${_TLA:-${_tla:-rtd}}/core/${library_name}" \
+		"/opt/rtd/core/${library_name}" \
+		"${HOME:-}/GIT/RTD-Setup/core/${library_name}" \
+		"${HOME:-}/RTD-Setup/core/${library_name}"; do
+		[[ -r "$path" ]] || continue
+		# shellcheck source=/dev/null
+		source "$path" ""
+		rc=$?
+		[[ $rc -eq 0 ]] && rtd::bootstrap_library::ok && return 0
+	done
+
+	src_url="https://github.com/${_GIT_PROFILE:-${GIT_Profile:-vonschutter}}/RTD-Setup/raw/main/core/${library_name}"
+	tmp="$(mktemp "/tmp/${library_name}.XXXXXX" 2>/dev/null || echo "/tmp/${library_name}.$$")"
+	rc=0
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL "$src_url" -o "$tmp" || rc=$?
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO "$tmp" "$src_url" || rc=$?
+	else
+		rc=1
+	fi
+	[[ ${rc:-0} -eq 0 ]] || { rm -f "$tmp"; return "$rc"; }
+
+	# shellcheck source=/dev/null
+	source "$tmp" ""
+	rc=$?
+	rm -f "$tmp"
+	[[ $rc -eq 0 ]] || return "$rc"
+	rtd::bootstrap_library::ok && return 0
+
+	printf 'Loaded %s, but the requested version/functions are not available.\n' "$library_name" >&2
+	return 1
+}
+
+usage() {
+	cat <<'EOF'
+Usage:
+  rtd-macos-kvm [prepare] [options]
+  rtd-macos-kvm fetch-installer [options]
+  rtd-macos-kvm stage-assets [options]
+  rtd-macos-kvm define-vm [options]
+  rtd-macos-kvm doctor
+
+Commands:
+  prepare           Default. Install/check KVM stack, stage boot assets, fetch media, and define VM.
+  fetch-installer   Download Apple recovery media and create a cached BaseSystem image.
+  stage-assets      Download the macOS bootloader image and stage OVMF firmware into the boot cache.
+  define-vm         Define or refresh the macOS libvirt domain from staged assets.
+  doctor            Check local host tooling needed for macOS KVM preparation.
+
+Common options:
+  --version <name>  latest-supported, n-1, catalina, mojave, high-sierra, 10.15, 10.14, or 10.13.
+  --n-1             Use the previous supported installer version.
+  --dir <path>      Cache directory. Default: /var/lib/libvirt/boot.
+  --bootloader <m>  auto, clover, or opencore-kvm. Auto uses opencore-kvm on AMD.
+  --image-dir <p>   VM image directory. Default: /var/lib/libvirt/images.
+  --disk-name <n>   System disk filename. Default: <vm-name>.qcow2.
+  --disk-size <s>   System disk size. Default: 128G.
+  --vm-name <name>  Libvirt domain name. Default: RTD-macOS-<timestamp>.
+  --memory <MiB>    Memory in MiB. Default: 4096.
+  --cpus <count>    vCPU count. Default: 4.
+  --cpu-args <cpu>  Advanced raw QEMU CPU override. Default: KVM-OpenCore Penryn profile.
+  --no-define       Prepare assets but do not define the VM.
+  --force           Re-stage assets and re-download/rebuild the cached image.
+  --keep-work       Keep temporary downloaded Apple package files after conversion.
+EOF
+}
+
+doctor() {
+	local missing=0
+	local command_name
+	local firmware_path=""
+	local -a commands=(python3 dmg2img qemu-system-x86_64 qemu-img)
+	local -a firmware_candidates=(
+		/usr/share/OVMF/OVMF_CODE.fd
+		/usr/share/OVMF/OVMF_CODE_4M.fd
+		/usr/share/edk2/ovmf/OVMF_CODE.fd
+		/usr/share/edk2/ovmf/OVMF_CODE.secboot.fd
+		/usr/share/qemu/ovmf-x86_64-code.bin
+	)
+
+	write_status "Checking macOS KVM preparation tools"
+	for command_name in "${commands[@]}"; do
+		if command -v "$command_name" >/dev/null 2>&1; then
+			write_information "Found: ${command_name}"
+		else
+			write_warning "Missing: ${command_name}"
+			missing=1
+		fi
+	done
+
+	if command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1; then
+		write_information "Found: curl or wget"
+	else
+		write_warning "Missing: curl or wget"
+		missing=1
+	fi
+
+	if command -v lscpu >/dev/null 2>&1; then
+		if lscpu | grep -Eiq 'Virtualization|vmx|svm'; then
+			write_information "Hardware virtualization appears available"
+		else
+			write_warning "Hardware virtualization was not detected by lscpu"
+			missing=1
+		fi
+	else
+		write_warning "Missing: lscpu"
+		missing=1
+	fi
+
+	for command_name in "${firmware_candidates[@]}"; do
+		if [[ -r "$command_name" ]]; then
+			firmware_path="$command_name"
+			break
+		fi
+	done
+
+	if [[ -n "$firmware_path" ]]; then
+		write_information "Found OVMF firmware: ${firmware_path}"
+	else
+		write_warning "Missing readable OVMF firmware"
+		missing=1
+	fi
+
+	return "$missing"
+}
+
+main() {
+	local command="prepare"
+
+	if [[ $# -gt 0 ]]; then
+		case "${1:-}" in
+			-h|--help)
+				command="help"
+				shift
+				;;
+			--*)
+				command="prepare"
+				;;
+			*)
+				command="$1"
+				shift
+				;;
+		esac
+	fi
+
+	rtd::bootstrap_library "_rtd_library" \
+		--version "$RTD_REQUIRED_LIBRARY_VERSION" \
+		--check macoskvm::fetch_installer_image \
+		--check macoskvm::ensure_installer_dependencies \
+		--check macoskvm::ensure_vm_dependencies \
+		--check macoskvm::ensure_system_disk \
+		--check macoskvm::stage_boot_assets \
+		--check macoskvm::define_vm \
+		--check macoskvm::prepare_host \
+		|| die "Unable to locate or download a compatible _rtd_library"
+
+	case "$command" in
+		prepare)
+			if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+				macoskvm::prepare_host --help
+				return 0
+			fi
+			security::ensure_admin "$command" "$@"
+			macoskvm::prepare_host "$@"
+			;;
+		fetch-installer|fetch|installer)
+			if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+				macoskvm::fetch_installer_image --help
+				return 0
+			fi
+			security::ensure_admin "$command" "$@"
+			macoskvm::ensure_installer_dependencies
+			macoskvm::fetch_installer_image "$@"
+			;;
+		stage-assets|assets)
+			if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+				macoskvm::stage_boot_assets --help
+				return 0
+			fi
+			security::ensure_admin "$command" "$@"
+			macoskvm::ensure_vm_dependencies
+			macoskvm::stage_boot_assets "$@"
+			;;
+		define-vm|define)
+			if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+				macoskvm::define_vm --help
+				return 0
+			fi
+			security::ensure_admin "$command" "$@"
+			macoskvm::define_vm "$@"
+			;;
+		doctor)
+			doctor
+			;;
+		help|-h|--help)
+			usage
+			;;
+		*)
+			usage
+			die "Unknown command: ${command}"
+			;;
+	esac
+}
+
+main "$@"

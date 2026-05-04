@@ -23,3 +23,4 @@ The default modules for the RTD Power Tools are:
 2. RTD-OEM-bundle-manager: used to add and remove bundles of software quickly and easily
 3. RTD_OEM-System_Admin: system support tools
 4. RTD-VPN-Router: quick setup of a PC or VM as a VPN router (routing all traffic coming to it through a VPN)
+5. RTD macOS KVM: fetches and stages macOS recovery installer images for QEMU/KVM workflows without storing generated Apple media in Git

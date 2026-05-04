@@ -13,7 +13,8 @@ The core of the RTD Power Tools are the core libraries and the configuration scr
 * sigs (folder): contains the hashes used to validate the oem apps compressed in the /apps folder
 * rtd-oem-enable-config.sh: script to enable the tools when auto installed via PRESEED or AUTOUNATTEND.
 * rtd-oem-linux-config.sh: script to configure a server, VDI, VM, or PC using the \_rtd\_library functions.
-* rtd-oem-win10-config.ps1: script to configure a server, VDI, VM, or PC.
+* rtd-oem-win10-config.ps1: script to configure a Windows 10 server, VDI, VM, or PC.
+* rtd-oem-win11-config.ps1: script to configure a Windows 11 server, VDI, VM, or PC with stronger debloat, telemetry reduction, suggestion removal, and performance-focused service defaults.
 
 Further tools and utilities are located in the /apps folder and the /modules folder. These modules may make use of the \_rtd\_library accomplish their tasks. For example; the software-bundle-manager
 
@@ -85,7 +86,7 @@ NOTE: For the software bundle installer, and particularly for validating depende
 
 The RTD Power Tools may be installed manually and/or added by either of PRESEED, KICKSTART, AUTOYAST, or AUTOUNATTEND installation configuration files. These configuration files are included by default in the RTD Power Tools Library and are created when needed. These are applied when either creating a VM or installation media using the RTD Power Tools.
 
-| RTD Power Tools Active during a Windows 10 VM Build |
+| RTD Power Tools Active during a Windows VM Build |
 | --- |
 | ![1683625615788](image/README/1683625615788.png) |
 

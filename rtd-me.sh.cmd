@@ -123,7 +123,9 @@ NO_COLOR="$(tput sgr0 2>/dev/null || printf '')"
 # capture the 3 first letters as org TLA (Three Letter Acronym)
 export _SCRIPTNAME=$(basename $0)
 export _TLA=${_SCRIPTNAME:0:3}
-export _LOG_DIR=/var/log/${_TLA}
+export _TLA_UPPER=$(printf '%s' "${_TLA}" | tr '[:lower:]' '[:upper:]')
+export _TLA_LOWER=$(printf '%s' "${_TLA}" | tr '[:upper:]' '[:lower:]')
+export _LOG_DIR=/var/log/${_TLA_LOWER}
 mkdir -p ${_LOG_DIR}
 export _LOGFILE=${_LOG_DIR}/$( basename ${0} )-$(date +%Y-%m-%d)-oem.log
 
@@ -131,7 +133,7 @@ export _LOGFILE=${_LOG_DIR}/$( basename ${0} )-$(date +%Y-%m-%d)-oem.log
 export _GIT_PROFILE="${_GIT_PROFILE:-vonschutter}"
 
 # Location of base administrative scripts and command-lets to get.
-_git_src_url=https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git
+_git_src_url=https://github.com/${_GIT_PROFILE}/${_TLA_UPPER}-Setup.git
 
 
 
@@ -164,15 +166,15 @@ if [[ "$OSTYPE" == *"linux"* ]]; then
 		fi
 	done
 	
-	if git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp ; then
+	if git clone --depth=1 ${_git_src_url} /opt/${_TLA_LOWER}.tmp ; then
 		printf "✅ Instructions successfully retrieved..."
-		if [[ -d /opt/${_TLA,,}  ]] ; then
-			mv /opt/${_TLA,,} ${_BackupFolderName:="/opt/${_TLA,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"}
+		if [[ -d /opt/${_TLA_LOWER}  ]] ; then
+			mv /opt/${_TLA_LOWER} ${_BackupFolderName:="/opt/${_TLA_LOWER}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"}
 			zip -m -r -5 ${_BackupFolderName}.zip  ${_BackupFolderName}
 			rm -r ${_BackupFolderName}
 		fi
-		mv /opt/${_TLA,,}.tmp /opt/${_TLA,,} ; rm -rf /opt/${_TLA,,}/.git
-		source /opt/${_TLA,,}/core/_rtd_library
+		mv /opt/${_TLA_LOWER}.tmp /opt/${_TLA_LOWER} ; rm -rf /opt/${_TLA_LOWER}/.git
+		source /opt/${_TLA_LOWER}/core/_rtd_library
 		oem::register_all_tools
 		ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
 		bash ${_OEM_DIR}/core/rtd-oem-linux-config.sh ${*}
@@ -180,7 +182,7 @@ if [[ "$OSTYPE" == *"linux"* ]]; then
 		printf "💥 Failed to retrieve instructions correctly! "
 		exit 1
 	fi
-	} |& tee -a ${_LOGFILE}
+	} 2>&1 | tee -a ${_LOGFILE}
 	exit $?
 elif [[ "$OSTYPE" == "darwin"* ]]; then
         echo "Mac OSX is currently not supported..."
@@ -262,19 +264,19 @@ exit $?
 
 	:: gather some info... (BETA)
 	setlocal EnableDelayedExpansion
-		set "ScriptName=%~nx0"
-		set "ScriptPath=%~dp0"
-		set "_tla=%ScriptName:~0,3%"
-		set "lowercase=abcdefghijklmnopqrstuvwxyz"
-		set "uppercase=ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-		set "Result="
-		for /L %%i in (0,1,2) do (
-			set "char=!_tla:~%%i,1!"
-			for /L %%j in (0,1,25) do (
-				if "!char!"=="!lowercase:~%%j,1!" set "char=!uppercase:~%%j,1!"
-			)
-			set "Result=!Result!!char!"
+	set "ScriptName=%~nx0"
+	set "ScriptPath=%~dp0"
+	set "_tla=%ScriptName:~0,3%"
+	set "lowercase=abcdefghijklmnopqrstuvwxyz"
+	set "uppercase=ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	set "Result="
+	for /L %%i in (0,1,2) do (
+		set "char=!_tla:~%%i,1!"
+		for /L %%j in (0,1,25) do (
+			if "!char!"=="!lowercase:~%%j,1!" set "char=!uppercase:~%%j,1!"
 		)
+		set "Result=!Result!!char!"
+	)
 	set _TLA=%Result%
 	set _TLA=RTD
 	set TEMP=C:\%_TLA%\temp
@@ -283,9 +285,12 @@ exit $?
 	set CACHE_DIR=C:\%_TLA%\cache
 	set CORE_DIR=C:\%_TLA%\core
         set WALLPAPER_URL=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/wallpaper/Wayland.jpg
-        set VIRTIO_URL=https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-guest-tools.exe
+        set VIRTIO_URL=https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.285-1/virtio-win-guest-tools.exe
 	set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
 	set _STAGE2FILE=rtd-oem-win10-config.ps1
+	set _WINDOWS_BUILD=0
+	for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "[Environment]::OSVersion.Version.Build" 2^>nul`) do set _WINDOWS_BUILD=%%i
+	if %_WINDOWS_BUILD% GEQ 22000 set _STAGE2FILE=rtd-oem-win11-config.ps1
 
 	md %TEMP%
 	md %LOG_DIR%
@@ -322,7 +327,7 @@ exit $?
 	ver | find "6.2" > nul && call :PS2 Windows 8
 	ver | find "6.3" > nul && call :PS2 Windows 8
 	ver | find "6.3" > nul && call :PS2 Windows 8
-	ver | find "10.0" > nul && call :PS2 Windows 10
+	ver | find "10.0" > nul && if %_WINDOWS_BUILD% GEQ 22000 (call :PS2 Windows 11) else (call :PS2 Windows 10)
 
 	:: Windows Server OS Versions:
 	ver | find "NT 6.2" > nul && call :PS2 Windows Server 2012
@@ -386,13 +391,15 @@ exit $?
         %CACHE_DIR%\virtio-win-guest-tools.exe /passive /norestart /log %LOG_DIR%\virtio_log.txt
     
 	if exist %CORE_DIR%\%_STAGE2FILE% (
-		@title "CMD: %_STAGE2FILE%File found locally..."
+		@title "CMD: %_STAGE2FILE% File found locally..."
 		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\%_STAGE2FILE%
 		) else (
 		@title "CMD: Fetching %_STAGE2FILE% from the internet..."
 		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %_STAGE2LOC%/%_STAGE2FILE% -OutFile %CACHE_DIR%\%_STAGE2FILE%"
 		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
 	)
+
+	if "%_STAGE2FILE%"=="rtd-oem-win11-config.ps1" goto end
 
 	if exist %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1 (
 		@title "CMD: _Chris-Titus-Post-Windows-Install-App.ps1 File found locally..."
@@ -411,7 +418,7 @@ exit $?
 
 	echo Detected %* ...
 	echo executing PRE Windows 7 instructions...
-	:: Assuming wget is in teh path...
+	:: Assuming wget is in the path...
 	wget -O %TEMP%\%_STAGE2FILE% %_STAGE2LOC%/%_STAGE2FILE%
 	powershell -ExecutionPolicy UnRestricted -File %TEMP%\%_STAGE2FILE%
 

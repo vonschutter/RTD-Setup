@@ -49,7 +49,7 @@ When running the install script on a server without a graphical environment on i
 
 As promised, the rtd-me.sh.cmd script will run under windows as well. Simply download it and double click on it (you will be prompted to elevate privileges if needed). Please NOTE: that at this time the Windows functionality is roughly equivalent to the Linux **Software Bundle Installer**, but will not prompt for anything, whereas for Linux the setup will pause for 60 seconds to allow for some selections. However, the script will optimize Windows by removing bloatware (Sponsored Software) and turning off services that most do not use to enhance both performance and security. Several useful and fun software titles are automatically added (will not fill up your disk). The Windows changes are made with PowerShell.
 
-Running "rtd-oem-win10-config.ps1" (**Software Bundle Installer**) in Windows (also run when installing RTD Power Tools):
+Running "rtd-oem-win10-config.ps1" or "rtd-oem-win11-config.ps1" (**Software Bundle Installer**) in Windows (also run when installing RTD Power Tools):
 ![Windows running RTD Power Tools](media_files/Scr11.png)
 
 # How to Install RTD Power Tools:
@@ -70,7 +70,7 @@ If you are using Windows Subsystem for Linux (WSL) you may copy and paste the sa
 
 ## Installing In Windows
 
-If you want to run the **Software Bundle Installer** (and optimizer) in Windows 10; please use the link below to save the script locally. Since it does not make sense to use linux tools in Windows, the power tools themselves are not made available in the Windows environment; but, since the power tools do include an option for automatically building a Windows Desktop Virtual Machine (VDI) in Linux; the **Software Bundle Installer** for Windows will be run for you automatically inside the Virtual Machine by downloading and executing **rtd-me.sh.cmd** in the VM.
+If you want to run the **Software Bundle Installer** (and optimizer) in Windows 10 or Windows 11, please use the link below to save the script locally. Since it does not make sense to use linux tools in Windows, the power tools themselves are not made available in the Windows environment; but, since the power tools do include an option for automatically building a Windows Desktop Virtual Machine (VDI) in Linux, the **Software Bundle Installer** for Windows will be run for you automatically inside the Virtual Machine by downloading and executing **rtd-me.sh.cmd** in the VM.
 
 On Windows rtd-me.sh.cmd will automatically:
 
