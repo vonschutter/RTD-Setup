@@ -13,6 +13,7 @@ The core of the RTD Power Tools are the core libraries and the configuration scr
 * sigs (folder): contains the hashes used to validate the oem apps compressed in the /apps folder
 * rtd-oem-enable-config.sh: script to enable the tools when auto installed via PRESEED or AUTOUNATTEND.
 * rtd-oem-linux-config.sh: script to configure a server, VDI, VM, or PC using the \_rtd\_library functions.
+* rtd-oem-macos-config.sh: script to configure a macOS VDI, VM, or workstation with Homebrew apps, privacy defaults, UI defaults, firewall settings, and safe user cleanup.
 * rtd-oem-win10-config.ps1: script to configure a Windows 10 server, VDI, VM, or PC.
 * rtd-oem-win11-config.ps1: script to configure a Windows 11 server, VDI, VM, or PC with stronger debloat, telemetry reduction, suggestion removal, and performance-focused service defaults.
 

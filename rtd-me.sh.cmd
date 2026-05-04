@@ -185,7 +185,10 @@ if [[ "$OSTYPE" == *"linux"* ]]; then
 	} 2>&1 | tee -a ${_LOGFILE}
 	exit $?
 elif [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "Mac OSX is currently not supported..."
+        echo "Mac OSX is currently not fully supported... hoever, I will attempt to get the appropriate script for this system and run it..."
+	read -n 1 -s -r -p "Press any key to continue... or CTRL+C to exit"
+	curl -L ${_git_src_url}/raw/main/core/rtd-oem-macos-config.sh -o /tmp/rtd-oem-macos-config.sh
+	bash /tmp/rtd-oem-macos-config.sh
 elif [[ "$OSTYPE" == "cygwin" ]]; then
         echo "CYGWIN is currently unsupported..."
 elif [[ "$OSTYPE" == "msys" ]]; then
