@@ -14,6 +14,7 @@ This module ships `rtd-vm-tool`, a menu-driven Bash utility for managing KVM/lib
 - Start/stop VMs from a simple menu.
 - Settings: adjust clone preferences via `RTD_VM_CLONE_ARGS`.
 - Maintenance: run maintenance helpers from a dedicated menu.
+- macOS KVM workflow: prepare macOS recovery/installer media, define a QEMU/KVM domain, and continue through the Apple installer and first-boot setup.
 
 ## Requirements
 
@@ -43,6 +44,30 @@ rtd-vm-tool
 ## Screenshot
 
 ![VM Tool Menu](Media_files/Screenshot.png)
+
+## macOS KVM Workflow Screenshots
+
+The following screenshots show a macOS guest created through the RTD VM Tool / macOS KVM flow on QEMU/KVM.
+
+### Boot
+
+![macOS guest booting on QEMU/KVM](Media_files/macos-kvm-boot.png)
+
+### First Setup
+
+![macOS first setup country selection on QEMU/KVM](Media_files/macos-kvm-welcome.png)
+
+### Recovery Utilities
+
+![macOS Utilities recovery screen on QEMU/KVM](Media_files/macos-kvm-recovery-utilities.png)
+
+### Installer Progress
+
+![macOS Catalina installer progress on QEMU/KVM](Media_files/macos-kvm-install-progress.png)
+
+### Desktop
+
+![macOS desktop running inside QEMU/KVM](Media_files/macos-kvm-desktop.png)
 
 ## Notes
 
