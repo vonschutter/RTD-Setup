@@ -64,6 +64,12 @@ To get these tools for yourself on Linux just copy and paste the line below in t
 wget https://github.com/vonschutter/RTD-Setup/raw/main/rtd-me.sh.cmd && bash ./rtd-me.sh.cmd
 ```
 
+Or, using curl:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/rtd-me.sh.cmd -o rtd-me.sh.cmd && bash ./rtd-me.sh.cmd
+```
+
 Please note that you will need elevated priviledges on the Linux system (root).
 
 If you are using Windows Subsystem for Linux (WSL) you may copy and paste the same in to your WSL terminal window to use this in WSL.

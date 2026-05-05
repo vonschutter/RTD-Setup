@@ -210,13 +210,34 @@ export _SUSE_NON_OSS_LEAP="https://download.opensuse.org/distribution/openSUSE-c
 export _SUSE_NON_OSS_TUMBLEWEED="https://download.opensuse.org/tumbleweed/repo/non-oss/"
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-# Fedora VM default build sources
-# NOTE: Fedora sources automatically set. To override the internal functions and preferences you may uncomment the following line: 
-# export _DEFAULT_FEDORA_VER="39"
+# Fedora VM default build sources.
+# Leave _DEFAULT_FEDORA_VER empty to auto-detect the latest release from the configured mirror.
+: "${_DEFAULT_FEDORA_VER:=}"
+: "${KVM_FEDORA_RELEASES_MIRROR:="https://dl.fedoraproject.org/pub/fedora/linux/releases"}"
+: "${KVM_FEDORA_ARCH:="x86_64"}"
+: "${KVM_FEDORA_DEFAULT_EDITION:="workstation"}"
+: "${KVM_FEDORA_DEFAULT_ISO_TYPE:="live"}"
+: "${KVM_FEDORA_DEFAULT_SPIN:="xfce"}"
+: "${KVM_FEDORA_INSTALL_EDITION:="everything"}"
+: "${KVM_FEDORA_INSTALL_ISO_TYPE:="netinst"}"
+: "${KVM_FEDORA_ISO_CACHE_DIR:="/var/lib/libvirt/boot"}"
+: "${KVM_FEDORA_VERIFY_ISO:="YES"}"
+: "${KVM_FEDORA_KEYRING_URL:="https://fedoraproject.org/fedora.gpg"}"
+: "${KVM_FEDORA_KEY_FORMAT:="binary"}"
 
-# To override the internal functions and preferences you may uncomment the following 2 lines:
-# export _mirrorlist_url="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-${_DEFAULT_FEDORA_VER}&arch=x86_64"
-# export _source_url="https://dl.fedoraproject.org/pub/fedora/linux/releases/${_DEFAULT_FEDORA_VER}/Everything/x86_64/os/"
+export _DEFAULT_FEDORA_VER KVM_FEDORA_RELEASES_MIRROR KVM_FEDORA_ARCH
+export KVM_FEDORA_DEFAULT_EDITION KVM_FEDORA_DEFAULT_ISO_TYPE KVM_FEDORA_DEFAULT_SPIN
+export KVM_FEDORA_INSTALL_EDITION KVM_FEDORA_INSTALL_ISO_TYPE KVM_FEDORA_ISO_CACHE_DIR
+export KVM_FEDORA_VERIFY_ISO KVM_FEDORA_KEYRING_URL KVM_FEDORA_KEY_FORMAT
+
+if [[ -n "${_DEFAULT_FEDORA_VER}" ]]; then
+	: "${_mirrorlist_url:="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-${_DEFAULT_FEDORA_VER}&arch=${KVM_FEDORA_ARCH}"}"
+	: "${_source_url:="${KVM_FEDORA_RELEASES_MIRROR%/}/${_DEFAULT_FEDORA_VER}/Everything/${KVM_FEDORA_ARCH}/os/"}"
+else
+	: "${_mirrorlist_url:=""}"
+	: "${_source_url:=""}"
+fi
+export _mirrorlist_url _source_url
 
 # Additional Fedora repos for use: 
 # repo --name=fedora-updates --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f${_DEFAULT_FEDORA_VER}&arch=x86_64" --cost=0

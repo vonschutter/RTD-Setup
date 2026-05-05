@@ -35,6 +35,13 @@ GTK front-end:
 bash rtd-vm-tool-gtk
 ```
 
+Clone options accepted by the terminal tool are also accepted by the GTK front-end and passed through to clone workflows:
+
+```bash
+bash rtd-vm-tool-gtk --sysprep
+bash rtd-vm-tool-gtk --customize "--install htop"
+```
+
 If installed on your `$PATH`, simply run:
 
 ```bash

@@ -147,10 +147,6 @@ dialog:
 disk:
 39   disk::reencrypt_device                                      ;           Securely encrypts an existing unencrypted block device using LUKS.
 
-fedora:
-40   fedora::get_fedora_netinst_iso_url                          ;           Resolve the full download URL for the Fedora Everything NetInstall ISO via the shared ISO resolver.
-41   fedora::get_latest_release_version                          ;           Retrieves the latest available Fedora release version from the official Fedora project.
-
 github:
 42   github::clone_repo_user                                     ;           Function to CLONE all github.com repositories for a specified user.
 43   github::list_all_user_repositories                          ;           Function to LIST all github.com repositories for a specified user.
@@ -211,7 +207,7 @@ kvm:
 92   kvm::clone_vdi_template_vm                                  ;           Display available VDI template VMs (Template*VDI*) and clone the selected entry.
 93   kvm::create_expanding_vm_hardisk                            ;           Creates a non-preallocated, dynamically expanding qcow2 disk image for a VM.
 94   kvm::get_almalinux_boot_iso                                 ;           Download the AlmaLinux network boot ISO for a specific version into
-95   kvm::get_fedora_workstation_iso                             ;           Downloads the specified or latest Fedora Workstation x86_64 ISO.
+95   kvm::get_fedora_workstation_iso                             ;           Downloads the configured Fedora installation ISO.
 96   kvm::get_kali_iso                                           ;           Fetches the newest Kali Linux installer ISO (64-bit) from cdimage.kali.org
 99   kvm::get_vm_config_preferences                              ;           Retrieves VM configuration values from a configuration file or defaults.
 100  kvm::get_vm_size_preferences                                ;           Loads VM sizing defaults from _locations.info or internal fallbacks and
@@ -3175,7 +3171,9 @@ dependency::virtualization() {
 		fi
 		;;
 	esac
-	wait # Wait for all background processes to finish
+	# Do not use a bare `wait` here. Callers may have unrelated background jobs
+	# such as process-substitution loggers; waiting for them can deadlock the VM
+	# build before it reaches virt-install.
 }
 
 system::prepare_environment_for_iso_creation() {
@@ -21255,12 +21253,12 @@ oem::task::iso::resolve_fedora_iso() {
 	# Usage:
 	#   oem::task::iso::resolve_fedora_iso --edition everything --iso-type netinst
 	# End of documentation
-	local mirror_url="https://dl.fedoraproject.org/pub/fedora/linux/releases"
-	local version=""
-	local edition="workstation"
-	local iso_type="live"
-	local spin="xfce"
-	local arch="x86_64"
+	local mirror_url="${KVM_FEDORA_RELEASES_MIRROR:-https://dl.fedoraproject.org/pub/fedora/linux/releases}"
+	local version="${_DEFAULT_FEDORA_VER:-}"
+	local edition="${KVM_FEDORA_DEFAULT_EDITION:-workstation}"
+	local iso_type="${KVM_FEDORA_DEFAULT_ISO_TYPE:-live}"
+	local spin="${KVM_FEDORA_DEFAULT_SPIN:-xfce}"
+	local arch="${KVM_FEDORA_ARCH:-x86_64}"
 	local iso_dir dir_listing iso_name checksum_name escaped_arch escaped_version
 
 	unset OEM_ISO_NAME OEM_ISO_URL OEM_ISO_VERSION OEM_ISO_DIR OEM_ISO_CHECKSUM_URL \
@@ -21467,8 +21465,8 @@ oem::task::iso::resolve_fedora_iso() {
 	OEM_ISO_SIGNATURE_FILE=""
 	OEM_ISO_CHECKSUM_ALGO="sha256"
 	OEM_ISO_KEYRING_PATH=""
-	OEM_ISO_KEYRING_URL="https://fedoraproject.org/fedora.gpg"
-	OEM_ISO_KEY_FORMAT="binary"
+	OEM_ISO_KEYRING_URL="${KVM_FEDORA_KEYRING_URL:-https://fedoraproject.org/fedora.gpg}"
+	OEM_ISO_KEY_FORMAT="${KVM_FEDORA_KEY_FORMAT:-binary}"
 	[[ -n "$checksum_name" ]] && OEM_ISO_CHECKSUM_URL="${iso_dir}/${checksum_name}"
 	return 0
 }
@@ -21563,19 +21561,23 @@ fedora::download_iso() {
 	# Usage:
 	#   fedora::download_iso --edition everything --iso-type netinst --version 43
 	# End of documentation
-	local permanent_download_dir="/var/lib/libvirt/boot"
+	local permanent_download_dir="${KVM_FEDORA_ISO_CACHE_DIR:-/var/lib/libvirt/boot}"
 	local mirror_url=""
 	local version=""
-	local edition="workstation"
-	local spin="xfce"
-	local iso_type="live"
-	local arch="x86_64"
+	local edition="${KVM_FEDORA_DEFAULT_EDITION:-workstation}"
+	local spin="${KVM_FEDORA_DEFAULT_SPIN:-xfce}"
+	local iso_type="${KVM_FEDORA_DEFAULT_ISO_TYPE:-live}"
+	local arch="${KVM_FEDORA_ARCH:-x86_64}"
 	local verify=1
 	local iso_filename=""
 	local cached_iso=""
 	local was_cached=0
 	local -a cache_dirs=()
 	local -a resolve_args=()
+
+	if [[ "${KVM_FEDORA_VERIFY_ISO:-YES}" =~ ^([Nn][Oo]|0|[Ff][Aa][Ll][Ss][Ee])$ ]]; then
+		verify=0
+	fi
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
@@ -21657,83 +21659,6 @@ fedora::download_iso() {
 
 	export iso
 	return 0
-}
-
-fedora::get_fedora_netinst_iso_url() {
-	# Description:
-	#   Retrieve the full download URL for the Fedora Everything NetInstall ISO.
-	# Globals:
-	#   OEM_ISO_URL (w)
-	# Arguments:
-	#   --version <version>  Optional Fedora release version number.
-	# Outputs:
-	#   STDOUT: Full URL to the resolved Fedora Everything NetInstall ISO.
-	# Returns:
-	#   0 on success; non-zero on failure.
-	# Usage Example:
-	#   local iso_url
-	#   iso_url=$(fedora::get_fedora_netinst_iso_url --version 43)
-	# End of Documentation
-	oem::task::iso::resolve_fedora_iso --edition everything --iso-type netinst "$@" || return 1
-	printf '%s\n' "$OEM_ISO_URL"
-	return 0
-}
-
-fedora::get_latest_release_version() {
-	# Description:
-	#   Retrieves the latest available Fedora release version from the official Fedora project.
-	#   This function scans the Fedora mirror directory listing and determines the latest
-	#   numerical release version by parsing subdirectory names.
-	#
-	# Globals:
-	#   None
-	#
-	# Arguments:
-	#   None
-	#
-	# Outputs:
-	#   STDOUT: Latest Fedora release version (e.g., 40, 41, 42)
-	#   STDERR: Errors encountered during retrieval or parsing
-	#
-	# Returns:
-	#   0 if the latest version is successfully determined
-	#   1 if an error occurs during HTTP requests, parsing, or no version found
-	#
-	# Dependencies:
-	#   curl, grep, sort, tail, mktemp
-	#
-	# Usage:
-	#   latest_version=$(fedora::get_latest_release_version) || printf "Failed to retrieve latest Fedora version.\n"
-	#
-	# End of Documentation:
-
-	local url="https://dl.fedoraproject.org/pub/fedora/linux/releases/"
-	local dir_listing
-	local latest_version
-
-	system::log_item "Fetching directory listing from $url..."
-	dir_listing=$(oem::task::iso::fetch_url "$url") || return 1
-
-	if [[ -z "$dir_listing" ]]; then
-		system::log_item "Error: Empty directory listing retrieved from $url"
-		return 1
-	fi
-
-	latest_version=$(
-		echo "$dir_listing" | \
-		grep -oP '<a href="\K[0-9]+(?=/")' | \
-		sort -n | \
-		tail -n 1
-	)
-
-	if [[ -n "$latest_version" ]]; then
-		system::log_item "Latest identified Fedora version: $latest_version"
-		printf "%s\n" "$latest_version"
-		return 0
-	else
-		system::log_item "Error: Could not determine the latest Fedora version from parsed data."
-		return 1
-	fi
 }
 
 oem::task::iso::resolve_opensuse_iso() {
@@ -24948,8 +24873,8 @@ kvm::get_almalinux_boot_iso() {
 
 kvm::get_fedora_workstation_iso() {
 	# Description:
-	#   Legacy wrapper that downloads the Fedora Everything NetInstall ISO used by the RTD KVM flow.
-	#   The historical function name is preserved for compatibility.
+	#   Download the configured Fedora installation ISO used by the RTD KVM flow.
+	#   The historical function name is preserved for compatibility with VM build callers.
 	# Usage:
 	#   kvm::get_fedora_workstation_iso [--version <number>]
 	# Outputs:
@@ -24958,7 +24883,13 @@ kvm::get_fedora_workstation_iso() {
 	#   0 on success, 1 on error.
 	# End of documentation
 	local VERSION=""
-	local -a download_args=(--dir /var/lib/libvirt/boot --edition everything --iso-type netinst)
+	local -a download_args=(
+		--dir "${KVM_FEDORA_ISO_CACHE_DIR:-/var/lib/libvirt/boot}"
+		--mirror "${KVM_FEDORA_RELEASES_MIRROR:-https://dl.fedoraproject.org/pub/fedora/linux/releases}"
+		--edition "${KVM_FEDORA_INSTALL_EDITION:-everything}"
+		--iso-type "${KVM_FEDORA_INSTALL_ISO_TYPE:-netinst}"
+		--architecture "${KVM_FEDORA_ARCH:-x86_64}"
+	)
 
 	system::log_item "Fetching Fedora installation ISO..."
 
@@ -25829,7 +25760,15 @@ kvm::make_vm_now_from_fedora_org() {
 		return 1
 	fi
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
-	: "${_DEFAULT_FEDORA_VER:="$(curl -s https://dl.fedoraproject.org/pub/fedora/linux/releases/ | grep -oP 'href="\K[0-9]+(?=/")' | sort -n | tail -1)"}"
+	if [[ -z "${_DEFAULT_FEDORA_VER:-}" ]]; then
+		local _fedora_releases_mirror="${KVM_FEDORA_RELEASES_MIRROR:-https://dl.fedoraproject.org/pub/fedora/linux/releases}"
+		_DEFAULT_FEDORA_VER="$(
+			oem::task::iso::fetch_url "${_fedora_releases_mirror%/}/" |
+				grep -oP 'href="\K[0-9]+(?=/")' |
+				sort -n |
+				tail -1
+		)"
+	fi
 	local _skip_prompt="FALSE"
 
 	while [[ $# -gt 0 ]]; do
@@ -25859,10 +25798,11 @@ kvm::make_vm_now_from_fedora_org() {
 
 	: "${_os_version:="${_DEFAULT_FEDORA_VER}"}"
 	: "${_preseed_file="$(mktemp -d)/ks.cfg"}"
-	: "${_source_url:="https://dl.fedoraproject.org/pub/fedora/linux/releases/${_os_version}/Everything/x86_64/os/"}"
+	local _fedora_releases_mirror="${KVM_FEDORA_RELEASES_MIRROR:-https://dl.fedoraproject.org/pub/fedora/linux/releases}"
+	: "${_source_url:="${_fedora_releases_mirror%/}/${_os_version}/Everything/${KVM_FEDORA_ARCH:-x86_64}/os/"}"
 	
 	# Get Fedora media if not already present:
-	if kvm::get_fedora_workstation_iso --version ${_os_version} ; then 
+	if kvm::get_fedora_workstation_iso --version "${_os_version}" ; then 
 		system::log_item "Using Fedora Workstation ISO: ${iso}"
 	else 
 		write_error "Failed to fetch Fedora ${_os_version} Workstation ISO. Please check your network connection or the Fedora repository."

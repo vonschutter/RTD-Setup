@@ -161,7 +161,7 @@ rtd::bootstrap_library() {
 		for check in "${checks[@]}"; do declare -F "$check" >/dev/null 2>&1 || return 1; done
 	}
 
-	[[ "$library_name" == "_rtd_library" && -n "$loaded_version" ]] && rtd::bootstrap_library::ok && return 0
+	[[ "$library_name" == "_rtd_library" && -n "${loaded_version:-}" ]] && rtd::bootstrap_library::ok && return 0
 
 	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 	for path in \
@@ -423,6 +423,16 @@ show_notice_on_fist_run() {
 
 
 
+vmtool::cleanup_after_action() {
+	if [[ "${RTD_VM_TOOL_EMBEDDED_ACTION:-0}" == "1" ]]; then
+		return 0
+	fi
+
+	system::cleanup_and_finish "$@"
+}
+
+
+
 vmtool::run_server_template_action() {
 	local selection="$1"
 
@@ -433,59 +443,59 @@ vmtool::run_server_template_action() {
 			;;
 		1 )
 			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app ubuntu-server --ask YES
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		2 )
 			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app lamp-server --ask YES
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		3 )
 			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app postfix --ask YES
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		4 )
 			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app bind9 --ask YES
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		5 )
 			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app dhcp-server --ask YES
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		6 )
 			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app samba --ask YES
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		7 )
 			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app print-server --ask YES
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		8 )
 			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app server-desktop --DE xubuntu-desktop --ask YES
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		9 )
 			kvm::make_vm_now_from_ubuntu_com --role server --flavor ubuntu --server-app docker.io --tshirt-size medium
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		10 )
 			kvm::make_vm_now_from_debian_org --role server --server_role print-server
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		11 )
 			kvm::make_vm_now_from_debian_org --role server --server_role openssh-server
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		12 )
 			kvm::make_vm_now_from_ubuntu_com --role server --pre-config minecraft --tshirt-size medium
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		13 )
 			kvm::make_vm_now_from_fedora_org --role server --tshirt-size small
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		14 )
 			kvm::make_vm_now_from_fedora_org --role server --server_role @network-server --tshirt-size small --tshirt-size small
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 	esac
 }
@@ -500,125 +510,125 @@ vmtool::run_vdi_template_action() {
 			;;
 		1 )
 			if kvm::make_vm_now_from_ubuntu_com --role VDI --DE ubuntu-desktop --ask YES --tshirt-size medium; then
-				system::cleanup_and_finish nomessage
+				vmtool::cleanup_after_action nomessage
 			else
 				dialog::display_error "Ubuntu GNOME VDI template creation failed. Review the on-screen error and log output before retrying."
 			fi
 			;;
 		2 )
 			if kvm::make_vm_now_from_ubuntu_com --role VDI --DE kubuntu-desktop --ask YES --tshirt-size medium; then
-				system::cleanup_and_finish nomessage
+				vmtool::cleanup_after_action nomessage
 			else
 				dialog::display_error "Ubuntu KDE VDI template creation failed. Review the on-screen error and log output before retrying."
 			fi
 			;;
 		3 )
 			if kvm::make_vm_now_from_ubuntu_com --role VDI --DE xubuntu-desktop --ask YES --tshirt-size medium; then
-				system::cleanup_and_finish nomessage
+				vmtool::cleanup_after_action nomessage
 			else
 				dialog::display_error "Ubuntu XFCE VDI template creation failed. Review the on-screen error and log output before retrying."
 			fi
 			;;
 		4 )
 			if kvm::make_vm_now_from_ubuntu_com --role VDI --DE ubuntu-mate-desktop --ask YES --tshirt-size medium; then
-				system::cleanup_and_finish nomessage
+				vmtool::cleanup_after_action nomessage
 			else
 				dialog::display_error "Ubuntu MATE VDI template creation failed. Review the on-screen error and log output before retrying."
 			fi
 			;;
 		5 )
 			if kvm::make_vm_now_from_ubuntu_com --role VDI --DE lubuntu-desktop --ask YES; then
-				system::cleanup_and_finish nomessage
+				vmtool::cleanup_after_action nomessage
 			else
 				dialog::display_error "Ubuntu LXQt VDI template creation failed. Review the on-screen error and log output before retrying."
 			fi
 			;;
 		6 )
 			if kvm::make_vm_now_from_ubuntu_com --role VDI --DE cinnamon-desktop-environment --ask YES; then
-				system::cleanup_and_finish nomessage
+				vmtool::cleanup_after_action nomessage
 			else
 				dialog::display_error "Ubuntu Cinnamon VDI template creation failed. Review the on-screen error and log output before retrying."
 			fi
 			;;
 		7 )
 			if kvm::make_vm_now_from_debian_org --role workstation --DE gnome-desktop --tshirt-size small; then
-				system::cleanup_and_finish nomessage
+				vmtool::cleanup_after_action nomessage
 			else
 				dialog::display_error "Debian GNOME VDI template creation failed. Review the on-screen error and log output before retrying."
 			fi
 			;;
 		8 )
 			if kvm::make_vm_now_from_debian_org --role workstation --DE cinnamon-desktop --tshirt-size small; then
-				system::cleanup_and_finish nomessage
+				vmtool::cleanup_after_action nomessage
 			else
 				dialog::display_error "Debian Cinnamon VDI template creation failed. Review the on-screen error and log output before retrying."
 			fi
 			;;
 		9 )
 			if kvm::make_vm_now_from_debian_org --role workstation --DE kde-desktop --tshirt-size small; then
-				system::cleanup_and_finish nomessage
+				vmtool::cleanup_after_action nomessage
 			else
 				dialog::display_error "Debian KDE VDI template creation failed. Review the on-screen error and log output before retrying."
 			fi
 			;;
 		10 )
 			if kvm::make_vm_now_from_debian_org --role workstation --DE lxde-desktop --tshirt-size small; then
-				system::cleanup_and_finish nomessage
+				vmtool::cleanup_after_action nomessage
 			else
 				dialog::display_error "Debian LXDE VDI template creation failed. Review the on-screen error and log output before retrying."
 			fi
 			;;
 		11 )
 			kvm::make_vm_now_from_fedora_org --role workstation --DE "@workstation-product-environment" --tshirt-size medium
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		12 )
 			kvm::make_vm_now_from_fedora_org --role workstation --DE "@kde-desktop-environment" --tshirt-size small
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		13 )
 			kvm::make_vm_now_from_fedora_org --role workstation --DE "@mate-desktop-environment" --tshirt-size small
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		14 )
 			kvm::make_vm_now_from_fedora_org --role workstation --DE "@cinnamon-desktop-environment" --tshirt-size small
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		15 )
 			kvm::make_vm_now_from_fedora_org --role workstation --DE "@budgie-desktop-environment" --tshirt-size small
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		16 )
 			kvm::make_vm_now_from_fedora_org --role workstation --DE "@i3-desktop-environment" --tshirt-size small
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		17 )
 			kvm::make_vm_now_from_fedora_org --role workstation --DE "@sway-desktop-environment" --tshirt-size small
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		18 )
 			kvm::make_vm_now_from_opensuse_org --DE kde --product Tumbleweed --tshirt-size small
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		19 )
 			kvm::make_vm_now_from_opensuse_org --DE gnome --product Tumbleweed --tshirt-size small
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		20 )
 			kvm::make_vm_now_from_opensuse_org --DE xfce --product Tumbleweed --tshirt-size small
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		21 )
 			kvm::make_vm_now_from_opensuse_org --DE lxde --product Tumbleweed --tshirt-size small
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		22 )
 			kvm::make_vm_now_from_opensuse_org --DE mate --product Tumbleweed --tshirt-size small
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		23 )
 			kvm::make_vm_now_from_opensuse_org --DE cinnamon --product Tumbleweed --tshirt-size small
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		24 )
 			kvm::make_vm_now_from_microsoft --winver win10 --tshirt-size medium
@@ -631,11 +641,11 @@ vmtool::run_vdi_template_action() {
 			;;
 		27 )
 			kvm::make_vm_now_from_kali_org --role workstation --DE standard --tshirt-size medium
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 		28 )
 			kvm::make_vm_now_from_redhat_com --role workstation --DE "@workstation-product" --tshirt-size small
-			system::cleanup_and_finish nomessage
+			vmtool::cleanup_after_action nomessage
 			;;
 	esac
 }

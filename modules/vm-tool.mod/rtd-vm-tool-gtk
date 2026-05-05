@@ -22,6 +22,8 @@ set -u
 
 RTD_VM_TUI_SCRIPT=""
 RTD_VM_TOOL_TRACE=0
+RTD_VM_GTK_ACTION_LOG="/var/log/rtd/rtd-vm-tool-gtk-actions.log"
+declare -a RTD_VM_CLONE_ARGS=()
 
 vmtoolgtk::find_tui_script() {
 	local script_dir candidate
@@ -54,6 +56,23 @@ vmtoolgtk::show_error() {
 vmtoolgtk::show_info() {
 	local message="$1"
 	zenity --info --title "${VMTOOLGTK_TITLE}" --width 720 --text "${message}"
+}
+
+vmtoolgtk::log() {
+	local message="$1"
+	local logfile="${_LOGFILE:-/var/log/rtd/rtd-vm-tool-gtk.log}"
+
+	printf '%(%Y/%m/%d %H:%M:%S)T rtd-vm-tool-gtk: %s\n' -1 "${message}" >>"${logfile}" 2>/dev/null || true
+}
+
+vmtoolgtk::prompt_yes_no() {
+	local title="$1"
+	local message="$2"
+
+	zenity --question \
+		--title "${title}" \
+		--width 560 \
+		--text "${message}"
 }
 
 vmtoolgtk::show_about() {
@@ -99,59 +118,281 @@ vmtoolgtk::show_menu() {
 
 vmtoolgtk::find_terminal_emulator() {
 	local candidate
-	for candidate in x-terminal-emulator gnome-terminal kgx tilix xfce4-terminal mate-terminal konsole xterm; do
-		if command -v "${candidate}" >/dev/null 2>&1; then
-			printf '%s\n' "${candidate}"
-			return 0
-		fi
-	done
+
+	while IFS= read -r candidate; do
+		printf '%s\n' "${candidate}"
+		return 0
+	done < <(vmtoolgtk::terminal_candidates)
 
 	return 1
+}
+
+vmtoolgtk::terminal_candidates() {
+	local candidate
+	local -a candidates
+
+	if [[ "${EUID}" -eq 0 ]]; then
+		candidates=(gnome-terminal konsole xterm uxterm lxterm xfce4-terminal mate-terminal kgx tilix x-terminal-emulator)
+	else
+		candidates=(gnome-terminal konsole kgx tilix xfce4-terminal mate-terminal xterm uxterm lxterm x-terminal-emulator)
+	fi
+
+	for candidate in "${candidates[@]}"; do
+		if vmtoolgtk::terminal_is_usable "${candidate}"; then
+			printf '%s\n' "${candidate}"
+		fi
+	done
+}
+
+vmtoolgtk::terminal_is_usable() {
+	local terminal="$1"
+
+	command -v "${terminal}" >/dev/null 2>&1 || return 1
+
+	case "${terminal}" in
+		gnome-terminal)
+			# GNOME Terminal needs a session bus. In sudo/root launches, wrap it
+			# with dbus-run-session when available; otherwise skip it if neither
+			# dbus-run-session nor dbus-launch exists.
+			if [[ "${EUID}" -eq 0 ]]; then
+				command -v dbus-run-session >/dev/null 2>&1 || command -v dbus-launch >/dev/null 2>&1
+				return $?
+			fi
+			;;
+	esac
+
+	return 0
+}
+
+vmtoolgtk::find_terminal_font() {
+	local font matched
+	local -a preferred_fonts=(
+		"JetBrainsMono Nerd Font"
+		"CaskaydiaMono Nerd Font"
+		"CaskaydiaCove Nerd Font"
+		"MesloLGS NF"
+		"Hack Nerd Font"
+		"FiraCode Nerd Font"
+		"Symbols Nerd Font Mono"
+		"DejaVu Sans Mono"
+	)
+
+	if command -v fc-match >/dev/null 2>&1; then
+		for font in "${preferred_fonts[@]}"; do
+			matched="$(fc-match -f '%{family[0]}' "${font}" 2>/dev/null || true)"
+			if [[ "${matched}" == "${font}" ]]; then
+				printf '%s\n' "${font}"
+				return 0
+			fi
+		done
+	fi
+
+	printf '%s\n' "monospace"
+}
+
+vmtoolgtk::parse_args() {
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--sysprep)
+				RTD_VM_CLONE_ARGS+=("--sysprep")
+				shift
+				;;
+			--customize)
+				if [[ -z "${2:-}" ]]; then
+					vmtoolgtk::show_error "--customize requires an argument specifying virt-customize options or a script path."
+					return 1
+				fi
+				RTD_VM_CLONE_ARGS+=("--customize" "$2")
+				shift 2
+				;;
+			--trace)
+				RTD_VM_TOOL_TRACE=1
+				export RTD_VM_TOOL_TRACE
+				shift
+				;;
+			*)
+				vmtoolgtk::show_error "Unknown option: $1"
+				return 1
+				;;
+		esac
+	done
 }
 
 vmtoolgtk::launch_terminal_payload() {
 	local title="$1"
 	local payload="$2"
-	local terminal
+	local terminal xterm_font xterm_font_size rc
+	local -a attempted_terminals=()
 
-	terminal="$(vmtoolgtk::find_terminal_emulator)" || {
+	if ! vmtoolgtk::find_terminal_emulator >/dev/null; then
 		vmtoolgtk::show_error "No supported terminal emulator was found. Install x-terminal-emulator, gnome-terminal, kgx, tilix, xfce4-terminal, mate-terminal, konsole, or xterm."
 		return 1
-	}
+	fi
 
-	case "${terminal}" in
-		gnome-terminal|tilix|xfce4-terminal|mate-terminal)
-			"${terminal}" --title="${title}" -- bash -lc "${payload}"
-			;;
-		kgx)
-			"${terminal}" --title="${title}" bash -lc "${payload}"
-			;;
-		konsole)
-			"${terminal}" --new-tab -p tabtitle="${title}" -e bash -lc "${payload}"
-			;;
-		x-terminal-emulator)
-			"${terminal}" -e bash -lc "${payload}"
-			;;
-		xterm)
-			"${terminal}" -T "${title}" -e bash -lc "${payload}"
-			;;
-		*)
-			"${terminal}" -e bash -lc "${payload}"
-			;;
-	esac
+	while IFS= read -r terminal; do
+		attempted_terminals+=("${terminal}")
+		vmtoolgtk::log "Launching terminal-backed action with ${terminal}: ${title}"
+
+		case "${terminal}" in
+			gnome-terminal)
+				if [[ "${EUID}" -eq 0 && "$(command -v dbus-run-session || true)" ]]; then
+					dbus-run-session -- "${terminal}" --wait --title="${title}" -- bash -lc "${payload}"
+				else
+					"${terminal}" --title="${title}" -- bash -lc "${payload}"
+				fi
+				;;
+			tilix|xfce4-terminal|mate-terminal)
+				"${terminal}" --title="${title}" -- bash -lc "${payload}"
+				;;
+			kgx)
+				"${terminal}" --title="${title}" bash -lc "${payload}"
+				;;
+			konsole)
+				"${terminal}" --new-tab -p tabtitle="${title}" -e bash -lc "${payload}"
+				;;
+			x-terminal-emulator)
+				"${terminal}" -e bash -lc "${payload}"
+				;;
+			xterm|uxterm|lxterm)
+				xterm_font="$(vmtoolgtk::find_terminal_font)"
+				xterm_font_size="${RTD_VM_GTK_XTERM_FONT_SIZE:-14}"
+				"${terminal}" -u8 -fa "${xterm_font}" -fs "${xterm_font_size}" -geometry 120x36 -T "${title}" -e bash -lc "${payload}"
+				;;
+			*)
+				"${terminal}" -e bash -lc "${payload}"
+				;;
+		esac
+		rc=$?
+
+		if (( rc == 0 )); then
+			vmtoolgtk::log "Terminal-backed action launched with ${terminal}: ${title}"
+			return 0
+		fi
+
+		vmtoolgtk::log "Terminal launch failed with status ${rc}: ${terminal} (${title}); trying next terminal."
+	done < <(vmtoolgtk::terminal_candidates)
+
+	vmtoolgtk::show_error "Failed to launch the terminal-backed action. Tried: ${attempted_terminals[*]:-none}."
+	return 1
 }
 
 vmtoolgtk::launch_tui_action() {
 	local title="$1"
 	local action_snippet="$2"
-	local payload
+	local payload clone_args_snippet quoted_clone_args
 
-	printf -v payload 'source %q; RTD_GUI=dialog; export RTD_GUI RTD_VM_TOOL_TRACE; rtd::bootstrap_library %q || exit 1; vmtool::refresh_backtitle; %s; rc=$?; printf "\\nExit status: %%s\\n" "$rc"; if [[ -t 0 ]]; then read -r -p "Press Enter to close..." _; fi; exit "$rc"' \
+	if (( ${#RTD_VM_CLONE_ARGS[@]} )); then
+		printf -v quoted_clone_args '%q ' "${RTD_VM_CLONE_ARGS[@]}"
+	else
+		quoted_clone_args=""
+	fi
+	clone_args_snippet="RTD_VM_CLONE_ARGS=(${quoted_clone_args})"
+
+	vmtoolgtk::log "Selected terminal-backed action: title=${title}; tui=${RTD_VM_TUI_SCRIPT}; action=${action_snippet}"
+
+	printf -v payload 'exec > >(tee -a %q) 2>&1; printf "\\n==== RTD VM GTK action: %%s ====\\n" "$(date "+%%F %%T")"; printf "Title: %%s\\nTUI script: %%s\\nAction: %%s\\n\\n" %q %q %q; source %q || { rc=$?; printf "\\nFailed to source TUI script (status %%s).\\n" "$rc"; if [[ -t 0 ]]; then read -r -p "Press Enter to close..." _; fi; exit "$rc"; }; RTD_GUI=dialog; RTD_VM_TOOL_EMBEDDED_ACTION=1; export RTD_GUI RTD_VM_TOOL_TRACE RTD_VM_TOOL_EMBEDDED_ACTION; rtd::bootstrap_library %q || { rc=$?; printf "\\nFailed to load _rtd_library (status %%s).\\n" "$rc"; if [[ -t 0 ]]; then read -r -p "Press Enter to close..." _; fi; exit "$rc"; }; vmtool::refresh_backtitle; %s; %s; rc=$?; printf "\\nExit status: %%s\\n" "$rc"; if [[ -t 0 ]]; then read -r -p "Press Enter to close..." _; fi; exit "$rc"' \
+		"${RTD_VM_GTK_ACTION_LOG}" \
+		"${title}" \
+		"${RTD_VM_TUI_SCRIPT}" \
+		"${action_snippet}" \
 		"${RTD_VM_TUI_SCRIPT}" \
 		"_rtd_library" \
+		"${clone_args_snippet}" \
 		"${action_snippet}"
 
 	vmtoolgtk::launch_terminal_payload "${title}" "${payload}"
+}
+
+vmtoolgtk::start_stop_vm_menu() {
+	if ! command -v virsh >/dev/null 2>&1; then
+		vmtoolgtk::show_error "virsh was not found. Install libvirt clients/tools before managing VM power state."
+		return 1
+	fi
+
+	while true; do
+		local -a menu_entries=()
+		local vm state label action_hint selection latest_state
+
+		while IFS= read -r vm; do
+			[[ -z "${vm}" ]] && continue
+			state="$(virsh domstate "${vm}" 2>/dev/null | tr '[:upper:]' '[:lower:]')"
+			case "${state}" in
+				running)
+					label="Running"
+					action_hint="Stop"
+					;;
+				paused)
+					label="Paused"
+					action_hint="Stop"
+					;;
+				shut*|off)
+					label="Off"
+					action_hint="Start"
+					;;
+				*)
+					label="${state:-unknown}"
+					action_hint="Toggle"
+					;;
+			esac
+			menu_entries+=("${vm}" "${label}" "${action_hint}")
+		done < <(virsh list --all --name | grep -vi '^Template' | sed '/^$/d')
+
+		if (( ${#menu_entries[@]} == 0 )); then
+			vmtoolgtk::show_info "No non-Template VMs found to manage."
+			return 0
+		fi
+
+		selection="$(zenity --list \
+			--title "${VMTOOLGTK_TITLE} - Start / Stop VMs" \
+			--text "Select a VM to start or stop. Template images are hidden automatically." \
+			--width 920 \
+			--height 620 \
+			--column "VM" \
+			--column "State" \
+			--column "Action" \
+			--print-column=1 \
+			"${menu_entries[@]}")" || return 0
+
+		[[ -z "${selection}" ]] && continue
+		state="$(virsh domstate "${selection}" 2>/dev/null | tr '[:upper:]' '[:lower:]')"
+		case "${state}" in
+			shut*|off|"")
+				vmtoolgtk::prompt_yes_no \
+					"Start VM" \
+					"Start \"${selection}\"?\n\nCurrent state: ${state:-unknown}" || continue
+				if virsh start "${selection}"; then
+					kvm::wait_for_domain_start --domain "${selection}" --timeout 90 || write_warning "Start signal sent but no start event observed for ${selection}."
+					latest_state="$(virsh domstate "${selection}" 2>/dev/null || echo unknown)"
+					vmtoolgtk::show_info "Launch requested for \"${selection}\".\n\nLatest state: ${latest_state}"
+				else
+					vmtoolgtk::show_error "Failed to start \"${selection}\"."
+				fi
+				;;
+			running|paused|pmsuspended*)
+				vmtoolgtk::prompt_yes_no \
+					"Stop VM" \
+					"Stop \"${selection}\" gracefully?\n\nCurrent state: ${state}" || continue
+				if virsh shutdown "${selection}"; then
+					if vmtool::wait_for_vm_stop "${selection}" 45; then
+						vmtoolgtk::show_info "\"${selection}\" is now stopped."
+					elif vmtoolgtk::prompt_yes_no \
+						"Force Stop?" \
+						"\"${selection}\" did not stop within 45 seconds.\n\nForce power off?"; then
+						if virsh destroy "${selection}"; then
+							vmtoolgtk::show_info "\"${selection}\" was forcefully powered off."
+						else
+							vmtoolgtk::show_error "Failed to force stop \"${selection}\"."
+						fi
+					fi
+				else
+					vmtoolgtk::show_error "Failed to send shutdown signal to \"${selection}\"."
+				fi
+				;;
+			*)
+				vmtoolgtk::show_error "Unknown state for \"${selection}\"; cannot toggle automatically."
+				;;
+		esac
+	done
 }
 
 vmtoolgtk::show_template_menu() {
@@ -305,9 +546,7 @@ vmtoolgtk::show_main_menu() {
 				vmtoolgtk::show_template_menu
 				;;
 			4)
-				vmtoolgtk::launch_tui_action \
-					"RTD VM Tool - Start / Stop VMs" \
-					"vmtool::run_main_action 4"
+				vmtoolgtk::start_stop_vm_menu
 				;;
 			5)
 				vmtoolgtk::show_settings_menu
@@ -326,11 +565,18 @@ main() {
 	if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 		cat <<EOF
 Usage:
-  $(basename "$0") [--help|-h]
+  $(basename "$0") [options]
 
 Description:
   Open the GTK front-end for the RTD VM Tool. Menu navigation uses Zenity and
   selected workflows execute through the existing terminal VM backend.
+
+Options:
+  --sysprep                 Run virt-sysprep after cloning templates that support it.
+  --customize <spec|script> Pass virt-customize options or script path to clone workflows.
+  --trace                   Enable RTD_VM_TOOL_TRACE for terminal-backed actions.
+  --about                   Show GTK about information and exit.
+  --help, -h                Show this help text.
 EOF
 		exit 0
 	fi
@@ -340,13 +586,25 @@ EOF
 		exit 1
 	}
 
+	if [[ "${1:-}" == "--about" || "${1:-}" == "about" ]]; then
+		vmtoolgtk::show_about
+		exit 0
+	fi
+
 	RTD_VM_TUI_SCRIPT="$(vmtoolgtk::find_tui_script)" || {
 		vmtoolgtk::show_error "Unable to locate the companion rtd-vm-tool script."
 		exit 1
 	}
 
+	local restore_nounset=0
+	case "$-" in
+		*u*) restore_nounset=1; set +u ;;
+	esac
 	# shellcheck source=/dev/null
 	source "${RTD_VM_TUI_SCRIPT}"
+	(( restore_nounset )) && set -u
+
+	vmtoolgtk::parse_args "$@" || exit 1
 
 	if ! rtd::bootstrap_library "_rtd_library"; then
 		vmtoolgtk::show_error "Failed to load _rtd_library."
