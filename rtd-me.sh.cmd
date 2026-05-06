@@ -193,15 +193,24 @@ if [[ "$OSTYPE" == *"linux"* ]]; then
 elif [[ "$OSTYPE" == "darwin"* ]]; then
         echo "Mac OSX is currently not fully supported... however, I will attempt to get the appropriate script for this system and run it..."
 	read -n 1 -s -r -p "Press any key to continue... or CTRL+C to exit"
-	if ! curl -fsSL "${_git_raw_url}/core/rtd-oem-macos-config.sh" -o /tmp/rtd-oem-macos-config.sh; then
+	_stage2_file="$(mktemp "${TMPDIR:-/tmp/}rtd-oem-macos-config.XXXXXX.sh")" || {
+		echo "Failed to create a temporary file for the macOS configuration script."
+		exit 1
+	}
+	if ! curl -fsSL "${_git_raw_url}/core/rtd-oem-macos-config.sh" -o "${_stage2_file}"; then
 		echo "Failed to download the macOS configuration script from ${_git_raw_url}/core/rtd-oem-macos-config.sh"
+		rm -f "${_stage2_file}"
 		exit 1
 	fi
-	if ! head -n 1 /tmp/rtd-oem-macos-config.sh | grep -Eq '^#!.*(ba)?sh'; then
+	if ! head -n 1 "${_stage2_file}" | grep -Eq '^#!.*(ba)?sh'; then
 		echo "Downloaded macOS configuration script does not look executable. Aborting."
+		rm -f "${_stage2_file}"
 		exit 1
 	fi
-	bash /tmp/rtd-oem-macos-config.sh
+	bash "${_stage2_file}"
+	_stage2_status=$?
+	rm -f "${_stage2_file}"
+	exit "${_stage2_status}"
 elif [[ "$OSTYPE" == "cygwin" ]]; then
         echo "CYGWIN is currently unsupported..."
 elif [[ "$OSTYPE" == "msys" ]]; then
