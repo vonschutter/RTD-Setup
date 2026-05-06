@@ -108,7 +108,9 @@ write_log() {
 	line="[$(date '+%Y-%m-%d %H:%M:%S')] [${level}] ${message}"
 	printf '%s\n' "$line"
 	mkdir -p "$LOG_DIR" 2>/dev/null || true
-	printf '%s\n' "$line" >>"$LOG_FILE" 2>/dev/null || true
+	if [ -n "${LOG_FILE:-}" ] && { : >>"$LOG_FILE"; } 2>/dev/null; then
+		{ printf '%s\n' "$line" >>"$LOG_FILE"; } 2>/dev/null || true
+	fi
 }
 
 write_status() { write_log "INFO" "$*"; }
@@ -285,6 +287,11 @@ parse_args() {
 
 initialize_log() {
 	mkdir -p "$LOG_DIR" 2>/dev/null || true
+	if ! { : >>"$LOG_FILE"; } 2>/dev/null; then
+		LOG_DIR="${TMPDIR:-/tmp}/RTD"
+		LOG_FILE="${LOG_DIR}/${SCRIPT_NAME}.log"
+		mkdir -p "$LOG_DIR" 2>/dev/null || true
+	fi
 	write_status "RTD macOS OEM configuration ${RTD_MACOS_CONFIG_VERSION} started."
 	write_status "Preset: ${PRESET}; dry-run: ${DRY_RUN}"
 	write_status "Target user: ${TARGET_USER}; home: ${TARGET_HOME}"
