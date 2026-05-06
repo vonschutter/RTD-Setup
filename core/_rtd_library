@@ -782,7 +782,7 @@ dialog::copy_file_progress() {
 	status_file="$(mktemp)" || {
 		write_error "Unable to create temporary status file."
 		return 1
-	}
+}
 
 	dialog --title "Copying files" --gauge "Preparing copy..." 10 75 0 < <(
 		_current_item="Preparing copy..."
@@ -2937,7 +2937,7 @@ dependency::check_hardware_virtualization_support() {
 		else
 			system::log_item "$1"
 		fi
-	}
+}
 
 	check_hardware_virtualization_support::_log_error() {
 		if [[ $_quiet_mode -eq 0 ]]; then
@@ -3403,7 +3403,7 @@ system::prepare_environment_for_iso_creation() {
 		tmp_work_root=$(mktemp -d "${tmp_base%/}/rtd-iso.XXXXXX") || {
 			write_error "Failed to create temporary workspace in ${tmp_base}"
 			return 1
-		}
+}
 		printf '%s\n' "$$" >"$tmp_work_root/.rtd-active" 2>/dev/null || true
 		_OLD_TMPDIR="${TMPDIR:-}"
 		export TMPDIR="$tmp_work_root"
@@ -22408,7 +22408,7 @@ macoskvm::normalize_installer_version() {
 	# Globals:
 	#   None
 	# Arguments:
-	#   $1 - Installer version/name: catalina, mojave, high-sierra, 10.15, 10.14, or 10.13.
+	#   $1 - Installer version/name: latest-supported, catalina, mojave, high-sierra, 10.15, 10.14, or 10.13.
 	# Outputs:
 	#   Prints the normalized catalog version to STDOUT.
 	# Returns:
@@ -22422,11 +22422,57 @@ macoskvm::normalize_installer_version() {
 		latest|latest-supported|supported|default|current|catalina|macos-catalina|10.15) printf '%s\n' "10.15" ;;
 		n-1|previous|previous-supported|mojave|macos-mojave|10.14) printf '%s\n' "10.14" ;;
 		high-sierra|high_sierra|highsierra|macos-high-sierra|10.13) printf '%s\n' "10.13" ;;
+		big-sur|bigsur|monterey|ventura|sonoma|sequoia|tahoe|11|11.*|12|12.*|13|13.*|14|14.*|15|15.*|26|26.*)
+			write_error "Unsupported legacy macOS installer version: ${requested}. Use macoskvm::fetch_installer_image or macoskvm::prepare_host to route Big Sur and newer through the modern OpenCore workflow."
+			return 1
+			;;
 		*)
-			system::log_item "Unsupported macOS installer version: ${requested}"
+			write_error "Unsupported macOS installer version: ${requested}. Supported values: latest-supported, catalina/10.15, mojave/10.14, high-sierra/10.13."
 			return 1
 			;;
 	esac
+}
+
+macoskvm::normalize_modern_installer_version() {
+	# Description:
+	#   Normalize Big Sur and newer macOS installer names to the short names used
+	#   by the OSX-KVM fetch-macOS-v2.py helper.
+	# Globals:
+	#   None
+	# Arguments:
+	#   $1 - Installer version/name: big-sur, monterey, ventura, sonoma, sequoia, tahoe, 11, 12, 13, 14, 15, or 26.
+	# Outputs:
+	#   Prints the normalized modern short name to STDOUT.
+	# Returns:
+	#   0 on success; non-zero for non-modern values.
+	# Usage:
+	#   macoskvm::normalize_modern_installer_version sonoma
+	# End of documentation
+	local requested="${1:-}"
+
+	case "${requested,,}" in
+		latest-modern|modern|modern-default|recommended-modern|sonoma|macos-sonoma|14|14.*) printf '%s\n' "sonoma" ;;
+		big-sur|bigsur|macos-big-sur|macos-bigsur|11|11.*) printf '%s\n' "big-sur" ;;
+		monterey|macos-monterey|12|12.*) printf '%s\n' "monterey" ;;
+		ventura|macos-ventura|13|13.*) printf '%s\n' "ventura" ;;
+		sequoia|macos-sequoia|15|15.*) printf '%s\n' "sequoia" ;;
+		tahoe|macos-tahoe|26|26.*) printf '%s\n' "tahoe" ;;
+		*) return 1 ;;
+	esac
+}
+
+macoskvm::is_modern_installer_version() {
+	# Description:
+	#   Return success when a requested macOS version belongs to the modern
+	#   OpenCore workflow rather than the legacy macOS-Simple-KVM workflow.
+	# Arguments:
+	#   $1 - Installer version/name.
+	# Returns:
+	#   0 for Big Sur and newer; non-zero otherwise.
+	# Usage:
+	#   macoskvm::is_modern_installer_version sonoma
+	# End of documentation
+	macoskvm::normalize_modern_installer_version "${1:-}" >/dev/null 2>&1
 }
 
 macoskvm::version_label() {
@@ -22452,6 +22498,54 @@ macoskvm::version_label() {
 			return 1
 			;;
 	esac
+}
+
+macoskvm::check_modern_host_requirements() {
+	# Description:
+	#   Check host CPU/runtime conditions that matter for modern macOS guests.
+	# Globals:
+	#   None
+	# Arguments:
+	#   $1 - Normalized modern short name.
+	# Outputs:
+	#   RTD status and warning messages.
+	# Returns:
+	#   0 when requirements are acceptable; non-zero for hard blockers.
+	# Usage:
+	#   macoskvm::check_modern_host_requirements ventura
+	# End of documentation
+	local modern_label="${1:-}"
+	local cpu_flags="" current_clocksource="" tsc_log=""
+
+	if command -v lscpu >/dev/null 2>&1; then
+		cpu_flags="$(lscpu 2>/dev/null | awk -F: '/Flags|Features/ {print tolower($2); exit}')"
+	elif [[ -r /proc/cpuinfo ]]; then
+		cpu_flags="$(awk -F: '/flags|Features/ {print tolower($2); exit}' /proc/cpuinfo)"
+	fi
+
+	case "$modern_label" in
+		ventura|sonoma|sequoia|tahoe)
+			if [[ " ${cpu_flags} " != *" avx2 "* ]]; then
+				write_error "macOS ${modern_label} requires a host CPU exposing AVX2 to the guest. Use Big Sur/Monterey on older CPUs or choose a different host."
+				return 1
+			fi
+			;;
+	esac
+
+	current_clocksource="$(cat /sys/devices/system/clocksource/clocksource0/current_clocksource 2>/dev/null || true)"
+	case "$modern_label" in
+		ventura|sonoma|sequoia|tahoe)
+			if [[ -n "$current_clocksource" && "$current_clocksource" != "tsc" ]]; then
+				write_warning "Host clocksource is ${current_clocksource}, not tsc. Ventura and newer can freeze on hosts with unstable TSC; consider validating BIOS/kernel settings before relying on this VM."
+			fi
+			if command -v dmesg >/dev/null 2>&1; then
+				tsc_log="$(dmesg 2>/dev/null | grep -i 'tsc.*unstable' | tail -n 1 || true)"
+				[[ -n "$tsc_log" ]] && write_warning "Kernel has reported TSC instability: ${tsc_log}"
+			fi
+			;;
+	esac
+
+	return 0
 }
 
 macoskvm::ensure_installer_dependencies() {
@@ -22852,6 +22946,147 @@ EOF
 	return 0
 }
 
+macoskvm::fetch_modern_installer_image() {
+	# Description:
+	#   Download Big Sur and newer Apple recovery media using OSX-KVM's
+	#   fetch-macOS-v2.py helper, convert BaseSystem.dmg to a QEMU-readable
+	#   image, and cache it under the libvirt boot media directory.
+	# Globals:
+	#   iso (w)
+	#   macos_installer_image (w)
+	# Arguments:
+	#   --version <name|version>      big-sur, monterey, ventura, sonoma, sequoia, tahoe, 11, 12, 13, 14, 15, or 26.
+	#   --dir <path>                  Destination cache directory. Defaults to /var/lib/libvirt/boot.
+	#   --work-dir <path>             Temporary work directory. Defaults to <dir>/.rtd-macos-modern-work.
+	#   --force                       Re-download and re-convert even if the cached image exists.
+	#   --keep-work                   Leave temporary downloaded Apple files in place.
+	#   --help                        Show usage.
+	# Outputs:
+	#   Prints the final BaseSystem image path and exports 'iso' plus
+	#   'macos_installer_image'.
+	# Returns:
+	#   0 on success; non-zero on failure.
+	# Usage:
+	#   macoskvm::fetch_modern_installer_image --version sonoma
+	# End of documentation
+	local requested_version="latest-modern"
+	local download_dir="/var/lib/libvirt/boot"
+	local work_dir=""
+	local force=0
+	local keep_work=0
+	local modern_label target_img converted_tmp fetch_root fetch_dir helper_py helper_url dmg_file
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--version|--catalog-version)
+				[[ -n "${2:-}" ]] || { write_error "Missing value for $1"; return 1; }
+				requested_version="$2"
+				shift 2
+				;;
+			--dir|--download-dir)
+				[[ -n "${2:-}" ]] || { write_error "Missing value for $1"; return 1; }
+				download_dir="$2"
+				shift 2
+				;;
+			--work-dir)
+				[[ -n "${2:-}" ]] || { write_error "Missing value for $1"; return 1; }
+				work_dir="$2"
+				shift 2
+				;;
+			--force)
+				force=1
+				shift
+				;;
+			--keep-work)
+				keep_work=1
+				shift
+				;;
+			-h|--help)
+				cat <<'EOF'
+Usage: macoskvm::fetch_modern_installer_image [options]
+  --version <name|version>     latest-modern, big-sur, monterey, ventura, sonoma, sequoia, tahoe, 11, 12, 13, 14, 15, or 26
+  --dir <path>                 cache directory, default: /var/lib/libvirt/boot
+  --work-dir <path>            temporary work directory, default: <dir>/.rtd-macos-modern-work
+  --force                      overwrite an existing cached image
+  --keep-work                  keep downloaded package files after conversion
+EOF
+				return 0
+				;;
+			*)
+				write_error "Unknown parameter passed to macoskvm::fetch_modern_installer_image: $1"
+				return 1
+				;;
+		esac
+	done
+
+	modern_label="$(macoskvm::normalize_modern_installer_version "$requested_version")" || {
+		write_error "Unsupported modern macOS installer version: ${requested_version}. Supported values: big-sur, monterey, ventura, sonoma, sequoia, tahoe."
+		return 1
+	}
+	target_img="${download_dir}/BaseSystem-${modern_label}.img"
+	converted_tmp="${target_img}.tmp"
+	work_dir="${work_dir:-${download_dir}/.rtd-macos-modern-work}"
+	fetch_root="${work_dir}/${modern_label}"
+	fetch_dir="${fetch_root}/download"
+	helper_py="${fetch_root}/fetch-macOS-v2.py"
+	helper_url="${MACOSKVM_MODERN_FETCHMACOS_URL:-https://raw.githubusercontent.com/kholia/OSX-KVM/master/fetch-macOS-v2.py}"
+
+	if [[ -f "$target_img" && $force -eq 0 ]]; then
+		system::log_item "Using cached modern macOS BaseSystem image: ${target_img}"
+		macos_installer_image="$target_img"
+		iso="$target_img"
+		export macos_installer_image iso
+		printf '%s\n' "$target_img"
+		return 0
+	fi
+
+	macoskvm::ensure_installer_dependencies || return 1
+	macoskvm::check_modern_host_requirements "$modern_label" || return 1
+
+	mkdir -p "$download_dir" "$fetch_dir" || return 1
+	if [[ ! -w "$download_dir" || ! -w "$fetch_root" ]]; then
+		write_error "The current user cannot write to ${download_dir}. Run this through the RTD module with sudo/admin privileges."
+		return 1
+	fi
+
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL "$helper_url" -o "$helper_py" || return 1
+	else
+		wget -qO "$helper_py" "$helper_url" || return 1
+	fi
+	chmod 0755 "$helper_py" || return 1
+
+	rm -rf "$fetch_dir"
+	mkdir -p "$fetch_dir" || return 1
+	system::log_item "Fetching modern macOS recovery media: ${modern_label}."
+	(
+		cd "$fetch_dir" || exit 1
+		python3 "$helper_py" -s "$modern_label"
+	) || return 1
+
+	dmg_file="$(find "$fetch_dir" -type f -name 'BaseSystem.dmg' | sort | head -n 1)"
+	if [[ -z "$dmg_file" || ! -f "$dmg_file" ]]; then
+		write_error "OSX-KVM fetch helper completed but BaseSystem.dmg was not found under ${fetch_dir}."
+		return 1
+	fi
+
+	rm -f "$converted_tmp"
+	dmg2img "$dmg_file" "$converted_tmp" || return 1
+	mv -f "$converted_tmp" "$target_img" || return 1
+	chmod 0644 "$target_img" || return 1
+
+	if [[ $keep_work -eq 0 ]]; then
+		rm -rf "$fetch_dir"
+	fi
+
+	macos_installer_image="$target_img"
+	iso="$target_img"
+	export macos_installer_image iso
+	system::log_item "Exporting modern macOS installer image value: macos_installer_image = ${macos_installer_image}"
+	printf '%s\n' "$target_img"
+	return 0
+}
+
 macoskvm::fetch_installer_image() {
 	# Description:
 	#   Download Apple recovery media using the macOS-Simple-KVM FetchMacOS helper,
@@ -22926,13 +23161,22 @@ macoskvm::fetch_installer_image() {
 			-h|--help)
 				cat <<'EOF'
 Usage: macoskvm::fetch_installer_image [options]
-  --version <name|version>     latest-supported, n-1, catalina, mojave, high-sierra, 10.15, 10.14, or 10.13
+  --version <name|version>     latest-supported, n-1, catalina, mojave, high-sierra, big-sur, monterey, ventura, sonoma, sequoia, tahoe, 10.13-15, or 26
   --n-1                        use the previous supported installer
   --dir <path>                 cache directory, default: /var/lib/libvirt/boot
   --work-dir <path>            temporary work directory, default: <dir>/.rtd-macos-work
   --catalog-id <id>            Apple catalog id, default: PublicRelease
   --force                      overwrite an existing cached image
   --keep-work                  keep downloaded package files after conversion
+
+Notes:
+  latest-supported still means Catalina / 10.15 for backward compatibility.
+  Big Sur and newer route through the modern OSX-KVM recovery helper.
+
+Examples:
+  macoskvm::fetch_installer_image --version catalina
+  macoskvm::fetch_installer_image --version mojave --force
+  macoskvm::fetch_installer_image --version high-sierra --keep-work
 EOF
 				return 0
 				;;
@@ -22942,6 +23186,15 @@ EOF
 				;;
 		esac
 	done
+
+	if macoskvm::is_modern_installer_version "$requested_version"; then
+		local -a modern_args=(--dir "$download_dir" --version "$requested_version")
+		[[ -n "$work_dir" ]] && modern_args+=(--work-dir "$work_dir")
+		[[ $force -eq 1 ]] && modern_args+=(--force)
+		[[ $keep_work -eq 1 ]] && modern_args+=(--keep-work)
+		macoskvm::fetch_modern_installer_image "${modern_args[@]}"
+		return $?
+	fi
 
 	catalog_version="$(macoskvm::normalize_installer_version "$requested_version")" || return 1
 	label="$(macoskvm::version_label "$catalog_version")" || return 1
@@ -23049,11 +23302,12 @@ macoskvm::define_vm() {
 	local vm_name=""
 	local memory_mib="4096"
 	local cpus="4"
-	local cpu_args="${MACOSKVM_CPU_ARGS:-Penryn,vendor=GenuineIntel,+hypervisor,+invtsc,kvm=on,vmware-cpuid-freq=on,+fma,+avx,+avx2,+aes,+ssse3,+sse4.2,+popcnt,+sse4a,+bmi1,+bmi2,+xsave,+xsaveopt,+xsavec,+xgetbv1}"
+	local cpu_args="${MACOSKVM_CPU_ARGS:-}"
 	local download_dir="/var/lib/libvirt/boot"
 	local image_dir="/var/lib/libvirt/images"
 	local disk_name=""
 	local force=0
+	local macos_profile="legacy"
 	local machine="q35"
 	local installer_image="${macos_installer_image:-}"
 	local esp_image="${macos_esp_image:-}"
@@ -23063,7 +23317,7 @@ macoskvm::define_vm() {
 	local system_disk="${macos_system_disk:-}"
 	local nvram_dir="/var/lib/libvirt/qemu/nvram"
 	local xml_dir="/var/lib/libvirt/boot"
-	local nvram_path xml_path uuid memory_kib mac_suffix existing_uuid domain_state instance_id base_vm_name cpu_commandline_xml
+	local nvram_path xml_path uuid memory_kib mac_suffix existing_uuid domain_state instance_id base_vm_name cpu_commandline_xml usb_controller_xml input_xml sound_xml network_model
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
@@ -23102,6 +23356,11 @@ macoskvm::define_vm() {
 				disk_name="$2"
 				shift 2
 				;;
+			--macos-profile|--profile)
+				[[ -n "${2:-}" ]] || { write_error "Missing value for $1"; return 1; }
+				macos_profile="$2"
+				shift 2
+				;;
 			--force)
 				force=1
 				shift
@@ -23116,6 +23375,7 @@ Usage: macoskvm::define_vm [options]
   --dir <path>          boot cache directory, default: /var/lib/libvirt/boot
   --image-dir <path>    image directory, default: /var/lib/libvirt/images
   --disk-name <name>    system disk filename, default: <vm-name>.qcow2
+  --macos-profile <p>   legacy or modern, default: legacy
   --force               redefine the domain if it already exists
 EOF
 				return 0
@@ -23128,6 +23388,23 @@ EOF
 	done
 
 	command -v virsh >/dev/null 2>&1 || { write_error "Required command not found: virsh"; return 1; }
+
+	case "${macos_profile,,}" in
+		legacy) macos_profile="legacy" ;;
+		modern|opencore-modern|osx-kvm) macos_profile="modern" ;;
+		*)
+			write_error "Unsupported macOS VM profile: ${macos_profile}. Supported values: legacy, modern."
+			return 1
+			;;
+	esac
+
+	if [[ -z "$cpu_args" ]]; then
+		if [[ "$macos_profile" == "modern" ]]; then
+			cpu_args="Skylake-Client,-hle,-rtm,kvm=on,vendor=GenuineIntel,+hypervisor,+invtsc,vmware-cpuid-freq=on,+ssse3,+sse4.2,+popcnt,+avx,+avx2,+aes,+xsave,+xsaveopt,check"
+		else
+			cpu_args="Penryn,vendor=GenuineIntel,+hypervisor,+invtsc,kvm=on,vmware-cpuid-freq=on,+fma,+avx,+avx2,+aes,+ssse3,+sse4.2,+popcnt,+sse4a,+bmi1,+bmi2,+xsave,+xsaveopt,+xsavec,+xgetbv1"
+		fi
+	fi
 
 	instance_id="$(date +%Y%m%d-%H%M%S 2>/dev/null || printf '%s' "$RANDOM")"
 	vm_name="${vm_name:-RTD-macOS-${instance_id}}"
@@ -23190,6 +23467,35 @@ EOF
 	if [[ -n "$cpu_args" ]]; then
 		cpu_commandline_xml="    <qemu:arg value='-cpu'/>
     <qemu:arg value='${cpu_args}'/>"
+	fi
+	if [[ "$macos_profile" == "modern" ]]; then
+		usb_controller_xml="    <controller type='usb' index='0' model='qemu-xhci'>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x07' function='0x0'/>
+    </controller>"
+		input_xml="    <input type='tablet' bus='usb'/>
+    <input type='keyboard' bus='usb'/>"
+		sound_xml="    <sound model='ich9'/>"
+		network_model="virtio"
+	else
+		usb_controller_xml="    <controller type='usb' index='0' model='ich9-ehci1'>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x07' function='0x7'/>
+    </controller>
+    <controller type='usb' index='0' model='ich9-uhci1'>
+      <master startport='0'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x07' function='0x0' multifunction='on'/>
+    </controller>
+    <controller type='usb' index='0' model='ich9-uhci2'>
+      <master startport='2'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x07' function='0x1'/>
+    </controller>
+    <controller type='usb' index='0' model='ich9-uhci3'>
+      <master startport='4'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x07' function='0x2'/>
+    </controller>"
+		input_xml="    <input type='tablet' bus='usb'/>
+    <input type='keyboard' bus='usb'/>"
+		sound_xml="    <sound model='ich9'/>"
+		network_model="e1000-82545em"
 	fi
 
 	cat > "$xml_path" <<EOF
@@ -23268,26 +23574,12 @@ EOF
     <controller type='sata' index='0'>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x1f' function='0x2'/>
     </controller>
-    <controller type='usb' index='0' model='ich9-ehci1'>
-      <address type='pci' domain='0x0000' bus='0x00' slot='0x07' function='0x7'/>
-    </controller>
-    <controller type='usb' index='0' model='ich9-uhci1'>
-      <master startport='0'/>
-      <address type='pci' domain='0x0000' bus='0x00' slot='0x07' function='0x0' multifunction='on'/>
-    </controller>
-    <controller type='usb' index='0' model='ich9-uhci2'>
-      <master startport='2'/>
-      <address type='pci' domain='0x0000' bus='0x00' slot='0x07' function='0x1'/>
-    </controller>
-    <controller type='usb' index='0' model='ich9-uhci3'>
-      <master startport='4'/>
-      <address type='pci' domain='0x0000' bus='0x00' slot='0x07' function='0x2'/>
-    </controller>
+${usb_controller_xml}
     <interface type='network'>
       <mac address='52:54:00:${mac_suffix}'/>
       <source network='default'/>
       <link state='up'/>
-      <model type='e1000-82545em'/>
+      <model type='${network_model}'/>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x05' function='0x0'/>
     </interface>
     <serial type='pty'>
@@ -23296,13 +23588,12 @@ EOF
     <console type='pty'>
       <target type='serial' port='0'/>
     </console>
-    <input type='tablet' bus='usb'/>
-    <input type='keyboard' bus='usb'/>
+${input_xml}
     <graphics type='spice' autoport='yes'>
       <listen type='address'/>
       <image compression='off'/>
     </graphics>
-    <sound model='ich9'/>
+${sound_xml}
     <video>
       <model type='vmvga' vram='16384' heads='1' primary='yes'/>
     </video>
@@ -23344,7 +23635,7 @@ macoskvm::prepare_host() {
 	#   macos_ovmf_vars (w)
 	#   macos_system_disk (w)
 	# Arguments:
-	#   --version <name|version>      Defaults to latest-supported. Use n-1 for the previous supported installer.
+	#   --version <name|version>      Defaults to latest-supported. Use n-1 for the previous supported legacy installer.
 	#   --n-1                         Shortcut for --version n-1.
 	#   --dir <path>                  Destination cache directory. Defaults to /var/lib/libvirt/boot.
 	#   --image-dir <path>            Destination VM image directory. Defaults to /var/lib/libvirt/images.
@@ -23374,10 +23665,11 @@ macoskvm::prepare_host() {
 	local vm_name=""
 	local memory_mib="4096"
 	local cpus="4"
-	local cpu_args="${MACOSKVM_CPU_ARGS:-Penryn,vendor=GenuineIntel,+hypervisor,+invtsc,kvm=on,vmware-cpuid-freq=on,+fma,+avx,+avx2,+aes,+ssse3,+sse4.2,+popcnt,+sse4a,+bmi1,+bmi2,+xsave,+xsaveopt,+xsavec,+xgetbv1}"
+	local cpu_args="${MACOSKVM_CPU_ARGS:-}"
 	local force=0
 	local keep_work=0
 	local define_domain=1
+	local modern_label=""
 	local -a fetch_args=()
 	local -a stage_args=()
 	local -a disk_args=()
@@ -23455,8 +23747,8 @@ macoskvm::prepare_host() {
 			-h|--help)
 				cat <<'EOF'
 Usage: macoskvm::prepare_host [options]
-  --version <name|version>     latest-supported, n-1, catalina, mojave, high-sierra, 10.15, 10.14, or 10.13
-  --n-1                        use the previous supported installer
+  --version <name|version>     latest-supported, n-1, catalina, mojave, high-sierra, big-sur, monterey, ventura, sonoma, sequoia, tahoe, 10.13-15, or 26
+  --n-1                        use the previous supported legacy installer
   --dir <path>                 cache directory, default: /var/lib/libvirt/boot
   --bootloader <mode>          auto, clover, or opencore-kvm; auto uses opencore-kvm on AMD
   --image-dir <path>           image directory, default: /var/lib/libvirt/images
@@ -23469,6 +23761,18 @@ Usage: macoskvm::prepare_host [options]
   --no-define                  prepare assets without defining the libvirt VM
   --force                      overwrite existing staged assets and installer image
   --keep-work                  keep downloaded package files after conversion
+
+Notes:
+  latest-supported still means Catalina / 10.15 for backward compatibility.
+  Big Sur and newer route through the modern OSX-KVM/OpenCore recovery flow.
+  The modern recommended alias latest-modern resolves to Sonoma.
+
+Examples:
+  macoskvm::prepare_host --version latest-supported
+  macoskvm::prepare_host --version catalina --vm-name RTD-macOS-Catalina
+  macoskvm::prepare_host --version sonoma --vm-name RTD-macOS-Sonoma
+  macoskvm::prepare_host --version sequoia --memory 8192 --cpus 4
+  macoskvm::prepare_host --version mojave --memory 6144 --cpus 4
 EOF
 				return 0
 				;;
@@ -23485,10 +23789,25 @@ EOF
 	vm_name="${vm_name:-RTD-macOS-${instance_id}}"
 	disk_name="${disk_name:-${vm_name}.qcow2}"
 
+	if macoskvm::is_modern_installer_version "$requested_version"; then
+		modern_label="$(macoskvm::normalize_modern_installer_version "$requested_version")" || return 1
+		macoskvm::check_modern_host_requirements "$modern_label" || return 1
+		if [[ "$bootloader" == "auto" ]]; then
+			bootloader="opencore-kvm"
+		elif [[ "${bootloader,,}" == "clover" || "${bootloader,,}" == "foxlet" || "${bootloader,,}" == "macos-simple-kvm" ]]; then
+			write_error "Modern macOS releases require OpenCore. Use --bootloader opencore-kvm or leave --bootloader as auto."
+			return 1
+		fi
+		write_status "Using modern macOS KVM workflow for ${modern_label}."
+	else
+		write_status "Using legacy macOS KVM workflow for ${requested_version}."
+	fi
+
 	stage_args=(--dir "$download_dir" --bootloader "$bootloader")
 	fetch_args=(--dir "$download_dir" --version "$requested_version")
 	disk_args=(--image-dir "$image_dir" --disk-name "$disk_name" --disk-size "$disk_size")
 	define_args=(--dir "$download_dir" --image-dir "$image_dir" --disk-name "$disk_name" --vm-name "$vm_name" --memory "$memory_mib" --cpus "$cpus")
+	[[ -n "$modern_label" ]] && define_args+=(--macos-profile modern)
 	[[ -n "$cpu_args" ]] && define_args+=(--cpu-args "$cpu_args")
 	[[ $force -eq 1 ]] && { stage_args+=(--force); fetch_args+=(--force); }
 	[[ $force -eq 1 ]] && define_args+=(--force)

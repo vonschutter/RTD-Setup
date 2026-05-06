@@ -48,33 +48,31 @@ If installed on your `$PATH`, simply run:
 rtd-vm-tool
 ```
 
-## Screenshot
+## Screenshots
 
-![VM Tool Menu](Media_files/Screenshot.png)
+### Terminal Interface
 
-## macOS KVM Workflow Screenshots
+![rtd-vm-tool terminal interface](Media_files/Screenshot_rtd-vm-tool.png)
 
-The following screenshots show a macOS guest created through the RTD VM Tool / macOS KVM flow on QEMU/KVM.
+### GTK Interface
 
-### Boot
+![rtd-vm-tool GTK interface](Media_files/Screenshot_rtd-vm-tool-gtk.png)
 
-![macOS guest booting on QEMU/KVM](Media_files/macos-kvm-boot.png)
+### Ubuntu VDI
 
-### First Setup
+![Ubuntu VDI running through RTD VM Tool](Media_files/Screenshot_Ubuntu_VDI.png)
 
-![macOS first setup country selection on QEMU/KVM](Media_files/macos-kvm-welcome.png)
+### Fedora VDI
 
-### Recovery Utilities
+![Fedora VDI running through RTD VM Tool](Media_files/Screenshot_Fedora_VDI.png)
 
-![macOS Utilities recovery screen on QEMU/KVM](Media_files/macos-kvm-recovery-utilities.png)
+### Fedora KDE VDI
 
-### Installer Progress
+![Fedora KDE VDI running through RTD VM Tool](Media_files/Screenshot_Fedora_VDI_KDE.png)
 
-![macOS Catalina installer progress on QEMU/KVM](Media_files/macos-kvm-install-progress.png)
+### Windows 11 VDI
 
-### Desktop
-
-![macOS desktop running inside QEMU/KVM](Media_files/macos-kvm-desktop.png)
+![Windows 11 VDI running through RTD VM Tool](Media_files/Screenshot_Windows11_VDI.png)
 
 ## Notes
 

@@ -117,8 +117,8 @@ Commands:
   doctor            Check local host tooling needed for macOS KVM preparation.
 
 Common options:
-  --version <name>  latest-supported, n-1, catalina, mojave, high-sierra, 10.15, 10.14, or 10.13.
-  --n-1             Use the previous supported installer version.
+  --version <name>  latest-supported, n-1, catalina, mojave, high-sierra, big-sur, monterey, ventura, sonoma, sequoia, tahoe, 10.13-15, or 26.
+  --n-1             Use the previous supported legacy installer version.
   --dir <path>      Cache directory. Default: /var/lib/libvirt/boot.
   --bootloader <m>  auto, clover, or opencore-kvm. Auto uses opencore-kvm on AMD.
   --image-dir <p>   VM image directory. Default: /var/lib/libvirt/images.
@@ -131,6 +131,23 @@ Common options:
   --no-define       Prepare assets but do not define the VM.
   --force           Re-stage assets and re-download/rebuild the cached image.
   --keep-work       Keep temporary downloaded Apple package files after conversion.
+
+Version notes:
+  latest-supported still means Catalina / 10.15 for backward compatibility.
+  High Sierra, Mojave, and Catalina use the legacy macOS-Simple-KVM flow.
+  Big Sur, Monterey, Ventura, Sonoma, Sequoia, and Tahoe use the modern
+  OSX-KVM/OpenCore flow. latest-modern resolves to Sonoma.
+
+Examples:
+  sudo rtd-macos-kvm prepare --version latest-supported
+  sudo rtd-macos-kvm prepare --version catalina --vm-name RTD-macOS-Catalina
+  sudo rtd-macos-kvm prepare --version sonoma --vm-name RTD-macOS-Sonoma
+  sudo rtd-macos-kvm prepare --version sequoia --memory 8192 --cpus 4
+  sudo rtd-macos-kvm prepare --version mojave --vm-name RTD-macOS-Mojave --memory 6144 --cpus 4
+  sudo rtd-macos-kvm fetch-installer --version tahoe --force --keep-work
+  sudo rtd-macos-kvm fetch-installer --version high-sierra --force --keep-work
+  sudo rtd-macos-kvm stage-assets --bootloader opencore-kvm --force
+  sudo rtd-macos-kvm define-vm --vm-name RTD-macOS-Test --disk-size 160G --memory 8192
 EOF
 }
 
