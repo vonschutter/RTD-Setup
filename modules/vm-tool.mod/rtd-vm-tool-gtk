@@ -23,6 +23,8 @@ set -u
 RTD_VM_TUI_SCRIPT=""
 RTD_VM_TOOL_TRACE=0
 RTD_VM_GTK_ACTION_LOG="/var/log/rtd/rtd-vm-tool-gtk-actions.log"
+: "${RTD_VM_GTK_TERMINAL_GEOMETRY:=132x42}"
+: "${RTD_VM_GTK_XTERM_FONT_SIZE:=14}"
 declare -a RTD_VM_CLONE_ARGS=()
 
 vmtoolgtk::find_tui_script() {
@@ -221,8 +223,10 @@ vmtoolgtk::parse_args() {
 vmtoolgtk::launch_terminal_payload() {
 	local title="$1"
 	local payload="$2"
-	local terminal xterm_font xterm_font_size rc
+	local terminal terminal_geometry xterm_font xterm_font_size rc
 	local -a attempted_terminals=()
+
+	terminal_geometry="${RTD_VM_GTK_TERMINAL_GEOMETRY:-132x42}"
 
 	if ! vmtoolgtk::find_terminal_emulator >/dev/null; then
 		vmtoolgtk::show_error "No supported terminal emulator was found. Install x-terminal-emulator, gnome-terminal, kgx, tilix, xfce4-terminal, mate-terminal, konsole, or xterm."
@@ -236,19 +240,22 @@ vmtoolgtk::launch_terminal_payload() {
 		case "${terminal}" in
 			gnome-terminal)
 				if [[ "${EUID}" -eq 0 && "$(command -v dbus-run-session || true)" ]]; then
-					dbus-run-session -- "${terminal}" --wait --title="${title}" -- bash -lc "${payload}"
+					dbus-run-session -- "${terminal}" --wait --geometry="${terminal_geometry}" --title="${title}" -- bash -lc "${payload}"
 				else
-					"${terminal}" --title="${title}" -- bash -lc "${payload}"
+					"${terminal}" --geometry="${terminal_geometry}" --title="${title}" -- bash -lc "${payload}"
 				fi
 				;;
-			tilix|xfce4-terminal|mate-terminal)
-				"${terminal}" --title="${title}" -- bash -lc "${payload}"
+			tilix)
+				"${terminal}" --geometry="${terminal_geometry}" --title="${title}" -- bash -lc "${payload}"
+				;;
+			xfce4-terminal|mate-terminal)
+				"${terminal}" --geometry="${terminal_geometry}" --title="${title}" -- bash -lc "${payload}"
 				;;
 			kgx)
 				"${terminal}" --title="${title}" bash -lc "${payload}"
 				;;
 			konsole)
-				"${terminal}" --new-tab -p tabtitle="${title}" -e bash -lc "${payload}"
+				"${terminal}" --geometry "${terminal_geometry}" --new-tab -p tabtitle="${title}" -e bash -lc "${payload}"
 				;;
 			x-terminal-emulator)
 				"${terminal}" -e bash -lc "${payload}"
@@ -256,7 +263,7 @@ vmtoolgtk::launch_terminal_payload() {
 			xterm|uxterm|lxterm)
 				xterm_font="$(vmtoolgtk::find_terminal_font)"
 				xterm_font_size="${RTD_VM_GTK_XTERM_FONT_SIZE:-14}"
-				"${terminal}" -u8 -fa "${xterm_font}" -fs "${xterm_font_size}" -geometry 120x36 -T "${title}" -e bash -lc "${payload}"
+				"${terminal}" -u8 -fa "${xterm_font}" -fs "${xterm_font_size}" -geometry "${terminal_geometry}" -T "${title}" -e bash -lc "${payload}"
 				;;
 			*)
 				"${terminal}" -e bash -lc "${payload}"

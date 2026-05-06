@@ -9385,11 +9385,11 @@ system::add_or_remove_login_script() {
 	_create_autostart_file() {
 		local exec_line
 		if command -v xterm >/dev/null 2>&1; then
-			exec_line="/usr/bin/xterm -fa Monospace -iconic -fs 10 -e \"sudo -E bash -c \"$script_path\"\""
+			exec_line="/usr/bin/xterm -fa Monospace -fs 12 -e sudo -E bash \"$script_path\""
 			write_information "📜 Creating autostart entry using xterm"
 		else
 			software::add_native_package xterm
-			exec_line="/usr/bin/xterm -fa Monospace -iconic -fs 10 -e \"sudo -E bash -c \"$script_path\"\""
+			exec_line="/usr/bin/xterm -fa Monospace -fs 12 -e sudo -E bash \"$script_path\""
 			write_information "📜 Creating autostart entry using default terminal"
 		fi
 
@@ -25869,6 +25869,8 @@ kvm::make_vm_now_from_fedora_org() {
 	🖥️ - Disk Size: ${_dsk} \n You may attach to this server and see the progress at IP: $(hostname -I)"
 
 	write_information "Creating VM: ${vm_name}..."
+	local fedora_extra_args
+	fedora_extra_args="inst.ks=file:/$(basename "${_preseed_file}") inst.text inst.repo=${_source_url} ip=dhcp rd.neednet=1"
 	{
 		"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
 			--vcpus "${_cpu}" \
@@ -25881,7 +25883,7 @@ kvm::make_vm_now_from_fedora_org() {
 			--video model=virtio \
 			--graphics spice,listen=127.0.0.1 \
 			--controller type=virtio-serial \
-			--extra-args "inst.ks=file:/$(basename $_preseed_file)" \
+			--extra-args "${fedora_extra_args}" \
 			--wait --noautoconsole \
 			|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
 	} >>"${_LOGFILE}" 2>&1 & disown
@@ -26779,17 +26781,19 @@ kvm::make_vm_now_from_ubuntu_com() {
 		return 1
 	fi
 
-	system::log_item  "Check that virtualization is supported on the host..."DS
+	system::log_item  "Check that virtualization is supported on the host..."
 	if ! dependency::virtualization; then
 		return 1
 	fi
 
 	system::log_item  "Get the version of Ubuntu to use; sets variable _tgt_ubuntu_ver..."
 	if [[ -z "${_tgt_ubuntu_ver}" ]]; then
-		if ubuntu::get_target_version ; then 
+		if ubuntu::get_target_version; then
 			write_status "🔎 	- Using the Ubuntu version as requested: ${_tgt_ubuntu_ver}"
+		elif [[ -n "${_tgt_ubuntu_ver:-}" ]]; then
+			write_status "🔎 	- Using the Ubuntu fallback version: ${_tgt_ubuntu_ver}"
 		else
-			write_status "💥 - User pressed [ESC] or [Cancel] not selecting a version..." 
+			write_status "💥 - User pressed [ESC] or [Cancel] not selecting a version..."
 			write_status "💥 - Press [ENTER] to select default version of Ubuntu (Latest LTS release)"
 			return 1
 		fi
@@ -27015,11 +27019,11 @@ kvm::make_vm_now_from_ubuntu_com() {
 			NOTE: Building a VDI for Ubuntu versions less than 23 is deprecated \n
 			Press OK to return to the previous menu. \n"
 			dialog::display_summary_message "NOTICE!"
-			unset _tgt_ubuntu_ver _summary_message iso_filename CloudConfigDir iso vm_name 
+			unset _tgt_ubuntu_ver _summary_message iso_filename CloudConfigDir iso vm_name
 			return
 		else
 			system::log_item "Downloading the Ubuntu ISO if not already present to ${permanent_download_dir} for media-type server version ${_tgt_ubuntu_ver}"
-			if ! ubuntu::download_iso --dir "${permanent_download_dir}" --media-type desktop --version "${_tgt_ubuntu_ver}"; then
+			if ! ubuntu::download_iso --dir "${permanent_download_dir}" --media-type server --version "${_tgt_ubuntu_ver}"; then
 				write_error "Failed to download the Ubuntu server ISO for ${_tgt_ubuntu_ver}."
 				return 1
 			fi
@@ -27027,8 +27031,8 @@ kvm::make_vm_now_from_ubuntu_com() {
 				write_error "Ubuntu server ISO missing after download."
 				return 1
 			fi
-			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: is greater than 23, so using cloud config to build server..."
-			system::log_item "🐧 Ubuntu version ${_tgt_ubuntu_ver}: Using SERVER installer as requested..."
+			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: using server autoinstall media for VDI build..."
+			system::log_item "🐧 Installing selected desktop payload as a server-app package: ${_UserDesktopEnvironmentSelection:-${server_app:-ubuntu-desktop}}"
 			if ! system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --vmname "${vm_name}" "$@"; then
 				write_error "Failed to generate the Ubuntu cloud-init configuration."
 				return 1
@@ -29401,6 +29405,7 @@ template::kickstart_cfg() {
 	local _kickstart_workstation_selection="${_UserDesktopEnvironmentSelection:-"@^workstation-product-environment"}"
 	local _kickstart_server_environment="@^server-product-environment"
 	local _kickstart_server_selection="${_UserServerEnvironemtSelection:-"@network-server"}"
+	local _kickstart_display_manager_enable=""
 
 	case "${_kickstart_workstation_selection}" in
 		@*-environment)
@@ -29419,6 +29424,16 @@ template::kickstart_cfg() {
 			_kickstart_server_selection="-@^${_kickstart_server_selection#-@}"
 			;;
 	esac
+
+	read -r -d '' _kickstart_display_manager_enable <<-'KS_DISPLAY_MANAGER'
+				if systemctl list-unit-files sddm.service 2>/dev/null | grep -q '^sddm.service'; then
+					systemctl enable sddm
+				elif systemctl list-unit-files lightdm.service 2>/dev/null | grep -q '^lightdm.service'; then
+					systemctl enable lightdm
+				elif systemctl list-unit-files gdm.service 2>/dev/null | grep -q '^gdm.service'; then
+					systemctl enable gdm
+				fi
+		KS_DISPLAY_MANAGER
 
 	if [[ -n "${_kickstart_password_value}" ]]; then
 		case "${_kickstart_password_value}" in
@@ -29521,7 +29536,7 @@ template::kickstart_cfg() {
 		cat >>"${_ks_file}" <<-KS_EOF
 			# Generated by RTD Power Tools ( ${FUNCNAME[0]} )
 			# Choosing mode (graphical|text|cmdline [--non-interactive])
-			graphical
+			text
 			${_kickstart_install_source:-}
 			firstboot --disable
 			keyboard --vckeymap=${Preference_InitialKeyboardLayout} --xlayouts="${Preference_InitialKeyboardLayout}"
@@ -29558,7 +29573,7 @@ template::kickstart_cfg() {
 				bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
 				# systemctl enable sshd
 				# restorecon -Rv /usr/share/wayland-sessions /usr/share/xsessions
-				systemctl enable gdm
+				${_kickstart_display_manager_enable}
 				systemctl set-default graphical.target
 			%end
 		KS_EOF
@@ -30943,7 +30958,7 @@ common_vdi_post_config=$(cat <<EOF
         # Final setup and installation of GUI software:
 
         # Enable and start spice-vdagent onlogin
-        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install spice-vdagent qemu-guest-agent ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install spice-vdagent qemu-guest-agent xterm ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install ansible ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c 'systemctl enable spice-vdagentd ; exit 0'
 
@@ -30951,10 +30966,18 @@ common_vdi_post_config=$(cat <<EOF
         - curtin in-target --target=/target -- mkdir -p /etc/xdg/autostart
         - curtin in-target --target=/target -- bash -c 'echo -e "[Desktop Entry]\nType=Application\nExec=/usr/bin/spice-vdagent\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\nName=Spice Agent" > /etc/xdg/autostart/spice-vdagent.desktop'
 
+        # Configure first-login OEM setup directly; rtd-oem-enable-config.sh also refreshes these settings after clone.
+        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /etc/xdg/autostart /etc/sddm.conf.d /etc/lightdm/lightdm.conf.d /etc/gdm3 /etc/systemd/system/getty@tty1.service.d ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'printf "%s\n" "[Desktop Entry]" "Type=Application" "Exec=/usr/bin/xterm -fa Monospace -fs 12 -e sudo -E bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-linux-config.sh" "Terminal=false" "Hidden=false" "X-GNOME-Autostart-enabled=true" "Name=OEM Run" "Comment=OEM Setup" > /etc/xdg/autostart/oem-run.desktop ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'printf "%s\n" "[Autologin]" "User=${Preference_InitialUser}" "Session=plasma.desktop" > /etc/sddm.conf.d/10-rtd-autologin.conf ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'printf "%s\n" "[Seat:*]" "autologin-user=${Preference_InitialUser}" "autologin-user-timeout=0" > /etc/lightdm/lightdm.conf.d/10-rtd-autologin.conf ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'printf "%s\n" "[daemon]" "AutomaticLoginEnable=True" "AutomaticLogin=${Preference_InitialUser}" > /etc/gdm3/custom.conf ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'printf "%s\n" "[Service]" "ExecStart=" "ExecStart=-/sbin/agetty --noissue --autologin ${Preference_InitialUser} %I \\\$TERM" "Type=idle" > /etc/systemd/system/getty@tty1.service.d/override.conf ; exit 0'
+
         # Clone RTD Setup & Execute OEM Config
-        - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"}'
-        - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..5}; do git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} && break || { echo "Clone failed, trying again..." ; rm -r ${_OEM_DIR:-"/opt/rtd"}/* ; sleep 10; }; done'
-        - curtin in-target --target=/target -- /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
+        - curtin in-target --target=/target -- /bin/bash -c 'rm -rf /tmp/rtd-setup-clone ; for i in {1..5}; do git clone --depth=1 ${GIT_RTD_SRC_URL} /tmp/rtd-setup-clone && break || { echo "RTD clone failed on attempt \$i, retrying..." ; rm -rf /tmp/rtd-setup-clone ; sleep 10; }; done ; test -f /tmp/rtd-setup-clone/core/rtd-oem-enable-config.sh'
+        - curtin in-target --target=/target -- /bin/bash -c 'rm -rf ${_OEM_DIR:-"/opt/rtd"} ; mkdir -p ${_OEM_DIR:-"/opt/rtd"} ; cp -a /tmp/rtd-setup-clone/. ${_OEM_DIR:-"/opt/rtd"}/ ; chmod 755 ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-linux-config.sh ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ; exit 0'
 EOF
 )
 

@@ -134,6 +134,7 @@ export _GIT_PROFILE="${_GIT_PROFILE:-vonschutter}"
 
 # Location of base administrative scripts and command-lets to get.
 _git_src_url=https://github.com/${_GIT_PROFILE}/${_TLA_UPPER}-Setup.git
+_git_raw_url=https://raw.githubusercontent.com/${_GIT_PROFILE}/${_TLA_UPPER}-Setup/main
 
 
 
@@ -185,9 +186,16 @@ if [[ "$OSTYPE" == *"linux"* ]]; then
 	} 2>&1 | tee -a ${_LOGFILE}
 	exit $?
 elif [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "Mac OSX is currently not fully supported... hoever, I will attempt to get the appropriate script for this system and run it..."
+        echo "Mac OSX is currently not fully supported... however, I will attempt to get the appropriate script for this system and run it..."
 	read -n 1 -s -r -p "Press any key to continue... or CTRL+C to exit"
-	curl -L ${_git_src_url}/raw/main/core/rtd-oem-macos-config.sh -o /tmp/rtd-oem-macos-config.sh
+	if ! curl -fsSL "${_git_raw_url}/core/rtd-oem-macos-config.sh" -o /tmp/rtd-oem-macos-config.sh; then
+		echo "Failed to download the macOS configuration script from ${_git_raw_url}/core/rtd-oem-macos-config.sh"
+		exit 1
+	fi
+	if ! head -n 1 /tmp/rtd-oem-macos-config.sh | grep -Eq '^#!.*(ba)?sh'; then
+		echo "Downloaded macOS configuration script does not look executable. Aborting."
+		exit 1
+	fi
 	bash /tmp/rtd-oem-macos-config.sh
 elif [[ "$OSTYPE" == "cygwin" ]]; then
         echo "CYGWIN is currently unsupported..."
