@@ -64,6 +64,8 @@ RUN_CLEANUP=1
 RESTART_UI=1
 LOG_DIR="${HOME}/Library/Logs/RTD"
 LOG_FILE="${LOG_DIR}/${SCRIPT_NAME}.log"
+TARGET_USER="${RTD_MACOS_TARGET_USER:-}"
+TARGET_HOME="${RTD_MACOS_TARGET_HOME:-}"
 
 MINIMAL_CASKS="firefox brave-browser vlc keka"
 WORKSTATION_CASKS="firefox brave-browser vlc keka libreoffice visual-studio-code rectangle the-unarchiver"
@@ -134,6 +136,44 @@ run_shell() {
 	/bin/bash -c "$*"
 }
 
+run_user_cmd() {
+	# Homebrew and per-user macOS defaults must run as the console user. Running
+	# them as root either fails outright or writes preferences into the wrong home.
+	write_status "RUN as ${TARGET_USER}: $*"
+	if [ "$DRY_RUN" -eq 1 ]; then
+		return 0
+	fi
+	if [ "$(id -u)" -eq 0 ]; then
+		sudo -u "$TARGET_USER" env HOME="$TARGET_HOME" USER="$TARGET_USER" LOGNAME="$TARGET_USER" PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" "$@"
+	else
+		HOME="$TARGET_HOME" USER="$TARGET_USER" LOGNAME="$TARGET_USER" PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" "$@"
+	fi
+}
+
+run_user_shell() {
+	write_status "RUN as ${TARGET_USER}: $*"
+	if [ "$DRY_RUN" -eq 1 ]; then
+		return 0
+	fi
+	if [ "$(id -u)" -eq 0 ]; then
+		sudo -u "$TARGET_USER" env HOME="$TARGET_HOME" USER="$TARGET_USER" LOGNAME="$TARGET_USER" PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" /bin/bash -c "$*"
+	else
+		HOME="$TARGET_HOME" USER="$TARGET_USER" LOGNAME="$TARGET_USER" PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" /bin/bash -c "$*"
+	fi
+}
+
+run_privileged_cmd() {
+	write_status "RUN privileged: $*"
+	if [ "$DRY_RUN" -eq 1 ]; then
+		return 0
+	fi
+	if [ "$(id -u)" -eq 0 ]; then
+		"$@"
+	else
+		sudo "$@"
+	fi
+}
+
 command_exists() {
 	command -v "$1" >/dev/null 2>&1
 }
@@ -145,6 +185,32 @@ require_macos() {
 		write_error "This script must be run on macOS."
 		exit 1
 	fi
+}
+
+detect_target_user() {
+	if [ -z "$TARGET_USER" ] || [ "$TARGET_USER" = "root" ]; then
+		TARGET_USER="${SUDO_USER:-}"
+	fi
+	if [ -z "$TARGET_USER" ] || [ "$TARGET_USER" = "root" ]; then
+		TARGET_USER="$(stat -f '%Su' /dev/console 2>/dev/null || true)"
+	fi
+	if [ -z "$TARGET_USER" ] || [ "$TARGET_USER" = "root" ]; then
+		TARGET_USER="$(id -un)"
+	fi
+	if [ "$TARGET_USER" = "root" ]; then
+		write_error "Could not determine a non-root macOS user for Homebrew and user defaults."
+		exit 1
+	fi
+
+	if [ -z "$TARGET_HOME" ]; then
+		TARGET_HOME="$(dscl . -read "/Users/${TARGET_USER}" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
+	fi
+	if [ -z "$TARGET_HOME" ] || [ ! -d "$TARGET_HOME" ]; then
+		TARGET_HOME="/Users/${TARGET_USER}"
+	fi
+
+	LOG_DIR="${TARGET_HOME}/Library/Logs/RTD"
+	LOG_FILE="${LOG_DIR}/${SCRIPT_NAME}.log"
 }
 
 parse_args() {
@@ -221,6 +287,7 @@ initialize_log() {
 	mkdir -p "$LOG_DIR" 2>/dev/null || true
 	write_status "RTD macOS OEM configuration ${RTD_MACOS_CONFIG_VERSION} started."
 	write_status "Preset: ${PRESET}; dry-run: ${DRY_RUN}"
+	write_status "Target user: ${TARGET_USER}; home: ${TARGET_HOME}"
 }
 
 ensure_command_line_tools() {
@@ -232,42 +299,42 @@ ensure_command_line_tools() {
 	fi
 
 	write_warning "Apple Command Line Tools are missing. Requesting installation."
-	run_cmd xcode-select --install || true
+	run_user_cmd xcode-select --install || true
 	write_warning "If a Command Line Tools installer opened, complete it and rerun this script."
 	return 1
 }
 
-load_homebrew_environment() {
+homebrew_bin() {
 	# Homebrew installs to different prefixes on Apple Silicon and Intel Macs.
-	# Loading shellenv makes the rest of the script independent of CPU type.
 	if [ -x /opt/homebrew/bin/brew ]; then
-		eval "$(/opt/homebrew/bin/brew shellenv)"
+		printf '%s\n' /opt/homebrew/bin/brew
 	elif [ -x /usr/local/bin/brew ]; then
-		eval "$(/usr/local/bin/brew shellenv)"
+		printf '%s\n' /usr/local/bin/brew
+	else
+		return 1
 	fi
 }
 
 ensure_homebrew() {
 	# Homebrew is the safest normal-user mechanism for installing desktop apps on
 	# macOS without bypassing platform protections or hand-maintaining DMG URLs.
-	load_homebrew_environment
-	if command_exists brew; then
+	local brew
+	if brew="$(homebrew_bin)"; then
 		write_ok "Homebrew is available."
 		return 0
 	fi
 
-	write_warning "Homebrew is not installed. Installing Homebrew for the current user."
+	write_warning "Homebrew is not installed. Installing Homebrew for ${TARGET_USER}."
 	if [ "$DRY_RUN" -eq 1 ]; then
 		write_status "DRY-RUN: would install Homebrew from https://brew.sh/"
 		return 0
 	fi
 
-	NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || {
+	run_user_shell 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' || {
 		write_error "Homebrew installation failed."
 		return 1
 	}
-	load_homebrew_environment
-	command_exists brew || {
+	homebrew_bin >/dev/null || {
 		write_error "Homebrew installed, but brew is still not available in PATH."
 		return 1
 	}
@@ -278,22 +345,23 @@ install_homebrew_apps() {
 	# on a fresh workstation/VDI. This avoids force-removing Apple apps and instead
 	# adds better default tools for browsers, media, archives, office, and editing.
 	local casks="$WORKSTATION_CASKS"
-	local app
+	local app brew
 	if [ "$PRESET" = "minimal" ]; then
 		casks="$MINIMAL_CASKS"
 	fi
 
 	ensure_command_line_tools || return 1
 	ensure_homebrew || return 1
+	brew="$(homebrew_bin)" || return 1
 
-	run_cmd brew update || write_warning "Homebrew update failed; continuing with available metadata."
+	run_user_cmd "$brew" update || write_warning "Homebrew update failed; continuing with available metadata."
 
 	for app in $casks; do
-		if brew list --cask "$app" >/dev/null 2>&1; then
+		if run_user_cmd "$brew" list --cask "$app" >/dev/null 2>&1; then
 			write_ok "Application already installed: ${app}"
 			continue
 		fi
-		run_cmd brew install --cask "$app" || write_warning "Failed to install cask: ${app}"
+		run_user_cmd "$brew" install --cask "$app" || write_warning "Failed to install cask: ${app}"
 	done
 }
 
@@ -302,58 +370,56 @@ apply_privacy_defaults() {
 	# disable security services such as Gatekeeper, XProtect, MRT, or updates.
 	write_status "Applying macOS privacy and suggestion defaults."
 
-	run_cmd defaults write com.apple.AdLib allowApplePersonalizedAdvertising -bool false
-	run_cmd defaults write com.apple.AdLib allowIdentifierForAdvertising -bool false
-	run_cmd defaults write com.apple.assistant.support "Assistant Enabled" -bool false
-	run_cmd defaults write com.apple.Siri StatusMenuVisible -bool false
-	run_cmd defaults write com.apple.Siri UserHasDeclinedEnable -bool true
-	run_cmd defaults write com.apple.spotlight SuggestionsEnabled -bool false
-	run_cmd defaults write com.apple.lookup.shared LookupSuggestionsDisabled -bool true
+	run_user_cmd defaults write com.apple.AdLib allowApplePersonalizedAdvertising -bool false
+	run_user_cmd defaults write com.apple.AdLib allowIdentifierForAdvertising -bool false
+	run_user_cmd defaults write com.apple.assistant.support "Assistant Enabled" -bool false
+	run_user_cmd defaults write com.apple.Siri StatusMenuVisible -bool false
+	run_user_cmd defaults write com.apple.Siri UserHasDeclinedEnable -bool true
+	run_user_cmd defaults write com.apple.spotlight SuggestionsEnabled -bool false
+	run_user_cmd defaults write com.apple.lookup.shared LookupSuggestionsDisabled -bool true
 
 	# System-wide diagnostic submission settings need sudo. Failures are warnings
 	# because some MDM-managed or newer macOS builds may reject local writes.
-	if command_exists sudo; then
-		run_cmd sudo defaults write /Library/Application\ Support/CrashReporter/DiagnosticMessagesHistory AutoSubmit -bool false || true
-		run_cmd sudo defaults write /Library/Application\ Support/CrashReporter/DiagnosticMessagesHistory ThirdPartyDataSubmit -bool false || true
-		run_cmd sudo defaults write /Library/Preferences/com.apple.SubmitDiagInfo AutoSubmit -bool false || true
-	fi
+	run_privileged_cmd defaults write /Library/Application\ Support/CrashReporter/DiagnosticMessagesHistory AutoSubmit -bool false || true
+	run_privileged_cmd defaults write /Library/Application\ Support/CrashReporter/DiagnosticMessagesHistory ThirdPartyDataSubmit -bool false || true
+	run_privileged_cmd defaults write /Library/Preferences/com.apple.SubmitDiagInfo AutoSubmit -bool false || true
 }
 
 apply_ui_defaults() {
 	# These are support-oriented UI defaults: make files inspectable, reduce
 	# animation overhead, keep screenshots organized, and remove noisy Dock items.
-	local screenshot_dir="${HOME}/Pictures/Screenshots"
+	local screenshot_dir="${TARGET_HOME}/Pictures/Screenshots"
 	write_status "Applying Finder, Dock, screenshot, and animation defaults."
 
-	run_cmd mkdir -p "$screenshot_dir"
+	run_user_cmd mkdir -p "$screenshot_dir"
 
-	run_cmd defaults write NSGlobalDomain AppleShowAllExtensions -bool true
-	run_cmd defaults write NSGlobalDomain NSAutomaticWindowAnimationsEnabled -bool false
-	run_cmd defaults write NSGlobalDomain NSDocumentSaveNewDocumentsToCloud -bool false
-	run_cmd defaults write NSGlobalDomain PMPrintingExpandedStateForPrint -bool true
-	run_cmd defaults write NSGlobalDomain PMPrintingExpandedStateForPrint2 -bool true
+	run_user_cmd defaults write NSGlobalDomain AppleShowAllExtensions -bool true
+	run_user_cmd defaults write NSGlobalDomain NSAutomaticWindowAnimationsEnabled -bool false
+	run_user_cmd defaults write NSGlobalDomain NSDocumentSaveNewDocumentsToCloud -bool false
+	run_user_cmd defaults write NSGlobalDomain PMPrintingExpandedStateForPrint -bool true
+	run_user_cmd defaults write NSGlobalDomain PMPrintingExpandedStateForPrint2 -bool true
 
-	run_cmd defaults write com.apple.finder AppleShowAllFiles -bool true
-	run_cmd defaults write com.apple.finder FXDefaultSearchScope -string SCcf
-	run_cmd defaults write com.apple.finder FXEnableExtensionChangeWarning -bool false
-	run_cmd defaults write com.apple.finder FXPreferredViewStyle -string Nlsv
-	run_cmd defaults write com.apple.finder ShowPathbar -bool true
-	run_cmd defaults write com.apple.finder ShowStatusBar -bool true
-	run_cmd defaults write com.apple.finder _FXShowPosixPathInTitle -bool true
+	run_user_cmd defaults write com.apple.finder AppleShowAllFiles -bool true
+	run_user_cmd defaults write com.apple.finder FXDefaultSearchScope -string SCcf
+	run_user_cmd defaults write com.apple.finder FXEnableExtensionChangeWarning -bool false
+	run_user_cmd defaults write com.apple.finder FXPreferredViewStyle -string Nlsv
+	run_user_cmd defaults write com.apple.finder ShowPathbar -bool true
+	run_user_cmd defaults write com.apple.finder ShowStatusBar -bool true
+	run_user_cmd defaults write com.apple.finder _FXShowPosixPathInTitle -bool true
 
-	run_cmd defaults write com.apple.dock autohide -bool false
-	run_cmd defaults write com.apple.dock expose-animation-duration -float 0.1
-	run_cmd defaults write com.apple.dock launchanim -bool false
-	run_cmd defaults write com.apple.dock mru-spaces -bool false
-	run_cmd defaults write com.apple.dock show-recents -bool false
-	run_cmd defaults write com.apple.dock tilesize -int 48
+	run_user_cmd defaults write com.apple.dock autohide -bool false
+	run_user_cmd defaults write com.apple.dock expose-animation-duration -float 0.1
+	run_user_cmd defaults write com.apple.dock launchanim -bool false
+	run_user_cmd defaults write com.apple.dock mru-spaces -bool false
+	run_user_cmd defaults write com.apple.dock show-recents -bool false
+	run_user_cmd defaults write com.apple.dock tilesize -int 48
 
-	run_cmd defaults write com.apple.screencapture disable-shadow -bool true
-	run_cmd defaults write com.apple.screencapture location -string "$screenshot_dir"
-	run_cmd defaults write com.apple.screencapture type -string png
+	run_user_cmd defaults write com.apple.screencapture disable-shadow -bool true
+	run_user_cmd defaults write com.apple.screencapture location -string "$screenshot_dir"
+	run_user_cmd defaults write com.apple.screencapture type -string png
 
-	run_cmd defaults write com.apple.universalaccess reduceMotion -bool true
-	run_cmd defaults write com.apple.universalaccess reduceTransparency -bool true
+	run_user_cmd defaults write com.apple.universalaccess reduceMotion -bool true
+	run_user_cmd defaults write com.apple.universalaccess reduceTransparency -bool true
 }
 
 apply_firewall_defaults() {
@@ -367,10 +433,10 @@ apply_firewall_defaults() {
 		return 0
 	fi
 
-	run_cmd sudo "$firewall" --setglobalstate on || true
-	run_cmd sudo "$firewall" --setstealthmode on || true
-	run_cmd sudo "$firewall" --setallowsigned on || true
-	run_cmd sudo "$firewall" --setallowsignedapp on || true
+	run_privileged_cmd "$firewall" --setglobalstate on || true
+	run_privileged_cmd "$firewall" --setstealthmode on || true
+	run_privileged_cmd "$firewall" --setallowsigned on || true
+	run_privileged_cmd "$firewall" --setallowsignedapp on || true
 }
 
 cleanup_user_caches() {
@@ -378,9 +444,9 @@ cleanup_user_caches() {
 	# It avoids /System, /Library, and protected app payloads.
 	write_status "Cleaning safe user cache and log files."
 
-	run_shell "rm -rf \"${HOME}/Library/Caches\"/* 2>/dev/null || true"
-	run_shell "rm -rf \"${HOME}/Library/Logs\"/*.log 2>/dev/null || true"
-	run_shell "rm -rf \"${HOME}/Library/Saved Application State\"/* 2>/dev/null || true"
+	run_user_shell "rm -rf \"${TARGET_HOME}/Library/Caches\"/* 2>/dev/null || true"
+	run_user_shell "rm -rf \"${TARGET_HOME}/Library/Logs\"/*.log 2>/dev/null || true"
+	run_user_shell "rm -rf \"${TARGET_HOME}/Library/Saved Application State\"/* 2>/dev/null || true"
 }
 
 restart_user_interface() {
@@ -391,9 +457,9 @@ restart_user_interface() {
 	fi
 
 	write_status "Restarting Finder, Dock, and SystemUIServer to apply UI defaults."
-	run_cmd killall Finder || true
-	run_cmd killall Dock || true
-	run_cmd killall SystemUIServer || true
+	run_user_cmd killall Finder || true
+	run_user_cmd killall Dock || true
+	run_user_cmd killall SystemUIServer || true
 }
 
 complete_setup() {
@@ -407,6 +473,7 @@ complete_setup() {
 main() {
 	parse_args "$@"
 	require_macos
+	detect_target_user
 	initialize_log
 
 	if [ "$INSTALL_APPS" -eq 1 ]; then
