@@ -14,7 +14,7 @@ GOTO :CMDSCRIPT
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #:: Author(s):	SLS, KLS, NB.  Buffalo Center, IA & Avarua, Cook Islands
-#:: Version:	1.07
+Version="1.07"
 #::
 #::
 #:: Purpose: 	The purpose of the script is to decide what scripts to download based
@@ -204,7 +204,7 @@ if [[ "$OSTYPE" == *"linux"* ]]; then
 	} 2>&1 | tee -a "${_LOGFILE}"
 	exit $?
 elif [[ "$OSTYPE" == "darwin"* ]]; then
-	echo "Mac OSX is currently not fully supported... however, I will attempt to get the appropriate script for this system and run it..."
+	echo "Mac OSX is currently not fully supported by ${_SCRIPTNAME} version ${Version}... however, I will attempt to get the appropriate script for this system and run it..."
 	read -n 1 -s -r -p "Press any key to continue... or CTRL+C to exit"
 	
 	if ! "${_SUDO[@]}" mkdir -p "${_CONFIG_CORE_DIR}" ; then
@@ -221,7 +221,7 @@ elif [[ "$OSTYPE" == "darwin"* ]]; then
 		echo "Downloaded macOS configuration script does not look executable. Aborting."
 		exit 1
 	fi
-	
+
 	"${_SUDO[@]}" chmod 0755 "${_CONFIG_CORE_DIR}/${_MAC_SCRIPT}" || { echo "Failed to make ${_CONFIG_CORE_DIR}/${_MAC_SCRIPT} executable."; exit 1; }
 	RTD_MACOS_SETUP_RAW_URL="${_RTD_SETUP_RAW_URL}" bash "${_CONFIG_CORE_DIR}/${_MAC_SCRIPT}" "$@"
 	exit $?
