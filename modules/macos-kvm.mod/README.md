@@ -127,6 +127,8 @@ The default `workstation` preset installs Firefox, Brave, VLC, Keka, LibreOffice
 
 Fresh newer macOS installs may need Apple Command Line Tools before every Homebrew operation is fully reliable. The config script requests Command Line Tools when they are missing, continues with the Homebrew/cask install attempt, and logs any cask failures individually. If the Apple installer is still running or finishes after the script has moved on, rerun the script after Command Line Tools are available.
 
+When `rtd-me.sh.cmd` is run on macOS, it stays a bootstrapper: it replaces `/opt/rtd/core/rtd-oem-macos-config.sh` with the current copy from the RTD repository and runs that installed configure script. Wallpaper retrieval and desktop picture setup remain owned by `rtd-oem-macos-config.sh`, which can use local RTD wallpaper files or download them from the repository as a fallback.
+
 ## Screenshots
 
 Tool Output | Sonoma Installer | Sonoma Install Progress

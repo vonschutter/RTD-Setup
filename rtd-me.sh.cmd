@@ -112,34 +112,42 @@ GOTO :CMDSCRIPT
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # Variables that govern the behavior or the script and location of files are
-# set here. There should be no reason to change any of this abcent strong preferences.
+# set here. There should be no reason to change any of this absent strong preferences.
 YELLOW="$(tput setaf 3 2>/dev/null || printf '')"
 NO_COLOR="$(tput sgr0 2>/dev/null || printf '')"
-
-# Ensure administrative privileges where the bootstrap needs them. The macOS
-# stage must keep Homebrew work under the logged-in user and will use sudo only
-# for the few system settings that require elevation.
-if [ "$UID" -ne 0 ] && [[ "$OSTYPE" != "darwin"* ]]; then
-	printf "%b" "${YELLOW}This script needs administrative access...${NO_COLOR}"
-	exec sudo -E bash "$0" "$@"
-fi
-
-# Put a convenient link to the logs where logs are normally found...
-# capture the 3 first letters as org TLA (Three Letter Acronym)
-export _SCRIPTNAME=$(basename $0)
-export _TLA=${_SCRIPTNAME:0:3}
-export _TLA_UPPER=$(printf '%s' "${_TLA}" | tr '[:lower:]' '[:upper:]')
-export _TLA_LOWER=$(printf '%s' "${_TLA}" | tr '[:upper:]' '[:lower:]')
-export _LOG_DIR=/var/log/${_TLA_LOWER}
-mkdir -p ${_LOG_DIR}
-export _LOGFILE=${_LOG_DIR}/$( basename ${0} )-$(date +%Y-%m-%d)-oem.log
-
-# Set the GIT profile name to be used if not set elsewhere:
+export _SCRIPTNAME="$(basename "$0")"
+export _TLA="${_SCRIPTNAME:0:3}"
+export _TLA_UPPER="$(printf '%s' "${_TLA}" | tr '[:lower:]' '[:upper:]')"
+export _TLA_LOWER="$(printf '%s' "${_TLA}" | tr '[:upper:]' '[:lower:]')"
 export _GIT_PROFILE="${_GIT_PROFILE:-vonschutter}"
 
-# Location of base administrative scripts and command-lets to get.
-_git_src_url=https://github.com/${_GIT_PROFILE}/${_TLA_UPPER}-Setup.git
-_git_raw_url=https://raw.githubusercontent.com/${_GIT_PROFILE}/${_TLA_UPPER}-Setup/main
+# Shared repository and log settings.
+_RTD_SETUP_GIT_URL="https://github.com/${_GIT_PROFILE}/${_TLA_UPPER}-Setup.git"
+_RTD_SETUP_RAW_URL="https://raw.githubusercontent.com/${_GIT_PROFILE}/${_TLA_UPPER}-Setup/main"
+export _LOG_DIR="/var/log/${_TLA_LOWER}"
+export _LOGFILE="${_LOG_DIR}/${_SCRIPTNAME}-$(date +%Y-%m-%d)-oem.log"
+
+# Shared POSIX config paths. Linux, macOS, BSD, and similar systems use /opt.
+_CONFIG_DIR="/opt/${_TLA_LOWER}"
+_CONFIG_TMP_DIR="${_CONFIG_DIR}.tmp"
+_CONFIG_CORE_DIR="${_CONFIG_DIR}/core"
+_CONFIG_LOG_LINK="${_CONFIG_DIR}/log"
+
+# POSIX stage-two script names.
+_LINUX_SCRIPT="rtd-oem-linux-config.sh"
+_MAC_SCRIPT="rtd-oem-macos-config.sh"
+
+# Shared privilege helper. macOS keeps the bootstrap running as the logged-in
+# user and uses sudo only for install/update operations. Linux re-enters this
+# script once as root so SUDO_USER is available to the stage-two scripts.
+_SUDO=()
+if [ "$UID" -ne 0 ]; then
+	printf "%b\n" "${YELLOW}This script needs administrative access for bootstrap operations.${NO_COLOR}"
+	_SUDO=(sudo)
+	"${_SUDO[@]}" -v || exit 1
+fi
+
+"${_SUDO[@]}" mkdir -p "${_LOG_DIR}" 2>/dev/null || true
 
 
 
@@ -159,6 +167,9 @@ _git_raw_url=https://raw.githubusercontent.com/${_GIT_PROFILE}/${_TLA_UPPER}-Set
 
 
 if [[ "$OSTYPE" == *"linux"* ]]; then
+	if [ "$UID" -ne 0 ]; then
+		exec "${_SUDO[@]}" -E bash "$0" "$@"
+	fi
 	{
 	printf "🌎 Linux OS Found: Attempting to get instructions for Linux: \n executing $0"
 	printf "📦 Verifying that the required software to continue is available and installing if not there..."
@@ -172,45 +183,48 @@ if [[ "$OSTYPE" == *"linux"* ]]; then
 		fi
 	done
 	
-	if git clone --depth=1 ${_git_src_url} /opt/${_TLA_LOWER}.tmp ; then
+	rm -rf "${_CONFIG_TMP_DIR}"
+	if git clone --depth=1 "${_RTD_SETUP_GIT_URL}" "${_CONFIG_TMP_DIR}" ; then
 		printf "✅ Instructions successfully retrieved..."
-		if [[ -d /opt/${_TLA_LOWER}  ]] ; then
-			mv /opt/${_TLA_LOWER} ${_BackupFolderName:="/opt/${_TLA_LOWER}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"}
-			zip -m -r -5 ${_BackupFolderName}.zip  ${_BackupFolderName}
-			rm -r ${_BackupFolderName}
+		if [[ -d "${_CONFIG_DIR}"  ]] ; then
+			_BackupFolderName="${_CONFIG_DIR}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"
+			mv "${_CONFIG_DIR}" "${_BackupFolderName}"
+			zip -m -r -5 "${_BackupFolderName}.zip" "${_BackupFolderName}"
+			rm -rf "${_BackupFolderName}"
 		fi
-		mv /opt/${_TLA_LOWER}.tmp /opt/${_TLA_LOWER} ; rm -rf /opt/${_TLA_LOWER}/.git
-		source /opt/${_TLA_LOWER}/core/_rtd_library
+		mv "${_CONFIG_TMP_DIR}" "${_CONFIG_DIR}" ; rm -rf "${_CONFIG_DIR}/.git"
+		source "${_CONFIG_CORE_DIR}/_rtd_library"
 		oem::register_all_tools
-		ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
-		bash ${_OEM_DIR}/core/rtd-oem-linux-config.sh ${*}
+		ln -s -f "${_LOG_DIR}" -T "${_CONFIG_LOG_LINK}"
+		bash "${_CONFIG_CORE_DIR}/${_LINUX_SCRIPT}" "$@"
 	else
 		printf "💥 Failed to retrieve instructions correctly! "
 		exit 1
 	fi
-	} 2>&1 | tee -a ${_LOGFILE}
+	} 2>&1 | tee -a "${_LOGFILE}"
 	exit $?
 elif [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "Mac OSX is currently not fully supported... however, I will attempt to get the appropriate script for this system and run it..."
+	echo "Mac OSX is currently not fully supported... however, I will attempt to get the appropriate script for this system and run it..."
 	read -n 1 -s -r -p "Press any key to continue... or CTRL+C to exit"
-	_stage2_file="$(mktemp "${TMPDIR:-/tmp/}rtd-oem-macos-config.XXXXXX.sh")" || {
-		echo "Failed to create a temporary file for the macOS configuration script."
-		exit 1
-	}
-	if ! curl -fsSL "${_git_raw_url}/core/rtd-oem-macos-config.sh" -o "${_stage2_file}"; then
-		echo "Failed to download the macOS configuration script from ${_git_raw_url}/core/rtd-oem-macos-config.sh"
-		rm -f "${_stage2_file}"
+	
+	if ! "${_SUDO[@]}" mkdir -p "${_CONFIG_CORE_DIR}" ; then
+		echo "Failed to create ${_CONFIG_CORE_DIR}."
 		exit 1
 	fi
-	if ! head -n 1 "${_stage2_file}" | grep -Eq '^#!.*(ba)?sh'; then
+	
+	if ! "${_SUDO[@]}" curl -fsSL "${_RTD_SETUP_RAW_URL}/core/${_MAC_SCRIPT}" -o "${_CONFIG_CORE_DIR}/${_MAC_SCRIPT}" ; then
+		echo "Failed to download ${_RTD_SETUP_RAW_URL}/core/${_MAC_SCRIPT}"
+		exit 1
+	fi
+
+	if ! head -n 1 "${_CONFIG_CORE_DIR}/${_MAC_SCRIPT}" | grep -Eq '^#!.*(ba)?sh' ; then
 		echo "Downloaded macOS configuration script does not look executable. Aborting."
-		rm -f "${_stage2_file}"
 		exit 1
 	fi
-	bash "${_stage2_file}"
-	_stage2_status=$?
-	rm -f "${_stage2_file}"
-	exit "${_stage2_status}"
+	
+	"${_SUDO[@]}" chmod 0755 "${_CONFIG_CORE_DIR}/${_MAC_SCRIPT}" || { echo "Failed to make ${_CONFIG_CORE_DIR}/${_MAC_SCRIPT} executable."; exit 1; }
+	RTD_MACOS_SETUP_RAW_URL="${_RTD_SETUP_RAW_URL}" bash "${_CONFIG_CORE_DIR}/${_MAC_SCRIPT}" "$@"
+	exit $?
 elif [[ "$OSTYPE" == "cygwin" ]]; then
         echo "CYGWIN is currently unsupported..."
 elif [[ "$OSTYPE" == "msys" ]]; then

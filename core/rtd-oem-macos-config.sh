@@ -462,7 +462,7 @@ apply_firewall_defaults() {
 }
 
 find_rtd_wallpaper_dir() {
-	local script_dir
+	local script_dir fallback_dir raw_base
 	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 	for candidate in \
 		"${RTD_MACOS_WALLPAPER_SOURCE:-}" \
@@ -475,7 +475,21 @@ find_rtd_wallpaper_dir() {
 			return 0
 		fi
 	done
-	return 1
+
+	raw_base="${RTD_MACOS_SETUP_RAW_URL:-https://raw.githubusercontent.com/vonschutter/RTD-Setup/main}"
+	fallback_dir="${TMPDIR:-/tmp}/rtd-macos-wallpaper"
+	mkdir -p "$fallback_dir" 2>/dev/null || return 1
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL "${raw_base}/wallpaper/Wayland.jpg" -o "${fallback_dir}/Wayland.jpg" || return 1
+		curl -fsSL "${raw_base}/wallpaper/Wayland-dark.jpg" -o "${fallback_dir}/Wayland-dark.jpg" || return 1
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO "${fallback_dir}/Wayland.jpg" "${raw_base}/wallpaper/Wayland.jpg" || return 1
+		wget -qO "${fallback_dir}/Wayland-dark.jpg" "${raw_base}/wallpaper/Wayland-dark.jpg" || return 1
+	else
+		return 1
+	fi
+	printf '%s\n' "$fallback_dir"
+	return 0
 }
 
 apply_rtd_wallpapers() {
