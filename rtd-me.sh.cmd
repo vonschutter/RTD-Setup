@@ -14,7 +14,7 @@ GOTO :CMDSCRIPT
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #:: Author(s):	SLS, KLS, NB.  Buffalo Center, IA & Avarua, Cook Islands
-Version="1.07"
+Version="1.08.2024-06-01"
 #::
 #::
 #:: Purpose: 	The purpose of the script is to decide what scripts to download based
