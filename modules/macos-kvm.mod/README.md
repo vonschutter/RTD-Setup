@@ -27,6 +27,7 @@ sudo rtd-macos-kvm prepare --n-1
 ```
 
 With no command or version, the module preserves the existing behavior: it prepares the host, fetches Catalina / `10.15`, and defines a new libvirt domain named `RTD-macOS-<timestamp>`.
+Legacy guests default to 4096 MiB RAM. Big Sur and newer default to 8192 MiB RAM unless `--memory` is provided.
 
 The bootloader can be selected explicitly:
 

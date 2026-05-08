@@ -353,13 +353,17 @@ install_homebrew_apps() {
 	# adds better default tools for browsers, media, archives, office, and editing.
 	local casks="$WORKSTATION_CASKS"
 	local app brew
+	local clt_ready=1
 	if [ "$PRESET" = "minimal" ]; then
 		casks="$MINIMAL_CASKS"
 	fi
 
-	ensure_command_line_tools || return 1
 	ensure_homebrew || return 1
 	brew="$(homebrew_bin)" || return 1
+	if ! ensure_command_line_tools; then
+		clt_ready=0
+		write_warning "Continuing with Homebrew cask installation; if macOS is still installing Command Line Tools, rerun this script after that finishes."
+	fi
 
 	run_user_cmd "$brew" update || write_warning "Homebrew update failed; continuing with available metadata."
 
@@ -370,6 +374,9 @@ install_homebrew_apps() {
 		fi
 		run_user_cmd "$brew" install --cask "$app" || write_warning "Failed to install cask: ${app}"
 	done
+	if [ "$clt_ready" -eq 0 ]; then
+		write_warning "Application installation may be incomplete because Apple Command Line Tools were not ready at the start of this run."
+	fi
 }
 
 apply_privacy_defaults() {

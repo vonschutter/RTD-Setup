@@ -23284,7 +23284,7 @@ macoskvm::define_vm() {
 	#   macos_domain_xml (w)
 	# Arguments:
 	#   --vm-name <name>              Domain name. Defaults to RTD-macOS-<timestamp>.
-	#   --memory <MiB>                VM memory in MiB. Defaults to 4096.
+	#   --memory <MiB>                VM memory in MiB. Defaults to 4096 for legacy guests and 8192 for modern guests.
 	#   --cpus <count>                VM CPU count. Defaults to 4.
 	#   --cpu-args <qemu-cpu>         Advanced raw QEMU CPU override. Defaults to the KVM-OpenCore Penryn profile.
 	#   --dir <path>                  Boot media cache directory. Defaults to /var/lib/libvirt/boot.
@@ -23301,6 +23301,7 @@ macoskvm::define_vm() {
 	# End of documentation
 	local vm_name=""
 	local memory_mib="4096"
+	local memory_explicit=0
 	local cpus="4"
 	local cpu_args="${MACOSKVM_CPU_ARGS:-}"
 	local download_dir="/var/lib/libvirt/boot"
@@ -23329,6 +23330,7 @@ macoskvm::define_vm() {
 			--memory|--memory-mib)
 				[[ -n "${2:-}" ]] || { write_error "Missing value for $1"; return 1; }
 				memory_mib="$2"
+				memory_explicit=1
 				shift 2
 				;;
 			--cpus|--vcpu|--vcpus)
@@ -23369,7 +23371,7 @@ macoskvm::define_vm() {
 				cat <<'EOF'
 Usage: macoskvm::define_vm [options]
   --vm-name <name>      domain name, default: RTD-macOS-<timestamp>
-  --memory <MiB>        memory in MiB, default: 4096
+  --memory <MiB>        memory in MiB, default: 4096 legacy, 8192 modern
   --cpus <count>        vCPU count, default: 4
   --cpu-args <qemu-cpu> advanced raw QEMU CPU override, default: KVM-OpenCore Penryn profile
   --dir <path>          boot cache directory, default: /var/lib/libvirt/boot
@@ -23397,6 +23399,10 @@ EOF
 			return 1
 			;;
 	esac
+
+	if [[ "$macos_profile" == "modern" && $memory_explicit -eq 0 ]]; then
+		memory_mib="8192"
+	fi
 
 	if [[ -z "$cpu_args" ]]; then
 		if [[ "$macos_profile" == "modern" ]]; then
@@ -23642,7 +23648,7 @@ macoskvm::prepare_host() {
 	#   --disk-name <name>            Writable system disk filename. Defaults to <vm-name>.qcow2.
 	#   --disk-size <size>            Writable system disk size. Defaults to 128G.
 	#   --vm-name <name>              Domain name. Defaults to RTD-macOS-<timestamp>.
-	#   --memory <MiB>                VM memory in MiB. Defaults to 4096.
+	#   --memory <MiB>                VM memory in MiB. Defaults to 4096 for legacy guests and 8192 for modern guests.
 	#   --cpus <count>                VM CPU count. Defaults to 4.
 	#   --cpu-args <qemu-cpu>         Advanced raw QEMU CPU override passed to the libvirt domain definition.
 	#   --no-define                   Prepare assets but do not define the libvirt domain.
@@ -23664,6 +23670,7 @@ macoskvm::prepare_host() {
 	local disk_size="128G"
 	local vm_name=""
 	local memory_mib="4096"
+	local memory_explicit=0
 	local cpus="4"
 	local cpu_args="${MACOSKVM_CPU_ARGS:-}"
 	local force=0
@@ -23720,6 +23727,7 @@ macoskvm::prepare_host() {
 			--memory|--memory-mib)
 				[[ -n "${2:-}" ]] || { write_error "Missing value for $1"; return 1; }
 				memory_mib="$2"
+				memory_explicit=1
 				shift 2
 				;;
 			--cpus|--vcpu|--vcpus)
@@ -23755,7 +23763,7 @@ Usage: macoskvm::prepare_host [options]
   --disk-name <name>           system disk filename, default: <vm-name>.qcow2
   --disk-size <size>           system disk size, default: 128G
   --vm-name <name>             libvirt domain name, default: RTD-macOS-<timestamp>
-  --memory <MiB>               memory in MiB, default: 4096
+  --memory <MiB>               memory in MiB, default: 4096 legacy, 8192 modern
   --cpus <count>               vCPU count, default: 4
   --cpu-args <qemu-cpu>        advanced raw QEMU CPU override, default: KVM-OpenCore Penryn profile
   --no-define                  prepare assets without defining the libvirt VM
@@ -23797,6 +23805,9 @@ EOF
 		elif [[ "${bootloader,,}" == "clover" || "${bootloader,,}" == "foxlet" || "${bootloader,,}" == "macos-simple-kvm" ]]; then
 			write_error "Modern macOS releases require OpenCore. Use --bootloader opencore-kvm or leave --bootloader as auto."
 			return 1
+		fi
+		if [[ $memory_explicit -eq 0 ]]; then
+			memory_mib="8192"
 		fi
 		write_status "Using modern macOS KVM workflow for ${modern_label}."
 	else
