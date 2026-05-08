@@ -12,6 +12,7 @@
 #::		 - Install a useful starter application bundle using Homebrew Cask.
 #::		 - Reduce analytics, personalized ads, suggestions, animations, and background noise.
 #::		 - Apply practical Finder, Dock, screenshot, and firewall defaults.
+#::		 - Install the RTD light/dark wallpapers and set the active desktop picture.
 #::		 - Clean safe user caches without touching protected system files.
 #::
 #::		NOTE: macOS protects most system apps and operating system components with SIP and the sealed
@@ -60,6 +61,7 @@ INSTALL_APPS=1
 APPLY_PRIVACY=1
 APPLY_UI=1
 APPLY_FIREWALL=1
+APPLY_WALLPAPER=1
 RUN_CLEANUP=1
 RESTART_UI=1
 LOG_DIR="${HOME}/Library/Logs/RTD"
@@ -87,6 +89,7 @@ Options:
   --no-privacy                       Skip privacy and suggestions settings.
   --no-ui                            Skip Finder, Dock, screenshot, and animation defaults.
   --no-firewall                      Skip firewall configuration.
+  --no-wallpaper                     Skip RTD wallpaper installation and desktop picture setup.
   --no-cleanup                       Skip safe user cache cleanup.
   --no-restart-ui                    Do not restart Finder, Dock, or SystemUIServer.
   --dry-run                          Print actions without changing the system.
@@ -239,6 +242,10 @@ parse_args() {
 				APPLY_FIREWALL=0
 				shift
 				;;
+			--no-wallpaper)
+				APPLY_WALLPAPER=0
+				shift
+				;;
 			--no-cleanup)
 				RUN_CLEANUP=0
 				shift
@@ -275,6 +282,7 @@ parse_args() {
 			APPLY_PRIVACY=0
 			APPLY_UI=0
 			APPLY_FIREWALL=0
+			APPLY_WALLPAPER=0
 			RUN_CLEANUP=0
 			RESTART_UI=0
 			;;
@@ -453,6 +461,59 @@ apply_firewall_defaults() {
 	run_privileged_cmd "$firewall" --setallowsignedapp on || true
 }
 
+find_rtd_wallpaper_dir() {
+	local script_dir
+	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+	for candidate in \
+		"${RTD_MACOS_WALLPAPER_SOURCE:-}" \
+		"${script_dir}/../wallpaper" \
+		"${script_dir}/../../wallpaper" \
+		"/opt/rtd/wallpaper" \
+		"/usr/local/rtd/wallpaper"; do
+		if [ -n "$candidate" ] && [ -r "${candidate}/Wayland.jpg" ] && [ -r "${candidate}/Wayland-dark.jpg" ]; then
+			printf '%s\n' "$candidate"
+			return 0
+		fi
+	done
+	return 1
+}
+
+apply_rtd_wallpapers() {
+	local source_dir target_dir light_wallpaper dark_wallpaper active_wallpaper active_style
+	write_status "Installing RTD wallpapers and setting the desktop picture."
+
+	if ! source_dir="$(find_rtd_wallpaper_dir)"; then
+		write_warning "RTD wallpapers were not found. Expected Wayland.jpg and Wayland-dark.jpg near the RTD setup files or in /opt/rtd/wallpaper."
+		return 0
+	fi
+
+	target_dir="${TARGET_HOME}/Pictures/RTD-Wallpapers"
+	light_wallpaper="${target_dir}/Wayland.jpg"
+	dark_wallpaper="${target_dir}/Wayland-dark.jpg"
+
+	run_user_cmd mkdir -p "$target_dir"
+	run_user_cmd cp -f "${source_dir}/Wayland.jpg" "$light_wallpaper"
+	run_user_cmd cp -f "${source_dir}/Wayland-dark.jpg" "$dark_wallpaper"
+
+	active_wallpaper="$light_wallpaper"
+	if [ "$DRY_RUN" -ne 1 ]; then
+		if [ "$(id -u)" -eq 0 ]; then
+			active_style="$(sudo -u "$TARGET_USER" env HOME="$TARGET_HOME" USER="$TARGET_USER" LOGNAME="$TARGET_USER" defaults read NSGlobalDomain AppleInterfaceStyle 2>/dev/null || true)"
+		else
+			active_style="$(HOME="$TARGET_HOME" USER="$TARGET_USER" LOGNAME="$TARGET_USER" defaults read NSGlobalDomain AppleInterfaceStyle 2>/dev/null || true)"
+		fi
+		if [ "$active_style" = "Dark" ]; then
+			active_wallpaper="$dark_wallpaper"
+		fi
+	fi
+
+	run_user_shell "osascript -e 'tell application \"System Events\" to tell every desktop to set picture to POSIX file \"${active_wallpaper}\"'" || {
+		write_warning "Unable to set the macOS desktop picture automatically."
+		return 0
+	}
+	write_ok "RTD desktop picture set to ${active_wallpaper}."
+}
+
 cleanup_user_caches() {
 	# This intentionally cleans only disposable user-owned cache/log locations.
 	# It avoids /System, /Library, and protected app payloads.
@@ -504,6 +565,10 @@ main() {
 
 	if [ "$APPLY_FIREWALL" -eq 1 ]; then
 		apply_firewall_defaults
+	fi
+
+	if [ "$APPLY_WALLPAPER" -eq 1 ]; then
+		apply_rtd_wallpapers
 	fi
 
 	if [ "$RUN_CLEANUP" -eq 1 ]; then

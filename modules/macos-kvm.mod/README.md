@@ -1,5 +1,7 @@
 # RTD macOS KVM Module
 
+![RTD macOS KVM](Media_files/macos-kvm-desktop.png "RTD macOS KVM")
+
 This module prepares a Linux host for macOS QEMU/KVM workflows without storing large Apple installer images in the RTD-Setup repository.
 
 ## Purpose
@@ -28,6 +30,7 @@ sudo rtd-macos-kvm prepare --n-1
 
 With no command or version, the module preserves the existing behavior: it prepares the host, fetches Catalina / `10.15`, and defines a new libvirt domain named `RTD-macOS-<timestamp>`.
 Legacy guests default to 4096 MiB RAM. Big Sur and newer default to 8192 MiB RAM unless `--memory` is provided.
+For modern macOS releases, keep the default 8192 MiB or set a larger value. 4096 MiB is still accepted but is generally too constrained for a useful Sonoma, Sequoia, or Tahoe VM.
 
 The bootloader can be selected explicitly:
 
@@ -110,31 +113,29 @@ To inspect host readiness:
 rtd-macos-kvm doctor
 ```
 
+## Guest Configuration
+
+After macOS is installed, `core/rtd-oem-macos-config.sh` can be run inside the guest to apply RTD workstation defaults and install a starter application bundle through Homebrew Cask.
+
+```bash
+bash rtd-oem-macos-config.sh
+bash rtd-oem-macos-config.sh --preset apps
+bash rtd-oem-macos-config.sh --preset minimal
+```
+
+The default `workstation` preset installs Firefox, Brave, VLC, Keka, LibreOffice, Visual Studio Code, Rectangle, and The Unarchiver. It also copies `Wayland.jpg` and `Wayland-dark.jpg` from the RTD wallpaper folder into the macOS user's Pictures folder and sets the active desktop picture, so a completed RTD guest is visually identifiable. Use `--no-wallpaper` to skip that step. The `apps` preset installs only the application bundle, while `minimal` skips application installation and applies only the configuration defaults.
+
+Fresh newer macOS installs may need Apple Command Line Tools before every Homebrew operation is fully reliable. The config script requests Command Line Tools when they are missing, continues with the Homebrew/cask install attempt, and logs any cask failures individually. If the Apple installer is still running or finishes after the script has moved on, rerun the script after Command Line Tools are available.
+
 ## Screenshots
 
-### Tool Output
-
-![RTD macOS KVM tool running in a terminal](Media_files/terminal-rtd-mac-os.png)
-
-### VM Boot
-
-![macOS guest booting on QEMU/KVM](Media_files/macos-kvm-boot.png)
-
-### Recovery Utilities
-
-![macOS Utilities recovery screen on QEMU/KVM](Media_files/macos-kvm-recovery-utilities.png)
-
-### First Setup
-
-![macOS first setup country selection on QEMU/KVM](Media_files/macos-kvm-welcome.png)
-
-### Installer Progress
-
-![macOS Catalina installer progress on QEMU/KVM](Media_files/macos-kvm-install-progress.png)
-
-### Desktop
-
-![macOS desktop running inside QEMU/KVM](Media_files/macos-kvm-desktop.png)
+Tool Output | Sonoma Installer | Sonoma Install Progress
+------------ | ------------- | -------------
+![RTD macOS KVM tool running in a terminal](Media_files/terminal-rtd-mac-os.png "Tool Output") | ![RTD macOS KVM fetching Sonoma recovery media](Media_files/macos-kvm-sonoma-fetch.png "Sonoma Recovery Media Fetch") | ![macOS Sonoma installer running in QEMU/KVM](Media_files/macos-kvm-sonoma-install-progress.png "Sonoma Install Progress")
+VM Boot | Recovery Utilities | First Setup
+![macOS guest booting on QEMU/KVM](Media_files/macos-kvm-boot.png "VM Boot") | ![macOS Utilities recovery screen on QEMU/KVM](Media_files/macos-kvm-recovery-utilities.png "Recovery Utilities") | ![macOS first setup country selection on QEMU/KVM](Media_files/macos-kvm-welcome.png "First Setup")
+Catalina Installer | macOS Desktop | Homebrew App Install
+![macOS Catalina installer progress on QEMU/KVM](Media_files/macos-kvm-install-progress.png "Catalina Installer") | ![macOS desktop running inside QEMU/KVM](Media_files/macos-kvm-desktop.png "macOS Desktop") | ![Homebrew installing cask applications inside the macOS guest](Media_files/macos-kvm-homebrew-app-install.png "Homebrew App Install")
 
 ## Output Location
 
