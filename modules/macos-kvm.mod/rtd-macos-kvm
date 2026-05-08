@@ -12,6 +12,13 @@
 #:: Usage:      sudo rtd-macos-kvm [prepare] [--version latest-supported|--n-1]
 #:: Requires:   RTD library >= 2.54, admin privileges, python3, curl/wget, dmg2img, and KVM/QEMU tools.
 #:: Notes:      Installer images are generated under /var/lib/libvirt/boot and are not stored in Git.
+#::             Downloaded Apple package files are cached in /var/lib/libvirt/boot/cache and are not automatically
+#::             deleted unless --force is used with --keep-work omitted. Use --keep-work to preserve working files
+#::             for debugging. Each macOS version uses a different build pipeline: High Sierra/Mojave/Catalina use
+#::             legacy macOS-Simple-KVM with UEFI; Big Sur and later use modern OSX-KVM with OpenCore. The tool
+#::             auto-detects and applies the correct bootloader per version. All VMs default to a KVM-optimized Penryn
+#::             CPU profile and require hardware virtualization (KVM/VT-x) on the host. Firmware, boot assets, and
+#::             recovery images persist across runs for faster redeployment.
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 set -euo pipefail
