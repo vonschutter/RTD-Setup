@@ -2,116 +2,262 @@
 
 ![RTD macOS KVM](Media_files/macos-kvm-desktop.png "RTD macOS KVM")
 
-This module prepares a Linux host for macOS QEMU/KVM workflows. rtd-macos-kvm will configure a VM on your Linux machine that runs MacOS with minimal setup. This will allow you to run Apple software and test or play around with MacOS. However, it is likely not a great ides to attempt to run heavy applications using lost of video memory to function. 
+`rtd-macos-kvm` prepares a Linux host for running macOS recovery installers in QEMU/KVM through libvirt. It installs or checks the host tools, downloads the needed upstream helper assets at runtime, builds a cached macOS `BaseSystem` image, creates a writable system disk, stages firmware and boot media, and defines a libvirt VM that can be opened in virt-manager.
 
-## Purpose
+The module is meant for light testing, configuration work, and development tasks where a macOS guest is useful. It is not tuned for graphics-heavy workloads.
 
-`rtd-macos-kvm` uses the same practical model RTD uses for Linux ISO files, but includes the extra KVM and firmware preparation macOS needs:
+## What It Does
 
-- installs/checks QEMU, KVM, libvirt, OVMF, `dmg2img`, and Python fetch tooling
-- stages a bootloader image in the libvirt boot cache; legacy `auto` keeps the previous AMD/OpenCore and Intel/Clover behavior, while modern macOS releases always use OpenCore
-- copies OVMF CODE and VARS firmware images into the libvirt boot cache
-- creates a writable qcow2 system disk if one does not already exist
-- downloads installer source data on demand
-- converts `BaseSystem.dmg` into a QEMU-readable `BaseSystem-<version>.img`
-- defines the VM in libvirt so it appears in virt-manager
-- caches the generated image under `/var/lib/libvirt/boot`
-- exports the resulting path through the shared RTD `iso` variable pattern
+The default command is `prepare`. A normal run:
 
-The module does not vendor `BaseSystem.img`, macOS installers, or large generated media.
+1. Checks or installs QEMU/KVM, libvirt, OVMF, `dmg2img`, Python, `curl` or `wget`, and related helper tools.
+2. Starts/enables libvirt where possible and ensures the default libvirt NAT network is available.
+3. Chooses the correct macOS recovery workflow for the requested version.
+4. Downloads the upstream Apple recovery helper script when needed.
+5. Fetches Apple recovery package data and converts `BaseSystem.dmg` to a QEMU-readable image.
+6. Stages OpenCore or Clover boot media in `/var/lib/libvirt/boot`.
+7. Copies OVMF CODE and VARS firmware into the libvirt boot cache.
+8. Creates a writable qcow2 system disk under `/var/lib/libvirt/images` if it does not already exist.
+9. Defines a timestamped libvirt domain named `RTD-macOS-<timestamp>` unless `--vm-name` is supplied.
 
-## Usage
+The module does not store Apple installers, generated `BaseSystem` images, OpenCore images, or large VM media in Git. Generated assets are cached on the local host.
 
-```bash
-sudo rtd-macos-kvm
-sudo rtd-macos-kvm prepare
-sudo rtd-macos-kvm prepare --n-1
-```
+## Quick Start
 
-With no command or version, the module preserves the existing behavior: it prepares the host, fetches Catalina / `10.15`, and defines a new libvirt domain named `RTD-macOS-<timestamp>`.
-Legacy guests default to 4096 MiB RAM. Big Sur and newer default to 8192 MiB RAM unless `--memory` is provided.
-For modern macOS releases, keep the default 8192 MiB or set a larger value. 4096 MiB is still accepted but is generally too constrained for a useful Sonoma, Sequoia, or Tahoe VM.
-
-The bootloader can be selected explicitly:
-
-```bash
-sudo rtd-macos-kvm prepare --bootloader opencore-kvm
-sudo rtd-macos-kvm prepare --bootloader clover
-```
-
-Supported version values are:
-
-- `latest-supported`, `latest`, or `default` for Catalina / `10.15`
-- `n-1`, `previous`, or `previous-supported` for Mojave / `10.14`
-- `catalina` or `10.15`
-- `mojave` or `10.14`
-- `high-sierra` or `10.13`
-- `latest-modern`, `modern`, or `modern-default` for Sonoma / `14`
-- `big-sur` or `11`
-- `monterey` or `12`
-- `ventura` or `13`
-- `sonoma` or `14`
-- `sequoia` or `15`
-- `tahoe` or `26`
-
-High Sierra, Mojave, and Catalina use the legacy macOS-Simple-KVM recovery flow. Big Sur and newer route through the modern OSX-KVM/OpenCore recovery flow.
-
-Installer-only usage is still available:
-
-```bash
-sudo rtd-macos-kvm fetch-installer --version catalina
-sudo rtd-macos-kvm fetch-installer --n-1
-sudo rtd-macos-kvm fetch-installer --version sonoma
-```
-
-To rebuild a cached image:
-
-```bash
-sudo rtd-macos-kvm prepare --force
-```
-
-To customize the libvirt VM definition:
-
-```bash
-sudo rtd-macos-kvm prepare --vm-name RTD-macOS --memory 8192 --cpus 4 --disk-size 128G
-sudo rtd-macos-kvm prepare --version sonoma --vm-name RTD-macOS-Sonoma --memory 8192 --cpus 4
-```
-
-The default CPU profile follows the KVM-OpenCore Penryn-style QEMU mask, including `vendor=GenuineIntel`, `+hypervisor`, `+invtsc`, `kvm=on`, `vmware-cpuid-freq=on`, and the XSAVE flags required for AVX/AVX2 state. If a host needs a different raw QEMU CPU mask, override it with `--cpu-args` or set `MACOSKVM_CPU_ARGS`.
-
-Ventura and newer require host AVX2 exposure. The modern workflow checks for AVX2 before fetching media and warns when the host clocksource suggests possible TSC instability, because newer macOS releases are less tolerant of unstable timekeeping.
-
-OpenCore is staged with verbose recovery boot arguments by default: `-v keepsyms=1 debug=0x100 npci=0x2000`. Override that with `MACOSKVM_BOOT_ARGS` before running `prepare`.
-
-OpenCore is staged with a 5-second boot picker timeout by default. Override that with `MACOSKVM_OPENCORE_TIMEOUT`; set it to `0` to wait indefinitely.
-
-Each run creates a timestamped writable OpenCore image from the cached base image so older or running VMs do not block boot-argument updates.
-
-The VM uses ICH9 EHCI/UHCI USB controllers plus USB and PS/2 input fallbacks for Catalina recovery compatibility.
-
-The NIC is modeled as `e1000-82545em` on PCI bus `0x00`, slot `0x05` so macOS sees it as built-in Ethernet while using libvirt's default NAT network.
-
-OpenCore and BaseSystem media are marked `snapshot='no'`; only the writable macOS system disk should participate in VM snapshots.
-
-Existing VMs keep the XML they were created with. Re-run `rtd-macos-kvm prepare` to create a new timestamped VM after changing module defaults, then boot the new VM instead of an older `RTD-macOS-*` entry.
-
-To define the VM from already staged assets:
-
-```bash
-sudo rtd-macos-kvm define-vm
-```
-
-To prepare media without defining the VM:
-
-```bash
-sudo rtd-macos-kvm prepare --no-define
-```
-
-To inspect host readiness:
+Check host readiness:
 
 ```bash
 rtd-macos-kvm doctor
 ```
+
+Create the default VM:
+
+```bash
+sudo rtd-macos-kvm
+```
+
+This is the same as:
+
+```bash
+sudo rtd-macos-kvm prepare --version latest-supported
+```
+
+For backward compatibility, `latest-supported` still means Catalina / `10.15`. The run defines a new VM in libvirt. Open it with virt-manager or start it with `virsh`, then use macOS Recovery to format the writable disk and install macOS.
+
+Create a modern macOS VM:
+
+```bash
+sudo rtd-macos-kvm prepare --version sonoma --vm-name RTD-macOS-Sonoma --memory 8192 --cpus 4
+```
+
+Rebuild cached media and boot assets:
+
+```bash
+sudo rtd-macos-kvm prepare --version sonoma --force
+```
+
+Prepare all assets without defining a VM:
+
+```bash
+sudo rtd-macos-kvm prepare --version sonoma --no-define
+```
+
+## Commands
+
+`prepare`
+: Default command. Installs/checks host tooling, stages firmware and boot media, fetches installer media, creates the system disk, and defines the VM.
+
+`fetch-installer`
+: Downloads Apple recovery media and creates a cached `BaseSystem-<version>.img`. It does not stage firmware, create a VM disk, or define a VM.
+
+`stage-assets`
+: Downloads/stages the bootloader image and OVMF firmware only.
+
+`define-vm`
+: Defines or refreshes a libvirt domain from already staged assets.
+
+`doctor`
+: Checks for the main host tools and firmware paths used by the module.
+
+Examples:
+
+```bash
+sudo rtd-macos-kvm prepare --version catalina --vm-name RTD-macOS-Catalina
+sudo rtd-macos-kvm prepare --version sequoia --memory 8192 --cpus 4
+sudo rtd-macos-kvm fetch-installer --version tahoe --force --keep-work
+sudo rtd-macos-kvm stage-assets --bootloader opencore-kvm --force
+sudo rtd-macos-kvm define-vm --vm-name RTD-macOS-Test --disk-name RTD-macOS-Test.qcow2 --memory 8192
+```
+
+## macOS Versions
+
+Supported version selectors:
+
+| Selector | Result | Workflow |
+| --- | --- | --- |
+| `latest-supported`, `latest`, `default`, `catalina`, `10.15` | Catalina | Legacy macOS-Simple-KVM |
+| `n-1`, `previous`, `mojave`, `10.14` | Mojave | Legacy macOS-Simple-KVM |
+| `high-sierra`, `10.13` | High Sierra | Legacy macOS-Simple-KVM |
+| `latest-modern`, `modern`, `sonoma`, `14` | Sonoma | Modern OSX-KVM/OpenCore |
+| `big-sur`, `11` | Big Sur | Modern OSX-KVM/OpenCore |
+| `monterey`, `12` | Monterey | Modern OSX-KVM/OpenCore |
+| `ventura`, `13` | Ventura | Modern OSX-KVM/OpenCore |
+| `sequoia`, `15` | Sequoia | Modern OSX-KVM/OpenCore |
+| `tahoe`, `26` | Tahoe | Modern OSX-KVM/OpenCore |
+
+High Sierra, Mojave, and Catalina use the legacy `macOS-Simple-KVM` recovery flow. Big Sur and newer use the modern `OSX-KVM` recovery helper and OpenCore.
+
+## Important Defaults
+
+- Cache directory: `/var/lib/libvirt/boot`
+- VM image directory: `/var/lib/libvirt/images`
+- VM name: `RTD-macOS-<timestamp>`
+- Writable disk: `<vm-name>.qcow2`
+- Disk size: `128G`
+- vCPUs: `4`
+- Memory: `4096` MiB for legacy guests, `8192` MiB for modern guests
+- Legacy bootloader: `auto`, which uses OpenCore on AMD hosts and Clover otherwise
+- Modern bootloader: OpenCore only
+
+Useful options:
+
+```bash
+sudo rtd-macos-kvm prepare \
+  --version sonoma \
+  --vm-name RTD-macOS-Sonoma \
+  --memory 8192 \
+  --cpus 4 \
+  --disk-size 160G
+```
+
+Override cache and image locations:
+
+```bash
+sudo rtd-macos-kvm prepare \
+  --version catalina \
+  --dir /var/lib/libvirt/boot \
+  --image-dir /var/lib/libvirt/images \
+  --disk-name RTD-macOS-Catalina.qcow2
+```
+
+Keep temporary Apple package downloads for troubleshooting:
+
+```bash
+sudo rtd-macos-kvm fetch-installer --version sonoma --force --keep-work
+```
+
+## Options By Mode
+
+`prepare` accepts the full workflow options: `--version`, `--n-1`, `--dir`, `--bootloader`, `--image-dir`, `--disk-name`, `--disk-size`, `--vm-name`, `--memory`, `--cpus`, `--cpu-args`, `--no-define`, `--force`, and `--keep-work`.
+
+`fetch-installer` accepts installer media options: `--version`, `--n-1`, `--dir`, `--work-dir`, `--catalog-id`, `--force`, and `--keep-work`. Big Sur and newer are automatically routed to the modern OSX-KVM helper; legacy versions use the macOS-Simple-KVM helper.
+
+`stage-assets` accepts boot asset options: `--dir`, `--bootloader`, and `--force`.
+
+`define-vm` accepts VM definition options: `--vm-name`, `--memory`, `--cpus`, `--cpu-args`, `--dir`, `--image-dir`, `--disk-name`, `--macos-profile`, and `--force`. It expects the installer image, boot media, firmware files, and system disk to already exist. Use `prepare` when you want the tool to create those assets for you.
+
+## Host Requirements
+
+The host must support KVM hardware virtualization and needs writable access to the libvirt boot and image directories. Run `prepare`, `fetch-installer`, and `stage-assets` with `sudo` when dependencies or cache files need to be installed or written.
+
+The module checks for:
+
+- `python3`
+- `python3-venv` and `python3-pip` when available
+- `curl` or `wget`
+- `dmg2img`
+- `gzip`
+- `mtools` / `mcopy`
+- `qemu-system-x86_64`
+- `qemu-img`
+- `virsh`
+- libvirt and virt-install tooling
+- OVMF / edk2 UEFI firmware
+
+Ventura and newer require host AVX2 exposure. The modern workflow checks for AVX2 before fetching media and warns when the host clocksource suggests possible TSC instability, because newer macOS guests are less tolerant of unstable timekeeping.
+
+## Boot And VM Behavior
+
+Modern macOS releases always use OpenCore. The staged OpenCore image is copied to a timestamped per-VM image on every run so boot-argument changes do not modify a base image that older or running VMs may still use.
+
+OpenCore defaults:
+
+- Boot arguments: `-v keepsyms=1 debug=0x100 npci=0x2000`
+- Boot picker timeout: `5` seconds
+
+Override them before running `prepare`:
+
+```bash
+MACOSKVM_BOOT_ARGS="-v keepsyms=1 debug=0x100" \
+MACOSKVM_OPENCORE_TIMEOUT=0 \
+sudo rtd-macos-kvm prepare --version sonoma
+```
+
+CPU defaults:
+
+- Legacy profile: Penryn-style QEMU CPU mask.
+- Modern profile: Skylake-Client-style QEMU CPU mask with AVX/AVX2 state exposed.
+
+Override the raw QEMU CPU mask with `--cpu-args` or `MACOSKVM_CPU_ARGS` only when the default profile does not work on a specific host.
+
+VM device defaults:
+
+- Firmware: OVMF pflash with per-domain NVRAM under `/var/lib/libvirt/qemu/nvram`
+- Machine type: `q35`
+- Boot, installer, and system disks attached on SATA
+- OpenCore/Clover and `BaseSystem` media marked `snapshot='no'`
+- Graphics: SPICE with `vmvga`
+- Sound: ICH9
+- Input: USB tablet and keyboard
+- Legacy network model: `e1000-82545em`
+- Modern network model: `virtio`
+- Libvirt network: `default`
+
+Existing VMs keep the XML they were created with. Re-run `rtd-macos-kvm prepare` to create a new timestamped VM after changing module defaults, then boot the new VM instead of an older `RTD-macOS-*` entry.
+
+## Output Locations
+
+Generated installer and boot files are stored here by default:
+
+```text
+/var/lib/libvirt/boot/BaseSystem-catalina.img
+/var/lib/libvirt/boot/BaseSystem-mojave.img
+/var/lib/libvirt/boot/BaseSystem-high-sierra.img
+/var/lib/libvirt/boot/BaseSystem-big-sur.img
+/var/lib/libvirt/boot/BaseSystem-monterey.img
+/var/lib/libvirt/boot/BaseSystem-ventura.img
+/var/lib/libvirt/boot/BaseSystem-sonoma.img
+/var/lib/libvirt/boot/BaseSystem-sequoia.img
+/var/lib/libvirt/boot/BaseSystem-tahoe.img
+/var/lib/libvirt/boot/OpenCore-KVM-v21.img
+/var/lib/libvirt/boot/OpenCore-KVM-v21-rtd-<timestamp>.img
+/var/lib/libvirt/boot/ESP-macos-clover.qcow2
+/var/lib/libvirt/boot/OVMF_CODE-macos.fd
+/var/lib/libvirt/boot/OVMF_VARS-macos.fd
+/var/lib/libvirt/boot/RTD-macOS-<timestamp>.xml
+/var/lib/libvirt/images/RTD-macOS-<timestamp>.qcow2
+/var/lib/libvirt/qemu/nvram/RTD-macOS-<timestamp>_VARS.fd
+```
+
+Temporary Apple package downloads are placed under:
+
+```text
+/var/lib/libvirt/boot/.rtd-macos-work/
+/var/lib/libvirt/boot/.rtd-macos-modern-work/
+```
+
+They are removed after conversion unless `--keep-work` is used.
+
+## Guest Installation Notes
+
+After the VM boots into macOS Recovery:
+
+1. Open Disk Utility.
+2. Erase the writable qcow2 disk, usually the largest blank disk, as APFS.
+3. Quit Disk Utility.
+4. Run the macOS installer and select the newly erased disk.
+
+The `BaseSystem` image is only recovery/install media. The installed macOS system goes onto the writable qcow2 system disk.
 
 ## Guest Configuration
 
@@ -129,57 +275,9 @@ Fresh newer macOS installs may need Apple Command Line Tools before every Homebr
 
 When `rtd-me.sh.cmd` is run on macOS, it stays a bootstrapper: it replaces `/opt/rtd/core/rtd-oem-macos-config.sh` with the current copy from the RTD repository and runs that installed configure script. Wallpaper retrieval and desktop picture setup remain owned by `rtd-oem-macos-config.sh`, which can use local RTD wallpaper files or download them from the repository as a fallback.
 
-## Screenshots
+## Environment Overrides
 
-Tool Output | Sonoma Installer | Sonoma Install Progress
------------- | ------------- | -------------
-![RTD macOS KVM tool running in a terminal](Media_files/terminal-rtd-mac-os.png "Tool Output") | ![RTD macOS KVM fetching Sonoma recovery media](Media_files/macos-kvm-sonoma-fetch.png "Sonoma Recovery Media Fetch") | ![macOS Sonoma installer running in QEMU/KVM](Media_files/macos-kvm-sonoma-install-progress.png "Sonoma Install Progress")
-VM Boot | Recovery Utilities | First Setup
-![macOS guest booting on QEMU/KVM](Media_files/macos-kvm-boot.png "VM Boot") | ![macOS Utilities recovery screen on QEMU/KVM](Media_files/macos-kvm-recovery-utilities.png "Recovery Utilities") | ![macOS first setup country selection on QEMU/KVM](Media_files/macos-kvm-welcome.png "First Setup")
-Catalina Installer | macOS Desktop | Homebrew App Install
-![macOS Catalina installer progress on QEMU/KVM](Media_files/macos-kvm-install-progress.png "Catalina Installer") | ![macOS desktop running inside QEMU/KVM](Media_files/macos-kvm-desktop.png "macOS Desktop") | ![Homebrew installing cask applications inside the macOS guest](Media_files/macos-kvm-homebrew-app-install.png "Homebrew App Install")
-
-## Output Location
-
-Generated installer images are stored here by default:
-
-```text
-/var/lib/libvirt/boot/BaseSystem-catalina.img
-/var/lib/libvirt/boot/BaseSystem-mojave.img
-/var/lib/libvirt/boot/BaseSystem-high-sierra.img
-/var/lib/libvirt/boot/BaseSystem-sonoma.img
-/var/lib/libvirt/boot/BaseSystem-sequoia.img
-/var/lib/libvirt/boot/BaseSystem-tahoe.img
-/var/lib/libvirt/boot/OpenCore-KVM-v21.img
-/var/lib/libvirt/boot/ESP-macos-clover.qcow2
-/var/lib/libvirt/boot/OVMF_CODE-macos.fd
-/var/lib/libvirt/boot/OVMF_VARS-macos.fd
-/var/lib/libvirt/boot/RTD-macOS-<timestamp>.xml
-/var/lib/libvirt/images/RTD-macOS-<timestamp>.qcow2
-/var/lib/libvirt/qemu/nvram/RTD-macOS-<timestamp>_VARS.fd
-```
-
-The cache directory can be overridden with `--dir`.
-The VM image directory, disk filename, and disk size can be overridden with `--image-dir`, `--disk-name`, and `--disk-size`.
-
-## Dependencies
-
-The module uses RTD's native package dependency helper to ensure these tools are available:
-
-- `python3`
-- `python3-venv` and `python3-pip` when available
-- `curl` or `wget`
-- `dmg2img`
-- QEMU/KVM tooling
-- libvirt tooling
-- OVMF/edk2 UEFI firmware
-- KVM-OpenCore boot image for modern macOS, and legacy KVM-OpenCore/Clover behavior for older macOS
-
-## Upstream Helper
-
-The legacy Apple catalog fetch logic comes from `foxlet/macOS-Simple-KVM`. The modern recovery fetch logic comes from `kholia/OSX-KVM`'s `fetch-macOS-v2.py`. Bootloader media comes from `thenickdude/KVM-Opencore` for OpenCore workflows and `foxlet/macOS-Simple-KVM` for the legacy Clover workflow. RTD downloads those assets at runtime instead of copying them into this module.
-
-The default helper URL can be overridden:
+Installer helper URLs:
 
 ```bash
 MACOSKVM_FETCHMACOS_URL=https://example.local/fetch-macos.py \
@@ -188,6 +286,35 @@ sudo rtd-macos-kvm fetch-installer --version catalina
 MACOSKVM_MODERN_FETCHMACOS_URL=https://example.local/fetch-macOS-v2.py \
 sudo rtd-macos-kvm fetch-installer --version sonoma
 ```
+
+Boot media URLs:
+
+```bash
+MACOSKVM_ESP_URL=https://example.local/ESP.qcow2 \
+MACOSKVM_OPENCORE_URL=https://example.local/OpenCore-v21.iso.gz \
+sudo rtd-macos-kvm stage-assets --force
+```
+
+VM tuning:
+
+```bash
+MACOSKVM_CPU_ARGS="Skylake-Client,kvm=on,vendor=GenuineIntel,+hypervisor,+invtsc" \
+sudo rtd-macos-kvm prepare --version sonoma
+```
+
+## Screenshots
+
+| Tool Output | Sonoma Installer | Sonoma Install Progress |
+| --- | --- | --- |
+| ![RTD macOS KVM tool running in a terminal](Media_files/terminal-rtd-mac-os.png "Tool Output") | ![RTD macOS KVM fetching Sonoma recovery media](Media_files/macos-kvm-sonoma-fetch.png "Sonoma Recovery Media Fetch") | ![macOS Sonoma installer running in QEMU/KVM](Media_files/macos-kvm-sonoma-install-progress.png "Sonoma Install Progress") |
+| VM Boot | Recovery Utilities | First Setup |
+| ![macOS guest booting on QEMU/KVM](Media_files/macos-kvm-boot.png "VM Boot") | ![macOS Utilities recovery screen on QEMU/KVM](Media_files/macos-kvm-recovery-utilities.png "Recovery Utilities") | ![macOS first setup country selection on QEMU/KVM](Media_files/macos-kvm-welcome.png "First Setup") |
+| Catalina Installer | macOS Desktop | Homebrew App Install |
+| ![macOS Catalina installer progress on QEMU/KVM](Media_files/macos-kvm-install-progress.png "Catalina Installer") | ![macOS desktop running inside QEMU/KVM](Media_files/macos-kvm-desktop.png "macOS Desktop") | ![Homebrew installing cask applications inside the macOS guest](Media_files/macos-kvm-homebrew-app-install.png "Homebrew App Install") |
+
+## Upstream Helpers
+
+The legacy Apple catalog fetch logic comes from `foxlet/macOS-Simple-KVM`. The modern recovery fetch logic comes from `kholia/OSX-KVM`'s `fetch-macOS-v2.py`. Bootloader media comes from `thenickdude/KVM-Opencore` for OpenCore workflows and `foxlet/macOS-Simple-KVM` for the legacy Clover workflow. RTD downloads those assets at runtime instead of copying them into this module.
 
 ## Legal Note
 
