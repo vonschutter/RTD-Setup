@@ -2,7 +2,7 @@
 
 ![RTD macOS KVM](Media_files/macos-kvm-desktop.png "RTD macOS KVM")
 
-This module prepares a Linux host for macOS QEMU/KVM workflows without storing large Apple installer images in the RTD-Setup repository.
+This module prepares a Linux host for macOS QEMU/KVM workflows. rtd-macos-kvm will configure a VM on your Linux machine that runs MacOS with minimal setup. This will allow you to run Apple software and test or play around with MacOS. However, it is likely not a great ides to attempt to run heavy applications using lost of video memory to function. 
 
 ## Purpose
 

@@ -18789,6 +18789,72 @@ software::ensure_flatpak_package_managment() {
 	fi
 }
 
+software::enable_extra_repos() {
+	# Description:
+	# Enables distribution-specific third-party or extra repositories used for
+	# drivers, multimedia codecs, and other packages commonly missing from the
+	# default enabled repository set.
+	# Arguments: None
+	# Returns: 0
+	# Usage: software::enable_extra_repos
+	# End of documentation
+
+	if [[ -f /etc/fedora-release ]] && hash fedora-third-party &>/dev/null; then
+		if fedora-third-party query 2>/dev/null | grep -qx "enabled"; then
+			write_status "Fedora third-party repositories are already enabled."
+		else
+			write_status "Fedora third-party repositories are not enabled, enabling now..."
+			fedora-third-party enable || write_warning "Failed to enable Fedora third-party repositories."
+		fi
+	fi
+
+	if [[ -f /etc/os-release ]] && hash zypper 2>/dev/null && grep -Eiq '(^ID=|^ID_LIKE=).*(opensuse|suse|sles)' /etc/os-release; then
+		local suse_id
+		local suse_version
+		local suse_packman_repo=""
+		local suse_non_oss_repo=""
+		local suse_nvidia_repo=""
+		local suse_repo
+		local suse_repo_alias
+		local suse_repo_priority
+		local suse_repo_url
+
+		suse_id=$(awk -F= '$1 == "ID" {gsub(/"/, "", $2); print tolower($2)}' /etc/os-release)
+		suse_version=$(awk -F= '$1 == "VERSION_ID" {gsub(/"/, "", $2); print $2}' /etc/os-release)
+
+		if [[ "$suse_id" == *"tumbleweed"* ]]; then
+			suse_packman_repo="${_SUSE_PACKMAN_TUMBLEWEED:-"https://ftp.gwdg.de/pub/linux/misc/packman/suse/openSUSE_Tumbleweed/"}"
+			suse_non_oss_repo="${_SUSE_NON_OSS_TUMBLEWEED:-"https://download.opensuse.org/tumbleweed/repo/non-oss/"}"
+			suse_nvidia_repo="${_SUSE_NVIDIA_TUMBLEWEED:-"https://download.nvidia.com/opensuse/tumbleweed/"}"
+		elif [[ "$suse_id" == *"leap"* || "$suse_id" == "opensuse" ]]; then
+			suse_packman_repo="${_SUSE_PACKMAN_LEAP:-"https://ftp.gwdg.de/pub/linux/misc/packman/suse/openSUSE_Leap_${suse_version}/"}"
+			suse_non_oss_repo="${_SUSE_NON_OSS_LEAP:-"https://download.opensuse.org/distribution/openSUSE-current/repo/non-oss/"}"
+			if [[ -n "$suse_version" ]]; then
+				suse_nvidia_repo="${_SUSE_NVIDIA_LEAP:-"https://download.nvidia.com/opensuse/leap/${suse_version}/"}"
+			fi
+		fi
+
+		for suse_repo in \
+			"non-oss|85|${suse_non_oss_repo}" \
+			"packman|90|${suse_packman_repo}" \
+			"nvidia|90|${suse_nvidia_repo}"; do
+			IFS="|" read -r suse_repo_alias suse_repo_priority suse_repo_url <<<"$suse_repo"
+			[[ -z "$suse_repo_url" ]] && continue
+
+			if zypper --non-interactive --quiet lr "$suse_repo_alias" &>/dev/null; then
+				write_status "SUSE repository '$suse_repo_alias' is already configured, making sure it is enabled."
+				zypper --non-interactive mr --enable "$suse_repo_alias" || write_warning "Failed to enable SUSE repository '$suse_repo_alias'."
+			else
+				write_status "SUSE repository '$suse_repo_alias' is not configured, adding it now..."
+				zypper --non-interactive ar -cfp "$suse_repo_priority" "$suse_repo_url" "$suse_repo_alias" || write_warning "Failed to add SUSE repository '$suse_repo_alias'."
+			fi
+		done
+		zypper --non-interactive --gpg-auto-import-keys refresh || write_warning "Failed to refresh SUSE repositories."
+	fi
+
+	return 0
+}
+
 software::update_system_txt() {
 	# Description:
 	# System update function. The purpose of this function is to update installed software from
@@ -18821,11 +18887,9 @@ software::update_system_txt() {
 
 	echo -e " \n"
 	(
-		if hash pkcon &>/dev/null; then
-			pkcon -y refresh
-			pkcon -y update --autoremove
-			pkcon -y update --autoremove
-		elif hash dnf &>/dev/null; then
+		software::enable_extra_repos
+
+		if hash dnf &>/dev/null; then
 			dnf -y upgrade
 		elif hash zypper 2>/dev/null; then
 			zypper up -y
@@ -18846,6 +18910,10 @@ software::update_system_txt() {
 				apt-get --purge autoremove -y
 				apt-get clean
 			fi
+		elif hash pkcon &>/dev/null; then
+			pkcon -y refresh
+			pkcon -y update --autoremove
+			pkcon -y update --autoremove
 		else
 			write_error "❌ This system does not seem to have a software management system"
 			return 1
@@ -18914,6 +18982,8 @@ software::update_all_ui() {
 
 	Native_Software_Packages() {
 		(
+			software::enable_extra_repos
+
 			if hash zypper 2>/dev/null; then
 				zypper up -y
 				write_information "📦 Update task complete."
