@@ -70,7 +70,7 @@ TARGET_USER="${RTD_MACOS_TARGET_USER:-}"
 TARGET_HOME="${RTD_MACOS_TARGET_HOME:-}"
 
 MINIMAL_CASKS="firefox brave-browser vlc keka"
-WORKSTATION_CASKS="firefox brave-browser vlc keka libreoffice visual-studio-code rectangle the-unarchiver"
+WORKSTATION_CASKS="firefox brave-browser vlc keka libreoffice onlyoffice visual-studio-code gitkraken rectangle the-unarchiver filezilla"
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
