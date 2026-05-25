@@ -13,7 +13,7 @@ This module ships `rtd-vm-tool`, a menu-driven Bash utility for managing KVM/lib
 - Create VM templates: guided creation for server roles (Ubuntu, Debian, Fedora, etc.) and VDI desktops.
 - Start/stop VMs from a simple menu.
 - Settings: adjust clone preferences via `RTD_VM_CLONE_ARGS`.
-- Maintenance: run maintenance helpers from a dedicated menu.
+- Maintenance: run cleanup helpers and toggle GNOME Boxes integration from a dedicated menu.
 - macOS KVM workflow: prepare macOS recovery/installer media, define a QEMU/KVM domain, and continue through the Apple installer and first-boot setup.
 
 ## Requirements
@@ -79,3 +79,7 @@ rtd-vm-tool
 - Logging/output follows the script’s dialog/whiptail presentation and `write_*` helpers from `_rtd_library`.
 - The tool honors RTD branding/version strings defined at the top of the script.
 - `_rtd_library` is plain Bash and publicly auditable in the RTD-Setup repository.
+- The GNOME Boxes integration maintenance task toggles the `QEMU System` libvirt source file when an existing GNOME Boxes config directory is found:
+  - `~/.config/gnome-boxes/sources/QEMU System`
+  - `~/.var/app/org.gnome.Boxes/config/gnome-boxes/sources/QEMU System`
+- For Flatpak GNOME Boxes, adding integration grants access to `/run/libvirt` with `flatpak override --user --filesystem=/run/libvirt org.gnome.Boxes` and writes the source URI with an explicit libvirt socket path. Removing integration deletes the source file and revokes that override.

@@ -678,6 +678,7 @@ vmtool::run_maintenance_action() {
 		2 ) vmtool::run_qcow_cleanup ;;
 		3 ) vmtool::run_floppy_cleanup --dry-run ;;
 		4 ) vmtool::run_floppy_cleanup ;;
+		5 ) vmtool::toggle_gnome_boxes_integration ;;
 	esac
 }
 
@@ -836,12 +837,20 @@ show_settings_menu() {
 
 show_maintenance_menu() {
 	while true; do
+		local gnome_boxes_integration_label
+		if vmtool::gnome_boxes_integration_enabled; then
+			gnome_boxes_integration_label="📦 Remove GNOME Boxes integration"
+		else
+			gnome_boxes_integration_label="📦 Add GNOME Boxes integration"
+		fi
+
 		exec 3>&1
 		selection=$( $RTD_GUI --backtitle "$BACKTITLE" --cancel-button "Back" --title "Maintenance Tasks" --menu "Select a maintenance task to run:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
 			"1" "🔍 Dry run: list unused QCOW images" \
 			"2" "🧹 Remove unused QCOW images" \
 			"3" "🔍 Dry run: list virtual floppy images" \
 			"4" "🧹 Remove virtual floppy images" \
+			"5" "$gnome_boxes_integration_label" \
 			2>&1 1>&3)
 		exit_status=$?
 		exec 3>&-
@@ -853,6 +862,197 @@ show_maintenance_menu() {
 
 		vmtool::run_maintenance_action "$selection"
 	done
+}
+
+
+vmtool::gnome_boxes_target_user() {
+	local target_user="${SUDO_USER:-${USER:-}}"
+
+	if [[ -z "$target_user" || "$target_user" == "root" ]]; then
+		target_user="$(logname 2>/dev/null || printf '%s' "${target_user:-root}")"
+	fi
+	printf '%s\n' "$target_user"
+}
+
+
+vmtool::gnome_boxes_target_home() {
+	local target_user="$1"
+	local target_home="/home/${target_user}"
+
+	if [[ ! -d "$target_home" ]]; then
+		target_home="$(getent passwd "$target_user" 2>/dev/null | cut -d: -f6)"
+	fi
+
+	[[ -n "$target_home" && -d "$target_home" ]] || return 1
+	printf '%s\n' "$target_home"
+}
+
+
+vmtool::gnome_boxes_integration_enabled() {
+	local target_user target_home
+	target_user="$(vmtool::gnome_boxes_target_user)"
+	target_home="$(vmtool::gnome_boxes_target_home "$target_user" 2>/dev/null)" || return 1
+
+	[[ -f "${target_home}/.config/gnome-boxes/sources/QEMU System" ||
+		-f "${target_home}/.var/app/org.gnome.Boxes/config/gnome-boxes/sources/QEMU System" ]]
+}
+
+
+vmtool::toggle_gnome_boxes_integration() {
+	if vmtool::gnome_boxes_integration_enabled; then
+		vmtool::remove_gnome_boxes_integration
+	else
+		vmtool::install_gnome_boxes_integration
+	fi
+}
+
+
+vmtool::install_gnome_boxes_integration() {
+	local target_user
+	local target_group
+	local target_home
+	local source_name="QEMU System"
+	local -a base_dirs=()
+	local -a written_files=()
+	local flatpak_override_status="not needed"
+
+	target_user="$(vmtool::gnome_boxes_target_user)"
+	if ! target_home="$(vmtool::gnome_boxes_target_home "$target_user")"; then
+		dialog::display_error "Unable to find a home directory for ${target_user:-the target user}."
+		return 1
+	fi
+	target_group="$(id -gn "$target_user" 2>/dev/null || printf '%s' "$target_user")"
+
+	base_dirs=(
+		"${target_home}/.config/gnome-boxes"
+		"${target_home}/.var/app/org.gnome.Boxes/config/gnome-boxes"
+	)
+
+	write_status "Installing GNOME Boxes integration for ${target_user}..."
+	for base_dir in "${base_dirs[@]}"; do
+		if [[ ! -d "$base_dir" ]]; then
+			write_information "GNOME Boxes config directory not found, skipping: ${base_dir}"
+			continue
+		fi
+
+		local sources_dir="${base_dir}/sources"
+		local source_file="${sources_dir}/${source_name}"
+		local source_uri="qemu+unix:///system"
+
+		if [[ "$base_dir" == *"/.var/app/org.gnome.Boxes/"* ]]; then
+			source_uri="qemu+unix:///system?socket=/run/libvirt/libvirt-sock"
+		fi
+
+		mkdir -p "$sources_dir" || {
+			write_warning "Unable to create ${sources_dir}"
+			continue
+		}
+
+		cat >"$source_file" <<EOF || {
+[source]
+name=QEMU System
+type=libvirt
+uri=${source_uri}
+save-on-quit=true
+EOF
+			write_warning "Unable to write ${source_file}"
+			continue
+		}
+
+		chown -R "${target_user}:${target_group}" "$sources_dir" 2>/dev/null || true
+		written_files+=("$source_file")
+	done
+
+	if [[ -d "${target_home}/.var/app/org.gnome.Boxes/config/gnome-boxes" ]] && command -v flatpak >/dev/null 2>&1; then
+		if [[ "${EUID:-$(id -u)}" -eq 0 && "$target_user" != "root" ]] && command -v sudo >/dev/null 2>&1; then
+			if sudo -u "$target_user" flatpak override --user --filesystem=/run/libvirt org.gnome.Boxes; then
+				flatpak_override_status="configured for ${target_user}"
+			else
+				flatpak_override_status="failed"
+			fi
+		elif flatpak override --user --filesystem=/run/libvirt org.gnome.Boxes; then
+			flatpak_override_status="configured"
+		else
+			flatpak_override_status="failed"
+		fi
+	fi
+
+	if (( ${#written_files[@]} == 0 )); then
+		result="No GNOME Boxes config directories were found for ${target_user}.
+
+Checked:
+ - ${base_dirs[0]}
+ - ${base_dirs[1]}
+
+Open GNOME Boxes once, then run this task again."
+		dialog::display_result "GNOME Boxes Integration"
+		return 0
+	fi
+
+	result="GNOME Boxes can now see the system libvirt connection.
+
+Written:
+$(printf ' - %s\n' "${written_files[@]}")
+
+Flatpak /run/libvirt access: ${flatpak_override_status}
+
+Restart GNOME Boxes if it is already open."
+	dialog::display_result "GNOME Boxes Integration"
+}
+
+
+vmtool::remove_gnome_boxes_integration() {
+	local target_user target_home
+	local source_file
+	local -a source_files=()
+	local -a removed_files=()
+	local flatpak_override_status="not needed"
+
+	target_user="$(vmtool::gnome_boxes_target_user)"
+	if ! target_home="$(vmtool::gnome_boxes_target_home "$target_user")"; then
+		dialog::display_error "Unable to find a home directory for ${target_user:-the target user}."
+		return 1
+	fi
+
+	source_files=(
+		"${target_home}/.config/gnome-boxes/sources/QEMU System"
+		"${target_home}/.var/app/org.gnome.Boxes/config/gnome-boxes/sources/QEMU System"
+	)
+
+	write_status "Removing GNOME Boxes integration for ${target_user}..."
+	for source_file in "${source_files[@]}"; do
+		if [[ -f "$source_file" ]]; then
+			if rm -f "$source_file"; then
+				removed_files+=("$source_file")
+			else
+				write_warning "Unable to remove ${source_file}"
+			fi
+		fi
+	done
+
+	if [[ -d "${target_home}/.var/app/org.gnome.Boxes/config/gnome-boxes" ]] && command -v flatpak >/dev/null 2>&1; then
+		if [[ "${EUID:-$(id -u)}" -eq 0 && "$target_user" != "root" ]] && command -v sudo >/dev/null 2>&1; then
+			if sudo -u "$target_user" flatpak override --user --nofilesystem=/run/libvirt org.gnome.Boxes; then
+				flatpak_override_status="removed for ${target_user}"
+			else
+				flatpak_override_status="failed"
+			fi
+		elif flatpak override --user --nofilesystem=/run/libvirt org.gnome.Boxes; then
+			flatpak_override_status="removed"
+		else
+			flatpak_override_status="failed"
+		fi
+	fi
+
+	result="GNOME Boxes system libvirt integration has been removed.
+
+Removed:
+$(if (( ${#removed_files[@]} )); then printf ' - %s\n' "${removed_files[@]}"; else printf ' - No source files were present.\n'; fi)
+
+Flatpak /run/libvirt access: ${flatpak_override_status}
+
+Restart GNOME Boxes if it is already open."
+	dialog::display_result "GNOME Boxes Integration"
 }
 
 

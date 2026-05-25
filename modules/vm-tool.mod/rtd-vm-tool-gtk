@@ -507,7 +507,16 @@ vmtoolgtk::show_settings_menu() {
 
 vmtoolgtk::show_maintenance_menu() {
 	while true; do
-		local selection
+		local selection gnome_boxes_integration_label gnome_boxes_integration_description
+		if [[ -f "${HOME}/.config/gnome-boxes/sources/QEMU System" ||
+			-f "${HOME}/.var/app/org.gnome.Boxes/config/gnome-boxes/sources/QEMU System" ]]; then
+			gnome_boxes_integration_label="📦 Remove GNOME Boxes integration"
+			gnome_boxes_integration_description="Remove the system libvirt source from GNOME Boxes."
+		else
+			gnome_boxes_integration_label="📦 Add GNOME Boxes integration"
+			gnome_boxes_integration_description="Add the system libvirt source to GNOME Boxes."
+		fi
+
 		selection="$(vmtoolgtk::show_menu \
 			"${VMTOOLGTK_TITLE} - Maintenance" \
 			"Choose a maintenance task to run. The selected workflow opens in a terminal session." \
@@ -515,7 +524,8 @@ vmtoolgtk::show_maintenance_menu() {
 			"1" "🔍 Dry run: list unused QCOW images" "Preview removable qcow images." \
 			"2" "🧹 Remove unused QCOW images" "Delete unused qcow images." \
 			"3" "🔍 Dry run: list virtual floppy images" "Preview removable floppy images." \
-			"4" "🧹 Remove virtual floppy images" "Delete virtual floppy images.")" || return 0
+			"4" "🧹 Remove virtual floppy images" "Delete virtual floppy images." \
+			"5" "$gnome_boxes_integration_label" "$gnome_boxes_integration_description")" || return 0
 
 		vmtoolgtk::launch_tui_action \
 			"RTD VM Tool - Maintenance ${selection}" \
