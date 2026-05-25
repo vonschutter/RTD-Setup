@@ -942,30 +942,53 @@ recipe:_SEC:_network_security () {
 }
 
 recipe:_SEC:_Proton_Suite_of_Ecrypted_Services () {
-	# Proton suite of software for debian, ubuntu (ProtonVPN, ProtonMail Bridge, ProtonDrive)...
+	# Proton Linux apps: cross-distribution snaps where published, plus native VPN and Authenticator.
 
 	# Loop through each item in this list of software and perform an install
 	# using the relevant packaging system.
+
+	local distribution_type fedora_version package
+	if [[ "${1:-}" == "--remove" ]]; then
+		software::from_snapcraft.io proton-mail --remove
+		software::from_snapcraft.io proton-pass --remove
+		software::from_snapcraft.io protonmail-bridge --remove
+		for package in proton-vpn-gnome-desktop proton-vpn-cli proton-authenticator protonvpn-stable-release; do
+			software::remove_native_software_package "${package}"
+		done
+		return 0
+	fi
+
+	# These packages provide Proton desktop apps on distributions beyond the native package targets below.
+	software::from_snapcraft.io proton-mail
+	software::from_snapcraft.io proton-pass
+	if software::from_snapcraft.io protonmail-bridge; then
+		snap connect protonmail-bridge:password-manager-service || write_warning "Connect protonmail-bridge:password-manager-service manually before using Bridge."
+	fi
 
 	distribution_type=$(system::distribution_type)
 
 	case ${distribution_type} in
 		"ubuntu" | "debian")
-			sotware::vendor_download_and_install https://repo.protonvpn.com/debian/dists/stable/main/binary-all/protonvpn-stable-release_1.0.8_all.deb
-			software::add_native_package proton-vpn-gnome-desktop  $1
-			software::add_native_package libayatana-appindicator3-1 $1
-			software::add_native_package gir1.2-ayatanaappindicator3-0.1 $1 
-			software::add_native_package gnome-shell-extension-appindicator  $1
-			software::add_native_package protonmail-bridge  $1
-			software::add_native_package protondrive $1
+			software::vendor_download_and_install "https://repo.protonvpn.com/debian/dists/stable/main/binary-all/protonvpn-stable-release_1.0.8_all.deb"
+			apt-get update
+			software::add_native_package proton-vpn-gnome-desktop proton-vpn-cli
+			software::add_native_package libayatana-appindicator3-1
+			software::add_native_package gir1.2-ayatanaappindicator3-0.1
+			software::add_native_package gnome-shell-extension-appindicator
+			software::vendor_download_and_install "https://proton.me/download/authenticator/linux/ProtonAuthenticator.deb"
+		;;
+		"fedora")
+			fedora_version=$(. /etc/os-release; printf '%s' "${VERSION_ID%%.*}")
+			software::vendor_download_and_install "https://repo.protonvpn.com/fedora-${fedora_version}-stable/protonvpn-stable-release/protonvpn-stable-release-1.0.3-1.noarch.rpm"
+			dnf -y makecache --refresh
+			software::add_native_package proton-vpn-gnome-desktop proton-vpn-cli
+			software::add_native_package libappindicator-gtk3 gnome-shell-extension-appindicator gnome-extensions-app
+			software::vendor_download_and_install "https://proton.me/download/authenticator/linux/ProtonAuthenticator.rpm"
 		;;
 		* )
-			write_error "Proton is not supported on the detected distribution ( ${distribution_type} ): skipping..."
+			write_warning "Proton VPN and Authenticator native installs are not configured for ${distribution_type}; installed available Snapcraft apps only."
 		;;
 	esac
-
-	# Uses protonmail.com (encrypted mail)
-	software::from_flathub.org com.github.vladimiry.ElectronMail $1
 }
 
 recipe:_SEC:_VPN_Software () {
@@ -1224,7 +1247,7 @@ recipe:_RDP:_RustDesk_Remote_Desktop () {
 recipe:_CLOUD:_MEGA_Cloud_Storage () {
 	# MEGA nz Private Cloud Storage (better than Drop Box)...
 
-	if $1 == "--remove" ; then
+	if [[ "${1:-}" == "--remove" ]]; then
 		write_information "Removing MEGA nz file crypto sync utility..."
 		software::remove_native_software_package megasync
 		software::remove_native_software_package megacmd
@@ -1420,4 +1443,3 @@ recipe:_RDP:_Citrix_App (){
 		fi
 	fi
 }
-
