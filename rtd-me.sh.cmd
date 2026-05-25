@@ -212,6 +212,8 @@ elif [[ "$OSTYPE" == "darwin"* ]]; then
 		exit 1
 	fi
 	
+	"${_SUDO[@]}" rm -f "${_CONFIG_CORE_DIR}/${_MAC_SCRIPT}"
+	
 	if ! "${_SUDO[@]}" curl -fsSL "${_RTD_SETUP_RAW_URL}/core/${_MAC_SCRIPT}" -o "${_CONFIG_CORE_DIR}/${_MAC_SCRIPT}" ; then
 		echo "Failed to download ${_RTD_SETUP_RAW_URL}/core/${_MAC_SCRIPT}"
 		exit 1
