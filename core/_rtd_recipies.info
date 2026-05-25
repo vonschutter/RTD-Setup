@@ -1232,7 +1232,8 @@ recipe:_CLOUD:_MEGA_Cloud_Storage () {
 	distro_type=$(system::distribution_type)
 	fetch_mega_file ()
 	{
-		product=$1
+		local product="$1"
+		local distro_version TGT
 		write_status "Looking for download URL for OS Type: [$distro_type] "
 
 		case $distro_type in
@@ -1246,15 +1247,16 @@ recipe:_CLOUD:_MEGA_Cloud_Storage () {
 				URL="https://mega.nz/linux/repo/Debian_$(hostnamectl |grep -i Debian |cut -f5 -d' ')/amd64/${product}-Debian_$(hostnamectl |grep -i Debian |cut -f5 -d' ')_amd64.deb"
 				write_information "Downloading ${product} from: ${URL}"
 			;;
-			"suse" | "opensuse")
+			"suse" | "opensuse" )
 			# Grab the SUSE name and version and format it like Mega does their download URL...
 				TGT=$(hostnamectl | awk -F ': ' '/Operating System:/ {gsub(/ /, "_", $2); print $2}')
 				URL="https://mega.nz/linux/repo/${TGT}/x86_64/${product}-${TGT}.x86_64.rpm"
 				write_information "Downloading ${product} from: ${URL}"
 			;;
-			"fedora" | "redhat")
+			"fedora" | "redhat" )
 				# Grab the Fedora name and version and format it like Mega does their download URL...
-				TGT="$(hostnamectl |grep -i Fedora |cut -f7 -d' ')_$(hostnamectl |grep -i Fedora |cut -f9 -d' ')"
+				distro_version=$(. /etc/os-release; printf '%s' "${VERSION_ID%%.*}")
+				TGT="Fedora_${distro_version}"
 				URL="https://mega.nz/linux/repo/${TGT}/x86_64/${product}-${TGT}.x86_64.rpm"
 				write_information "Downloading ${product} from: ${URL}"
 			;;
@@ -1266,7 +1268,7 @@ recipe:_CLOUD:_MEGA_Cloud_Storage () {
 
 		# If a known distributio was found and URL set, use "software::vendor_download_and_install" function to install app...
 		write_information "🌐 Downloading ${product} from: ${URL}"
-		if [[ -n "${URL}" ]] && software::vendor_download_and_install ${URL}; then
+		if [[ -n "${URL}" ]] && software::vendor_download_and_install "${URL}"; then
 			write_information "✅ Installed: ${product}"
 		else
 			write_error "❌ Failed to install: ${product}"
@@ -1275,10 +1277,10 @@ recipe:_CLOUD:_MEGA_Cloud_Storage () {
 	fetch_mega_file megasync
 	fetch_mega_file megacmd
 
-	if is_software_package_installed nautilus ; then fetch_mega_file nautilus-megasync ; fi
-	if is_software_package_installed thunar ; then fetch_mega_file thunar-megasync ; fi
-	if is_software_package_installed nemo ; then fetch_mega_file nemo-megasync ; fi
-	if is_software_package_installed dolphin ; then fetch_mega_file dolphin-megasync ; fi
+	if software::is_native_package_installed nautilus ; then fetch_mega_file nautilus-megasync ; fi
+	if software::is_native_package_installed thunar ; then fetch_mega_file thunar-megasync ; fi
+	if software::is_native_package_installed nemo ; then fetch_mega_file nemo-megasync ; fi
+	if software::is_native_package_installed dolphin ; then fetch_mega_file dolphin-megasync ; fi
 }
 
 
