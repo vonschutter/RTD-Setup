@@ -5,7 +5,7 @@
 
 This module contains two companion scripts:
 - `rtd-update-system`: update OS packages (APT/YUM/Zypper/PKCON), snaps, and Flatpaks from one place
-- `rtd-update-self`: refresh the RTD Power Tools installation itself from GitHub and rebuild launchers/themes
+- `rtd-update-self`: update or reinitialize the RTD Power Tools installation from GitHub and rebuild launchers/themes
 
 Both tools run independently of the rest of the stack and will elevate with `sudo/pkexec` when required.
 
@@ -37,7 +37,9 @@ rtd-update-self
 rtd-update-self --autoconfirm
 ```
 What happens:
-- prompts for which pieces to update (base tools, menu launchers, themes)
-- clones fresh content from `https://github.com/<git_profile>/RTD-Setup` into `/opt/rtd`
-- backs up the previous install under `/opt/backup` with a timestamped zip
+- prompts for which pieces to update (base tools, menu launchers, themes, or a clean reinitialize)
+- stages fresh content from `https://github.com/<git_profile>/RTD-Setup` in a temporary directory
+- by default, backs up `/opt/rtd` to a timestamped directory under `/opt/backup` and synchronizes new content into place with `rsync`, retaining unmatched local files
+- theme updates likewise stage, back up, and synchronize themes into place without removing unmatched local files
+- offers `Refresh/Reinitialize` when a clean replacement is needed; that path archives the previous install as a timestamped zip
 - registers the tools and recreates desktop/menu entries; logs to `/var/log/rtd`

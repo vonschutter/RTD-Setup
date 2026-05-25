@@ -19,7 +19,7 @@ GIT_Profile=${GIT_Profile:-vonschutter}
 #::
 #::		This task sequence should be executed on a PC with the the RTD OEM installation or configuration
 #::
-#:: Value:        Useful for refreshing an installed RTD environment without
+#:: Value:        Useful for updating an installed RTD environment without
 #::               manually cloning, replacing, or relinking the toolset.
 #::
 #:: Usage:        Run the script on a system with an existing RTD installation.
@@ -83,8 +83,9 @@ export _git_theme_url="https://github.com/${_git_profile}/RTD-Themes.git"
 # Determine log file names for this session
 export _logfile="${_log_dir}/$(date +%Y-%m-%d-%H-%M)-${_scriptname}.log"
 
-# List spciffic commands of software that are needed
-export _software_dependencies="zip dialog pkexec"
+# List specific commands of software that are needed.
+# zip is retained for the explicit refresh/reinitialize path.
+export _software_dependencies="rsync zip dialog pkexec"
 
 # Decide where to put the backed up old versions of the tools... 
 export _bakup_dir=/opt/backup
@@ -168,80 +169,228 @@ rtd::bootstrap_library() {
 	return 1
 }
 
+rtd::stage_powertools_update() {
+	RTD_UPDATE_STAGE_DIR="$(mktemp -d "/tmp/${_tla,,}-update.XXXXXX")" || {
+		write_error "Failed to create temporary directory for the RTD update."
+		return 1
+	}
+
+	if git clone --depth=1 "${_git_src_url}" "${RTD_UPDATE_STAGE_DIR}/repository"; then
+		write_information "Powertools successfully retrieved into ${RTD_UPDATE_STAGE_DIR}."
+		return 0
+	fi
+
+	write_error "Failed to retrieve power tools correctly."
+	rm -rf -- "${RTD_UPDATE_STAGE_DIR}"
+	RTD_UPDATE_STAGE_DIR=
+	return 1
+}
+
+rtd::cleanup_powertools_stage() {
+	[[ -n "${RTD_UPDATE_STAGE_DIR:-}" ]] || return 0
+	rm -rf -- "${RTD_UPDATE_STAGE_DIR}"
+	RTD_UPDATE_STAGE_DIR=
+}
+
+rtd::register_updated_powertools() {
+	# shellcheck source=/dev/null
+	source "/opt/${_tla,,}/core/_rtd_library"
+	oem::register_all_tools
+	[[ -e "${_OEM_DIR}/log" || -L "${_OEM_DIR}/log" ]] || ln -s "${_log_dir}" "${_OEM_DIR}/log"
+}
+
+rtd::update_powertools_in_place() {
+	local install_dir="/opt/${_tla,,}"
+	local backup_dir
+	local -a rsync_options=(-a --exclude='/.git/')
+	backup_dir="${_bakup_dir}/${_tla,,}-$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"
+
+	write_information "Attempting to get the latest RTD tools..."
+	hash git &>> "${_logfile}" || software::check_native_package_dependency git
+	hash rsync &>> "${_logfile}" || software::check_native_package_dependency rsync
+	rtd::stage_powertools_update || return 1
+
+	if [[ -d "${install_dir}" ]]; then
+		write_warning "Backing up old (${install_dir}) to ${backup_dir}..."
+		if ! mkdir -p "${backup_dir}" || ! rsync -a "${install_dir}/" "${backup_dir}/"; then
+			write_error "Failed to backup ${install_dir}; update cancelled."
+			rtd::cleanup_powertools_stage
+			return 1
+		fi
+	fi
+
+	mkdir -p "${install_dir}" || {
+		write_error "Failed to create ${install_dir}; update cancelled."
+		rtd::cleanup_powertools_stage
+		return 1
+	}
+
+	# Themes have their own update option and must not be overwritten by a base update.
+	[[ -e "${_theme_dir}" ]] && rsync_options+=(--exclude='/themes/')
+	write_information "Updating ${install_dir} in place; unmatched installed files will be retained."
+	if ! rsync "${rsync_options[@]}" "${RTD_UPDATE_STAGE_DIR}/repository/" "${install_dir}/"; then
+		write_error "Failed to synchronize updated RTD tools into ${install_dir}."
+		rtd::cleanup_powertools_stage
+		return 1
+	fi
+
+	rtd::cleanup_powertools_stage
+	rtd::register_updated_powertools
+}
+
+rtd::reinitialize_powertools() {
+	local install_dir="/opt/${_tla,,}"
+	local backup_dir
+	local theme_backup_dir=""
+	backup_dir="${_bakup_dir}/${_tla,,}-$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"
+
+	write_information "Refreshing RTD tools with a clean replacement install..."
+	hash git &>> "${_logfile}" || software::check_native_package_dependency git
+	rtd::stage_powertools_update || return 1
+
+	if [[ -e "${_theme_dir}" ]]; then
+		theme_backup_dir="${_bakup_dir}/themes-$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"
+		write_information "Moving themes out of the way..."
+		if ! mv -- "${_theme_dir}" "${theme_backup_dir}"; then
+			write_error "Failed to preserve themes from ${_theme_dir}; refresh cancelled."
+			rtd::cleanup_powertools_stage
+			return 1
+		fi
+	fi
+
+	if [[ -d "${install_dir}" ]]; then
+		if ! mv -- "${install_dir}" "${backup_dir}"; then
+			write_error "Failed to move ${install_dir} out of the way; refresh cancelled."
+			[[ -n "${theme_backup_dir}" ]] && mv -- "${theme_backup_dir}" "${_theme_dir}"
+			rtd::cleanup_powertools_stage
+			return 1
+		fi
+		write_warning "Backing up old (${install_dir}) to ${backup_dir}.zip..."
+		if zip -r -5 -q "${backup_dir}.zip" "${backup_dir}"; then
+			rm -rf -- "${backup_dir}"
+		else
+			write_error "Failed to archive the previous installation; it remains at ${backup_dir}."
+		fi
+	fi
+
+	if ! mv -- "${RTD_UPDATE_STAGE_DIR}/repository" "${install_dir}"; then
+		write_error "Failed to install the refreshed RTD tree."
+		rtd::cleanup_powertools_stage
+		return 1
+	fi
+	rm -rf -- "${install_dir}/.git"
+	rtd::cleanup_powertools_stage
+
+	if [[ -n "${theme_backup_dir}" && -e "${theme_backup_dir}" ]]; then
+		write_information "Restoring themes from ${theme_backup_dir}..."
+		rm -rf -- "${_theme_dir}"
+		mv -- "${theme_backup_dir}" "${_theme_dir}"
+	fi
+
+	rtd::register_updated_powertools
+}
+
+rtd::stage_themes_update() {
+	RTD_THEME_STAGE_DIR="$(mktemp -d "/tmp/${_tla,,}-themes-update.XXXXXX")" || {
+		write_error "Failed to create temporary directory for the themes update."
+		return 1
+	}
+
+	if git clone --depth=1 "${_git_theme_url}" "${RTD_THEME_STAGE_DIR}/repository"; then
+		write_information "Themes successfully retrieved into ${RTD_THEME_STAGE_DIR}."
+		return 0
+	fi
+
+	write_error "Failed to retrieve themes correctly."
+	rm -rf -- "${RTD_THEME_STAGE_DIR}"
+	RTD_THEME_STAGE_DIR=
+	return 1
+}
+
+rtd::cleanup_themes_stage() {
+	[[ -n "${RTD_THEME_STAGE_DIR:-}" ]] || return 0
+	rm -rf -- "${RTD_THEME_STAGE_DIR}"
+	RTD_THEME_STAGE_DIR=
+}
+
+rtd::update_themes_in_place() {
+	local backup_dir
+	backup_dir="${_bakup_dir}/themes-$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"
+
+	hash git &>> "${_logfile}" || software::check_native_package_dependency git
+	hash rsync &>> "${_logfile}" || software::check_native_package_dependency rsync
+	rtd::stage_themes_update || return 1
+
+	if [[ -d "${_theme_dir}" ]]; then
+		write_warning "Backing up old themes (${_theme_dir}) to ${backup_dir}..."
+		if ! mkdir -p "${backup_dir}" || ! rsync -a "${_theme_dir}/" "${backup_dir}/"; then
+			write_error "Failed to backup ${_theme_dir}; themes update cancelled."
+			rtd::cleanup_themes_stage
+			return 1
+		fi
+	fi
+
+	mkdir -p "${_theme_dir}" || {
+		write_error "Failed to create ${_theme_dir}; themes update cancelled."
+		rtd::cleanup_themes_stage
+		return 1
+	}
+
+	write_information "Updating themes in place; unmatched installed files will be retained."
+	if ! rsync -a --exclude='/.git/' "${RTD_THEME_STAGE_DIR}/repository/" "${_theme_dir}/"; then
+		write_error "Failed to synchronize updated themes into ${_theme_dir}."
+		rtd::cleanup_themes_stage
+		return 1
+	fi
+
+	rtd::cleanup_themes_stage
+	write_information "Themes updated."
+}
+
 system::perform_powertools_update_linux ()
 {
-	cmd=(dialog --backtitle "${PUBLICATION}" --title "${_tla^^} PowerTools Updater" --separate-output --checklist "Please select what to include in the update below:" 22 85 16 )
-	options=(1 "Update Base RTD Powertools" on
+	local choices exit_status choice theme_update_default reinitialize_selected
+	local -a cmd options
+	theme_update_default=off
+	[[ -e "${_theme_dir}" ]] && theme_update_default=on
+
+	cmd=(dialog --backtitle "${PUBLICATION}" --title "${_tla^^} PowerTools Updater" --separate-output --checklist "Please select what to include in the update below:" 22 85 16)
+	options=(1 "Update Base RTD Powertools (retain locally added files)" on
 		2 "Update menu shortcuts" on
-		3 "Update Themes (wallpapers, icons, themes, fonts etc.)" $( if [[ -e "${_theme_dir}" ]]; then echo on ; else echo off ; fi )
-		)
+		3 "Update Themes (wallpapers, icons, themes, fonts etc.)" "${theme_update_default}"
+		4 "Refresh/Reinitialize Base RTD Powertools (replace install)" off
+	)
 
-		choices=$("${cmd[@]}" "${options[@]}" 2>&1 >/dev/tty)
-		exit_status=$?
-		export choices
-		case $exit_status in
-			1) clear && _pressed=Cancel && return ;;
-			255) clear && _pressed=ESC && return ;;
+	choices=$("${cmd[@]}" "${options[@]}" 2>&1 >/dev/tty)
+	exit_status=$?
+	case $exit_status in
+		1) clear && _pressed=Cancel && return ;;
+		255) clear && _pressed=ESC && return ;;
+	esac
+
+	clear
+	reinitialize_selected=false
+	for choice in $choices; do
+		[[ "${choice}" == "4" ]] && reinitialize_selected=true
+	done
+
+	for choice in $choices; do
+		case $choice in
+			1)
+				[[ "${reinitialize_selected}" == true ]] || rtd::update_powertools_in_place || return 1
+			;;
+			2)
+				write_information "Creating menu launchers..."
+				oem::rtd_tools_make_launchers
+			;;
+			3)
+				rtd::update_themes_in_place || return 1
+			;;
+			4)
+				rtd::reinitialize_powertools || return 1
+			;;
 		esac
-
-		clear
-		for choice in $choices
-			do
-			case $choice in
-				1)
-					write_information "Attempting to get the latest RTD tools..."
-					hash git &>> ${_logfile} || software::check_native_package_dependency git
-
-					[[ -e "${_theme_dir}" ]] && { 
-						write_information "Moving themes out of the way..."
-						local _theme_backup_dir="${_bakup_dir}/themes-$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"
-						mv "${_theme_dir}" "${_theme_backup_dir}" || write_warning "Failed to backup themes from ${_theme_dir} to ${_theme_backup_dir}..."
-						}
-					
-					if git clone --depth=1 "${_git_src_url}" "/opt/${_tla,,}.tmp" ; then
-						write_information "Powertools successfully retrieved..."
-						if [[ -d /opt/${_tla,,}  ]] ; then
-							mv "/opt/${_tla,,}" "${_BackupFolderName:="${_bakup_dir}/${_tla,,}-$(date +%Y-%m-%d-%H-%M).bakup"}"
-							write_warning "Backing up old (/opt/${_tla,,}) to ${_BackupFolderName}.zip..." 
-							zip -m -r -5 -q "${_BackupFolderName}.zip"  "${_BackupFolderName}"
-							rm -r "${_BackupFolderName}"
-						fi
-
-						mv "/opt/${_tla,,}.tmp" "/opt/${_tla,,}" ; rm -rf /opt/${_tla,,}/.git
-						
-						[[ -e "${_theme_backup_dir}" ]] && { 
-							write_information "Restoring themes from ${_theme_backup_dir}..."
-							mv "${_theme_backup_dir}" "${_theme_dir}"
-							}
-
-						source "/opt/${_tla,,}/core/_rtd_library"
-						oem::register_all_tools
-						ln -s "${_log_dir}" "${_OEM_DIR}/log"
-					else
-						echo "Failed to retrieve power tools correctly! "
-						echo "Suggestion: check write permission in "/opt" or internet connectivity."
-						exit 1
-					fi
-				;;
-				2)
-					write_information "Creating menu launchers..."
-					oem::rtd_tools_make_launchers				
-				;;
-				3)
-					write_information "Updating themes in ${_theme_dir}..."
-					[[ -e "${_theme_dir}" ]] && zip -m -r -5 -q ${_bakup_dir}/themes-$(date +%Y-%m-%d-%H-%M-%S-%s).bakup.zip "${_theme_dir}" ; rm -r "${_theme_dir}"
-					mkdir -p "${_theme_dir}"
-					
-
-					if git clone --depth=1 "${_git_theme_url}" "${_theme_dir}" ; then
-						write_information "done!"
-					else
-						_err_cmd=" git clone --depth=1 ${_git_theme_url} ${_theme_dir}"
-						dialog --backtitle "${PUBLICATION}" --title "${BRAND} tools updater: ERROR!" --msgbox "\ncommand: \n $_err_cmd ." 20 80 ; clear
-					fi
-				;;
-			esac
-		done	
+	done
 }
 
 
