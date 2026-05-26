@@ -977,7 +977,7 @@ recipe:_SEC:_Proton_Suite_of_Ecrypted_Services () {
 			software::add_native_package gnome-shell-extension-appindicator
 			software::vendor_download_and_install "https://proton.me/download/authenticator/linux/ProtonAuthenticator.deb"
 		;;
-		"fedora")
+		"fedora" | "redhat" )
 			fedora_version=$(. /etc/os-release; printf '%s' "${VERSION_ID%%.*}")
 			software::vendor_download_and_install "https://repo.protonvpn.com/fedora-${fedora_version}-stable/protonvpn-stable-release/protonvpn-stable-release-1.0.3-1.noarch.rpm"
 			dnf -y makecache --refresh
@@ -1011,21 +1011,15 @@ recipe:_SEC:_VPN_Software () {
 			tool::up_2_date
 			software::add_native_package mullvad-vpn
 		;;
-		"suse" | "opensuse" | "fedora" | "redhat" )
+		"fedora" | "redhat" )
 			software::check_native_package_dependency curl
-			case ${distribution_type} in
-				"fedora" | "redhat")
-					dnf config-manager addrepo --from-repofile=https://repository.mullvad.net/rpm/stable/mullvad.repo
-					dnf config-manager --add-repo https://repository.mullvad.net/rpm/stable/mullvad.repo
-					tool::up_2_date
-					software::add_native_package mullvad-vpn
-				;;
-			*)
-				write_error "Mullvad is not supported on the detected distribution ( ${distribution_type} ): skipping..."
-			esac
+			dnf config-manager addrepo --from-repofile=https://repository.mullvad.net/rpm/stable/mullvad.repo
+			dnf config-manager --add-repo https://repository.mullvad.net/rpm/stable/mullvad.repo
+			tool::up_2_date
+			software::add_native_package mullvad-vpn
 		;;
 		* )
-			write_error "Spported distribution ( ${distribution_type} ) not found: skipping..."
+			write_error "Supported distribution ( ${distribution_type} ) not found: skipping..."
 		;;
 	esac
 }
@@ -1038,31 +1032,6 @@ recipe:_ADM:_Advanced_Terminals () {
 	software::from_snapcraft.io waveterm $1
 }
 
-recipe:_ADM:_Warp_Terminal () {
-	# Advanced PROPRIETARY! terminal app (Warp AI Terminal )...
-	# This bundle is not removable. It contains downloaded software from sites. 
-	# Loop through each item in this list of software and perform an install
-	# using the relevant packaging system.
-
-	distribution_type=$(system::distribution_type)
-
-	case ${distribution_type} in
-		"ubuntu" | "debian")
-			wget -qO- https://releases.warp.dev/linux/keys/warp.asc | gpg --dearmor > warpdotdev.gpg
-			sudo install -D -o root -g root -m 644 warpdotdev.gpg /etc/apt/keyrings/warpdotdev.gpg
-			sudo sh -c 'echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/warpdotdev.gpg] https://releases.warp.dev/linux/deb stable main" > /etc/apt/sources.list.d/warpdotdev.list'
-			rm warpdotdev.gpg
-			software::update_system_txt
-			software::add_native_package warp-terminal
-		;;
-		suse | opensuse | fedora | redhat)
-			software::vendor_download_and_install https://releases.warp.dev/stable/warp-terminal-x86_64.rpm
-		;;
-		*)
-			write_error "Warp is not supported on the detected distribution ( ${distribution_type} )..."
-			exit 1
-	esac
-}
 
 recipe:_OEM:_Themes_and_Tweaks () {
 	# Configuration, tweaks, and settings for a better user experience (KDE or Gnome).
@@ -1143,6 +1112,8 @@ recipe:_OEM:_Themes_and_Tweaks () {
 		else
 			write_information "Only implementing tweaks for the current user..."
 		fi
+
+		for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
 		# -------------------------------------------------------------------------------------------------------
 	fi
 
@@ -1170,7 +1141,7 @@ recipe:_OEM:_Themes_and_Tweaks () {
 		# Set wallpaper and theme
 		sudo -H -E -u $SUDO_USER  bash -c "source /opt/rtd/core/_rtd_library ; kde::set_wallpaper ${_WALLPAPER_DIR}/Wayland.jpg"
 		software::from_snapcraft.io gtk-theme-breeze $1
-		# for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i vimix-themes:gtk-3-themes; done
+		for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i gtk-theme-breeze:gtk-3-themes; done
 		# sudo -E -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c '/usr/bin/lookandfeeltool -a RTD-Win11-Dark --resetLayout'
 		# -------------------------------------------------------------------------------------------------------
 	fi
