@@ -18852,6 +18852,107 @@ software::enable_extra_repos() {
 	return 0
 }
 
+software::offer_reboot_if_required() {
+	# Description: Checks package-manager reboot indicators and offers an interactive reboot.
+	# Arguments: --dialog uses the dialog-based prompt for UI update workflows.
+	local prompt_mode="${1:-}"
+	local check_performed=0
+	local reboot_required=0
+	local reboot_reason=""
+	local check_status=0
+	local answer=""
+
+	if [[ -e /var/run/reboot-required ]]; then
+		check_performed=1
+		reboot_required=1
+		reboot_reason="Installed updates have marked this system for reboot."
+	elif hash zypper 2>/dev/null; then
+		zypper -q needs-rebooting >/dev/null 2>&1
+		check_status=$?
+		case "$check_status" in
+		0)
+			check_performed=1
+			;;
+		102)
+			check_performed=1
+			reboot_required=1
+			reboot_reason="Zypper reports that installed updates require a reboot."
+			;;
+		*)
+			system::log_item "Unable to determine reboot status with zypper needs-rebooting (exit $check_status)."
+			;;
+		esac
+	elif hash needs-restarting 2>/dev/null; then
+		needs-restarting -r >/dev/null 2>&1
+		check_status=$?
+		case "$check_status" in
+		0)
+			check_performed=1
+			;;
+		1)
+			check_performed=1
+			reboot_required=1
+			reboot_reason="Installed RPM updates require a reboot."
+			;;
+		*)
+			system::log_item "Unable to determine reboot status with needs-restarting (exit $check_status)."
+			;;
+		esac
+	elif hash dnf 2>/dev/null && dnf -q needs-restarting --help >/dev/null 2>&1; then
+		dnf -q needs-restarting -r >/dev/null 2>&1
+		check_status=$?
+		case "$check_status" in
+		0)
+			check_performed=1
+			;;
+		1)
+			check_performed=1
+			reboot_required=1
+			reboot_reason="Installed RPM updates require a reboot."
+			;;
+		*)
+			system::log_item "Unable to determine reboot status with dnf needs-restarting (exit $check_status)."
+			;;
+		esac
+	elif hash apt-get 2>/dev/null; then
+		check_performed=1
+	fi
+
+	if [[ "$check_performed" -ne 1 ]]; then
+		write_information "No supported reboot-required check is available; skipping reboot prompt."
+		return 0
+	fi
+
+	if [[ "$reboot_required" -ne 1 ]]; then
+		write_information "No system reboot is currently required."
+		return 0
+	fi
+
+	write_warning "$reboot_reason"
+	if [[ "$prompt_mode" == "--dialog" ]]; then
+		if dialog::prompt_yes_no --back-title "${PUBLICATION:-$BRANDING}" --title "Reboot Required" \
+			--message "$reboot_reason\n\nReboot the system now?"; then
+			write_status "Rebooting the system now..."
+			reboot
+		else
+			write_information "Reboot postponed by user."
+		fi
+	elif [[ -t 0 ]]; then
+		read -r -p "$reboot_reason Reboot the system now? [y/N] " answer
+		case "$answer" in
+		[Yy] | [Yy][Ee][Ss])
+			write_status "Rebooting the system now..."
+			reboot
+			;;
+		*)
+			write_information "Reboot postponed by user."
+			;;
+		esac
+	else
+		write_warning "A reboot is required, but no interactive prompt is available. Reboot manually when appropriate."
+	fi
+}
+
 software::update_system_txt() {
 	# Description:
 	# System update function. The purpose of this function is to update installed software from
@@ -18966,6 +19067,8 @@ software::update_system_txt() {
 		flatpak history --system --since=1d
 		flatpak history --user --since=1d
 	)" | tee -a "$LOGFILE"
+
+	software::offer_reboot_if_required
 }
 
 software::update_all_ui() {
@@ -19085,6 +19188,7 @@ software::update_all_ui() {
 
 				" \
 				20 120
+			software::offer_reboot_if_required --dialog
 			;;
 		*)
 			write_warning "No update actions were requested."
