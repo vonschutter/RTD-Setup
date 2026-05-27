@@ -1,102 +1,85 @@
 # RTD Power Tools
 
-<img src="media_files/WindowsLogo.png" width="15"/>  <img src="media_files/UbuntuLogo.png" width="20"/>  <img src="media_files/RedHatLogo.png" width="20"/>  <img src="media_files/SuseLogo.png" width="28"/> <img src="media_files/DebianLogo.png" width="28"/>
+![RTD Power Tools](media_files/header-time.jpg)
 
-[MinecraftServer](https://github.com/vonschutter/RTD-Setup/blob/main/modules/minecraft-server-manager.mod/README.md) | [NordVPN_GUI](https://github.com/vonschutter/RTD-Setup/blob/main/modules/nordvpn-manager.mod/README.md) | [DesktopLookSwitcher](modules/rtd-desktop-look-switcher.mod/README.md) | [Instant VPN Router](/modules/rtd-vpn-router.mod/README.md) | [Simple Support Tool](/modules/simple-support-tool.mod/README.md) | [WoW Replay Launcher](/modules/steam-world-of-warships-utility.mod/README.md) | [WoT Replay Launcher](/modules/steam-world-of-tanks-utility.mod/README.md) | [System Update](/modules/oem-system-update.mod/README.md) | [Ventoy USB Creator](/modules/oem-ventoy.mod/README.md) | [System Hardware Information](/modules/system-hardware-information.mod/README.md) | [OEM System Admin Tools](/modules/oem-system-admin.mod/README.md) | [OEM Support App Runner](/modules/oem-app-runner.mod/README.md) | [OEM Bundle Manager](/modules/oem-bundle-manager.mod/README.md) | [OEM User Backup Tool](/modules/system-user-backup.mod/README.md) | [Gnome Shell Extension Installer](/modules/gnome-shell-extension-installer.mod/README.md) | [RTD Core Library](/core/README.md)
+RTD Power Tools is a collection of interactive administration utilities for Linux workstations, remote support, installation media, networking, security checks, and KVM virtual machines. The commands are designed to turn multi-step system tasks into guided terminal or desktop workflows while keeping the underlying Bash scripts inspectable.
 
-![RTD Builder Screenshot](media_files/header-time.jpg)
+## Choose A Task
 
-# Overview:
+| I want to... | Command | What it does | Important note |
+| --- | --- | --- | --- |
+| Update installed software | `rtd-update-system` | Updates native packages, Flatpaks, and snaps when configured | May require a reboot |
+| See updates installed today | `rtd-update-system --show` | Displays package activity for today | Read-only |
+| Update RTD Power Tools | `rtd-update-self` | Backs up and synchronizes the installed RTD files | Changes `/opt/rtd` |
+| Install software by role | `rtd-oem-bundle-manager` | Installs selected application/configuration bundles | Downloads and installs software |
+| Back up a user before a reinstall | `rtd-oem-backup-linux-config` | Builds encrypted archives of selected user data | Provide external or mounted storage |
+| Diagnose or maintain a remote system | `rtd-simple-support-tool` | Presents common support tasks in one menu | Some tasks elevate privileges |
+| View system hardware | `rtd-system-hardware-information` | Shows hardware and sensor information in a dashboard | Desktop UI required |
+| Build a multi-ISO boot USB | `rtd-ventoy-usb` | Installs Ventoy and copies installation media | Erases the selected drive |
+| Build or manage KVM guests | `rtd-vm-tool` | Creates, clones, starts, and maintains virtual machines | Requires KVM/libvirt |
+| Route network traffic through a VPN | `rtd-start-vpn-router` | Configures a Linux host as a VPN gateway | Changes firewall and routing rules |
 
-These Power Tools are originally created to facilitate supporting Linux machines remotely. However, are broadly applicable as they simplify the life of an enthusiast, a system administrator or developer. These tools are written in simple bash script to be as open and easily understandable as possible, so that anyone can download and modify them for their own unique purposes. If you are the person who lives and breathes in the terminal and know every single system command in the back of your head like a reflex, and you don't mind typing several hundred characters each time you want to, for example, build a VM to test your stuff; this may not be as valuable to you. The purpose of these tools are to expose common tasks and automate them so all you need to do is a few up/down arrows and selections. Some tools included are (usable over an ssh connection).
+See the full [tool reference](docs/TOOLS.md) or start with the [example workflows](docs/USE_CASES.md).
 
-Installing the RTD Power Tools will give you:
+## Install On Linux
 
-* Software Productivity Bundle installer (auto run the first time)
-* Global system update tool to update native packages, flatpaks, and snaps.
-* Auto VM builder for Debian, Ubuntu, SUSE, Fedora, and Windows 10, 11
-* Simple system support tool for remote computers
-* System cleanup tool
-* Add system to an on-premise Ubuntu Landscape Server
-* Desktop Installation media creator for Debian and Ubuntu Desktops
-* Server Installation media creator Linux servers
-* Viewing system information
-* Removing unused PPA repositories
-* Terminal GUI for NordVPN
-* Instant VPN router setup
-* SSH local network scan and connect utility
-* Steam World of Warships replay launcher
-* Desktop look changer to assist with MAC and Windows users
-* and more...
-
-## On Linux
-
-Of course the tools are available at the Terminal: Just type "rtd" and hit [TAB] once or twice to see all the tools available at the terminal. The main tools are available in the OEM or "other" category in the menu/launcher in Linux.
-
-![RTD Builder Screenshot 2](media_files/ScrRTDTerm.png)
-
-The **RTD Power Tools** includes the **Software Bundle Installer** intended to facilitate adding optional software and optimizing configuration of a vanilla install of Ubuntu, Debian (or derivatives), SUSE, Fedora, CentOS based distribution, and even Windows (Useful when building Vitual Machines using the RTD Poser Tools). The bootstrap script (**rtd-me.sh.cmd**) is made to run both on windows and Linux; and will identify Linux/Mac/BSD/Windows versions and execute those configurations scripts if they are defined. The non Linux or Windows references are essentially empty in the bootstrap script at present but may simply be added as needed. However, most of the software intended for Windows and Mac are proprietary and may not be distributed so only freely available software is added. Please keep in mind that this does not mean that the Open Source Software (OSS), or any of the free software in the Windows or linux repositories is less capable. You may well be able to do just about anything with OSS that you can do with proprietary software. The OSS does have one advantage though: it is peer reviewed and will unlikely come with built in back doors (intended or otherwise).
-
-When the RTD Power Tools are installed the install script will automatically run the **Software Bundle Installer** for convenience. This will allow you to automatically add wholw bundles of applicatione for various puurposes. Running RTD Power Tools setup in Debian:
-
-![img](media_files/20230508_145523_image.png)
-
-When running the install script on a server without a graphical environment on it, the setup will discover that a graphical environment is not present and display the relevant menu of options instead:
-
-![RTD Builder Screenshot 2](media_files/ScrTermOEMSetup.png)
-
-## On Windows
-
-As promised, the rtd-me.sh.cmd script will run under windows as well. Simply download it and double click on it (you will be prompted to elevate privileges if needed). Please NOTE: that at this time the Windows functionality is roughly equivalent to the Linux **Software Bundle Installer**, but will not prompt for anything, whereas for Linux the setup will pause for 60 seconds to allow for some selections. However, the script will optimize Windows by removing bloatware (Sponsored Software) and turning off services that most do not use to enhance both performance and security. Several useful and fun software titles are automatically added (will not fill up your disk). The Windows changes are made with PowerShell.
-
-Running "rtd-oem-win10-config.ps1" or "rtd-oem-win11-config.ps1" (**Software Bundle Installer**) in Windows (also run when installing RTD Power Tools):
-![Windows running RTD Power Tools](media_files/Scr11.png)
-
-# How to Install RTD Power Tools:
-
-Getting the RTD power Tools has been made as easy as possible. The installation process simply involves downloading and running a single script. This script will make these tools available on you system with a minimum of questions.
-
-## Installing In Linux
-
-To get these tools for yourself on Linux just copy and paste the line below in to a terminal:
+Download and run the bootstrap script:
 
 ```bash
-wget https://github.com/vonschutter/RTD-Setup/raw/main/rtd-me.sh.cmd && bash ./rtd-me.sh.cmd
+curl -fsSL https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/rtd-me.sh.cmd -o rtd-me.sh.cmd
+bash ./rtd-me.sh.cmd
 ```
 
-Or, using curl:
+The installer may request administrator privileges to install tools and dependencies under `/opt/rtd`. After installation, list available commands with shell completion:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/rtd-me.sh.cmd -o rtd-me.sh.cmd && bash ./rtd-me.sh.cmd
+rtd<TAB><TAB>
 ```
 
-Please note that you will need elevated priviledges on the Linux system (root).
+For first-run guidance, privilege expectations, and log locations, read [Getting Started](docs/GETTING_STARTED.md).
 
-If you are using Windows Subsystem for Linux (WSL) you may copy and paste the same in to your WSL terminal window to use this in WSL.
+## Common Workflows
 
-## Installing In Windows
+Set up and maintain a desktop workstation:
 
-If you want to run the **Software Bundle Installer** (and optimizer) in Windows 10 or Windows 11, please use the link below to save the script locally. Since it does not make sense to use linux tools in Windows, the power tools themselves are not made available in the Windows environment; but, since the power tools do include an option for automatically building a Windows Desktop Virtual Machine (VDI) in Linux, the **Software Bundle Installer** for Windows will be run for you automatically inside the Virtual Machine by downloading and executing **rtd-me.sh.cmd** in the VM.
-
-On Windows rtd-me.sh.cmd will automatically:
-
-* Add a proper package manager for you (chocolatey)
-* Install some useful OSS software (Libre Office, Secure internet browsers and communication tools)
-* Debloat Windows (disabling services, telemetry, software not used)
-* Fix some minor security settings
-* Make some UI Tweaks for better usability
-
-Download:
-[Direct Download Link](https://github.com/vonschutter/RTD-Setup/raw/main/rtd-me.sh.cmd)
-
-```
-https://github.com/vonschutter/RTD-Setup/raw/main/rtd-me.sh.cmd
+```bash
+rtd-oem-bundle-manager
+rtd-oem-tweaks
+rtd-update-system
 ```
 
-Running RTD Power Tools to add software to WSL in Windows:
-![RTD Builder Screenshot 2](media_files/ScrWinWSL.png?raw=true)
-l
+Back up a computer before reinstalling its operating system:
 
-# Please Share Back:
+```bash
+rtd-oem-backup-linux-config
+rtd-ventoy-usb
+```
 
-It would make me happy if any modifications are shared back, or if any suggestions could be shared. Please read the license file for details.
+Support a Linux computer over SSH:
+
+```bash
+rtd-simple-support-tool
+rtd-update-system --show
+```
+
+More detailed examples, including virtual machines and VPN gateways, are in [Use Cases](docs/USE_CASES.md).
+
+## Documentation
+
+| Document | Intended reader |
+| --- | --- |
+| [Getting Started](docs/GETTING_STARTED.md) | Anyone installing or running RTD tools |
+| [Use Cases](docs/USE_CASES.md) | Users choosing tools for a real task |
+| [Tool Reference](docs/TOOLS.md) | Users looking up a specific `rtd-*` command |
+| [Modules](modules/README.md) | Contributors and users browsing module packages |
+| [Core Library](core/README.md) | Developers writing modules or using `_rtd_library` |
+
+## Other Platforms
+
+`rtd-me.sh.cmd` also contains Windows and macOS bootstrap paths. On Windows, configuration is performed through the PowerShell configuration scripts in `core/`; on macOS, the bootstrap invokes the macOS configuration script. Most `rtd-*` module commands documented here are Linux tools.
+
+## Safety
+
+Several RTD tools intentionally make system-level changes. In particular, review the prompts before using disk-writing, network-routing, security-hardening, backup, virtual-machine, or operating-system configuration commands. Module documentation identifies the expected effects and requirements for these workflows.
+
+Contributions and corrections are welcome; see the repository license for terms.

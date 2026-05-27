@@ -42,16 +42,17 @@ To install this tool it is recommended to install the RTD Power Tools for which 
 wget https://github.com/vonschutter/RTD-Setup/raw/main/rtd-me.sh.cmd && bash ./rtd-me.sh.cmd
 ```
 
-It may also be possible to simply download the script and run it as a stand alone script because it will try to satisfy ist own dependencies by downloading them as needed:
+It may also be possible to download the script and run it directly because it attempts to satisfy its own dependencies when required:
 
 ```bash
-wget https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/modules/RTD-OEM-bundle-manager/rtd-oem-bundle-manager
+wget https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/modules/oem-bundle-manager.mod/rtd-oem-bundle-manager
+chmod +x rtd-oem-bundle-manager
 ./rtd-oem-bundle-manager
 ```
 
 Alternatively, try using the direct download link:
 
-[Direct Download Link](https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/modules/RTD-OEM-bundle-manager/rtd-oem-bundle-manager "Use the save asd button in your browser")
+[Direct Download Link](https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/modules/oem-bundle-manager.mod/rtd-oem-bundle-manager)
 
 ## Questions and comments
 

@@ -14,6 +14,9 @@ Both tools run independently of the rest of the stack and will elevate with `sud
 # interactive update of all package channels
 rtd-update-system
 
+# show updates installed today without performing an update
+rtd-update-system --show
+
 # non-interactive, text-only progress (no dialog/zenity UI)
 rtd-update-system --noui
 
@@ -26,6 +29,7 @@ rtd-update-system setup
 What happens:
 - elevates to root if needed, then loads `_rtd_library` helpers
 - updates the native package manager, then snaps and Flatpak runtimes if present
+- reports counts for updates installed through native, Flatpak, and Snap channels; `--show` prints today's recorded updates without running an update
 - logs to `/var/log/rtd/rtd-update-system.log`
 
 ## rtd-update-self
