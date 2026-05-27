@@ -77,6 +77,7 @@ ${BLUE}${BOLD}Options:${ENDCOLOR}
   ${YELLOW}--help${ENDCOLOR}   Display this help text.
   ${YELLOW}-h${ENDCOLOR}       Display this help text.
   ${YELLOW}--config${ENDCOLOR} Same as config.
+  ${YELLOW}--show${ENDCOLOR}   Show the updates installed today without running an update.
   ${YELLOW}--noui${ENDCOLOR}   Update the system without displaying the user interface.
   ${YELLOW}--setup${ENDCOLOR}  Same as setup. Optionally limit setup to flatpak, snap, or both.
 
@@ -90,6 +91,7 @@ ${BLUE}${BOLD}Examples:${ENDCOLOR}
   Setup only Snap:              ${YELLOW}${script_name} --setup snap${ENDCOLOR}
   Setup Flatpak and Snap:       ${YELLOW}${script_name} --setup flatpak snap${ENDCOLOR}
   Setup comma targets:          ${YELLOW}${script_name} --setup flatpak,snap${ENDCOLOR}
+  Show today's updates:         ${YELLOW}${script_name} --show${ENDCOLOR}
   Update without UI:            ${YELLOW}${script_name} --noui${ENDCOLOR}
 "
 }
@@ -146,6 +148,15 @@ main ()
 		config | --config)
 			script::config_notice
 			exit 0
+			;;
+		--show)
+			script::show_banner
+			rtd::bootstrap_library "_rtd_library" || {
+				printf "%b\n" "${RED}Failed to load RTD Library.${ENDCOLOR}" >&2
+				exit 1
+			}
+			software::show_updates_installed_today
+			exit $?
 			;;
 		--update | --setup | --noui)
 			;;
