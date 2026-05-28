@@ -45,7 +45,8 @@ fi
 : "${_TLA:=${_SCRIPTNAME:0:3}}"  ;  _TLA="${_TLA,,}"
 : "${_GIT_PROFILE:=vonschutter}"
 : "${_TITLE_MAIN:=RunTime Data - Software Bundle Manager}"
-: "${_SCRIPT_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+: "${_SCRIPT_PATH:=$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || realpath "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")}"
+: "${_SCRIPT_DIR:=$(cd "$(dirname "${_SCRIPT_PATH}")" && pwd)}"
 : "${_CONFIG_DIR:=/etc/${_TLA:-"rtd"}}"
 : "${completed_bundles_list:=${_CONFIG_DIR}/completed-bundles.info}"
 
@@ -60,9 +61,9 @@ fi
 # export _TLA=
 
 if [[ ${EUID} -eq 0 ]]; then
-	${_LOG_DIR:="/var/log/${_TLA,,}"}
+	: "${_LOG_DIR:=/var/log/${_TLA}}"
 else
-	${_LOG_DIR="${HOME}/.config/${_TLA,,}/log"}
+	: "${_LOG_DIR:=${HOME}/.config/${_TLA}/log}"
 fi
 
 if mkdir -p "${_LOG_DIR}" ; then
@@ -276,6 +277,21 @@ bm2::build_list_args() {
 	done < <(software::list_bundles "$mode")
 }
 
+bm2::build_installed_list_args() {
+	local selected bundle description clean_bundle display_bundle clean_description category source
+	while IFS= read -r selected && IFS= read -r bundle && IFS= read -r description; do
+		clean_bundle="$(bm2::trim "$bundle")"
+		[[ -n "$clean_bundle" ]] || continue
+		display_bundle="$(bm2::display_name_for_bundle "$clean_bundle")"
+		clean_description="$(bm2::trim "$description")"
+		clean_description="${clean_description#: }"
+		category="$(bm2::category_for_bundle "$clean_bundle")"
+		source="$(bm2::source_summary_for_bundle "$clean_bundle")"
+		printf '%s\n%s\n%s\n%s\n%s\n' \
+			"$category" "$display_bundle" "$clean_description" "$source" "$clean_bundle"
+	done < <(software::list_bundles --zformat-removable)
+}
+
 bm2::show_about() {
 	yad --info \
 		--title="About ${_TITLE_MAIN}" \
@@ -353,7 +369,7 @@ bm2::select_bundles() {
 
 bm2::show_installed() {
 	local -a list_args
-	mapfile -t list_args < <(bm2::build_list_args --zformat-removable "Installed")
+	mapfile -t list_args < <(bm2::build_installed_list_args)
 	if ((${#list_args[@]} == 0)); then
 		yad --info --title="Installed Bundles" --width=520 --height=160 --text="No installed bundles are recorded yet."
 		return 0
@@ -363,21 +379,18 @@ bm2::show_installed() {
 		--title="Installed Bundles" \
 		--text="Bundles recorded in $(bm2::completed_file)" \
 		--width=1400 --height=720 \
-		--search-column=3 \
-		--expand-column=4 \
+		--search-column=2 \
+		--expand-column=3 \
 		--grid-lines=both \
-		--wrap-cols=4 \
+		--wrap-cols=3 \
 		--wrap-width=720 \
 		--ellipsize=none \
-		--tooltip-column=4 \
-		--hide-column=8 \
-		--column="Selected" \
+		--tooltip-column=3 \
+		--hide-column=5 \
 		--column="Category" \
 		--column="Bundle" \
 		--column="Description" \
-		--column="Status" \
 		--column="Sources" \
-		--column="Default" \
 		--column="Bundle ID" \
 		"${list_args[@]}" >/dev/null 2>&1
 }
@@ -388,9 +401,10 @@ bm2::progress_dialog() {
 		--title="${title}" \
 		--text="${text}" \
 		--percentage=0 \
-		--width=760 --height=420 \
+		--width=920 --height=620 \
 		--enable-log="Details" \
 		--log-expanded \
+		--log-height=360 \
 		--auto-close \
 		--no-cancel
 }
