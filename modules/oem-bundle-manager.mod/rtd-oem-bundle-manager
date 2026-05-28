@@ -372,6 +372,61 @@ system::ExecStart::help ()
 	zenity::display_info "$_HELP_MSG"
 }
 
+system::open_url_in_browser ()
+{
+	local url="${1:-}" target_user="${2:-}" uid browser
+	local -a run_as browser_candidates
+
+	[[ -n "${url}" ]] || return 1
+
+	browser_candidates=(
+		"${BROWSER:-}"
+		sensible-browser
+		x-www-browser
+		firefox
+		firefox-esr
+		brave-browser
+		google-chrome-stable
+		google-chrome
+		chromium
+		chromium-browser
+		microsoft-edge
+		opera
+		vivaldi
+	)
+
+	if [[ -n "${target_user}" ]]; then
+		uid="$(id -u "${target_user}" 2>/dev/null)" || return 1
+		run_as=(
+			sudo -H -u "${target_user}" env
+			"DISPLAY=${DISPLAY:-}"
+			"WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-}"
+			"XDG_RUNTIME_DIR=/run/user/${uid}"
+			"DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS:-unix:path=/run/user/${uid}/bus}"
+		)
+	else
+		run_as=(env)
+	fi
+
+	for browser in "${browser_candidates[@]}"; do
+		[[ -n "${browser}" ]] || continue
+		command -v "${browser}" >/dev/null 2>&1 || continue
+		"${run_as[@]}" "${browser}" "${url}" >/dev/null 2>&1 &
+		return 0
+	done
+
+	if command -v gio >/dev/null 2>&1; then
+		"${run_as[@]}" gio open "${url}" >/dev/null 2>&1 &
+		return 0
+	fi
+
+	if command -v xdg-open >/dev/null 2>&1; then
+		"${run_as[@]}" xdg-open "${url}" >/dev/null 2>&1 &
+		return 0
+	fi
+
+	return 1
+}
 
 
 
@@ -425,16 +480,18 @@ main ()
 			run="no"
 			shift
 			;;
-		--more-help ) 
+		--more-help )
 			system::log_item "Displaying more help online"
-			if [[ EUID -eq 0 ]] ; then
-				system::log_item "Running as root, using sudo to open browser"
-				sudo -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/$(id -u $SUDO_USER)" xdg-open  "https://github.com/${_GIT_PROFILE}/RTD-Setup/blob/main/modules/oem-bundle-manager.mod/README.md" 
+			_more_help_url="https://github.com/${_GIT_PROFILE}/RTD-Setup/blob/main/modules/oem-bundle-manager.mod/README.md"
+			if [[ ${EUID} -eq 0 && -n "${SUDO_USER:-}" ]] ; then
+				system::log_item "Running as root, opening browser as ${SUDO_USER}"
+				system::open_url_in_browser "${_more_help_url}" "${SUDO_USER}" || system::log_item "Unable to open browser for ${_more_help_url}"
 			else
-				system::log_item "Running as user, using xdg-open to open browser"
-				xdg-open  "https://github.com/${_GIT_PROFILE}/RTD-Setup/blob/main/modules/oem-bundle-manager.mod/README.md" 
+				system::log_item "Running as user, opening browser"
+				system::open_url_in_browser "${_more_help_url}" || system::log_item "Unable to open browser for ${_more_help_url}"
 
 			fi
+			unset _more_help_url
 			run="no"
 			shift
 			;;
