@@ -173,19 +173,19 @@ gnome:
 60   gnome::set_ui_win10_tweaks_for_user                         ;           Apply a Windows 10-inspired GNOME theme for the current desktop
 
 kde:
-61   kde::_apply_lnf_cmd                                         ;           Apply lnf cmd.
-62   kde::_kwriteconfig_cmd                                      ;           Return kwriteconfig6 when present, otherwise kwriteconfig5.
-63   kde::_plasma_version_major                                  ;           Plasma version major.
-64   kde::_reload_shell                                          ;           Reload shell.
-65   kde::apply_window_rules                                     ;           Write a minimal kwinrulesrc with sensible defaults (e.g., no borders on maximized windows).
-66   kde::set_color_scheme                                       ;           Apply a KDE color scheme. Non-interactive unless --interactive is set.
-67   kde::set_cursor_theme                                       ;           Apply a cursor theme. Non-interactive unless --interactive is set.
-68   kde::set_global_look_and_feel                               ;           Apply a KDE Plasma Look & Feel package (LNF). Non-interactive by default.
-69   kde::set_icon_theme                                         ;           Apply an icon theme. Non-interactive unless --interactive is set.
-70   kde::set_layout_panel                                       ;           Apply a Plasma layout file (JS/JSON). Non-interactive by default.
-71   kde::set_startup_apps                                       ;           Create or update an autostart entry for the current user.
-72   kde::set_wallpaper                                          ;           Function to set KDE Plasma wallpaper from a script. this function expects one variable
-73   kde::tune_fonts_antialias                                   ;           Set font hinting/subpixel options for KDE.
+61   kde::_apply_lnf_cmd                                         ;           Selects the available KDE Look & Feel apply command.
+62   kde::_kwriteconfig_cmd                                      ;           Selects the available KDE configuration writer command.
+63   kde::_plasma_version_major                                  ;           Returns the detected KDE Plasma major version.
+64   kde::_reload_shell                                          ;           Restarts the KDE Plasma shell using the best available method.
+65   kde::apply_window_rules                                     ;           Creates or installs KDE KWin window rules for the current user.
+66   kde::set_color_scheme                                       ;           Applies a KDE Plasma color scheme for the current user.
+67   kde::set_cursor_theme                                       ;           Applies KDE cursor theme and cursor size settings.
+68   kde::set_global_look_and_feel                               ;           Applies a KDE Plasma global Look & Feel package.
+69   kde::set_icon_theme                                         ;           Applies a KDE icon theme for the current user.
+70   kde::set_layout_panel                                       ;           Applies a KDE Plasma layout file to the running shell.
+71   kde::set_startup_apps                                       ;           Creates or updates a KDE autostart desktop entry.
+72   kde::set_wallpaper                                          ;           Sets the KDE Plasma wallpaper for all current desktops.
+73   kde::tune_fonts_antialias                                   ;           Configures KDE font antialiasing, hinting, subpixel order, and optional DPI.
 
 kvm:
 74   kvm::backup_all_running_vm                                  ;           This function backs up all running virtual machines on the host system. It checks for necessary components
@@ -13745,17 +13745,16 @@ add_gnome3_favorite_app() {
 
 
 kde::set_wallpaper() {
-	# Description:
-	# Function to set KDE Plasma wallpaper from a script. this function expects one variable
-	# indication what file to set as background. You must provide the full path to the file.
-	# rtd_oem_kde_set_wallpaper /opt/oem/wallpaper.png Supported fule types are:
-	# webm, mp4, png, jpeg, gif, webp.
-	# Globals:
-	# Arguments: None
-	# Outputs:
-	# Returns:
-	# Usage:
-	# "kde::set_wallpaper /path/to/image_or_video [wallpaper_type] [config_key]"
+	# Description: Sets the KDE Plasma wallpaper for all current desktops using the Plasma shell D-Bus scripting interface.
+	# Globals: SUDO_UID (r), _qdbus (w)
+	# Dependencies: realpath, file, qdbus or qdbus-qt5, kwriteconfig5, plasmashell D-Bus service.
+	# Arguments:
+	#   $1 - Full path to an image or video wallpaper file. Supported types include webm, mp4, png, jpeg, jpg, gif, and webp.
+	#   $2 - Optional Plasma wallpaper plugin type override.
+	#   $3 - Optional Plasma wallpaper config key override.
+	# Outputs: Writes status text and applies KDE Plasma wallpaper settings.
+	# Returns: The return status of the final KDE configuration command.
+	# Usage: kde::set_wallpaper /path/to/image_or_video [wallpaper_type] [config_key]
 	# End of documentation
 
 	echo "Setting wallpaper $1"
@@ -13807,7 +13806,14 @@ kde::set_wallpaper() {
 ######################
 
 kde::_kwriteconfig_cmd() {
-	# Return kwriteconfig6 when present, otherwise kwriteconfig5.
+	# Description: Selects the available KDE configuration writer command.
+	# Globals: None
+	# Dependencies: kwriteconfig6 or kwriteconfig5.
+	# Arguments: None
+	# Outputs: Prints the command name to stdout.
+	# Returns: 0.
+	# Usage: kwc="$(kde::_kwriteconfig_cmd)"
+	# End of documentation
 	if command -v kwriteconfig6 >/dev/null 2>&1; then
 		printf '%s' "kwriteconfig6"
 	else
@@ -13816,6 +13822,14 @@ kde::_kwriteconfig_cmd() {
 }
 
 kde::_apply_lnf_cmd() {
+	# Description: Selects the available KDE Look & Feel apply command.
+	# Globals: None
+	# Dependencies: plasma-apply-lookandfeel or lookandfeeltool.
+	# Arguments: None
+	# Outputs: Prints the command name to stdout.
+	# Returns: 0.
+	# Usage: apply_cmd="$(kde::_apply_lnf_cmd)"
+	# End of documentation
 	if command -v plasma-apply-lookandfeel >/dev/null 2>&1; then
 		printf '%s' "plasma-apply-lookandfeel"
 	else
@@ -13824,6 +13838,14 @@ kde::_apply_lnf_cmd() {
 }
 
 kde::_plasma_version_major() {
+	# Description: Returns the detected KDE Plasma major version.
+	# Globals: None
+	# Dependencies: plasmashell, sed, head.
+	# Arguments: None
+	# Outputs: Prints the Plasma major version to stdout; defaults to 5 when detection is unavailable.
+	# Returns: 0.
+	# Usage: major="$(kde::_plasma_version_major)"
+	# End of documentation
 	local ver
 	if command -v plasmashell >/dev/null 2>&1; then
 		ver="$(plasmashell --version 2>/dev/null | sed -n 's/[^0-9]*\([0-9]\+\).*/\1/p' | head -n1)"
@@ -13832,29 +13854,57 @@ kde::_plasma_version_major() {
 }
 
 kde::_reload_shell() {
-	local major
+	# Description: Restarts the KDE Plasma shell using the best available method.
+	# Globals: None
+	# Dependencies: kde::_plasma_version_major; optionally systemctl, kquitapp6, kquitapp5, kstart, kstart5, plasmashell.
+	# Arguments:
+	#   $@ - Optional command prefix used to run the reload in another user/session context, for example: sudo -H -u user env ...
+	# Outputs: None on success; called commands may write their own output if not redirected by a future implementation.
+	# Returns: 0 when a restart command was launched successfully; 1 when no supported restart method was available.
+	# Usage: kde::_reload_shell [command_prefix...]
+	# End of documentation
+	local major restart_done=0
+	local -a run_as=()
 	major="$(kde::_plasma_version_major)"
-	if command -v kquitapp6 >/dev/null 2>&1; then
-		kquitapp6 plasmashell >/dev/null 2>&1 || true
-	elif command -v kquitapp5 >/dev/null 2>&1; then
-		kquitapp5 plasmashell >/dev/null 2>&1 || true
+	if [[ $# -gt 0 ]]; then
+		run_as=("$@")
+	else
+		run_as=(env)
 	fi
 
-	if [[ "$major" -ge 6 ]] && command -v plasmashell >/dev/null 2>&1; then
-		nohup plasmashell >/dev/null 2>&1 &
+	if "${run_as[@]}" systemctl --user restart plasma-plasmashell 2>/dev/null; then
+		restart_done=1
+	elif command -v kquitapp6 >/dev/null 2>&1 && command -v kstart >/dev/null 2>&1; then
+		"${run_as[@]}" kquitapp6 plasmashell >/dev/null 2>&1 || true
+		"${run_as[@]}" kstart plasmashell >/dev/null 2>&1 && restart_done=1
+	elif command -v kquitapp6 >/dev/null 2>&1 && command -v kstart5 >/dev/null 2>&1; then
+		"${run_as[@]}" kquitapp6 plasmashell >/dev/null 2>&1 || true
+		"${run_as[@]}" kstart5 plasmashell >/dev/null 2>&1 && restart_done=1
+	elif command -v kquitapp5 >/dev/null 2>&1 && command -v kstart5 >/dev/null 2>&1; then
+		"${run_as[@]}" kquitapp5 plasmashell >/dev/null 2>&1 || true
+		"${run_as[@]}" kstart5 plasmashell >/dev/null 2>&1 && restart_done=1
+	elif [[ "$major" -ge 6 ]] && command -v plasmashell >/dev/null 2>&1; then
+		"${run_as[@]}" plasmashell >/dev/null 2>&1 &
+		restart_done=1
 	elif command -v plasmashell >/dev/null 2>&1; then
-		nohup plasmashell --replace >/dev/null 2>&1 &
+		"${run_as[@]}" plasmashell --replace >/dev/null 2>&1 &
+		restart_done=1
 	fi
+
+	return $(( restart_done == 0 ))
 }
 
 kde::set_global_look_and_feel() {
-	# Description:
-	#   Apply a KDE Plasma Look & Feel package (LNF). Non-interactive by default.
+	# Description: Applies a KDE Plasma global Look & Feel package for the current user.
+	# Globals: BRANDING (r)
+	# Dependencies: dependency::command_exists, kde::_apply_lnf_cmd, write_status, write_error; optionally dialog.
 	# Arguments:
-	#   --package <id>     : LNF package id (default: org.kde.breezedark.desktop)
-	#   --interactive      : Prompt with dialog/menu for package selection.
-	# Outputs: Status messages.
+	#   --package <id> - Look & Feel package id. Defaults to org.kde.breezedark.desktop.
+	#   --interactive  - Prompt with dialog for package selection when dialog is available.
+	# Outputs: Writes status/error messages and applies KDE Look & Feel settings.
 	# Returns: 0 on success, non-zero on failure.
+	# Usage: kde::set_global_look_and_feel [--package <id>] [--interactive]
+	# End of documentation
 	local pkg="org.kde.breezedark.desktop"
 	local interactive=0
 	local apply_cmd
@@ -13902,13 +13952,16 @@ kde::set_global_look_and_feel() {
 }
 
 kde::set_color_scheme() {
-	# Description:
-	#   Apply a KDE color scheme. Non-interactive unless --interactive is set.
+	# Description: Applies a KDE Plasma color scheme for the current user.
+	# Globals: BRANDING (r)
+	# Dependencies: dependency::command_exists, kde::_kwriteconfig_cmd, write_status, write_error; optionally dialog, plasma-apply-colorscheme.
 	# Arguments:
-	#   --scheme <id>      : Color scheme name (default: BreezeDark).
-	#   --interactive      : Choose scheme via dialog if available.
-	# Outputs: Status messages.
+	#   --scheme <id> - Color scheme name. Defaults to BreezeDark.
+	#   --interactive - Prompt with dialog for color scheme selection when dialog is available.
+	# Outputs: Writes status/error messages and applies KDE color settings.
 	# Returns: 0 on success, non-zero on failure.
+	# Usage: kde::set_color_scheme [--scheme <id>] [--interactive]
+	# End of documentation
 	local scheme="BreezeDark"
 	local interactive=0
 	local apply_cmd="plasma-apply-colorscheme"
@@ -13949,13 +14002,16 @@ kde::set_color_scheme() {
 }
 
 kde::set_icon_theme() {
-	# Description:
-	#   Apply an icon theme. Non-interactive unless --interactive is set.
+	# Description: Applies a KDE icon theme for the current user.
+	# Globals: BRANDING (r)
+	# Dependencies: dependency::command_exists, kde::_kwriteconfig_cmd, write_status, write_error; optionally dialog, plasma-apply-icon-theme.
 	# Arguments:
-	#   --theme <name>     : Icon theme name (default: breeze-dark).
-	#   --interactive      : Choose icon theme via dialog if available.
-	# Outputs: Status messages.
+	#   --theme <name> - Icon theme name. Defaults to breeze-dark.
+	#   --interactive  - Prompt with dialog for icon theme selection when dialog is available.
+	# Outputs: Writes status/error messages and applies KDE icon settings.
 	# Returns: 0 on success, non-zero on failure.
+	# Usage: kde::set_icon_theme [--theme <name>] [--interactive]
+	# End of documentation
 	local theme="breeze-dark"
 	local interactive=0
 
@@ -13995,14 +14051,17 @@ kde::set_icon_theme() {
 }
 
 kde::set_cursor_theme() {
-	# Description:
-	#   Apply a cursor theme. Non-interactive unless --interactive is set.
+	# Description: Applies KDE cursor theme and cursor size settings for the current user.
+	# Globals: BRANDING (r)
+	# Dependencies: dependency::command_exists, kde::_kwriteconfig_cmd, kde::_reload_shell, write_status; optionally dialog.
 	# Arguments:
-	#   --theme <name>     : Cursor theme (default: breeze_cursors).
-	#   --size <px>        : Cursor size (default: 24).
-	#   --interactive      : Prompt to choose theme/size if dialog available.
-	# Outputs: Status messages.
+	#   --theme <name> - Cursor theme name. Defaults to breeze_cursors.
+	#   --size <px>    - Cursor size in pixels. Defaults to 24.
+	#   --interactive  - Prompt with dialog for cursor theme and size when dialog is available.
+	# Outputs: Writes status messages and applies KDE cursor settings.
 	# Returns: 0 on success, non-zero on failure.
+	# Usage: kde::set_cursor_theme [--theme <name>] [--size <px>] [--interactive]
+	# End of documentation
 	local theme="breeze_cursors"
 	local size="24"
 	local interactive=0
@@ -14048,13 +14107,16 @@ kde::set_cursor_theme() {
 }
 
 kde::set_layout_panel() {
-	# Description:
-	#   Apply a Plasma layout file (JS/JSON). Non-interactive by default.
+	# Description: Applies a KDE Plasma layout file to the running Plasma shell.
+	# Globals: HOME (r), BRANDING (r)
+	# Dependencies: dependency::command_exists, kde::_reload_shell, write_status, write_error; optionally dialog, plasmashell.
 	# Arguments:
-	#   --layout <path>    : Path to layout file (required).
-	#   --interactive      : Prompt for layout path.
-	# Outputs: Status messages.
+	#   --layout <path> - Path to the Plasma layout file to apply.
+	#   --interactive   - Prompt with dialog file selector for the layout path when dialog is available.
+	# Outputs: Writes status/error messages and launches plasmashell with the requested layout.
 	# Returns: 0 on success, non-zero on failure.
+	# Usage: kde::set_layout_panel --layout <path> [--interactive]
+	# End of documentation
 	local layout=""
 	local interactive=0
 
@@ -14091,14 +14153,17 @@ kde::set_layout_panel() {
 }
 
 kde::tune_fonts_antialias() {
-	# Description:
-	#   Set font hinting/subpixel options for KDE.
+	# Description: Configures KDE font antialiasing, hinting, subpixel order, and optional forced DPI.
+	# Globals: None
+	# Dependencies: kde::_kwriteconfig_cmd, kde::_reload_shell, write_status.
 	# Arguments:
-	#   --hintstyle <none|slight|medium|full> (default: hintmedium)
-	#   --subpixel <none|rgb|bgr|vrgb|vbgr>   (default: rgb)
-	#   --dpi <int>                           (default: inherit)
-	# Outputs: Status messages.
+	#   --hintstyle <none|slight|medium|full> - Font hinting style. Defaults to hintmedium.
+	#   --subpixel <none|rgb|bgr|vrgb|vbgr>  - Subpixel rendering order. Defaults to rgb.
+	#   --dpi <int>                          - Optional forced font DPI.
+	# Outputs: Writes status messages and applies KDE font rendering settings.
 	# Returns: 0 on success, non-zero on failure.
+	# Usage: kde::tune_fonts_antialias [--hintstyle <style>] [--subpixel <order>] [--dpi <int>]
+	# End of documentation
 	local hint="hintmedium"
 	local subpixel="rgb"
 	local dpi=""
@@ -14126,13 +14191,16 @@ kde::tune_fonts_antialias() {
 }
 
 kde::apply_window_rules() {
-	# Description:
-	#   Write a minimal kwinrulesrc with sensible defaults (e.g., no borders on maximized windows).
+	# Description: Creates or installs KDE KWin window rules for the current user.
+	# Globals: HOME (r), BRANDING (r)
+	# Dependencies: dependency::command_exists, write_status; optionally dialog, cp, qdbus, qdbus-qt5.
 	# Arguments:
-	#   --rules-file <path> : Use an existing kwinrulesrc snippet.
-	#   --interactive       : Prompt for rules file path.
-	# Outputs: Status messages.
+	#   --rules-file <path> - Existing kwinrulesrc file to install instead of writing RTD defaults.
+	#   --interactive       - Prompt with dialog file selector for the rules file when dialog is available.
+	# Outputs: Writes status messages, updates kwinrulesrc, and requests KWin reconfiguration when possible.
 	# Returns: 0 on success, non-zero on failure.
+	# Usage: kde::apply_window_rules [--rules-file <path>] [--interactive]
+	# End of documentation
 	local rules_file=""
 	local interactive=0
 	local target="${HOME}/.config/kwinrulesrc"
@@ -14189,15 +14257,18 @@ EOF
 }
 
 kde::set_startup_apps() {
-	# Description:
-	#   Create or update an autostart entry for the current user.
+	# Description: Creates or updates a KDE autostart desktop entry for the current user.
+	# Globals: HOME (r), BRANDING (r)
+	# Dependencies: dependency::command_exists, write_status, write_error, mkdir; optionally dialog.
 	# Arguments:
-	#   --name <Name>       : Display name (required).
-	#   --exec <command>    : Command to run (required).
-	#   --icon <icon>       : Icon name/path (optional).
-	#   --interactive       : Prompt for fields via dialog if available.
-	# Outputs: Status messages.
+	#   --name <Name>    - Display name for the autostart entry.
+	#   --exec <command> - Command to run at login.
+	#   --icon <icon>    - Optional icon name or path. Defaults to system-run.
+	#   --interactive    - Prompt with dialog for entry fields when dialog is available.
+	# Outputs: Writes status/error messages and creates a .desktop file in ~/.config/autostart.
 	# Returns: 0 on success, non-zero on failure.
+	# Usage: kde::set_startup_apps --name <Name> --exec <command> [--icon <icon>] [--interactive]
+	# End of documentation
 	local name=""
 	local exec_cmd=""
 	local icon=""
@@ -18717,7 +18788,7 @@ software::ensure_gnome_software_store_available() {
 software::refresh_flatpak_desktop_registration() {
 	# Description: Refreshes desktop session registration after Flatpak support or Flatpak apps are installed.
 	# Globals: XDG_DATA_DIRS (rw), SUDO_USER (r), SUDO_UID (r), DISPLAY (r), DBUS_SESSION_BUS_ADDRESS (r), WAYLAND_DISPLAY (r)
-	# Dependencies: write_status, write_information, write_warning, dependency::current_desktop; optionally flatpak, dbus-update-activation-environment, systemctl, update-desktop-database, xdg-desktop-menu, kbuildsycoca6, kbuildsycoca5, xfdesktop.
+	# Dependencies: write_status, write_information, write_warning, dependency::current_desktop, kde::_reload_shell; optionally flatpak, dbus-update-activation-environment, systemctl, update-desktop-database, xdg-desktop-menu, kbuildsycoca6, kbuildsycoca5, xfdesktop.
 	# Arguments: None
 	# Outputs: Status messages describing any supported refresh actions performed.
 	# Returns: 0. This is a best-effort session refresh and should not fail package installation workflows.
@@ -18807,6 +18878,11 @@ software::refresh_flatpak_desktop_registration() {
 			"${user_cmd[@]}" "${kde_refresh_cmd}" --noincremental 2>/dev/null || write_warning "Unable to refresh KDE application launcher cache with ${kde_refresh_cmd}."
 		else
 			write_information "KDE session detected, but kbuildsycoca was not available."
+		fi
+
+		write_status "Refreshing KDE Plasma shell so Flatpak launchers appear in the menu..."
+		if ! kde::_reload_shell "${user_cmd[@]}"; then
+			write_warning "Unable to restart KDE Plasma shell automatically. A logout/login may still be required for Flatpak launchers."
 		fi
 	elif [[ "${detected_desktop}" == "xfce" ]] && hash xfdesktop &>/dev/null; then
 		"${user_cmd[@]}" xfdesktop --reload 2>/dev/null || true
