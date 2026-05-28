@@ -259,8 +259,24 @@ bm2::count_zformat_records() {
 
 bm2::build_list_args() {
 	local mode="${1:?}" status="${2:?}"
-	local selected bundle description clean_bundle display_bundle clean_description category source default_label
-	while IFS= read -r selected && IFS= read -r bundle && IFS= read -r description; do
+	local line selected bundle description clean_bundle display_bundle clean_description category source default_label
+	local -a record=()
+	while IFS= read -r line; do
+		line="$(bm2::trim "$line")"
+		[[ -n "$line" ]] || continue
+		record+=("$line")
+		((${#record[@]} == 3)) || continue
+
+		selected="${record[0]}"
+		bundle="${record[1]}"
+		description="${record[2]}"
+		record=()
+
+		case "$(bm2::trim "$selected")" in
+			true|TRUE|false|FALSE) ;;
+			*) continue ;;
+		esac
+
 		clean_bundle="$(bm2::trim "$bundle")"
 		[[ -n "$clean_bundle" ]] || continue
 		display_bundle="$(bm2::display_name_for_bundle "$clean_bundle")"
@@ -278,8 +294,24 @@ bm2::build_list_args() {
 }
 
 bm2::build_installed_list_args() {
-	local selected bundle description clean_bundle display_bundle clean_description category source
-	while IFS= read -r selected && IFS= read -r bundle && IFS= read -r description; do
+	local line selected bundle description clean_bundle display_bundle clean_description category source
+	local -a record=()
+	while IFS= read -r line; do
+		line="$(bm2::trim "$line")"
+		[[ -n "$line" ]] || continue
+		record+=("$line")
+		((${#record[@]} == 3)) || continue
+
+		selected="${record[0]}"
+		bundle="${record[1]}"
+		description="${record[2]}"
+		record=()
+
+		case "$(bm2::trim "$selected")" in
+			true|TRUE|false|FALSE) ;;
+			*) continue ;;
+		esac
+
 		clean_bundle="$(bm2::trim "$bundle")"
 		[[ -n "$clean_bundle" ]] || continue
 		display_bundle="$(bm2::display_name_for_bundle "$clean_bundle")"
@@ -287,8 +319,8 @@ bm2::build_installed_list_args() {
 		clean_description="${clean_description#: }"
 		category="$(bm2::category_for_bundle "$clean_bundle")"
 		source="$(bm2::source_summary_for_bundle "$clean_bundle")"
-		printf '%s\n%s\n%s\n%s\n%s\n' \
-			"$category" "$display_bundle" "$clean_description" "$source" "$clean_bundle"
+		printf '%s\n%s\n%s\n%s\n' \
+			"$category" "$display_bundle" "$clean_description" "$source"
 	done < <(software::list_bundles --zformat-removable)
 }
 
@@ -386,12 +418,10 @@ bm2::show_installed() {
 		--wrap-width=720 \
 		--ellipsize=none \
 		--tooltip-column=3 \
-		--hide-column=5 \
 		--column="Category" \
 		--column="Bundle" \
 		--column="Description" \
 		--column="Sources" \
-		--column="Bundle ID" \
 		"${list_args[@]}" >/dev/null 2>&1
 }
 
