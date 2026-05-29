@@ -203,19 +203,19 @@ prompt_text() {
 
 prompt_password() {
 	local title="$1" msg="$2" out
-	if command -v dialog >/dev/null 2>&1; then
-		out=$(dialog --stdout --title "$title" --passwordbox "$msg" 10 70)
-		local rc=$?
-		clear
-		if [[ $rc -ne 0 ]]; then
-			return 1
-		fi
-		echo "$out"
+	: "${title:=Password}"
+
+	if [[ -r /dev/tty && -w /dev/tty ]]; then
+		printf '%s\n' "$title" > /dev/tty
+		printf '%s ' "$msg" > /dev/tty
+		IFS= read -r -s out < /dev/tty || return 1
+		printf '\n' > /dev/tty
 	else
 		read -r -s -p "$msg " out
 		echo
-		echo "$out"
 	fi
+
+	echo "$out"
 }
 
 parse_args() {

@@ -19177,7 +19177,7 @@ software::offer_reboot_if_required() {
 software::updates_installed_today::native() {
 	# Description: Emits today's installed native-package update records from the supported package-manager logs.
 	# Globals: None
-	# Dependencies: date; optionally zgrep, grep, apt-get, dnf, or zypper and their history logs.
+	# Dependencies: date; optionally zgrep, grep, awk, apt-get, dnf, rpm, or zypper and their history logs.
 	# Arguments: None
 	# Outputs: One matching installed native-package update record per line on STDOUT.
 	# Returns: 0, including when no supported history source or no update records are present.
@@ -19189,7 +19189,39 @@ software::updates_installed_today::native() {
 	if hash apt-get 2>/dev/null; then
 		zgrep -h "^${today}.* upgrade " /var/log/dpkg.log /var/log/dpkg.log.1* 2>/dev/null || true
 	elif hash dnf 2>/dev/null; then
-		zgrep -h "^${today}.* Upgraded: " /var/log/dnf.log* /var/log/dnf.rpm.log* 2>/dev/null || true
+		local records=""
+		records=$(
+			LANG=C zgrep -hiE "^${today}.*(Upgraded|Upgrade)[[:space:]:]" /var/log/dnf.log* /var/log/dnf.rpm.log* 2>/dev/null |
+				awk 'NF && !seen[$0]++'
+		) || true
+
+		if [[ -n "$records" ]]; then
+			printf '%s\n' "$records"
+		else
+			local history_records=""
+			history_records=$(
+				while IFS= read -r history_id; do
+					[[ -n "$history_id" ]] || continue
+					LANG=C dnf history info "$history_id" 2>/dev/null |
+						awk '/^[[:space:]]*(Upgrade|Upgraded)[[:space:]]/ { print }'
+				done < <(
+					LANG=C dnf history list 2>/dev/null |
+						awk -F'|' -v today="$today" 'NF >= 3 && index($3, today) { id = $1; gsub(/^[[:space:]]+|[[:space:]]+$/, "", id); if (id ~ /^[0-9]+$/) print id }'
+				) |
+					awk 'NF && !seen[$0]++'
+			) || true
+
+			if [[ -n "$history_records" ]]; then
+				printf '%s\n' "$history_records"
+			elif hash rpm 2>/dev/null; then
+				local start_epoch
+				start_epoch=$(date -d "${today} 00:00:00" +%s 2>/dev/null || true)
+				[[ -n "$start_epoch" ]] || return 0
+
+				rpm -qa --qf '%{INSTALLTIME}\t%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n' 2>/dev/null |
+					awk -v start="$start_epoch" '$1 >= start { print strftime("%Y-%m-%d %H:%M:%S", $1) " rpmdb\t" $2 }'
+			fi
+		fi
 	elif hash zypper 2>/dev/null; then
 		grep "^${today}.*|patch|" /var/log/zypp/history 2>/dev/null || true
 	fi
