@@ -33,40 +33,30 @@ Select the games to install:
 
 ![Lightweight Office Games selection checklist](Media_files/screenshot-game-selection.png)
 
-When Flatpak capability is missing, the installer asks before changing the system:
 
-![Flatpak capability permission prompt](Media_files/screenshot-flatpak-permission.png)
-
-Approved Flatpak setup displays status details while the shared RTD helper works:
-
-![Flatpak capability setup progress](Media_files/screenshot-flatpak-progress.png)
-
-After installation, a summary reports the result:
-
-![Lightweight Office Games installation summary](Media_files/screenshot-installation-summary.png)
 
 ## Included Games
 
 The default list was curated on 2026-05-30 from Flathub's public Game collection, using `installs_last_month` and `favorites_count` as the available popularity signals. Flathub's public collection API does not expose user star ratings.
 
-| Game | Flatpak ID | Type |
-| --- | --- | --- |
-| KPatience | `org.kde.kpat` | Cards / Solitaire |
-| Aisleriot Solitaire | `org.gnome.Aisleriot` | Cards / Solitaire |
-| Mines | `org.gnome.Mines` | Puzzle / Logic |
-| Mahjongg | `org.gnome.Mahjongg` | Tiles / Mahjongg |
-| Solitaire | `org.gnome.gitlab.wwarner.Solitaire` | Cards / Solitaire |
-| KMahjongg | `org.kde.kmahjongg` | Tiles / Mahjongg |
-| GNOME Chess | `org.gnome.Chess` | Board / Chess |
-| GNOME Sudoku | `org.gnome.Sudoku` | Puzzle / Numbers |
-| PySolFC | `io.sourceforge.pysolfc.PySolFC` | Cards / Solitaire |
-| KMines | `org.kde.kmines` | Puzzle / Logic |
-| Sudoku | `io.github.sepehr_rs.Sudoku` | Puzzle / Numbers |
-| PokerTH | `net.pokerth.PokerTH` | Cards / Poker |
-| Cockatrice | `io.github.Cockatrice.cockatrice` | Cards / Tabletop |
-| KNights | `org.kde.knights` | Board / Chess |
-| KShisen | `org.kde.kshisen` | Tiles / Mahjongg |
-| Kigo | `org.kde.kigo` | Board / Go |
+| Game                | Flatpak ID                             | Type              |
+| ------------------- | -------------------------------------- | ----------------- |
+| KPatience           | `org.kde.kpat`                       | Cards / Solitaire |
+| Aisleriot Solitaire | `org.gnome.Aisleriot`                | Cards / Solitaire |
+| Mines               | `org.gnome.Mines`                    | Puzzle / Logic    |
+| Mahjongg            | `org.gnome.Mahjongg`                 | Tiles / Mahjongg  |
+| Solitaire           | `org.gnome.gitlab.wwarner.Solitaire` | Cards / Solitaire |
+| KMahjongg           | `org.kde.kmahjongg`                  | Tiles / Mahjongg  |
+| GNOME Chess         | `org.gnome.Chess`                    | Board / Chess     |
+| GNOME Sudoku        | `org.gnome.Sudoku`                   | Puzzle / Numbers  |
+| PySolFC             | `io.sourceforge.pysolfc.PySolFC`     | Cards / Solitaire |
+| KMines              | `org.kde.kmines`                     | Puzzle / Logic    |
+| Sudoku              | `io.github.sepehr_rs.Sudoku`         | Puzzle / Numbers  |
+| PokerTH             | `net.pokerth.PokerTH`                | Cards / Poker     |
+| Cockatrice          | `io.github.Cockatrice.cockatrice`    | Cards / Tabletop  |
+| KNights             | `org.kde.knights`                    | Board / Chess     |
+| KShisen             | `org.kde.kshisen`                    | Tiles / Mahjongg  |
+| Kigo                | `org.kde.kigo`                       | Board / Go        |
 
 ## Requirements
 
