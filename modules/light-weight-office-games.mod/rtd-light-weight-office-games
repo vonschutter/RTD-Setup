@@ -1,0 +1,730 @@
+#!/bin/bash
+#
+#::                         A D M I N   C O M M A N D L E T
+#:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::// Lightweight Office Games Installer //::::::::::::::::::::// Linux //:::::::
+#::
+#::     Author:    SLS
+#::     Version    1.00
+#::
+#::     Purpose: Install a curated set of lightweight board, card, tile,
+#::              puzzle, and office-friendly games from Flathub.
+#::
+#::     Value:   Provides a simple graphical installer for quiet desktop and
+#::              office-friendly games without exposing Flatpak complexity.
+#::
+#::     Usage:   Launch the installer and select the installation scope and
+#::              games from the graphical interface.
+#::
+#::     Examples:
+#::              rtd-light-weight-office-games
+#::              rtd-light-weight-office-games --zenity
+#::
+#::     Notes:   Game list was curated from Flathub's public Game category
+#::              using installs_last_month and favorites_count on 2026-05-30.
+#::              Flathub does not expose user star ratings in that collection.
+#:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Safety                   ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# Never run in Windows, even if the file extension is .cmd or .bat.
+:<<"::CMDLITERAL"
+@ECHO OFF
+GOTO :CMDSCRIPT
+::CMDLITERAL
+
+# only run on Linux, since the games are Linux-only and the script is not designed for cross-platform compatibility.
+case "${OSTYPE:-unknown}" in
+    linux*)
+        ;;
+    darwin*)
+        echo "macOS is currently unsupported by $(basename "$0")." >&2
+        exit 1
+        ;;
+    cygwin*)
+        echo "Cygwin is currently unsupported." >&2
+        exit 1
+        ;;
+    msys*)
+        echo "MSYS is currently unsupported." >&2
+        exit 1
+        ;;
+    freebsd*)
+        echo "FreeBSD is currently unsupported." >&2
+        exit 1
+        ;;
+    *)
+        echo "This operating system is unknown to $(basename "$0"): ${OSTYPE:-unset}" >&2
+        exit 1
+        ;;
+esac
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+_scriptname="$(basename "$0")"
+_tla="${_scriptname:0:3}"
+_LOGFILE="${RTD_LOG_DIR:-/var/log/rtd}/${_scriptname}.log"
+if ! mkdir -p "$(dirname "$_LOGFILE")" 2>/dev/null || ! touch "$_LOGFILE" 2>/dev/null; then
+	unset _LOGFILE
+fi
+export _LOGFILE
+
+_GIT_PROFILE="${_GIT_PROFILE:-vonschutter}"
+_title="RunTime Data - Lightweight Office Games Installer"
+_script_path="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || realpath "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")"
+_script_dir="$(cd "$(dirname "$_script_path")" && pwd)"
+_media_dir="${_script_dir}/Media_files"
+_sidebar_image="${_media_dir}/light-weight-office-games-sidebar.png"
+_window_icon="${_media_dir}/light-weight-office-games-icon.png"
+_ui_tool=""
+_requested_ui_tool=""
+_show_help=0
+_setup_flatpak_capability=0
+_setup_ui_dependency=""
+_install_scope="user"
+_install_summary_file=""
+_install_summary=""
+_selected_game_count=0
+_yad_common_args=(--title "$_title" --center)
+_yad_sidebar_args=("${_yad_common_args[@]}")
+_yad_icon_args=("${_yad_common_args[@]}")
+_zenity_icon_args=()
+if [[ -r "$_window_icon" ]]; then
+	_yad_common_args+=(--window-icon="$_window_icon")
+	_yad_sidebar_args+=(--window-icon="$_window_icon")
+	_yad_icon_args+=(--window-icon="$_window_icon" --image="$_window_icon")
+	_zenity_icon_args+=(--icon="$_window_icon")
+fi
+[[ -r "$_sidebar_image" ]] && _yad_sidebar_args+=(--image="$_sidebar_image")
+
+# Format:
+# app_id|name|type|installs_last_month|favorites|summary
+GAME_CATALOG=(
+	"org.kde.kpat|KPatience|Cards / Solitaire|6301|20|A polished KDE solitaire collection."
+	"org.gnome.Aisleriot|Aisleriot Solitaire|Cards / Solitaire|5850|14|Many classic solitaire variants."
+	"org.gnome.Mines|Mines|Puzzle / Logic|4650|25|Classic minesweeper-style logic game."
+	"org.gnome.Mahjongg|Mahjongg|Tiles / Mahjongg|3733|36|Match tiles and clear the board."
+	"org.gnome.gitlab.wwarner.Solitaire|Solitaire|Cards / Solitaire|3700|6|A focused patience card game."
+	"org.kde.kmahjongg|KMahjongg|Tiles / Mahjongg|3231|8|Mahjongg solitaire with KDE themes."
+	"org.gnome.Chess|GNOME Chess|Board / Chess|2525|33|Classic chess for one or two players."
+	"org.gnome.Sudoku|GNOME Sudoku|Puzzle / Numbers|1936|27|Classic sudoku puzzles."
+	"io.sourceforge.pysolfc.PySolFC|PySolFC|Cards / Solitaire|1806|2|Large solitaire and patience game collection."
+	"org.kde.kmines|KMines|Puzzle / Logic|1429|3|KDE minesweeper-style game."
+	"io.github.sepehr_rs.Sudoku|Sudoku|Puzzle / Numbers|1340|23|Modern sudoku puzzle app."
+	"net.pokerth.PokerTH|PokerTH|Cards / Poker|1016|5|Texas Hold'em poker with local and network play."
+	"io.github.Cockatrice.cockatrice|Cockatrice|Cards / Tabletop|992|6|Virtual tabletop for multiplayer card games."
+	"org.kde.knights|KNights|Board / Chess|988|12|KDE chess game."
+	"org.kde.kshisen|KShisen|Tiles / Mahjongg|985|1|Shisen-Sho Mahjongg-like tile game."
+	"org.kde.kigo|Kigo|Board / Go|489|3|Go board game."
+)
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Initialization           ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# These allow the script to display basic messages before _rtd_library is loaded. Once the library is sourced,
+# its richer implementations replace these fallback definitions, including RTD formatting and logging.
+write_information() { printf 'INFO: %s\n' "$*"; }
+write_warning() { printf 'WARN: %s\n' "$*" >&2; }
+write_error() { printf 'ERROR: %s\n' "$*" >&2; }
+system::log_item() { :; }
+
+rtd::bootstrap_library() {
+	local library_name="${1:-_rtd_library}" loaded_version path script_dir src_url tmp rc check
+	local -a checks=()
+
+	[[ "$library_name" == "_rtd_library" && ${#checks[@]} -eq 0 ]] && checks=(
+		system::log_item
+		write_information
+		write_warning
+		write_error
+		software::ensure_flatpak_package_managment
+		software::from_flathub.org
+	)
+
+	rtd::bootstrap_library::ok() {
+		loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
+		for check in "${checks[@]}"; do declare -F "$check" >/dev/null 2>&1 || return 1; done
+	}
+
+	[[ "$library_name" == "_rtd_library" && -n "$loaded_version" ]] && rtd::bootstrap_library::ok && return 0
+
+	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	for path in \
+		"${script_dir}/${library_name}" \
+		"${script_dir}/../core/${library_name}" \
+		"${script_dir}/../../core/${library_name}" \
+		"/opt/${_TLA:-${_tla:-rtd}}/core/${library_name}" \
+		"/opt/rtd/core/${library_name}" \
+		"${HOME:-}/GIT/RTD-Setup/core/${library_name}" \
+		"${HOME:-}/RTD-Setup/core/${library_name}"; do
+		[[ -r "$path" ]] || continue
+		# shellcheck source=/dev/null
+		source "$path" ""
+		rc=$?
+		[[ $rc -eq 0 ]] && rtd::bootstrap_library::ok && return 0
+	done
+
+	src_url="https://github.com/${_GIT_PROFILE:-${GIT_Profile:-vonschutter}}/RTD-Setup/raw/main/core/${library_name}"
+	tmp="$(mktemp "/tmp/${library_name}.XXXXXX" 2>/dev/null || echo "/tmp/${library_name}.$$")"
+	rc=0
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL "$src_url" -o "$tmp" || rc=$?
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO "$tmp" "$src_url" || rc=$?
+	else
+		rc=1
+	fi
+	[[ ${rc:-0} -eq 0 ]] || { rm -f "$tmp"; return "$rc"; }
+
+	# shellcheck source=/dev/null
+	source "$tmp" ""
+	rc=$?
+	rm -f "$tmp"
+	[[ $rc -eq 0 ]] || return "$rc"
+	rtd::bootstrap_library::ok && return 0
+	return 1
+}
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions          ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+usage() {
+	cat <<USAGE
+Usage:
+  ${_scriptname} [--yad | --zenity] [--help]
+
+Launches a graphical installer for lightweight Flatpak games.
+
+Options:
+  --yad       Use YAD dialogs. This is the preferred default when available.
+  --zenity    Use Zenity dialogs instead of YAD.
+  -h, --help  Show this help text.
+USAGE
+}
+
+parse_args() {
+	local requested_tool
+
+	while (($# > 0)); do
+		case "$1" in
+			--yad|--zenity)
+				requested_tool="${1#--}"
+				if [[ -n "$_requested_ui_tool" && "$_requested_ui_tool" != "$requested_tool" ]]; then
+					printf 'ERROR: Use either --yad or --zenity, not both.\n' >&2
+					return 2
+				fi
+				_requested_ui_tool="$requested_tool"
+			;;
+			-h|--help)
+				_show_help=1
+			;;
+			--setup-flatpak-capability)
+				_setup_flatpak_capability=1
+			;;
+			--setup-ui-dependency)
+				case "${2:-}" in
+					yad|zenity)
+						_setup_ui_dependency="$2"
+						shift
+					;;
+					*)
+						printf 'ERROR: --setup-ui-dependency requires yad or zenity.\n' >&2
+						return 2
+					;;
+				esac
+			;;
+			*)
+				printf 'ERROR: Unknown option: %s\n' "$1" >&2
+				usage >&2
+				return 2
+			;;
+		esac
+		shift
+	done
+}
+
+ui_message() {
+	local kind="$1" title="$2" message="$3"
+	case "$_ui_tool" in
+		yad)
+			yad "--${kind}" "${_yad_icon_args[@]}" --title "$title" --text "$message" --width 560 --button="OK:0"
+		;;
+		zenity)
+			zenity "--${kind}" "${_zenity_icon_args[@]}" --title "$title" --text "$message" --width 520
+		;;
+		*)
+			printf '%s: %s\n' "$title" "$message"
+		;;
+	esac
+}
+
+detect_ui_tool() {
+	if [[ -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
+		write_error "This installer requires a graphical desktop session. DISPLAY and WAYLAND_DISPLAY are both unset."
+		return 1
+	fi
+
+	if [[ -n "$_requested_ui_tool" ]]; then
+		command -v "$_requested_ui_tool" >/dev/null 2>&1 || install_requested_ui_tool "$_requested_ui_tool" || return 1
+		_ui_tool="$_requested_ui_tool"
+	elif command -v yad >/dev/null 2>&1; then
+		_ui_tool="yad"
+	elif command -v zenity >/dev/null 2>&1; then
+		_ui_tool="zenity"
+	else
+		confirm_ui_tool_installation || {
+			write_error "This installer requires YAD or Zenity."
+			return 1
+		}
+		if install_ui_dependency yad; then
+			_ui_tool="yad"
+		else
+			write_warning "YAD could not be installed. Trying Zenity instead."
+			install_ui_dependency zenity || {
+				write_error "Unable to install YAD or Zenity."
+				return 1
+			}
+			_ui_tool="zenity"
+		fi
+	fi
+	system::log_item "Using UI tool: ${_ui_tool}${_requested_ui_tool:+ (requested)}"
+}
+
+confirm_ui_tool_installation() {
+	local answer=""
+
+	if [[ -r /dev/tty && -w /dev/tty ]]; then
+		printf '\n%s\n' "A graphical dialog tool is required. May RTD install YAD or, if YAD is unavailable, Zenity? [y/N] " >/dev/tty
+		read -r answer </dev/tty || return 1
+	elif [[ -t 0 ]]; then
+		printf '\n%s\n' "A graphical dialog tool is required. May RTD install YAD or, if YAD is unavailable, Zenity? [y/N] "
+		read -r answer || return 1
+	else
+		write_error "YAD and Zenity are missing. Install one of them and rerun ${_scriptname}."
+		return 1
+	fi
+
+	[[ "$answer" =~ ^[Yy]([Ee][Ss])?$ ]]
+}
+
+install_ui_dependency() {
+	local dependency="$1"
+
+	write_information "Installing graphical dialog dependency: ${dependency}."
+	if ((EUID == 0)); then
+		software::check_native_package_dependency "$dependency"
+	else
+		( security::ensure_admin --sudo --setup-ui-dependency "$dependency" )
+	fi
+	hash -r
+	command -v "$dependency" >/dev/null 2>&1
+}
+
+install_requested_ui_tool() {
+	local dependency="$1"
+
+	confirm_ui_tool_installation || {
+		write_error "Requested UI backend '${dependency}' is not installed."
+		return 1
+	}
+	install_ui_dependency "$dependency" || {
+		write_error "Requested UI backend '${dependency}' could not be installed."
+		return 1
+	}
+}
+
+flatpak_capability_is_present() {
+	command -v flatpak >/dev/null 2>&1 || return 1
+	flatpak remotes --system --columns=name 2>/dev/null | grep -qx "flathub" || return 1
+	flatpak info --system com.github.tchx84.Flatseal >/dev/null 2>&1 || return 1
+}
+
+confirm_flatpak_capability_setup() {
+	local message="<b>Flatpak support is required</b>\n\nThis installer needs Flatpak, the Flathub application source, and the Flatseal permissions manager.\n\nMay RTD add the missing Flatpak support now? Administrative authentication may be requested."
+
+	case "$_ui_tool" in
+		yad)
+			yad --question \
+				"${_yad_icon_args[@]}" \
+				--text="$message" \
+				--text-align=left \
+				--width=600 \
+				--button="Add Flatpak Support:0" --button="Cancel:1"
+		;;
+		zenity)
+			zenity --question \
+				"${_zenity_icon_args[@]}" \
+				--title "$_title" \
+				--text "$message" \
+				--width 560 \
+				--ok-label "Add Flatpak Support" --cancel-label "Cancel"
+		;;
+	esac
+}
+
+show_flatpak_setup_progress() {
+	if [[ "$_ui_tool" == "yad" ]]; then
+		yad --progress \
+			"${_yad_icon_args[@]}" \
+			--text="Adding Flatpak support" \
+			--width 760 --height 430 --center \
+			--pulsate --auto-close --no-cancel \
+			--enable-log --log-expanded --log-on-top --log-height 260
+	else
+		zenity --progress \
+			"${_zenity_icon_args[@]}" \
+			--title "$_title" \
+			--text "Adding Flatpak support" \
+			--width 560 \
+			--pulsate --auto-close --no-cancel
+	fi
+}
+
+setup_flatpak_capability_as_admin() {
+	if ((EUID == 0)); then
+		software::ensure_flatpak_package_managment
+	else
+		security::ensure_admin --sudo --setup-flatpak-capability
+	fi
+}
+
+ensure_flatpak_capability_for_installer() {
+	local -a pipeline_status=()
+
+	if flatpak_capability_is_present; then
+		software::ensure_flatpak_package_managment
+		return
+	fi
+
+	confirm_flatpak_capability_setup || return 2
+	write_information "User approved Flatpak capability setup."
+	{
+		printf '# Adding Flatpak support...\n'
+		setup_flatpak_capability_as_admin
+	} 2>&1 | show_flatpak_setup_progress
+	pipeline_status=("${PIPESTATUS[@]}")
+
+	((pipeline_status[1] == 0)) || return 1
+	((pipeline_status[0] == 0)) || return "${pipeline_status[0]}"
+
+	# Refresh this user-level process after the elevated setup subprocess completes.
+	software::ensure_flatpak_package_managment
+}
+
+show_welcome() {
+	local message="<b>Lightweight Office Games</b>\n\nChoose from a curated collection of board, card, tile, and puzzle games from Flathub.\n\nThe installer will verify Flatpak support before showing the game list. Administrative authentication is requested only when system setup or an all-users installation requires it."
+
+	if [[ "$_ui_tool" == "yad" ]]; then
+		yad --question \
+			"${_yad_sidebar_args[@]}" \
+			--text="$message" \
+			--text-align=left \
+			--width=720 --height=390 \
+			--button="Continue:0" --button="Cancel:1"
+	else
+		zenity --question \
+			"${_zenity_icon_args[@]}" \
+			--title "$_title" \
+			--text "Choose from a curated collection of board, card, tile, and puzzle games from Flathub.\n\nThe installer will verify Flatpak support before showing the game list." \
+			--width 560 \
+			--ok-label "Continue" --cancel-label "Cancel"
+	fi
+}
+
+choose_scope() {
+	local key left_pid right_pid result_file selected yad_status
+	if [[ "$_ui_tool" == "yad" && -n "${DISPLAY:-}" && -r "$_sidebar_image" ]]; then
+		key=$((BASHPID + RANDOM))
+		result_file="$(mktemp "/tmp/${_scriptname}.scope.XXXXXX")" || return 1
+
+		GDK_BACKEND=x11 yad --plug="$key" --tabnum=1 \
+			--picture --filename="$_sidebar_image" --size=fit --no-buttons \
+			>/dev/null 2>&1 &
+		left_pid=$!
+
+		GDK_BACKEND=x11 yad --plug="$key" --tabnum=2 \
+			--list --radiolist --no-buttons \
+			--text="<b>Install scope</b>\nChoose who should have access to these games." \
+			--text-align=left \
+			--column="" --column="Install for" --column="Description" --column="Scope:HD" \
+			TRUE "Just me" "Install for the current user without changing the whole system." "user" \
+			FALSE "All users" "Install system-wide. This may require sudo or PolicyKit." "system" \
+			--print-column=4 --separator="" \
+			--grid-lines=horizontal --wrap-cols=3 --wrap-width=280 --expand-column=3 \
+			>"$result_file" 2>/dev/null &
+		right_pid=$!
+
+		GDK_BACKEND=x11 yad --paned --key="$key" --orient=horizontal --splitter=225 \
+			"${_yad_common_args[@]}" \
+			--width=745 --height=420 \
+			--button="Continue:0" --button="Cancel:1"
+		yad_status=$?
+
+		if ((yad_status != 0)); then
+			kill "$left_pid" "$right_pid" 2>/dev/null || true
+		fi
+		wait "$left_pid" "$right_pid" 2>/dev/null || true
+		selected="$(<"$result_file")"
+		rm -f "$result_file"
+		((yad_status == 0)) || return 1
+	elif [[ "$_ui_tool" == "yad" ]]; then
+		selected=$(yad --list --radiolist \
+			"${_yad_sidebar_args[@]}" \
+			--text="<b>Install scope</b>\nChoose whether these games should be installed only for you or for all users." \
+			--text-align=left \
+			--width 760 --height 360 \
+			--column "" --column "Scope" --column "Description" \
+			TRUE "user" "Install for the current user without changing the whole system." \
+			FALSE "system" "Install for all users. This may require sudo or PolicyKit." \
+			--print-column=2 --separator="" \
+			--button="Continue:0" --button="Cancel:1") || return 1
+	else
+		selected=$(zenity --list --radiolist \
+			"${_zenity_icon_args[@]}" \
+			--title "$_title" \
+			--text "Choose installation scope" \
+			--width 640 --height 240 \
+			--column "" --column "Scope" --column "Description" \
+			TRUE "user" "Install for the current user only." \
+			FALSE "system" "Install for all users.") || return 1
+	fi
+	_install_scope="${selected:-user}"
+}
+
+select_games() {
+	local selected row app_id name type installs favorites summary
+	local -a ui_rows=()
+
+	for row in "${GAME_CATALOG[@]}"; do
+		IFS='|' read -r app_id name type installs favorites summary <<<"$row"
+		ui_rows+=(TRUE "$name" "$type" "${installs}/mo, ${favorites} fav" "$app_id" "$summary")
+	done
+
+	if [[ "$_ui_tool" == "yad" ]]; then
+		selected=$(yad --list --checklist \
+			"${_yad_icon_args[@]}" \
+			--text="<b>Choose games to install</b>\nCurated from popular Flathub board, card, tile, and puzzle games. Uncheck anything you do not want." \
+			--width 980 --height 560 --center \
+			--column "Install" --column "Game" --column "Type" --column "Popularity" --column "Flatpak ID" --column "Summary" \
+			"${ui_rows[@]}" \
+			--print-column=5 --hide-column=5 --separator=$'\n' \
+			--grid-lines=horizontal --search-column=2 --expand-column=6 --wrap-cols=6 --wrap-width=340 \
+			--button="Install Games:0" --button="Cancel:1") || return 1
+	else
+		selected=$(zenity --list --checklist \
+			"${_zenity_icon_args[@]}" \
+			--title "$_title" \
+			--text "Choose games to install" \
+			--width 980 --height 560 \
+			--column "Install" --column "Game" --column "Type" --column "Popularity" --column "Flatpak ID" --column "Summary" \
+			"${ui_rows[@]}" \
+			--print-column=5 --hide-column=5 --separator=$'\n' \
+			--ok-label "Install Games" --cancel-label "Cancel") || return 1
+	fi
+
+	if [[ -z "$selected" ]]; then
+		return 2
+	fi
+
+	printf '%s\n' "$selected"
+}
+
+install_games() {
+	local selected="$1" total count app_id row name rc=0
+	local -a pipeline_status=()
+	local -a selected_apps=()
+	local -A game_name_by_id=()
+	mapfile -t selected_apps <<<"$selected"
+	total="${#selected_apps[@]}"
+	_selected_game_count="$total"
+	count=0
+	_install_summary_file="$(mktemp "${TMPDIR:-/tmp}/rtd-office-games-summary.XXXXXX")" || return 1
+
+	for row in "${GAME_CATALOG[@]}"; do
+		IFS='|' read -r app_id name _ <<<"$row"
+		game_name_by_id["$app_id"]="$name"
+	done
+
+	{
+		printf '# Installing selected games from Flathub...\n'
+		for app_id in "${selected_apps[@]}"; do
+			((count++))
+			name="${game_name_by_id[$app_id]:-$app_id}"
+			printf '# Installing %s (%s of %s)\n' "$name" "$count" "$total"
+			if ! software::from_flathub.org "$app_id" "--${_install_scope}"; then
+				rc=1
+				printf 'failed\t%s\n' "$name" >>"$_install_summary_file"
+				printf '# Failed: %s\n' "$name"
+			elif [[ "${_RTD_FLATHUB_ACTION_RESULT:-}" == "already-installed" ]]; then
+				printf 'already-installed\t%s\n' "$name" >>"$_install_summary_file"
+				printf '# Already installed: %s\n' "$name"
+			else
+				printf 'installed\t%s\n' "$name" >>"$_install_summary_file"
+			fi
+			printf '%s\n' $(( count * 100 / total ))
+		done
+		exit "$rc"
+	} 2>&1 | show_progress
+	pipeline_status=("${PIPESTATUS[@]}")
+	((pipeline_status[1] == 0)) || return 130
+	return "${pipeline_status[0]}"
+}
+
+show_progress() {
+	if [[ "$_ui_tool" == "yad" ]]; then
+		yad --progress \
+			"${_yad_icon_args[@]}" \
+			--text="Installing selected Flatpak games" \
+			--width 760 --height 430 --center \
+			--percentage=0 \
+			--auto-close --auto-kill \
+			--enable-log --log-expanded --log-on-top --log-height 260 \
+			--button="Cancel:1"
+	else
+		zenity --progress \
+			"${_zenity_icon_args[@]}" \
+			--title "$_title" \
+			--text "Installing selected Flatpak games" \
+			--width 620 \
+			--percentage=0 \
+			--auto-close --auto-kill
+	fi
+}
+
+build_install_summary() {
+	local heading="${1:-Installation complete}" status name
+	local installed=0
+	local already_installed=0
+	local failed=0
+	local failed_names=""
+
+	while IFS=$'\t' read -r status name; do
+		[[ -n "$status" ]] || continue
+		case "$status" in
+			installed)
+				((installed+=1))
+				;;
+			already-installed)
+				((already_installed+=1))
+				;;
+			failed)
+				((failed+=1))
+				failed_names+="${failed_names:+, }${name}"
+				;;
+		esac
+	done <"${_install_summary_file:-/dev/null}"
+
+	rm -f -- "${_install_summary_file:-}"
+	_install_summary_file=""
+	_install_summary="<b>${heading}</b>\n\nScope: ${_install_scope}\nSelected: ${_selected_game_count}\nInstalled: ${installed}\nAlready available: ${already_installed}\nFailed: ${failed}"
+	[[ -n "$failed_names" ]] && _install_summary+="\n\nFailed games: ${failed_names}"
+}
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+main() {
+	local selected_games select_status install_status
+	parse_args "$@" || exit $?
+	if ((_show_help)); then
+		usage
+		exit 0
+	fi
+
+	rtd::bootstrap_library "_rtd_library" || {
+		write_error "Unable to load the RTD function library."
+		exit 1
+	}
+	if [[ -n "$_setup_ui_dependency" ]]; then
+		software::check_native_package_dependency "$_setup_ui_dependency"
+		exit $?
+	fi
+	if ((_setup_flatpak_capability)); then
+		software::ensure_flatpak_package_managment
+		exit $?
+	fi
+	write_information "Starting ${_scriptname}; log file: ${_LOGFILE:-default RTD log}"
+	detect_ui_tool || exit 1
+	show_welcome || exit 0
+	ensure_flatpak_capability_for_installer
+	case $? in
+		0)
+			;;
+		2)
+			ui_message info "$_title" "<b>Installation canceled</b>\n\nFlatpak support was not changed and no games were installed."
+			exit 0
+			;;
+		*)
+			ui_message error "$_title" "Flatpak capability could not be configured. Review the terminal output or RTD log."
+			exit 1
+			;;
+	esac
+	choose_scope || {
+		ui_message info "$_title" "<b>Installation canceled</b>\n\nNo games were installed."
+		exit 0
+	}
+	selected_games="$(select_games)"
+	select_status=$?
+	case "$select_status" in
+		0)
+			;;
+		1)
+			ui_message info "$_title" "<b>Installation canceled</b>\n\nNo games were installed."
+			exit 0
+			;;
+		2)
+			ui_message warning "$_title" "<b>No games selected</b>\n\nSelect at least one game to start an installation."
+			exit 0
+			;;
+		*)
+			ui_message error "$_title" "The game selection dialog failed."
+			exit 1
+			;;
+	esac
+	write_information "Installing selected games for scope: ${_install_scope}"
+	if install_games "$selected_games"; then
+		build_install_summary
+		ui_message info "$_title" "$_install_summary"
+	else
+		install_status=$?
+		if ((install_status == 130)); then
+			build_install_summary "Installation canceled"
+			ui_message warning "$_title" "${_install_summary}\n\nThe remaining games were not installed."
+			exit 0
+		else
+			build_install_summary "Installation failed"
+			ui_message error "$_title" "${_install_summary}\n\nReview the terminal output or RTD log for details."
+			exit 1
+		fi
+	fi
+}
+
+main "$@"
+exit $?
+
+:CMDSCRIPT
+echo "NO! Just say no! Please install Linux instead of Windows"

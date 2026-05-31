@@ -61,7 +61,7 @@ rtd-ventoy-usb
 Use this when the tools themselves need to be refreshed from the repository.
 
 ```bash
-rtd-update-self
+rtd-self-update
 ```
 
 The normal update path stages a new checkout, backs up the current `/opt/rtd` contents, then synchronizes the staged repository into place while retaining unmatched local files. Choose refresh/reinitialize only when a clean replacement is required because local files are stale or inconsistent.

@@ -115,12 +115,14 @@ script::initialize_runtime ()
 	export _TLA
 	export _LOG_DIR
 	export LOGFILE
+	export _LOGFILE
 
 	_SCRIPTNAME=$(basename "$0")
 	_TLA=${_SCRIPTNAME:0:3}
 	_LOG_DIR=/var/log/${_TLA}
 	mkdir -p "${_LOG_DIR}" || return 1
 	LOGFILE=${_LOG_DIR}/${_SCRIPTNAME}.log
+	_LOGFILE=$LOGFILE
 }
 
 script::show_banner ()
@@ -128,6 +130,7 @@ script::show_banner ()
 	echo -e "${GREEN}${PUBLICATION}: Version ${VERSION}${ENDCOLOR}"
 	echo -e "${GREEN}--------------------------------------------------------${ENDCOLOR}"
 }
+
 
 
 
@@ -167,7 +170,10 @@ main ()
 			;;
 	esac
 
-	become_root "$@" || pause::for_input 1 "$0: $* Failed to elevate privileges!"
+		# Load the RTD library before elevation so the shared helper is available.
+		# Its --sudo path preserves only required desktop-session variables.
+		rtd::bootstrap_library "_rtd_library" || pause::for_input 1 "$0: $* Failed to load RTD Library!"
+		security::ensure_admin --sudo "$@" || pause::for_input 1 "$0: $* Failed to elevate privileges!"
 
 	script::initialize_runtime || pause::for_input 1 "$0: $* Failed to initialize runtime!"
 	script::show_banner
@@ -205,6 +211,7 @@ main ()
 					software::update_all_ui 
 					;;
 			esac
+			script::offer_remove_abandoned_flatpaks
 			;;
 	esac
 }
@@ -293,6 +300,107 @@ log_item ()
 	echo "$DATE --- : $*" >> "${LOGFILE}"
 }
 
+script::offer_remove_abandoned_flatpaks ()
+{
+	local records=""
+	local summary=""
+	local scope=""
+	local app_id=""
+	local reason=""
+	local answer=""
+	local remove_status=0
+	local selected_records=""
+	local selected_tags=""
+	local tag=""
+	local install_label=""
+	local app_count=0
+	local -a checklist_rows=()
+	local -A record_by_tag=()
+
+	[[ -t 0 && -t 1 ]] || {
+		system::log_item "Skipping abandoned Flatpak application cleanup offer: no interactive terminal."
+		return 0
+	}
+	hash flatpak 2>/dev/null || return 0
+
+	records=$(software::flatpak_list_eol_apps)
+	[[ -n "$records" ]] || {
+		system::log_item "No end-of-life Flatpak applications were found."
+		return 0
+	}
+
+	while IFS=$'\t' read -r scope app_id reason; do
+		[[ -n "$app_id" ]] || continue
+		(( app_count++ ))
+		tag="$app_count"
+		[[ "$scope" == "--user" ]] && install_label="Current user" || install_label="All users"
+		summary+="  ${app_id}"$'\n'
+		summary+="      ${install_label}: ${reason}"$'\n'
+		checklist_rows+=("$tag" "$app_id" "on" "${install_label}: ${reason}")
+		record_by_tag["$tag"]="${scope}"$'\t'"${app_id}"$'\t'"${reason}"
+		system::log_item "Found end-of-life Flatpak application: scope=${scope}; app=${app_id}; reason=${reason}"
+	done <<<"$records"
+
+	if hash dialog 2>/dev/null; then
+		dialog \
+			--backtitle "${PUBLICATION}" \
+			--title "Unsupported Flatpak Apps" \
+			--msgbox "Some installed Flatpak applications are no longer maintained.\n\nYou can review the affected applications on the next screen. Selected applications will be removed, followed by Flatpak runtimes that are no longer used." \
+			13 88
+		selected_tags=$(dialog \
+			--stdout \
+			--separate-output \
+			--item-help \
+			--backtitle "${PUBLICATION}" \
+			--title "Unsupported Flatpak Apps" \
+			--ok-label "Remove Selected" \
+			--cancel-label "Keep Apps" \
+			--checklist "Select abandoned applications to remove. Details for the highlighted application appear below." \
+			20 100 10 \
+			"${checklist_rows[@]}")
+		answer=$?
+		clear
+		[[ $answer -eq 0 ]] || {
+			system::log_item "User declined removal of end-of-life Flatpak applications."
+			return 0
+		}
+
+		while IFS= read -r tag; do
+			[[ -n "$tag" && -n "${record_by_tag[$tag]:-}" ]] || continue
+			selected_records+="${record_by_tag[$tag]}"$'\n'
+		done <<<"$selected_tags"
+		records=${selected_records%$'\n'}
+		[[ -n "$records" ]] || {
+			system::log_item "User kept all end-of-life Flatpak applications."
+			return 0
+		}
+	else
+		printf '\nThe following Flatpak applications are no longer maintained:\n\n%s\n' "$summary"
+		read -r -p "Remove these applications and clean up unused Flatpak runtimes? [y/N] " answer
+		case "$answer" in
+			y | Y | yes | YES | Yes)
+				;;
+			*)
+				system::log_item "User declined removal of end-of-life Flatpak applications."
+				return 0
+				;;
+		esac
+	fi
+
+	while IFS=$'\t' read -r scope app_id reason; do
+		[[ -n "$app_id" ]] || continue
+		write_status "Removing abandoned Flatpak application: ${app_id} (${scope})"
+		system::log_item "Removing end-of-life Flatpak application: scope=${scope}; app=${app_id}"
+		software::from_flathub.org "$app_id" --remove "$scope" 2>&1 | tee -a "$LOGFILE"
+		remove_status=${PIPESTATUS[0]}
+		if [[ $remove_status -eq 0 ]]; then
+			system::log_item "Removed end-of-life Flatpak application: scope=${scope}; app=${app_id}"
+		else
+			write_warning "Failed to remove Flatpak application: ${app_id}"
+			system::log_item "Failed to remove end-of-life Flatpak application: scope=${scope}; app=${app_id}; rc=${remove_status}"
+		fi
+	done <<<"$records"
+}
 
 
 update_me ()
@@ -452,18 +560,5 @@ setup_me ()
 	fi
 }
 
-
-become_root ()
-{
-	if [[ $EUID -ne 0 ]]; then
-		# Ensure administrative privileges.
-		echo -e $YELLOW"This script needs administrative access..." $ENDCOLOR
-		exec sudo -E SUDO_USER="$USER" /bin/bash "${0}" "$@" || pause::for_input 1
-	else
-		# We are root, so no need to become root.
-		echo -e $GREEN"Administrative access granted..." $ENDCOLOR
-		echo -e " "
-	fi
-}
 
 main "$@"

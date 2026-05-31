@@ -9,7 +9,7 @@ This catalog covers the `rtd-*` command entry points shipped in `modules/`. Comm
 | Command | Purpose | Notes | Documentation |
 | --- | --- | --- | --- |
 | `rtd-update-system` | Update native packages, Flatpaks, and snaps | `--show` reports today's updates without updating | [System Update](../modules/oem-system-update.mod/README.md) |
-| `rtd-update-self` | Update or reinitialize the RTD installation | Backs up and synchronizes `/opt/rtd` | [System Update](../modules/oem-system-update.mod/README.md) |
+| `rtd-self-update` | Update or reinitialize the RTD installation | Backs up and synchronizes `/opt/rtd` | [System Update](../modules/oem-system-update.mod/README.md) |
 | `rtd-simple-support-tool` | Menu of common support tasks | Useful in terminal/SSH workflows | [Simple Support](../modules/simple-support-tool.mod/README.md) |
 | `rtd-system-hardware-information` | Graphical hardware and sensor dashboard | Uses a desktop UI | [Hardware Information](../modules/system-hardware-information.mod/README.md) |
 | `rtd-oem-backup-linux-config` | Encrypted user/configuration backup workflow | Requires chosen destination and passphrase | [User Backup](../modules/system-user-backup.mod/README.md) |
@@ -23,6 +23,7 @@ This catalog covers the `rtd-*` command entry points shipped in `modules/`. Comm
 | `rtd-desktop-look-switcher` | Apply RTD GNOME visual presets | Changes per-user desktop appearance | [Desktop Look Switcher](../modules/rtd-desktop-look-switcher.mod/README.md) |
 | `rtd-theme-manager` | Select installed GNOME themes and optional wallpaper | Requires GNOME tooling and Zenity | [Theme Manager](../modules/theme-manager/README.md) |
 | `rtd-gnome-shell-extension-installer` | Search for and install GNOME Shell extensions | Modifies installed user/system extensions | [GNOME Extension Installer](../modules/gnome-shell-extension-installer.mod/README.md) |
+| `rtd-light-weight-office-games` | Install curated lightweight board, card, tile, and puzzle games | Uses YAD or Zenity; installs Flatpaks from Flathub | [Lightweight Office Games](../modules/light-weight-office-games.mod/README.md) |
 
 ## Media And Virtualization
 

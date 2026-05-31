@@ -8,8 +8,9 @@ Modules contain the commands installed by RTD Power Tools. During installation, 
 
 | Task area | Module documentation | Main commands |
 | --- | --- | --- |
-| Maintenance | [System Update](oem-system-update.mod/README.md) | `rtd-update-system`, `rtd-update-self` |
+| Maintenance | [System Update](oem-system-update.mod/README.md) | `rtd-update-system`, `rtd-self-update` |
 | Software setup | [Bundle Manager](oem-bundle-manager.mod/README.md) | `rtd-oem-bundle-manager` |
+| Games | [Lightweight Office Games](light-weight-office-games.mod/README.md) | `rtd-light-weight-office-games` |
 | Backup | [User Backup](system-user-backup.mod/README.md) | `rtd-oem-backup-linux-config` |
 | Remote support | [Simple Support Tool](simple-support-tool.mod/README.md) | `rtd-simple-support-tool` |
 | Hardware reporting | [System Hardware Information](system-hardware-information.mod/README.md) | `rtd-system-hardware-information` |

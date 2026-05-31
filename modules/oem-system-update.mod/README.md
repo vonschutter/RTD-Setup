@@ -5,7 +5,7 @@
 
 This module contains two companion scripts:
 - `rtd-update-system`: update OS packages (APT/YUM/Zypper/PKCON), snaps, and Flatpaks from one place
-- `rtd-update-self`: update or reinitialize the RTD Power Tools installation from GitHub and rebuild launchers/themes
+- `rtd-self-update`: update or reinitialize the RTD Power Tools installation from GitHub and rebuild launchers/themes
 
 Both tools run independently of the rest of the stack and will elevate with `sudo/pkexec` when required.
 
@@ -32,13 +32,13 @@ What happens:
 - reports counts for updates installed through native, Flatpak, and Snap channels; `--show` prints today's recorded updates without running an update
 - logs to `/var/log/rtd/rtd-update-system.log`
 
-## rtd-update-self
+## rtd-self-update
 ```bash
 # update RTD Power Tools, menu launchers, and optional themes
-rtd-update-self
+rtd-self-update
 
 # run with no prompts (assumes full update)
-rtd-update-self --autoconfirm
+rtd-self-update --autoconfirm
 ```
 What happens:
 - prompts for which pieces to update (base tools, menu launchers, themes, or a clean reinitialize)

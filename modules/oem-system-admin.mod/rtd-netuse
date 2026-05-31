@@ -38,9 +38,11 @@ GOTO :CMDSCRIPT
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 _scriptname="$(basename "$0")"
 _tla="${_scriptname:0:3}"
-_log_dir="${HOME}/.config/${_tla}/logs"
-_log_file="${_log_dir}/${_scriptname}.log"
-mkdir -p "${_log_dir}" && touch "${_log_file}"
+_LOGFILE="${RTD_LOG_DIR:-/var/log/rtd}/${_scriptname}.log"
+if ! mkdir -p "$(dirname "$_LOGFILE")" 2>/dev/null || ! touch "$_LOGFILE" 2>/dev/null; then
+	unset _LOGFILE
+fi
+export _LOGFILE
 
 # Defaults
 _GIT_PROFILE="${_GIT_PROFILE:-vonschutter}"
@@ -64,27 +66,49 @@ ask_missing=0
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-log_info() {
-	if type write_information &>/dev/null; then
-		write_information "$*"
-	else
-		echo "$*"
+sanitize_args_for_log() {
+	local arg redact_next=0
+	local -a sanitized=()
+
+	for arg in "$@"; do
+		if [[ $redact_next -eq 1 ]]; then
+			sanitized+=("<redacted>")
+			redact_next=0
+			continue
+		fi
+
+		case "$arg" in
+			-p|--password)
+				sanitized+=("$arg")
+				redact_next=1
+			;;
+			--password=*)
+				sanitized+=("--password=<redacted>")
+			;;
+			*)
+				sanitized+=("$arg")
+			;;
+		esac
+	done
+
+	printf '%q ' "${sanitized[@]}"
+}
+
+require_option_value() {
+	local option="$1" value="${2:-}"
+
+	if [[ -z "$value" || "$value" == --* ]]; then
+		write_error "Missing value for ${option}."
+		usage
+		exit 1
 	fi
 }
 
-log_warn() {
-	if type write_warning &>/dev/null; then
-		write_warning "$*"
+clear_screen() {
+	if [[ -w /dev/tty ]]; then
+		clear > /dev/tty 2>/dev/null || true
 	else
-		echo "WARN: $*"
-	fi
-}
-
-log_error() {
-	if type write_error &>/dev/null; then
-		write_error "$*"
-	else
-		echo "ERROR: $*"
+		clear >&2 2>/dev/null || true
 	fi
 }
 
@@ -93,6 +117,7 @@ usage() {
 
 Usage:
   ${_scriptname} <server> <share1> [share2 ...] [options]
+  ${_scriptname}                 Open a dialog form
 
 Options:
   -s, --server <name>       SMB server name or IP
@@ -106,6 +131,7 @@ Options:
   -h, --help                Show this help
 
 Examples:
+  ${_scriptname}
   ${_scriptname} fileserver Public Backups
   ${_scriptname} --server 10.0.0.10 --user alice --ask
   ${_scriptname} -s nas01 -u bob -m /mnt/smb -o "vers=3.0"
@@ -190,7 +216,7 @@ prompt_text() {
 	if command -v dialog >/dev/null 2>&1; then
 		out=$(dialog --stdout --title "$title" --inputbox "$msg" 10 70 "$default")
 		local rc=$?
-		clear
+		clear_screen
 		if [[ $rc -ne 0 ]]; then
 			return 1
 		fi
@@ -205,51 +231,130 @@ prompt_password() {
 	local title="$1" msg="$2" out
 	: "${title:=Password}"
 
-	if [[ -r /dev/tty && -w /dev/tty ]]; then
+	if command -v dialog >/dev/null 2>&1; then
+		out=$(dialog --stdout --insecure --title "$title" --passwordbox "$msg" 10 70)
+		local rc=$?
+		clear_screen
+		[[ $rc -eq 0 ]] || return 1
+	elif [[ -r /dev/tty && -w /dev/tty ]]; then
 		printf '%s\n' "$title" > /dev/tty
 		printf '%s ' "$msg" > /dev/tty
 		IFS= read -r -s out < /dev/tty || return 1
 		printf '\n' > /dev/tty
 	else
 		read -r -s -p "$msg " out
-		echo
+		printf '\n' >&2
 	fi
 
 	echo "$out"
 }
 
+parse_yes_no() {
+	case "${1,,}" in
+		y|yes|true|1|on)
+			return 0
+		;;
+		*)
+			return 1
+		;;
+	esac
+}
+
+prompt_netuse_form() {
+	local output rc share_input list_input password_status
+	local -a fields=()
+
+	if command -v dialog >/dev/null 2>&1; then
+		system::log_item "Opening dialog form for zero-argument run."
+		output=$(dialog --stdout \
+			--title "SMB Mount" \
+			--form "Enter SMB connection details. Share names may be space-separated." 19 86 8 \
+			"Server:"      1 2 "${server}"      1 24 52 0 \
+			"Shares:"      2 2 ""              2 24 52 0 \
+			"Username:"    3 2 "${smb_user}"    3 24 52 0 \
+			"Domain:"      4 2 "${smb_domain}"  4 24 52 0 \
+			"Mount base:"  5 2 "${mount_base}"  5 24 52 0 \
+			"Options:"     6 2 "${extra_opts}"  6 24 52 0 \
+			"List only:"   7 2 "no"            7 24 12 0)
+		rc=$?
+		clear_screen
+		if [[ $rc -ne 0 ]]; then
+			write_warning "Dialog form cancelled with rc=${rc}."
+			return 1
+		fi
+
+		mapfile -t fields <<<"$output"
+		server="${fields[0]}"
+		share_input="${fields[1]}"
+		smb_user="${fields[2]}"
+		smb_domain="${fields[3]}"
+		mount_base="${fields[4]}"
+		extra_opts="${fields[5]}"
+		list_input="${fields[6]}"
+	else
+		system::log_item "Dialog command not found; using terminal prompts for zero-argument run."
+		server=$(prompt_text "SMB Server" "Enter SMB server name or IP:" "${server}") || return 1
+		share_input=$(prompt_text "SMB Shares" "Enter share names (space-separated; leave blank when listing only):" "") || return 1
+		smb_user=$(prompt_text "SMB Username" "Enter SMB username:" "${smb_user}") || return 1
+		smb_domain=$(prompt_text "SMB Domain" "Enter SMB domain (optional):" "${smb_domain}") || return 1
+		mount_base=$(prompt_text "Mount Base" "Enter base mount directory:" "${mount_base}") || return 1
+		extra_opts=$(prompt_text "Mount Options" "Enter extra mount options (optional):" "${extra_opts}") || return 1
+		list_input=$(prompt_text "List Only" "List available shares only? (yes/no):" "no") || return 1
+	fi
+
+	smb_pass=$(prompt_password "SMB Password" "Enter SMB password for ${smb_user}@${server}:") || {
+		write_warning "Password prompt cancelled."
+		return 1
+	}
+
+	shares=()
+	if [[ -n "$share_input" ]]; then
+		read -r -a shares <<<"$share_input"
+	fi
+
+	if parse_yes_no "$list_input"; then
+		list_only=1
+	else
+		list_only=0
+	fi
+
+	password_status="not provided"
+	[[ -n "$smb_pass" ]] && password_status="provided"
+	write_information "Form captured: server='${server:-<empty>}', shares_count=${#shares[@]}, user='${smb_user:-<empty>}', domain='${smb_domain:-<empty>}', mount_base='${mount_base:-<empty>}', extra_opts='${extra_opts:-<empty>}', list_only=${list_only}, password=${password_status}."
+}
+
 parse_args() {
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
-		-s|--server)
-			server="$2"; shift 2;;
-		-u|--user)
-			smb_user="$2"; shift 2;;
-		-p|--password)
-			smb_pass="$2"; shift 2;;
-		-d|--domain)
-			smb_domain="$2"; shift 2;;
-		-m|--mount-base)
-			mount_base="$2"; shift 2;;
-		-o|--options)
-			extra_opts="$2"; shift 2;;
-		-l|--list)
-			list_only=1; shift;;
-		-a|--ask)
-			ask_missing=1; shift;;
-		-h|--help)
-			usage; exit 0;;
-		--)
-			shift; break;;
-		-*)
-			log_error "Unknown option: $1"; usage; exit 1;;
-		*)
-			if [[ -z "$server" ]]; then
-				server="$1"
-			else
-				shares+=("$1")
-			fi
-			shift;;
+			-s|--server)
+				require_option_value "$1" "${2:-}"; server="$2"; shift 2;;
+			-u|--user)
+				require_option_value "$1" "${2:-}"; smb_user="$2"; shift 2;;
+			-p|--password)
+				require_option_value "$1" "${2:-}"; smb_pass="$2"; shift 2;;
+			-d|--domain)
+				require_option_value "$1" "${2:-}"; smb_domain="$2"; shift 2;;
+			-m|--mount-base)
+				require_option_value "$1" "${2:-}"; mount_base="$2"; shift 2;;
+			-o|--options)
+				require_option_value "$1" "${2:-}"; extra_opts="$2"; shift 2;;
+			-l|--list)
+				list_only=1; shift;;
+			-a|--ask)
+				ask_missing=1; shift;;
+			-h|--help)
+				usage; exit 0;;
+			--)
+				shift; break;;
+			-*)
+				write_error "Unknown option: $1"; usage; exit 1;;
+			*)
+				if [[ -z "$server" ]]; then
+					server="$1"
+				else
+					shares+=("$1")
+				fi
+				shift;;
 		esac
 	done
 
@@ -283,51 +388,132 @@ resolve_defaults() {
 	_default_opts="uid=${uid},gid=${gid},file_mode=0644,dir_mode=0755,iocharset=utf8,vers=3.0"
 }
 
-list_shares() {
-	if ! command -v smbclient >/dev/null 2>&1; then
-		log_warn "smbclient not available; cannot list shares."
-		return 1
-	fi
-	log_info "Listing shares on //${server} (may prompt)..."
-	smbclient -L "//${server}" -U "${smb_user}%${smb_pass}" 2>/dev/null || return 1
-	return 0
-}
-
-mount_share() {
-	local share="$1"
-	local mount_dir="${mount_base}/${server}/${share}"
-	mkdir -p "$mount_dir" || return 1
-
-	if command -v mountpoint >/dev/null 2>&1; then
-		if mountpoint -q "$mount_dir"; then
-			log_warn "Already mounted: $mount_dir"
-			return 0
-		fi
-	fi
-
+create_credential_file() {
 	local cred_file
-	cred_file=$(mktemp)
-	chmod 600 "$cred_file"
+	cred_file=$(mktemp "/tmp/${_scriptname}.credentials.XXXXXX") || return 1
+	chmod 600 "$cred_file" || {
+		rm -f "$cred_file"
+		return 1
+	}
 	{
 		echo "username=${smb_user}"
 		echo "password=${smb_pass}"
 		[[ -n "$smb_domain" ]] && echo "domain=${smb_domain}"
 	} >"$cred_file"
+	echo "$cred_file"
+}
+
+cleanup_credential_file() {
+	local cred_file="$1"
+	[[ -n "$cred_file" ]] && rm -f "$cred_file"
+}
+
+require_sudo_credentials() {
+	if [[ $EUID -eq 0 ]]; then
+		system::log_item "Administrative access already available."
+		return 0
+	fi
+
+	if ! command -v sudo >/dev/null 2>&1; then
+		write_error "sudo is required to mount SMB shares when not running as root."
+		return 1
+	fi
+
+	write_information "Requesting administrative credentials for mount operations."
+	sudo -v || {
+		write_error "Administrative authentication failed."
+		return 1
+	}
+}
+
+run_admin_command() {
+	if [[ $EUID -eq 0 ]]; then
+		"$@"
+	else
+		sudo "$@"
+	fi
+}
+
+ensure_mount_dir() {
+	local mount_dir="$1"
+
+	if mkdir -p "$mount_dir" 2>/dev/null; then
+		return 0
+	fi
+
+	system::log_item "Could not create ${mount_dir} as current user; retrying with sudo."
+	run_admin_command mkdir -p "$mount_dir" || {
+		write_error "Failed to create mount directory: ${mount_dir}"
+		return 1
+	}
+}
+
+list_shares() {
+	local cred_file rc output
+	if ! command -v smbclient >/dev/null 2>&1; then
+		write_warning "smbclient not available; cannot list shares."
+		return 1
+	fi
+	cred_file=$(create_credential_file) || {
+		write_error "Failed to create temporary credential file for smbclient."
+		return 1
+	}
+	write_information "Listing shares on //${server} using smbclient -A <credential-file>."
+	output=$(smbclient -L "//${server}" -A "$cred_file" 2>&1)
+	rc=$?
+	cleanup_credential_file "$cred_file"
+	system::log_item "smbclient rc=${rc}; output follows:"
+	while IFS= read -r line; do
+		system::log_item "$line"
+	done <<<"$output"
+	printf '%s\n' "$output"
+	[[ $rc -eq 0 ]] || {
+		write_error "smbclient failed while listing shares on //${server}; rc=${rc}."
+		return "$rc"
+	}
+	return 0
+}
+
+mount_share() {
+	local share="$1" output rc
+	local mount_dir="${mount_base}/${server}/${share}"
+	ensure_mount_dir "$mount_dir" || return 1
+
+	if command -v mountpoint >/dev/null 2>&1; then
+		if mountpoint -q "$mount_dir"; then
+			write_warning "Already mounted: $mount_dir"
+			return 0
+		fi
+	fi
+
+	local cred_file
+	cred_file=$(create_credential_file) || {
+		write_error "Failed to create temporary credential file for mount."
+		return 1
+	}
 
 	local opts="credentials=${cred_file},${_default_opts}"
 	if [[ -n "$extra_opts" ]]; then
 		opts="${opts},${extra_opts}"
 	fi
 
-	log_info "Mounting //${server}/${share} -> ${mount_dir}"
-	if ! mount -t cifs "//${server}/${share}" "$mount_dir" -o "$opts"; then
-		log_error "Failed to mount //${server}/${share}"
-		rm -f "$cred_file"
+	write_information "Mounting //${server}/${share} -> ${mount_dir}"
+	system::log_item "mount command: $( [[ $EUID -eq 0 ]] || printf 'sudo ' )mount -t cifs '//${server}/${share}' '${mount_dir}' -o 'credentials=<temporary-file>,${_default_opts}${extra_opts:+,${extra_opts}}'"
+	output=$(run_admin_command mount -t cifs "//${server}/${share}" "$mount_dir" -o "$opts" 2>&1)
+	rc=$?
+	cleanup_credential_file "$cred_file"
+	system::log_item "mount rc=${rc}; output follows:"
+	while IFS= read -r line; do
+		system::log_item "$line"
+	done <<<"$output"
+
+	if [[ $rc -ne 0 ]]; then
+		[[ -n "$output" ]] && printf '%s\n' "$output" >&2
+		write_error "Failed to mount //${server}/${share}; rc=${rc}."
 		return 1
 	fi
 
-	rm -f "$cred_file"
-	log_info "Mounted: ${mount_dir}"
+	write_information "Mounted: ${mount_dir}"
 	return 0
 }
 
@@ -337,56 +523,78 @@ mount_share() {
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 rtd::bootstrap_library "_rtd_library" || { echo "Failed to load _rtd_library"; exit 1; }
+write_information "Starting ${_scriptname}; log file: ${_LOGFILE}"
+arg_count=$#
+system::log_item "Argument count: ${arg_count}; args: $(sanitize_args_for_log "$@")"
 parse_args "$@"
+system::log_item "After parse_args: server='${server:-<empty>}', shares_count=${#shares[@]}, user='${smb_user:-<empty>}', domain='${smb_domain:-<empty>}', mount_base='${mount_base:-<empty>}', extra_opts='${extra_opts:-<empty>}', list_only=${list_only}, ask_missing=${ask_missing}, password=$([[ -n "$smb_pass" ]] && echo provided || echo not-provided)."
 resolve_defaults
+system::log_item "After resolve_defaults: smb_user='${smb_user:-<empty>}', mount_base='${mount_base:-<empty>}', default_opts='${_default_opts}'."
+
+if [[ $arg_count -eq 0 ]]; then
+	prompt_netuse_form || {
+		write_warning "Cancelled."
+		exit 1
+	}
+fi
 
 if [[ -z "$server" && $ask_missing -eq 1 ]]; then
+	write_information "Server missing and --ask was provided; prompting for server."
 	server=$(prompt_text "SMB Server" "Enter SMB server name or IP:" "") || {
-		log_warn "Cancelled."
+		write_warning "Cancelled."
 		exit 1
 	}
 fi
 
 if [[ -z "$server" ]]; then
+	write_error "Server was not provided."
 	usage
 	exit 1
 fi
 
 if [[ -z "$smb_pass" ]]; then
+	write_information "Password was not provided; prompting for SMB password."
 	smb_pass=$(prompt_password "SMB Password" "Enter SMB password for ${smb_user}@${server}:") || {
-		log_warn "Cancelled."
+		write_warning "Cancelled."
 		exit 1
 	}
+	system::log_item "Password prompt completed: $([[ -n "$smb_pass" ]] && echo provided || echo empty)."
 fi
 
 if [[ $list_only -eq 1 ]]; then
+	write_information "List-only mode selected."
 	list_shares
 	exit $?
 fi
 
-# Ensure admin and dependencies
-security::ensure_admin
-software::check_native_package_dependency cifs-utils >/dev/null 2>&1 || {
-	log_error "cifs-utils is required."; exit 1;
-}
-
 if [[ ${#shares[@]} -eq 0 && $ask_missing -eq 1 ]]; then
+	write_information "Shares missing and --ask was provided; prompting for share list."
 	share_input=$(prompt_text "SMB Shares" "Enter share names (space-separated):" "") || {
-		log_warn "Cancelled."
+		write_warning "Cancelled."
 		exit 1
 	}
 	read -r -a shares <<<"$share_input"
 fi
 
 if [[ ${#shares[@]} -eq 0 ]]; then
-	log_error "No shares specified."
+	write_error "No shares specified."
 	usage
 	exit 1
 fi
 
-log_info "Mount base: ${mount_base}"
-log_info "Server: ${server}"
-log_info "User: ${smb_user}"
+write_information "Mount base: ${mount_base}"
+write_information "Server: ${server}"
+write_information "User: ${smb_user}"
+write_information "Shares to mount: ${shares[*]}"
+
+write_information "Checking dependency: cifs-utils."
+if ! command -v mount.cifs >/dev/null 2>&1 && [[ ! -x /sbin/mount.cifs && ! -x /usr/sbin/mount.cifs ]]; then
+	write_error "cifs-utils is required; mount.cifs was not found."
+	exit 1
+fi
+write_information "Dependency check completed."
+
+require_sudo_credentials || exit 1
 
 exit_code=0
 for share in "${shares[@]}"; do
@@ -395,7 +603,7 @@ for share in "${shares[@]}"; do
 	fi
 done
 
-log_info "Done."
+write_information "Done. exit_code=${exit_code}"
 exit "$exit_code"
 
 :CMDSCRIPT

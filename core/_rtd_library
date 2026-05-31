@@ -12,7 +12,7 @@ fi
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::// Linux //:::::::
 ::  Author(s):    SLS, KLS, NB.  Buffalo Center, IA & Avarua, Cook Islands
-::  Version:      2.54
+::  Version:      2.61
 ::
 ::
 ::  Purpose:    To collect and enable the use of code snippets in other scripts.
@@ -336,8 +336,11 @@ software:
 205  software::determine_package_name_from_cmd                   ;           Function to determine the package name from the command line.
 206  software::display_bundle_install_choices_gtk                ;           Function to display the software install options. All software options are listed in.
 207  software::display_bundle_removal_choices_gtk                ;           Function to display the Software Productivity Bundles removal options. All software options are listed in.
-208  software::ensure_flatpak_package_managment                  ;           Function to ensure that Flatpak is installed and Flathub enabled.
-209  software::refresh_flatpak_desktop_registration              ;           Refreshes desktop session registration after Flatpak support or Flatpak apps are installed.
+208  software::ensure_flatpak_package_managment                  ;           Establishes Flatpak, Flathub, Flatseal, and desktop export registration when needed.
+208a software::flatpak_list_eol_apps                             ;           Lists installed Flatpak applications explicitly marked as end-of-life.
+208b software::_flatpak_cmd                                     ;           Internal scoped Flatpak command runner with optional terminal progress output.
+208c software::_flatpak_filter_advisories                       ;           Internal filter that removes Flatpak advisory blocks and terminal replies from display output.
+209  software::refresh_flatpak_desktop_registration              ;           Refreshes desktop session registration when Flatpak export paths are first registered.
 210  software::ensure_gnome_software_store_available             ;           Function to ensure that Flatpak is installed and Flathub enabled.
 211  software::ensure_restricted_codecs                          ;           simple function to ensure that restricted codecs are available on the system.
 212  software::ensure_snap_package_managment                     ;           Function to ensure that snap is installed.
@@ -358,7 +361,7 @@ software:
 227  software::update_all_ui                                     ;           Displays an interactive update selector and runs selected native, Snap, and Flatpak update channels.
 228  software::update_system                                     ;           System update function. The purpose of this function is to update installed software from
 229  software::update_system_txt                                 ;           System update function. The purpose of this function is to update installed software from
-230  software::update_user_flatpaks                              ;           Updates the invoking user's Flatpak applications correctly during elevated update workflows.
+229a software::update_flatpaks                                   ;           Updates user and system Flatpaks, filters advisory notices, and removes unused dependencies.
 231  software::updates_installed_today::flatpak                  ;           Emits today's Flatpak update deployment records for system and invoking-user installations.
 232  software::updates_installed_today::native                   ;           Emits today's installed native-package update records from the supported package-manager logs.
 233  software::updates_installed_today::snap                     ;           Emits today's successfully completed Snap refresh records.
@@ -561,7 +564,7 @@ Library_Documentation
 
 # If the vars exist but the functions do not, we clear the stale vars and loads normally.
 # That is the right defensive behavior for re-exec, byobu/tmux, sudo, and similar process-boundary cases.
-_RTD_LIBRARY_SELF_VERSION="2.54"
+_RTD_LIBRARY_SELF_VERSION="2.61"
 if [[ -n "${RTDFUNCTIONS:-}" && "${RTDFUNCTIONS}" == "${_RTD_LIBRARY_SELF_VERSION}" ]]; then
 	if declare -F system::log_item >/dev/null 2>&1 && declare -F library::apply_rtd_defaults >/dev/null 2>&1; then
 		return 0 2>/dev/null || exit 0
@@ -18412,7 +18415,23 @@ security::ensure_admin() {
 	fi
 
 	local _ensure_admin_should_exit=1
+	local elevated_xdg_data_dirs="${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+	local flatpak_export_path=""
 	[[ $- == *i* ]] && _ensure_admin_should_exit=0
+
+	# Keep Flatpak desktop exports visible when the requested command is relaunched as root.
+	# sudo -H changes HOME, so pass the invoking desktop session's data path explicitly.
+	for flatpak_export_path in \
+		"${HOME:-/tmp}/.local/share/flatpak/exports/share" \
+		"/var/lib/flatpak/exports/share"; do
+		case ":${elevated_xdg_data_dirs}:" in
+			*":${flatpak_export_path}:"*)
+				;;
+			*)
+				elevated_xdg_data_dirs="${flatpak_export_path}:${elevated_xdg_data_dirs}"
+				;;
+		esac
+	done
 
 	# Determine if we are in a graphical session
 	if [ -n "$XDG_SESSION_TYPE" ] && [ "$XDG_SESSION_TYPE" = "wayland" ]; then
@@ -18444,14 +18463,14 @@ security::ensure_admin() {
 		--sudo)
 			system::log_item "🔐 Authenticating using 'sudo'..."
 			write_warning "🔐 This script needs administrative access..."
-			local preserve_env_list="DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,WAYLAND_DISPLAY"
+			local preserve_env_list="DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,XDG_DATA_DIRS,WAYLAND_DISPLAY"
 			shift
 			# When sourced interactively, $0 is usually the bash binary; re-running that path as a script
 			# causes "cannot execute binary file". In that case, just run the requested command with sudo.
 			if [[ "$(basename "$0")" == "bash" ]]; then
-				sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" "$@" || pause::for_input 1 "Thre was an error running the requested command with sudo."
+				sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" XDG_DATA_DIRS="$elevated_xdg_data_dirs" "$@" || pause::for_input 1 "Thre was an error running the requested command with sudo."
 			else
-				sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" bash "$(readlink -f "$0")" "$@" || pause::for_input 1 "There was an error running the requested command with sudo."
+				sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" XDG_DATA_DIRS="$elevated_xdg_data_dirs" bash "$(readlink -f "$0")" "$@" || pause::for_input 1 "There was an error running the requested command with sudo."
 			fi
 			local rc=$?
 			if (( _ensure_admin_should_exit )); then
@@ -18469,6 +18488,7 @@ security::ensure_admin() {
 			[[ -n "${XAUTHORITY:-}" ]] && pkexec_env+=("XAUTHORITY=$XAUTHORITY")
 			[[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]] && pkexec_env+=("DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS")
 			[[ -n "${XDG_RUNTIME_DIR:-}" ]] && pkexec_env+=("XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR")
+			pkexec_env+=("XDG_DATA_DIRS=$elevated_xdg_data_dirs")
 			[[ -n "${WAYLAND_DISPLAY:-}" ]] && pkexec_env+=("WAYLAND_DISPLAY=$WAYLAND_DISPLAY")
 			pkexec_env+=("SUDO_USER=$USER")
 			# If sourced, $0 is the bash binary; re-running it as a script fails. Run the requested
@@ -18498,8 +18518,8 @@ security::ensure_admin() {
 				system::log_item "🔐 Authenticating using dialog..."
 				export HISTIGNORE='*sudo -S*'
 				echo "${token}" | sudo -S -v || security::ensure_admin
-				local preserve_env_list="DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,WAYLAND_DISPLAY"
-				sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" bash "$(readlink -f "$0")" "$@" || pause::for_input 1
+				local preserve_env_list="DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,XDG_DATA_DIRS,WAYLAND_DISPLAY"
+				sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" XDG_DATA_DIRS="$elevated_xdg_data_dirs" bash "$(readlink -f "$0")" "$@" || pause::for_input 1
 				rc=$?
 				;;
 				1) echo "Request cancelled" ; rc=1 ;;
@@ -18514,8 +18534,8 @@ security::ensure_admin() {
 		else
 			system::log_item "🔐 No dialog installed: authenticating using plain sudo..."
 			write_warning "🔐 This script needs administrative access..."
-			local preserve_env_list="DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,WAYLAND_DISPLAY"
-			sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" bash "$(readlink -f "$0")" "$@" || pause::for_input 1
+			local preserve_env_list="DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,XDG_DATA_DIRS,WAYLAND_DISPLAY"
+			sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" XDG_DATA_DIRS="$elevated_xdg_data_dirs" bash "$(readlink -f "$0")" "$@" || pause::for_input 1
 			local rc=$?
 			if (( _ensure_admin_should_exit )); then
 				exit $rc
@@ -18786,7 +18806,7 @@ software::ensure_gnome_software_store_available() {
 }
 
 software::refresh_flatpak_desktop_registration() {
-	# Description: Refreshes desktop session registration after Flatpak support or Flatpak apps are installed.
+	# Description: Refreshes desktop session registration after Flatpak export paths are first added.
 	# Globals: XDG_DATA_DIRS (rw), SUDO_USER (r), SUDO_UID (r), DISPLAY (r), DBUS_SESSION_BUS_ADDRESS (r), WAYLAND_DISPLAY (r)
 	# Dependencies: write_status, write_information, write_warning, dependency::current_desktop, kde::_reload_shell; optionally flatpak, dbus-update-activation-environment, systemctl, update-desktop-database, xdg-desktop-menu, kbuildsycoca6, kbuildsycoca5, xfdesktop.
 	# Arguments: None
@@ -18799,6 +18819,8 @@ software::refresh_flatpak_desktop_registration() {
 	local target_uid="${SUDO_UID:-}"
 	local target_home="${HOME:-}"
 	local default_xdg="/usr/local/share:/usr/share"
+	local data_dirs="${XDG_DATA_DIRS:-${default_xdg}}"
+	local export_path=""
 	local detected_desktop=""
 	local kde_refresh_cmd=""
 	local -a user_env=()
@@ -18816,7 +18838,16 @@ software::refresh_flatpak_desktop_registration() {
 	[[ -n "${target_home}" ]] || target_home="${HOME:-/tmp}"
 
 	local flatpak_user_export="${target_home}/.local/share/flatpak/exports/share"
-	export XDG_DATA_DIRS="${flatpak_user_export}:${flatpak_system_export}:${XDG_DATA_DIRS:-${default_xdg}}"
+	for export_path in "$flatpak_user_export" "$flatpak_system_export"; do
+		case ":${data_dirs}:" in
+			*":${export_path}:"*)
+				;;
+			*)
+				data_dirs="${export_path}:${data_dirs}"
+				;;
+		esac
+	done
+	export XDG_DATA_DIRS="$data_dirs"
 
 	user_env=(
 		"HOME=${target_home}"
@@ -18894,110 +18925,102 @@ software::refresh_flatpak_desktop_registration() {
 }
 
 software::ensure_flatpak_package_managment() {
-	# Description: Function to ensure that Flatpak is installed and Flathub enabled.
-	# Globals: none
-	# Dependencies: [distro package management] [function: software::check_native_package_dependency] [Internet access]
-	# Arguments: None
-	# Outputs:
-	# Returns: Standard return codes 1/0
-	# Usage: Call the function with no arguments
-	# NOTE: https://www.fosslinux.com/42410/snap-vs-flatpak-vs-appimage-know-the-differences-which-is-better.htm
-	# Like Snap, Flatpak is another distribution independent package format aimed to simplify overall
-	# app distribution and usage in Linux systems. Previously known as xdg-app, the framework was based
-	# on the concept of running applications in a secure virtual sandbox without requiring root privileges
-	# or posing a security threat to the system.
-	# Flatpak was officially released in 2015 with a reliable backup from Red Hat, Endless Computers, and
-	# Collabora. It targeted primarily three Desktop Environments. That is FreeDesktop, KDE, and GNOME. The
-	# Linux distributions currently having this framework are arch Linux, Debian, Fedora, Mageia,
-	# Solus, and Ubuntu.The Flatpak framework itself is developed in C programming and released under the
-	# LGPL license. The lead developer is Alexander Larsson – a Red Hat employee. Like Snapcraft for Snap,
-	# Flatpak also has the Flathub app store where users can find and install all Flatpak packages.
-	# Initially, Flathub only allowed open-source publishing applications on the website but
-	# has recently approved the publishing of proprietary apps.
-	# Additionally, unlike Snap, where we have a single repository controlled by Canonical to install and update
-	# software packages, Flatpak supports the use of multiple repos. The one significant disadvantage with this
-	# package is the lack of support for Servers.
-	#
-	#	*	---       PREFFERRED Software install (Security + Control)           ----		*
-	#
-	#  CAPABILITY TABLE:
-	# +----------------------------------------------------+-------------+-------------+--------------+
-	# | Features                                           | Snap        | Flatpak     | AppImage     |
-	# +----------------------------------------------------+-------------+-------------+--------------+
-	# | Permission Controls Toggles                        | Yes         | Yes         | No           |
-	# | Sandboxing Support                                 | Yes         | Yes         | Yes          |
-	# | Sandboxing Mandatory                               | Yes         | Yes         | No           |
-	# | App Portability                                    | Yes         | Yes         | No           |
-	# | Native Theme Support                               | Yes (caveat)| Yes (caveat)| Yes (caveat) |
-	# | Support for Bundled Libraries                      | Yes         | Yes         | Yes          |
-	# | Fully Contained Single Executable Support          | No          | No          | Yes          |
-	# | Online App Store                                   | Yes         | Yes         | Yes          |
-	# | Multi-version Parallel Apps Support                | Yes         | Yes         | Yes          |
-	# | Automatic Updates                                  | Yes         | Yes         | Yes (caveat) |
-	# | Support for Chrome OS (through Crostini containers)| Yes         | Yes         | Yes          |
-	# | App Size                                           | higher than | higher than | Lowest       |
-	# | Number of Applications Available in the App Store  | Highest     | Lowest      | Somewhere in |
-	# | Plugins for Desktop App Store Software             | Yes         | Yes         | No           |
-	# +----------------------------------------------------+-------------+-------------+--------------+
+	# Description: Establishes a sensible system Flatpak capability when it is not already present.
+	# Installs Flatpak, configures the system Flathub remote, installs Flatseal, registers Flatpak
+	# export paths, and refreshes desktop registration only when the desktop paths were missing.
+	# Globals: OSTYPE (r), PATH (rw), XDG_DATA_DIRS (rw), SUDO_USER (r), USER (r)
+	# Dependencies: software::check_native_package_dependency, software::_flatpak_cmd,
+	# security::ensure_admin, software::refresh_flatpak_desktop_registration.
+	# Arguments: None.
+	# Outputs: Status and error messages describing setup work performed.
+	# Returns: 0 when Flatpak capability is ready; 1 when setup fails or the platform is unsupported.
+	# Usage: software::ensure_flatpak_package_managment
 	# End of documentation
-	if [[ $(echo "$OSTYPE" | grep "linux") ]] &>/dev/null; then
-		# these tests focus on the latest versions of the distros evaluated...
-		write_information "Ensuring flatpak software distribution system is available..."
-		if hash flatpak &>/dev/null; then
-			write_status "flatpak command is available... "
-			if flatpak remotes | grep flathub &>/dev/null; then
-				write_status "flathub remote is present..."
-				export PATH=$PATH:/var/lib/flatpak/exports/bin
-			else
-				write_warning "flathub remote is not present... adding now... "
-				security::ensure_admin
-				flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || write_error "Failed to add flatpak repo!"
-				export PATH=$PATH:/var/lib/flatpak/exports/bin
-			fi
+	local flathub_url="https://flathub.org/repo/flathub.flatpakrepo"
+	local flatseal_id="com.github.tchx84.Flatseal"
+	local target_user="${SUDO_USER:-${USER:-}}"
+	local target_home="${HOME:-}"
+	local data_dirs="${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+	local registration_required=0
+	local export_path=""
 
-			if flatpak list | grep com.github.tchx84.Flatseal &>/dev/null; then
-				write_status "flatseal security management is also present..."
-			else
-				security::ensure_admin
-				write_status "flatseal security manager not found, adding now..."
-				flatpak install flathub com.github.tchx84.Flatseal --noninteractive -y
-			fi
-		else
-			security::ensure_admin
-			write_information "Ensuring Flatpak software distribution system is available..."
-			if software::check_native_package_dependency flatpak; then
-				flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || write_error "Failed to add flatpak repo!"
-				export PATH=$PATH:/var/lib/flatpak/exports/bin
-			else
-				write_error "Failed to satisfy dependecy flatpak!"
-			fi
+	[[ "${OSTYPE:-}" == linux* ]] || {
+		write_error "Flatpak setup is currently supported only on Linux."
+		return 1
+	}
 
-			if flatpak list | grep com.github.tchx84.Flatseal &>/dev/null; then
-				write_status "flatseal security management is also present..."
-				else
-					security::ensure_admin
-					write_status "flatseal security manager not found, adding now..."
-					flatpak install flathub com.github.tchx84.Flatseal --noninteractive -y
-				fi
-			fi
-			software::refresh_flatpak_desktop_registration
-
-		elif [[ "$OSTYPE" == "darwin"* ]]; then
-			write_error "${FUNCNAME[0]}: Mac OSX is currently not supported with snap..."
-		return 1
-	elif [[ "$OSTYPE" == "cygwin" ]]; then
-		write_error "${FUNCNAME[0]}: CYGWIN is currently unsupported with snap..."
-		return 1
-	elif [[ "$OSTYPE" == "msys" ]]; then
-		write_error "${FUNCNAME[0]}: Lightweight shell is currently unsupported with snap... "
-		return 1
-	elif [[ "$OSTYPE" == "freebsd"* ]]; then
-		write_error "${FUNCNAME[0]}: Free BSD is currently unsupported with snap... "
-		return 1
-	else
-		echo "I have no Idea what this system is"
-		return 1
+	if [[ "${_RTD_FLATPAK_CAPABILITY_READY:-0}" == 1 ]] && hash flatpak 2>/dev/null; then
+		return 0
 	fi
+
+	write_information "Ensuring Flatpak software distribution system is available..."
+	if ! hash flatpak 2>/dev/null; then
+		security::ensure_admin
+		software::check_native_package_dependency flatpak || {
+			write_error "Failed to install the Flatpak package."
+			return 1
+		}
+	fi
+	hash flatpak 2>/dev/null || {
+		write_error "Flatpak command is not available after installation."
+		return 1
+	}
+
+	if ! software::_flatpak_cmd --system remotes --columns=name 2>/dev/null | grep -qx "flathub"; then
+		write_status "Adding the system Flathub remote..."
+		software::_flatpak_cmd --system remote-add --if-not-exists flathub "$flathub_url" || {
+			write_error "Failed to add the system Flathub remote."
+			return 1
+		}
+	fi
+
+	if ! software::_flatpak_cmd --system info "$flatseal_id" >/dev/null 2>&1; then
+		write_status "Installing Flatseal security manager..."
+		software::_flatpak_cmd --system install --noninteractive -y flathub "$flatseal_id" || {
+			write_error "Failed to install Flatseal."
+			return 1
+		}
+	fi
+
+	if [[ -n "$target_user" ]] && hash getent 2>/dev/null; then
+		target_home="$(getent passwd "$target_user" 2>/dev/null | awk -F: 'NR == 1 { print $6 }')"
+	fi
+	[[ -n "$target_home" ]] || target_home="${HOME:-/tmp}"
+
+	for export_path in \
+		"${target_home}/.local/share/flatpak/exports/bin" \
+		"/var/lib/flatpak/exports/bin"; do
+		case ":${PATH:-}:" in
+			*":${export_path}:"*)
+				;;
+			*)
+				PATH="${export_path}${PATH:+:${PATH}}"
+				;;
+		esac
+	done
+	export PATH
+
+	for export_path in \
+		"${target_home}/.local/share/flatpak/exports/share" \
+		"/var/lib/flatpak/exports/share"; do
+		case ":${data_dirs}:" in
+			*":${export_path}:"*)
+				;;
+			*)
+				data_dirs="${export_path}:${data_dirs}"
+				registration_required=1
+				;;
+		esac
+	done
+	export XDG_DATA_DIRS="$data_dirs"
+
+	if (( registration_required )); then
+		software::refresh_flatpak_desktop_registration
+	fi
+
+	export _RTD_FLATPAK_CAPABILITY_READY=1
+	write_status "Flatpak capability is ready."
+	return 0
 }
 
 software::enable_extra_repos() {
@@ -19257,32 +19280,251 @@ software::updates_installed_today::flatpak() {
 	since="$(date +%Y-%m-%d) 00:00:00"
 
 	hash flatpak 2>/dev/null || return 0
-	LANG=C flatpak history --system --since="$since" --columns=time,change,application 2>/dev/null |
+	LANG=C software::_flatpak_cmd --system history --since="$since" --columns=time,change,application 2>/dev/null |
 		awk '/deploy update/ { print "system\t" $0 }'
 
-	if [[ $EUID -eq 0 && -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]] && hash sudo 2>/dev/null; then
-		sudo -H -u "$SUDO_USER" env LANG=C flatpak history --user --since="$since" --columns=time,change,application 2>/dev/null |
-			awk '/deploy update/ { print "user\t" $0 }'
+	LANG=C software::_flatpak_cmd --user history --since="$since" --columns=time,change,application 2>/dev/null |
+		awk '/deploy update/ { print "user\t" $0 }'
+}
+
+software::_flatpak_cmd() {
+	# Description: Internal scoped Flatpak command runner with optional pseudo-terminal output.
+	# Globals: EUID (r), SUDO_USER (r)
+	# Dependencies: flatpak; optionally sudo and script.
+	# Arguments: Optional --tty, scope (--user or --system), Flatpak command, and command arguments.
+	# Outputs: Passes through Flatpak output.
+	# Returns: The exit status from the Flatpak command.
+	# Usage: software::_flatpak_cmd [--tty] --user list --app
+	# End of documentation
+	local use_tty=0
+	local scope=""
+	local requires_admin=0
+	local command_string=""
+	local flatpak_locale="C.UTF-8"
+	local flatpak_data_dirs="${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+	local target_home="${HOME:-/tmp}"
+	local export_path=""
+	local -a command=()
+
+	if [[ "${1:-}" == "--tty" ]]; then
+		use_tty=1
+		shift
+	fi
+	scope="${1:-}"
+	shift || return 1
+
+	case "$scope" in
+		--user | --system)
+			;;
+		*)
+			write_error "A Flatpak scope of --user or --system is required."
+			return 2
+			;;
+	esac
+
+	if ! locale -a 2>/dev/null | grep -Eiq '^C\.utf-?8$'; then
+		flatpak_locale="${LC_ALL:-${LANG:-C}}"
+	fi
+
+	if [[ "$scope" == "--user" && $EUID -eq 0 && -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]] && hash getent 2>/dev/null; then
+		target_home="$(getent passwd "$SUDO_USER" 2>/dev/null | awk -F: 'NR == 1 { print $6 }')"
+	fi
+	[[ -n "$target_home" ]] || target_home="${HOME:-/tmp}"
+
+	for export_path in \
+		"${target_home}/.local/share/flatpak/exports/share" \
+		"/var/lib/flatpak/exports/share"; do
+		case ":${flatpak_data_dirs}:" in
+			*":${export_path}:"*)
+				;;
+			*)
+				flatpak_data_dirs="${export_path}:${flatpak_data_dirs}"
+				;;
+		esac
+	done
+
+	if [[ "$scope" == "--system" ]]; then
+		case "${1:-}" in
+			install | uninstall | update | remote-add)
+				requires_admin=1
+				;;
+		esac
+	fi
+
+	if [[ "$scope" == "--user" && $EUID -eq 0 && -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]] && hash sudo 2>/dev/null; then
+		command=(sudo -H -u "$SUDO_USER" env LC_ALL="$flatpak_locale" XDG_DATA_DIRS="$flatpak_data_dirs" flatpak "$@" "$scope")
+	elif (( requires_admin )) && [[ $EUID -ne 0 ]] && hash sudo 2>/dev/null; then
+		command=(sudo env LC_ALL="$flatpak_locale" XDG_DATA_DIRS="$flatpak_data_dirs" flatpak "$@" "$scope")
 	else
-		LANG=C flatpak history --user --since="$since" --columns=time,change,application 2>/dev/null |
-			awk '/deploy update/ { print "user\t" $0 }'
+		command=(env LC_ALL="$flatpak_locale" XDG_DATA_DIRS="$flatpak_data_dirs" flatpak "$@" "$scope")
+	fi
+
+	if (( use_tty )) && hash script 2>/dev/null; then
+		printf -v command_string '%q ' "${command[@]}"
+		script --quiet --return --flush --echo never --command "${command_string% }" /dev/null </dev/null
+	else
+		"${command[@]}"
 	fi
 }
 
-software::update_user_flatpaks() {
-	# Description: Updates the invoking user's Flatpak applications correctly during elevated update workflows.
-	# Globals: EUID (r), SUDO_USER (r)
-	# Dependencies: flatpak; sudo when called as root on behalf of another user.
-	# Arguments: Any additional options accepted by "flatpak update --user", such as "--noninteractive" or "-y".
-	# Outputs: Passes through Flatpak update output.
-	# Returns: The exit status from the Flatpak update command.
-	# Usage: software::update_user_flatpaks --noninteractive -y
+software::_flatpak_filter_advisories() {
+	# Description: Removes Flatpak advisory blocks and leaked terminal replies from display output.
+	# Dependencies: perl.
+	# Arguments: None. Reads a Flatpak terminal transcript from STDIN.
+	# Outputs: Flatpak output without advisory blocks or cursor-position replies.
+	# Returns: The perl exit status.
+	# Usage: software::_flatpak_filter_advisories < flatpak-output.log
 	# End of documentation
-	if [[ $EUID -eq 0 && -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]] && hash sudo 2>/dev/null; then
-		sudo -H -u "$SUDO_USER" flatpak update --user "$@"
-	else
-		flatpak update --user "$@"
-	fi
+
+	perl -e '
+		$| = 1;
+		my $buffer = "";
+		my $suppress = 0;
+		my $suppress_note = 0;
+
+		sub emit_record {
+			my ($line, $separator) = @_;
+			$line =~ s/\e\[[0-9]+;[0-9]+R//g;
+
+			if ($suppress_note) {
+				if ($line =~ /^(Looking for updates|Nothing to do\.|[ \t]*ID[ \t]+Branch|Updating [0-9]+\/[0-9]+)/) {
+					$suppress_note = 0;
+				} else {
+					return;
+				}
+			}
+			if ($line =~ /^Note that /) {
+				$suppress_note = 1;
+				return;
+			}
+			if ($line =~ /^(Info:|These runtimes .* are pinned and won.t be removed)/) {
+				$suppress = 1;
+				return;
+			}
+			if ($suppress && $line =~ /^[ \t]/) {
+				return;
+			}
+			if ($suppress && $line eq "") {
+				$suppress = 0;
+				return;
+			}
+			$suppress = 0;
+			print $line, $separator;
+		}
+
+		while (read(STDIN, my $chunk, 4096)) {
+			$buffer .= $chunk;
+			while ($buffer =~ s/^(.*?)(\r\n|\n|\r)//s) {
+				emit_record($1, $2);
+			}
+		}
+		emit_record($buffer, "") if length $buffer;
+	'
+}
+
+software::update_flatpaks() {
+	# Description: Updates user and system Flatpaks with readable progress and removes unused dependencies.
+	# Globals: _LOGFILE (r)
+	# Dependencies: software::_flatpak_cmd, software::_flatpak_filter_advisories, system::determine_logfile, mktemp, tee.
+	# Arguments: Options accepted by "flatpak update", such as "--noninteractive" or "-y".
+	# Outputs: Passes through normal Flatpak progress output without Info advisory blocks.
+	# Returns: 0 when both scopes update and cleanup successfully; otherwise the latest failure status.
+	# Usage: software::update_flatpaks --noninteractive -y
+	# End of documentation
+	local logfile=""
+	local output_file=""
+	local scope=""
+	local status=0
+	local command_status=0
+	local use_tty=1
+	local arg=""
+	local -a tty_arg=()
+
+	hash flatpak 2>/dev/null || return 0
+	for arg in "$@"; do
+		[[ "$arg" == "--noninteractive" ]] && use_tty=0
+	done
+	(( use_tty )) && tty_arg=(--tty)
+
+	for scope in --user --system; do
+		write_status "Updating ${scope#--} Flatpak applications..."
+		output_file=$(mktemp "${TMPDIR:-/tmp}/rtd-flatpak-update.XXXXXX") || {
+			write_error "Unable to create a temporary file for Flatpak update output."
+			return 1
+		}
+
+		# Interactive runs retain Flatpak's native progress bars through a PTY. The transcript
+		# is logged verbatim while advisory records are removed only from terminal output.
+		software::_flatpak_cmd "${tty_arg[@]}" "$scope" update "$@" 2>&1 |
+			tee "$output_file" |
+			software::_flatpak_filter_advisories
+		command_status=${PIPESTATUS[0]}
+
+		if logfile=$(system::determine_logfile 2>/dev/null); then
+			{
+				printf '\n--- Flatpak update transcript (%s) ---\n' "$scope"
+				cat "$output_file"
+				printf '%s\n' "--- End Flatpak update transcript (${scope}) ---"
+			} >>"$logfile"
+		fi
+		rm -f -- "$output_file"
+		(( command_status == 0 )) || status=$command_status
+
+		write_status "Removing unused ${scope#--} Flatpak dependencies..."
+		output_file=$(mktemp "${TMPDIR:-/tmp}/rtd-flatpak-cleanup.XXXXXX") || {
+			write_error "Unable to create a temporary file for Flatpak cleanup output."
+			return 1
+		}
+		software::_flatpak_cmd "$scope" uninstall --unused --noninteractive -y 2>&1 |
+			tee "$output_file" |
+			software::_flatpak_filter_advisories
+		command_status=${PIPESTATUS[0]}
+
+		if logfile=$(system::determine_logfile 2>/dev/null); then
+			{
+				printf '\n--- Flatpak cleanup transcript (%s) ---\n' "$scope"
+				cat "$output_file"
+				printf '%s\n' "--- End Flatpak cleanup transcript (${scope}) ---"
+			} >>"$logfile"
+		fi
+		rm -f -- "$output_file"
+		(( command_status == 0 )) || status=$command_status
+	done
+
+	return "$status"
+}
+
+software::flatpak_list_eol_apps() {
+	# Description: Lists installed Flatpak applications explicitly marked as end-of-life.
+	# Dependencies: software::_flatpak_cmd, awk.
+	# Arguments: None.
+	# Outputs: Tab-separated scope, application ID, and end-of-life reason.
+	# Returns: 0, including when Flatpak is unavailable or no abandoned applications are installed.
+	# Usage: software::flatpak_list_eol_apps
+	# End of documentation
+	local scope=""
+	local app_id=""
+	local app_info=""
+	local reason=""
+
+	hash flatpak 2>/dev/null || return 0
+
+	for scope in --user --system; do
+		while IFS= read -r app_id; do
+			[[ -n "$app_id" ]] || continue
+			app_info=$(LANG=C software::_flatpak_cmd "$scope" info "$app_id" 2>/dev/null) || continue
+			reason=$(printf '%s\n' "$app_info" | awk '
+				/^[[:space:]]*End-of-life:[[:space:]]*/ {
+					sub(/^[[:space:]]*End-of-life:[[:space:]]*/, "")
+					print
+					exit
+				}
+			')
+			[[ -n "$reason" ]] && printf '%s\t%s\t%s\n' "$scope" "$app_id" "$reason"
+		done < <(LANG=C software::_flatpak_cmd "$scope" list --app --columns=application 2>/dev/null)
+	done
+
+	return 0
 }
 
 software::report_updates_installed_today() {
@@ -19416,10 +19658,7 @@ software::update_system_txt() {
 
 	write_status "updating flatpaks if flatpak is present on system..."
 	if hash flatpak 2>/dev/null; then
-		write_status "Updating user installed flatpaks... "
-		software::update_user_flatpaks -y
-		write_status "Updating system installed flatpaks... "
-		flatpak update --system -y
+		software::update_flatpaks -y
 	else
 		write_warning "--- flatpak software is not present on this system... skipping..."
 	fi
@@ -19433,7 +19672,7 @@ software::update_system_txt() {
 software::update_all_ui() {
 	# Description: Displays an interactive update selector and runs selected native, Snap, and Flatpak update channels.
 	# Globals: BRANDING (r), RTD_GUI (r), _LOGFILE (r)
-	# Dependencies: security::ensure_admin, software::enable_extra_repos, software::update_user_flatpaks, software::report_updates_installed_today, software::offer_reboot_if_required, tee, a dialog-compatible UI command, and installed package managers for selected channels.
+	# Dependencies: security::ensure_admin, software::enable_extra_repos, software::update_flatpaks, software::report_updates_installed_today, software::offer_reboot_if_required, tee, a dialog-compatible UI command, and installed package managers for selected channels.
 	# Arguments: None
 	# Outputs: Displays dialog checklists, progress views, and a completion summary; appends task output to _LOGFILE.
 	# Returns: 0 when the user selects Quit after processing or cancels; may terminate the invoking script on ESC or when no update actions are selected.
@@ -19496,16 +19735,13 @@ software::update_all_ui() {
 	}
 
 	Flatpak_Apps() {
-		(
-			write_status "updating flatpaks if flatpak is present on system..."
-			if hash flatpak 2>/dev/null; then
-				software::update_user_flatpaks --noninteractive -y
-				flatpak update --system --noninteractive -y
-				write_information "Update task complete."
-			else
-				write_warning "!flatpak software is not present on this system... skipping..."
-			fi
-		) | tee -a "$_LOGFILE" | $dialog_ui --backtitle "\Zb$PUBLICATION             $VERSION\ZB" --progressbox "Updating all Contained Flatpaks Apps..." 25 120
+		write_status "updating flatpaks if flatpak is present on system..."
+		if hash flatpak 2>/dev/null; then
+			software::update_flatpaks -y
+			write_information "Update task complete."
+		else
+			write_warning "!flatpak software is not present on this system... skipping..."
+		fi
 	}
 
 	while true; do
@@ -19546,14 +19782,15 @@ software::update_all_ui() {
 software::from_flathub.org() {
 	# Description: Function to simplify and streamline the installation and removal of flatpaks.
 	# Globals: none
-	# Dependencies: [distro package management] [function: software::check_native_package_dependency] [Internet access]
+	# Dependencies: software::ensure_flatpak_package_managment, software::_flatpak_cmd, system::log_item.
 	# Arguments:
 	# -- Default action is to add software title matching passed parameter.
 	# -- An option "--remove" may be passed to attempt removal of the software title.
+	# -- An optional scope of "--user" or "--system" may be passed. The historical default is "--system".
 	#
 	# Outputs:
 	# Returns: Standard return codes 1/0
-	# Usage: software::from_flathub.org [ title-name | title-name --remove ]
+	# Usage: software::from_flathub.org [ title-name ] [ --remove ] [ --user | --system ]
 	#
 	#
 	# NOTE: https://www.fosslinux.com/42410/snap-vs-flatpak-vs-appimage-know-the-differences-which-is-better.htm
@@ -19586,46 +19823,20 @@ software::from_flathub.org() {
 	# End of documentation
 
 	local app_name=""
-	local remove_flag=""
-	local flatpak_temp_dir=""
-
-	software::from_flathub.org::_cleanup_tmp() {
-		if [[ -n "$flatpak_temp_dir" && -d "$flatpak_temp_dir" ]]; then
-			rm -rf "$flatpak_temp_dir"
-			system::log_item "Cleaned up Flatpak temp directory: $flatpak_temp_dir"
-			flatpak_temp_dir=""
-		fi
-	}
-
-	software::from_flathub.org::_flatpak_cmd() {
-		local status
-
-		if [[ -z "$flatpak_temp_dir" ]]; then
-			flatpak_temp_dir=$(mktemp -d /tmp/rtd-flatpak.XXXXXX 2>/dev/null) || flatpak_temp_dir=""
-			if [[ -n "$flatpak_temp_dir" ]]; then
-				system::log_item "Using Flatpak temp directory: $flatpak_temp_dir"
-			else
-				system::log_item "Unable to create dedicated Flatpak temp directory; falling back to default TMPDIR."
-			fi
-		fi
-
-		if [[ -n "$flatpak_temp_dir" ]]; then
-			TMPDIR="$flatpak_temp_dir" flatpak "$@"
-			status=$?
-		else
-			flatpak "$@"
-			status=$?
-		fi
-
-		software::from_flathub.org::_cleanup_tmp
-		return $status
-	}
+	local action="install"
+	local flathub_url="https://flathub.org/repo/flathub.flatpakrepo"
+	local scope="--system"
+	export _RTD_FLATHUB_ACTION_RESULT=""
 
 	# Parse command line arguments
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 		--remove)
-			remove_flag="--remove"
+			action="remove"
+			shift
+			;;
+		--user | --system)
+			scope="$1"
 			shift
 			;;
 		*)
@@ -19633,7 +19844,7 @@ software::from_flathub.org() {
 				app_name="$1"
 			else
 				write_error "Error: Invalid parameter '$1'"
-				write_information "Usage: software::from_flathub.org [app_name] [--remove]"
+				write_information "Usage: software::from_flathub.org [app_name] [--remove] [--user | --system]"
 				return 1
 			fi
 			shift
@@ -19641,35 +19852,58 @@ software::from_flathub.org() {
 		esac
 	done
 
-	software::ensure_flatpak_package_managment
-
 	if [[ -z "$app_name" ]]; then
 		write_error "Error: App name is missing."
-		write_information "Usage: software::from_flathub.org [app_name] [--remove]"
+		write_information "Usage: software::from_flathub.org [app_name] [--remove] [--user | --system]"
 		return 1
 	fi
 
-	if [[ "$remove_flag" == "--remove" ]]; then
-		system::log_item "Request to remove Flatpak app '$app_name'"
+	if [[ "$action" == "remove" ]]; then
+		system::log_item "Request to remove Flatpak app '$app_name' from scope '$scope'"
 
-		if software::from_flathub.org::_flatpak_cmd uninstall -y "$app_name"; then
-			system::log_item "Flatpak app '$app_name' has been uninstalled."
-		else
-			system::log_item "Error: Failed to uninstall Flatpak app '$app_name'"
+		hash flatpak 2>/dev/null || {
+			write_error "Flatpak is not available; unable to remove '$app_name'."
 			return 1
-		fi
-	else
-		system::log_item "Request to install Flatpak app '$app_name'"
+		}
 
-			if flatpak info "$app_name" >/dev/null 2>&1; then
-				write_information "Flatpak app '$app_name' is already installed."
-			else
-				if software::from_flathub.org::_flatpak_cmd install -y "$app_name"; then
-					system::log_item "Flatpak app '$app_name' has been installed."
-				else
-					system::log_item "Error: Failed to install Flatpak app '$app_name'"
-					return 1
-				fi
+		if software::_flatpak_cmd "$scope" info "$app_name" >/dev/null 2>&1; then
+			software::_flatpak_cmd "$scope" uninstall --app --delete-data --noninteractive -y "$app_name" || {
+				export _RTD_FLATHUB_ACTION_RESULT="failed"
+				system::log_item "Error: Failed to uninstall Flatpak app '$app_name' from scope '$scope'"
+				return 1
+			}
+			export _RTD_FLATHUB_ACTION_RESULT="removed"
+			system::log_item "Flatpak app '$app_name' has been uninstalled from scope '$scope'."
+		else
+			export _RTD_FLATHUB_ACTION_RESULT="not-installed"
+			write_information "Flatpak app '$app_name' is not installed in scope '$scope'."
+		fi
+
+		write_status "Removing unused ${scope#--} Flatpak dependencies..."
+		software::_flatpak_cmd "$scope" uninstall --unused --noninteractive -y || {
+			export _RTD_FLATHUB_ACTION_RESULT="failed"
+			system::log_item "Error: Failed to clean unused Flatpak dependencies from scope '$scope'"
+			return 1
+		}
+	else
+		system::log_item "Request to install Flatpak app '$app_name' in scope '$scope'"
+		software::ensure_flatpak_package_managment || return 1
+
+		if ! software::_flatpak_cmd "$scope" remotes --columns=name 2>/dev/null | grep -qx "flathub"; then
+			write_status "Adding the ${scope#--} Flathub remote..."
+			software::_flatpak_cmd "$scope" remote-add --if-not-exists flathub "$flathub_url" || return 1
+		fi
+
+		if software::_flatpak_cmd "$scope" info "$app_name" >/dev/null 2>&1; then
+			export _RTD_FLATHUB_ACTION_RESULT="already-installed"
+			write_information "Flatpak app '$app_name' is already installed."
+		elif software::_flatpak_cmd "$scope" install --noninteractive -y flathub "$app_name"; then
+			export _RTD_FLATHUB_ACTION_RESULT="installed"
+			system::log_item "Flatpak app '$app_name' has been installed in scope '$scope'."
+		else
+			export _RTD_FLATHUB_ACTION_RESULT="failed"
+			system::log_item "Error: Failed to install Flatpak app '$app_name' in scope '$scope'"
+			return 1
 		fi
 	fi
 }
@@ -21172,8 +21406,7 @@ software::update_system() {
 
 	write_status "updating flatpaks if flatpak is present on system..."
 	if hash flatpak 2>/dev/null; then
-		term::task_exec_list_output software::update_user_flatpaks --noninteractive -y
-		term::task_exec_list_output flatpak update --system --noninteractive -y
+		term::task_exec_list_output software::update_flatpaks --noninteractive -y
 	else
 		write_warning "--- flatpak software is not present on this system... skipping..."
 	fi

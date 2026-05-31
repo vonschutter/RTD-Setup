@@ -10,7 +10,7 @@ RTD Power Tools is a collection of interactive administration utilities for Linu
 | --- | --- | --- | --- |
 | Update installed software | `rtd-update-system` | Updates native packages, Flatpaks, and snaps when configured | May require a reboot |
 | See updates installed today | `rtd-update-system --show` | Displays package activity for today | Read-only |
-| Update RTD Power Tools | `rtd-update-self` | Backs up and synchronizes the installed RTD files | Changes `/opt/rtd` |
+| Update RTD Power Tools | `rtd-self-update` | Backs up and synchronizes the installed RTD files | Changes `/opt/rtd` |
 | Install software by role | `rtd-oem-bundle-manager` | Installs selected application/configuration bundles | Downloads and installs software |
 | Back up a user before a reinstall | `rtd-oem-backup-linux-config` | Builds encrypted archives of selected user data | Provide external or mounted storage |
 | Diagnose or maintain a remote system | `rtd-simple-support-tool` | Presents common support tasks in one menu | Some tasks elevate privileges |

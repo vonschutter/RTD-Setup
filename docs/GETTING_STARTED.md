@@ -68,10 +68,10 @@ rtd-update-system --show
 Update the RTD toolset itself:
 
 ```bash
-rtd-update-self
+rtd-self-update
 ```
 
-`rtd-update-self` stages new repository content, backs up `/opt/rtd` under `/opt/backup`, and synchronizes updates into the installation. Its refresh/reinitialize option performs a clean replacement when local or orphaned files must be discarded.
+`rtd-self-update` stages new repository content, backs up `/opt/rtd` under `/opt/backup`, and synchronizes updates into the installation. Its refresh/reinitialize option performs a clean replacement when local or orphaned files must be discarded.
 
 System-level RTD logs are generally written under `/var/log/rtd`. User-level operations may use `~/.config/rtd/log`.
 
