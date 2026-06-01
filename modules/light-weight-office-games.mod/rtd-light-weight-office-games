@@ -73,11 +73,6 @@ esac
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 _scriptname="$(basename "$0")"
 _tla="${_scriptname:0:3}"
-_LOGFILE="${RTD_LOG_DIR:-/var/log/rtd}/${_scriptname}.log"
-if ! mkdir -p "$(dirname "$_LOGFILE")" 2>/dev/null || ! touch "$_LOGFILE" 2>/dev/null; then
-	unset _LOGFILE
-fi
-export _LOGFILE
 
 _GIT_PROFILE="${_GIT_PROFILE:-vonschutter}"
 _title="RunTime Data - Lightweight Office Games Installer"
@@ -95,10 +90,14 @@ _install_scope="user"
 _install_summary_file=""
 _install_summary=""
 _selected_game_count=0
+_scope_result_file=""
+_scope_left_pid=""
+_scope_right_pid=""
 _yad_common_args=(--title "$_title" --center)
 _yad_sidebar_args=("${_yad_common_args[@]}")
 _yad_icon_args=("${_yad_common_args[@]}")
 _zenity_icon_args=()
+# Reuse the module artwork when the active dialog backend supports it.
 if [[ -r "$_window_icon" ]]; then
 	_yad_common_args+=(--window-icon="$_window_icon")
 	_yad_sidebar_args+=(--window-icon="$_window_icon")
@@ -107,6 +106,7 @@ if [[ -r "$_window_icon" ]]; then
 fi
 [[ -r "$_sidebar_image" ]] && _yad_sidebar_args+=(--image="$_sidebar_image")
 
+# Keep the curated Flatpak metadata in one place so the selection dialog stays data-driven.
 # Format:
 # app_id|name|type|installs_last_month|favorites|summary
 GAME_CATALOG=(
@@ -163,7 +163,8 @@ rtd::bootstrap_library() {
 
 	[[ "$library_name" == "_rtd_library" && -n "$loaded_version" ]] && rtd::bootstrap_library::ok && return 0
 
-	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	script_dir="$_script_dir"
+	# Prefer an installed or nearby library, then download a temporary copy as a last resort.
 	for path in \
 		"${script_dir}/${library_name}" \
 		"${script_dir}/../core/${library_name}" \
@@ -211,14 +212,20 @@ rtd::bootstrap_library() {
 usage() {
 	cat <<USAGE
 Usage:
-  ${_scriptname} [--yad | --zenity] [--help]
+  ${_scriptname} [--yad | --zenity] [-h | --help]
+  ${_scriptname} --setup-flatpak-capability
+  ${_scriptname} --setup-ui-dependency <yad | zenity>
 
 Launches a graphical installer for lightweight Flatpak games.
 
 Options:
-  --yad       Use YAD dialogs. This is the preferred default when available.
-  --zenity    Use Zenity dialogs instead of YAD.
-  -h, --help  Show this help text.
+  --yad                         Use YAD dialogs. This is the preferred default.
+  --zenity                      Use Zenity dialogs instead of YAD.
+  -h, --help                    Show this help text.
+
+Internal setup options:
+  --setup-flatpak-capability    Add the RTD Flatpak capability after elevation.
+  --setup-ui-dependency <tool>  Install the requested YAD or Zenity dependency.
 USAGE
 }
 
@@ -278,7 +285,26 @@ ui_message() {
 	esac
 }
 
+# shellcheck disable=SC2329 # Invoked indirectly by EXIT and signal traps.
+office_games::cleanup() {
+	[[ -n "${_scope_left_pid:-}" ]] && kill "$_scope_left_pid" 2>/dev/null || true
+	[[ -n "${_scope_right_pid:-}" ]] && kill "$_scope_right_pid" 2>/dev/null || true
+	[[ -n "${_scope_left_pid:-}" ]] && wait "$_scope_left_pid" 2>/dev/null || true
+	[[ -n "${_scope_right_pid:-}" ]] && wait "$_scope_right_pid" 2>/dev/null || true
+	[[ -n "${_scope_result_file:-}" ]] && rm -f -- "$_scope_result_file" || true
+	[[ -n "${_install_summary_file:-}" ]] && rm -f -- "$_install_summary_file" || true
+}
+
+# shellcheck disable=SC2329 # Invoked indirectly by INT and TERM traps.
+office_games::handle_signal() {
+	local exit_code="$1"
+	office_games::cleanup
+	trap - EXIT
+	exit "$exit_code"
+}
+
 detect_ui_tool() {
+	# Prefer YAD for the richer interface and fall back to Zenity when necessary.
 	if [[ -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
 		write_error "This installer requires a graphical desktop session. DISPLAY and WAYLAND_DISPLAY are both unset."
 		return 1
@@ -311,13 +337,21 @@ detect_ui_tool() {
 }
 
 confirm_ui_tool_installation() {
+	local dependency="${1:-}"
 	local answer=""
+	local message=""
+
+	if [[ -n "$dependency" ]]; then
+		message="The requested graphical dialog tool '${dependency}' is not installed. May RTD install it now? [y/N] "
+	else
+		message="A graphical dialog tool is required. May RTD install YAD or, if YAD is unavailable, Zenity? [y/N] "
+	fi
 
 	if [[ -r /dev/tty && -w /dev/tty ]]; then
-		printf '\n%s\n' "A graphical dialog tool is required. May RTD install YAD or, if YAD is unavailable, Zenity? [y/N] " >/dev/tty
+		printf '\n%s\n' "$message" >/dev/tty
 		read -r answer </dev/tty || return 1
 	elif [[ -t 0 ]]; then
-		printf '\n%s\n' "A graphical dialog tool is required. May RTD install YAD or, if YAD is unavailable, Zenity? [y/N] "
+		printf '\n%s\n' "$message"
 		read -r answer || return 1
 	else
 		write_error "YAD and Zenity are missing. Install one of them and rerun ${_scriptname}."
@@ -343,7 +377,7 @@ install_ui_dependency() {
 install_requested_ui_tool() {
 	local dependency="$1"
 
-	confirm_ui_tool_installation || {
+	confirm_ui_tool_installation "$dependency" || {
 		write_error "Requested UI backend '${dependency}' is not installed."
 		return 1
 	}
@@ -354,6 +388,7 @@ install_requested_ui_tool() {
 }
 
 flatpak_capability_is_present() {
+	# A usable RTD Flatpak setup includes Flatpak, Flathub, and Flatseal.
 	command -v flatpak >/dev/null 2>&1 || return 1
 	flatpak remotes --system --columns=name 2>/dev/null | grep -qx "flathub" || return 1
 	flatpak info --system com.github.tchx84.Flatseal >/dev/null 2>&1 || return 1
@@ -411,6 +446,7 @@ setup_flatpak_capability_as_admin() {
 ensure_flatpak_capability_for_installer() {
 	local -a pipeline_status=()
 
+	# Configure missing Flatpak support only after the user explicitly approves it.
 	if flatpak_capability_is_present; then
 		software::ensure_flatpak_package_managment
 		return
@@ -452,15 +488,16 @@ show_welcome() {
 }
 
 choose_scope() {
-	local key left_pid right_pid result_file selected yad_status
+	local key selected yad_status
+	# Use the richer side-by-side YAD layout when a display and sidebar image are available.
 	if [[ "$_ui_tool" == "yad" && -n "${DISPLAY:-}" && -r "$_sidebar_image" ]]; then
 		key=$((BASHPID + RANDOM))
-		result_file="$(mktemp "/tmp/${_scriptname}.scope.XXXXXX")" || return 1
+		_scope_result_file="$(mktemp "/tmp/${_scriptname}.scope.XXXXXX")" || return 1
 
 		GDK_BACKEND=x11 yad --plug="$key" --tabnum=1 \
 			--picture --filename="$_sidebar_image" --size=fit --no-buttons \
 			>/dev/null 2>&1 &
-		left_pid=$!
+		_scope_left_pid=$!
 
 		GDK_BACKEND=x11 yad --plug="$key" --tabnum=2 \
 			--list --radiolist --no-buttons \
@@ -471,8 +508,8 @@ choose_scope() {
 			FALSE "All users" "Install system-wide. This may require sudo or PolicyKit." "system" \
 			--print-column=4 --separator="" \
 			--grid-lines=horizontal --wrap-cols=3 --wrap-width=280 --expand-column=3 \
-			>"$result_file" 2>/dev/null &
-		right_pid=$!
+			>"$_scope_result_file" 2>/dev/null &
+		_scope_right_pid=$!
 
 		GDK_BACKEND=x11 yad --paned --key="$key" --orient=horizontal --splitter=225 \
 			"${_yad_common_args[@]}" \
@@ -481,11 +518,14 @@ choose_scope() {
 		yad_status=$?
 
 		if ((yad_status != 0)); then
-			kill "$left_pid" "$right_pid" 2>/dev/null || true
+			kill "$_scope_left_pid" "$_scope_right_pid" 2>/dev/null || true
 		fi
-		wait "$left_pid" "$right_pid" 2>/dev/null || true
-		selected="$(<"$result_file")"
-		rm -f "$result_file"
+		wait "$_scope_left_pid" "$_scope_right_pid" 2>/dev/null || true
+		_scope_left_pid=""
+		_scope_right_pid=""
+		selected="$(<"$_scope_result_file")"
+		rm -f -- "$_scope_result_file"
+		_scope_result_file=""
 		((yad_status == 0)) || return 1
 	elif [[ "$_ui_tool" == "yad" ]]; then
 		selected=$(yad --list --radiolist \
@@ -515,6 +555,7 @@ select_games() {
 	local selected row app_id name type installs favorites summary
 	local -a ui_rows=()
 
+	# Convert the catalog into checklist rows while keeping Flatpak IDs hidden from the user.
 	for row in "${GAME_CATALOG[@]}"; do
 		IFS='|' read -r app_id name type installs favorites summary <<<"$row"
 		ui_rows+=(TRUE "$name" "$type" "${installs}/mo, ${favorites} fav" "$app_id" "$summary")
@@ -554,7 +595,10 @@ install_games() {
 	local -a pipeline_status=()
 	local -a selected_apps=()
 	local -A game_name_by_id=()
-	mapfile -t selected_apps <<<"$selected"
+	# Normalize dialog output because YAD may emit blank lines between selected rows.
+	mapfile -t selected_apps < <(
+		printf '%s\n' "$selected" | sed '/^[[:space:]]*$/d'
+	)
 	total="${#selected_apps[@]}"
 	_selected_game_count="$total"
 	count=0
@@ -565,6 +609,7 @@ install_games() {
 		game_name_by_id["$app_id"]="$name"
 	done
 
+	# Feed installation messages and percentages directly into the graphical progress dialog.
 	{
 		printf '# Installing selected games from Flathub...\n'
 		for app_id in "${selected_apps[@]}"; do
@@ -584,10 +629,18 @@ install_games() {
 			printf '%s\n' $(( count * 100 / total ))
 		done
 		exit "$rc"
-	} 2>&1 | show_progress
+	} 2>&1 | office_games::log_progress_output | show_progress
 	pipeline_status=("${PIPESTATUS[@]}")
-	((pipeline_status[1] == 0)) || return 130
+	((pipeline_status[2] == 0)) || return 130
 	return "${pipeline_status[0]}"
+}
+
+office_games::log_progress_output() {
+	if [[ -n "${_LOGFILE:-}" ]]; then
+		tee -a "$_LOGFILE"
+	else
+		cat
+	fi
 }
 
 show_progress() {
@@ -618,6 +671,7 @@ build_install_summary() {
 	local failed=0
 	local failed_names=""
 
+	# Turn the per-game result file into a concise completion message.
 	while IFS=$'\t' read -r status name; do
 		[[ -n "$status" ]] || continue
 		case "$status" in
@@ -634,7 +688,7 @@ build_install_summary() {
 		esac
 	done <"${_install_summary_file:-/dev/null}"
 
-	rm -f -- "${_install_summary_file:-}"
+	[[ -n "$_install_summary_file" ]] && rm -f -- "$_install_summary_file"
 	_install_summary_file=""
 	_install_summary="<b>${heading}</b>\n\nScope: ${_install_scope}\nSelected: ${_selected_game_count}\nInstalled: ${installed}\nAlready available: ${already_installed}\nFailed: ${failed}"
 	[[ -n "$failed_names" ]] && _install_summary+="\n\nFailed games: ${failed_names}"
@@ -649,16 +703,25 @@ build_install_summary() {
 
 main() {
 	local selected_games select_status install_status
+	# Handle public options and the internal elevated setup modes first.
 	parse_args "$@" || exit $?
 	if ((_show_help)); then
 		usage
 		exit 0
 	fi
 
+	# Load the shared RTD helpers before checking dependencies or installing applications.
 	rtd::bootstrap_library "_rtd_library" || {
 		write_error "Unable to load the RTD function library."
 		exit 1
 	}
+	# Logging is useful for diagnostics, but a logging failure must not block the installer.
+	if _LOGFILE="$(system::determine_logfile)"; then
+		export _LOGFILE
+	else
+		unset _LOGFILE
+		printf 'WARN: Unable to determine a writable log file; continuing without logging.\n' >&2
+	fi
 	if [[ -n "$_setup_ui_dependency" ]]; then
 		software::check_native_package_dependency "$_setup_ui_dependency"
 		exit $?
@@ -667,7 +730,8 @@ main() {
 		software::ensure_flatpak_package_managment
 		exit $?
 	fi
-	write_information "Starting ${_scriptname}; log file: ${_LOGFILE:-default RTD log}"
+	# Start the interactive workflow after elevated helper invocations have been handled.
+	write_information "Starting ${_scriptname}; log file: ${_LOGFILE:-unavailable}"
 	detect_ui_tool || exit 1
 	show_welcome || exit 0
 	ensure_flatpak_capability_for_installer
@@ -683,6 +747,7 @@ main() {
 			exit 1
 			;;
 	esac
+	# Collect the install scope and selected games before starting any application installs.
 	choose_scope || {
 		ui_message info "$_title" "<b>Installation canceled</b>\n\nNo games were installed."
 		exit 0
@@ -705,6 +770,7 @@ main() {
 			exit 1
 			;;
 	esac
+	# Install each selected Flatpak and present a summary that distinguishes cancellation from failure.
 	write_information "Installing selected games for scope: ${_install_scope}"
 	if install_games "$selected_games"; then
 		build_install_summary
@@ -722,6 +788,10 @@ main() {
 		fi
 	fi
 }
+
+trap office_games::cleanup EXIT
+trap 'office_games::handle_signal 130' INT
+trap 'office_games::handle_signal 143' TERM
 
 main "$@"
 exit $?
