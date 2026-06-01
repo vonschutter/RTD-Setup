@@ -18714,7 +18714,7 @@ software::list_bundles() {
 	case "$1" in
 	--zformat-installable)
 		# List software bundles for use with zenity
-		for _bundle in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep "${bundle_prefix}" | grep -v "Single_Install"); do
+		for _bundle in $(declare -F | awk '{print $NF}' | sort | grep -E -v "^_" | grep "${bundle_prefix}" | grep -v "Single_Install"); do
 			# Build each line to be displayed in the bundle installer...
 			true_false="$(grep -A 2 "$_bundle ()" "${_OEM_DIR:-"/opt/rtd"}/core/${_rtd_recipies_info}" )"
 			true_false="$(echo $true_false | grep "DEFAULT=TRUE"  &>/dev/null && echo "true" || echo "false")"
@@ -18738,7 +18738,7 @@ software::list_bundles() {
 	*)
 		# Default list format
 		i=1
-		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep ${bundle_prefix:-"recipe_"} | grep -v "Single_Install"); do
+		for index in $(declare -F | awk '{print $NF}' | sort | grep -E -v "^_" | grep ${bundle_prefix:-"recipe_"} | grep -v "Single_Install"); do
 			echo "$index #$i"
 			((i = i + 1))
 		done
@@ -33661,7 +33661,7 @@ library::list_loaded_internal_functions() {
 
 	if [[ "$1" == "--zformat" ]]; then
 		i=1
-		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep -v "^library::" | grep -v "recipe:_" | grep -v "Single_Install"); do
+		for index in $(declare -F | awk '{print $NF}' | sort | grep -E -v "^_" | grep -v "^library::" | grep -v "recipe:_" | grep -v "Single_Install"); do
 			Description=$(library::__get_function_description "${index}")
 			__RTD_DEVHELP_LIST+=("$i" "${index}" "${Description}")
 			__RTD_DEVHELP_ZFORMAT+=("$i" "${index}" "${Description}")
@@ -33680,7 +33680,7 @@ library::list_loaded_internal_functions() {
 		done
 	elif [[ "${1}" == "--make-doc" ]]; then
 		i=1
-		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep -v "^library::" | grep -v "recipe:_" | grep -v "Single_Install"); do
+		for index in $(declare -F | awk '{print $NF}' | sort | grep -E -v "^_" | grep -v "^library::" | grep -v "recipe:_" | grep -v "Single_Install"); do
 			Description=$(library::__get_function_description "${index}")
 			printf "%-5s %-50s ; %s\n" "${i}" "${index}" "${Description}"
 			__RTD_DEVHELP_LIST+=("$i" "${index}" "${Description}")
@@ -33688,14 +33688,14 @@ library::list_loaded_internal_functions() {
 		done
 	elif [[ "$1" == "--hformat" ]]; then
 		i=1
-		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep -v "^library::" | grep -v "recipe:_" | grep -v "Single_Install"); do
+		for index in $(declare -F | awk '{print $NF}' | sort | grep -E -v "^_" | grep -v "^library::" | grep -v "recipe:_" | grep -v "Single_Install"); do
 			echo "#$i:	$index "
 			__RTD_DEVHELP_LIST+=("$i" "${index}" "$(library::__get_function_description "${index}")")
 			((i = i + 1))
 		done
 	else
 		i=1
-		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep -v "^library::" | grep -v "recipe_" | grep -v "Single_Install"); do
+		for index in $(declare -F | awk '{print $NF}' | sort | grep -E -v "^_" | grep -v "^library::" | grep -v "recipe:_" | grep -v "Single_Install"); do
 			echo "$index #$i "
 			__RTD_DEVHELP_LIST+=("$i" "${index}" "$(library::__get_function_description "${index}")")
 			((i = i + 1))
@@ -33887,12 +33887,12 @@ library::list_loaded_software_functions() {
 	# End of documentation
 
 	if [[ "$1" == "--nonum" ]]; then
-		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep "recipe:_"); do
+		for index in $(declare -F | awk '{print $NF}' | sort | grep -E -v "^_" | grep "recipe:_"); do
 			echo false ${index/recipe:_/}
 		done
 	else
 		i=1
-		for index in $(declare -F | awk '{print $NF}' | sort | egrep -v "^_" | grep "recipe:_"); do
+		for index in $(declare -F | awk '{print $NF}' | sort | grep -E -v "^_" | grep "recipe:_"); do
 			echo "$i	${index/recipe:_/}"
 			((i = i + 1))
 		done
