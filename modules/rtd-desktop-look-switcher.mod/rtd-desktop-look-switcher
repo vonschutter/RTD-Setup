@@ -1,4 +1,5 @@
 #!/bin/bash
+
 #
 #::             			A D M I N   T O O L
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -33,6 +34,18 @@
 
 
 
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Safety Check             ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+	echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
+	return 1 2>/dev/null || exit 1
+fi
+
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::          Script Settings                 ::::::::::::::::::::::
@@ -58,6 +71,10 @@ touch "${_LOGFILE}"
 # a copy must be downloaded.
 
 rtd::bootstrap_library() {
+	if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+		echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
+		return 1
+	fi
 	local library_name="${1:-_rtd_library}" minimum_version="" loaded_version path script_dir src_url tmp rc check
 	local -a checks=()
 
@@ -136,7 +153,7 @@ rtd::bootstrap_library() {
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 # Ensure access to the rtd library functions:
-date &>>"${_LOGFILE}"
+date >>"${_LOGFILE}" 2>&1
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 	cat <<EOF
 Usage:
@@ -147,7 +164,7 @@ Description:
 EOF
 	exit 0
 fi
-rtd::bootstrap_library "_rtd_library" &>>"${_LOGFILE}" || {
+rtd::bootstrap_library "_rtd_library" >>"${_LOGFILE}" 2>&1 || {
 	echo "Failed to load _rtd_library" | tee -a "${_LOGFILE}"
 	exit 1
 }
@@ -182,7 +199,7 @@ if dependency::desktop gnome ; then
 		"Crisp Day" "Crisp and clean proffessional business look (Tuned for day time)" \
 		"Crisp Evening" "Crisp and clean proffessional business look (Tuned for evening time)" \
 		"Moca Smooth" "A dark and chocolate smooth comfortable look" \
-		"${DefaultDistro/ /}" "The default look and feel of ${DefaultDistro/ /} (this distribution of Linux)" ) &>>"${_LOGFILE}"
+		"${DefaultDistro/ /}" "The default look and feel of ${DefaultDistro/ /} (this distribution of Linux)" ) >>"${_LOGFILE}" 2>&1
 
 		exit_status=$?
 
@@ -192,7 +209,7 @@ if dependency::desktop gnome ; then
 			255) clear && echo [ESC] && exit ;;
 		esac
 
-		write_status "OK setting OEM theme: ${selection}"  &>>"${_LOGFILE}"
+		write_status "OK setting OEM theme: ${selection}" >>"${_LOGFILE}" 2>&1
 
 		case "${selection}" in
 			"Windows 10 Dark Mode" ) gnome::set_ui_win10_tweaks_for_user Dark & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
@@ -219,7 +236,7 @@ if dependency::desktop gnome ; then
 else 
 	if dependency::desktop kde ; then
 		echo "Found KDE -- Using kcm_lookandfeel instead..." >> "${_LOGFILE}"
-		kcmshell5 kcm_lookandfeel  &>>"${_LOGFILE}"
+		kcmshell5 kcm_lookandfeel >>"${_LOGFILE}" 2>&1
 	else
 		echo "Neither Gnome or KDE found -- Notifying and quitting... " >> "${_LOGFILE}"
 		zenity --info --text "You are not using the gnome desktop so it does not make sense to use this tool... " 

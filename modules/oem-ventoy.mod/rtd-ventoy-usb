@@ -1,4 +1,5 @@
 #!/bin/bash
+
 #
 #::                                       A D M I N   T O O L
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -16,6 +17,18 @@
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Safety Check             ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+	echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
+	return 1 2>/dev/null || exit 1
+fi
+
+
 SCRIPT_VERSION="${RTD_Version}"
 APP_DEVICE=""
 APP_VERSION="latest"
@@ -31,8 +44,12 @@ HAVE_DIALOG=0
 declare -a APP_SOURCES=()
 declare -a SETUP_ARGS=()
 
-	rtd::bootstrap_library() {
-	local library_name="${1:-_rtd_library}" minimum_version="" loaded_version path script_dir src_url tmp rc check
+		rtd::bootstrap_library() {
+		if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+			echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
+			return 1
+		fi
+		local library_name="${1:-_rtd_library}" minimum_version="" loaded_version path script_dir src_url tmp rc check
 	local -a checks=()
 
 	[[ $# -gt 0 && "${1:-}" != --* ]] && { library_name="$1"; shift; }

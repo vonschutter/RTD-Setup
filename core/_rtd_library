@@ -1,11 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # shellcheck shell=bash
 
-# Library early safety check...
-if [[ -z "${BASH_VERSINFO[0]:-}" ]]; then
-	echo "SHELL ENV ERROR: You must use a BASH Shell to load this library. Exiting..."
-	exit 255
-fi
+
 
 : <<'Library_Documentation'
 ::              R T D   F u n c t i o n   L i b r a r y
@@ -18,6 +14,8 @@ fi
 ::  Purpose:    To collect and enable the use of code snippets in other scripts.
 ::              To document these thoroughly so that they may be useful for learning BASH.
 ::  Usage:      call this file using the "source" statement in bash.
+::
+::  Requires:   Linux and Bash 4.4 or newer.
 ::
 ::  This script is shared in the hopes that
 ::  someone will find it useful.
@@ -562,6 +560,20 @@ Library_Documentation
 #                                                 "Y88P"
 ################################################################################################
 
+# Library early safety check...
+
+if [[ -z "${BASH_VERSINFO[0]:-}" ]]; then
+	echo "SHELL ENV ERROR: You must use a BASH Shell to load this library. Exiting..." >&2
+	return 255 2>/dev/null || exit 255
+fi
+
+# Launchers must also check this before sourcing: legacy Bash versions may fail
+# while parsing modern syntax before this in-library diagnostic can execute.
+if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+	echo "SHELL ENV ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
+	return 255 2>/dev/null || exit 255
+fi
+
 # If the vars exist but the functions do not, we clear the stale vars and loads normally.
 # That is the right defensive behavior for re-exec, byobu/tmux, sudo, and similar process-boundary cases.
 _RTD_LIBRARY_SELF_VERSION="2.61"
@@ -790,7 +802,7 @@ dialog::copy_file_progress() {
 	status_file="$(mktemp)" || {
 		write_error "Unable to create temporary status file."
 		return 1
-}
+	}
 
 	dialog --title "Copying files" --gauge "Preparing copy..." 10 75 0 < <(
 		_current_item="Preparing copy..."
@@ -809,8 +821,8 @@ dialog::copy_file_progress() {
 
 			case "${_line}" in
 				"sending incremental file list"|created\ directory*|sent\ *|total\ size\ is*|receiving\ incremental\ file\ list)
-					continue
-					;;
+				continue
+				;;
 			esac
 
 			if [[ "${_line}" =~ ([0-9]{1,3})% ]]; then

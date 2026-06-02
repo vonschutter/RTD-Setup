@@ -193,7 +193,11 @@ if [[ "$OSTYPE" == *"linux"* ]]; then
 			rm -rf "${_BackupFolderName}"
 		fi
 		mv "${_CONFIG_TMP_DIR}" "${_CONFIG_DIR}" ; rm -rf "${_CONFIG_DIR}/.git"
-		source "${_CONFIG_CORE_DIR}/_rtd_library"
+			if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+				echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
+				exit 1
+			fi
+			source "${_CONFIG_CORE_DIR}/_rtd_library"
 		oem::register_all_tools
 		ln -s -f "${_LOG_DIR}" -T "${_CONFIG_LOG_LINK}"
 		bash "${_CONFIG_CORE_DIR}/${_LINUX_SCRIPT}" "$@"

@@ -8,7 +8,7 @@ This document is for module authors and maintainers. Users looking for commands 
 
 | Path | Purpose |
 | --- | --- |
-| `_rtd_library` | Shared Bash functions used by module scripts |
+| `_rtd_library` | Shared Linux Bash functions used by module scripts |
 | `_rtd_recipies.info` | Software bundles and installation recipes |
 | `_branding.info` and location configuration | RTD names, paths, URLs, and presentation defaults |
 | `sigs/` | Hashes used when verifying packaged OEM applications |
@@ -19,7 +19,7 @@ This document is for module authors and maintainers. Users looking for commands 
 
 ## What `_rtd_library` Provides
 
-Modules source `_rtd_library` to reuse package-management, UI, logging, system, desktop, network, security, media, and virtualization routines. This prevents individual tools from reimplementing distro detection, dependency installation, dialog handling, and standard logging.
+Linux modules source `_rtd_library` to reuse package-management, UI, logging, system, desktop, network, security, media, and virtualization routines. This prevents individual tools from reimplementing distro detection, dependency installation, dialog handling, and standard logging.
 
 Major function namespaces include:
 
@@ -37,13 +37,35 @@ Major function namespaces include:
 
 ## Loading The Library
 
-Source it when a shell session needs to call functions directly:
+`_rtd_library` is Linux-oriented and requires Bash 4.4 or newer. Apple ships
+Bash 3.2 with macOS, which cannot parse several modern Bash features used by
+the library.
+
+On Linux with Bash 4.4 or newer, source it when a shell session needs to call
+functions directly:
 
 ```bash
 source core/_rtd_library
 ```
 
 Module entry points typically bootstrap the library themselves and should validate the functions they require before continuing.
+
+On macOS, use the dedicated configuration entry point instead of sourcing the
+Linux library:
+
+```bash
+bash core/rtd-oem-macos-config.sh
+```
+
+Maintainers who need to inspect the Linux library on macOS can install modern
+Bash through Homebrew and launch a compatible shell explicitly:
+
+```bash
+brew install bash
+/opt/homebrew/bin/bash -c 'source core/_rtd_library'
+```
+
+On Intel Macs, Homebrew may install Bash under `/usr/local/bin/bash`.
 
 ## Built-In Help
 

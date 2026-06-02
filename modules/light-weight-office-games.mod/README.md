@@ -1,4 +1,4 @@
-# Lightweight Office Games
+# Lightweight Office Games Installer
 
 [Back to Modules](../README.md) | [Tool Reference](../../docs/TOOLS.md)
 

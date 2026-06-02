@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 #
 #::                          Whonix KVM Installer (RTD)
 #::                     S O F T W A R E    C O N F I G U R A T I O N
@@ -14,6 +15,18 @@
 #:: Notes:      Downloads the latest Whonix libvirt bundle, verifies, defines networks, and stages/defines the Gateway + Workstation VMs.
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Safety Check             ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+	echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
+	return 1 2>/dev/null || exit 1
+fi
+
 set -euo pipefail
 
 ##############  globals  ####################################################
@@ -72,6 +85,10 @@ EOF
 
 ##############  locate and source RTD library  ##############################
 rtd::bootstrap_library() {
+	if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+		echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
+		return 1
+	fi
 	local library_name="${1:-_rtd_library}" minimum_version="" loaded_version path script_dir src_url tmp rc check
 	local -a checks=()
 

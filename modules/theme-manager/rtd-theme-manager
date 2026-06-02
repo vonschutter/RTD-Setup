@@ -1,245 +1,422 @@
 #!/usr/bin/env bash
+
 #
 #::                                       A D M I N   T O O L
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #:::::::::::::::::::::::::::::::::::::::// RTD GNOME Theme Manager //::::::::::::::::::::::::::::::::// Linux //::::::::
 #:: Author(s):    RTD
-#:: Version:      1.00
+#:: Version:      2.00
 #::
-#:: Purpose:      Discover available GNOME themes, let the user choose one, and
-#::               apply GTK, Shell, icon, cursor, and optional wallpaper changes.
+#:: Purpose:      Apply complete or individually selected GNOME theme elements.
 #::
-#:: Value:        Simplifies theme switching and reduces the manual GNOME and
-#::               extension setup usually required to fully apply a desktop theme.
-#::
-#:: Usage:        Run without arguments to launch the selector GUI, or use
-#::               --help to show the built-in help dialog.
-#::
-#:: Examples:
-#::               rtd-theme-manager
-#::               rtd-theme-manager --help
-#::
-#:: Requirements: gsettings, zenity, gnome-extensions
-#::
+#:: Usage:        Run without arguments to launch the GTK selector GUI.
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Safety Check             ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+	echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
+	return 1 2>/dev/null || exit 1
+fi
+
 
 set -euo pipefail
 
+readonly KEEP="__KEEP__"
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly BANNER="${SCRIPT_DIR}/Media_files/theme-manager-banner.png"
+
 die() { echo "Error: $*" >&2; exit 1; }
 warn() { echo "Warning: $*" >&2; }
+info() { echo "Info: $*" >&2; }
 
-require() { command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"; }
-
-require gsettings
-require zenity
-require gnome-extensions
-
-find_themes() {
-	local -a themes=()
-	# Prefer user themes, but include system themes too.
-	while IFS= read -r -d '' dir; do
-		themes+=("$(basename "$dir")")
-	done < <(find "$HOME/.themes" /usr/share/themes -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null | sort -z)
-
-	# Keep unique names in order
-	printf '%s\n' "${themes[@]}" | awk '!seen[$0]++'
+require() {
+	command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"
 }
 
-theme_path() {
-	local theme="$1"
-	local -a roots=("$HOME/.themes" "/usr/share/themes")
-	local dir
-	for dir in "${roots[@]}"; do
-		if [[ -d "${dir}/${theme}" ]]; then
-			printf '%s\n' "${dir}/${theme}"
-			return 0
-		fi
+rtd::bootstrap_library() {
+	if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+		echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
+		return 1
+	fi
+	local library_name="${1:-_rtd_library}" path tmp rc
+
+	for path in \
+		"${SCRIPT_DIR}/${library_name}" \
+		"${SCRIPT_DIR}/../core/${library_name}" \
+		"${SCRIPT_DIR}/../../core/${library_name}" \
+		"/opt/rtd/core/${library_name}" \
+		"${HOME:-}/GIT/RTD-Setup/core/${library_name}" \
+		"${HOME:-}/RTD-Setup/core/${library_name}"; do
+		[[ -r "$path" ]] || continue
+		# shellcheck source=/dev/null
+		source "$path" ""
+		declare -F software::check_native_package_dependency >/dev/null 2>&1 && return 0
 	done
+
+	tmp="$(mktemp "/tmp/${library_name}.XXXXXX")" || return 1
+	rc=0
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL "https://github.com/vonschutter/RTD-Setup/raw/main/core/${library_name}" -o "$tmp" || rc=$?
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO "$tmp" "https://github.com/vonschutter/RTD-Setup/raw/main/core/${library_name}" || rc=$?
+	else
+		rc=1
+	fi
+	if ((rc == 0)); then
+		# shellcheck source=/dev/null
+		source "$tmp" ""
+		declare -F software::check_native_package_dependency >/dev/null 2>&1 || rc=1
+	fi
+	rm -f "$tmp"
+	return "$rc"
+}
+
+gtk_frontend_ready() {
+	command -v python3 >/dev/null 2>&1 &&
+		python3 -c 'import gi; gi.require_version("Gtk", "3.0"); from gi.repository import GdkPixbuf, Gtk' >/dev/null 2>&1
+}
+
+install_python_gtk_dependencies() {
+	local distro
+	rtd::bootstrap_library "_rtd_library" || return 1
+	distro="$(system::distribution_type)"
+
+	case "$distro" in
+		ubuntu|debian)
+			software::check_native_package_dependency python3 python3-gi gir1.2-gtk-3.0
+			;;
+		fedora|redhat)
+			software::check_native_package_dependency python3 python3-gobject gtk3
+			;;
+		suse)
+			software::check_native_package_dependency python3 python3-gobject-Gdk typelib-1_0-Gtk-3_0
+			;;
+		*)
+			warn "Automatic Python GTK setup is not available for distribution family: ${distro}."
+			return 1
+			;;
+	esac
+}
+
+ensure_python_gtk_frontend() {
+	gtk_frontend_ready && return 0
+	info "Installing the Python GTK components required by the RTD Theme Manager."
+	rtd::bootstrap_library "_rtd_library" || {
+		warn "Unable to load the RTD dependency installer."
+		return 1
+	}
+	if ((EUID == 0)); then
+		install_python_gtk_dependencies || return 1
+	else
+		( security::ensure_admin --sudo --setup-python-gtk-dependencies ) || return 1
+	fi
+	hash -r
+	gtk_frontend_ready
+}
+
+ensure_dialog_backend() {
+	local requested="${1:-}"
+	if [[ -n "$requested" ]]; then
+		[[ "$requested" =~ ^(yad|zenity)$ ]] || return 1
+		command -v "$requested" >/dev/null 2>&1 && { printf '%s\n' "$requested"; return 0; }
+	else
+		command -v yad >/dev/null 2>&1 && { printf 'yad\n'; return 0; }
+		command -v zenity >/dev/null 2>&1 && { printf 'zenity\n'; return 0; }
+	fi
+	rtd::bootstrap_library "_rtd_library" || return 1
+
+	info "Installing a graphical dialog fallback."
+	if ((EUID == 0)); then
+		if [[ -n "$requested" ]]; then
+			software::check_native_package_dependency "$requested" || return 1
+		else
+			software::check_native_package_dependency yad ||
+				software::check_native_package_dependency zenity || return 1
+		fi
+	else
+		if [[ -n "$requested" ]]; then
+			( security::ensure_admin --sudo --setup-dialog-dependency "$requested" ) || return 1
+		else
+			( security::ensure_admin --sudo --setup-dialog-dependency yad ) ||
+				( security::ensure_admin --sudo --setup-dialog-dependency zenity ) || return 1
+		fi
+	fi
+	hash -r
+	[[ -n "$requested" ]] && command -v "$requested" >/dev/null 2>&1 && { printf '%s\n' "$requested"; return 0; }
+	command -v yad >/dev/null 2>&1 && { printf 'yad\n'; return 0; }
+	command -v zenity >/dev/null 2>&1 && { printf 'zenity\n'; return 0; }
 	return 1
 }
 
-find_theme_wallpapers() {
-	local theme="$1"
-	local tpath
-	tpath=$(theme_path "$theme") || return 1
-	find "$tpath" -maxdepth 3 -type f \( -iname 'wallpaper.*' -o -iname 'background.*' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) \
-		-print0 2>/dev/null | sort -z
-}
-
-pick_wallpaper() {
-	local theme="$1"
-	local selected
-	local -a wallpapers
-	mapfile -d '' wallpapers < <(find_theme_wallpapers "$theme")
-
-	if ((${#wallpapers[@]} == 0)); then
-		return 0
-	fi
-
-	local options=(TRUE "None" "Don't change wallpaper")
-	for wallpaper in "${wallpapers[@]}"; do
-		options+=(FALSE "$(basename "$wallpaper")" "$wallpaper")
-	done
-
-	selected=$(zenity --list \
-		--title="Wallpaper Selection" \
-		--text="Select a wallpaper to apply" \
-		--radiolist \
-		--column="Select" --column="Wallpaper" --column="Path" \
-		--height=400 --width=500 \
-		--print-column=3 \
-		"${options[@]}") || return 1
-
-	if [[ "$selected" == "Don't change wallpaper" ]]; then
-		echo "None"
-	else
-		echo "$selected"
-	fi
-}
-
-
-pick_theme() {
-	local themes
-	themes=$(find_themes) || return 1
-
-	[[ -z "$themes" ]] && die "No themes found in ~/.themes or /usr/share/themes."
-
-	zenity --list \
-		--title="GNOME Theme Manager" \
-		--text="Select a theme to apply" \
-		--column="Themes" \
-		--height=400 --width=320 \
-		--hide-header <<<"$themes"
-}
-
-find_installer() {
-	# First, try PATH
-	if command -v rtd-gnome-shell-extension-installer >/dev/null 2>&1; then
-		command -v rtd-gnome-shell-extension-installer
-		return
-	fi
-
-	# Then search common RTD locations
-	local candidate
-	candidate=$(find /opt -maxdepth 4 -type f -name 'rtd-gnome-shell-extension-installer' 2>/dev/null | head -n1 || true)
-	if [[ -n "$candidate" && -x "$candidate" ]]; then
-		echo "$candidate"
-		return
-	fi
-
-	# Fallback: download a fresh copy to a temp location
-	local tmp_installer
-	tmp_installer="$(mktemp -p /tmp rtd-gnome-extension-installer.XXXXXX)"
-	if curl -fsSL "https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer" -o "$tmp_installer"; then
-		chmod +x "$tmp_installer"
-		echo "$tmp_installer"
-		return
-	fi
-
-	warn "Unable to download rtd-gnome-shell-extension-installer."
-}
-
-ensure_extension() {
-	local uuid="$1" id="$2"
-
-	if gnome-extensions list 2>/dev/null | grep -Fxq "$uuid"; then
-		enable_extension_uuid "$uuid"
-		return 0
-	fi
-
-	local installer
-	installer=$(find_installer)
-	if [[ -z "$installer" ]]; then
-		warn "Extension '${uuid}' not installed and no installer found. Please install manually."
-		return 1
-	fi
-
-	echo "Installing GNOME extension ${uuid} (id ${id})..."
-	if bash "$installer" "$id" --yes >/dev/null 2>&1; then
-		enable_extension_uuid "$uuid"
-	else
-		warn "Failed to install extension ${uuid}."
-		return 1
-	fi
-}
-
-ensure_dependencies() {
-	# Allow user extensions to load
-	gsettings set org.gnome.shell disable-user-extensions false 2>/dev/null || true
-
-	# Ensure key extensions are present and enabled (best effort)
-	ensure_extension "user-theme@gnome-shell-extensions.gcampax.github.com" "19" || warn "Could not ensure User Themes extension."
-	ensure_extension "dash-to-dock@micxgx.gmail.com" "307" || warn "Could not ensure Dash-to-Dock extension."
-	ensure_extension "dash-to-panel@jderose9.github.com" "1160" || warn "Could not ensure Dash-to-Panel extension."
+setting_is_writable() {
+	gsettings writable "$1" "$2" 2>/dev/null | grep -Fxq true
 }
 
 enable_extension_uuid() {
 	local uuid="$1"
 
-	# Primary: gnome-extensions
-	if gnome-extensions enable "$uuid" 2>/dev/null; then
+	command -v gnome-extensions >/dev/null 2>&1 &&
+		gnome-extensions enable "$uuid" >/dev/null 2>&1 &&
 		return 0
-	fi
-
-	# Fallback: D-Bus call to GNOME Shell (works on Wayland without full reload)
-	if command -v busctl >/dev/null 2>&1; then
-		busctl --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell.Extensions EnableExtension s "$uuid" >/dev/null 2>&1 && return 0
-	fi
-
-	# Final fallback: gsettings to toggle user extensions back on (forces reload when possible)
-	gsettings set org.gnome.shell disable-user-extensions false >/dev/null 2>&1 || true
+	command -v busctl >/dev/null 2>&1 &&
+		busctl --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell.Extensions EnableExtension s "$uuid" >/dev/null 2>&1 &&
+		return 0
 	return 1
 }
 
-apply_theme() {
-	local theme="$1"
-	local wallpaper="${2:-}"
+find_extension_installer() {
+	local candidate
+	for candidate in \
+		"${SCRIPT_DIR}/../gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer" \
+		"/opt/rtd/modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer"; do
+		[[ -r "$candidate" ]] && { printf '%s\n' "$candidate"; return 0; }
+	done
+	command -v rtd-gnome-shell-extension-installer 2>/dev/null
+}
 
-	gsettings set org.gnome.desktop.interface gtk-theme "$theme" || warn "Failed to set GTK theme."
-	# GTK 4 uses same setting; also align icon/cursor if present
-	gsettings set org.gnome.desktop.interface icon-theme "$theme" >/dev/null 2>&1 || true
-	gsettings set org.gnome.desktop.interface cursor-theme "$theme" >/dev/null 2>&1 || true
+ensure_user_theme_extension() {
+	local uuid="user-theme@gnome-shell-extensions.gcampax.github.com"
+	local installer
 
-	# Apply shell theme if user-theme extension is available
-	if gsettings writable org.gnome.shell.extensions.user-theme name >/dev/null 2>&1; then
-		gsettings set org.gnome.shell.extensions.user-theme name "$theme" || warn "Failed to set GNOME Shell theme."
+	gsettings set org.gnome.shell disable-user-extensions false >/dev/null 2>&1 || true
+	if command -v gnome-extensions >/dev/null 2>&1 &&
+		gnome-extensions list 2>/dev/null | grep -Fxq "$uuid"; then
+		enable_extension_uuid "$uuid" || warn "The GNOME User Themes extension is installed but could not be enabled."
+		return 0
+	fi
+
+	installer="$(find_extension_installer)" || {
+		warn "Could not find the RTD GNOME extension installer."
+		return 1
+	}
+	info "Installing the GNOME User Themes extension."
+	rtd::bootstrap_library "_rtd_library" &&
+		software::check_native_package_dependency curl unzip >/dev/null 2>&1 || true
+	bash "$installer" 19 --yes >/dev/null 2>&1 || {
+		warn "Unable to install the GNOME User Themes extension."
+		return 1
+	}
+	enable_extension_uuid "$uuid" || warn "Log out and back in if the new GNOME User Themes extension is not active yet."
+}
+
+find_component_names() {
+	local component="$1"
+	local -a roots=()
+
+	case "$component" in
+		gtk) roots=("$HOME/.themes" /usr/share/themes) ;;
+		shell) roots=("$HOME/.themes" /usr/share/themes) ;;
+		icons|cursors) roots=("$HOME/.icons" "$HOME/.local/share/icons" /usr/share/icons) ;;
+	esac
+	find "${roots[@]}" -mindepth 1 -maxdepth 1 -type d 2>/dev/null |
+		while IFS= read -r path; do
+			case "$component" in
+				gtk) [[ -d "$path/gtk-3.0" || -d "$path/gtk-4.0" ]] ;;
+				shell) [[ -d "$path/gnome-shell" ]] ;;
+				icons) [[ -f "$path/index.theme" ]] ;;
+				cursors) [[ -d "$path/cursors" ]] ;;
+			esac && basename "$path"
+		done | awk '!seen[$0]++' | sort -f
+}
+
+component_value_or_keep() {
+	local component="$1" requested="$2"
+	find_component_names "$component" | grep -Fxq "$requested" &&
+		printf '%s\n' "$requested" ||
+		printf '%s\n' "$KEEP"
+}
+
+dialog_info() {
+	local backend="$1" title="$2" text="$3"
+	if [[ "$backend" == yad ]]; then
+		if [[ -r "$BANNER" ]]; then
+			yad --info --title="$title" --text="$text" --image="$BANNER" --width=620 --button="OK:0"
+		else
+			yad --info --title="$title" --text="$text" --width=620 --button="OK:0"
+		fi
 	else
-		warn "User Themes extension not available; skipping shell theme."
+		zenity --info --title="$title" --text="$text" --width=620
+	fi
+}
+
+dialog_list() {
+	local backend="$1" title="$2" text="$3"
+	shift 3
+	if [[ "$backend" == yad ]]; then
+		yad --list --title="$title" --text="$text" --width=780 --height=480 \
+			--column="Choice" "$@" --button="Select:0" --button="Cancel:1"
+	else
+		zenity --list --title="$title" --text="$text" --width=780 --height=480 \
+			--column="Choice" "$@" --ok-label="Select" --cancel-label="Cancel"
+	fi
+}
+
+pick_component() {
+	local backend="$1" component="$2" title="$3"
+	local -a values=()
+	mapfile -t values < <(find_component_names "$component")
+	((${#values[@]} > 0)) || { printf '%s\n' "$KEEP"; return 0; }
+	dialog_list "$backend" "$title" "Select the ${title,,}, or cancel to keep the current setting." "${values[@]}" ||
+		printf '%s\n' "$KEEP"
+}
+
+run_dialog_fallback() {
+	local backend backend_label action theme gtk shell icons cursors color wallpaper
+	backend="$(ensure_dialog_backend "${1:-}")" || die "Unable to install Python GTK, YAD, or Zenity."
+	backend_label="$(printf '%s' "$backend" | tr '[:lower:]' '[:upper:]')"
+	warn "Using the ${backend_label} compatibility interface because Python GTK is unavailable."
+	action="$(dialog_list "$backend" "RTD GNOME Theme Manager" \
+		"Choose how you want to shape your GNOME desktop." \
+		"Apply a complete installed theme" \
+		"Customize individual elements" \
+		"Open RTD Desktop Profiles")" || exit 0
+
+	case "$action" in
+		"Apply a complete installed theme")
+			mapfile -t themes < <(
+				{ find_component_names gtk; find_component_names shell; find_component_names icons; find_component_names cursors; } |
+					awk '!seen[$0]++' | sort -f
+			)
+			theme="$(dialog_list "$backend" "Complete Theme" "Select an installed theme." "${themes[@]}")" || exit 0
+			apply_theme \
+				"$(component_value_or_keep gtk "$theme")" \
+				"$(component_value_or_keep shell "$theme")" \
+				"$(component_value_or_keep icons "$theme")" \
+				"$(component_value_or_keep cursors "$theme")" \
+				"$KEEP" "$KEEP"
+			;;
+		"Customize individual elements")
+			gtk="$(pick_component "$backend" gtk "application theme")"
+			shell="$(pick_component "$backend" shell "GNOME Shell theme")"
+			icons="$(pick_component "$backend" icons "icon theme")"
+			cursors="$(pick_component "$backend" cursors "cursor theme")"
+			color="$(dialog_list "$backend" "Light Or Dark Preference" "Select the GNOME color preference." \
+				default prefer-light prefer-dark)" || color="$KEEP"
+			wallpaper="$KEEP"
+			apply_theme "$gtk" "$shell" "$icons" "$cursors" "$color" "$wallpaper"
+			;;
+		"Open RTD Desktop Profiles")
+			launch_presets
+			;;
+	esac
+	dialog_info "$backend" "RTD GNOME Theme Manager" "Your GNOME appearance settings have been updated."
+}
+
+set_setting() {
+	local schema="$1" key="$2" value="$3" description="$4"
+
+	[[ "$value" == "$KEEP" ]] && return 0
+	if setting_is_writable "$schema" "$key"; then
+		gsettings set "$schema" "$key" "$value" || warn "Failed to set ${description}."
+	else
+		warn "${description} is not available in this GNOME session."
+	fi
+}
+
+apply_theme() {
+	local gtk_theme="$1" shell_theme="$2" icon_theme="$3" cursor_theme="$4"
+	local color_scheme="$5" wallpaper="$6"
+
+	require gsettings
+
+	set_setting org.gnome.desktop.interface gtk-theme "$gtk_theme" "GTK theme"
+	set_setting org.gnome.desktop.interface icon-theme "$icon_theme" "icon theme"
+	set_setting org.gnome.desktop.interface cursor-theme "$cursor_theme" "cursor theme"
+	set_setting org.gnome.desktop.interface color-scheme "$color_scheme" "color scheme"
+
+	if [[ "$shell_theme" != "$KEEP" ]]; then
+		ensure_user_theme_extension || true
+		if setting_is_writable org.gnome.shell.extensions.user-theme name; then
+			gsettings set org.gnome.shell.extensions.user-theme name "$shell_theme" ||
+				warn "Failed to set GNOME Shell theme."
+		else
+			warn "GNOME User Themes is not active yet. Log out and back in, then apply the Shell theme again."
+		fi
 	fi
 
-	if [[ -n "$wallpaper" && -f "$wallpaper" ]]; then
-		local uri="file://$wallpaper"
-		gsettings set org.gnome.desktop.background picture-uri "$uri" || warn "Failed to set wallpaper."
-		# Keep dark-mode background in sync when available
-		gsettings set org.gnome.desktop.background picture-uri-dark "$uri" >/dev/null 2>&1 || true
+	if [[ "$wallpaper" != "$KEEP" && -f "$wallpaper" ]]; then
+		local uri
+		uri="$(python3 -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve().as_uri())' "$wallpaper" 2>/dev/null ||
+			printf 'file://%s' "$wallpaper")"
+		set_setting org.gnome.desktop.background picture-uri "$uri" "wallpaper"
+		set_setting org.gnome.desktop.background picture-uri-dark "$uri" "dark wallpaper"
 	fi
+}
+
+find_preset_switcher() {
+	local script_dir candidate
+	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+	for candidate in \
+		"${script_dir}/../rtd-desktop-look-switcher.mod/rtd-desktop-look-switcher" \
+		"/opt/rtd/scripts/rtd-desktop-look-switcher"; do
+		[[ -x "$candidate" ]] && { printf '%s\n' "$candidate"; return 0; }
+	done
+
+	command -v rtd-desktop-look-switcher 2>/dev/null
+}
+
+launch_presets() {
+	local switcher
+	switcher="$(find_preset_switcher)" ||
+		die "Could not find rtd-desktop-look-switcher. Install that module to use RTD desktop profiles."
+	exec "$switcher"
 }
 
 show_help() {
-	zenity --info --title="About RTD Theme Manager" --width=400 --no-wrap --text="<span size='large'><b>RTD GNOME Theme Manager</b></span>\n\nA simple graphical tool to apply GNOME themes.\n\n<b>Usage:</b>\n  - Run without arguments to launch the theme selector.\n  - Use <b>--help</b> or <b>-h</b> to show this message.\n\n<b>How it works:</b>\n1. It finds themes in <b>~/.themes</b> and <b>/usr/share/themes</b>.\n2. You select a theme from the list.\n3. It applies the GTK, Shell, Icon, and Cursor themes.\n4. If a wallpaper is found in the theme's folder, it will be set."
+	cat <<EOF
+Usage:
+  $(basename "$0")
+  $(basename "$0") [--yad | --zenity]
+  $(basename "$0") --apply GTK SHELL ICONS CURSOR COLOR_SCHEME WALLPAPER
+  $(basename "$0") --launch-presets
+  $(basename "$0") --help
+
+Description:
+  Launch the RTD GNOME Theme Manager. Use the Complete Theme page for a
+  coordinated theme, or customize individual GNOME appearance elements.
+  Use --yad or --zenity to force a compatibility interface.
+EOF
 }
 
 main() {
-	if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-		show_help
-		exit 0
-	fi
-
-	local theme wallpaper
-
-	ensure_dependencies
-
-	theme=$(pick_theme) || exit 1
-	[[ -z "$theme" ]] && exit 0
-
-	wallpaper=$(pick_wallpaper "$theme" || true)
-	if [[ "$wallpaper" == "None" ]]; then
-		wallpaper=""
-	fi
-
-	apply_theme "$theme" "$wallpaper"
-
-	zenity --info --title="GNOME Theme Manager" --text="Applied theme: $theme${wallpaper:+\nWallpaper: $wallpaper}"
+	case "${1:-}" in
+		--apply)
+			[[ $# -eq 7 ]] || die "--apply requires six values."
+			apply_theme "$2" "$3" "$4" "$5" "$6" "$7"
+			;;
+		--launch-presets)
+			launch_presets
+			;;
+		--yad|--zenity)
+			run_dialog_fallback "${1#--}"
+			;;
+		--setup-python-gtk-dependencies)
+			install_python_gtk_dependencies
+			;;
+		--setup-dialog-dependency)
+			[[ $# -eq 2 && "$2" =~ ^(yad|zenity)$ ]] || die "--setup-dialog-dependency requires yad or zenity."
+			rtd::bootstrap_library "_rtd_library" || die "Unable to load the RTD dependency installer."
+			software::check_native_package_dependency "$2"
+			;;
+		--help|-h)
+			show_help
+			;;
+		"")
+			if ensure_python_gtk_frontend; then
+				exec python3 "${SCRIPT_DIR}/rtd-theme-manager-gtk.py"
+			fi
+			run_dialog_fallback
+			;;
+		*)
+			die "Unknown option: $1"
+			;;
+	esac
 }
 
 main "$@"

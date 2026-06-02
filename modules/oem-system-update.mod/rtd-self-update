@@ -1,4 +1,5 @@
 #!/bin/bash
+
 VERSION=1.01
 _HOST_INFO="$(command -v hostnamectl >/dev/null 2>&1 && hostnamectl 2>/dev/null | grep -E 'Operating System|Hardware Model' | paste -sd ' ' - || true)"
 PUBLICATION="$(basename "$0") | OEM Power Tools Updater          Version: ${VERSION}    ${_HOST_INFO}"
@@ -42,6 +43,18 @@ GIT_Profile=${GIT_Profile:-vonschutter}
 #
 
 
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Safety Check             ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+	echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
+	return 1 2>/dev/null || exit 1
+fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -98,6 +111,10 @@ mkdir -p ${_bakup_dir}
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 rtd::bootstrap_library() {
+	if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+		echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
+		return 1
+	fi
 	local library_name="${1:-_rtd_library}" minimum_version="" loaded_version path script_dir src_url tmp rc check
 	local -a checks=()
 
@@ -193,6 +210,10 @@ rtd::cleanup_powertools_stage() {
 }
 
 rtd::register_updated_powertools() {
+	if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+		write_error "RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}."
+		return 1
+	fi
 	# shellcheck source=/dev/null
 	source "/opt/${_tla,,}/core/_rtd_library"
 	oem::register_all_tools
@@ -206,8 +227,8 @@ rtd::update_powertools_in_place() {
 	backup_dir="${_bakup_dir}/${_tla,,}-$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"
 
 	write_information "Attempting to get the latest RTD tools..."
-	hash git &>> "${_logfile}" || software::check_native_package_dependency git
-	hash rsync &>> "${_logfile}" || software::check_native_package_dependency rsync
+	hash git >> "${_logfile}" 2>&1 || software::check_native_package_dependency git
+	hash rsync >> "${_logfile}" 2>&1 || software::check_native_package_dependency rsync
 	rtd::stage_powertools_update || return 1
 
 	if [[ -d "${install_dir}" ]]; then
@@ -245,7 +266,7 @@ rtd::reinitialize_powertools() {
 	backup_dir="${_bakup_dir}/${_tla,,}-$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"
 
 	write_information "Refreshing RTD tools with a clean replacement install..."
-	hash git &>> "${_logfile}" || software::check_native_package_dependency git
+	hash git >> "${_logfile}" 2>&1 || software::check_native_package_dependency git
 	rtd::stage_powertools_update || return 1
 
 	if [[ -e "${_theme_dir}" ]]; then
@@ -317,8 +338,8 @@ rtd::update_themes_in_place() {
 	local backup_dir
 	backup_dir="${_bakup_dir}/themes-$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"
 
-	hash git &>> "${_logfile}" || software::check_native_package_dependency git
-	hash rsync &>> "${_logfile}" || software::check_native_package_dependency rsync
+	hash git >> "${_logfile}" 2>&1 || software::check_native_package_dependency git
+	hash rsync >> "${_logfile}" 2>&1 || software::check_native_package_dependency rsync
 	rtd::stage_themes_update || return 1
 
 	if [[ -d "${_theme_dir}" ]]; then

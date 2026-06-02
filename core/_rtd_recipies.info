@@ -1093,9 +1093,13 @@ recipe:_OEM:_Themes_and_Tweaks () {
 
 		tempfile=$( mktemp )
 		chmod 777 ${tempfile}
-		cat > ${tempfile} <<-EOF
-			#!/bin/bash
-			source ${_OEM_DIR}/core/_rtd_library
+			cat > ${tempfile} <<-EOF
+				#!/bin/bash
+				if (( \${BASH_VERSINFO[0]} < 4 || (\${BASH_VERSINFO[0]} == 4 && \${BASH_VERSINFO[1]} < 4) )); then
+					echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash \${BASH_VERSION}." >&2
+					exit 1
+				fi
+				source ${_OEM_DIR}/core/_rtd_library
 			gnome::set_ui_common_tweaks_for_user
 			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR} -name Wayland.jpg)
 			gsettings set org.gnome.desktop.background picture-uri-dark file://$(find ${_OEM_DIR} -name Wayland-dark.jpg)
@@ -1139,7 +1143,7 @@ recipe:_OEM:_Themes_and_Tweaks () {
 		fi
 
 		# Set wallpaper and theme
-		sudo -H -E -u $SUDO_USER  bash -c "source /opt/rtd/core/_rtd_library ; kde::set_wallpaper ${_WALLPAPER_DIR}/Wayland.jpg"
+			sudo -H -E -u $SUDO_USER bash -c "if (( \${BASH_VERSINFO[0]} < 4 || (\${BASH_VERSINFO[0]} == 4 && \${BASH_VERSINFO[1]} < 4) )); then echo \"ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash \${BASH_VERSION}.\" >&2; exit 1; fi; source /opt/rtd/core/_rtd_library; kde::set_wallpaper ${_WALLPAPER_DIR}/Wayland.jpg"
 		software::from_snapcraft.io gtk-theme-breeze $1
 		for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i gtk-theme-breeze:gtk-3-themes; done
 		# sudo -E -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c '/usr/bin/lookandfeeltool -a RTD-Win11-Dark --resetLayout'

@@ -76,7 +76,7 @@ More detailed examples, including virtual machines and VPN gateways, are in [Use
 
 ## Other Platforms
 
-`rtd-me.sh.cmd` also contains Windows and macOS bootstrap paths. On Windows, configuration is performed through the PowerShell configuration scripts in `core/`; on macOS, the bootstrap invokes the macOS configuration script. Most `rtd-*` module commands documented here are Linux tools.
+`rtd-me.sh.cmd` also contains Windows and macOS bootstrap paths. On Windows, configuration is performed through the PowerShell configuration scripts in `core/`; on macOS, the bootstrap invokes `core/rtd-oem-macos-config.sh`. The shared `core/_rtd_library` is Linux-oriented and requires Bash 4.4 or newer, so it should not be sourced with Apple's bundled Bash 3.2. Most `rtd-*` module commands documented here are Linux tools.
 
 ## Safety
 
