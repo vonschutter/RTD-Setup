@@ -37,7 +37,8 @@ rtd-oem-tweaks
 ```
 
 The launcher opens the Python GTK interface when the GTK bindings are available.
-If they are not available, it falls back to the Zenity checklist interface.
+If they are not available, it falls back to a Zenity checklist where checked
+rows are enabled and unchecked applied rows are reset.
 
 Print live tweak status:
 
@@ -68,8 +69,8 @@ Profiles are simple text files stored in:
 ```
 
 Each profile contains one enabled tweak ID per line, making it easy to inspect
-or copy profiles between systems. In the GTK interface, applying a profile makes
-the current toggles match the profile.
+or copy profiles between systems. In the GTK and Zenity interfaces, applying a
+profile makes the current toggles match the profile.
 
 ## Notes
 

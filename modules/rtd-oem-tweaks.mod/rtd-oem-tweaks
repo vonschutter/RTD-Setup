@@ -1467,7 +1467,7 @@ print_status() {
 print_tweak_catalog() {
 	local key status
 
-	initialize_menu_state
+	initialize_menu_state 1
 	for key in "${MENU_KEYS[@]}"; do
 		status="${MENU_APPLIED[${key}]:-Unknown}"
 		printf '%s\t%s\t%s\t%s\t%s\n' \
@@ -1588,6 +1588,7 @@ launch_gtk_frontend() {
 main() {
 	local selection
 	local menu_rc
+	local run_rc
 
 	if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 		cat <<EOF
@@ -1635,7 +1636,7 @@ EOF
 		exit 1
 	}
 
-	initialize_menu_state
+	initialize_menu_state 1
 
 	case "${1:-}" in
 	--status)
@@ -1712,6 +1713,10 @@ EOF
 		0)
 			capture_menu_selection "${selection}"
 			run_selected_tweaks
+			run_rc=$?
+			if [[ "${run_rc}" -eq 130 ]]; then
+				zenity --info --title "${PUBLICATION}" --text "Operation canceled. No further changes were applied."
+			fi
 			sync_menu_state_from_selection
 			;;
 		*)
