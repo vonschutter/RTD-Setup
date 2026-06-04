@@ -75,6 +75,7 @@ profile makes the current toggles match the profile.
 
 - Must be run as the regular desktop user (not `root`) so `gsettings` updates the correct GNOME profile.
 - Use elevated privileges only for separate package installation actions, such as installing missing GTK or Zenity dependencies.
-- Requires a GNOME desktop session.
+- Requires a GNOME Shell based session, such as GNOME, Ubuntu GNOME, or Pop sessions that expose GNOME Shell.
+- KDE Plasma, XFCE, Cinnamon, MATE, COSMIC, and other non-GNOME desktops are not supported because this tool applies GNOME `gsettings`, Nautilus, GNOME Shell extension, and GNOME interface settings.
 - Uses Python GTK for the polished interface and `zenity` for fallback.
 - Some advanced items prompt for extra input (for example custom GTK4 theme values or startup sound file).

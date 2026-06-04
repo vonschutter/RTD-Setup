@@ -291,6 +291,26 @@ startup_sound_autostart_file() {
 	printf '%s\n' "${XDG_CONFIG_HOME:-${HOME}/.config}/autostart/rtd-startup-sound.desktop"
 }
 
+show_gnome_session_required_notice() {
+	local detected_desktop
+	local message
+
+	detected_desktop="$(dependency::current_desktop 2>/dev/null || true)"
+	[[ -n "${detected_desktop}" ]] || detected_desktop="unknown"
+
+	message="RTD OEM Tweaks only works in GNOME Shell based sessions.
+
+Detected desktop: ${detected_desktop}
+
+This tool changes GNOME gsettings, Nautilus, GNOME Shell extensions, and GNOME power/interface settings. It will not work correctly on KDE Plasma, XFCE, Cinnamon, MATE, COSMIC, or other non-GNOME desktops."
+
+	if command -v zenity >/dev/null 2>&1; then
+		zenity --warning --title "${PUBLICATION}" --width 620 --text "${message}"
+	else
+		write_warning "${message}"
+	fi
+}
+
 gsettings_value_is() {
 	local schema="$1"
 	local key="$2"
@@ -720,7 +740,7 @@ show_gtk_menu() {
 		zenity
 		--list
 		--checklist
-		--title "${PUBLICATION} v${VERSION}"
+		--title "Simplified ${PUBLICATION} v${VERSION}"
 		--width 1160
 		--height 700
 		--separator "|"
@@ -1623,11 +1643,7 @@ EOF
 	fi
 
 	if ! dependency::desktop gnome; then
-		if command -v zenity >/dev/null 2>&1; then
-			zenity --error --title "${PUBLICATION}" --text "GNOME desktop session not detected."
-		else
-			write_error "GNOME desktop session not detected."
-		fi
+		show_gnome_session_required_notice
 		exit 1
 	fi
 
