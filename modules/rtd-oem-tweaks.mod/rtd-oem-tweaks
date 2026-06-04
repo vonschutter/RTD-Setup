@@ -5,7 +5,7 @@
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #:::::::::::::::::::::::::::::::::::::::// RTD OEM GNOME Tweaks //::::::::::::::::::::::::::::::::::::// Linux //::::::::
 #:: Author(s):    RTD
-#:: Version:      1.11
+#:: Version:      1.12
 #::
 #:: Purpose:      Apply a curated set of GNOME desktop tweaks from the RTD library
 #::               through a checklist-style GUI.
@@ -42,25 +42,38 @@ fi
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-VERSION="1.11"
+VERSION="1.12"
 PUBLICATION="RTD OEM Tweaks"
 LAST_TWEAK_LABEL=""
 DEFAULT_BUTTON_LAYOUT="appmenu:minimize,maximize,close"
+RTD_CONFIG_DIR="${XDG_CONFIG_HOME:-${HOME}/.config}/rtd"
+PROFILE_DIR="${RTD_CONFIG_DIR}/oem-tweak-profiles"
 
 declare -a MENU_KEYS=(
-	"core"
-	"common"
-	"usability"
-	"nautilus"
-	"overlay"
+	"mouse_accel"
+	"volume_limit"
+	"calendar_weekdate"
+	"right_resize"
+	"window_buttons"
+	"workspaces_all_monitors"
+	"nautilus_icon_zoom"
+	"nautilus_executable_text"
+	"filechooser_dirs_first"
+	"nautilus_tree_view"
+	"nautilus_list_zoom"
+	"app_folders"
 	"extensions"
-	"power"
-	"font"
+	"sleep_ac_off"
+	"sleep_battery_off"
+	"tracker_battery_saver"
+	"battery_percent"
+	"clock_details"
+	"hot_corners"
+	"font_smoothing"
 	"tilix"
 	"terminal"
 	"dock"
 	"panel"
-	"buttons_default"
 	"buttons_custom"
 	"gtk4_custom"
 	"reset_theme"
@@ -69,28 +82,106 @@ declare -a MENU_KEYS=(
 	"startup_off"
 )
 
+declare -A MENU_CATEGORY=(
+	["mouse_accel"]="Usability"
+	["volume_limit"]="Usability"
+	["calendar_weekdate"]="Usability"
+	["right_resize"]="Usability"
+	["window_buttons"]="Usability"
+	["workspaces_all_monitors"]="Usability"
+	["nautilus_icon_zoom"]="Files"
+	["nautilus_executable_text"]="Files"
+	["filechooser_dirs_first"]="Files"
+	["nautilus_tree_view"]="Files"
+	["nautilus_list_zoom"]="Files"
+	["app_folders"]="App Grid"
+	["extensions"]="Extensions"
+	["sleep_ac_off"]="Power"
+	["sleep_battery_off"]="Power"
+	["tracker_battery_saver"]="Power"
+	["battery_percent"]="Panel"
+	["clock_details"]="Panel"
+	["hot_corners"]="Usability"
+	["font_smoothing"]="Fonts"
+	["tilix"]="Terminal"
+	["terminal"]="Terminal"
+	["dock"]="Dock"
+	["panel"]="Panel"
+	["buttons_custom"]="Advanced"
+	["gtk4_custom"]="Advanced"
+	["reset_theme"]="Advanced"
+	["reload_shell"]="Advanced"
+	["startup_on"]="Startup"
+	["startup_off"]="Startup"
+)
+
 declare -A MENU_STATE=()
 declare -A MENU_SELECTION=()
+declare -A MENU_APPLIED=()
 declare -A MENU_TEXT=(
-	["core"]="Apply core OEM GNOME tweak bundle"
-	["common"]="Apply common UI tweaks alias"
-	["usability"]="Apply general GNOME usability defaults"
-	["nautilus"]="Apply Nautilus usability defaults"
-	["overlay"]="Organize app grid folders in GNOME overview"
+	["mouse_accel"]="Adaptive mouse acceleration"
+	["volume_limit"]="Disable volume above 100 percent"
+	["calendar_weekdate"]="Show week numbers in calendar"
+	["right_resize"]="Resize windows with right mouse button"
+	["window_buttons"]="Show standard window buttons"
+	["workspaces_all_monitors"]="Use workspaces on all monitors"
+	["nautilus_icon_zoom"]="Set Nautilus icon zoom to standard"
+	["nautilus_executable_text"]="Ask before running executable text files"
+	["filechooser_dirs_first"]="Sort folders first in file chooser"
+	["nautilus_tree_view"]="Enable Nautilus tree view"
+	["nautilus_list_zoom"]="Set Nautilus list zoom to small"
+	["app_folders"]="Organize GNOME app grid folders"
 	["extensions"]="Enable baseline GNOME extensions"
-	["power"]="Apply desktop power/interface defaults"
-	["font"]="Apply improved GNOME font smoothing"
-	["tilix"]="Apply Tilix and GNOME Terminal tweaks"
-	["terminal"]="Apply GNOME Terminal profile preferences"
+	["sleep_ac_off"]="Disable automatic sleep on AC power"
+	["sleep_battery_off"]="Disable automatic sleep on battery"
+	["tracker_battery_saver"]="Reduce Tracker indexing on battery"
+	["battery_percent"]="Show battery percentage"
+	["clock_details"]="Show date and seconds in top bar clock"
+	["hot_corners"]="Enable GNOME hot corners"
+	["font_smoothing"]="Apply improved GNOME font smoothing"
+	["tilix"]="Configure Tilix defaults"
+	["terminal"]="Configure GNOME Terminal profiles"
 	["dock"]="Configure Dash-to-Dock defaults"
 	["panel"]="Configure Dash-to-Panel defaults"
-	["buttons_default"]="Ensure window buttons are visible (default layout)"
-	["buttons_custom"]="Set custom window buttons layout"
-	["gtk4_custom"]="Apply custom GTK4 theme file (advanced)"
+	["buttons_custom"]="Set custom window button layout"
+	["gtk4_custom"]="Write custom GTK4 settings.ini theme"
 	["reset_theme"]="Reset GNOME theme settings and GTK4 overrides"
 	["reload_shell"]="Reload GNOME Shell theme"
-	["startup_on"]="Enable GNOME startup sound from a selected file"
+	["startup_on"]="Enable GNOME startup sound from a file"
 	["startup_off"]="Disable GNOME startup sound"
+)
+
+declare -A MENU_DESCRIPTION=(
+	["mouse_accel"]="Uses GNOME adaptive mouse acceleration."
+	["volume_limit"]="Keeps system volume capped at the normal maximum."
+	["calendar_weekdate"]="Adds week numbers to the GNOME calendar menu."
+	["right_resize"]="Allows right-button window resizing from GNOME Shell."
+	["window_buttons"]="Applies appmenu:minimize,maximize,close."
+	["workspaces_all_monitors"]="Makes workspaces span all connected displays."
+	["nautilus_icon_zoom"]="Uses the standard Nautilus icon-view zoom."
+	["nautilus_executable_text"]="Prompts before executable text files are run."
+	["filechooser_dirs_first"]="Shows folders before files in GTK file choosers."
+	["nautilus_tree_view"]="Enables folder tree expansion in Nautilus list view."
+	["nautilus_list_zoom"]="Uses the compact Nautilus list-view zoom."
+	["app_folders"]="Creates RTD-style GNOME app-grid folders."
+	["extensions"]="Enables the baseline extension list for this distribution."
+	["sleep_ac_off"]="Prevents GNOME power settings from sleeping on AC."
+	["sleep_battery_off"]="Prevents GNOME power settings from sleeping on battery."
+	["tracker_battery_saver"]="Stops Tracker indexing while on battery power."
+	["battery_percent"]="Shows battery percentage in the top bar."
+	["clock_details"]="Shows both date and seconds in the top bar clock."
+	["hot_corners"]="Enables GNOME hot corner activation."
+	["font_smoothing"]="Sets hinting, antialiasing, and RGB subpixel order."
+	["tilix"]="Applies the RTD Tilix configuration and profile import."
+	["terminal"]="Applies consistent GNOME Terminal profile defaults."
+	["dock"]="Applies RTD Dash-to-Dock layout and indicator defaults."
+	["panel"]="Applies RTD Dash-to-Panel layout and indicator defaults."
+	["buttons_custom"]="Prompts for a custom GNOME button-layout string."
+	["gtk4_custom"]="Prompts for GTK4 theme, icon theme, and dark preference."
+	["reset_theme"]="Clears theme overrides and removes GTK4 theme cache files."
+	["reload_shell"]="Requests a GNOME Shell theme reload."
+	["startup_on"]="Prompts for an audio file and enables login playback."
+	["startup_off"]="Removes the RTD startup sound autostart entry."
 )
 
 
@@ -390,36 +481,7 @@ overlay_folder_matches() {
 }
 
 set_last_tweak_label() {
-	case "$1" in
-	core) LAST_TWEAK_LABEL="Core OEM GNOME tweak bundle" ;;
-	common) LAST_TWEAK_LABEL="Common UI tweaks alias" ;;
-	usability) LAST_TWEAK_LABEL="GNOME usability defaults" ;;
-	nautilus) LAST_TWEAK_LABEL="Nautilus usability defaults" ;;
-	overlay) LAST_TWEAK_LABEL="GNOME overlay app folders" ;;
-	extensions) LAST_TWEAK_LABEL="Baseline GNOME extensions" ;;
-	power) LAST_TWEAK_LABEL="Desktop power/interface defaults" ;;
-	font) LAST_TWEAK_LABEL="GNOME font smoothing defaults" ;;
-	tilix) LAST_TWEAK_LABEL="Tilix and GNOME Terminal tweaks" ;;
-	terminal) LAST_TWEAK_LABEL="GNOME Terminal profile preferences" ;;
-	dock) LAST_TWEAK_LABEL="Dash-to-Dock defaults" ;;
-	panel) LAST_TWEAK_LABEL="Dash-to-Panel defaults" ;;
-	buttons_default) LAST_TWEAK_LABEL="Window buttons visible (default layout)" ;;
-	buttons_custom) LAST_TWEAK_LABEL="Window buttons visible (custom layout)" ;;
-	gtk4_custom) LAST_TWEAK_LABEL="Custom GTK4 settings.ini theme" ;;
-	reset_theme) LAST_TWEAK_LABEL="Reset GNOME theme settings and GTK4 overrides" ;;
-	reload_shell) LAST_TWEAK_LABEL="Reload GNOME Shell theme" ;;
-	startup_on) LAST_TWEAK_LABEL="Enable startup sound" ;;
-	startup_off) LAST_TWEAK_LABEL="Disable startup sound" ;;
-	win10_light) LAST_TWEAK_LABEL="Windows 10 style (Light)" ;;
-	win10_dark) LAST_TWEAK_LABEL="Windows 10 style (Dark)" ;;
-	mac_light) LAST_TWEAK_LABEL="macOS style (Light)" ;;
-	mac_dark) LAST_TWEAK_LABEL="macOS style (Dark)" ;;
-	corp_light) LAST_TWEAK_LABEL="Corporate Crisp style (Light)" ;;
-	corp_dark) LAST_TWEAK_LABEL="Corporate Crisp style (Dark)" ;;
-	moca) LAST_TWEAK_LABEL="Moca style" ;;
-	ui_media_prompt) LAST_TWEAK_LABEL="Theme media recovery prompt" ;;
-	*) LAST_TWEAK_LABEL="Unknown tweak ($1)" ;;
-	esac
+	LAST_TWEAK_LABEL="${MENU_TEXT[$1]:-Unknown tweak ($1)}"
 }
 
 tweak_is_applied() {
@@ -428,29 +490,40 @@ tweak_is_applied() {
 	local gtk4_file
 
 	case "${key}" in
-	core | common)
-		tweak_is_applied tilix &&
-			tweak_is_applied usability &&
-			tweak_is_applied nautilus &&
-			tweak_is_applied overlay &&
-			tweak_is_applied extensions
+	mouse_accel)
+		gsettings_value_is org.gnome.desktop.peripherals.mouse accel-profile "'adaptive'"
 		;;
-	usability)
-		gsettings_value_is org.gnome.desktop.peripherals.mouse accel-profile "'adaptive'" &&
-			gsettings_value_is org.gnome.desktop.sound allow-volume-above-100-percent "false" &&
-			gsettings_value_is org.gnome.desktop.calendar show-weekdate "true" &&
-			gsettings_value_is org.gnome.desktop.wm.preferences resize-with-right-button "true" &&
-			gsettings_value_is org.gnome.desktop.wm.preferences button-layout "'${DEFAULT_BUTTON_LAYOUT}'" &&
-			gsettings_value_is org.gnome.shell.overrides workspaces-only-on-primary "false"
+	volume_limit)
+		gsettings_value_is org.gnome.desktop.sound allow-volume-above-100-percent "false"
 		;;
-	nautilus)
-		gsettings_value_is org.gnome.nautilus.icon-view default-zoom-level "'standard'" &&
-			gsettings_value_is org.gnome.nautilus.preferences executable-text-activation "'ask'" &&
-			gsettings_value_is org.gtk.Settings.FileChooser sort-directories-first "true" &&
-			gsettings_value_is org.gnome.nautilus.list-view use-tree-view "true" &&
-			gsettings_value_is org.gnome.nautilus.list-view default-zoom-level "'small'"
+	calendar_weekdate)
+		gsettings_value_is org.gnome.desktop.calendar show-weekdate "true"
 		;;
-	overlay)
+	right_resize)
+		gsettings_value_is org.gnome.desktop.wm.preferences resize-with-right-button "true"
+		;;
+	window_buttons)
+		gsettings_value_is org.gnome.desktop.wm.preferences button-layout "'${DEFAULT_BUTTON_LAYOUT}'"
+		;;
+	workspaces_all_monitors)
+		gsettings_value_is org.gnome.shell.overrides workspaces-only-on-primary "false"
+		;;
+	nautilus_icon_zoom)
+		gsettings_value_is org.gnome.nautilus.icon-view default-zoom-level "'standard'"
+		;;
+	nautilus_executable_text)
+		gsettings_value_is org.gnome.nautilus.preferences executable-text-activation "'ask'"
+		;;
+	filechooser_dirs_first)
+		gsettings_value_is org.gtk.Settings.FileChooser sort-directories-first "true"
+		;;
+	nautilus_tree_view)
+		gsettings_value_is org.gnome.nautilus.list-view use-tree-view "true"
+		;;
+	nautilus_list_zoom)
+		gsettings_value_is org.gnome.nautilus.list-view default-zoom-level "'small'"
+		;;
+	app_folders)
 		gsettings_compact_value_is org.gnome.desktop.app-folders folder-children "['accessories', 'chrome-apps', 'games', 'graphics', 'internet', 'office', 'programming', 'science', 'sound---video', 'system-tools', 'universal-access', 'wine', 'OEM', '3D-Printing', 'Cloud']" &&
 			overlay_folder_matches org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/accessories/ "Accessories" "['Utility']" &&
 			overlay_folder_matches org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/chrome-apps/ "Chrome Apps" "['chrome-apps']" &&
@@ -472,20 +545,30 @@ tweak_is_applied() {
 		gsettings_value_is org.gnome.shell disable-user-extensions "false" &&
 			gsettings_compact_value_is org.gnome.shell enabled-extensions "$(expected_extensions_list)"
 		;;
-	power)
+	sleep_ac_off)
 		gsettings_value_is org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout "0" &&
-			gsettings_value_is org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type "'nothing'" &&
-			gsettings_value_is org.gnome.settings-daemon.plugins.power sleep-inactive-battery-timeout "0" &&
-			gsettings_value_is org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type "'nothing'" &&
-			gsettings_value_is org.freedesktop.Tracker.Miner.Files index-on-battery "false" &&
-			gsettings_value_is org.freedesktop.Tracker.Miner.Files index-on-battery-first-time "false" &&
-			gsettings_value_is org.freedesktop.Tracker.Miner.Files throttle "15" &&
-			gsettings_value_is org.gnome.desktop.interface show-battery-percentage "true" &&
-			gsettings_value_is org.gnome.desktop.interface clock-show-date "true" &&
-			gsettings_value_is org.gnome.desktop.interface clock-show-seconds "true" &&
-			gsettings_value_is org.gnome.desktop.interface enable-hot-corners "true"
+			gsettings_value_is org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type "'nothing'"
 		;;
-	font)
+	sleep_battery_off)
+		gsettings_value_is org.gnome.settings-daemon.plugins.power sleep-inactive-battery-timeout "0" &&
+			gsettings_value_is org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type "'nothing'"
+		;;
+	tracker_battery_saver)
+		gsettings_value_is org.freedesktop.Tracker.Miner.Files index-on-battery "false" &&
+			gsettings_value_is org.freedesktop.Tracker.Miner.Files index-on-battery-first-time "false" &&
+			gsettings_value_is org.freedesktop.Tracker.Miner.Files throttle "15"
+		;;
+	battery_percent)
+		gsettings_value_is org.gnome.desktop.interface show-battery-percentage "true"
+		;;
+	clock_details)
+		gsettings_value_is org.gnome.desktop.interface clock-show-date "true" &&
+			gsettings_value_is org.gnome.desktop.interface clock-show-seconds "true"
+		;;
+	hot_corners)
+		gsettings_value_is org.gnome.desktop.interface enable-hot-corners "true"
+		;;
+	font_smoothing)
 		gsettings_value_is org.gnome.settings-daemon.plugins.xsettings hinting "'slight'" &&
 			gsettings_value_is org.gnome.settings-daemon.plugins.xsettings antialiasing "'rgba'" &&
 			gsettings_value_is org.gnome.settings-daemon.plugins.xsettings rgba-order "'rgb'"
@@ -559,9 +642,6 @@ tweak_is_applied() {
 			gsettings_value_is org.gnome.shell.extensions.dash-to-panel trans-use-custom-opacity "true" &&
 			gsettings_value_is org.gnome.shell.extensions.dash-to-panel tray-size "0"
 		;;
-	buttons_default)
-		gsettings_value_is org.gnome.desktop.wm.preferences button-layout "'${DEFAULT_BUTTON_LAYOUT}'"
-		;;
 	buttons_custom)
 		default_uuid="$(gsettings get org.gnome.desktop.wm.preferences button-layout 2>/dev/null | tr -d "'")"
 		[[ -n "${default_uuid}" && "${default_uuid}" != "${DEFAULT_BUTTON_LAYOUT}" ]]
@@ -598,10 +678,11 @@ initialize_menu_state() {
 
 	for key in "${MENU_KEYS[@]}"; do
 		if tweak_is_applied "${key}"; then
-			MENU_STATE["${key}"]="TRUE"
+			MENU_APPLIED["${key}"]="Applied"
 		else
-			MENU_STATE["${key}"]="FALSE"
+			MENU_APPLIED["${key}"]="Not applied"
 		fi
+		: "${MENU_STATE[${key}]:=FALSE}"
 	done
 }
 
@@ -627,8 +708,9 @@ sync_menu_state_from_selection() {
 	local key
 
 	for key in "${MENU_KEYS[@]}"; do
-		MENU_STATE["${key}"]="${MENU_SELECTION[${key}]:-FALSE}"
+		MENU_STATE["${key}"]="FALSE"
 	done
+	initialize_menu_state
 }
 
 show_gtk_menu() {
@@ -646,21 +728,212 @@ show_gtk_menu() {
 		--print-column 2
 		--ok-label "APPLY"
 		--cancel-label "EXIT"
-		--text "Checked items are armed for apply.\n\nThe initial state is read from your live GNOME settings. Already-applied tweaks are skipped unless you uncheck them, apply once, then check them again to force a reapply."
+		--extra-button "SAVE PROFILE"
+		--extra-button "LOAD PROFILE"
+		--extra-button "DELETE PROFILE"
+		--text "Select individual tweaks to apply, or load a saved profile.\n\nProfiles are stored in ${PROFILE_DIR}."
 		--column "Apply"
 		--column "ID"
+		--column "Status"
+		--column "Category"
 		--column "Tweak"
+		--column "Description"
 	)
 
 	for key in "${MENU_KEYS[@]}"; do
 		options+=(
 			"${MENU_STATE[${key}]:-FALSE}"
 			"${key}"
+			"${MENU_APPLIED[${key}]:-Unknown}"
+			"${MENU_CATEGORY[${key}]:-General}"
 			"${MENU_TEXT[${key}]}"
+			"${MENU_DESCRIPTION[${key}]:-}"
 		)
 	done
 
 	"${cmd[@]}" "${options[@]}"
+}
+
+profile_safe_name() {
+	local name="$1"
+
+	name="${name//[^[:alnum:]_.-]/_}"
+	printf '%s\n' "${name}"
+}
+
+profile_path() {
+	local name
+
+	name="$(profile_safe_name "$1")"
+	printf '%s/%s.profile\n' "${PROFILE_DIR}" "${name}"
+}
+
+profile_exists() {
+	[[ -f "$(profile_path "$1")" ]]
+}
+
+valid_tweak_key() {
+	local wanted="$1"
+	local key
+
+	for key in "${MENU_KEYS[@]}"; do
+		[[ "${key}" == "${wanted}" ]] && return 0
+	done
+	return 1
+}
+
+reset_menu_selection() {
+	local key
+
+	for key in "${MENU_KEYS[@]}"; do
+		MENU_STATE["${key}"]="FALSE"
+		MENU_SELECTION["${key}"]="FALSE"
+	done
+}
+
+prompt_profile_name() {
+	local name safe_name
+
+	name="$(zenity --entry \
+		--title "${PUBLICATION} - Save Profile" \
+		--width 560 \
+		--text "Enter a profile name. It will be stored in ${PROFILE_DIR}." \
+		--entry-text "workstation-default")" || return 1
+	safe_name="$(profile_safe_name "${name}")"
+	[[ -n "${safe_name}" ]] || {
+		zenity --error --title "${PUBLICATION}" --text "Profile name cannot be empty."
+		return 1
+	}
+	printf '%s\n' "${safe_name}"
+}
+
+show_profile_builder() {
+	local -a options
+	local key
+
+	for key in "${MENU_KEYS[@]}"; do
+		options+=(
+			"${MENU_STATE[${key}]:-FALSE}"
+			"${key}"
+			"${MENU_CATEGORY[${key}]:-General}"
+			"${MENU_TEXT[${key}]}"
+			"${MENU_DESCRIPTION[${key}]:-}"
+		)
+	done
+
+	zenity \
+		--list \
+		--checklist \
+		--title "${PUBLICATION} - Build Profile" \
+		--width 1160 \
+		--height 700 \
+		--separator "|" \
+		--print-column 2 \
+		--ok-label "SAVE" \
+		--cancel-label "CANCEL" \
+		--text "Choose the tweaks that should belong to this profile." \
+		--column "Include" \
+		--column "ID" \
+		--column "Category" \
+		--column "Tweak" \
+		--column "Description" \
+		"${options[@]}"
+}
+
+save_profile() {
+	local selection profile_name profile_file key
+	local -a selected_keys
+
+	selection="$(show_profile_builder 2>/dev/null)" || return 0
+	[[ -n "${selection}" ]] || {
+		zenity --info --title "${PUBLICATION}" --text "No tweaks selected. Profile was not saved."
+		return 0
+	}
+	profile_name="$(prompt_profile_name)" || return 0
+	profile_file="$(profile_path "${profile_name}")"
+
+	if [[ -e "${profile_file}" ]]; then
+		zenity --question \
+			--title "${PUBLICATION}" \
+			--width 520 \
+			--text "Profile '${profile_name}' already exists. Replace it?" || return 0
+	fi
+
+	mkdir -p "${PROFILE_DIR}"
+	{
+		printf '# RTD OEM Tweaks profile\n'
+		printf '# name=%s\n' "${profile_name}"
+		printf '# saved_at=%s\n' "$(date --iso-8601=seconds 2>/dev/null || date '+%Y-%m-%dT%H:%M:%S%z')"
+		IFS='|' read -r -a selected_keys <<< "${selection}"
+		for key in "${selected_keys[@]}"; do
+			valid_tweak_key "${key}" && printf '%s\n' "${key}"
+		done
+	} >"${profile_file}"
+
+	zenity --info --title "${PUBLICATION}" --width 560 --text "Saved profile '${profile_name}' to:\n${profile_file}"
+}
+
+choose_profile() {
+	local title="$1"
+	local -a options
+	local profile file
+
+	mkdir -p "${PROFILE_DIR}"
+	while IFS= read -r -d '' file; do
+		profile="$(basename "${file}" .profile)"
+		options+=("${profile}" "${file}")
+	done < <(find "${PROFILE_DIR}" -maxdepth 1 -type f -name '*.profile' -print0 2>/dev/null | sort -z)
+
+	if (( ${#options[@]} == 0 )); then
+		zenity --info --title "${PUBLICATION}" --text "No tweak profiles found in ${PROFILE_DIR}."
+		return 1
+	fi
+
+	zenity \
+		--list \
+		--title "${title}" \
+		--width 760 \
+		--height 420 \
+		--print-column 1 \
+		--column "Profile" \
+		--column "File" \
+		"${options[@]}"
+}
+
+load_profile() {
+	local profile profile_file line loaded_count=0
+
+	profile="$(choose_profile "${PUBLICATION} - Load Profile")" || return 0
+	profile_file="$(profile_path "${profile}")"
+	[[ -f "${profile_file}" ]] || {
+		zenity --error --title "${PUBLICATION}" --text "Profile file not found: ${profile_file}"
+		return 1
+	}
+
+	reset_menu_selection
+	while IFS= read -r line; do
+		[[ -n "${line}" && "${line}" != \#* ]] || continue
+		if valid_tweak_key "${line}"; then
+			MENU_STATE["${line}"]="TRUE"
+			loaded_count=$((loaded_count + 1))
+		fi
+	done <"${profile_file}"
+
+	zenity --info --title "${PUBLICATION}" --width 560 --text "Loaded profile '${profile}'.\n${loaded_count} tweak(s) selected for apply."
+}
+
+delete_profile() {
+	local profile profile_file
+
+	profile="$(choose_profile "${PUBLICATION} - Delete Profile")" || return 0
+	profile_file="$(profile_path "${profile}")"
+	[[ -f "${profile_file}" ]] || return 0
+	zenity --question \
+		--title "${PUBLICATION}" \
+		--width 520 \
+		--text "Delete profile '${profile}'?\n\n${profile_file}" || return 0
+	rm -f "${profile_file}"
+	zenity --info --title "${PUBLICATION}" --text "Deleted profile '${profile}'."
 }
 
 prompt_custom_gtk4_theme() {
@@ -736,6 +1009,14 @@ run_function_checked() {
 	"${func}" "$@"
 }
 
+apply_gsetting() {
+	local schema="$1"
+	local key="$2"
+	local value="$3"
+
+	gsettings set "${schema}" "${key}" "${value}"
+}
+
 execute_tweak() {
 	local key="$1"
 	local force_apply="${2:-0}"
@@ -747,29 +1028,90 @@ execute_tweak() {
 	set_last_tweak_label "${key}"
 
 	case "${key}" in
-		core)
-			func="gnome::set_ui_tweaks_for_user"
+		mouse_accel)
+			[[ "${force_apply}" != "1" ]] && tweak_is_applied "${key}" && return 2
+			apply_gsetting org.gnome.desktop.peripherals.mouse accel-profile adaptive
 			;;
-		common)
-			func="gnome::set_ui_common_tweaks_for_user"
+		volume_limit)
+			[[ "${force_apply}" != "1" ]] && tweak_is_applied "${key}" && return 2
+			apply_gsetting org.gnome.desktop.sound allow-volume-above-100-percent false
 			;;
-		usability)
-			func="gnome::set_better_usability_for_user"
+		calendar_weekdate)
+			[[ "${force_apply}" != "1" ]] && tweak_is_applied "${key}" && return 2
+			apply_gsetting org.gnome.desktop.calendar show-weekdate true
 			;;
-		nautilus)
-			func="gnome::configure_nautilus"
+		right_resize)
+			[[ "${force_apply}" != "1" ]] && tweak_is_applied "${key}" && return 2
+			apply_gsetting org.gnome.desktop.wm.preferences resize-with-right-button true
 			;;
-		overlay)
+		window_buttons)
+			[[ "${force_apply}" != "1" ]] && tweak_is_applied "${key}" && return 2
+			apply_gsetting org.gnome.desktop.wm.preferences button-layout "${DEFAULT_BUTTON_LAYOUT}"
+			;;
+		workspaces_all_monitors)
+			[[ "${force_apply}" != "1" ]] && tweak_is_applied "${key}" && return 2
+			apply_gsetting org.gnome.shell.overrides workspaces-only-on-primary false
+			;;
+		nautilus_icon_zoom)
+			[[ "${force_apply}" != "1" ]] && tweak_is_applied "${key}" && return 2
+			apply_gsetting org.gnome.nautilus.icon-view default-zoom-level standard
+			;;
+		nautilus_executable_text)
+			[[ "${force_apply}" != "1" ]] && tweak_is_applied "${key}" && return 2
+			apply_gsetting org.gnome.nautilus.preferences executable-text-activation ask
+			;;
+		filechooser_dirs_first)
+			[[ "${force_apply}" != "1" ]] && tweak_is_applied "${key}" && return 2
+			apply_gsetting org.gtk.Settings.FileChooser sort-directories-first true
+			;;
+		nautilus_tree_view)
+			[[ "${force_apply}" != "1" ]] && tweak_is_applied "${key}" && return 2
+			apply_gsetting org.gnome.nautilus.list-view use-tree-view true
+			;;
+		nautilus_list_zoom)
+			[[ "${force_apply}" != "1" ]] && tweak_is_applied "${key}" && return 2
+			apply_gsetting org.gnome.nautilus.list-view default-zoom-level small
+			;;
+		app_folders)
 			func="gnome::organize_overlay_menu"
 			;;
 		extensions)
 			func="gnome::set_basic_extensions_enabled"
 			;;
-		power)
-			func="gnome::set_power_configuraton_for_user"
+		sleep_ac_off)
+			[[ "${force_apply}" != "1" ]] && tweak_is_applied "${key}" && return 2
+			apply_gsetting org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout 0 &&
+				apply_gsetting org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type nothing
 			;;
-		font)
-			func="gnome::set_better_font_smoothing_for_user"
+		sleep_battery_off)
+			[[ "${force_apply}" != "1" ]] && tweak_is_applied "${key}" && return 2
+			apply_gsetting org.gnome.settings-daemon.plugins.power sleep-inactive-battery-timeout 0 &&
+				apply_gsetting org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type nothing
+			;;
+		tracker_battery_saver)
+			[[ "${force_apply}" != "1" ]] && tweak_is_applied "${key}" && return 2
+			apply_gsetting org.freedesktop.Tracker.Miner.Files index-on-battery false &&
+				apply_gsetting org.freedesktop.Tracker.Miner.Files index-on-battery-first-time false &&
+				apply_gsetting org.freedesktop.Tracker.Miner.Files throttle 15
+			;;
+		battery_percent)
+			[[ "${force_apply}" != "1" ]] && tweak_is_applied "${key}" && return 2
+			apply_gsetting org.gnome.desktop.interface show-battery-percentage true
+			;;
+		clock_details)
+			[[ "${force_apply}" != "1" ]] && tweak_is_applied "${key}" && return 2
+			apply_gsetting org.gnome.desktop.interface clock-show-date true &&
+				apply_gsetting org.gnome.desktop.interface clock-show-seconds true
+			;;
+		hot_corners)
+			[[ "${force_apply}" != "1" ]] && tweak_is_applied "${key}" && return 2
+			apply_gsetting org.gnome.desktop.interface enable-hot-corners true
+			;;
+		font_smoothing)
+			[[ "${force_apply}" != "1" ]] && tweak_is_applied "${key}" && return 2
+			apply_gsetting org.gnome.settings-daemon.plugins.xsettings hinting slight &&
+				apply_gsetting org.gnome.settings-daemon.plugins.xsettings antialiasing rgba &&
+				apply_gsetting org.gnome.settings-daemon.plugins.xsettings rgba-order rgb
 			;;
 		tilix)
 			func="gnome::set_tilix_ui_tweaks_for_user"
@@ -782,16 +1124,6 @@ execute_tweak() {
 			;;
 		panel)
 			func="gnome::configure_dash_to_panel"
-			;;
-		buttons_default)
-			func="gnome::ensure_window_buttons_visible"
-			if [[ "${force_apply}" != "1" ]] && tweak_is_applied buttons_default; then
-				return 2
-			fi
-			if run_function_checked "${func}" "appmenu:minimize,maximize,close"; then
-				return 0
-			fi
-			return 1
 			;;
 		buttons_custom)
 			layout="$(prompt_window_buttons_layout)" || return 2
@@ -846,58 +1178,12 @@ execute_tweak() {
 			fi
 			return 1
 			;;
-		win10_light)
-			func="gnome::set_ui_win10_tweaks_for_user"
-			if run_function_checked "${func}" Light; then
-				return 0
-			fi
-			return 1
-			;;
-		win10_dark)
-			func="gnome::set_ui_win10_tweaks_for_user"
-			if run_function_checked "${func}" Dark; then
-				return 0
-			fi
-			return 1
-			;;
-		mac_light)
-			func="gnome::set_ui_mac_tweaks_for_user"
-			if run_function_checked "${func}" Light; then
-				return 0
-			fi
-			return 1
-			;;
-		mac_dark)
-			func="gnome::set_ui_mac_tweaks_for_user"
-			if run_function_checked "${func}" Dark; then
-				return 0
-			fi
-			return 1
-			;;
-		corp_light)
-			func="gnome::set_ui_corporate_crisp_tweaks_for_user"
-			if run_function_checked "${func}" Light; then
-				return 0
-			fi
-			return 1
-			;;
-		corp_dark)
-			func="gnome::set_ui_corporate_crisp_tweaks_for_user"
-			if run_function_checked "${func}" Dark; then
-				return 0
-			fi
-			return 1
-			;;
-		moca)
-			func="gnome::set_ui_moca_tweaks_for_user"
-			;;
-		ui_media_prompt)
-			func="gnome::set_ui_tweak_no_media_error"
-			;;
 		*)
 			return 2
 			;;
 	esac
+	local case_rc=$?
+	[[ -z "${func}" ]] && return "${case_rc}"
 
 	if [[ "${force_apply}" != "1" ]] && tweak_is_applied "${key}"; then
 		return 2
@@ -974,6 +1260,16 @@ run_selected_tweaks() {
 	return "${rc}"
 }
 
+print_status() {
+	local key status
+
+	initialize_menu_state
+	for key in "${MENU_KEYS[@]}"; do
+		status="${MENU_APPLIED[${key}]:-Unknown}"
+		printf '%-26s %-12s %s\n' "${key}" "${status}" "${MENU_TEXT[${key}]}"
+	done
+}
+
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -989,10 +1285,11 @@ main() {
 	if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 		cat <<EOF
 Usage:
-  $(basename "$0") [--help|-h]
+  $(basename "$0") [--help|-h] [--status]
 
 Description:
   Open the RTD OEM GNOME tweaks selector and apply one or more desktop tweaks.
+  Profiles are stored under ${PROFILE_DIR}.
 EOF
 		exit 0
 	fi
@@ -1021,17 +1318,41 @@ EOF
 		exit 1
 	fi
 
-	command -v zenity >/dev/null 2>&1 || software::check_native_package_dependency zenity || exit 1
 	command -v gsettings >/dev/null 2>&1 || {
-		zenity --error --title "${PUBLICATION}" --text "Required command missing: gsettings"
+		write_error "Required command missing: gsettings"
 		exit 1
 	}
 
 	initialize_menu_state
 
+	if [[ "${1:-}" == "--status" ]]; then
+		print_status
+		exit 0
+	fi
+
+	command -v zenity >/dev/null 2>&1 || software::check_native_package_dependency zenity || exit 1
+
 	while true; do
 		selection="$(show_gtk_menu 2>/dev/null)"
 		menu_rc=$?
+
+		case "${selection}" in
+		"SAVE PROFILE")
+			save_profile
+			initialize_menu_state
+			continue
+			;;
+		"LOAD PROFILE")
+			load_profile
+			initialize_menu_state
+			continue
+			;;
+		"DELETE PROFILE")
+			delete_profile
+			initialize_menu_state
+			continue
+			;;
+		esac
 
 		case "${menu_rc}" in
 		0)
