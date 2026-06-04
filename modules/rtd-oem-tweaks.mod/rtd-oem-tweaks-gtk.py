@@ -91,12 +91,12 @@ class TweakWindow(Gtk.Window):
             background: #263b4d;
             color: white;
         }
-        .title {
+        .app-title {
             color: white;
             font-size: 28px;
             font-weight: 700;
         }
-        .subtitle {
+        .app-subtitle {
             color: #d7e8ff;
             font-size: 14px;
         }
@@ -142,26 +142,24 @@ class TweakWindow(Gtk.Window):
 
     def build_header(self):
         overlay = Gtk.Overlay()
-        header = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        header.set_size_request(-1, 170)
-        header.set_border_width(24)
-        banner_loaded = False
 
         if BANNER is not None:
             try:
                 pixels = GdkPixbuf.Pixbuf.new_from_file_at_scale(str(BANNER), 1100, 170, False)
                 overlay.add(Gtk.Image.new_from_pixbuf(pixels))
-                banner_loaded = True
+                return overlay
             except Exception:
-                header.get_style_context().add_class("header")
-                overlay.add(header)
-        else:
-            header.get_style_context().add_class("header")
-            overlay.add(header)
+                pass
+
+        header = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        header.set_size_request(-1, 170)
+        header.set_border_width(24)
+        header.get_style_context().add_class("header")
+        overlay.add(header)
 
         title = Gtk.Label(label="RTD OEM Tweaks")
         title.set_halign(Gtk.Align.START)
-        title.get_style_context().add_class("title")
+        title.get_style_context().add_class("app-title")
         header.pack_start(title, False, False, 0)
 
         subtitle = Gtk.Label(
@@ -169,10 +167,8 @@ class TweakWindow(Gtk.Window):
         )
         subtitle.set_halign(Gtk.Align.START)
         subtitle.set_line_wrap(True)
-        subtitle.get_style_context().add_class("subtitle")
+        subtitle.get_style_context().add_class("app-subtitle")
         header.pack_start(subtitle, False, False, 0)
-        if banner_loaded:
-            overlay.add_overlay(header)
         return overlay
 
     def build_sidebar(self):
