@@ -5,7 +5,7 @@
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #:::::::::::::::::::::::::::::::::::::::// RTD OEM GNOME Tweaks //::::::::::::::::::::::::::::::::::::// Linux //::::::::
 #:: Author(s):    RTD
-#:: Version:      1.12
+#:: Version:      1.13
 #::
 #:: Purpose:      Apply a curated set of GNOME desktop tweaks from the RTD library
 #::               through a checklist-style GUI.
@@ -20,7 +20,7 @@
 #::
 #:: Examples:
 #::               rtd-oem-tweaks
-#::               sudo rtd-oem-tweaks
+#::               rtd-oem-tweaks --status
 #::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
@@ -42,12 +42,14 @@ fi
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-VERSION="1.12"
+VERSION="1.13"
 PUBLICATION="RTD OEM Tweaks"
 LAST_TWEAK_LABEL=""
 DEFAULT_BUTTON_LAYOUT="appmenu:minimize,maximize,close"
 RTD_CONFIG_DIR="${XDG_CONFIG_HOME:-${HOME}/.config}/rtd"
 PROFILE_DIR="${RTD_CONFIG_DIR}/oem-tweak-profiles"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+GTK_FRONTEND="${SCRIPT_DIR}/rtd-oem-tweaks-gtk.py"
 
 declare -a MENU_KEYS=(
 	"mouse_accel"
@@ -94,7 +96,7 @@ declare -A MENU_CATEGORY=(
 	["filechooser_dirs_first"]="Files"
 	["nautilus_tree_view"]="Files"
 	["nautilus_list_zoom"]="Files"
-	["app_folders"]="App Grid"
+	["app_folders"]="Overview"
 	["extensions"]="Extensions"
 	["sleep_ac_off"]="Power"
 	["sleep_battery_off"]="Power"
@@ -130,7 +132,7 @@ declare -A MENU_TEXT=(
 	["filechooser_dirs_first"]="Sort folders first in file chooser"
 	["nautilus_tree_view"]="Enable Nautilus tree view"
 	["nautilus_list_zoom"]="Set Nautilus list zoom to small"
-	["app_folders"]="Organize GNOME app grid folders"
+	["app_folders"]="Organize Overview applications into categories"
 	["extensions"]="Enable baseline GNOME extensions"
 	["sleep_ac_off"]="Disable automatic sleep on AC power"
 	["sleep_battery_off"]="Disable automatic sleep on battery"
@@ -163,7 +165,7 @@ declare -A MENU_DESCRIPTION=(
 	["filechooser_dirs_first"]="Shows folders before files in GTK file choosers."
 	["nautilus_tree_view"]="Enables folder tree expansion in Nautilus list view."
 	["nautilus_list_zoom"]="Uses the compact Nautilus list-view zoom."
-	["app_folders"]="Creates RTD-style GNOME app-grid folders."
+	["app_folders"]="Creates RTD-style categories in the GNOME applications overview."
 	["extensions"]="Enables the baseline extension list for this distribution."
 	["sleep_ac_off"]="Prevents GNOME power settings from sleeping on AC."
 	["sleep_battery_off"]="Prevents GNOME power settings from sleeping on battery."
@@ -1126,7 +1128,7 @@ execute_tweak() {
 			func="gnome::configure_dash_to_panel"
 			;;
 		buttons_custom)
-			layout="$(prompt_window_buttons_layout)" || return 2
+			layout="$(prompt_window_buttons_layout)" || return 130
 			func="gnome::ensure_window_buttons_visible"
 			if [[ "${force_apply}" != "1" ]] && gsettings_value_is org.gnome.desktop.wm.preferences button-layout "'${layout}'"; then
 				return 2
@@ -1137,7 +1139,7 @@ execute_tweak() {
 			return 1
 			;;
 		gtk4_custom)
-			gtk4_values="$(prompt_custom_gtk4_theme)" || return 2
+			gtk4_values="$(prompt_custom_gtk4_theme)" || return 130
 			IFS='|' read -r theme_name icon_name prefer_dark <<< "${gtk4_values}"
 			func="gnome::_apply_gtk4_theme"
 			if [[ "${force_apply}" != "1" ]] &&
@@ -1162,7 +1164,7 @@ execute_tweak() {
 			if [[ "${force_apply}" != "1" ]] && startup_sound_enabled; then
 				return 2
 			fi
-			sound_file="$(prompt_startup_sound_file)" || return 2
+			sound_file="$(prompt_startup_sound_file)" || return 130
 			if run_function_checked "${func}" on "${sound_file}"; then
 				return 0
 			fi
@@ -1270,6 +1272,91 @@ print_status() {
 	done
 }
 
+print_tweak_catalog() {
+	local key status
+
+	initialize_menu_state
+	for key in "${MENU_KEYS[@]}"; do
+		status="${MENU_APPLIED[${key}]:-Unknown}"
+		printf '%s\t%s\t%s\t%s\t%s\n' \
+			"${key}" \
+			"${MENU_CATEGORY[${key}]:-General}" \
+			"${status}" \
+			"${MENU_TEXT[${key}]}" \
+			"${MENU_DESCRIPTION[${key}]:-}"
+	done
+}
+
+print_profile_list() {
+	local file
+
+	mkdir -p "${PROFILE_DIR}"
+	find "${PROFILE_DIR}" -maxdepth 1 -type f -name '*.profile' -print0 2>/dev/null |
+		sort -z |
+		while IFS= read -r -d '' file; do
+			printf '%s\t%s\n' "$(basename "${file}" .profile)" "${file}"
+		done
+}
+
+apply_tweaks_cli() {
+	local key rc=0 run_rc
+
+	[[ $# -gt 0 ]] || {
+		write_error "No tweak IDs were provided."
+		return 64
+	}
+
+	for key in "$@"; do
+		if ! valid_tweak_key "${key}"; then
+			write_error "Unknown tweak ID: ${key}"
+			rc=1
+			continue
+		fi
+		execute_tweak "${key}" 1
+		run_rc=$?
+		case "${run_rc}" in
+		0|2) ;;
+		130) return 130 ;;
+		*) rc=1 ;;
+		esac
+	done
+	return "${rc}"
+}
+
+apply_profile_cli() {
+	local profile="$1"
+	local profile_file line
+	local -a keys=()
+
+	[[ -n "${profile}" ]] || {
+		write_error "No profile name was provided."
+		return 64
+	}
+	profile_file="$(profile_path "${profile}")"
+	[[ -f "${profile_file}" ]] || {
+		write_error "Profile file not found: ${profile_file}"
+		return 1
+	}
+
+	while IFS= read -r line; do
+		[[ -n "${line}" && "${line}" != \#* ]] || continue
+		valid_tweak_key "${line}" && keys+=("${line}")
+	done <"${profile_file}"
+
+	apply_tweaks_cli "${keys[@]}"
+}
+
+gtk_frontend_ready() {
+	command -v python3 >/dev/null 2>&1 &&
+		python3 -c 'import gi; gi.require_version("Gtk", "3.0"); from gi.repository import Gtk' >/dev/null 2>&1
+}
+
+launch_gtk_frontend() {
+	[[ -r "${GTK_FRONTEND}" ]] || return 1
+	gtk_frontend_ready || return 1
+	exec python3 "${GTK_FRONTEND}" "$@"
+}
+
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -1285,7 +1372,11 @@ main() {
 	if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 		cat <<EOF
 Usage:
-  $(basename "$0") [--help|-h] [--status]
+  $(basename "$0") [--help|-h] [--status] [--list-tweaks]
+  $(basename "$0") [--apply <tweak-id>...]
+  $(basename "$0") [--list-profiles]
+  $(basename "$0") [--apply-profile <profile-name>]
+  $(basename "$0") [--gtk|--zenity]
 
 Description:
   Open the RTD OEM GNOME tweaks selector and apply one or more desktop tweaks.
@@ -1325,10 +1416,47 @@ EOF
 
 	initialize_menu_state
 
-	if [[ "${1:-}" == "--status" ]]; then
+	case "${1:-}" in
+	--status)
 		print_status
 		exit 0
-	fi
+		;;
+	--list-tweaks)
+		print_tweak_catalog
+		exit 0
+		;;
+	--apply)
+		shift
+		apply_tweaks_cli "$@"
+		exit $?
+		;;
+	--list-profiles)
+		print_profile_list
+		exit 0
+		;;
+	--apply-profile)
+		shift
+		apply_profile_cli "${1:-}"
+		exit $?
+		;;
+	--gtk)
+		shift
+		launch_gtk_frontend "$@" || {
+			write_error "Python GTK frontend is not available."
+			exit 1
+		}
+		;;
+	"")
+		launch_gtk_frontend || true
+		;;
+	--zenity)
+		shift
+		;;
+	*)
+		write_error "Unknown option: $1"
+		exit 64
+		;;
+	esac
 
 	command -v zenity >/dev/null 2>&1 || software::check_native_package_dependency zenity || exit 1
 
