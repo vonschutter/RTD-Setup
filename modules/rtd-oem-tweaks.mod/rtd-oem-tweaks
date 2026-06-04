@@ -1359,49 +1359,77 @@ execute_tweak() {
 }
 
 run_selected_tweaks() {
-	local -a success_list failure_list skipped_list
+	local -a enabled_list disabled_list failure_list skipped_list
 	local key
 	local rc=0
 	local run_rc
-	local force_apply
-	local selected_count=0
+	local change_count=0
+	local desired_enabled applied_enabled
 
 	for key in "${MENU_KEYS[@]}"; do
-		checkbox_state "${MENU_SELECTION[${key}]:-FALSE}" || continue
-		selected_count=$((selected_count + 1))
-		force_apply=0
-		if ! checkbox_state "${MENU_STATE[${key}]:-FALSE}"; then
-			force_apply=1
+		desired_enabled=0
+		applied_enabled=0
+		checkbox_state "${MENU_SELECTION[${key}]:-FALSE}" && desired_enabled=1
+		[[ "${MENU_APPLIED[${key}]:-}" == "Applied" ]] && applied_enabled=1
+
+		set_last_tweak_label "${key}"
+		if [[ "${desired_enabled}" == "${applied_enabled}" ]]; then
+			skipped_list+=("${LAST_TWEAK_LABEL}")
+			continue
 		fi
 
-		execute_tweak "${key}" "${force_apply}"
-		run_rc=$?
-
-		case "${run_rc}" in
-		0)
-			success_list+=("${LAST_TWEAK_LABEL}")
-			;;
-		2)
-			skipped_list+=("${LAST_TWEAK_LABEL}")
-			;;
-		*)
-			failure_list+=("${LAST_TWEAK_LABEL}")
-			rc=1
-			;;
-		esac
+		change_count=$((change_count + 1))
+		if [[ "${desired_enabled}" == "1" ]]; then
+			execute_tweak "${key}" 1
+			run_rc=$?
+			case "${run_rc}" in
+			0|2)
+				enabled_list+=("${LAST_TWEAK_LABEL}")
+				;;
+			130)
+				return 130
+				;;
+			*)
+				failure_list+=("${LAST_TWEAK_LABEL}")
+				rc=1
+				;;
+			esac
+		else
+			reset_tweak "${key}"
+			run_rc=$?
+			case "${run_rc}" in
+			0|2)
+				disabled_list+=("${LAST_TWEAK_LABEL}")
+				;;
+			130)
+				return 130
+				;;
+			*)
+				failure_list+=("${LAST_TWEAK_LABEL}")
+				rc=1
+				;;
+			esac
+		fi
 	done
 
-	if (( selected_count == 0 )); then
-		zenity --info --title "${PUBLICATION}" --text "No tweaks selected. Nothing changed."
+	if (( change_count == 0 )); then
+		zenity --info --title "${PUBLICATION}" --text "All toggles already match the current tweak status."
 		return 0
 	fi
 
 	local summary
 	summary="GNOME tweaks execution completed."
 
-	if (( ${#success_list[@]} > 0 )); then
-		summary+=$'\n\nApplied successfully:'
-		for key in "${success_list[@]}"; do
+	if (( ${#enabled_list[@]} > 0 )); then
+		summary+=$'\n\nEnabled:'
+		for key in "${enabled_list[@]}"; do
+			summary+=$'\n'"- ${key}"
+		done
+	fi
+
+	if (( ${#disabled_list[@]} > 0 )); then
+		summary+=$'\n\nDisabled/reset:'
+		for key in "${disabled_list[@]}"; do
 			summary+=$'\n'"- ${key}"
 		done
 	fi
@@ -1429,7 +1457,7 @@ run_selected_tweaks() {
 print_status() {
 	local key status
 
-	initialize_menu_state
+	initialize_menu_state 1
 	for key in "${MENU_KEYS[@]}"; do
 		status="${MENU_APPLIED[${key}]:-Unknown}"
 		printf '%-26s %-12s %s\n' "${key}" "${status}" "${MENU_TEXT[${key}]}"
@@ -1665,7 +1693,7 @@ EOF
 		case "${selection}" in
 		"SAVE PROFILE")
 			save_profile
-			initialize_menu_state
+			initialize_menu_state 1
 			continue
 			;;
 		"LOAD PROFILE")
@@ -1675,7 +1703,7 @@ EOF
 			;;
 		"DELETE PROFILE")
 			delete_profile
-			initialize_menu_state
+			initialize_menu_state 1
 			continue
 			;;
 		esac
