@@ -81,7 +81,6 @@ declare -a MENU_KEYS=(
 	"reset_theme"
 	"reload_shell"
 	"startup_on"
-	"startup_off"
 )
 
 declare -A MENU_CATEGORY=(
@@ -1019,6 +1018,173 @@ apply_gsetting() {
 	gsettings set "${schema}" "${key}" "${value}"
 }
 
+reset_gsetting() {
+	local schema="$1"
+	local key="$2"
+
+	gsettings reset "${schema}" "${key}"
+}
+
+reset_terminal_profile() {
+	local schema="$1"
+
+	reset_gsetting "${schema}" font || true
+	reset_gsetting "${schema}" use-system-font || true
+	reset_gsetting "${schema}" audible-bell || true
+	reset_gsetting "${schema}" use-theme-colors || true
+	reset_gsetting "${schema}" background-color || true
+	reset_gsetting "${schema}" foreground-color || true
+	reset_gsetting "${schema}" use-transparent-background || true
+	reset_gsetting "${schema}" background-transparency-percent || true
+	reset_gsetting "${schema}" bold-is-bright || true
+	reset_gsetting "${schema}" default-size-columns || true
+	reset_gsetting "${schema}" use-theme-transparency || true
+	reset_gsetting "${schema}" scrollback-lines || true
+}
+
+reset_tweak() {
+	local key="$1"
+	local profiles uuid schema folder setting_key
+	local -a app_folders=(
+		accessories chrome-apps games graphics internet office programming science
+		sound---video system-tools universal-access wine OEM 3D-Printing Cloud
+	)
+	local -a dock_keys=(
+		click-action dock-position apply-custom-theme custom-background-color
+		custom-theme-customize-running-dots custom-theme-running-dots-color
+		custom-theme-shrink dock-fixed extend-height force-straight-corner
+		icon-size-fixed intellihide-mode isolate-workspaces show-apps-at-top
+		unity-backlit-items transparency-mode running-indicator-style background-opacity
+	)
+	local -a panel_keys=(
+		click-action dash-max-icon-size appicon-margin appicon-padding available-monitors
+		dot-color-1 dot-color-2 dot-color-3 dot-color-4 dot-color-dominant
+		dot-color-override dot-color-unfocused-1 dot-color-unfocused-2
+		dot-color-unfocused-3 dot-color-unfocused-4 dot-color-unfocused-different
+		dot-style-focused dot-style-unfocused focus-highlight-color
+		focus-highlight-dominant force-check-update group-apps hotkeys-overlay-combo
+		isolate-monitors isolate-workspaces panel-element-positions
+		secondarymenu-contains-showdetails show-appmenu show-favorites
+		show-favorites-all-monitors stockgs-keep-dash stockgs-keep-top-panel
+		trans-use-custom-bg trans-use-custom-opacity tray-size
+	)
+
+	case "${key}" in
+	mouse_accel)
+		reset_gsetting org.gnome.desktop.peripherals.mouse accel-profile
+		;;
+	volume_limit)
+		reset_gsetting org.gnome.desktop.sound allow-volume-above-100-percent
+		;;
+	calendar_weekdate)
+		reset_gsetting org.gnome.desktop.calendar show-weekdate
+		;;
+	right_resize)
+		reset_gsetting org.gnome.desktop.wm.preferences resize-with-right-button
+		;;
+	window_buttons|buttons_custom)
+		reset_gsetting org.gnome.desktop.wm.preferences button-layout
+		;;
+	workspaces_all_monitors)
+		reset_gsetting org.gnome.shell.overrides workspaces-only-on-primary
+		;;
+	nautilus_icon_zoom)
+		reset_gsetting org.gnome.nautilus.icon-view default-zoom-level
+		;;
+	nautilus_executable_text)
+		reset_gsetting org.gnome.nautilus.preferences executable-text-activation
+		;;
+	filechooser_dirs_first)
+		reset_gsetting org.gtk.Settings.FileChooser sort-directories-first
+		;;
+	nautilus_tree_view)
+		reset_gsetting org.gnome.nautilus.list-view use-tree-view
+		;;
+	nautilus_list_zoom)
+		reset_gsetting org.gnome.nautilus.list-view default-zoom-level
+		;;
+	app_folders)
+		reset_gsetting org.gnome.desktop.app-folders folder-children || true
+		for folder in "${app_folders[@]}"; do
+			schema="org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/${folder}/"
+			reset_gsetting "${schema}" name || true
+			reset_gsetting "${schema}" categories || true
+		done
+		;;
+	extensions)
+		reset_gsetting org.gnome.shell disable-user-extensions || true
+		reset_gsetting org.gnome.shell enabled-extensions || true
+		;;
+	sleep_ac_off)
+		reset_gsetting org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout &&
+			reset_gsetting org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type
+		;;
+	sleep_battery_off)
+		reset_gsetting org.gnome.settings-daemon.plugins.power sleep-inactive-battery-timeout &&
+			reset_gsetting org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type
+		;;
+	tracker_battery_saver)
+		reset_gsetting org.freedesktop.Tracker.Miner.Files index-on-battery &&
+			reset_gsetting org.freedesktop.Tracker.Miner.Files index-on-battery-first-time &&
+			reset_gsetting org.freedesktop.Tracker.Miner.Files throttle
+		;;
+	battery_percent)
+		reset_gsetting org.gnome.desktop.interface show-battery-percentage
+		;;
+	clock_details)
+		reset_gsetting org.gnome.desktop.interface clock-show-date &&
+			reset_gsetting org.gnome.desktop.interface clock-show-seconds
+		;;
+	hot_corners)
+		reset_gsetting org.gnome.desktop.interface enable-hot-corners
+		;;
+	font_smoothing)
+		reset_gsetting org.gnome.settings-daemon.plugins.xsettings hinting &&
+			reset_gsetting org.gnome.settings-daemon.plugins.xsettings antialiasing &&
+			reset_gsetting org.gnome.settings-daemon.plugins.xsettings rgba-order
+		;;
+	tilix)
+		reset_gsetting com.gexperts.Tilix.Settings theme-variant || true
+		reset_gsetting com.gexperts.Tilix.Settings font || true
+		reset_gsetting com.gexperts.Tilix.Settings use-system-font || true
+		reset_gsetting com.gexperts.Tilix.Settings bold-is-bright || true
+		rm -f "${HOME}/.config/rtd/gconf-tilix-settings.ini"
+		profiles="$(terminal_profiles)"
+		for uuid in ${profiles}; do
+			reset_terminal_profile "$(terminal_profile_schema "${uuid}")"
+		done
+		;;
+	terminal)
+		profiles="$(terminal_profiles)"
+		for uuid in ${profiles}; do
+			reset_terminal_profile "$(terminal_profile_schema "${uuid}")"
+		done
+		;;
+	dock)
+		for setting_key in "${dock_keys[@]}"; do
+			reset_gsetting org.gnome.shell.extensions.dash-to-dock "${setting_key}" || true
+		done
+		;;
+	panel)
+		for setting_key in "${panel_keys[@]}"; do
+			reset_gsetting org.gnome.shell.extensions.dash-to-panel "${setting_key}" || true
+		done
+		;;
+	gtk4_custom|reset_theme)
+		run_function_checked gnome::_reset_ui_theme_settings
+		;;
+	reload_shell)
+		return 2
+		;;
+	startup_on|startup_off)
+		run_function_checked gnome::set_startup_sound off /dev/null
+		;;
+	*)
+		return 2
+		;;
+	esac
+}
+
 execute_tweak() {
 	local key="$1"
 	local force_apply="${2:-0}"
@@ -1323,6 +1489,34 @@ apply_tweaks_cli() {
 	return "${rc}"
 }
 
+set_tweak_state_cli() {
+	local key="$1"
+	local state="$2"
+
+	[[ -n "${key}" && -n "${state}" ]] || {
+		write_error "Usage: $(basename "$0") --set <tweak-id> <on|off>"
+		return 64
+	}
+
+	if ! valid_tweak_key "${key}"; then
+		write_error "Unknown tweak ID: ${key}"
+		return 64
+	fi
+
+	case "${state}" in
+	on|true|1|yes)
+		execute_tweak "${key}" 1
+		;;
+	off|false|0|no)
+		reset_tweak "${key}"
+		;;
+	*)
+		write_error "Invalid state '${state}'. Use on or off."
+		return 64
+		;;
+	esac
+}
+
 apply_profile_cli() {
 	local profile="$1"
 	local profile_file line
@@ -1374,6 +1568,7 @@ main() {
 Usage:
   $(basename "$0") [--help|-h] [--status] [--list-tweaks]
   $(basename "$0") [--apply <tweak-id>...]
+  $(basename "$0") [--set <tweak-id> <on|off>]
   $(basename "$0") [--list-profiles]
   $(basename "$0") [--apply-profile <profile-name>]
   $(basename "$0") [--gtk|--zenity]
@@ -1428,6 +1623,11 @@ EOF
 	--apply)
 		shift
 		apply_tweaks_cli "$@"
+		exit $?
+		;;
+	--set)
+		shift
+		set_tweak_state_cli "${1:-}" "${2:-}"
 		exit $?
 		;;
 	--list-profiles)

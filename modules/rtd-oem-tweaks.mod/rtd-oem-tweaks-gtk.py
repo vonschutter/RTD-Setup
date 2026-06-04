@@ -200,12 +200,12 @@ class TweakWindow(Gtk.Window):
         footer.pack_start(self.summary, True, True, 0)
 
         refresh = Gtk.Button(label="Refresh Status")
-        refresh.connect("clicked", lambda _button: self.refresh_tweaks())
+        refresh.connect("clicked", lambda _button: self.refresh_tweaks(preserve_desired=False))
         footer.pack_end(refresh, False, False, 0)
 
-        apply = Gtk.Button(label="Apply Selected")
+        apply = Gtk.Button(label="Apply Changes")
         apply.get_style_context().add_class("suggested-action")
-        apply.connect("clicked", self.apply_selected)
+        apply.connect("clicked", self.apply_changes)
         footer.pack_end(apply, False, False, 0)
         return footer
 
@@ -222,10 +222,15 @@ class TweakWindow(Gtk.Window):
             tweaks.append(Tweak(*parts))
         return tweaks
 
-    def refresh_tweaks(self):
+    def refresh_tweaks(self, preserve_desired=True):
+        had_state = bool(self.tweaks or self.selected_ids)
         self.tweaks = self.load_tweaks()
         valid_ids = {tweak.id for tweak in self.tweaks}
-        self.selected_ids.intersection_update(valid_ids)
+        applied_ids = {tweak.id for tweak in self.tweaks if tweak.status == "Applied"}
+        if preserve_desired and had_state:
+            self.selected_ids.intersection_update(valid_ids)
+        else:
+            self.selected_ids = applied_ids
         self.rebuild_pages()
         self.summary.set_text(f"Loaded {len(self.tweaks)} tweak options.")
 
@@ -394,7 +399,7 @@ class TweakWindow(Gtk.Window):
         page.pack_start(scroll, True, True, 0)
 
         actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        save = Gtk.Button(label="Save Selected as Profile")
+        save = Gtk.Button(label="Save Enabled as Profile")
         save.connect("clicked", self.save_profile)
         actions.pack_start(save, False, False, 0)
         load = Gtk.Button(label="Load Profile")
@@ -468,24 +473,44 @@ class TweakWindow(Gtk.Window):
     def show_category(self, _button, category):
         self.stack.set_visible_child_name(category)
 
-    def apply_selected(self, _button):
-        selected = self.selected_tweak_ids()
-        if not selected:
-            self.show_info("Nothing selected", "Choose one or more toggles before applying.")
+    def pending_changes(self):
+        changes = []
+        for tweak in self.tweaks:
+            desired = tweak.id in self.selected_ids
+            applied = tweak.status == "Applied"
+            if desired != applied:
+                changes.append((tweak, "on" if desired else "off"))
+        return changes
+
+    def apply_changes(self, _button):
+        changes = self.pending_changes()
+        if not changes:
+            self.show_info("No changes", "All toggles already match the current tweak status.")
             return
-        result = run_backend("--apply", *selected)
-        if result.returncode == 0:
-            self.show_info("Tweaks applied", f"Applied {len(selected)} selected tweak(s).")
-            self.refresh_tweaks()
-        elif result.returncode == 130:
-            self.show_info("Canceled", "No changes were applied.")
+        failures = []
+        canceled = False
+        for tweak, state in changes:
+            result = run_backend("--set", tweak.id, state)
+            if result.returncode == 0:
+                continue
+            if result.returncode == 130:
+                canceled = True
+                break
+            detail = result.stderr.strip() or result.stdout.strip()
+            failures.append(f"{tweak.title}: {detail or 'No details were provided.'}")
+
+        self.refresh_tweaks(preserve_desired=False)
+        if canceled:
+            self.show_info("Canceled", "No further changes were applied.")
+        elif failures:
+            self.show_error("Some changes failed", "\n".join(failures))
         else:
-            self.show_error("Some tweaks failed", result.stderr.strip() or result.stdout.strip())
+            self.show_info("Changes applied", f"Updated {len(changes)} tweak(s).")
 
     def save_profile(self, _button):
         selected = self.selected_tweak_ids()
         if not selected:
-            self.show_info("Nothing selected", "Choose one or more toggles before saving a profile.")
+            self.show_info("Nothing enabled", "Turn on one or more toggles before saving a profile.")
             return
         dialog = Gtk.Dialog(title="Save Profile", transient_for=self, modal=True)
         dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
@@ -545,14 +570,8 @@ class TweakWindow(Gtk.Window):
         if not name:
             self.show_info("No profile selected", "Select a profile first.")
             return
-        result = run_backend("--apply-profile", name)
-        if result.returncode == 0:
-            self.show_info("Profile applied", f"Applied profile {name}.")
-            self.refresh_tweaks()
-        elif result.returncode == 130:
-            self.show_info("Canceled", "Profile application was canceled.")
-        else:
-            self.show_error("Profile failed", result.stderr.strip() or result.stdout.strip())
+        self.load_profile(_button)
+        self.apply_changes(_button)
 
     def delete_profile(self, _button):
         name = self.selected_profile()

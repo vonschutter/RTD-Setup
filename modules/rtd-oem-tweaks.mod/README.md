@@ -1,8 +1,8 @@
 # RTD OEM Tweaks
 
 `rtd-oem-tweaks` is a polished GTK tool for GNOME desktops. It presents
-individual GNOME tweaks as simple toggle rows, shows live applied/not-applied
-state, and can save reusable tweak profiles under
+individual GNOME tweaks as stateful toggle rows, shows live applied/not-applied
+state, can apply or reset supported tweaks from those toggles, and can save reusable tweak profiles under
 `~/.config/rtd/oem-tweak-profiles/`.
 
 It exposes useful GNOME tweak functions from `core/_rtd_library`, including:
@@ -58,8 +58,9 @@ Profiles are simple text files stored in:
 ~/.config/rtd/oem-tweak-profiles/
 ```
 
-Each profile contains one tweak ID per line, making it easy to inspect or copy
-profiles between systems.
+Each profile contains one enabled tweak ID per line, making it easy to inspect
+or copy profiles between systems. In the GTK interface, applying a profile makes
+the current toggles match the profile.
 
 ## Notes
 
