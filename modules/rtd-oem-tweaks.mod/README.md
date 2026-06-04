@@ -22,10 +22,9 @@ intentionally handled by the separate theme tooling, not this tweak tool.
 ## Screenshot
 
 <img
-  src="Media_files/Screenshot.png"
+  src="Media_files/Screenshot-rounded.png"
   alt="RTD OEM Tweaks GTK interface showing stateful GNOME tweak toggles"
   width="100%"
-  style="border-radius: 12px;"
 />
 
 ## Usage
