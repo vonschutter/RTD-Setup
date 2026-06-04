@@ -398,10 +398,12 @@ class TweakWindow(Gtk.Window):
 
         if not profiles:
             row = Gtk.ListBoxRow()
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            box.set_border_width(12)
             label = Gtk.Label(label="No profiles saved yet.")
             label.set_halign(Gtk.Align.START)
-            label.set_border_width(12)
-            row.add(label)
+            box.pack_start(label, False, False, 0)
+            row.add(box)
             row.profile_name = None
             self.profile_list.add(row)
         else:
