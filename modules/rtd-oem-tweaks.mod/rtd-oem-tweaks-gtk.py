@@ -10,7 +10,7 @@ try:
     import gi
 
     gi.require_version("Gtk", "3.0")
-    from gi.repository import Gtk
+    from gi.repository import GdkPixbuf, Gtk
 except (ImportError, ValueError) as error:
     raise SystemExit(
         "RTD OEM Tweaks requires GTK 3 Python bindings (python3-gi): "
@@ -19,9 +19,26 @@ except (ImportError, ValueError) as error:
 
 
 APP_DIR = Path(__file__).resolve().parent
+LINK_DIR = Path(__file__).parent
 BACKEND = APP_DIR / "rtd-oem-tweaks"
 PROFILE_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "rtd" / "oem-tweak-profiles"
 ADVANCED_CATEGORIES = {"Advanced"}
+
+
+def first_existing_path(*paths):
+    for path in paths:
+        if path.is_file():
+            return path
+    return None
+
+
+BANNER = first_existing_path(
+    APP_DIR / "Media_files" / "rtd-oem-tweaks-banner.svg",
+    LINK_DIR / "Media_files" / "rtd-oem-tweaks-banner.svg",
+    Path("/opt/rtd/modules/rtd-oem-tweaks.mod/Media_files/rtd-oem-tweaks-banner.svg"),
+    Path.home() / "GIT/RTD-Setup/modules/rtd-oem-tweaks.mod/Media_files/rtd-oem-tweaks-banner.svg",
+    Path.home() / "RTD-Setup/modules/rtd-oem-tweaks.mod/Media_files/rtd-oem-tweaks-banner.svg",
+)
 
 
 class Tweak:
@@ -124,9 +141,23 @@ class TweakWindow(Gtk.Window):
         return outer
 
     def build_header(self):
+        overlay = Gtk.Overlay()
         header = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        header.set_size_request(-1, 170)
         header.set_border_width(24)
-        header.get_style_context().add_class("header")
+        banner_loaded = False
+
+        if BANNER is not None:
+            try:
+                pixels = GdkPixbuf.Pixbuf.new_from_file_at_scale(str(BANNER), 1100, 170, False)
+                overlay.add(Gtk.Image.new_from_pixbuf(pixels))
+                banner_loaded = True
+            except Exception:
+                header.get_style_context().add_class("header")
+                overlay.add(header)
+        else:
+            header.get_style_context().add_class("header")
+            overlay.add(header)
 
         title = Gtk.Label(label="RTD OEM Tweaks")
         title.set_halign(Gtk.Align.START)
@@ -140,7 +171,9 @@ class TweakWindow(Gtk.Window):
         subtitle.set_line_wrap(True)
         subtitle.get_style_context().add_class("subtitle")
         header.pack_start(subtitle, False, False, 0)
-        return header
+        if banner_loaded:
+            overlay.add_overlay(header)
+        return overlay
 
     def build_sidebar(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
