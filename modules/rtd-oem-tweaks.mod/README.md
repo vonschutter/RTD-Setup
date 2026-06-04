@@ -19,6 +19,15 @@ It exposes useful GNOME tweak functions from `core/_rtd_library`, including:
 Full visual style presets such as Windows, macOS, Corporate Crisp, and Moca are
 intentionally handled by the separate theme tooling, not this tweak tool.
 
+## Screenshot
+
+<img
+  src="Media_files/Screenshot.png"
+  alt="RTD OEM Tweaks GTK interface showing stateful GNOME tweak toggles"
+  width="100%"
+  style="border-radius: 12px;"
+/>
+
 ## Usage
 
 Run the graphical interface:

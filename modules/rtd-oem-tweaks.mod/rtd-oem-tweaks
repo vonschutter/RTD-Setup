@@ -675,13 +675,16 @@ tweak_is_applied() {
 }
 
 initialize_menu_state() {
+	local sync_state="${1:-0}"
 	local key
 
 	for key in "${MENU_KEYS[@]}"; do
 		if tweak_is_applied "${key}"; then
 			MENU_APPLIED["${key}"]="Applied"
+			[[ "${sync_state}" == "1" ]] && MENU_STATE["${key}"]="TRUE"
 		else
 			MENU_APPLIED["${key}"]="Not applied"
+			[[ "${sync_state}" == "1" ]] && MENU_STATE["${key}"]="FALSE"
 		fi
 		: "${MENU_STATE[${key}]:=FALSE}"
 	done
@@ -706,12 +709,7 @@ capture_menu_selection() {
 }
 
 sync_menu_state_from_selection() {
-	local key
-
-	for key in "${MENU_KEYS[@]}"; do
-		MENU_STATE["${key}"]="FALSE"
-	done
-	initialize_menu_state
+	initialize_menu_state 1
 }
 
 show_gtk_menu() {
@@ -727,13 +725,13 @@ show_gtk_menu() {
 		--height 700
 		--separator "|"
 		--print-column 2
-		--ok-label "APPLY"
+		--ok-label "APPLY CHANGES"
 		--cancel-label "EXIT"
 		--extra-button "SAVE PROFILE"
 		--extra-button "LOAD PROFILE"
 		--extra-button "DELETE PROFILE"
-		--text "Select individual tweaks to apply, or load a saved profile.\n\nProfiles are stored in ${PROFILE_DIR}."
-		--column "Apply"
+		--text "Checked tweaks are enabled; unchecked applied tweaks are reset to their defaults.\n\nProfiles are stored in ${PROFILE_DIR}."
+		--column "Enabled"
 		--column "ID"
 		--column "Status"
 		--column "Category"
