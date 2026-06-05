@@ -233,22 +233,76 @@ steam::install_proton_ge ()
 			((_count=_count+1))
 		done
 	}
-	get_ge_proton | yad --progress --auto-close  \
-		--title="$_title" \
+	local _progress_key _image_pid _progress_pid _paned_pid _worker_pid _progress_fifo _progress_fifo_fd _progress_rc
+	_progress_key=$(( (RANDOM * 32768 + RANDOM) % 2000000000 + 1 ))
+	_progress_fifo="$(mktemp -u "/tmp/${_scriptname}.proton-progress.XXXXXX")"
+	mkfifo "${_progress_fifo}"
+	exec {_progress_fifo_fd}<>"${_progress_fifo}"
+
+	GDK_BACKEND=x11 yad --plug="${_progress_key}" --tabnum=1 \
+		--picture \
+		--filename="${_ui_side_bar}" \
+		--size=fit \
+		--no-buttons &
+	_image_pid=$!
+
+	GDK_BACKEND=x11 yad --plug="${_progress_key}" --tabnum=2 \
+		--progress \
 		--text="Installing GE-Proton:" \
-		--image="${_ui_side_bar}" \
 		--percentage=0 \
-		--auto-kill \
-		--auto-close \
-		--width 800 --height 600 \
 		--no-buttons \
 		--enable-log \
 		--log-on-top \
 		--log-expanded \
-		--log-height 400 \
-		--center 
-	rtd_say "${action_items[*]} ${_ui_message_003}" 
-	exit 0
+		--log-height 500 < "${_progress_fifo}" &
+	_progress_pid=$!
+
+	{
+		get_ge_proton
+		_progress_rc=$?
+		echo 100
+		exit "${_progress_rc}"
+	} > "${_progress_fifo}" &
+	_worker_pid=$!
+
+	GDK_BACKEND=x11 yad --paned \
+		--key="${_progress_key}" \
+		--orient=hor \
+		--splitter=240 \
+		--title="$_title" \
+		--width 900 --height 700 \
+		--button="Cancel:1" \
+		--center &
+	_paned_pid=$!
+
+	while kill -0 "${_worker_pid}" 2>/dev/null; do
+		if ! kill -0 "${_paned_pid}" 2>/dev/null; then
+			kill "${_worker_pid}" "${_progress_pid}" "${_image_pid}" 2>/dev/null || true
+			wait "${_worker_pid}" "${_progress_pid}" "${_image_pid}" 2>/dev/null || true
+			exec {_progress_fifo_fd}>&-
+			rm -f "${_progress_fifo}"
+			echo "Installation canceled."
+			return 1
+		fi
+		sleep 0.2
+	done
+
+	wait "${_worker_pid}"
+	_progress_rc=$?
+	kill "${_paned_pid}" "${_progress_pid}" "${_image_pid}" 2>/dev/null || true
+	wait "${_paned_pid}" "${_progress_pid}" "${_image_pid}" 2>/dev/null || true
+	exec {_progress_fifo_fd}>&-
+	rm -f "${_progress_fifo}"
+	[[ ${_progress_rc} -eq 0 ]] || return "${_progress_rc}"
+	GDK_BACKEND=x11 yad --info \
+		--title="$_title" \
+		--text="${action_items[*]} ${_ui_message_003}" \
+		--text-align=left \
+		--image="${_ui_side_bar}" \
+		--button="OK:0" \
+		--width 760 --height 600 \
+		--center
+	return 0
 }
 
 
