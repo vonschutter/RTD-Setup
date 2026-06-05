@@ -41,7 +41,7 @@ This catalog covers the `rtd-*` command entry points shipped in `modules/`. Comm
 | --- | --- | --- | --- |
 | `rtd-security-tool` | Menu-driven security setup and audit actions | Actions can alter host security configuration | [Security Tool](../modules/Security-tool.mod/README.md) |
 | `rtd-check-sec` | Inspect ELF/kernel exploit mitigations | Inspection-oriented command | [Checksec](../modules/rtd-check-sec.mod/README.md) |
-| `rtd-start-vpn-router` | Turn a Linux host into a VPN-backed gateway | Modifies routing and firewall rules | [VPN Router](../modules/rtd-vpn-router.mod/README.md) |
+| `rtd-start-vpn-router` | Turn a Linux host into a VPN-backed gateway | Configures routing/firewall rules; no-argument launches monitor an active service | [VPN Router](../modules/rtd-vpn-router.mod/README.md) |
 | `rtd-nordvpn` | Terminal UI for common NordVPN client actions | Requires a NordVPN account/client | [NordVPN Manager](../modules/nordvpn-manager.mod/README.md) |
 
 ## Specialist Utilities

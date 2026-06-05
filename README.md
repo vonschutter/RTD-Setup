@@ -17,7 +17,7 @@ RTD Power Tools is a collection of interactive administration utilities for Linu
 | View system hardware | `rtd-system-hardware-information` | Shows hardware and sensor information in a dashboard | Desktop UI required |
 | Build a multi-ISO boot USB | `rtd-ventoy-usb` | Installs Ventoy and copies installation media | Erases the selected drive |
 | Build or manage KVM guests | `rtd-vm-tool` | Creates, clones, starts, and maintains virtual machines | Requires KVM/libvirt |
-| Route network traffic through a VPN | `rtd-start-vpn-router` | Configures a Linux host as a VPN gateway | Changes firewall and routing rules |
+| Route network traffic through a VPN | `rtd-start-vpn-router` | Configures a Linux host as a VPN gateway | Changes routing/firewall rules; monitors an active service |
 
 See the full [tool reference](docs/TOOLS.md) or start with the [example workflows](docs/USE_CASES.md).
 

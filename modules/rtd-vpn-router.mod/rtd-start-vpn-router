@@ -3,36 +3,23 @@
 #::                                    VPN Server Firewall configuration script
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#:: Author:   	SLS
-#:: Verssion 1.06
+#:: Author:       SLS
+#:: Version:      1.07
 #::
-#::	Monday 27 November, 2017  - SLS.
-#::		* File originally created.
-#::		* Added setup actions to auto login and auto start router on reboot
+#:: Purpose:      Configure this Linux host as a VPN-backed router that forwards LAN
+#::               traffic through a supported VPN CLI and fails closed if the VPN drops.
 #::
-#::	Purpose: The purpose of the script is to setup iptables (Fire Wall) so that it will forward all traffic through
-#:: 		 a vpn (tun0) and block all traffic if the VPN is down for any reason. This will ensure that
-#:: 		 traffic is not accidentally exposed to evil authorities.
-#::              - Local interface is "ens3"
-#::              - VPN tunnel interface is "tun0"
-#:: 		If either of these are different on your system you must change these in the script.
-#::		The script will, however, try to identify the primary local newtork interface.
+#:: Value:        Useful when a Linux host or VM should act as the default gateway for
+#::               client devices while keeping their internet traffic behind NordVPN,
+#::               Mullvad, or Proton VPN.
 #::
-#::	Value: This is useful when a Linux host or VM should act as a VPN-routed
-#::	       gateway for other machines while failing closed if the VPN is down.
+#:: Usage:        Run with sudo on the machine that should provide VPN-backed routing.
+#::               The script connects the VPN, applies forwarding/NAT firewall rules,
+#::               then opens a terminal monitor.
 #::
-#::	Usage: Run with sudo on the machine that should provide VPN-backed routing.
-#::	       The script will install or configure a supported VPN client and
-#::	       apply the forwarding and NAT rules required for the local network.
+#:: Examples:
+#::               sudo rtd-start-vpn-router
 #::
-#::	Examples:
-#::	       sudo rtd-start-vpn-router
-#::
-#:: You may for example deploy a Debian based VM, and install your preferred VPN, run this script,
-#:: and then configure your client devices to (via DHCP) route all traffic through the VM's IP address.
-#:: This will ensure that all traffic from your LAN to the internet is anonymized, and that traffic is blocked if not.
-#::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 
@@ -44,6 +31,7 @@
 
 if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
 	echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
+	# shellcheck disable=SC2317 # Supports both sourced and executed use.
 	return 1 2>/dev/null || exit 1
 fi
 
@@ -54,42 +42,98 @@ fi
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-# Fail fast on unset vars and pipeline errors where reasonable
 set -o errexit
 set -o pipefail
 set -o nounset
 
-# Environment override settings (allow caller to set before running)
+# Editable routing defaults. Leave blank to auto-detect.
 : "${_LOCALINT:=}"
 : "${_VPNINT:=}"
 : "${_LOCALNET:=}"
 : "${_LOCALSUB:=24}"
-: "${_HOMEDIR:="$HOME"}"
+
+# Editable user-interface and runtime defaults.
 : "${_branding:=VPN Router}"
 : "${me:=${0##*/}}"
-: "${RED:=}"
-: "${YELLOW:=}"
-: "${ENDCOLOR:=}"
+: "${VPN_COUNTRY_TIMEOUT:=10}"
+: "${VPN_INTERFACE_WAIT_SECONDS:=20}"
+: "${VPN_PREFERRED_CLIENT:=}"
+: "${MONITOR_PREFERRED_TOOL:=btop}"
+: "${BYOBU_MONITOR_ENABLED:=1}"
+: "${BYOBU_SESSION_NAME:=rtd-vpn-router}"
+: "${VPN_ROUTER_LOGFILE:=/var/log/rtd/rtd-vpn-router.log}"
+: "${VPN_ROUTER_README:=/tmp/rtd-vpn-router-readme.txt}"
+: "${VPN_ROUTER_NONINTERACTIVE:=0}"
+: "${BANDWIDTH_MONITOR_PREFERRED_TOOL:=speedometer}"
+: "${VPN_ROUTER_SERVICE_NAME:=rtd-vpn-router.service}"
+: "${VPN_ROUTER_INSTALL_PATH:=/usr/local/sbin/rtd-start-vpn-router}"
+: "${VPN_ROUTER_MONITOR_ONLY_WHEN_SERVICE_ACTIVE:=1}"
+: "${VPN_ROUTER_RUN_USER:=}"
 
-NORDVPN_DEB="https://repo.nordvpn.com/deb/nordvpn/debian/pool/main/nordvpn-release_1.0.0_all.deb"
-NORDVPN_RPM="https://repo.nordvpn.com/yum/nordvpn/centos/noarch/Packages/n/nordvpn-release-1.0.0-1.noarch.rpm"
+# Editable vendor package sources.
+NORDVPN_DEB_URL="${NORDVPN_DEB_URL:-https://repo.nordvpn.com/deb/nordvpn/debian/pool/main/nordvpn-release_1.0.0_all.deb}"
+NORDVPN_RPM_URL="${NORDVPN_RPM_URL:-https://repo.nordvpn.com/yum/nordvpn/centos/noarch/Packages/n/nordvpn-release-1.0.0-1.noarch.rpm}"
+PROTONVPN_DEB_RELEASE_URL="${PROTONVPN_DEB_RELEASE_URL:-https://repo.protonvpn.com/debian/dists/stable/main/binary-all/protonvpn-stable-release_1.0.8_all.deb}"
+PROTONVPN_RPM_RELEASE_URL="${PROTONVPN_RPM_RELEASE_URL:-https://repo.protonvpn.com/fedora-$(rpm -E %fedora 2>/dev/null || printf '42')-stable/protonvpn-stable-release/protonvpn-stable-release-1.0.3-1.noarch.rpm}"
+MULLVAD_APT_KEY_URL="${MULLVAD_APT_KEY_URL:-https://repository.mullvad.net/deb/mullvad-keyring.asc}"
+MULLVAD_APT_REPO="${MULLVAD_APT_REPO:-https://repository.mullvad.net/deb/stable}"
+MULLVAD_RPM_REPO_URL="${MULLVAD_RPM_REPO_URL:-https://repository.mullvad.net/rpm/stable/mullvad.repo}"
 
-# Require root; preserve invoking user for safe use
-if [[ "${EUID}" -ne 0 ]]; then
-	echo "This script needs administrative access..."
-	exec sudo -H SUDO_USER="${SUDO_USER:-$USER}" bash "$0" "$@"
-fi
+# Runtime state.
+rtd_menu=""
+VPN_CLIENT=""
+VPN_COUNTRY=""
+MONITOR_TOOL=""
+RUN_USER=""
+RUN_HOME=""
 
-if [[ -z "${SUDO_USER:-}" ]]; then
-	echo "SUDO_USER is not set; run via sudo from a non-root account."
-	exit 1
-fi
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Initialization           ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+usage() {
+	cat <<EOF_USAGE
+Usage:
+  $(basename "$0") [--help|-h]
+  $(basename "$0") --install
+
+Description:
+  Configure the host as a VPN-backed router and fail closed if the VPN drops.
+  Supported VPN CLIs: nordvpn, mullvad, protonvpn/protonvpn-cli.
+  If no supported VPN CLI is installed, the script can offer to install one.
+
+Options:
+  --install                  Install this script as a systemd service and enable
+                             automatic startup after server reboot.
+
+Environment overrides:
+  _LOCALINT                 Local LAN interface. Auto-detected when blank.
+  _VPNINT                   VPN tunnel interface. Auto-detected after connect.
+  _LOCALNET                 Local network address. Auto-derived when blank.
+  _LOCALSUB                 Local network CIDR prefix. Default: 24.
+  VPN_PREFERRED_CLIENT      nordvpn, mullvad, or protonvpn.
+  VPN_COUNTRY_TIMEOUT       Country prompt timeout in seconds. Default: 10.
+  MONITOR_PREFERRED_TOOL    Preferred monitor. Default: btop.
+  BYOBU_MONITOR_ENABLED     Use byobu multi-pane monitor. Default: 1.
+  BYOBU_SESSION_NAME        Byobu session name. Default: rtd-vpn-router.
+  VPN_ROUTER_LOGFILE        Log pane file. Default: /var/log/rtd/rtd-vpn-router.log.
+  VPN_ROUTER_NONINTERACTIVE Skip interactive prompts. Default: 0.
+  VPN_ROUTER_SERVICE_NAME   Systemd service name. Default: rtd-vpn-router.service.
+  VPN_ROUTER_INSTALL_PATH   Installed script path. Default: /usr/local/sbin/rtd-start-vpn-router.
+  VPN_ROUTER_MONITOR_ONLY_WHEN_SERVICE_ACTIVE
+                            With no arguments, monitor an active service instead
+                            of starting another VPN connection. Default: 1.
+  VPN_ROUTER_RUN_USER       User whose home directory should be used by service
+                            and monitor sessions. Auto-detected by default.
+  BANDWIDTH_MONITOR_PREFERRED_TOOL
+                            Preferred bandwidth tool. Default: speedometer.
+EOF_USAGE
+}
 
 rtd::bootstrap_library() {
-	if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
-		echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
-		return 1
-	fi
 	local library_name="${1:-_rtd_library}" minimum_version="" loaded_version path script_dir src_url tmp rc check
 	local -a checks=()
 
@@ -109,7 +153,7 @@ rtd::bootstrap_library() {
 		esac
 	done
 
-	[[ "$library_name" == "_rtd_library" && ${#checks[@]} -eq 0 ]] && checks=(system::log_item library::apply_rtd_defaults)
+	[[ "$library_name" == "_rtd_library" && ${#checks[@]} -eq 0 ]] && checks=(system::log_item library::apply_rtd_defaults software::vendor_download_and_install)
 
 	rtd::bootstrap_library::ok() {
 		loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
@@ -161,34 +205,126 @@ rtd::bootstrap_library() {
 	return 1
 }
 
-if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-	cat <<EOF
-Usage:
-  $(basename "$0") [--help|-h]
+initialize_runtime_user() {
+	RUN_USER="${VPN_ROUTER_RUN_USER:-${SUDO_USER:-${USER:-root}}}"
+	[[ -n "$RUN_USER" ]] || RUN_USER="root"
+	RUN_HOME="$(getent passwd "$RUN_USER" 2>/dev/null | awk -F: '{print $6}' || true)"
+	[[ -n "$RUN_HOME" ]] || RUN_HOME="${HOME:-/root}"
+	export SUDO_USER="$RUN_USER"
+}
 
-Description:
-  Configure the host as a VPN-backed router and fail closed if the VPN drops.
-EOF
-	exit 0
-fi
+initialize_script() {
+	if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+		usage
+		exit 0
+	fi
 
-rtd::bootstrap_library "_rtd_library" || {
-	echo "Failed to load _rtd_library"
-	exit 1
+	if [[ "${EUID}" -ne 0 ]]; then
+		echo "This script needs administrative access..."
+		exec sudo -H SUDO_USER="${SUDO_USER:-$USER}" bash "$0" "$@"
+	fi
+
+	initialize_runtime_user
+
+	rtd::bootstrap_library "_rtd_library" || {
+		echo "Failed to load _rtd_library"
+		exit 1
+	}
+
+	if [[ "${1:-}" == "--install" ]]; then
+		install_systemd_service
+		exit $?
+	fi
 }
 
 
-
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Setup routing for VPN           ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-find_active_newtork_interface (){
-	# Prefer interface used for default route
+cleanup() {
+	_branding=""
+}
+
+require_command() {
+	local command_name="$1" package_name="${2:-$1}"
+	command -v "$command_name" >/dev/null 2>&1 && return 0
+	software::check_native_package_dependency "$package_name"
+}
+
+install_software() {
+	software::check_native_package_dependency "$@"
+}
+
+ensure_optional_package() {
+	local command_name="$1" package_name="${2:-$1}"
+	command -v "$command_name" >/dev/null 2>&1 && return 0
+	install_software "$package_name" >/dev/null 2>&1 || true
+	command -v "$command_name" >/dev/null 2>&1
+}
+
+vendor_download_and_install() {
+	local package_url="$1"
+	mkdir -p "${_OEM_DIR:-/opt/rtd}/cache"
+	software::vendor_download_and_install "$package_url"
+}
+
+install_systemd_service() {
+	local source_script install_path service_file service_name
+	source_script="$(readlink -f "$0")"
+	install_path="$VPN_ROUTER_INSTALL_PATH"
+	service_name="$VPN_ROUTER_SERVICE_NAME"
+	service_file="/etc/systemd/system/${service_name}"
+
+	command -v systemctl >/dev/null 2>&1 || {
+		echo "systemd is required to install ${service_name}."
+		return 1
+	}
+
+	install -d -m 0755 "$(dirname "$install_path")" /etc/systemd/system "$(dirname "$VPN_ROUTER_LOGFILE")"
+	install -m 0755 "$source_script" "$install_path"
+
+	cat >"$service_file" <<EOF_SERVICE
+[Unit]
+Description=RTD VPN Router
+Documentation=man:systemd.service(5)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+Environment=BYOBU_MONITOR_ENABLED=0
+Environment=VPN_ROUTER_NONINTERACTIVE=1
+Environment=VPN_ROUTER_MONITOR_ONLY_WHEN_SERVICE_ACTIVE=0
+Environment=VPN_ROUTER_RUN_USER=${RUN_USER}
+Environment=VPN_ROUTER_LOGFILE=${VPN_ROUTER_LOGFILE}
+Environment=VPN_PREFERRED_CLIENT=${VPN_PREFERRED_CLIENT}
+Environment=_LOCALINT=${_LOCALINT}
+Environment=_VPNINT=${_VPNINT}
+Environment=_LOCALNET=${_LOCALNET}
+Environment=_LOCALSUB=${_LOCALSUB}
+ExecStart=${install_path}
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target
+EOF_SERVICE
+
+	systemctl daemon-reload
+	systemctl enable "$service_name"
+	systemctl restart "$service_name"
+	echo "Installed and started ${service_name}."
+	echo "Installed script: ${install_path}"
+	echo "Service file: ${service_file}"
+	echo "Status: systemctl status ${service_name}"
+}
+
+find_active_newtork_interface() {
 	if [[ -z "${_LOCALINT}" ]]; then
-		_LOCALINT=$(ip route show default 2>/dev/null | awk '{print $5}' | head -n1)
+		_LOCALINT="$(ip route show default 2>/dev/null | awk '{print $5}' | head -n1)"
 	fi
 	if [[ -z "${_LOCALINT}" ]]; then
 		echo "Failed to determine local interface; please set _LOCALINT and rerun."
@@ -198,40 +334,61 @@ find_active_newtork_interface (){
 }
 
 derive_local_network() {
-	if [[ -n "${_LOCALNET}" ]]; then
-		return 0
-	fi
-
 	local cidr
-	cidr=$(ip -4 -o addr show dev "${_LOCALINT}" 2>/dev/null | awk '{print $4}' | head -n1 || true)
+
+	[[ -n "${_LOCALNET}" ]] && return 0
+
+	cidr="$(ip -4 -o addr show dev "${_LOCALINT}" 2>/dev/null | awk '{print $4}' | head -n1 || true)"
 	if [[ -z "$cidr" ]]; then
 		echo "Failed to derive local network for ${_LOCALINT}; please set _LOCALNET and _LOCALSUB."
 		exit 1
 	fi
-	_LOCALNET=${cidr%/*}
-	_LOCALSUB=${cidr#*/}
+	_LOCALNET="${cidr%/*}"
+	_LOCALSUB="${cidr#*/}"
 	echo "Derived local network: ${_LOCALNET}/${_LOCALSUB}"
 }
 
-find_active_bridge_interface () {
-	# Discover VPN tunnel interface (default tun0) unless overridden
+find_active_bridge_interface() {
 	if [[ -z "${_VPNINT}" ]]; then
 		if ip link show tun0 &>/dev/null; then
 			_VPNINT="tun0"
 		else
-			_VPNINT=$(ip -o link show | awk -F': ' '/: tun[0-9]+/ {print $2; exit}')
+			_VPNINT="$(
+				ip -o link show |
+					awk -F': ' '/: (tun[0-9]+|wg[^:@]*|nordlynx|proton[^:@]*|mullvad[^:@]*)/ { sub(/@.*/, "", $2); print $2; exit }'
+			)"
+		fi
+	fi
+	if [[ -z "${_VPNINT}" ]]; then
+		local route_int
+		route_int="$(ip route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i == "dev") {print $(i+1); exit}}' || true)"
+		if [[ -n "$route_int" && "$route_int" != "$_LOCALINT" ]]; then
+			_VPNINT="$route_int"
 		fi
 	fi
 	if [[ -z "${_VPNINT}" ]]; then
 		echo "Failed to determine VPN interface; please set _VPNINT and rerun."
-		exit 1
+		return 1
 	fi
 	echo "VPN interface is: ${_VPNINT}"
 }
 
+wait_for_vpn_interface() {
+	local attempt
 
+	for ((attempt = 1; attempt <= VPN_INTERFACE_WAIT_SECONDS; attempt++)); do
+		_VPNINT=""
+		if find_active_bridge_interface; then
+			return 0
+		fi
+		sleep 1
+	done
 
-setup_routing_for_vpn () {
+	echo "VPN connect command returned, but no VPN interface was found."
+	exit 1
+}
+
+setup_routing_for_vpn() {
 	echo #---------------------------------------------------------------
 	echo "Checking for iptables and install if not there..."
 	echo #---------------------------------------------------------------
@@ -259,15 +416,15 @@ setup_routing_for_vpn () {
 	echo #---------------------------------------------------------------
 	echo "Allow loopback and established connections."
 	echo #---------------------------------------------------------------
-	iptables -A INPUT  -i lo  -j ACCEPT
-	iptables -A OUTPUT -o lo  -j ACCEPT
+	iptables -A INPUT -i lo -j ACCEPT
+	iptables -A OUTPUT -o lo -j ACCEPT
 	iptables -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 	iptables -A OUTPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 
 	echo #---------------------------------------------------------------
 	echo "Allow LAN traffic on local interface."
 	echo #---------------------------------------------------------------
-	iptables -A INPUT  -i "${_LOCALINT}" -s "${_LOCALNET}/${_LOCALSUB}" -j ACCEPT
+	iptables -A INPUT -i "${_LOCALINT}" -s "${_LOCALNET}/${_LOCALSUB}" -j ACCEPT
 	iptables -A OUTPUT -o "${_LOCALINT}" -d "${_LOCALNET}/${_LOCALSUB}" -j ACCEPT
 
 	echo #---------------------------------------------------------------
@@ -277,9 +434,9 @@ setup_routing_for_vpn () {
 	iptables -A FORWARD -i "${_VPNINT}" -j ACCEPT
 	iptables -A OUTPUT -o "${_VPNINT}" -j ACCEPT
 
-	#---------------------------------------------------------------
+	echo #---------------------------------------------------------------
 	echo "Forward all traffic to this host through the VPN."
-	#---------------------------------------------------------------
+	echo #---------------------------------------------------------------
 	sysctl -w net.ipv4.ip_forward=1 >/dev/null
 	iptables -A FORWARD -o "${_VPNINT}" -i "${_LOCALINT}" -s "${_LOCALNET}/${_LOCALSUB}" -m conntrack --ctstate NEW -j ACCEPT
 	iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
@@ -287,43 +444,89 @@ setup_routing_for_vpn () {
 	iptables-save | tee /etc/iptables.sav >/dev/null
 }
 
-
-
-run_nordvpn() {
-	if hash nordvpn 2>/dev/null; then
-		nordvpn connect
-
+get_codename() {
+	if command -v lsb_release >/dev/null 2>&1; then
+		lsb_release -cs
+	elif [[ -r /etc/os-release ]]; then
+		# shellcheck source=/dev/null
+		. /etc/os-release
+		echo "${VERSION_CODENAME:-stable}"
 	else
-		if ($rtd_menu --title "$_branding helper: Get VPN" --yesno "Nordvpn is not installed... I need to download it from the internet. Is this OK?" 8 78); then
-			echo "OK Thank you. Geting Nordvpn from the website..."
-			if hash rpm 2>/dev/null; then
-				sudo rpm -ivh "$NORDVPN_RPM" || sudo yum update -y
-				sudo yum install -y nordvpn && nordvpn connect || err_nordvpn_install
-			elif hash apt 2>/dev/null; then
-				tmp_pkg=$(mktemp)
-				if wget -q "$NORDVPN_DEB" -O "$tmp_pkg"; then
-					sudo dpkg -i "$tmp_pkg" || true
-					rm -f "$tmp_pkg"
-					sudo apt-get -f install -y
-					sudo apt-get update
-					sudo DEBIAN_FRONTEND=noninteractive apt-get -y install nordvpn || err_nordvpn_install
-					nordvpn connect || err_nordvpn_install
-				else
-					err_nordvpn_install
-				fi
-			else
-				err_nordvpn_install
-			fi
-		else
-			$rtd_menu --title "$_branding helper: Get VPN" --msgbox "Nordvpn was not installed... Without the VPN software I cannot continue. My appologies, but I must exit." 8 78
-			_cleanup
-			exit
-		fi
-
+		echo "stable"
 	fi
 }
 
+install_nordvpn_client() {
+	echo "Installing NordVPN repository package..."
+	if command -v apt-get >/dev/null 2>&1; then
+		vendor_download_and_install "$NORDVPN_DEB_URL"
+		apt-get update
+		install_software nordvpn
+	elif command -v rpm >/dev/null 2>&1; then
+		vendor_download_and_install "$NORDVPN_RPM_URL"
+		install_software nordvpn
+	else
+		err_vpn_install
+	fi
+
+	command -v nordvpn >/dev/null 2>&1
+}
+
+ensure_mullvad_repo() {
+	if command -v apt-get >/dev/null 2>&1; then
+		if [[ ! -f /etc/apt/sources.list.d/mullvad.list ]]; then
+			install_software curl gpg
+			curl -fsSL "$MULLVAD_APT_KEY_URL" -o /usr/share/keyrings/mullvad-keyring.asc
+			echo "deb [signed-by=/usr/share/keyrings/mullvad-keyring.asc arch=$(dpkg --print-architecture)] ${MULLVAD_APT_REPO} stable main" | tee /etc/apt/sources.list.d/mullvad.list >/dev/null
+			apt-get update
+		fi
+	elif command -v dnf >/dev/null 2>&1 || command -v yum >/dev/null 2>&1; then
+		if [[ ! -f /etc/yum.repos.d/mullvad.repo ]]; then
+			require_command curl
+			curl -fsSL "$MULLVAD_RPM_REPO_URL" -o /etc/yum.repos.d/mullvad.repo
+		fi
+	fi
+}
+
+ensure_protonvpn_repo() {
+	if command -v apt-get >/dev/null 2>&1; then
+		vendor_download_and_install "$PROTONVPN_DEB_RELEASE_URL"
+		apt-get update
+	elif command -v rpm >/dev/null 2>&1; then
+		vendor_download_and_install "$PROTONVPN_RPM_RELEASE_URL" || true
+	fi
+}
+
+install_vpn_client() {
+	local choice="$1"
+	case "$choice" in
+		nordvpn)
+			install_nordvpn_client
+			;;
+		mullvad)
+			ensure_mullvad_repo
+			install_software mullvad-vpn
+			;;
+		protonvpn)
+			ensure_protonvpn_repo
+			install_software proton-vpn-cli || install_software protonvpn-cli
+			;;
+		*)
+			return 1
+			;;
+	esac
+}
+
 detect_vpn_client() {
+	if [[ -n "$VPN_PREFERRED_CLIENT" ]]; then
+		case "$VPN_PREFERRED_CLIENT" in
+			nordvpn|mullvad|protonvpn)
+				echo "$VPN_PREFERRED_CLIENT"
+				return 0
+				;;
+		esac
+	fi
+
 	if command -v nordvpn >/dev/null 2>&1; then
 		echo "nordvpn"
 	elif command -v mullvad >/dev/null 2>&1; then
@@ -335,225 +538,331 @@ detect_vpn_client() {
 	fi
 }
 
-get_codename() {
-	if command -v lsb_release >/dev/null 2>&1; then
-		lsb_release -cs
-	elif [[ -r /etc/os-release ]]; then
-		. /etc/os-release
-		echo "${VERSION_CODENAME:-stable}"
+protonvpn_command() {
+	if command -v protonvpn >/dev/null 2>&1; then
+		echo "protonvpn"
+	elif command -v protonvpn-cli >/dev/null 2>&1; then
+		echo "protonvpn-cli"
+	fi
+}
+
+prompt_vpn_country() {
+	local answer=""
+	local prompt
+
+	if [[ "${VPN_ROUTER_NONINTERACTIVE}" == "1" ]]; then
+		echo ""
+		return 0
+	fi
+
+	prompt=$'Country to connect to (optional).\nUse a country code such as SE, US, DE, or leave blank.\nContinuing uses the nearest/fastest server: '
+	if [[ -r /dev/tty && -w /dev/tty ]]; then
+		printf '\n%s' "$prompt" >/dev/tty
+		if read -r -t "$VPN_COUNTRY_TIMEOUT" answer </dev/tty; then
+			printf '\n' >/dev/tty
+		else
+			printf '\nNo country selected; using nearest/fastest server.\n' >/dev/tty
+			answer=""
+		fi
 	else
-		echo "stable"
+		read -r -t "$VPN_COUNTRY_TIMEOUT" -p "$prompt" answer || answer=""
 	fi
-}
 
-ensure_mullvad_repo() {
-	if command -v apt-get >/dev/null 2>&1; then
-		if [[ ! -f /etc/apt/sources.list.d/mullvad.list ]]; then
-			curl -fsSL https://repository.mullvad.net/deb/mullvad-keyring.asc | gpg --dearmor -o /usr/share/keyrings/mullvad-keyring.gpg
-			echo "deb [signed-by=/usr/share/keyrings/mullvad-keyring.gpg] https://repository.mullvad.net/deb/stable $(get_codename) main" | tee /etc/apt/sources.list.d/mullvad.list >/dev/null
-			apt-get update
-		fi
-	elif command -v dnf >/dev/null 2>&1 || command -v yum >/dev/null 2>&1; then
-		if [[ ! -f /etc/yum.repos.d/mullvad.repo ]]; then
-			cat >/etc/yum.repos.d/mullvad.repo <<'EOF'
-[mullvad]
-name=Mullvad VPN
-baseurl=https://repository.mullvad.net/rpm/stable/$basearch
-enabled=1
-gpgcheck=1
-gpgkey=https://repository.mullvad.net/rpm/mullvad-keyring.asc
-EOF
-		fi
-	fi
-}
-
-ensure_protonvpn_repo() {
-	if command -v apt-get >/dev/null 2>&1; then
-		if [[ ! -f /etc/apt/sources.list.d/protonvpn.list ]]; then
-			curl -fsSL https://repo.protonvpn.com/debian/public_key.asc -o /usr/share/keyrings/protonvpn.asc
-			echo "deb [signed-by=/usr/share/keyrings/protonvpn.asc] https://repo.protonvpn.com/debian stable main" | tee /etc/apt/sources.list.d/protonvpn.list >/dev/null
-			apt-get update
-		fi
-	fi
-}
-
-install_vpn_client() {
-	local choice="$1"
-	case "$choice" in
-		nordvpn)
-			run_nordvpn
-			;;
-		mullvad)
-			if hash apt-get >/dev/null 2>&1; then
-				ensure_mullvad_repo
-				install_software mullvad-vpn
-			elif hash yum >/dev/null 2>&1 || hash dnf >/dev/null 2>&1; then
-				ensure_mullvad_repo
-				install_software mullvad-vpn
-			else
-				err_nordvpn_install
-			fi
-			;;
-		protonvpn)
-			if hash apt-get >/dev/null 2>&1; then
-				ensure_protonvpn_repo
-				install_software protonvpn-cli
-			elif hash yum >/dev/null 2>&1 || hash dnf >/dev/null 2>&1; then
-				install_software protonvpn-cli
-			else
-				err_nordvpn_install
-			fi
-			;;
-		*)
-			return 1
-			;;
-	esac
+	answer="${answer#"${answer%%[![:space:]]*}"}"
+	answer="${answer%"${answer##*[![:space:]]}"}"
+	echo "$answer"
 }
 
 connect_vpn_client() {
-	local choice="$1"
+	local choice="$1" country="${2:-}" proton_cmd=""
 	case "$choice" in
 		nordvpn)
-			nordvpn connect
+			if [[ -n "$country" ]]; then
+				nordvpn connect "$country" || nordvpn connect
+			else
+				nordvpn connect
+			fi
 			;;
 		mullvad)
+			if [[ -n "$country" ]]; then
+				mullvad relay set location "${country,,}" || return 1
+			fi
 			mullvad connect
 			;;
 		protonvpn)
-			if command -v protonvpn-cli >/dev/null 2>&1; then
-				protonvpn-cli c -f
+			proton_cmd="$(protonvpn_command)"
+			[[ -n "$proton_cmd" ]] || return 1
+			if [[ "$proton_cmd" == "protonvpn" ]]; then
+				if [[ -n "$country" ]]; then
+					protonvpn connect --country "$country" || protonvpn connect -c "$country" || protonvpn connect
+				else
+					protonvpn connect
+				fi
 			else
-				protonvpn c -f
+				if [[ -n "$country" ]]; then
+					protonvpn-cli c --cc "$country" || protonvpn-cli connect --country "$country" || protonvpn-cli connect -c "$country" || protonvpn-cli c -f
+				else
+					protonvpn-cli c -f || protonvpn-cli connect --fastest || protonvpn-cli connect
+				fi
 			fi
 			;;
 		*)
 			return 1
 			;;
 	esac
+}
+
+check_menu_availability() {
+	if command -v whiptail >/dev/null 2>&1; then
+		rtd_menu="whiptail"
+	elif command -v dialog >/dev/null 2>&1; then
+		rtd_menu="dialog"
+	else
+		err_no_menu_system_found
+	fi
+}
+
+choose_vpn_to_install() {
+	local choice=""
+
+	if [[ -n "$rtd_menu" ]]; then
+		choice="$($rtd_menu --menu "No supported VPN CLI was found. Select one to install." 15 70 3 \
+			"nordvpn" "NordVPN" \
+			"mullvad" "Mullvad VPN" \
+			"protonvpn" "Proton VPN CLI" \
+			3>&1 1>&2 2>&3)"
+	else
+		read -r -p "No VPN client found. Install which? [nordvpn/mullvad/protonvpn]: " choice
+	fi
+
+	choice="${choice,,}"
+	[[ -n "$choice" ]] || return 1
+	echo "$choice"
 }
 
 run_vpn() {
 	local vpn_client choice=""
-	vpn_client=$(detect_vpn_client)
+	vpn_client="$(detect_vpn_client)"
 
 	if [[ -z "$vpn_client" ]]; then
-		# Prompt user to install a client
-		if [[ -n "${rtd_menu:-}" ]]; then
-			choice=$($rtd_menu --menu "Select VPN client to install" 15 70 3 \
-				"nordvpn" "NordVPN" \
-				"mullvad" "Mullvad VPN" \
-				"protonvpn" "Proton VPN" \
-				3>&1 1>&2 2>&3)
-		else
-			read -p "No VPN client found. Install which? [nordvpn/mullvad/protonvpn]: " choice
-		fi
-		choice=${choice,,}
-		if [[ -z "$choice" ]]; then
+		choice="$(choose_vpn_to_install)" || {
 			echo "No VPN client selected; exiting."
 			exit 1
-		fi
-		if ! install_vpn_client "$choice"; then
+		}
+		install_vpn_client "$choice" || {
 			echo "Failed to install VPN client: $choice"
 			exit 1
-		fi
+		}
 		vpn_client="$choice"
 	fi
 
-	connect_vpn_client "$vpn_client" || {
+	VPN_CLIENT="$vpn_client"
+	VPN_COUNTRY="$(prompt_vpn_country)"
+	echo "Connecting ${VPN_CLIENT}${VPN_COUNTRY:+ to ${VPN_COUNTRY}}..."
+	connect_vpn_client "$VPN_CLIENT" "$VPN_COUNTRY" || {
 		echo "Failed to start VPN client: $vpn_client"
 		exit 1
 	}
 }
 
-
-
-_cleanup () {
-	_branding=
-}
-
-
-
-err_nordvpn_install () {
-	$rtd_menu --title "$_branding helper: PROBLEM" --msgbox "	I was not able to install the selected VPN client for you. Please do it manually and try again" 0 110
-	_cleanup
-	exit 1
-}
-
-
-
-err_no_menu_system_available () {
-	echo "There is no menu or dialog software installed on this system..."
-	echo "If you want to use $me you must ensure that whiptail or dialog is installed."
-	read -p "Press [ENTER] to exit... "
-	_cleanup
-	exit 1
-}
-
-
-
-check_menu_availability () {
-	# First discover what menu system is installed. Some systems use "dialog" and
-	# other systems use whiptail for the terminal to show menus and dialogs.
-	# If nothing is found, then make sure it is available before continuing.
-	if hash whiptail >/dev/null 2>&1 ; then
-		export rtd_menu=whiptail
-	elif hash dialog >/dev/null 2>&1 ; then
-		export rtd_menu=dialog
-	else
-		err_no_menu_system_found
+ensure_monitor_tool() {
+	if ((BYOBU_MONITOR_ENABLED)); then
+		ensure_optional_package byobu byobu || true
+		ensure_optional_package htop htop || true
+		ensure_optional_package "$BANDWIDTH_MONITOR_PREFERRED_TOOL" "$BANDWIDTH_MONITOR_PREFERRED_TOOL" || true
+		ensure_optional_package nload nload || true
 	fi
 
+	if command -v "$MONITOR_PREFERRED_TOOL" >/dev/null 2>&1; then
+		MONITOR_TOOL="$MONITOR_PREFERRED_TOOL"
+		return 0
+	fi
+
+	echo "${MONITOR_PREFERRED_TOOL} is not installed; attempting to install btop for live monitoring."
+	install_software btop || true
+	if command -v btop >/dev/null 2>&1; then
+		MONITOR_TOOL="btop"
+	elif command -v htop >/dev/null 2>&1; then
+		MONITOR_TOOL="htop"
+	else
+		MONITOR_TOOL="top"
+	fi
 }
 
+write_monitor_readme() {
+	mkdir -p "$(dirname "$VPN_ROUTER_README")" "$(dirname "$VPN_ROUTER_LOGFILE")" 2>/dev/null || true
+	cat >"$VPN_ROUTER_README" <<EOF_README
+FIREWALL VPN ROUTER
 
+- Detach from this monitoring console with F6.
+- Reattach with: sudo -H byobu attach -t ${BYOBU_SESSION_NAME}
+- VPN client: ${VPN_CLIENT:-unknown}
+- VPN interface: ${_VPNINT:-unknown}
+- LAN interface: ${_LOCALINT:-unknown}
+- LAN network: ${_LOCALNET:-unknown}/${_LOCALSUB:-unknown}
 
-err_no_menu_system_found () {
-	echo -e "$RED There is no way to display menus on this system $ENDCOLOR"
-	echo -e "This is required to display the choices of countries..."
-	echo -e "$YELLOW May I attepmpt to install this ability to your system? $ENDCOLOR"
-	read -p "Add software: (y/n)?" choice
+Quick checks:
+  ip route get 1.1.1.1
+  iptables -S
+  iptables -t nat -S
+  journalctl -f
+EOF_README
+}
+
+append_monitor_log() {
+	mkdir -p "$(dirname "$VPN_ROUTER_LOGFILE")" 2>/dev/null || true
+	{
+		printf '\n[%s] VPN router active\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+		printf 'VPN client: %s\n' "${VPN_CLIENT:-unknown}"
+		printf 'VPN country: %s\n' "${VPN_COUNTRY:-nearest/fastest}"
+		printf 'VPN interface: %s\n' "${_VPNINT:-unknown}"
+		printf 'LAN interface: %s\n' "${_LOCALINT:-unknown}"
+		printf 'LAN network: %s/%s\n' "${_LOCALNET:-unknown}" "${_LOCALSUB:-unknown}"
+	} >>"$VPN_ROUTER_LOGFILE" 2>/dev/null || true
+}
+
+bandwidth_monitor_command() {
+	if command -v speedometer >/dev/null 2>&1; then
+		printf 'speedometer -r %q -t %q' "$_VPNINT" "$_VPNINT"
+	elif command -v nload >/dev/null 2>&1; then
+		printf 'nload %q' "$_VPNINT"
+	else
+		printf 'watch -n 1 %q' "ip -s link show dev $_VPNINT"
+	fi
+}
+
+process_monitor_command() {
+	if command -v htop >/dev/null 2>&1; then
+		printf 'htop'
+	else
+		printf 'top'
+	fi
+}
+
+start_byobu_monitoring() {
+	local session="$BYOBU_SESSION_NAME"
+	local process_cmd bandwidth_cmd quick_cmd
+
+	command -v byobu >/dev/null 2>&1 || return 1
+	process_cmd="$(process_monitor_command)"
+	bandwidth_cmd="$(bandwidth_monitor_command)"
+	write_monitor_readme
+	append_monitor_log
+	quick_cmd="cd ${RUN_HOME@Q}; cat ${VPN_ROUTER_README@Q}; exec bash"
+
+	byobu kill-session -t "$session" >/dev/null 2>&1 || true
+	byobu new-session -d -s "$session" -n status "$process_cmd"
+	byobu split-window -h -t "$session:0.0" "$quick_cmd"
+	byobu split-window -v -t "$session:0.0" "touch ${VPN_ROUTER_LOGFILE@Q}; tail -n 80 -f ${VPN_ROUTER_LOGFILE@Q}"
+	byobu split-window -v -t "$session:0.1" "$bandwidth_cmd"
+	byobu select-pane -t "$session:0.1"
+	byobu attach-session -t "$session"
+}
+
+start_monitoring() {
+	echo "VPN routing is active through ${_VPNINT}."
+	if [[ "${BYOBU_MONITOR_ENABLED}" == "0" ]]; then
+		append_monitor_log
+		echo "Interactive monitoring disabled; keeping service process active."
+		exec tail -n 0 -F "$VPN_ROUTER_LOGFILE"
+	fi
+
+	if ((BYOBU_MONITOR_ENABLED)) && start_byobu_monitoring; then
+		return 0
+	fi
+
+	echo "Starting monitor: ${MONITOR_TOOL}"
+	case "$MONITOR_TOOL" in
+		btop|htop)
+			exec "$MONITOR_TOOL"
+			;;
+		*)
+			exec top
+			;;
+	esac
+}
+
+vpn_router_service_is_active() {
+	command -v systemctl >/dev/null 2>&1 || return 1
+	systemctl is-active --quiet "$VPN_ROUTER_SERVICE_NAME"
+}
+
+monitor_existing_service_only() {
+	[[ "$#" -eq 0 ]] || return 1
+	[[ "$VPN_ROUTER_NONINTERACTIVE" != "1" ]] || return 1
+	[[ "$VPN_ROUTER_MONITOR_ONLY_WHEN_SERVICE_ACTIVE" == "1" ]] || return 1
+	vpn_router_service_is_active
+}
+
+start_existing_service_monitor() {
+	echo "${VPN_ROUTER_SERVICE_NAME} is already active; starting monitor only."
+	find_active_newtork_interface
+	derive_local_network
+	wait_for_vpn_interface
+	ensure_monitor_tool
+	start_monitoring
+}
+
+err_vpn_install() {
+	if [[ -n "$rtd_menu" ]]; then
+		$rtd_menu --title "$_branding helper: PROBLEM" --msgbox "I was not able to install the selected VPN client. Please install it manually and try again." 8 90
+	else
+		echo "I was not able to install the selected VPN client. Please install it manually and try again."
+	fi
+	cleanup
+	exit 1
+}
+
+err_no_menu_system_available() {
+	echo "There is no menu or dialog software installed on this system."
+	echo "If you want to use $me you must ensure that whiptail or dialog is installed."
+	read -r -p "Press [ENTER] to exit... "
+	cleanup
+	exit 1
+}
+
+err_no_menu_system_found() {
+	echo "There is no way to display menus on this system."
+	echo "This is required to display the VPN client install choices."
+	read -r -p "May I attempt to install whiptail? (y/n)? " choice
 	case "$choice" in
-	  y|Y ) install_software whiptail ;;
-	  n|N ) err_no_menu_system_available ;;
-	  * ) echo "Invalid Selection" && err_no_menu_system_found ;;
+		y|Y)
+			install_software whiptail
+			;;
+		n|N)
+			err_no_menu_system_available
+			;;
+		*)
+			echo "Invalid Selection"
+			err_no_menu_system_found
+			;;
 	esac
 }
 
 
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-install_software () {
-	if hash pkcon 2>/dev/null; then
-		sudo pkcon -y  install "$@"
-	elif hash yum 2>/dev/null; then
-		sudo yum -y  install "$@"
-	elif hash zypper 2>/dev/null; then
-		sudo zypper install -y "$@"
-	elif hash apt-get 2>/dev/null; then
-		export DEBIAN_FRONTEND=noninteractive
-		sudo apt-get -y -qq --allow-change-held-packages --ignore-missing install "$@"
-	else
-		echo -e "$YELLOW This system does not seem to have a software managment system $ENDCOLOR"
-		err_no_menu_system_available
-		_cleanup
-		exit 1
+main() {
+	initialize_script "$@"
+	pushd "$RUN_HOME" >/dev/null || echo "Failed to enter $RUN_HOME"
+
+	if monitor_existing_service_only "$@"; then
+		start_existing_service_monitor
+		return $?
 	fi
+
+	find_active_newtork_interface
+	derive_local_network
+	check_menu_availability
+	ensure_monitor_tool
+	run_vpn
+	wait_for_vpn_interface
+	setup_routing_for_vpn
+	start_monitoring
 }
 
-
-
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Connect VPN                     ::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#
-# This script routes LAN traffic through a VPN and fails closed if the VPN drops.
-# Ensure you have valid VPN credentials/config prior to running.
-
-pushd "/home/$SUDO_USER" || echo "Failed to enter /home/$SUDO_USER "
-find_active_newtork_interface
-find_active_bridge_interface
-derive_local_network
-check_menu_availability
-setup_routing_for_vpn
-run_vpn
+main "$@"

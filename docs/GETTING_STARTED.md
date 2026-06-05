@@ -80,7 +80,7 @@ System-level RTD logs are generally written under `/var/log/rtd`. User-level ope
 | Operation | Tool | Why to review it carefully |
 | --- | --- | --- |
 | USB creation | `rtd-ventoy-usb` | Erases and formats the selected target drive |
-| VPN gateway setup | `rtd-start-vpn-router` | Changes routing and firewall behavior |
+| VPN gateway setup | `rtd-start-vpn-router` | Changes routing/firewall behavior; monitors an active service on no-argument launch |
 | Security configuration | `rtd-security-tool` | May alter firewall, audit, password, or intrusion-detection configuration |
 | User backup | `rtd-oem-backup-linux-config` | Creates encrypted archives; passphrase and destination are essential |
 | Virtual machines | `rtd-vm-tool`, `rtd-macos-kvm`, `rtd-setup-whonix.sh` | Installs virtualization dependencies and creates disk images/domains |

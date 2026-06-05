@@ -100,6 +100,8 @@ sudo rtd-start-vpn-router
 
 The tool configures routing and firewall rules and can assist with supported VPN clients. Set a stable address for the gateway host before directing client devices to it. Perform this workflow from a connection path that will not be lost if routing changes require correction.
 
+Use `sudo rtd-start-vpn-router --install` to enable automatic startup after reboot. When that service is already active, running `sudo rtd-start-vpn-router` with no parameters opens the monitor only instead of starting another VPN connection.
+
 For simple interactive NordVPN use on one computer, use:
 
 ```bash

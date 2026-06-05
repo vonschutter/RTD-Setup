@@ -50,6 +50,8 @@ To watch a replay simply click watch replay and select the replay you want to wa
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 _scriptname="$(basename $0)"
+_scriptpath="$(readlink -f "$0")"
+_script_dir="$(dirname "$_scriptpath")"
 _tla="${_scriptname:0:3}"
 _log_dir="$HOME/.config/${_tla}/logs" ; mkdir -p $_log_dir
 _log_file="$_log_dir/${_scriptname}.log" ; touch $_log_file
@@ -67,10 +69,11 @@ _wot_app_id="1407200"
 _title="RTD Unofficial Steam World of Tanks Utility"
 _steam_install_url_rpm="https://steamcdn-a.akamaihd.net/client/installer/steam.rpm"
 _steam_install_url_deb="https://steamcdn-a.akamaihd.net/client/installer/steam.deb"
-_ui_side_bar="$(find /opt/$_tla -name swot-sideimg.png)"
-_ui_header="$(find /opt/$_tla -name swot-header-sm.png)"
+_ui_side_bar="$(find "$_script_dir" -name swot-sideimg.png)"
+_ui_header="$(find "$_script_dir" -name swot-header-sm.png)"
 _ge_proton_target_dir="$HOME/.steam/root/compatibilitytools.d/"
-_ge_proton_repo="https://github.com/GloriousEggroll/proton-ge-custom/releases"
+_ge_proton_releases_api="https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases"
+_ge_proton_download_base="https://github.com/GloriousEggroll/proton-ge-custom/releases/download"
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 	cat <<EOF
@@ -148,12 +151,37 @@ software::vendor_download_and_install ()
 
 
 
+steam::get_proton_ge_versions ()
+{
+	curl -fsSL "${_ge_proton_releases_api}" |
+		sed -n 's/^[[:space:]]*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' |
+		grep -E '^GE-Proton[0-9]+[-.][0-9]+' |
+		awk '!seen[$0]++' |
+		head -n 30
+}
+
+
+
+
+
 steam::install_proton_ge ()
 {
-	gelist="$(curl -s "${_ge_proton_repo}" | grep 'GE-Proton*-*' | grep -v 'span' | grep -v 'div' | grep -v 'href' | grep -v 'class')"
-	versions=($( for i in ${gelist} ; do echo FALSE $i ; done))
+	mapfile -t gelist < <(steam::get_proton_ge_versions)
+	if [[ ${#gelist[@]} -eq 0 ]]; then
+		yad --error \
+			--title="$_title" \
+			--text="I could not find any GE-Proton releases from GitHub. Please check your internet connection and try again." \
+			--image="${_ui_header}" \
+			--width 780 --height 220
+		return 1
+	fi
 
-	selected_versions=$(yad --title "Select GE-Proton Versions to Install" \
+	versions=()
+	for version in "${gelist[@]}" ; do
+		versions+=(FALSE "$version")
+	done
+
+	if ! selected_versions=$(yad --title "Select GE-Proton Versions to Install" \
 		--list --checklist \
 		--column "Select" --column "Version" \
 		--width 780 --height 500 \
@@ -161,13 +189,17 @@ steam::install_proton_ge ()
 		--button="Install:0" --button="Cancel:1" \
 		--print-column="2" --multiple --separator=" " \
 		--separator=" " \
-		--image="${_ui_header}" )
-
-	if [ $? -ne 0 ]; then
+		--image="${_ui_header}" ); then
 		echo "Installation canceled."
 		return 1
 	fi
-	action_items=($( for i in ${selected_versions} ; do echo $i ; done))
+
+	read -r -a action_items <<< "${selected_versions}"
+	if [[ ${#action_items[@]} -eq 0 ]]; then
+		echo "No GE-Proton versions selected."
+		return 0
+	fi
+
 	echo "Installing the following versions: ${action_items[*]}"
 	get_ge_proton () {
 		target_dir="$_ge_proton_target_dir"
@@ -175,9 +207,9 @@ steam::install_proton_ge ()
 		local _total_count=${#action_items[*]}
 		local _count=1
 
-		for version in ${action_items[*]} ; do
+		for version in "${action_items[@]}" ; do
 			echo "# Processing ${_count} of ${_total_count}: ${version}..."
-			url="${_ge_proton_repo}/download/$version/$version.tar.gz"
+			url="${_ge_proton_download_base}/$version/$version.tar.gz"
 
 			if [[ -d "${target_dir}/${version}" ]]; then
 				echo "# $version is allready installed..." 
@@ -197,8 +229,8 @@ steam::install_proton_ge ()
 				fi
 				rm "${target_dir}/${version}.tar.gz" 
 			fi
+			echo $(( 100*_count/_total_count ))
 			((_count=_count+1))
-			echo $(( 100*${_count}/${_total_count} ))
 		done
 	}
 	get_ge_proton | yad --progress --auto-close  \
