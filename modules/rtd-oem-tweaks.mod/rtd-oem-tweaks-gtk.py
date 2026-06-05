@@ -1,4 +1,27 @@
 #!/usr/bin/env python3
+#
+#::                                       A D M I N   T O O L
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::// RTD OEM GNOME Tweaks GTK Frontend //::::::::::::::::::::::// Linux //:::::::::
+#:: Author(s):    RTD
+#:: Version:      1.13
+#::
+#:: Purpose:      Provide a GTK frontend for the RTD OEM GNOME Tweaks backend.
+#::               It displays available tweaks, profiles, and status in a desktop GUI.
+#::
+#:: Value:        Makes the OEM tweak workflow easier to scan and operate than a
+#::               terminal checklist while keeping the Bash backend as the source
+#::               of truth for applying settings and reporting status.
+#::
+#:: Usage:        Run the frontend to open the graphical tweak manager.
+#::               Select tweaks or profiles, then apply them through the interface.
+#::
+#:: Examples:
+#::               rtd-oem-tweaks-gtk.py
+#::               ./rtd-oem-tweaks-gtk.py
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 """GTK frontend for RTD OEM Tweaks."""
 
 from pathlib import Path
