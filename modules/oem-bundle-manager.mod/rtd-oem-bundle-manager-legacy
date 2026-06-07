@@ -1,0 +1,546 @@
+#!/bin/bash
+
+#
+#::                                       A D M I N   T O O L
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:::::::::::::::::::::::::::::::::::::::// RTD OEM bundle manager //::::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Author(s):   	Vonschutter
+#:: Version 1.00
+#::
+#::
+#::	Purpose: - The purpose of the script is to setup extra apps/config that is useful for a complete and productive environment.
+#::		 - Feature: this script "detects" how to install and update software and and tweak the system.
+#::		 - Flexible: This script works on several distributions of Linux since it uses "RTD Functions". Of course, you could
+#::		   simply list all the "apt", "yum", or "zypper" commands along with the "snap" and "flatpak" to install
+#::		   the software needed. However, you would likely need separate scripts for each distribution AND you
+#::		   could not select or de-select software bundles or speciffic titles. This uses a GUI with a timeout for that.
+#::		 - Smart: The "recipies" also downloads setup files from vendors with no repositories, and that do not have "snaps".
+#::		 - Resiliant: This RTD installation system is therefore resiliant, stable, and flexible.
+#::
+#::	Value: This tool makes it practical to install or remove grouped software
+#::	       bundles with one interface instead of manually running many distro-
+#::	       specific package manager commands and post-install steps.
+#::
+#::	Usage: Run with no arguments for the main bundle menu, or use the CLI
+#::	       options to jump directly to install, remove, or help flows.
+#::
+#::	Examples:
+#::	       rtd-oem-bundle-manager
+#::	       rtd-oem-bundle-manager --install-menu
+#::	       rtd-oem-bundle-manager --remove-menu
+#::
+#::	Dependencies:
+#::	  _rtd_functions -- contain usefull admin functions for scripts, such as "how to install software" on different systems.
+#::	  _rtd_recipies  -- contain software installation and configuration "recipies".
+#::
+#::
+#::
+#::
+#::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Safety Check             ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+	echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
+	return 1 2>/dev/null || exit 1
+fi
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# Variables that govern the behavior or the script and location of files are
+# set here. There should be no reason to change any of this.
+
+# Decide where to put log files.
+# Default: log in to the $_LOG_DIR location dated accordingly. If this is already set
+# we use the requested location. These settings are calculated below but you may
+# chose to over ride them by uncommenting the variables below:
+#
+# export _LOG_DIR=
+# export _ERRLOGFILE=
+# export _LOGFILE=
+# export _TLA=
+
+
+
+: ${_SCRIPTNAME=$(basename $0)}
+: ${_TLA=${_SCRIPTNAME:0:3}}
+: ${_GIT_PROFILE:=vonschutter}
+: ${TITLE_MAIN="RunTime Data App Bundle Manager"}
+if [[ $EUID -eq 0 ]] ; then
+	_LOG_DIR="/var/log/${_TLA,,}"
+	if [[ ! -d "${_LOG_DIR}" ]] ; then
+		mkdir -p "${_LOG_DIR}"
+		chmod 755 "${_LOG_DIR}"
+	fi
+else
+	_LOG_DIR="${HOME}/.config/${_TLA,,}/log"
+	if [[ ! -d "${_LOG_DIR}" ]] ; then
+		mkdir -p "${_LOG_DIR}"
+		chmod 700 "${_LOG_DIR}"
+	fi
+fi
+: ${_LOGFILE:="${_LOG_DIR}/$(basename $0)-$(date +%Y-%m-%d).log"}
+touch "${_LOGFILE}"
+chmod 644 "${_LOGFILE}"
+
+_ui_side_bar="/opt/rtd/modules/oem-bundle-manager.mod/image/banner.png"
+_title="RunTime Data Bundle Manager"
+
+_ABOUT='
+<span font="16" foreground="blue"><b>OEM Bundle Manager</b></span>
+
+The OEM Bundle Manager is part of the RTD Power Tools, and makes is easy to add
+and remove groups of packages. A group of packages are ususally grouped
+around a capabillity or set of tasks, and could be considered roles.
+
+For example, you may have a bundle called '3D_Printing' that will
+install all applications needed to work with 3D Pringing objects.
+These applications can be added or removed by simply checking a box.
+A bundle can also be a collection of themes, or fonts, or a
+set of configurations; not just a list of software and plugins.
+
+<big><b>Overview</b></big>
+
+The purpose of this tool is to facilitate the easy adding and removal of
+extra apps/config and other items useful for a complete and productive desktop environment.
+This is an ideal tool to use on a newly built system when you need to install a ton of stuff
+to get a truly useful system. Then Bundle Manager lets you install software by task or role. 
+
+- <b>Feature:</b> this tool detects how to install and update software and and tweak the system.
+- <b>Flexible:</b> This tool works on several distributions of Linux since it uses RTD Functions.
+  Of course, you could simply list all the apt, yum, or zypper commands along with the snap
+  and flatpak commands to install the software needed. However, you would likely need separate scripts
+  for each distribution AND you could not select or de-select software bundles or speciffic titles.
+  The OEM Bundle Manager uses a simple GUI to select and make sure app, configurations,
+  and other items are added.
+- <b>Smart:</b> The "recipies" also downloads setup files from vendors with no repositories, and that do not have "contained apps".
+- <b>Resiliant:</b> This RTD bundle manager is therefore resiliant, stable, and flexible since it is built to partially
+  succeed tather than fail and installing dependencies when you need them.
+'
+
+_INFO_TXT="
+
+	<span font='16' foreground='red'>Add or remove software bundles on this system</span> \n
+	NOTE: The Software Bundle Manager make it easy to install software by task or role, 
+	depending on your choices, the Software Bundle Manager may download vendor 
+	packages, or install applications such as snap apps, or flatpak apps, 
+	or even download software from a vendors web site, as well as install 
+	fonts and wallpapeers etc. \n "
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+
+rtd::bootstrap_library() {
+	if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+		echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
+		return 1
+	fi
+	local library_name="${1:-_rtd_library}" minimum_version="" loaded_version path script_dir src_url tmp rc check
+	local -a checks=()
+
+	[[ $# -gt 0 && "${1:-}" != --* ]] && { library_name="$1"; shift; }
+	[[ $# -gt 0 && "${1:-}" != --* ]] && { minimum_version="$1"; shift; }
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--version|--check)
+				[[ -n "${2:-}" ]] || { echo "Missing value for $1" >&2; return 1; }
+				[[ "$1" == "--version" ]] && minimum_version="$2" || checks+=("$2")
+				shift 2
+			;;
+			*)
+				echo "Unknown rtd::bootstrap_library option: $1" >&2
+				return 1
+			;;
+		esac
+	done
+
+	[[ "$library_name" == "_rtd_library" && ${#checks[@]} -eq 0 ]] && checks=(system::log_item library::apply_rtd_defaults)
+
+	rtd::bootstrap_library::ok() {
+		loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
+		if [[ "$library_name" == "_rtd_library" && -n "$minimum_version" ]]; then
+			[[ -n "$loaded_version" ]] || return 1
+			[[ "$(printf '%s\n%s\n' "$minimum_version" "$loaded_version" | sort -V | tail -n 1)" == "$loaded_version" ]] || return 1
+		fi
+		for check in "${checks[@]}"; do declare -F "$check" >/dev/null 2>&1 || return 1; done
+	}
+
+	[[ "$library_name" == "_rtd_library" && -n "$loaded_version" ]] && rtd::bootstrap_library::ok && return 0
+
+	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	for path in \
+		"${script_dir}/${library_name}" \
+		"${script_dir}/../core/${library_name}" \
+		"${script_dir}/../../core/${library_name}" \
+		"/opt/${_TLA:-${_tla:-rtd}}/core/${library_name}" \
+		"/opt/rtd/core/${library_name}" \
+		"${HOME:-}/GIT/RTD-Setup/core/${library_name}" \
+		"${HOME:-}/RTD-Setup/core/${library_name}"; do
+		[[ -r "$path" ]] || continue
+		# shellcheck source=/dev/null
+		source "$path" ""
+		rc=$?
+		[[ $rc -eq 0 ]] && rtd::bootstrap_library::ok && return 0
+	done
+
+	src_url="https://github.com/${_GIT_PROFILE:-${GIT_Profile:-vonschutter}}/RTD-Setup/raw/main/core/${library_name}"
+	tmp="$(mktemp "/tmp/${library_name}.XXXXXX" 2>/dev/null || echo "/tmp/${library_name}.$$")"
+	rc=0
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL "$src_url" -o "$tmp" || rc=$?
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO "$tmp" "$src_url" || rc=$?
+	else
+		rc=1
+	fi
+	[[ ${rc:-0} -eq 0 ]] || { rm -f "$tmp"; return "$rc"; }
+
+	# shellcheck source=/dev/null
+	source "$tmp" ""
+	rc=$?
+	rm -f "$tmp"
+	[[ $rc -eq 0 ]] || return "$rc"
+	rtd::bootstrap_library::ok && return 0
+
+	echo "Loaded $library_name, but the requested version/functions are not available." >&2
+	return 1
+}
+
+system::ExecStart () {
+	[ "$UID" -eq 0 ] || security::ensure_admin
+	[ -z "$RTD_INTERNET_IP" ] || system::wait_for_internet_availability
+	if [[ "$UID" -eq 0 ]]; then
+		system::preserve_graphical_session_environment || true
+	fi
+
+	# Allow super user to display gui menu on users screen.
+	if [[ -f /etc/pam.d/sudo ]] ; then
+		sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
+	else
+		write_warning "The file /etc/pam.d/sudo does not apear to exist. "
+	fi
+
+	if ! [ "$UID" -eq 0 ]; then
+		write_error "This script needs administrative access..."
+		return 1
+	fi
+	
+	# Ensure that users chooice of GUI is available, if not, install it, and if not possible then use zenity
+	if hash yad &>/dev/null ; then
+		DisplayGUI="${DisplayGUI:-"yad"}"
+		system::log_item "$(basename $0) using [yad] for GUI"
+	elif hash zenity &>/dev/null ; then
+		DisplayGUI="zenity"
+		system::log_item "$(basename $0) using [zenity] for GUI"
+	else
+		write_error "Neither [yad] or [zenity] are available to display menus"
+		if software::add_native_package "zenity" "yad" ; then
+			system::log_item "$(basename $0) installed [yad] or [zenity] for GUI: Please re-run this script"
+			if hash yad &>/dev/null ; then
+				DisplayGUI="yad"
+				system::log_item "$(basename $0) using [yad] for GUI"
+			elif hash zenity &>/dev/null ; then
+				DisplayGUI="zenity"
+				system::log_item "$(basename $0) using [zenity] for GUI"
+			else
+				write_error "Failed to install [yad] or [zenity] for GUI"
+				return 1
+			fi
+	else
+			write_error "Failed to install [yad] or [zenity] for GUI"
+			return 1
+		fi
+		
+	fi
+
+	if [[ $DisplayGUI == "zenity" ]]; then
+		while true; do
+			exec 3>&1
+			selection=$(zenity --cancel-label=QUIT  --list \
+				"Add Bundles to this computer" \
+				"Remove Bundles from this computer" \
+				"Information abount this tool" \
+				--column="Select What you Want To Do:" --text="$_INFO_TXT" \
+				--title="${_TITLE_MAIN}" --height=500 --width=800 )
+			exit_status=$?
+			exec 3>&-
+
+			system::log_item "$(basename $0) user selected: $selection"
+
+			case ${exit_status} in
+				1) system::log_item "$(basename $0) was told to [QUIT]" & echo [QUIT] && exit 
+				;;
+				255) system::log_item "$(basename $0) user pressed [ESC]" & echo [ESC] && exit 
+				;;
+			esac
+
+			case "$selection" in
+				"Add Bundles to this computer" ) 
+					software::display_bundle_install_choices_gtk --zenity
+				;;
+				"Remove Bundles from this computer" ) 
+					software::display_bundle_removal_choices_gtk --zenity
+				;;
+				"Information abount this tool" ) 
+					zenity::display_info "$_ABOUT"  
+				;;
+				* )
+					return 1
+					;;
+			esac
+		done
+	else
+		while true; do
+			local _info_rendered _info_line _info_trimmed _info_label
+			local -a yad_cmd
+
+			_info_rendered=$(printf '%b' "$_INFO_TXT")
+			# Build yad command so informational text is rendered as stacked labels
+			yad_cmd=(
+				--form
+				--image="/opt/rtd/modules/oem-bundle-manager.mod/image/banner.png"
+				--image-on-top
+				--title="${_title}"
+				--columns=1
+			)
+
+			while IFS= read -r _info_line; do
+				_info_trimmed="${_info_line#"${_info_line%%[![:space:]]*}"}"
+				_info_trimmed="${_info_trimmed%"${_info_trimmed##*[![:space:]]}"}"
+				[[ -z "$_info_trimmed" ]] && continue
+				_info_label="${_info_trimmed//:/\\:}"
+				yad_cmd+=(--field="$_info_label":LBL)
+			done <<< "$_info_rendered"
+
+			yad_cmd+=(
+				--width=700
+				--height=360
+				--button="Add Bundles to this computer:0"
+				--button="Remove Bundles from this computer:2"
+				--button="Information abount this tool:3"
+				--button="Quit:1"
+				--buttons-layout=center
+			)
+
+			# Display the yad form and capture the selected button
+			selection=$(yad "${yad_cmd[@]}")
+			ret=$?
+
+			# Handle the user's selection
+			case $ret in
+				0) software::display_bundle_install_choices_gtk --yad ;;
+				1) clear && echo "[Quit]" | tee -a "${_LOGFILE}" ; break ;;
+				2) software::display_bundle_removal_choices_gtk --yad;;
+				3) yad::display_info "$_ABOUT" ;;
+				252) clear && echo "[ESC]" | tee -a "${_LOGFILE}" && break ;;
+				*) clear && echo "[Unknown Request]" | tee -a "${_LOGFILE}" && break ;;
+			esac
+			unset _ret
+		done
+	fi
+}
+
+
+
+system::ExecStart::help ()
+{
+	clear
+	_HELP_MSG='
+	<span font="16" foreground="red">🔧    OEM Bundle Manager HELP     🔧</span>
+
+	This is not yet written.
+
+	Syntax (to be added):
+
+	rtd-oem-bundle-manager [ --remove-menu | --install-menu | --help | --timeout="SECONDS" ]
+
+	Where:
+	<tt>
+	--remove-menu .......... Display the "Remove Bundle" menu
+	--install-menu ......... Display the "Install Bundle" menu
+	--timeout="SECONDS" .... Set a timeout for the menu
+	--about ................ Show information about this tool
+	--help ................. Display this help message
+	--more-help ............ Display online help
+	</tt>
+
+	If nothing is specified the main dialog will be shown.
+
+	'
+	zenity::display_info "$_HELP_MSG"
+}
+
+system::open_url_in_browser ()
+{
+	local url="${1:-}" target_user="${2:-}" uid browser
+	local -a run_as browser_candidates
+
+	[[ -n "${url}" ]] || return 1
+
+	browser_candidates=(
+		"${BROWSER:-}"
+		sensible-browser
+		x-www-browser
+		firefox
+		firefox-esr
+		brave-browser
+		google-chrome-stable
+		google-chrome
+		chromium
+		chromium-browser
+		microsoft-edge
+		opera
+		vivaldi
+	)
+
+	if [[ -n "${target_user}" ]]; then
+		uid="$(id -u "${target_user}" 2>/dev/null)" || return 1
+		run_as=(
+			sudo -H -u "${target_user}" env
+			"DISPLAY=${DISPLAY:-}"
+			"WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-}"
+			"XDG_RUNTIME_DIR=/run/user/${uid}"
+			"DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS:-unix:path=/run/user/${uid}/bus}"
+		)
+	else
+		run_as=(env)
+	fi
+
+	for browser in "${browser_candidates[@]}"; do
+		[[ -n "${browser}" ]] || continue
+		command -v "${browser}" >/dev/null 2>&1 || continue
+		"${run_as[@]}" "${browser}" "${url}" >/dev/null 2>&1 &
+		return 0
+	done
+
+	if command -v gio >/dev/null 2>&1; then
+		"${run_as[@]}" gio open "${url}" >/dev/null 2>&1 &
+		return 0
+	fi
+
+	if command -v xdg-open >/dev/null 2>&1; then
+		"${run_as[@]}" xdg-open "${url}" >/dev/null 2>&1 &
+		return 0
+	fi
+
+	return 1
+}
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Execute tasks                   ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+rtd::bootstrap_library "_rtd_library" &>/dev/null || {
+	echo "Failed to load _rtd_library"
+	exit 1
+}
+
+
+main ()
+{
+	DisplayGUI="yad"
+	run="yes"
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--display-gui )
+			DisplayGUI="$2"
+			system::log_item "GUI requested: ${DisplayGUI}"
+			shift 2
+			;;
+		--timeout )
+			# Set the timeout for the menu
+			# This is not yet implemented
+			timeout="$2"
+			system::log_item "Timeout set to: ${timeout}"
+			shift 2
+			;;
+		--help )
+			system::log_item "Displaying help message" 
+			system::ExecStart::help
+			run="no" 
+			shift
+			;;
+		--about )
+			system::log_item "Displaying about message"
+			case "$DisplayGUI" in
+			"yad" )
+				yad::display_info "$_ABOUT"
+				;;
+			"zenity" )
+				zenity::display_info "$_ABOUT"
+				;;
+			esac
+			run="no"
+			shift
+			;;
+		--more-help )
+			system::log_item "Displaying more help online"
+			_more_help_url="https://github.com/${_GIT_PROFILE}/RTD-Setup/blob/main/modules/oem-bundle-manager.mod/README.md"
+			if [[ ${EUID} -eq 0 && -n "${SUDO_USER:-}" ]] ; then
+				system::log_item "Running as root, opening browser as ${SUDO_USER}"
+				system::open_url_in_browser "${_more_help_url}" "${SUDO_USER}" || system::log_item "Unable to open browser for ${_more_help_url}"
+			else
+				system::log_item "Running as user, opening browser"
+				system::open_url_in_browser "${_more_help_url}" || system::log_item "Unable to open browser for ${_more_help_url}"
+
+			fi
+			unset _more_help_url
+			run="no"
+			shift
+			;;
+		--rtd )
+			system::log_item "Displaying RTD README"
+			case "$DisplayGUI" in
+			"yad" )
+				yad::display_file "/opt/rtd/README.md" 
+				;;
+			"zenity" )
+				zenity::display_file "/opt/rtd/README.md" 
+				;;
+			esac
+			run="no"
+			shift
+			;;
+		* )
+			# If no options are specified, we will use the default GUI
+			DisplayGUI="zenity"
+			system::log_item "No GUI specified, using default: ${DisplayGUI}"
+			shift
+			;;
+		esac
+	done
+
+	if [[ $run == "no" ]] ; then
+		system::log_item "Exiting script"
+		exit 0
+	else
+		system::log_item "Running script"
+		system::log_item "Starting the OEM Bundle Manager"
+		system::ExecStart 2>&1 | tee -a "${_LOGFILE}"
+	fi
+}
+main "$@" 	 	

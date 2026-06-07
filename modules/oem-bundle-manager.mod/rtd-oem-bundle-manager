@@ -3,44 +3,26 @@
 #
 #::                                       A D M I N   T O O L
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#:::::::::::::::::::::::::::::::::::::::// RTD OEM bundle manager //::::::::::::::::::::::::::::::::::// Linux //::::::::
-#:: Author(s):   	Vonschutter
-#:: Version 1.00
+#:::::::::::::::::::::::::::::::::::::::// RTD OEM bundle manager v2 //::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Author(s):    RTD
+#:: Version:      0.10
 #::
+#:: Purpose:      Experimental YAD-first bundle manager UI for installing and
+#::               removing RTD software bundles without changing the current
+#::               production bundle manager or _rtd_library zformat contract.
 #::
-#::	Purpose: - The purpose of the script is to setup extra apps/config that is useful for a complete and productive environment.
-#::		 - Feature: this script "detects" how to install and update software and and tweak the system.
-#::		 - Flexible: This script works on several distributions of Linux since it uses "RTD Functions". Of course, you could
-#::		   simply list all the "apt", "yum", or "zypper" commands along with the "snap" and "flatpak" to install
-#::		   the software needed. However, you would likely need separate scripts for each distribution AND you
-#::		   could not select or de-select software bundles or speciffic titles. This uses a GUI with a timeout for that.
-#::		 - Smart: The "recipies" also downloads setup files from vendors with no repositories, and that do not have "snaps".
-#::		 - Resiliant: This RTD installation system is therefore resiliant, stable, and flexible.
+#:: Usage:        Run with no arguments to open the v2 dashboard.
 #::
-#::	Value: This tool makes it practical to install or remove grouped software
-#::	       bundles with one interface instead of manually running many distro-
-#::	       specific package manager commands and post-install steps.
-#::
-#::	Usage: Run with no arguments for the main bundle menu, or use the CLI
-#::	       options to jump directly to install, remove, or help flows.
-#::
-#::	Examples:
-#::	       rtd-oem-bundle-manager
-#::	       rtd-oem-bundle-manager --install-menu
-#::	       rtd-oem-bundle-manager --remove-menu
-#::
-#::	Dependencies:
-#::	  _rtd_functions -- contain usefull admin functions for scripts, such as "how to install software" on different systems.
-#::	  _rtd_recipies  -- contain software installation and configuration "recipies".
-#::
+#:: Examples:
+#::               rtd-oem-bundle-manager-2
+#::               rtd-oem-bundle-manager-2 --install-menu
+#::               rtd-oem-bundle-manager-2 --remove-menu
 #::
 #::
 #::
 #::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -54,13 +36,23 @@ if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) ))
 	return 1 2>/dev/null || exit 1
 fi
 
+
+
+
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::          Script Settings                 ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-# Variables that govern the behavior or the script and location of files are
-# set here. There should be no reason to change any of this.
+
+: "${_SCRIPTNAME:=$(basename "$0")}"
+: "${_TLA:=${_SCRIPTNAME:0:3}}"  ;  _TLA="${_TLA,,}"
+: "${_GIT_PROFILE:=vonschutter}"
+: "${_TITLE_MAIN:=RunTime Data - Software Bundle Manager}"
+: "${_SCRIPT_PATH:=$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || realpath "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")}"
+: "${_SCRIPT_DIR:=$(cd "$(dirname "${_SCRIPT_PATH}")" && pwd)}"
+: "${_CONFIG_DIR:=/etc/${_TLA:-"rtd"}}"
+: "${completed_bundles_list:=${_CONFIG_DIR}/completed-bundles.info}"
 
 # Decide where to put log files.
 # Default: log in to the $_LOG_DIR location dated accordingly. If this is already set
@@ -72,81 +64,37 @@ fi
 # export _LOGFILE=
 # export _TLA=
 
-
-
-: ${_SCRIPTNAME=$(basename $0)}
-: ${_TLA=${_SCRIPTNAME:0:3}}
-: ${_GIT_PROFILE:=vonschutter}
-: ${TITLE_MAIN="RunTime Data App Bundle Manager"}
-if [[ $EUID -eq 0 ]] ; then
-	_LOG_DIR="/var/log/${_TLA,,}"
-	if [[ ! -d "${_LOG_DIR}" ]] ; then
-		mkdir -p "${_LOG_DIR}"
-		chmod 755 "${_LOG_DIR}"
-	fi
+if [[ ${EUID} -eq 0 ]]; then
+	: "${_LOG_DIR:=/var/log/${_TLA}}"
 else
-	_LOG_DIR="${HOME}/.config/${_TLA,,}/log"
-	if [[ ! -d "${_LOG_DIR}" ]] ; then
-		mkdir -p "${_LOG_DIR}"
-		chmod 700 "${_LOG_DIR}"
-	fi
+	: "${_LOG_DIR:=${HOME}/.config/${_TLA}/log}"
 fi
-: ${_LOGFILE:="${_LOG_DIR}/$(basename $0)-$(date +%Y-%m-%d).log"}
-touch "${_LOGFILE}"
-chmod 644 "${_LOGFILE}"
 
-_ui_side_bar="/opt/rtd/modules/oem-bundle-manager.mod/image/banner.png"
-_title="RunTime Data Bundle Manager"
+if mkdir -p "${_LOG_DIR}" ; then
+	: "${_LOGFILE:=${_LOG_DIR}/${_SCRIPTNAME}-$(date +%Y-%m-%d).log}"
+	touch "${_LOGFILE}"
+	chmod 644 "${_LOGFILE}" 2>/dev/null || true
+else
+	echo "Failed to create log directory at ${_LOG_DIR}. Check permissions or set _LOG_DIR to a writable location." >&2
+fi
 
-_ABOUT='
-<span font="16" foreground="blue"><b>OEM Bundle Manager</b></span>
+# Set UI image paths with fallbacks to ensure the script can run even if the expected images are missing.
+# The images are not critical for functionality, so we check if they are readable and if not, we simply won't use them in the UI.
+_ui_side_bar="${_SCRIPT_DIR}/image/sideimage.png"
+_local_side_bar="/usr/share/icons/media-removable.svg"
+[[ -r "${_ui_side_bar}" ]] || _ui_side_bar="${_local_side_bar}"
+_ui_icon="${_SCRIPT_DIR}/image/software.ico"
+_local_icon="/usr/share/icons/media-removable.svg"
+[[ -r "${_ui_icon}" ]] || _ui_icon="${_local_icon}"
 
-The OEM Bundle Manager is part of the RTD Power Tools, and makes is easy to add
-and remove groups of packages. A group of packages are ususally grouped
-around a capabillity or set of tasks, and could be considered roles.
-
-For example, you may have a bundle called '3D_Printing' that will
-install all applications needed to work with 3D Pringing objects.
-These applications can be added or removed by simply checking a box.
-A bundle can also be a collection of themes, or fonts, or a
-set of configurations; not just a list of software and plugins.
-
-<big><b>Overview</b></big>
-
-The purpose of this tool is to facilitate the easy adding and removal of
-extra apps/config and other items useful for a complete and productive desktop environment.
-This is an ideal tool to use on a newly built system when you need to install a ton of stuff
-to get a truly useful system. Then Bundle Manager lets you install software by task or role. 
-
-- <b>Feature:</b> this tool detects how to install and update software and and tweak the system.
-- <b>Flexible:</b> This tool works on several distributions of Linux since it uses RTD Functions.
-  Of course, you could simply list all the apt, yum, or zypper commands along with the snap
-  and flatpak commands to install the software needed. However, you would likely need separate scripts
-  for each distribution AND you could not select or de-select software bundles or speciffic titles.
-  The OEM Bundle Manager uses a simple GUI to select and make sure app, configurations,
-  and other items are added.
-- <b>Smart:</b> The "recipies" also downloads setup files from vendors with no repositories, and that do not have "contained apps".
-- <b>Resiliant:</b> This RTD bundle manager is therefore resiliant, stable, and flexible since it is built to partially
-  succeed tather than fail and installing dependencies when you need them.
-'
-
-_INFO_TXT="
-
-	<span font='16' foreground='red'>Add or remove software bundles on this system</span> \n
-	NOTE: The Software Bundle Manager make it easy to install software by task or role, 
-	depending on your choices, the Software Bundle Manager may download vendor 
-	packages, or install applications such as snap apps, or flatpak apps, 
-	or even download software from a vendors web site, as well as install 
-	fonts and wallpapeers etc. \n "
 
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::          Script initialization           ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
 
 
 rtd::bootstrap_library() {
@@ -165,15 +113,15 @@ rtd::bootstrap_library() {
 				[[ -n "${2:-}" ]] || { echo "Missing value for $1" >&2; return 1; }
 				[[ "$1" == "--version" ]] && minimum_version="$2" || checks+=("$2")
 				shift 2
-			;;
+				;;
 			*)
 				echo "Unknown rtd::bootstrap_library option: $1" >&2
 				return 1
-			;;
+				;;
 		esac
 	done
 
-	[[ "$library_name" == "_rtd_library" && ${#checks[@]} -eq 0 ]] && checks=(system::log_item library::apply_rtd_defaults)
+	[[ "$library_name" == "_rtd_library" && ${#checks[@]} -eq 0 ]] && checks=(system::log_item software::list_bundles)
 
 	rtd::bootstrap_library::ok() {
 		loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
@@ -220,327 +168,434 @@ rtd::bootstrap_library() {
 	rm -f "$tmp"
 	[[ $rc -eq 0 ]] || return "$rc"
 	rtd::bootstrap_library::ok && return 0
-
-	echo "Loaded $library_name, but the requested version/functions are not available." >&2
-	return 1
 }
 
-system::ExecStart () {
-	[ "$UID" -eq 0 ] || security::ensure_admin
-	[ -z "$RTD_INTERNET_IP" ] || system::wait_for_internet_availability
-	if [[ "$UID" -eq 0 ]]; then
-		system::preserve_graphical_session_environment || true
-	fi
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-	# Allow super user to display gui menu on users screen.
-	if [[ -f /etc/pam.d/sudo ]] ; then
-		sed -i s/'# session  optional       pam_xauth.so'/'session  optional       pam_xauth.so'/g /etc/pam.d/sudo
+bm2::log() {
+	if declare -F system::log_item >/dev/null 2>&1; then
+		system::log_item "$*"
 	else
-		write_warning "The file /etc/pam.d/sudo does not apear to exist. "
+		printf '%s\n' "$*" >>"${_LOGFILE}"
 	fi
+}
 
-	if ! [ "$UID" -eq 0 ]; then
-		write_error "This script needs administrative access..."
+bm2::trim() {
+	local value="${1:-}"
+	value="${value#"${value%%[![:space:]]*}"}"
+	value="${value%"${value##*[![:space:]]}"}"
+	printf '%s' "$value"
+}
+
+bm2::ensure_yad() {
+	if ! command -v yad >/dev/null 2>&1; then
+		software::check_native_package_dependency yad >/dev/null 2>&1 || {
+			echo "YAD is required for ${_SCRIPTNAME}." >&2
+			return 1
+		}
+	fi
+}
+
+bm2::ensure_admin() {
+	if [[ ${UID} -ne 0 ]]; then
+		security::ensure_admin
+	fi
+	if [[ ${UID} -eq 0 ]]; then
+		system::preserve_graphical_session_environment >/dev/null 2>&1 || true
+	fi
+}
+
+bm2::completed_file() {
+	mkdir -p "${completed_bundles_list%/*}"
+	touch "${completed_bundles_list}"
+	printf '%s' "${completed_bundles_list}"
+}
+
+bm2::category_for_bundle() {
+	local bundle="${1:-}" category
+	if [[ "$bundle" == *":_"* ]]; then
+		category="${bundle%%:_*}"
+	else
+		category="${bundle%%_*}"
+	fi
+	category="${category//_/ }"
+	printf '%s' "${category:-Other}"
+}
+
+bm2::display_name_for_bundle() {
+	local bundle="${1:-}" display
+	if [[ "$bundle" == *":_"* ]]; then
+		display="${bundle#*:_}"
+	else
+		display="${bundle#*_}"
+	fi
+	display="${display//_/ }"
+	printf '%s' "${display:-$bundle}"
+}
+
+bm2::source_summary_for_bundle() {
+	local bundle="${1:-}" func source="Mixed"
+	func="$(declare -f "${bundle_prefix:-recipe:_}${bundle}" 2>/dev/null || true)"
+	[[ -n "$func" ]] || { printf '%s' "Unknown"; return 0; }
+
+	local has_flatpak=0 has_snap=0 has_native=0 has_vendor=0
+	grep -q 'software::from_flathub' <<<"$func" && has_flatpak=1
+	grep -q 'software::from_snapcraft' <<<"$func" && has_snap=1
+	grep -q 'software::add_native_package\|software::check_native_package_dependency' <<<"$func" && has_native=1
+	grep -q 'vendor_download_and_install\|curl .*\.\(deb\|rpm\)\|wget .*\.\(deb\|rpm\)' <<<"$func" && has_vendor=1
+
+	source=""
+	((has_flatpak)) && source+="${source:+, }Flatpak"
+	((has_snap)) && source+="${source:+, }Snap"
+	((has_native)) && source+="${source:+, }Native"
+	((has_vendor)) && source+="${source:+, }Vendor"
+	printf '%s' "${source:-Mixed}"
+}
+
+bm2::count_zformat_records() {
+	local mode="${1:?}" count=0 selected bundle description
+	while IFS= read -r selected && IFS= read -r bundle && IFS= read -r description; do
+		[[ -n "$(bm2::trim "$bundle")" ]] || continue
+		((count++))
+	done < <(software::list_bundles "$mode")
+	printf '%s' "$count"
+}
+
+bm2::build_list_args() {
+	local mode="${1:?}" status="${2:?}"
+	local line selected bundle description clean_bundle display_bundle clean_description category source default_label
+	local -a record=()
+	while IFS= read -r line; do
+		line="$(bm2::trim "$line")"
+		[[ -n "$line" ]] || continue
+		record+=("$line")
+		((${#record[@]} == 3)) || continue
+
+		selected="${record[0]}"
+		bundle="${record[1]}"
+		description="${record[2]}"
+		record=()
+
+		case "$(bm2::trim "$selected")" in
+			true|TRUE|false|FALSE) ;;
+			*) continue ;;
+		esac
+
+		clean_bundle="$(bm2::trim "$bundle")"
+		[[ -n "$clean_bundle" ]] || continue
+		display_bundle="$(bm2::display_name_for_bundle "$clean_bundle")"
+		clean_description="$(bm2::trim "$description")"
+		clean_description="${clean_description#: }"
+		category="$(bm2::category_for_bundle "$clean_bundle")"
+		source="$(bm2::source_summary_for_bundle "$clean_bundle")"
+		case "$(bm2::trim "$selected")" in
+			true|TRUE) default_label="Recommended" ;;
+			*) default_label="" ;;
+		esac
+		printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \
+			"$(bm2::trim "$selected")" "$category" "$display_bundle" "$clean_description" "$status" "$source" "$default_label" "$clean_bundle"
+	done < <(software::list_bundles "$mode")
+}
+
+bm2::build_installed_list_args() {
+	local line selected bundle description clean_bundle display_bundle clean_description category source
+	local -a record=()
+	while IFS= read -r line; do
+		line="$(bm2::trim "$line")"
+		[[ -n "$line" ]] || continue
+		record+=("$line")
+		((${#record[@]} == 3)) || continue
+
+		selected="${record[0]}"
+		bundle="${record[1]}"
+		description="${record[2]}"
+		record=()
+
+		case "$(bm2::trim "$selected")" in
+			true|TRUE|false|FALSE) ;;
+			*) continue ;;
+		esac
+
+		clean_bundle="$(bm2::trim "$bundle")"
+		[[ -n "$clean_bundle" ]] || continue
+		display_bundle="$(bm2::display_name_for_bundle "$clean_bundle")"
+		clean_description="$(bm2::trim "$description")"
+		clean_description="${clean_description#: }"
+		category="$(bm2::category_for_bundle "$clean_bundle")"
+		source="$(bm2::source_summary_for_bundle "$clean_bundle")"
+		printf '%s\n%s\n%s\n%s\n' \
+			"$category" "$display_bundle" "$clean_description" "$source"
+	done < <(software::list_bundles --zformat-removable)
+}
+
+bm2::show_about() {
+	yad --info \
+		--title="About ${_TITLE_MAIN}" \
+		--width=620 --height=300 \
+		--image="${_ui_side_bar}" \
+		--text="<b>RTD Bundle Manager 2</b>\n\nThis is an experimental YAD-first interface for RTD software bundles.\n\nIt keeps the existing _rtd_library zformat output untouched and builds richer dashboard, list, and progress views locally."
+}
+
+bm2::dashboard() {
+	local available_count installed_count default_count distro summary
+	available_count="$(bm2::count_zformat_records --zformat-installable)"
+	installed_count="$(bm2::count_zformat_records --zformat-removable)"
+	default_count="$(software::list_bundles --zformat-installable | awk 'tolower($0)=="true" {c++} END{print c+0}')"
+	distro="$(system::os_pretty_name 2>/dev/null || system::distribution_type 2>/dev/null || echo "Linux")"
+
+	summary="<b>RTD Bundle Manager 2</b>\n\n"
+	summary+="Install or remove curated application bundles by task.\n\n"
+	summary+="<b>System:</b> ${distro}\n"
+	summary+="<b>Available bundles:</b> ${available_count}\n"
+	summary+="<b>Recommended bundles:</b> ${default_count}\n"
+	summary+="<b>Installed bundles:</b> ${installed_count}\n\n"
+	summary+="Phase 1 UI: dashboard, category/status columns, searchable bundle lists, and log-enabled progress."
+
+	yad --form \
+		--title="${_TITLE_MAIN}" \
+		--image="${_ui_side_bar}" \
+		--width=720 --height=420 \
+		--text="${summary}" \
+		--button="Install Bundles:10" \
+		--button="Remove Bundles:20" \
+		--button="Installed Bundles:30" \
+		--button="About:40" \
+		--button="Quit:1" \
+		--buttons-layout=center
+}
+
+bm2::select_bundles() {
+	local mode="${1:?}" title="${2:?}" text="${3:?}" status="${4:?}" selection exit_status
+	local -a list_args
+	mapfile -t list_args < <(bm2::build_list_args "$mode" "$status")
+
+	if ((${#list_args[@]} == 0)); then
+		yad --info --title="${title}" --width=520 --height=160 --text="No bundles are available for this action."
 		return 1
 	fi
-	
-	# Ensure that users chooice of GUI is available, if not, install it, and if not possible then use zenity
-	if hash yad &>/dev/null ; then
-		DisplayGUI="${DisplayGUI:-"yad"}"
-		system::log_item "$(basename $0) using [yad] for GUI"
-	elif hash zenity &>/dev/null ; then
-		DisplayGUI="zenity"
-		system::log_item "$(basename $0) using [zenity] for GUI"
-	else
-		write_error "Neither [yad] or [zenity] are available to display menus"
-		if software::add_native_package "zenity" "yad" ; then
-			system::log_item "$(basename $0) installed [yad] or [zenity] for GUI: Please re-run this script"
-			if hash yad &>/dev/null ; then
-				DisplayGUI="yad"
-				system::log_item "$(basename $0) using [yad] for GUI"
-			elif hash zenity &>/dev/null ; then
-				DisplayGUI="zenity"
-				system::log_item "$(basename $0) using [zenity] for GUI"
+
+	selection=$(yad --list --checklist \
+		--title="${title}" \
+		--text="${text}" \
+		--width=1500 --height=760 \
+		--search-column=3 \
+		--expand-column=4 \
+		--grid-lines=both \
+		--wrap-cols=4 \
+		--wrap-width=760 \
+		--ellipsize=none \
+		--tooltip-column=4 \
+		--print-column=8 \
+		--hide-column=8 \
+		--separator=" " \
+		--column="Select" \
+		--column="Category" \
+		--column="Bundle" \
+		--column="Description" \
+		--column="Status" \
+		--column="Sources" \
+		--column="Default" \
+		--column="Bundle ID" \
+		"${list_args[@]}" 2>/dev/null)
+	exit_status=$?
+	[[ $exit_status -eq 0 ]] || return 1
+	[[ -n "${selection// /}" ]] || return 1
+	printf '%s' "$selection"
+}
+
+bm2::show_installed() {
+	local -a list_args
+	mapfile -t list_args < <(bm2::build_installed_list_args)
+	if ((${#list_args[@]} == 0)); then
+		yad --info --title="Installed Bundles" --width=520 --height=160 --text="No installed bundles are recorded yet."
+		return 0
+	fi
+
+	yad --list \
+		--title="Installed Bundles" \
+		--text="Bundles recorded in $(bm2::completed_file)" \
+		--width=1400 --height=720 \
+		--search-column=2 \
+		--expand-column=3 \
+		--grid-lines=both \
+		--wrap-cols=3 \
+		--wrap-width=720 \
+		--ellipsize=none \
+		--tooltip-column=3 \
+		--column="Category" \
+		--column="Bundle" \
+		--column="Description" \
+		--column="Sources" \
+		"${list_args[@]}" >/dev/null 2>&1
+}
+
+bm2::progress_dialog() {
+	local title="${1:?}" text="${2:?}"
+	yad --progress \
+		--title="${title}" \
+		--text="${text}" \
+		--percentage=0 \
+		--width=920 --height=620 \
+		--enable-log="Details" \
+		--log-expanded \
+		--log-height=360 \
+		--auto-close \
+		--no-cancel
+}
+
+bm2::install_bundles() {
+	local selection completed_file snapshot_file total count current_bundle current_bundle_full_name result_file
+	selection="$(bm2::select_bundles --zformat-installable "Install Bundles" "Select software bundles to install. Search by typing while the bundle list is focused." "Available")" || return 0
+
+	completed_file="$(bm2::completed_file)"
+	snapshot_file="$(mktemp 2>/dev/null || echo "${completed_file}.snapshot")"
+	result_file="$(mktemp 2>/dev/null || echo "/tmp/rtd-bundle-manager-2-install.$$")"
+	cp "${completed_file}" "${snapshot_file}" 2>/dev/null || : >"${snapshot_file}"
+
+	# shellcheck disable=SC2206
+	local -a selection_list=(${selection})
+	total=${#selection_list[@]}
+	count=0
+
+	(
+		for current_bundle in "${selection_list[@]}"; do
+			[[ -n "${current_bundle}" ]] || continue
+			((count++))
+			current_bundle_full_name="${bundle_prefix:-recipe:_}${current_bundle}"
+			echo "# Installing bundle ${count} of ${total}: ${current_bundle}"
+			echo "Installing ${current_bundle}"
+			bm2::log "Bundle Manager 2 installing ${current_bundle}"
+			if "${current_bundle_full_name}" >>"${_LOGFILE}" 2>&1; then
+				grep -Fxq "${current_bundle}" "${completed_file}" || printf '%s\n' "${current_bundle}" >>"${completed_file}"
+				printf 'Installed\t%s\n' "${current_bundle}" >>"${result_file}"
+				echo "Installed ${current_bundle}"
 			else
-				write_error "Failed to install [yad] or [zenity] for GUI"
-				return 1
+				printf 'Failed\t%s\n' "${current_bundle}" >>"${result_file}"
+				echo "Failed ${current_bundle}; see ${_LOGFILE}"
 			fi
-	else
-			write_error "Failed to install [yad] or [zenity] for GUI"
-			return 1
-		fi
-		
-	fi
-
-	if [[ $DisplayGUI == "zenity" ]]; then
-		while true; do
-			exec 3>&1
-			selection=$(zenity --cancel-label=QUIT  --list \
-				"Add Bundles to this computer" \
-				"Remove Bundles from this computer" \
-				"Information abount this tool" \
-				--column="Select What you Want To Do:" --text="$_INFO_TXT" \
-				--title="${_TITLE_MAIN}" --height=500 --width=800 )
-			exit_status=$?
-			exec 3>&-
-
-			system::log_item "$(basename $0) user selected: $selection"
-
-			case ${exit_status} in
-				1) system::log_item "$(basename $0) was told to [QUIT]" & echo [QUIT] && exit 
-				;;
-				255) system::log_item "$(basename $0) user pressed [ESC]" & echo [ESC] && exit 
-				;;
-			esac
-
-			case "$selection" in
-				"Add Bundles to this computer" ) 
-					software::display_bundle_install_choices_gtk --zenity
-				;;
-				"Remove Bundles from this computer" ) 
-					software::display_bundle_removal_choices_gtk --zenity
-				;;
-				"Information abount this tool" ) 
-					zenity::display_info "$_ABOUT"  
-				;;
-				* )
-					return 1
-					;;
-			esac
+			echo $((100 * count / total))
 		done
-	else
-		while true; do
-			local _info_rendered _info_line _info_trimmed _info_label
-			local -a yad_cmd
+	) | bm2::progress_dialog "Installing Software Bundles" "Please wait while selected bundles are installed."
 
-			_info_rendered=$(printf '%b' "$_INFO_TXT")
-			# Build yad command so informational text is rendered as stacked labels
-			yad_cmd=(
-				--form
-				--image="/opt/rtd/modules/oem-bundle-manager.mod/image/banner.png"
-				--image-on-top
-				--title="${_title}"
-				--columns=1
-			)
+	bm2::summary "Install Summary" "${result_file}"
+	rm -f "${snapshot_file}" "${result_file}"
+}
 
-			while IFS= read -r _info_line; do
-				_info_trimmed="${_info_line#"${_info_line%%[![:space:]]*}"}"
-				_info_trimmed="${_info_trimmed%"${_info_trimmed##*[![:space:]]}"}"
-				[[ -z "$_info_trimmed" ]] && continue
-				_info_label="${_info_trimmed//:/\\:}"
-				yad_cmd+=(--field="$_info_label":LBL)
-			done <<< "$_info_rendered"
+bm2::remove_bundles() {
+	local selection completed_file total count current_bundle current_bundle_full_name result_file
+	selection="$(bm2::select_bundles --zformat-removable "Remove Bundles" "Select installed bundles to remove. Removal runs the same recipe with --remove." "Installed")" || return 0
 
-			yad_cmd+=(
-				--width=700
-				--height=360
-				--button="Add Bundles to this computer:0"
-				--button="Remove Bundles from this computer:2"
-				--button="Information abount this tool:3"
-				--button="Quit:1"
-				--buttons-layout=center
-			)
+	completed_file="$(bm2::completed_file)"
+	result_file="$(mktemp 2>/dev/null || echo "/tmp/rtd-bundle-manager-2-remove.$$")"
 
-			# Display the yad form and capture the selected button
-			selection=$(yad "${yad_cmd[@]}")
-			ret=$?
+	# shellcheck disable=SC2206
+	local -a selection_list=(${selection})
+	total=${#selection_list[@]}
+	count=0
 
-			# Handle the user's selection
-			case $ret in
-				0) software::display_bundle_install_choices_gtk --yad ;;
-				1) clear && echo "[Quit]" | tee -a "${_LOGFILE}" ; break ;;
-				2) software::display_bundle_removal_choices_gtk --yad;;
-				3) yad::display_info "$_ABOUT" ;;
-				252) clear && echo "[ESC]" | tee -a "${_LOGFILE}" && break ;;
-				*) clear && echo "[Unknown Request]" | tee -a "${_LOGFILE}" && break ;;
-			esac
-			unset _ret
+	(
+		for current_bundle in "${selection_list[@]}"; do
+			[[ -n "${current_bundle}" ]] || continue
+			((count++))
+			current_bundle_full_name="${bundle_prefix:-recipe:_}${current_bundle}"
+			echo "# Removing bundle ${count} of ${total}: ${current_bundle}"
+			echo "Removing ${current_bundle}"
+			bm2::log "Bundle Manager 2 removing ${current_bundle}"
+			if "${current_bundle_full_name}" --remove >>"${_LOGFILE}" 2>&1; then
+				awk -v bundle="${current_bundle}" '$0 != bundle' "${completed_file}" >"${completed_file}.tmp" && mv "${completed_file}.tmp" "${completed_file}"
+				printf 'Removed\t%s\n' "${current_bundle}" >>"${result_file}"
+				echo "Removed ${current_bundle}"
+			else
+				printf 'Failed\t%s\n' "${current_bundle}" >>"${result_file}"
+				echo "Failed ${current_bundle}; see ${_LOGFILE}"
+			fi
+			echo $((100 * count / total))
 		done
-	fi
+	) | bm2::progress_dialog "Removing Software Bundles" "Please wait while selected bundles are removed."
+
+	bm2::summary "Removal Summary" "${result_file}"
+	rm -f "${result_file}"
 }
 
-
-
-system::ExecStart::help ()
-{
-	clear
-	_HELP_MSG='
-	<span font="16" foreground="red">🔧    OEM Bundle Manager HELP     🔧</span>
-
-	This is not yet written.
-
-	Syntax (to be added):
-
-	rtd-oem-bundle-manager [ --remove-menu | --install-menu | --help | --timeout="SECONDS" ]
-
-	Where:
-	<tt>
-	--remove-menu .......... Display the "Remove Bundle" menu
-	--install-menu ......... Display the "Install Bundle" menu
-	--timeout="SECONDS" .... Set a timeout for the menu
-	--about ................ Show information about this tool
-	--help ................. Display this help message
-	--more-help ............ Display online help
-	</tt>
-
-	If nothing is specified the main dialog will be shown.
-
-	'
-	zenity::display_info "$_HELP_MSG"
+bm2::summary() {
+	local title="${1:?}" result_file="${2:?}"
+	local -a rows
+	if [[ ! -s "${result_file}" ]]; then
+		yad --info --title="${title}" --width=520 --height=160 --text="No bundle results were recorded."
+		return 0
+	fi
+	while IFS=$'\t' read -r status bundle; do
+		rows+=("$status" "$bundle")
+	done <"${result_file}"
+	yad --list \
+		--title="${title}" \
+		--text="Completed action details. Full log: ${_LOGFILE}" \
+		--width=760 --height=420 \
+		--grid-lines=both \
+		--column="Result" \
+		--column="Bundle" \
+		"${rows[@]}" >/dev/null 2>&1
 }
 
-system::open_url_in_browser ()
-{
-	local url="${1:-}" target_user="${2:-}" uid browser
-	local -a run_as browser_candidates
+bm2::help() {
+	cat <<EOF
+Usage:
+  ${_SCRIPTNAME} [--install-menu|--remove-menu|--installed|--about|--help]
 
-	[[ -n "${url}" ]] || return 1
-
-	browser_candidates=(
-		"${BROWSER:-}"
-		sensible-browser
-		x-www-browser
-		firefox
-		firefox-esr
-		brave-browser
-		google-chrome-stable
-		google-chrome
-		chromium
-		chromium-browser
-		microsoft-edge
-		opera
-		vivaldi
-	)
-
-	if [[ -n "${target_user}" ]]; then
-		uid="$(id -u "${target_user}" 2>/dev/null)" || return 1
-		run_as=(
-			sudo -H -u "${target_user}" env
-			"DISPLAY=${DISPLAY:-}"
-			"WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-}"
-			"XDG_RUNTIME_DIR=/run/user/${uid}"
-			"DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS:-unix:path=/run/user/${uid}/bus}"
-		)
-	else
-		run_as=(env)
-	fi
-
-	for browser in "${browser_candidates[@]}"; do
-		[[ -n "${browser}" ]] || continue
-		command -v "${browser}" >/dev/null 2>&1 || continue
-		"${run_as[@]}" "${browser}" "${url}" >/dev/null 2>&1 &
-		return 0
-	done
-
-	if command -v gio >/dev/null 2>&1; then
-		"${run_as[@]}" gio open "${url}" >/dev/null 2>&1 &
-		return 0
-	fi
-
-	if command -v xdg-open >/dev/null 2>&1; then
-		"${run_as[@]}" xdg-open "${url}" >/dev/null 2>&1 &
-		return 0
-	fi
-
-	return 1
+Description:
+  Experimental YAD-first RTD bundle manager. It uses the current
+  software::list_bundles --zformat-* output and does not change the library
+  zformat contract used by the original bundle manager.
+EOF
 }
-
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Execute tasks                   ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-rtd::bootstrap_library "_rtd_library" &>/dev/null || {
-	echo "Failed to load _rtd_library"
-	exit 1
-}
 
+bm2::main() {
+	local action
+	case "${1:-}" in
+		--help|-h)
+			bm2::help
+			return
+			;;
+	esac
 
-main ()
-{
-	DisplayGUI="yad"
-	run="yes"
+	rtd::bootstrap_library "_rtd_library" || {
+		echo "Failed to load _rtd_library" >&2
+		exit 1
+	}
+	bm2::ensure_yad || exit 1
+	bm2::ensure_admin
 
-	while [[ $# -gt 0 ]]; do
-		case "$1" in
-		--display-gui )
-			DisplayGUI="$2"
-			system::log_item "GUI requested: ${DisplayGUI}"
-			shift 2
-			;;
-		--timeout )
-			# Set the timeout for the menu
-			# This is not yet implemented
-			timeout="$2"
-			system::log_item "Timeout set to: ${timeout}"
-			shift 2
-			;;
-		--help )
-			system::log_item "Displaying help message" 
-			system::ExecStart::help
-			run="no" 
-			shift
-			;;
-		--about )
-			system::log_item "Displaying about message"
-			case "$DisplayGUI" in
-			"yad" )
-				yad::display_info "$_ABOUT"
-				;;
-			"zenity" )
-				zenity::display_info "$_ABOUT"
-				;;
-			esac
-			run="no"
-			shift
-			;;
-		--more-help )
-			system::log_item "Displaying more help online"
-			_more_help_url="https://github.com/${_GIT_PROFILE}/RTD-Setup/blob/main/modules/oem-bundle-manager.mod/README.md"
-			if [[ ${EUID} -eq 0 && -n "${SUDO_USER:-}" ]] ; then
-				system::log_item "Running as root, opening browser as ${SUDO_USER}"
-				system::open_url_in_browser "${_more_help_url}" "${SUDO_USER}" || system::log_item "Unable to open browser for ${_more_help_url}"
-			else
-				system::log_item "Running as user, opening browser"
-				system::open_url_in_browser "${_more_help_url}" || system::log_item "Unable to open browser for ${_more_help_url}"
+	case "${1:-}" in
+		--install-menu) bm2::install_bundles; return ;;
+		--remove-menu) bm2::remove_bundles; return ;;
+		--installed) bm2::show_installed; return ;;
+		--about) bm2::show_about; return ;;
+	esac
 
-			fi
-			unset _more_help_url
-			run="no"
-			shift
-			;;
-		--rtd )
-			system::log_item "Displaying RTD README"
-			case "$DisplayGUI" in
-			"yad" )
-				yad::display_file "/opt/rtd/README.md" 
-				;;
-			"zenity" )
-				zenity::display_file "/opt/rtd/README.md" 
-				;;
-			esac
-			run="no"
-			shift
-			;;
-		* )
-			# If no options are specified, we will use the default GUI
-			DisplayGUI="zenity"
-			system::log_item "No GUI specified, using default: ${DisplayGUI}"
-			shift
-			;;
+	while true; do
+		bm2::dashboard
+		action=$?
+		case "$action" in
+			10) bm2::install_bundles ;;
+			20) bm2::remove_bundles ;;
+			30) bm2::show_installed ;;
+			40) bm2::show_about ;;
+			1|252) break ;;
+			*) break ;;
 		esac
 	done
-
-	if [[ $run == "no" ]] ; then
-		system::log_item "Exiting script"
-		exit 0
-	else
-		system::log_item "Running script"
-		system::log_item "Starting the OEM Bundle Manager"
-		system::ExecStart 2>&1 | tee -a "${_LOGFILE}"
-	fi
 }
-main "$@" 	 	
+
+bm2::main "$@"
