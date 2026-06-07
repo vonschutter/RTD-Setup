@@ -14,7 +14,7 @@ Modules contain the commands installed by RTD Power Tools. During installation, 
 | Backup | [User Backup](system-user-backup.mod/README.md) | `rtd-oem-backup-linux-config` |
 | Remote support | [Simple Support Tool](simple-support-tool.mod/README.md) | `rtd-simple-support-tool` |
 | Hardware reporting | [System Hardware Information](system-hardware-information.mod/README.md) | `rtd-system-hardware-information` |
-| Desktop configuration | [Desktop Look Switcher](rtd-desktop-look-switcher.mod/README.md), [OEM Tweaks](rtd-oem-tweaks.mod/README.md), [Theme Manager](theme-manager/README.md) | `rtd-desktop-look-switcher`, `rtd-oem-tweaks`, `rtd-theme-manager` |
+| Desktop configuration | [Theme Manager](theme-manager/README.md), [Desktop Look Switcher](rtd-desktop-look-switcher.mod/README.md), [OEM Tweaks](rtd-oem-tweaks.mod/README.md) | `rtd-theme-manager`, `rtd-desktop-look-switcher`, `rtd-oem-tweaks` |
 | Boot media | [Ventoy USB Creator](oem-ventoy.mod/README.md) | `rtd-ventoy-usb` |
 | Virtualization | [VM Tool](vm-tool.mod/README.md), [macOS KVM](macos-kvm.mod/README.md), [Whonix](setup-whonix.mod/README.md) | `rtd-vm-tool`, `rtd-macos-kvm`, `rtd-setup-whonix.sh` |
 | Networking | [VPN Router](rtd-vpn-router.mod/README.md), [NordVPN Manager](nordvpn-manager.mod/README.md) | `rtd-start-vpn-router`, `rtd-nordvpn` |

@@ -18,7 +18,7 @@ rtd-update-system
 | --- | --- |
 | `rtd-oem-bundle-manager` | Select application or configuration bundles by task rather than installing each package manually |
 | `rtd-oem-tweaks` | Apply optional GNOME desktop usability defaults |
-| `rtd-desktop-look-switcher` | Optionally apply a familiar GNOME visual preset |
+| `rtd-theme-manager` | Optionally apply a familiar GNOME visual preset |
 | `rtd-update-system` | Bring native packages, Flatpaks, and snaps up to date |
 
 Expect software downloads and desktop setting changes. Run the desktop tools as the desktop user so settings are applied to the intended account.

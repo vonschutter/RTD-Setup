@@ -26,6 +26,56 @@ KEEP = "__KEEP__"
 THEME_ROOTS = (Path.home() / ".themes", Path("/usr/share/themes"))
 ICON_ROOTS = (Path.home() / ".icons", Path.home() / ".local/share/icons", Path("/usr/share/icons"))
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+PROFILES = (
+    {
+        "id": "win10-light",
+        "name": "Windows 10 Light Mode",
+        "summary": "A familiar light desktop layout with Windows-inspired panels, icons, and spacing.",
+        "image": "profile-win10-light.jpg",
+    },
+    {
+        "id": "win10-dark",
+        "name": "Windows 10 Dark Mode",
+        "summary": "A Windows-inspired profile tuned for darker rooms and lower desktop glare.",
+        "image": "profile-win10-dark.jpg",
+    },
+    {
+        "id": "mac-bright",
+        "name": "Mac OS Bright",
+        "summary": "A bright macOS-inspired profile with a dock-oriented workflow and clean surfaces.",
+        "image": "profile-mac-bright.jpg",
+    },
+    {
+        "id": "mac-dusk",
+        "name": "Mac OS Dusk",
+        "summary": "The macOS-inspired profile with darker colors and a more subdued desktop feel.",
+        "image": "profile-mac-dusk.jpg",
+    },
+    {
+        "id": "crisp-day",
+        "name": "Crisp Day",
+        "summary": "A clean professional profile tuned for day work, balanced contrast, and legibility.",
+        "image": "profile-crisp-day.jpg",
+    },
+    {
+        "id": "crisp-evening",
+        "name": "Crisp Evening",
+        "summary": "The crisp professional profile in a darker evening variant for extended sessions.",
+        "image": "profile-crisp-evening.jpg",
+    },
+    {
+        "id": "moca-smooth",
+        "name": "Moca Smooth",
+        "summary": "A warm, low-glare profile intended to reduce eye strain during long workdays.",
+        "image": "profile-moca-smooth.jpg",
+    },
+    {
+        "id": "distro-reset",
+        "name": "Distribution Reset",
+        "summary": "Reset GNOME appearance settings back toward the distribution defaults.",
+        "image": "profile-distro-reset.jpg",
+    },
+)
 
 
 def directories(roots, marker=None):
@@ -95,6 +145,13 @@ def combo(values, current=""):
 
 def combo_value(widget, fallback=KEEP):
     return widget.get_active_text() or fallback
+
+
+def scaled_image(path, width, height):
+    if not path.is_file():
+        return Gtk.Image()
+    pixels = GdkPixbuf.Pixbuf.new_from_file_at_scale(str(path), width, height, True)
+    return Gtk.Image.new_from_pixbuf(pixels)
 
 
 class ThemeManager(Gtk.Window):
@@ -258,18 +315,80 @@ class ThemeManager(Gtk.Window):
     def build_presets_page(self):
         page, body = self.page(
             "Explore RTD desktop profiles",
-            "Open the familiar RTD Desktop Look Switcher for complete workstation profiles inspired by Windows, macOS, crisp professional layouts, and Moca Smooth.",
+            "Select a complete workstation profile with a screenshot preview, then apply the matching RTD desktop look directly from this manager.",
         )
-        profiles = Gtk.Label(
-            label="Available profiles\n\nWindows 10 Light and Dark  |  Mac OS Bright and Dusk\nCrisp Day and Evening  |  Moca Smooth  |  Distribution Reset"
+
+        profile_area = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        body.pack_start(profile_area, True, True, 0)
+
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroller.set_min_content_width(270)
+        self.profile_list = Gtk.ListBox()
+        self.profile_list.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        self.profile_list.connect("row-selected", self.select_profile)
+        scroller.add(self.profile_list)
+        profile_area.pack1(scroller, resize=False, shrink=False)
+
+        preview = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        preview.set_margin_start(18)
+        profile_area.pack2(preview, resize=True, shrink=False)
+
+        self.profile_preview = Gtk.Image()
+        self.profile_preview.set_halign(Gtk.Align.CENTER)
+        self.profile_preview.set_valign(Gtk.Align.START)
+        preview.pack_start(self.profile_preview, False, False, 0)
+
+        self.profile_title = Gtk.Label()
+        self.profile_title.set_halign(Gtk.Align.START)
+        self.profile_title.set_markup("<span size='large' weight='bold'>Select a profile</span>")
+        preview.pack_start(self.profile_title, False, False, 0)
+
+        self.profile_summary = Gtk.Label()
+        self.profile_summary.set_halign(Gtk.Align.START)
+        self.profile_summary.set_line_wrap(True)
+        preview.pack_start(self.profile_summary, False, False, 0)
+
+        note = Gtk.Label(
+            label="Profiles may install theme assets, enable GNOME extensions, adjust panel behavior, and change user appearance settings. GNOME can require a logout and login before every Shell change is visible."
         )
-        profiles.set_halign(Gtk.Align.START)
-        profiles.set_justify(Gtk.Justification.LEFT)
-        body.pack_start(profiles, False, False, 12)
-        launch = Gtk.Button(label="Open RTD Desktop Look Switcher")
-        launch.connect("clicked", self.launch_presets)
-        body.pack_end(launch, False, False, 0)
+        note.set_halign(Gtk.Align.START)
+        note.set_line_wrap(True)
+        preview.pack_start(note, False, False, 0)
+
+        apply_button = Gtk.Button(label="Apply Selected Profile")
+        apply_button.get_style_context().add_class("suggested-action")
+        apply_button.connect("clicked", self.apply_selected_profile)
+        preview.pack_end(apply_button, False, False, 0)
+
+        for profile in PROFILES:
+            self.profile_list.add(self.profile_row(profile))
+        self.profile_list.show_all()
+        first = self.profile_list.get_row_at_index(0)
+        if first is not None:
+            self.profile_list.select_row(first)
         return page
+
+    def profile_row(self, profile):
+        row = Gtk.ListBoxRow()
+        row.profile = profile
+        item = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        item.set_border_width(8)
+        item.pack_start(scaled_image(APP_DIR / "Media_files" / profile["image"], 96, 58), False, False, 0)
+
+        copy = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+        title = Gtk.Label(label=profile["name"])
+        title.set_halign(Gtk.Align.START)
+        title.get_style_context().add_class("heading")
+        summary = Gtk.Label(label=profile["summary"])
+        summary.set_halign(Gtk.Align.START)
+        summary.set_line_wrap(True)
+        summary.set_max_width_chars(28)
+        copy.pack_start(title, False, False, 0)
+        copy.pack_start(summary, False, False, 0)
+        item.pack_start(copy, True, True, 0)
+        row.add(item)
+        return row
 
     def refresh_global_details(self, *_args):
         name = combo_value(self.global_theme, "")
@@ -340,11 +459,36 @@ class ThemeManager(Gtk.Window):
         else:
             self.message("Could not apply theme", result.stderr.strip() or "The theme update failed.", Gtk.MessageType.ERROR)
 
-    def launch_presets(self, _button):
-        try:
-            subprocess.Popen([str(BACKEND), "--launch-presets"])
-        except OSError as error:
-            self.message("Could not open presets", str(error), Gtk.MessageType.ERROR)
+    def select_profile(self, _listbox, row):
+        if row is None:
+            return
+        profile = row.profile
+        image_path = APP_DIR / "Media_files" / profile["image"]
+        if image_path.is_file():
+            pixels = GdkPixbuf.Pixbuf.new_from_file_at_scale(str(image_path), 500, 300, True)
+            self.profile_preview.set_from_pixbuf(pixels)
+        else:
+            self.profile_preview.clear()
+        self.profile_title.set_markup(f"<span size='large' weight='bold'>{profile['name']}</span>")
+        self.profile_summary.set_text(profile["summary"])
+
+    def apply_selected_profile(self, _button):
+        row = self.profile_list.get_selected_row()
+        if row is None:
+            self.message("No profile selected", "Select an RTD desktop profile first.", Gtk.MessageType.WARNING)
+            return
+        profile = row.profile
+        result = subprocess.run(
+            [str(BACKEND), "--apply-profile", profile["id"]],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+        )
+        if result.returncode == 0:
+            detail = result.stderr.strip() or f"{profile['name']} has been applied."
+            self.message("Profile applied", detail, Gtk.MessageType.INFO)
+        else:
+            self.message("Could not apply profile", result.stderr.strip() or "The profile update failed.", Gtk.MessageType.ERROR)
 
     def message(self, title, detail, kind):
         dialog = Gtk.MessageDialog(

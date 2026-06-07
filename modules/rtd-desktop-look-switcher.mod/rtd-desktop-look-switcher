@@ -1,245 +1,54 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 #
-#::             			A D M I N   T O O L
+#::                                       A D M I N   T O O L
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::// Simple Admin Tool //::::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#:::::::::::::::::::::::::::::::// RTD Desktop Look Switcher Compatibility Launcher //::::::::::::::::// Linux //::::::
+#:: Author(s):    RTD
+#:: Version:      2.00
 #::
-#:: Author:   	SLS
-#:: Version 	1.02
-#::
-#::
-#::	Purpose: The purpose of this script is to switch from one gnome desktop
-#::		 look and feel to another (Mac like, windows 10 like, original distro).
-#::
-#::     Usage:	Simply execute this commandlet to accomplish this task. No parameters required.
-#:: 		NOTE: Please refer to: https://www.huion.com/pen_tablet/
-#::
-#::
-#::
-#::
+#:: Purpose:      Open the integrated RTD GNOME Theme Manager desktop profiles.
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#
-# This script is shared in the hopes that someone will find it useful.
-# For convenience and supportability most actions (work) is stored in a common library used bu multiple scripts.
-# To use these functions in the library, simply load the library using the "source" bash built in command. All
-# functions will then be available for use. This script demonstrates the simplicity of using these functions.
-#
-# This script is intended to live in the ~/bin/ or /bin/ folder, alternatively in the $PATH.
-# By default this script is placed in /opt/rtd/scrips/
-#
-# 1 - To see options to use the rtd library type: "bash _rtd_library --help"
-# 2 - To see usefull documentation on each function in this library: "bash _rtd_library --devhelp"
 
+set -euo pipefail
 
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 
-
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Script Safety Check             ::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
-	echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
-	return 1 2>/dev/null || exit 1
-fi
-
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Script Settings                 ::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-_LOG_DIR="${HOME}/.config/rtd/log"
-_LOGFILE="${_LOG_DIR}/$(basename $0).log"
-_HEIGHT="480" 
-_WIDTH="830"
-
-mkdir -p "${_LOG_DIR}"
-touch "${_LOGFILE}"
-
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Script Functions                ::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-
-# This script requires the bash library "rtd library", so if it is not present;
-# a copy must be downloaded.
-
-rtd::bootstrap_library() {
-	if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
-		echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
-		return 1
-	fi
-	local library_name="${1:-_rtd_library}" minimum_version="" loaded_version path script_dir src_url tmp rc check
-	local -a checks=()
-
-	[[ $# -gt 0 && "${1:-}" != --* ]] && { library_name="$1"; shift; }
-	[[ $# -gt 0 && "${1:-}" != --* ]] && { minimum_version="$1"; shift; }
-	while [[ $# -gt 0 ]]; do
-		case "$1" in
-			--version|--check)
-				[[ -n "${2:-}" ]] || { echo "Missing value for $1" >&2; return 1; }
-				[[ "$1" == "--version" ]] && minimum_version="$2" || checks+=("$2")
-				shift 2
-			;;
-			*)
-				echo "Unknown rtd::bootstrap_library option: $1" >&2
-				return 1
-			;;
-		esac
+find_theme_manager() {
+	local candidate
+	for candidate in \
+		"${SCRIPT_DIR}/../theme-manager/rtd-theme-manager" \
+		"/opt/rtd/scripts/rtd-theme-manager"; do
+		[[ -x "$candidate" ]] && { printf '%s\n' "$candidate"; return 0; }
 	done
-
-	[[ "$library_name" == "_rtd_library" && ${#checks[@]} -eq 0 ]] && checks=(system::log_item library::apply_rtd_defaults)
-
-	rtd::bootstrap_library::ok() {
-		loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
-		if [[ "$library_name" == "_rtd_library" && -n "$minimum_version" ]]; then
-			[[ -n "$loaded_version" ]] || return 1
-			[[ "$(printf '%s\n%s\n' "$minimum_version" "$loaded_version" | sort -V | tail -n 1)" == "$loaded_version" ]] || return 1
-		fi
-		for check in "${checks[@]}"; do declare -F "$check" >/dev/null 2>&1 || return 1; done
-	}
-
-	[[ "$library_name" == "_rtd_library" && -n "$loaded_version" ]] && rtd::bootstrap_library::ok && return 0
-
-	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-	for path in \
-		"${script_dir}/${library_name}" \
-		"${script_dir}/../core/${library_name}" \
-		"${script_dir}/../../core/${library_name}" \
-		"/opt/${_TLA:-${_tla:-rtd}}/core/${library_name}" \
-		"/opt/rtd/core/${library_name}" \
-		"${HOME:-}/GIT/RTD-Setup/core/${library_name}" \
-		"${HOME:-}/RTD-Setup/core/${library_name}"; do
-		[[ -r "$path" ]] || continue
-		# shellcheck source=/dev/null
-		source "$path" ""
-		rc=$?
-		[[ $rc -eq 0 ]] && rtd::bootstrap_library::ok && return 0
-	done
-
-	src_url="https://github.com/${_GIT_PROFILE:-${GIT_Profile:-vonschutter}}/RTD-Setup/raw/main/core/${library_name}"
-	tmp="$(mktemp "/tmp/${library_name}.XXXXXX" 2>/dev/null || echo "/tmp/${library_name}.$$")"
-	rc=0
-	if command -v curl >/dev/null 2>&1; then
-		curl -fsSL "$src_url" -o "$tmp" || rc=$?
-	elif command -v wget >/dev/null 2>&1; then
-		wget -qO "$tmp" "$src_url" || rc=$?
-	else
-		rc=1
-	fi
-	[[ ${rc:-0} -eq 0 ]] || { rm -f "$tmp"; return "$rc"; }
-
-	# shellcheck source=/dev/null
-	source "$tmp" ""
-	rc=$?
-	rm -f "$tmp"
-	[[ $rc -eq 0 ]] || return "$rc"
-	rtd::bootstrap_library::ok && return 0
-
-	echo "Loaded $library_name, but the requested version/functions are not available." >&2
-	return 1
+	command -v rtd-theme-manager 2>/dev/null
 }
 
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Script Executive                ::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-# Ensure access to the rtd library functions:
-date >>"${_LOGFILE}" 2>&1
-if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+show_help() {
 	cat <<EOF
 Usage:
   $(basename "$0") [--help|-h]
 
 Description:
-  Launch the RTD desktop look switcher for GNOME, or fall back to KDE look-and-feel settings.
+  RTD desktop profiles are now integrated into rtd-theme-manager.
+  This compatibility launcher opens the RTD GNOME Theme Manager.
 EOF
-	exit 0
-fi
-rtd::bootstrap_library "_rtd_library" >>"${_LOGFILE}" 2>&1 || {
-	echo "Failed to load _rtd_library" | tee -a "${_LOGFILE}"
-	exit 1
 }
-dependency::os_linux || ( 
-	echo "This script is intended for Linux only!"
-	exit 1 
-	)
 
-
-
-
-if dependency::desktop gnome ; then 
-	zenity --info --text "Please be advised: the developers of Gnome have limited the ability to use Themes. So not all elements may be set correctly... " 
-	while true; do
-		exec 3>&1
-		DefaultDistro=$(hostnamectl |grep "Operating System" |cut -d: -f2)
-		DefaultTitle=$( basename $0 ) ; DefaultTitle=${DefaultTitle//-/ }
-		ProgressTXT="Working..."
-
-		selection=$(zenity --title="${DefaultTitle^^}" --list \
-		--text "        	Select your prefferred style of desktop look below. Please NOTE: that the resulting look is just an
-		adjustment to look more like what you may be used to, and not a perfect replica of the original look.
-		NOTE: Gnome resists changes and does not respect older extensions that these themes rely on. Therefore not all 
-		elements may be changed as expected. " \
-		--height="$_HEIGHT" \
-		--width="$_WIDTH" \
-		--print-column=1 --column "Look" --column "Description" \
-		"Windows 10 Dark Mode" "Change the look of this desktop be more like Windows 10 Dark" \
-		"Windows 10 Light Mode" "Change the look of this desktop be more like Windows 10 Light" \
-		"Mac OS Bright" "Change the look of this desktop for be more like Apple's MAC OS" \
-		"Mac OS Dusk" "Change the look of this desktop for be more like Apple's MAC OS" \
-		"Crisp Day" "Crisp and clean proffessional business look (Tuned for day time)" \
-		"Crisp Evening" "Crisp and clean proffessional business look (Tuned for evening time)" \
-		"Moca Smooth" "A dark and chocolate smooth comfortable look" \
-		"${DefaultDistro/ /}" "The default look and feel of ${DefaultDistro/ /} (this distribution of Linux)" ) >>"${_LOGFILE}" 2>&1
-
-		exit_status=$?
-
-		exec 3>&-
-		case $exit_status in
-			1) clear && echo [Cancel] && exit ;;
-			255) clear && echo [ESC] && exit ;;
-		esac
-
-		write_status "OK setting OEM theme: ${selection}" >>"${_LOGFILE}" 2>&1
-
-		case "${selection}" in
-			"Windows 10 Dark Mode" ) gnome::set_ui_win10_tweaks_for_user Dark & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
-			"Windows 10 Light Mode" ) gnome::set_ui_win10_tweaks_for_user Light & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
-			"Mac OS Bright" ) gnome::set_ui_mac_tweaks_for_user Light & sleep 5 ; notify-send --urgency=low "${selection} set"  ;;
-			"Mac OS Dusk" ) gnome::set_ui_mac_tweaks_for_user Dark & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
-			"Crisp Day" ) gnome::set_ui_corporate_crisp_tweaks_for_user Light & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
-			"Crisp Evening" ) gnome::set_ui_corporate_crisp_tweaks_for_user Dark & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
-			"Moca Smooth" ) gnome::set_ui_moca_tweaks_for_user & sleep 5 ; notify-send --urgency=low "${selection} set" ;;
-			"${DefaultDistro/ /}" )
-				# Resetting deskop environment to distribution defaults!
-				KeyboardLanguage=$(gsettings get org.gnome.desktop.input-sources sources )
-				dconf reset -f /org/gnome/
-				busctl --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'Meta.restart("Reloadig Gnome with the new settings...")'
-				notify-send --urgency=low "UI reset to: ${selection}"
-				gsettings set org.gnome.desktop.input-sources sources "${KeyboardLanguage}"
-				;;
-			* )
-			# Trap unknown exit code...
-			exit
-			;;
-		esac
-	done
-else 
-	if dependency::desktop kde ; then
-		echo "Found KDE -- Using kcm_lookandfeel instead..." >> "${_LOGFILE}"
-		kcmshell5 kcm_lookandfeel >>"${_LOGFILE}" 2>&1
-	else
-		echo "Neither Gnome or KDE found -- Notifying and quitting... " >> "${_LOGFILE}"
-		zenity --info --text "You are not using the gnome desktop so it does not make sense to use this tool... " 
+case "${1:-}" in
+	--help|-h)
+		show_help
+		;;
+	"")
+		manager="$(find_theme_manager)" || {
+			echo "Error: Could not find rtd-theme-manager." >&2
+			exit 1
+		}
+		exec "$manager"
+		;;
+	*)
+		echo "Error: Unknown option: $1" >&2
 		exit 1
-	fi 
-fi
+		;;
+esac

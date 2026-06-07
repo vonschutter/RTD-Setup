@@ -12,7 +12,7 @@
 
 - Applying every available element from one installed theme.
 - Mixing application, Shell, icon, cursor, light or dark preference, and wallpaper settings.
-- Opening the RTD Desktop Look Switcher for complete workstation profiles.
+- Applying complete RTD desktop profiles with screenshot previews.
 
 ## Requirements
 
@@ -51,14 +51,14 @@ rtd-theme-manager --help
 
 - **Complete Theme** applies all matching components from one installed theme and can select an included wallpaper.
 - **Individual Elements** provides separate selectors for every supported GNOME appearance element.
-- **RTD Desktop Profiles** opens the existing Desktop Look Switcher for familiar complete profiles.
+- **RTD Desktop Profiles** shows a professional screenshot selector for familiar complete profiles and applies them directly.
 
 ## What It Changes
 
-The tool updates desktop theme and optional wallpaper settings for the current GNOME user. When a Shell theme is selected, RTD installs and enables the GNOME User Themes extension when needed. GNOME may require a logout and login before a newly installed extension becomes active.
+The tool updates desktop theme and optional wallpaper settings for the current GNOME user. RTD desktop profiles may also install theme assets, enable GNOME extensions, adjust panel behavior, and change user appearance settings. When a Shell theme is selected, RTD installs and enables the GNOME User Themes extension when needed. GNOME may require a logout and login before a newly installed extension becomes active.
 
 ## Related Tools
 
-- [`rtd-desktop-look-switcher`](../rtd-desktop-look-switcher.mod/README.md) applies complete RTD visual presets.
+- [`rtd-desktop-look-switcher`](../rtd-desktop-look-switcher.mod/README.md) is retained as a compatibility launcher for this manager.
 - [`rtd-oem-tweaks`](../rtd-oem-tweaks.mod/README.md) applies selected workstation usability settings.
 - [`rtd-gnome-shell-extension-installer`](../gnome-shell-extension-installer.mod/README.md) installs extensions directly.

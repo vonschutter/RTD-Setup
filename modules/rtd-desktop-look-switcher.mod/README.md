@@ -3,10 +3,10 @@
 
 ![RTD Blind Install Media Header](Media_files/header-time.jpg "Executing the Script")
 
-Would you like to feel more at home, or just like theming your desktop wverall? This is a simple tool to do that!
+RTD desktop profiles are now integrated into the RTD GNOME Theme Manager. This module remains as a compatibility launcher for existing menu entries and scripts that still call `rtd-desktop-look-switcher`.
 
 ## Purpose:
-This is a tool to help users who come to Linux from a different OS. Currently there are the following **looks** available:
+The integrated manager helps users coming to Linux from another OS, or anyone who wants a complete GNOME visual preset. Currently there are the following **looks** available:
 
 - Windows 10 light (typical Windows 10 look)
 - Windows 10 Dark (dark Windows 10 look)
@@ -30,12 +30,18 @@ These tweaks are not intended to be so similar that they confuse the user as to 
 ## How to use this script. 
 Refer to the install instructions of the [RTD Power Tools](https://github.com/vonschutter/RTD-Setup/blob/main/README.md)
 
-Once installed, run:
+Once installed, use the integrated manager:
+
+```bash
+rtd-theme-manager
+```
+
+Existing automation can still run:
 ```bash
 rtd-desktop-look-switcher
 ```
 
-The script will:
+The integrated manager will:
 - fetch any required themes/icons/extensions via the shared `_rtd_library`
 - apply the selected preset (GTK theme, icon pack, fonts, shell extensions, dash/dock placement)
 - offer a “Distribution Reset” to roll back to stock GNOME defaults

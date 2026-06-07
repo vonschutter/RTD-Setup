@@ -27,8 +27,10 @@ fi
 set -euo pipefail
 
 readonly KEEP="__KEEP__"
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+readonly SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 readonly BANNER="${SCRIPT_DIR}/Media_files/theme-manager-banner.png"
+readonly GTK_FRONTEND="${SCRIPT_DIR}/theme-manager-gtk.py"
 
 die() { echo "Error: $*" >&2; exit 1; }
 warn() { echo "Warning: $*" >&2; }
@@ -266,7 +268,7 @@ pick_component() {
 }
 
 run_dialog_fallback() {
-	local backend backend_label action theme gtk shell icons cursors color wallpaper
+	local backend backend_label action theme gtk shell icons cursors color wallpaper profile
 	backend="$(ensure_dialog_backend "${1:-}")" || die "Unable to install Python GTK, YAD, or Zenity."
 	backend_label="$(printf '%s' "$backend" | tr '[:lower:]' '[:upper:]')"
 	warn "Using the ${backend_label} compatibility interface because Python GTK is unavailable."
@@ -301,7 +303,26 @@ run_dialog_fallback() {
 			apply_theme "$gtk" "$shell" "$icons" "$cursors" "$color" "$wallpaper"
 			;;
 		"Open RTD Desktop Profiles")
-			launch_presets
+			profile="$(dialog_list "$backend" "RTD Desktop Profiles" \
+				"Select a complete RTD desktop profile." \
+				"Windows 10 Dark Mode" \
+				"Windows 10 Light Mode" \
+				"Mac OS Bright" \
+				"Mac OS Dusk" \
+				"Crisp Day" \
+				"Crisp Evening" \
+				"Moca Smooth" \
+				"Distribution Reset")" || exit 0
+			case "$profile" in
+				"Windows 10 Dark Mode") apply_desktop_profile win10-dark ;;
+				"Windows 10 Light Mode") apply_desktop_profile win10-light ;;
+				"Mac OS Bright") apply_desktop_profile mac-bright ;;
+				"Mac OS Dusk") apply_desktop_profile mac-dusk ;;
+				"Crisp Day") apply_desktop_profile crisp-day ;;
+				"Crisp Evening") apply_desktop_profile crisp-evening ;;
+				"Moca Smooth") apply_desktop_profile moca-smooth ;;
+				"Distribution Reset") apply_desktop_profile distro-reset ;;
+			esac
 			;;
 	esac
 	dialog_info "$backend" "RTD GNOME Theme Manager" "Your GNOME appearance settings have been updated."
@@ -348,24 +369,66 @@ apply_theme() {
 	fi
 }
 
-find_preset_switcher() {
-	local script_dir candidate
-	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-	for candidate in \
-		"${script_dir}/../rtd-desktop-look-switcher.mod/rtd-desktop-look-switcher" \
-		"/opt/rtd/scripts/rtd-desktop-look-switcher"; do
-		[[ -x "$candidate" ]] && { printf '%s\n' "$candidate"; return 0; }
-	done
-
-	command -v rtd-desktop-look-switcher 2>/dev/null
+require_profile_functions() {
+	rtd::bootstrap_library "_rtd_library" || die "Unable to load the RTD desktop profile library."
+	declare -F dependency::desktop >/dev/null 2>&1 || die "The RTD library does not provide desktop detection."
+	declare -F gnome::set_ui_win10_tweaks_for_user >/dev/null 2>&1 || die "The RTD library does not provide GNOME desktop profiles."
 }
 
-launch_presets() {
-	local switcher
-	switcher="$(find_preset_switcher)" ||
-		die "Could not find rtd-desktop-look-switcher. Install that module to use RTD desktop profiles."
-	exec "$switcher"
+apply_desktop_profile() {
+	local profile="$1" keyboard_language
+
+	require gsettings
+	require_profile_functions
+
+	if ! dependency::desktop gnome; then
+		if dependency::desktop kde && command -v kcmshell5 >/dev/null 2>&1; then
+			kcmshell5 kcm_lookandfeel
+			return
+		fi
+		die "RTD desktop profiles require a GNOME desktop session."
+	fi
+
+	case "$profile" in
+		win10-dark)
+			gnome::set_ui_win10_tweaks_for_user Dark
+			;;
+		win10-light)
+			gnome::set_ui_win10_tweaks_for_user Light
+			;;
+		mac-bright)
+			gnome::set_ui_mac_tweaks_for_user Light
+			;;
+		mac-dusk)
+			gnome::set_ui_mac_tweaks_for_user Dark
+			;;
+		crisp-day)
+			gnome::set_ui_corporate_crisp_tweaks_for_user Light
+			;;
+		crisp-evening)
+			gnome::set_ui_corporate_crisp_tweaks_for_user Dark
+			;;
+		moca-smooth)
+			gnome::set_ui_moca_tweaks_for_user
+			;;
+		distro-reset)
+			keyboard_language="$(gsettings get org.gnome.desktop.input-sources sources 2>/dev/null || true)"
+			if command -v dconf >/dev/null 2>&1; then
+				dconf reset -f /org/gnome/
+			else
+				warn "dconf is not installed; GNOME settings could not be fully reset."
+			fi
+			busctl --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'Meta.restart("Reloading GNOME with the new settings...")' >/dev/null 2>&1 || true
+			[[ -n "$keyboard_language" ]] &&
+				gsettings set org.gnome.desktop.input-sources sources "$keyboard_language" || true
+			;;
+		*)
+			die "Unknown RTD desktop profile: $profile"
+			;;
+	esac
+
+	command -v notify-send >/dev/null 2>&1 &&
+		notify-send --urgency=low "RTD desktop profile applied" "$profile" || true
 }
 
 show_help() {
@@ -374,12 +437,13 @@ Usage:
   $(basename "$0")
   $(basename "$0") [--yad | --zenity]
   $(basename "$0") --apply GTK SHELL ICONS CURSOR COLOR_SCHEME WALLPAPER
-  $(basename "$0") --launch-presets
+  $(basename "$0") --apply-profile PROFILE
   $(basename "$0") --help
 
 Description:
   Launch the RTD GNOME Theme Manager. Use the Complete Theme page for a
-  coordinated theme, or customize individual GNOME appearance elements.
+  coordinated theme, customize individual GNOME appearance elements, or apply
+  integrated RTD desktop profiles.
   Use --yad or --zenity to force a compatibility interface.
 EOF
 }
@@ -390,8 +454,9 @@ main() {
 			[[ $# -eq 7 ]] || die "--apply requires six values."
 			apply_theme "$2" "$3" "$4" "$5" "$6" "$7"
 			;;
-		--launch-presets)
-			launch_presets
+		--apply-profile)
+			[[ $# -eq 2 ]] || die "--apply-profile requires a profile id."
+			apply_desktop_profile "$2"
 			;;
 		--yad|--zenity)
 			run_dialog_fallback "${1#--}"
@@ -409,7 +474,7 @@ main() {
 			;;
 		"")
 			if ensure_python_gtk_frontend; then
-				exec python3 "${SCRIPT_DIR}/rtd-theme-manager-gtk.py"
+				exec python3 "$GTK_FRONTEND"
 			fi
 			run_dialog_fallback
 			;;

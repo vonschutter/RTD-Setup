@@ -20,8 +20,8 @@ This catalog covers the `rtd-*` command entry points shipped in `modules/`. Comm
 | --- | --- | --- | --- |
 | `rtd-oem-bundle-manager` | Add or remove software/configuration bundles | Installs selected software | [Bundle Manager](../modules/oem-bundle-manager.mod/README.md) |
 | `rtd-oem-tweaks` | Apply selected GNOME workstation tweaks | Run as the desktop user | [OEM Tweaks](../modules/rtd-oem-tweaks.mod/README.md) |
-| `rtd-desktop-look-switcher` | Apply RTD GNOME visual presets | Changes per-user desktop appearance | [Desktop Look Switcher](../modules/rtd-desktop-look-switcher.mod/README.md) |
-| `rtd-theme-manager` | Select installed GNOME themes and optional wallpaper | Uses GTK with an automatic YAD or Zenity fallback | [Theme Manager](../modules/theme-manager/README.md) |
+| `rtd-desktop-look-switcher` | Compatibility launcher for RTD GNOME visual presets | Opens the integrated Theme Manager | [Desktop Look Switcher](../modules/rtd-desktop-look-switcher.mod/README.md) |
+| `rtd-theme-manager` | Select installed GNOME themes, optional wallpaper, and RTD desktop profiles | Uses GTK with an automatic YAD or Zenity fallback | [Theme Manager](../modules/theme-manager/README.md) |
 | `rtd-gnome-shell-extension-installer` | Search for and install GNOME Shell extensions | Modifies installed user/system extensions | [GNOME Extension Installer](../modules/gnome-shell-extension-installer.mod/README.md) |
 | `rtd-light-weight-office-games` | Install curated lightweight board, card, tile, and puzzle games | Uses YAD or Zenity; installs Flatpaks from Flathub | [Lightweight Office Games](../modules/light-weight-office-games.mod/README.md) |
 
