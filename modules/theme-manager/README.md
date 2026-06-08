@@ -11,8 +11,9 @@
 ## Good For
 
 - Applying every available element from one installed theme.
-- Mixing application, Shell, icon, cursor, light or dark preference, and wallpaper settings.
+- Mixing application, Shell, icon, cursor, light or dark preference, and wallpapers from `/opt/rtd/themes/wallpaper`.
 - Applying complete RTD desktop profiles with screenshot previews.
+- Handing KDE Plasma users to the RTD KDE Look and Feel helper, with native KDE settings as a fallback.
 
 ## Requirements
 
@@ -49,13 +50,13 @@ rtd-theme-manager --help
 
 ## Interface
 
-- **Complete Theme** applies all matching components from one installed theme and can select an included wallpaper.
+- **Complete Theme** applies all matching components from one installed theme and can select an RTD wallpaper from `/opt/rtd/themes/wallpaper`.
 - **Individual Elements** provides separate selectors for every supported GNOME appearance element.
 - **RTD Desktop Profiles** shows a professional screenshot selector for familiar complete profiles and applies them directly.
 
 ## What It Changes
 
-The tool updates desktop theme and optional wallpaper settings for the current GNOME user. RTD desktop profiles may also install theme assets, enable GNOME extensions, adjust panel behavior, and change user appearance settings. When a Shell theme is selected, RTD installs and enables the GNOME User Themes extension when needed. GNOME may require a logout and login before a newly installed extension becomes active.
+The tool updates desktop theme and optional wallpaper settings for the current GNOME user. RTD desktop profiles may also install theme assets, enable GNOME extensions, adjust panel behavior, and change user appearance settings. When a Shell theme is selected, RTD installs and enables the GNOME User Themes extension when needed. GNOME may require a logout and login before a newly installed extension becomes active. On KDE Plasma, the launcher offers the shared `kde::set_global_look_and_feel --interactive` helper instead of showing GNOME-only controls, and falls back to KDE's native Look and Feel settings if the helper is unavailable.
 
 ## Related Tools
 

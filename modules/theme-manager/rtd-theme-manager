@@ -40,6 +40,82 @@ require() {
 	command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"
 }
 
+current_desktop() {
+	printf '%s:%s:%s\n' "${XDG_CURRENT_DESKTOP:-}" "${DESKTOP_SESSION:-}" "${KDE_FULL_SESSION:-}" |
+		tr '[:upper:]' '[:lower:]'
+}
+
+desktop_matches() {
+	local desktop="$1"
+
+	if rtd::bootstrap_library "_rtd_library" >/dev/null 2>&1 &&
+		declare -F dependency::desktop >/dev/null 2>&1; then
+		dependency::desktop "$desktop"
+		return
+	fi
+
+	case "$desktop" in
+		kde) current_desktop | grep -Eq 'kde|plasma|true' ;;
+		gnome) current_desktop | grep -Eq 'gnome|ubuntu' ;;
+		*) return 1 ;;
+	esac
+}
+
+is_kde_desktop() {
+	desktop_matches kde
+}
+
+is_gnome_desktop() {
+	desktop_matches gnome
+}
+
+launch_native_kde_look_settings() {
+	if command -v kcmshell6 >/dev/null 2>&1; then
+		exec kcmshell6 kcm_lookandfeel
+	elif command -v kcmshell5 >/dev/null 2>&1; then
+		exec kcmshell5 kcm_lookandfeel
+	elif command -v systemsettings >/dev/null 2>&1; then
+		exec systemsettings kcm_lookandfeel
+	fi
+	die "KDE look-and-feel settings were requested, but kcmshell6, kcmshell5, and systemsettings are not available."
+}
+
+apply_kde_look_and_feel() {
+	if rtd::bootstrap_library "_rtd_library" >/dev/null 2>&1 &&
+		declare -F kde::set_global_look_and_feel >/dev/null 2>&1; then
+		if command -v dialog >/dev/null 2>&1; then
+			kde::set_global_look_and_feel --interactive && return 0
+			warn "The RTD KDE Look and Feel helper failed; opening KDE settings instead."
+		else
+			warn "The RTD KDE Look and Feel helper needs dialog for interactive selection; opening KDE settings instead."
+		fi
+	fi
+
+	launch_native_kde_look_settings
+}
+
+offer_kde_look_settings() {
+	local prompt="KDE Plasma was detected. RTD Theme Manager currently manages GNOME themes. Open the RTD KDE Look and Feel selector instead?"
+
+	if command -v kdialog >/dev/null 2>&1; then
+		kdialog --yesno "$prompt" --title "RTD Theme Manager" && apply_kde_look_and_feel
+		return 0
+	elif command -v zenity >/dev/null 2>&1; then
+		zenity --question --title="RTD Theme Manager" --text="$prompt" && apply_kde_look_and_feel
+		return 0
+	elif command -v yad >/dev/null 2>&1; then
+		yad --question --title="RTD Theme Manager" --text="$prompt" --button="Open KDE Selector:0" --button="Cancel:1" && apply_kde_look_and_feel
+		return 0
+	elif [[ -t 0 ]]; then
+		read -r -p "${prompt} [y/N] " answer
+		[[ "$answer" =~ ^[Yy] ]] && apply_kde_look_and_feel
+		return 0
+	fi
+
+	warn "KDE Plasma was detected. Run 'rtd-theme-manager --kde-look-settings' to change KDE desktop looks."
+	return 0
+}
+
 rtd::bootstrap_library() {
 	if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
 		echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
@@ -382,10 +458,7 @@ apply_desktop_profile() {
 	require_profile_functions
 
 	if ! dependency::desktop gnome; then
-		if dependency::desktop kde && command -v kcmshell5 >/dev/null 2>&1; then
-			kcmshell5 kcm_lookandfeel
-			return
-		fi
+		dependency::desktop kde && apply_kde_look_and_feel
 		die "RTD desktop profiles require a GNOME desktop session."
 	fi
 
@@ -438,12 +511,14 @@ Usage:
   $(basename "$0") [--yad | --zenity]
   $(basename "$0") --apply GTK SHELL ICONS CURSOR COLOR_SCHEME WALLPAPER
   $(basename "$0") --apply-profile PROFILE
+  $(basename "$0") --kde-look-settings
   $(basename "$0") --help
 
 Description:
   Launch the RTD GNOME Theme Manager. Use the Complete Theme page for a
-  coordinated theme, customize individual GNOME appearance elements, or apply
-  integrated RTD desktop profiles.
+  coordinated theme, customize individual GNOME appearance elements, apply
+  integrated RTD desktop profiles, or hand KDE users to the RTD KDE Look and
+  Feel helper.
   Use --yad or --zenity to force a compatibility interface.
 EOF
 }
@@ -457,6 +532,9 @@ main() {
 		--apply-profile)
 			[[ $# -eq 2 ]] || die "--apply-profile requires a profile id."
 			apply_desktop_profile "$2"
+			;;
+		--kde-look-settings)
+			apply_kde_look_and_feel
 			;;
 		--yad|--zenity)
 			run_dialog_fallback "${1#--}"
@@ -473,6 +551,10 @@ main() {
 			show_help
 			;;
 		"")
+			if is_kde_desktop && ! is_gnome_desktop; then
+				offer_kde_look_settings
+				exit 0
+			fi
 			if ensure_python_gtk_frontend; then
 				exec python3 "$GTK_FRONTEND"
 			fi

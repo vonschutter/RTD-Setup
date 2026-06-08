@@ -25,6 +25,7 @@ BANNER = APP_DIR / "Media_files" / "theme-manager-banner.png"
 KEEP = "__KEEP__"
 THEME_ROOTS = (Path.home() / ".themes", Path("/usr/share/themes"))
 ICON_ROOTS = (Path.home() / ".icons", Path.home() / ".local/share/icons", Path("/usr/share/icons"))
+WALLPAPER_ROOT = Path("/opt/rtd/themes/wallpaper")
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 PROFILES = (
     {
@@ -101,17 +102,14 @@ def theme_path(name):
     return None
 
 
-def wallpapers(name):
-    root = theme_path(name)
-    if root is None:
+def wallpapers():
+    if not WALLPAPER_ROOT.is_dir():
         return []
     return sorted(
         (
             path
-            for path in root.rglob("*")
-            if path.is_file()
-            and path.suffix.lower() in IMAGE_SUFFIXES
-            and len(path.relative_to(root).parts) <= 3
+            for path in WALLPAPER_ROOT.iterdir()
+            if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES
         ),
         key=lambda path: str(path).casefold(),
     )
@@ -255,7 +253,7 @@ class ThemeManager(Gtk.Window):
         self.global_wallpaper_switch = Gtk.Switch()
         self.global_wallpaper_switch.set_halign(Gtk.Align.START)
         self.global_wallpaper_switch.connect("notify::active", self.toggle_global_wallpapers)
-        self.row(grid, 2, "Use included wallpaper", self.global_wallpaper_switch)
+        self.row(grid, 2, "Use RTD wallpaper", self.global_wallpaper_switch)
         self.global_wallpaper_box = combo([])
         self.row(grid, 3, "Wallpaper", self.global_wallpaper_box)
 
@@ -286,6 +284,8 @@ class ThemeManager(Gtk.Window):
         image_filter.set_name("Images")
         image_filter.add_pixbuf_formats()
         self.custom_wallpaper.add_filter(image_filter)
+        if WALLPAPER_ROOT.is_dir():
+            self.custom_wallpaper.set_current_folder(str(WALLPAPER_ROOT))
 
         for position, (title, control) in enumerate(
             (
@@ -406,7 +406,7 @@ class ThemeManager(Gtk.Window):
             "Available components: " + (", ".join(components) if components else "No matching GNOME components found")
         )
         self.global_wallpaper_box.remove_all()
-        for path in wallpapers(name):
+        for path in wallpapers():
             self.global_wallpaper_box.append_text(str(path))
         self.global_wallpaper_box.set_active(0)
         self.global_wallpaper_switch.set_sensitive(self.global_wallpaper_box.get_active_text() is not None)
