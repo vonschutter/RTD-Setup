@@ -1131,7 +1131,15 @@ recipe:_OEM:_Themes_and_Tweaks () {
 			oem::deploy_themes
 			bash ${_THEME_DIR}/plus-themes.sh || write_error "There was a problem installing themes... "
 		fi
+		software::from_snapcraft.io gtk-theme-breeze $1
+		for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i gtk-theme-breeze:gtk-3-themes; done
 
+		# Set wallpaper and theme
+		sudo -H -E -u $SUDO_USER bash -c "source /opt/rtd/core/_rtd_library; kde::set_wallpaper ${_WALLPAPER_DIR}/Wayland.jpg"
+		sudo -H -E -u $SUDO_USER bash -c "source /opt/rtd/core/_rtd_library; kde::set_icon_theme --theme ${_KDE_DEFAULT_ICON_THEME:-default}"
+		# sudo -E -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c '/usr/bin/lookandfeeltool -a ${_KDE_DEFAULT_THEME:-default} --resetLayout'
+
+		# Save the current user's plasma configuration to be copied to new users if this system was built by an OEM process.
 		if [[ -e /opt/${_TLA,,} ]] ; then
 			write_information "This system was built by an OEM process: copying tweaks for all new users..."
 			cp -r /home/${SUDO_USER}/.config /etc/skel/
@@ -1141,12 +1149,6 @@ recipe:_OEM:_Themes_and_Tweaks () {
 		else
 			write_information "Only implementing tweaks for the current user..."
 		fi
-
-		# Set wallpaper and theme
-			sudo -H -E -u $SUDO_USER bash -c "if (( \${BASH_VERSINFO[0]} < 4 || (\${BASH_VERSINFO[0]} == 4 && \${BASH_VERSINFO[1]} < 4) )); then echo \"ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash \${BASH_VERSION}.\" >&2; exit 1; fi; source /opt/rtd/core/_rtd_library; kde::set_wallpaper ${_WALLPAPER_DIR}/Wayland.jpg"
-		software::from_snapcraft.io gtk-theme-breeze $1
-		for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i gtk-theme-breeze:gtk-3-themes; done
-		# sudo -E -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c '/usr/bin/lookandfeeltool -a RTD-Win11-Dark --resetLayout'
 		# -------------------------------------------------------------------------------------------------------
 	fi
 }

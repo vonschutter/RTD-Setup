@@ -13,7 +13,7 @@
 - Applying every available element from one installed theme.
 - Mixing application, Shell, icon, cursor, light or dark preference, and wallpapers from `/opt/rtd/themes/wallpaper`.
 - Applying complete RTD desktop profiles with screenshot previews.
-- Handing KDE Plasma users to the RTD KDE Look and Feel helper, with native KDE settings as a fallback.
+- Handing KDE Plasma users to the graphical KDE Global Theme settings module.
 
 ## Requirements
 
@@ -56,7 +56,7 @@ rtd-theme-manager --help
 
 ## What It Changes
 
-The tool updates desktop theme and optional wallpaper settings for the current GNOME user. RTD desktop profiles may also install theme assets, enable GNOME extensions, adjust panel behavior, and change user appearance settings. When a Shell theme is selected, RTD installs and enables the GNOME User Themes extension when needed. GNOME may require a logout and login before a newly installed extension becomes active. On KDE Plasma, the launcher offers the shared `kde::set_global_look_and_feel --interactive` helper instead of showing GNOME-only controls, and falls back to KDE's native Look and Feel settings if the helper is unavailable.
+The tool updates desktop theme and optional wallpaper settings for the current GNOME user. RTD desktop profiles may also install theme assets, enable GNOME extensions, adjust panel behavior, and change user appearance settings. When a Shell theme is selected, RTD installs and enables the GNOME User Themes extension when needed. GNOME may require a logout and login before a newly installed extension becomes active. On KDE Plasma, the launcher opens KDE's graphical Global Theme settings instead of showing GNOME-only controls.
 
 ## Related Tools
 

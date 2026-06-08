@@ -40,25 +40,10 @@ require() {
 	command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"
 }
 
-current_desktop() {
-	printf '%s:%s:%s\n' "${XDG_CURRENT_DESKTOP:-}" "${DESKTOP_SESSION:-}" "${KDE_FULL_SESSION:-}" |
-		tr '[:upper:]' '[:lower:]'
-}
-
 desktop_matches() {
-	local desktop="$1"
-
-	if rtd::bootstrap_library "_rtd_library" >/dev/null 2>&1 &&
-		declare -F dependency::desktop >/dev/null 2>&1; then
-		dependency::desktop "$desktop"
-		return
-	fi
-
-	case "$desktop" in
-		kde) current_desktop | grep -Eq 'kde|plasma|true' ;;
-		gnome) current_desktop | grep -Eq 'gnome|ubuntu' ;;
-		*) return 1 ;;
-	esac
+	rtd::bootstrap_library "_rtd_library" >/dev/null 2>&1 || return 1
+	declare -F dependency::desktop >/dev/null 2>&1 || return 1
+	dependency::desktop "$1"
 }
 
 is_kde_desktop() {
@@ -81,39 +66,7 @@ launch_native_kde_look_settings() {
 }
 
 apply_kde_look_and_feel() {
-	if rtd::bootstrap_library "_rtd_library" >/dev/null 2>&1 &&
-		declare -F kde::set_global_look_and_feel >/dev/null 2>&1; then
-		if command -v dialog >/dev/null 2>&1; then
-			kde::set_global_look_and_feel --interactive && return 0
-			warn "The RTD KDE Look and Feel helper failed; opening KDE settings instead."
-		else
-			warn "The RTD KDE Look and Feel helper needs dialog for interactive selection; opening KDE settings instead."
-		fi
-	fi
-
 	launch_native_kde_look_settings
-}
-
-offer_kde_look_settings() {
-	local prompt="KDE Plasma was detected. RTD Theme Manager currently manages GNOME themes. Open the RTD KDE Look and Feel selector instead?"
-
-	if command -v kdialog >/dev/null 2>&1; then
-		kdialog --yesno "$prompt" --title "RTD Theme Manager" && apply_kde_look_and_feel
-		return 0
-	elif command -v zenity >/dev/null 2>&1; then
-		zenity --question --title="RTD Theme Manager" --text="$prompt" && apply_kde_look_and_feel
-		return 0
-	elif command -v yad >/dev/null 2>&1; then
-		yad --question --title="RTD Theme Manager" --text="$prompt" --button="Open KDE Selector:0" --button="Cancel:1" && apply_kde_look_and_feel
-		return 0
-	elif [[ -t 0 ]]; then
-		read -r -p "${prompt} [y/N] " answer
-		[[ "$answer" =~ ^[Yy] ]] && apply_kde_look_and_feel
-		return 0
-	fi
-
-	warn "KDE Plasma was detected. Run 'rtd-theme-manager --kde-look-settings' to change KDE desktop looks."
-	return 0
 }
 
 rtd::bootstrap_library() {
@@ -552,8 +505,7 @@ main() {
 			;;
 		"")
 			if is_kde_desktop && ! is_gnome_desktop; then
-				offer_kde_look_settings
-				exit 0
+				apply_kde_look_and_feel
 			fi
 			if ensure_python_gtk_frontend; then
 				exec python3 "$GTK_FRONTEND"
