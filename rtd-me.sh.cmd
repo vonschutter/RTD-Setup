@@ -115,25 +115,25 @@ Version="1.08.2024-06-01"
 # set here. There should be no reason to change any of this absent strong preferences.
 YELLOW="$(tput setaf 3 2>/dev/null || printf '')"
 NO_COLOR="$(tput sgr0 2>/dev/null || printf '')"
-export _SCRIPTNAME="$(basename "$0")"
-export _TLA="${_SCRIPTNAME:0:3}"
-export _TLA_UPPER="$(printf '%s' "${_TLA}" | tr '[:lower:]' '[:upper:]')"
-export _TLA_LOWER="$(printf '%s' "${_TLA}" | tr '[:upper:]' '[:lower:]')"
-export _GIT_PROFILE="${_GIT_PROFILE:-vonschutter}"
+_SCRIPTNAME="$(basename "$0")"
+_TLA="${_SCRIPTNAME:0:3}"
+_TLA_UPPER="$(printf '%s' "${_TLA}" | tr '[:lower:]' '[:upper:]')"
+_TLA_LOWER="$(printf '%s' "${_TLA}" | tr '[:upper:]' '[:lower:]')"
+_GIT_PROFILE="${_GIT_PROFILE:-vonschutter}"
 
 # Shared repository and log settings.
 _RTD_SETUP_GIT_URL="https://github.com/${_GIT_PROFILE}/${_TLA_UPPER}-Setup.git"
 _RTD_SETUP_RAW_URL="https://raw.githubusercontent.com/${_GIT_PROFILE}/${_TLA_UPPER}-Setup/main"
-export _LOG_DIR="/var/log/${_TLA_LOWER}"
-export _LOGFILE="${_LOG_DIR}/${_SCRIPTNAME}-$(date +%Y-%m-%d)-oem.log"
+_LOG_DIR="/var/log/${_TLA_LOWER}"
+_LOGFILE="${_LOG_DIR}/${_SCRIPTNAME}-$(date +%Y-%m-%d)-oem.log"
 
-# Shared POSIX config paths. Linux, macOS, BSD, and similar systems use /opt.
+# Shared config paths. Linux, macOS, BSD, and similar systems use /opt.
 _CONFIG_DIR="/opt/${_TLA_LOWER}"
 _CONFIG_TMP_DIR="${_CONFIG_DIR}.tmp"
 _CONFIG_CORE_DIR="${_CONFIG_DIR}/core"
 _CONFIG_LOG_LINK="${_CONFIG_DIR}/log"
 
-# POSIX stage-two script names.
+# stage-two script names.
 _LINUX_SCRIPT="rtd-oem-linux-config.sh"
 _MAC_SCRIPT="rtd-oem-macos-config.sh"
 
@@ -197,7 +197,7 @@ if [[ "$OSTYPE" == *"linux"* ]]; then
 				echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
 				exit 1
 			fi
-			source "${_CONFIG_CORE_DIR}/_rtd_library"
+		source "${_CONFIG_CORE_DIR}/_rtd_library"
 		oem::register_all_tools
 		ln -s -f "${_LOG_DIR}" -T "${_CONFIG_LOG_LINK}"
 		bash "${_CONFIG_CORE_DIR}/${_LINUX_SCRIPT}" "$@"
