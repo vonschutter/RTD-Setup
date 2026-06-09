@@ -1,6 +1,6 @@
-# RTD macOS KVM Module
+# RunTime Data macOS KVM Tool
 
-![RTD macOS KVM](Media_files/macos-kvm-desktop.png "RTD macOS KVM")
+![RTD macOS KVM](Media_files/macos-kvm-gui-banner.png "RTD macOS KVM")
 
 `rtd-macos-kvm` prepares a Linux host for running macOS recovery installers in QEMU/KVM through libvirt. It installs or checks the host tools, downloads the needed upstream helper assets at runtime, builds a cached macOS `BaseSystem` image, creates a writable system disk, stages firmware and boot media, and defines a libvirt VM that can be opened in virt-manager.
 
@@ -8,7 +8,7 @@ The module is meant for light testing, configuration work, and development tasks
 
 ## What It Does
 
-The default command is `prepare`. A normal run:
+The default action is "Prepare complete VM" (command:  `prepare`). A normal run does the following:
 
 1. Checks or installs QEMU/KVM, libvirt, OVMF, `dmg2img`, Python, `curl` or `wget`, and related helper tools.
 2. Starts/enables libvirt where possible and ensures the default libvirt NAT network is available.
@@ -22,7 +22,42 @@ The default command is `prepare`. A normal run:
 
 The module does not store Apple installers, generated `BaseSystem` images, OpenCore images, or large VM media in Git. Generated assets are cached on the local host.
 
-## Quick Start
+
+## Main App Window
+
+![RTD macOS KVM main window](Media_files/macos-kvm-main-window.png "RTD macOS KVM GUI")
+
+`rtd-macos-kvm-gui` is intended for users who prefer a guided desktop workflow over CLI flags. It exposes the same major actions as the script:
+
+- Host readiness check
+- Complete VM preparation
+- Installer media fetch
+- Boot asset staging
+- VM definition from existing assets
+
+The left side of the window contains the workflow, macOS version, VM sizing, storage paths, bootloader mode, and advanced toggles. The right side shows the generated command and a live progress log.
+
+The GUI does not replace the shell script or duplicate VM creation logic. It calls `rtd-macos-kvm` underneath, so CLI and GUI behavior stay aligned.
+
+The GUI needs Python GTK 3 bindings:
+
+```bash
+python3
+python3-gi
+GTK 3 introspection bindings
+```
+
+On most RTD targets these are available through the native package manager. Administrative workflows need `pkexec` so the GUI can run the backend with the required privileges while the window itself remains a normal user process.
+
+## Quick Start CLI
+
+Launch the graphical frontend:
+
+```bash
+rtd-macos-kvm-gui
+```
+
+The GUI keeps the existing command-line tool as the backend. It builds the `rtd-macos-kvm` command from the selected workflow, shows the exact command before it runs, requests elevation through `pkexec` for actions that need admin rights, and streams progress into the window.
 
 Check host readiness:
 
@@ -93,17 +128,17 @@ sudo rtd-macos-kvm define-vm --vm-name RTD-macOS-Test --disk-name RTD-macOS-Test
 
 Supported version selectors:
 
-| Selector | Result | Workflow |
-| --- | --- | --- |
-| `latest-supported`, `latest`, `default`, `catalina`, `10.15` | Catalina | Legacy macOS-Simple-KVM |
-| `n-1`, `previous`, `mojave`, `10.14` | Mojave | Legacy macOS-Simple-KVM |
-| `high-sierra`, `10.13` | High Sierra | Legacy macOS-Simple-KVM |
-| `latest-modern`, `modern`, `sonoma`, `14` | Sonoma | Modern OSX-KVM/OpenCore |
-| `big-sur`, `11` | Big Sur | Modern OSX-KVM/OpenCore |
-| `monterey`, `12` | Monterey | Modern OSX-KVM/OpenCore |
-| `ventura`, `13` | Ventura | Modern OSX-KVM/OpenCore |
-| `sequoia`, `15` | Sequoia | Modern OSX-KVM/OpenCore |
-| `tahoe`, `26` | Tahoe | Modern OSX-KVM/OpenCore |
+| Selector                                                               | Result      | Workflow                |
+| ---------------------------------------------------------------------- | ----------- | ----------------------- |
+| `latest-supported`, `latest`, `default`, `catalina`, `10.15` | Catalina    | Legacy macOS-Simple-KVM |
+| `n-1`, `previous`, `mojave`, `10.14`                           | Mojave      | Legacy macOS-Simple-KVM |
+| `high-sierra`, `10.13`                                             | High Sierra | Legacy macOS-Simple-KVM |
+| `latest-modern`, `modern`, `sonoma`, `14`                      | Sonoma      | Modern OSX-KVM/OpenCore |
+| `big-sur`, `11`                                                    | Big Sur     | Modern OSX-KVM/OpenCore |
+| `monterey`, `12`                                                   | Monterey    | Modern OSX-KVM/OpenCore |
+| `ventura`, `13`                                                    | Ventura     | Modern OSX-KVM/OpenCore |
+| `sequoia`, `15`                                                    | Sequoia     | Modern OSX-KVM/OpenCore |
+| `tahoe`, `26`                                                      | Tahoe       | Modern OSX-KVM/OpenCore |
 
 High Sierra, Mojave, and Catalina use the legacy `macOS-Simple-KVM` recovery flow. Big Sur and newer use the modern `OSX-KVM` recovery helper and OpenCore.
 
@@ -304,13 +339,13 @@ sudo rtd-macos-kvm prepare --version sonoma
 
 ## Screenshots
 
-| Tool Output | Sonoma Installer | Sonoma Install Progress |
-| --- | --- | --- |
-| ![RTD macOS KVM tool running in a terminal](Media_files/terminal-rtd-mac-os.png "Tool Output") | ![RTD macOS KVM fetching Sonoma recovery media](Media_files/macos-kvm-sonoma-fetch.png "Sonoma Recovery Media Fetch") | ![macOS Sonoma installer running in QEMU/KVM](Media_files/macos-kvm-sonoma-install-progress.png "Sonoma Install Progress") |
-| VM Boot | Recovery Utilities | First Setup |
-| ![macOS guest booting on QEMU/KVM](Media_files/macos-kvm-boot.png "VM Boot") | ![macOS Utilities recovery screen on QEMU/KVM](Media_files/macos-kvm-recovery-utilities.png "Recovery Utilities") | ![macOS first setup country selection on QEMU/KVM](Media_files/macos-kvm-welcome.png "First Setup") |
-| Catalina Installer | macOS Desktop | Homebrew App Install |
-| ![macOS Catalina installer progress on QEMU/KVM](Media_files/macos-kvm-install-progress.png "Catalina Installer") | ![macOS desktop running inside QEMU/KVM](Media_files/macos-kvm-desktop.png "macOS Desktop") | ![Homebrew installing cask applications inside the macOS guest](Media_files/macos-kvm-homebrew-app-install.png "Homebrew App Install") |
+| Tool Output                                                                                                  | Sonoma Installer                                                                                                 | Sonoma Install Progress                                                                                                           |
+| ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| ![RTD macOS KVM tool running in a terminal](Media_files/terminal-rtd-mac-os.png "Tool Output")                    | ![RTD macOS KVM fetching Sonoma recovery media](Media_files/macos-kvm-sonoma-fetch.png "Sonoma Recovery Media Fetch") | ![macOS Sonoma installer running in QEMU/KVM](Media_files/macos-kvm-sonoma-install-progress.png "Sonoma Install Progress")             |
+| VM Boot                                                                                                      | Recovery Utilities                                                                                               | First Setup                                                                                                                       |
+| ![macOS guest booting on QEMU/KVM](Media_files/macos-kvm-boot.png "VM Boot")                                      | ![macOS Utilities recovery screen on QEMU/KVM](Media_files/macos-kvm-recovery-utilities.png "Recovery Utilities")     | ![macOS first setup country selection on QEMU/KVM](Media_files/macos-kvm-welcome.png "First Setup")                                    |
+| Catalina Installer                                                                                           | macOS Desktop                                                                                                    | Homebrew App Install                                                                                                              |
+| ![macOS Catalina installer progress on QEMU/KVM](Media_files/macos-kvm-install-progress.png "Catalina Installer") | ![macOS desktop running inside QEMU/KVM](Media_files/macos-kvm-desktop.png "macOS Desktop")                           | ![Homebrew installing cask applications inside the macOS guest](Media_files/macos-kvm-homebrew-app-install.png "Homebrew App Install") |
 
 ## Upstream Helpers
 

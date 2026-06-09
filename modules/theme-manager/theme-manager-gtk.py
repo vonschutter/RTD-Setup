@@ -1,5 +1,38 @@
 #!/usr/bin/env python3
-"""GTK frontend for the RTD GNOME Theme Manager."""
+
+#
+#::                          RTD GNOME Theme Manager GTK Frontend
+#::                     G R A P H I C A L    F R O N T E N D
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Module:     theme-manager
+#:: Script:     theme-manager-gtk.py
+#:: Author(s):  RTD Team (vonschutter)
+#:: Version:    2.00
+#::
+#:: Purpose:    Provides the GTK window for the RTD GNOME Theme Manager. The
+#::             frontend lets users apply complete GNOME theme sets, customize
+#::             individual appearance elements, select RTD wallpapers, and launch
+#::             integrated RTD desktop profiles through the rtd-theme-manager
+#::             backend.
+#::
+#:: Usage:      rtd-theme-manager
+#::
+#:: Requires:   python3, python3-gi, GTK 3 introspection bindings, and the sibling
+#::             rtd-theme-manager backend script.
+#::
+#:: Runtime:    This file is intentionally not named rtd-* and is not intended to
+#::             be installed as a direct command. Use rtd-theme-manager so RTD can
+#::             validate the desktop environment, route KDE users to the native
+#::             KDE Global Theme module, and install Python GTK dependencies before
+#::             this frontend is executed.
+#::
+#:: Notes:      GNOME Shell theme changes depend on the User Themes extension and
+#::             may require logout/login before every change is visible. Wallpaper
+#::             selection defaults to the installed RTD theme assets under
+#::             /opt/rtd/themes/wallpaper.
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 import ast
 import os

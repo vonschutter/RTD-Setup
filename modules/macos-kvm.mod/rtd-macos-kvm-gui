@@ -1,0 +1,206 @@
+#!/usr/bin/env bash
+
+#
+#::                          RTD macOS KVM GUI Launcher
+#::                     G R A P H I C A L    F R O N T E N D
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Module:     macos-kvm.mod
+#:: Script:     rtd-macos-kvm-gui
+#:: Author(s):  RTD Team (vonschutter)
+#:: Version:    1.0
+#::
+#:: Purpose:    Launches the GTK frontend for the RTD macOS KVM tool. The GUI
+#::             builds and runs commands for the existing rtd-macos-kvm backend,
+#::             including host checks, installer media fetches, boot asset staging,
+#::             VM disk preparation, and libvirt VM definition.
+#::
+#:: Usage:      rtd-macos-kvm-gui [GTK frontend arguments]
+#::
+#:: Requires:   bash >= 4.4, python3, python3-gi, GTK 3 introspection bindings,
+#::             and the sibling macos-kvm-gtk.py frontend file.
+#::
+#:: Runtime:    The launcher itself does not require root. Administrative actions
+#::             are requested by the GTK frontend through pkexec when it invokes
+#::             the rtd-macos-kvm backend.
+#::
+#:: Session:    Requires a graphical session. In headless shells, SSH consoles,
+#::             or TTY-only environments, use the CLI backend directly:
+#::             rtd-macos-kvm --help
+#::
+#:: Dependency: The launcher sources _rtd_library when GTK bindings are missing
+#::             and uses software::check_native_package_dependency to install the
+#::             distro-native Python GTK packages where RTD supports the platform.
+#::
+#:: Notes:      This file intentionally keeps the rtd-* executable name so RTD
+#::             launcher/symlink generation exposes only this entrypoint. The
+#::             Python frontend is named macos-kvm-gtk.py and is not executable,
+#::             preventing it from being published as a separate command.
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Safety Check             ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+	echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
+	return 1 2>/dev/null || exit 1
+fi
+
+set -euo pipefail
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+GTK_FRONTEND="${SCRIPT_DIR}/macos-kvm-gtk.py"
+_GIT_PROFILE="${_GIT_PROFILE:-${GIT_Profile:-vonschutter}}"
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+die() {
+	# Print a concise launcher error and stop before Python is invoked.
+	echo "Error: $*" >&2
+	exit 1
+}
+
+warn() {
+	# Print a warning from the launcher before Python is invoked. 
+	echo "Warning: $*" >&2
+}
+
+info() {
+	# Print an informational message from the launcher before Python is invoked.
+	echo "Info: $*" >&2
+}
+
+ensure_graphical_session() {
+	if [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
+		return 0
+	fi
+
+	cat >&2 <<'EOF'
+Error: RTD macOS KVM GUI requires a graphical desktop session.
+
+This launcher starts the GTK interface and cannot run from a TTY-only or
+headless shell. Use the command-line backend instead:
+
+  rtd-macos-kvm --help
+  rtd-macos-kvm doctor
+  sudo rtd-macos-kvm prepare --version sonoma
+EOF
+	return 1
+}
+
+rtd::bootstrap_library() {
+	local library_name="${1:-_rtd_library}" path tmp rc
+
+	for path in \
+		"${SCRIPT_DIR}/${library_name}" \
+		"${SCRIPT_DIR}/../core/${library_name}" \
+		"${SCRIPT_DIR}/../../core/${library_name}" \
+		"/opt/rtd/core/${library_name}" \
+		"${HOME:-}/GIT/RTD-Setup/core/${library_name}" \
+		"${HOME:-}/RTD-Setup/core/${library_name}"; do
+		[[ -r "$path" ]] || continue
+		# shellcheck source=/dev/null
+		source "$path" ""
+		declare -F software::check_native_package_dependency >/dev/null 2>&1 && return 0
+	done
+
+	tmp="$(mktemp "/tmp/${library_name}.XXXXXX")" || return 1
+	rc=0
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL "https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/${library_name}" -o "$tmp" || rc=$?
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO "$tmp" "https://github.com/${_GIT_PROFILE}/RTD-Setup/raw/main/core/${library_name}" || rc=$?
+	else
+		rc=1
+	fi
+	if ((rc == 0)); then
+		# shellcheck source=/dev/null
+		source "$tmp" ""
+		declare -F software::check_native_package_dependency >/dev/null 2>&1 || rc=1
+	fi
+	rm -f "$tmp"
+	return "$rc"
+}
+
+gtk_frontend_ready() {
+	# Keep dependency validation small and local. The GTK frontend checks and
+	# reports backend/runtime failures after the window starts.
+	command -v python3 >/dev/null 2>&1 &&
+		python3 -c 'import gi; gi.require_version("Gtk", "3.0"); gi.require_version("Gdk", "3.0"); gi.require_version("GdkPixbuf", "2.0"); from gi.repository import Gdk, GdkPixbuf, Gtk, Pango' >/dev/null 2>&1
+}
+
+install_python_gtk_dependencies() {
+	local distro
+
+	rtd::bootstrap_library "_rtd_library" || return 1
+	distro="$(system::distribution_type)"
+
+	case "$distro" in
+		ubuntu|debian)
+			software::check_native_package_dependency python3 python3-gi gir1.2-gtk-3.0
+			;;
+		fedora|redhat)
+			software::check_native_package_dependency python3 python3-gobject gtk3
+			;;
+		suse)
+			software::check_native_package_dependency python3 python3-gobject-Gdk typelib-1_0-Gtk-3_0
+			;;
+		*)
+			warn "Automatic Python GTK setup is not available for distribution family: ${distro}."
+			return 1
+			;;
+	esac
+}
+
+ensure_python_gtk_frontend() {
+	gtk_frontend_ready && return 0
+	info "Installing the Python GTK components required by the RTD macOS KVM GUI."
+
+	if ((EUID == 0)); then
+		install_python_gtk_dependencies || return 1
+	elif command -v pkexec >/dev/null 2>&1; then
+		pkexec env DISPLAY="${DISPLAY:-}" XAUTHORITY="${XAUTHORITY:-}" "$SCRIPT_PATH" --setup-python-gtk-dependencies || return 1
+	elif command -v sudo >/dev/null 2>&1; then
+		sudo -E "$SCRIPT_PATH" --setup-python-gtk-dependencies || return 1
+	else
+		warn "Neither pkexec nor sudo is available to install Python GTK dependencies."
+		return 1
+	fi
+
+	hash -r
+	gtk_frontend_ready
+}
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+case "${1:-}" in
+	--setup-python-gtk-dependencies)
+		install_python_gtk_dependencies
+		exit $?
+		;;
+esac
+
+ensure_graphical_session || exit 1
+ensure_python_gtk_frontend || die "RTD macOS KVM GUI requires python3, python3-gi, and GTK 3 bindings."
+[[ -r "$GTK_FRONTEND" ]] || die "GTK frontend not found: ${GTK_FRONTEND}"
+exec python3 "$GTK_FRONTEND" "$@"

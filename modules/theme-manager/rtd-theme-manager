@@ -1,15 +1,49 @@
 #!/usr/bin/env bash
 
 #
-#::                                       A D M I N   T O O L
+#::                                RTD GNOME Theme Manager
+#::                     G R A P H I C A L    F R O N T E N D
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #:::::::::::::::::::::::::::::::::::::::// RTD GNOME Theme Manager //::::::::::::::::::::::::::::::::// Linux //::::::::
-#:: Author(s):    RTD
-#:: Version:      2.00
+#:: Module:     theme-manager
+#:: Script:     rtd-theme-manager
+#:: Author(s):  RTD Team (vonschutter)
+#:: Version:    2.00
 #::
-#:: Purpose:      Apply complete or individually selected GNOME theme elements.
+#:: Purpose:    Launches the RTD GNOME Theme Manager and applies appearance
+#::             settings through the same backend used by the GTK frontend. The
+#::             tool can apply complete GNOME theme sets, individual GTK/Shell/
+#::             icon/cursor/color/wallpaper selections, and RTD desktop profiles.
 #::
-#:: Usage:        Run without arguments to launch the GTK selector GUI.
+#:: Usage:      rtd-theme-manager
+#::             rtd-theme-manager --apply GTK SHELL ICONS CURSOR COLOR WALLPAPER
+#::             rtd-theme-manager --apply-profile PROFILE
+#::             rtd-theme-manager --kde-look-settings
+#::             rtd-theme-manager [--yad | --zenity]
+#::             rtd-theme-manager --help
+#::
+#:: Requires:   bash >= 4.4, RTD library, gsettings, python3, python3-gi, GTK 3
+#::             introspection bindings, and the sibling theme-manager-gtk.py
+#::             frontend for the primary GUI. Dialog fallback mode requires yad
+#::             or zenity.
+#::
+#:: Desktop:    GNOME sessions use the RTD GTK frontend by default. KDE Plasma
+#::             sessions are routed directly to the native Global Theme settings
+#::             module through kcmshell6 kcm_lookandfeel, kcmshell5
+#::             kcm_lookandfeel, or systemsettings kcm_lookandfeel. The GNOME
+#::             chooser is not shown on Plasma because GNOME gsettings, Shell
+#::             themes, and GNOME profile controls are not the correct mechanism
+#::             for applying KDE global themes.
+#::
+#:: Profiles:   win10-light, win10-dark, mac-bright, mac-dusk, crisp-day,
+#::             crisp-evening, moca-smooth, distro-reset.
+#::
+#:: Notes:      GNOME Shell theme changes depend on the User Themes extension and
+#::             can require logout/login before every change is visible. Wallpaper
+#::             selection defaults to installed RTD assets under
+#::             /opt/rtd/themes/wallpaper. The --setup-* options are internal
+#::             helper entrypoints used when installing GUI/dialog dependencies.
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -465,14 +499,57 @@ Usage:
   $(basename "$0") --apply GTK SHELL ICONS CURSOR COLOR_SCHEME WALLPAPER
   $(basename "$0") --apply-profile PROFILE
   $(basename "$0") --kde-look-settings
+  $(basename "$0") --setup-python-gtk-dependencies
+  $(basename "$0") --setup-dialog-dependency yad|zenity
   $(basename "$0") --help
 
 Description:
   Launch the RTD GNOME Theme Manager. Use the Complete Theme page for a
   coordinated theme, customize individual GNOME appearance elements, apply
   integrated RTD desktop profiles, or hand KDE users to the RTD KDE Look and
-  Feel helper.
-  Use --yad or --zenity to force a compatibility interface.
+  Feel settings module.
+
+Desktop behavior:
+  GNOME:
+    Opens the RTD GTK theme manager. The GUI can apply complete GNOME themes,
+    individual GTK/Shell/icon/cursor/color/wallpaper selections, and RTD
+    desktop profiles.
+
+  KDE Plasma:
+    Does not open the GNOME chooser. The launcher opens KDE's native Global
+    Theme settings module instead, trying these commands in order:
+      kcmshell6 kcm_lookandfeel
+      kcmshell5 kcm_lookandfeel
+      systemsettings kcm_lookandfeel
+
+    This lets KDE apply installed Plasma global themes through KDE's supported
+    settings path.
+
+Options:
+  --apply
+    Apply one explicit GNOME appearance selection. Use __KEEP__ for any element
+    that should not be changed.
+
+  --apply-profile
+    Apply one RTD desktop profile. Available profile IDs:
+      win10-light, win10-dark, mac-bright, mac-dusk, crisp-day,
+      crisp-evening, moca-smooth, distro-reset
+
+  --kde-look-settings
+    Open the native KDE Global Theme settings module.
+
+  --yad, --zenity
+    Force the compatibility dialog interface instead of the GTK frontend.
+
+  --setup-python-gtk-dependencies
+  --setup-dialog-dependency yad|zenity
+    Internal helper entrypoints used by the launcher when a required GUI or
+    dialog dependency is missing.
+
+Notes:
+  GNOME Shell themes require the User Themes extension and can require a logout
+  and login before every visual change is active. RTD wallpaper selection uses
+  installed theme assets under /opt/rtd/themes/wallpaper.
 EOF
 }
 

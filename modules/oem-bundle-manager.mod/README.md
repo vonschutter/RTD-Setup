@@ -1,4 +1,5 @@
-# OEM Bundle Manager
+# Software Bundle Manager
+
 < [Back](https://github.com/vonschutter/RTD-Setup/blob/main/README.md) |
 
 The OEM Bundle Manager is part of the Power Tools, and makes it easy to add and remove groups of packages. A group of packages are usually grouped around a capability or set of tasks, and could be considered roles.
@@ -20,19 +21,25 @@ To use the OEM Bundle Manager open a terminal and type:
 rtd-oem-bundle-manager
 ```
 
+## Main Window
+
 The main window will let you choose between a few options: to add bundles, remove bundles, or detailed information about the tool itself.
 
 ![1679592203031](image/README/main.png)
 
-When selecting "Add Bundles to this computer" you will see a list of bundles available to install on your computer. Only bundles that have not already been installed will be listed in this dialog. To the right of the Bundle name there is a brief description of the contents of the bundle. Bundles are defined in the "_rtd_recipes" file.
+## Install Bundles
+
+When selecting "Install Bundles" you will see a list of bundles available to install on your computer. Only bundles that have not already been installed will be listed in this dialog. To the right of the Bundle name there is a brief description of the contents of the bundle. Bundles are defined in the "_rtd_recipes" file.
 
 NOTE: Software is not provided as part of the OEM Bundle Manager of the RTD Power Tools, but downloaded from the internet when needed.
 
 ![1679592132039](image/README/install.png)
 
+## Remove Bundles
+
 Once a bundle is added to your computer, it may be removed by choosing the "Remove Bundles from this computer" from the selection in the main window. Any installed bundles will be listed here. Selecting it in this window will remove it from your computer.
 
-![1679592243988](image/README/1679592243988.png)
+![1679592243988](image/README/remove.png)
 
 ### Installation Guide
 
