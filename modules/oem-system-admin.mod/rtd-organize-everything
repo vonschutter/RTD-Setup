@@ -1,50 +1,42 @@
 #!/bin/bash
-#				-	RTD Power Toy Script      -
+
 #
-#::::::::::::::::::::::::::::::::::::::::::::: HEADER DO NOT REMOVE :::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::                                  RTD Organize Everything
+#::                              F I L E    O R G A N I Z A T I O N
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::// RTD Organize Everything //::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Module:     oem-system-admin.mod
+#:: Script:     rtd-organize-everything
+#:: Author(s):  RTD Team (vonschutter)
+#:: Version:    1.0
+#::
+#:: Purpose:    Organize files in the current directory into subdirectories named after each file extension.
+#::
+#:: Usage:      rtd-organize-everything [--help]
+#::
+#:: Requires:   bash and a Linux desktop or terminal session.
+#::
+#:: Notes:      Moves matching files in the current directory. Files without extensions and nested directories are not the primary target of this helper.
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Safety Check             ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 :<<"::CMDLITERAL"
-cls
-@ECHO "Do not attempt to run this script in PowerShell"
-exit /b 1
+@ECHO OFF
+GOTO :CMDSCRIPT
 ::CMDLITERAL
 
-#::
-#::
-#::
-#::                                      A D M I N   C O M M A N D
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::// Simple Organization Toy //::::::::::::::::::::::::::::::::::// Linux //::::::::
-#::
-#:: 	Author:   	SLS
-#:: 	Version 	1.00
-#::
-#::
-#::	Purpose: To organize all the files found in the current folder by extension.
-#::		 The current folder refers to the present working directory "PWD".
-#::
-#::	Usage:	Simply execute this script to accomplish this task. No parameters required.
-#::
-#::
-#::
-#::
-#::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#
-# This script is shared in the hopes that someone will find it useful.
-#
-# This script iterates over all files in the current directory, extracts their extensions, creates a directory for each 
-# unique extension (if it doesn't already exist), and then copies the files into the corresponding directory 
-# based on their extension.
-#
-#     for f in *.*; iterates over all files in the current directory that have an extension.
-#     do d="${f##*.}"; extracts the file extension and assigns it to variable d. This effectively isolates the extension 
-#     from the filename. mkdir -p "$d" creates a directory named after the file extension if it doesn't already exist. 
-#     The -p flag ensures that mkdir does not throw an error if the directory already exists.
-#     && mv "$f" "$d"; moves the file into the newly created directory. "done" marks the end of the loop.
-#
-# This assumes that files are named in a conventional manner with a single dot before the file extension (e.g., file.txt). 
-# It will not correctly handle files with multiple dots in their names (e.g., archive.tar.gz) or files without extensions.
+if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+	echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
+	return 1 2>/dev/null || exit 1
+fi
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -79,7 +71,7 @@ $Cyan $( basename ${0} ) $Color_Off
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Execute tasks                   ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 

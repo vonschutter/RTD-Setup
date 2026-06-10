@@ -1,35 +1,34 @@
 #!/bin/bash
 
 #
-#::                                     A D M I N   C O M M A N D L E T
+#::                                RTD Xterm Sysconsole
+#::                       S Y S T E M    M O N I T O R I N G
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::// Simple Admin Tool //::::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#::::::::::::::::::::::::::::::::::::::// RTD Xterm Sysconsole //:::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Module:     oem-system-admin.mod
+#:: Script:     rtd-xterm-sysconsole
+#:: Author(s):  RTD Team (vonschutter)
+#:: Version:    1.0
 #::
-#::     Author:   	SLS
-#::     Version 	1.02
-:	${GIT_Profile:=vonschutter}
+#:: Purpose:    Launch four xterm windows for interactive system monitoring.
 #::
+#:: Usage:      rtd-xterm-sysconsole [--help]
 #::
-#::	Purpose: The purpose of this script is to monitor a linux system interactively.
-#::		 This may be useful for trouble shooting.
+#:: Requires:   bash >= 4.4, RTD library, xterm, htop, syslog-ng-core or syslog, watch/df, and bmon.
 #::
-#::     Usage:	Simply execute this commandlet to accomplith this task.
+#:: Notes:      Opens htop, syslog tailing, disk usage watch, and bandwidth monitoring in fixed screen positions.
+#:: Launches 4 Xterm windows and starts system monitoring tool in them. This is intended to demonstrate how to
+#:: launch windows from the ternminal and determin where on the screen they should appear.
 #::
+#:: Xterm obeys the following on screen positions:
 #::
-#::
-#::
-#::
+#:: +0+0    upper left hand corner.
+#:: -0+0    upper right hand corner.
+#:: -0-0    lower right hand corner.
+#:: +0-0    lower left hand corner.
+#:: 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-# Lunches 4 Xterm windows and starts system monitoring tool in them. This is intended to demonstrate how to
-# launch windows from the ternminal and determin where on the screen they should appear.
-#
-# Xterm obeys the following on screen positions:
-#
-# +0+0    upper left hand corner.
-# -0+0    upper right hand corner.
-# -0-0    lower right hand corner.
-# +0-0    lower left hand corner.
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -42,6 +41,15 @@ if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) ))
 	echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
 	return 1 2>/dev/null || exit 1
 fi
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+:	${GIT_Profile:=vonschutter}
+
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -124,6 +132,12 @@ rtd::bootstrap_library() {
 	echo "Loaded $library_name, but the requested version/functions are not available." >&2
 	return 1
 }
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 	cat <<EOF

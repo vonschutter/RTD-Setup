@@ -1,55 +1,42 @@
 #!/bin/bash
 
 #
-#::                                      A D M I N   C O M M A N D L E T
+#::                                RTD On Notify Wait
+#::                       F I L E    E V E N T    H E L P E R
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::// Simple Admin Tool //::::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#::::::::::::::::::::::::::::::::::::::// RTD On Notify Wait //:::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Module:     oem-system-admin.mod
+#:: Script:     rtd-on-notify-wait
+#:: Author(s):  RTD Team (vonschutter), based on the original inotify helper by
+#::             Senko Rasic <senko.rasic@dobarkod.hr>
+#:: Version:    1.02
 #::
-#::     Author:   	SLS
-#::     Version 	1.02
-:	${GIT_Profile:=vonschutter}
+#:: Purpose:    Watches the current directory tree for file changes and runs the
+#::             command supplied on the command line after changes settle. This is
+#::             useful for lightweight sync, build, scan, or automation workflows
+#::             that should react to local file creation, modification, deletion,
+#::             or move events.
 #::
+#:: Usage:      rtd-on-notify-wait COMMAND [ARG...]
+#::             rtd-on-notify-wait rsync -avt . host:/remote/dir
+#::             rtd-on-notify-wait --help
 #::
-#::	Purpose: The purpose of this script is to clear out zombie processes.
-#::		 This may be useful in troubleshooting. It may work, but depending on the cause
-#::		 of the zombification it may or may not work.
-#::     Usage:	Simply execute this commandlet to accomplish this task. No parameters required.
+#:: Requires:   bash >= 4.4, RTD library, and inotifywait from the inotify-tools
+#::             package. The RTD library installs inotify-tools when supported by
+#::             the current distribution.
 #::
+#:: Behavior:   The helper watches the current working directory recursively for
+#::             CREATE, CLOSE_WRITE, DELETE, MODIFY, MOVED_FROM, and MOVED_TO
+#::             events. It waits for a one-second quiet period before running the
+#::             supplied command, which prevents repeated runs during bursts of
+#::             related file events.
 #::
-#::
-#::
-#::
+#:: Notes:      Run this command from the directory you want to monitor. The
+#::             helper runs until interrupted with Ctrl+C. It is a thin entrypoint
+#::             to system::io_on_notify_wait in _rtd_library.
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#
-#
-# This script was originally developed for RuntimeData, a small OEM in Buffalo Center, IA.
-# This OEM and store nolonger exists as its owner has passed away.
-# This script is shared in the hopes that someone will find it usefull.
-#
-# This script is instended to live in the ~/bin/ folder.
-#
-# Purpose:
-# Watch current directory (recursively) for file changes, and execute
-# a command when a file or directory is created, modified or deleted.
-#
-# Original Written by: Senko Rasic <senko.rasic@dobarkod.hr>
-#
-# Requires Linux, bash and inotifywait (from inotify-tools package).
-#
-# To avoid executing the command multiple times when a sequence of
-# events happen, the script waits one second after the change - if
-# more changes happen, the timeout is extended by a second again.
-#
-# Installation:
-#     chmod a+rx rtd-on-notify-wait
-#     sudo cp rtd-on-notify-wait "to somewhere in your path" or ~/bin
-#
-# Example use - rsync local changes to the remote server:
-#
-#    rtd-on-notify-wait rsync -avt . host:/remote/dir
-#
-#
+
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -61,6 +48,15 @@ if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) ))
 	echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
 	return 1 2>/dev/null || exit 1
 fi
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+:	${GIT_Profile:=vonschutter}
+
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -144,18 +140,35 @@ rtd::bootstrap_library() {
 	return 1
 }
 
-
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 	cat <<EOF
 Usage:
-  $(basename "$0") [--help|-h]
+  $(basename "$0") COMMAND [ARG...]
+  $(basename "$0") rsync -avt . host:/remote/dir
+  $(basename "$0") --help
 
 Description:
-  Run the RTD on-notify wait helper from the shared library.
+  Watch the current directory recursively with inotifywait. When files or
+  directories are created, modified, deleted, or moved, wait for a one-second
+  quiet period and then run COMMAND.
+
+Examples:
+  $(basename "$0") rsync -avt . host:/remote/dir
+  $(basename "$0") make
+  $(basename "$0") clamscan -r .
+
+Notes:
+  Run this helper from the directory you want to monitor. It continues watching
+  until interrupted with Ctrl+C.
 EOF
 	exit 0
 fi
 
 rtd::bootstrap_library "_rtd_library" || { echo "Failed to load _rtd_library"; exit 1; }
-io_on_notify_wait
+system::io_on_notify_wait "$@"

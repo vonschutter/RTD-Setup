@@ -1,31 +1,25 @@
 #!/bin/bash
 
 #
-#::                         A D M I N   C O M M A N D L E T
-#:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::// Simple Admin Tool //::::::::::::::::::::::::::::::::::::::::// Linux //:::::::
+#::                                            RTD Net Use
+#::                                  S M B    M O U N T    H E L P E R
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:::::::::::::::::::::::::::::::::::::::::::::// RTD Net Use //:::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Module:     oem-system-admin.mod
+#:: Script:     rtd-netuse
+#:: Author(s):  RTD Team (vonschutter)
+#:: Version:    1.0
 #::
-#::     Author:    SLS
-#::     Version    1.11
+#:: Purpose:    Mount one or more SMB/CIFS shares under a local mount base.
 #::
-#::     Purpose: Mount one or more SMB/Windows shares from a given server.
-#::              Supports interactive prompts when parameters are missing.
+#:: Usage:      rtd-netuse [options] SERVER SHARE [...]
 #::
-#::     Value:   Useful for quickly mounting remote Windows or Samba shares
-#::              from Linux without manually building long mount commands.
+#:: Requires:   bash >= 4.4, cifs-utils or mount.cifs, sudo rights for mounting, and network access to the SMB server.
 #::
-#::     Usage:   Run with a server and one or more share names, or run it in
-#::              interactive mode so the script can prompt for missing values.
-#::
-#::     Examples:
-#::              rtd-netuse --server fileserver --share Public
-#::              rtd-netuse --server nas01 --share Media --ask
-#::
-#:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#
-# This script was originally developed for RuntimeData, a small OEM in Buffalo Center, IA.
-# This OEM and store nolonger exists as its owner has passed away.
-# This script is shared in the hopes that someone will find it useful.
+#:: Notes:      Prompts for missing connection details and mounts each requested share individually.
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 
 :<<"::CMDLITERAL"
 @ECHO OFF
@@ -536,9 +530,10 @@ mount_share() {
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Main                             ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 rtd::bootstrap_library "_rtd_library" || { echo "Failed to load _rtd_library"; exit 1; }
 write_information "Starting ${_scriptname}; log file: ${_LOGFILE}"
 arg_count=$#

@@ -1,37 +1,26 @@
 #!/bin/bash
 
 #
-#::                                            A D M I N   C O M M A N D L E T
+#::                                           RTD Restart Sound
+#::                                 S Y S T E M    R E M E D I A T I O N
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::// Simple Admin Tool //::::::::::::::::::::::::::::::::::::::::// Ubuntu //:::::::
+#::::::::::::::::::::::::::::::::::::::::// RTD Restart Sound //::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Module:     oem-system-admin.mod
+#:: Script:     rtd-restart-sound
+#:: Author(s):  RTD Team (vonschutter)
+#:: Version:    1.0
 #::
-#::     Author:   	SLS
-#::     Version 	1.02
-:	${GIT_Profile:=vonschutter}
+#:: Purpose:    Restart the active sound stack using the RTD library helper.
 #::
+#:: Usage:      rtd-restart-sound [--help]
 #::
-#::	Purpose: The purpose of this script is to force reload the sound system
+#:: Requires:   bash >= 4.4 and RTD library sound restart support.
 #::
-#::
-#::     Usage:	Simply execute this commandlet to accomplish this task.
-#::
-#::
-#::
-#::
-#::
+#:: Notes:      Prompts before restarting sound services for the current system.
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#
-#
-# This  script was originally developed for RuntimeData, a small OEM in Buffalo Center, IA.
-# This OEM and store no longer exists as its owner has passed away.
-# This script is shared in the hopes that someone will find it useful.
-#
-# This script is intended to live in the ~/bin/ folder or in the $PATH.
-#
-# The sound system in Ubuntu may sometimes do strange things and sound odd.
-# The purpose of this short script is to facilitate the support of client workstations
-# by making it ease to reload the sound system on the PC.
+
+
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -44,6 +33,15 @@ if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) ))
 	echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
 	return 1 2>/dev/null || exit 1
 fi
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+:	${GIT_Profile:=vonschutter}
+
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -127,6 +125,11 @@ rtd::bootstrap_library() {
 	return 1
 }
 
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 	cat <<EOF

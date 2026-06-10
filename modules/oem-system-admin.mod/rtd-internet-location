@@ -1,35 +1,25 @@
 #!/bin/bash
 
 #
-#::             			A D M I N   C O M M A N D
+#::                                RTD Internet Location
+#::                       N E T W O R K    I N F O R M A T I O N
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::// Simple Admin Tool //::::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#::::::::::::::::::::::::::::::::::::// RTD Internet Location //::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Module:     oem-system-admin.mod
+#:: Script:     rtd-internet-location
+#:: Author(s):  RTD Team (vonschutter)
+#:: Version:    1.0
 #::
-#::     Author:   	SLS
-#::     Version 	1.02
-:	${GIT_Profile:=vonschutter}
+#:: Purpose:    Show the public IP address and geographic data returned by external lookup services.
 #::
-#::	January 1 2019  - SLS
-#::		* File originally created.
-#::             * Updated w. check_rtd_library
+#:: Usage:      rtd-internet-location [--help]
 #::
-#::	Purpose: The purpose of the script is to find and display you internet location (geolocation)
-#:: 	 	 Executing this command will identify you external IP and where physically it is located.
-#::		 This is a useful function to quickly check if you VPN is working correctly.
+#:: Requires:   bash >= 4.4, RTD library, curl, dig, dialog, and internet access.
 #::
-#::	Value: Quickly confirms whether traffic is exiting from the expected region,
-#::	       which is useful for validating VPN routing or troubleshooting egress.
-#::
-#::	Usage: Run the script and it will query an external service and print the
-#::	       detected public address and geolocation details.
-#::
-#::	Examples:
-#::	       rtd-internet-location
-#::
-#::
-#::
+#:: Notes:      Uses public lookup services, so returned location is approximate and based on the visible public IP address.
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -42,6 +32,14 @@ if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) ))
 	echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
 	return 1 2>/dev/null || exit 1
 fi
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+:	${GIT_Profile:=vonschutter}
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::

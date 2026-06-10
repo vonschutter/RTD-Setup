@@ -1,37 +1,24 @@
 #!/bin/bash
 
-PUBLICATION="${_TLA} Simple Global OEM Kernel Remover"
-VERSION="0.01"
 #
-#::             Linux Kernel Remover Script
+#::                                RTD OEM Old Kernel Remover
+#::                       P A C K A G E    M A I N T E N A N C E
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::// Linux //::::
-#:: Author(s):   	SLS
-#:: Version 1.00
+#:::::::::::::::::::::::::::::::// RTD OEM Old Kernel Remover //::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Module:     oem-system-admin.mod
+#:: Script:     rtd-oem-old-kernel-remover
+#:: Author(s):  RTD Team (vonschutter)
+#:: Version:    1.0
 #::
+#:: Purpose:    Prompt for confirmation and remove old kernel packages using the RTD library.
 #::
-#::	Purpose:       The purpose of this script is to remove all old kernels on a system. This is usefull when you get the
-#::                    error message that /boot is out of space...
+#:: Usage:      sudo rtd-oem-old-kernel-remover [--help]
 #::
-#::	Value:         Useful for reclaiming space on systems with a small /boot
-#::	               partition after multiple kernel upgrades have accumulated.
+#:: Requires:   bash >= 4.4, RTD library, dialog-compatible UI, package tooling, and administrative privileges.
 #::
-#::	Usage:         Run with administrative privileges and confirm the warning
-#::	               prompt before any kernels are removed.
-#::
-#::	Examples:
-#::	               sudo rtd-oem-old-kernel-remover
-#::
-#::
-#::	Dependencies: - There may be dependencies like make and other development utilities.
-#::
+#:: Notes:      Requires explicit typed confirmation because removing kernels can make a system unbootable if misused.
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-
-
-
-
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -44,6 +31,16 @@ if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) ))
 	echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
 	return 1 2>/dev/null || exit 1
 fi
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+:	${GIT_Profile:=vonschutter}
+PUBLICATION="${_TLA} Simple Global OEM Kernel Remover"
+VERSION="1.0"
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -135,9 +132,10 @@ rtd::bootstrap_library() {
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Logic and Flow Control          ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 	cat <<EOF
 Usage:

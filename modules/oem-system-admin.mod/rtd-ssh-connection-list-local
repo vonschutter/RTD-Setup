@@ -1,40 +1,23 @@
 #!/bin/bash
 
-#
-#::                                    SSH automatic find and connect script
+#::                                       RTD SSH Connection List Local
+#::                                       N E T W O R K    H E L P E R
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::// Simple Admin Tool //::::::::::::::::::::::::::::::::::::::::// Linux  //:::::::
-#::     Author:   	SLS
-#::     Version 	1.00
-:	"${GIT_Profile:=vonschutter}"
+#::::::::::::::::::::::::::::::::::::::// RTD SSH Connection List Local //::::::::::::::::::::::::::::// Linux //::::::::
+#:: Module:     oem-system-admin.mod
+#:: Script:     rtd-ssh-connection-list-local
+#:: Author(s):  RTD Team (vonschutter)
+#:: Version:    1.0
 #::
-#::	Monday 27 November, 2017  - SLS.
-#::		* File originally created.
+#:: Purpose:    Scan the local subnet for SSH-capable hosts and show a menu for connecting to one.
 #::
+#:: Usage:      rtd-ssh-connection-list-local [--config-user|--help]
 #::
-#::	Purpose: The purpose of the script is to scan the local subnet for computers with ssh running on it
-#::              and give you a menu where you can select on of the computers to connect to. 
-#:: 
-#::              This is useful for a home network or a small business to manage local linux PCs.
-#::           
-#::	Value: Makes it easier to discover SSH-capable hosts on the local subnet
-#::	       and connect without manually scanning or remembering addresses.
+#:: Requires:   bash >= 4.4, RTD library, SSH client tooling, local network access, and dialog-compatible UI support.
 #::
-#::	Usage: Run the script to scan the local network and select a host from the
-#::	       menu, or use --config-user to save a default remote username.
-#::
-#::	Examples:
-#::	       rtd-ssh-connection-list-local
-#::	       rtd-ssh-connection-list-local --config-user
-#::
-#:: 
-#::
-#:: 
-#:: 
-#::
+#:: Notes:      Use --config-user to save the default remote username used for connections.
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -48,13 +31,14 @@ if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) ))
 	return 1 2>/dev/null || exit 1
 fi
 
+
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::          Script Settings                 ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-
+:	${GIT_Profile:=vonschutter}
 _LOCALNET="$(ip -o addr show up primary scope global | while read -r num dev fam addr rest; do echo ${addr%/*}; done | head -1)"
 _LOCALSUB="$(ip -o -f inet addr show | awk '/scope global/ {print $4}' | head -1 | cut -f2 -d/)"
 
@@ -248,7 +232,7 @@ parameter_check ()
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Setup iptables for VPN          ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #

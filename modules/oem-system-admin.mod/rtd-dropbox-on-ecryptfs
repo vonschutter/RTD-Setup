@@ -1,34 +1,26 @@
 #!/bin/bash
 
 #
-#::                                    A D M I N   C O M M A N D
+#::                                        RTD Dropbox On eCryptfs
+#::                                      S T O R A G E    H E L P E R
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::// Simple Admin Tool //::::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#::::::::::::::::::::::::::::::::::// RTD Dropbox On eCryptfs //::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Module:     oem-system-admin.mod
+#:: Script:     rtd-dropbox-on-ecryptfs
+#:: Author(s):  RTD Team (vonschutter)
+#:: Version:    1.0
 #::
-#::     Author:   	SLS
-#::     Version 	1.02
-:	${GIT_Profile:=vonschutter}
+#:: Purpose:    Move an existing Dropbox folder onto a loop-mounted ext4 image for encrypted-home setups.
 #::
+#:: Usage:      rtd-dropbox-on-ecryptfs [--help]
 #::
-#::	Purpose: The purpose of this script is to migrate a users dropbox folder to a volume
-#::		 that is loopmounted and formatted with extfs4. This may be needed if the dropbox folder
-#::		 needs to reside on a Luks encrypted home folder; wich Dropbox has dropped support for.
-#::     Usage:	Simply execute this commandlet to accomplish this task. No parameters required.
+#:: Requires:   bash >= 4.4, RTD library, Dropbox folder, dd, mkfs.ext4, chattr, mount, and sufficient disk space.
 #::
-#::
-#::
-#::
-#::
+#:: Notes:      Stops Dropbox, backs up the existing Dropbox folder, creates a backing image under ~/.dropbox, mounts it, and copies content back.
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#
-#
-#
-# This  script was originally developed for RuntimeData, a small OEM in Buffalo Center, IA.
-# This OEM and store nolonger exists as its owner has passed away.
-# This script is shared in the hopes that someone will find it useful.
-#
-# This script is intended to live in the ~/bin/ or /bin/ folder, alternatively in the $PATH.
+
+
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -40,6 +32,14 @@ if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) ))
 	echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
 	return 1 2>/dev/null || exit 1
 fi
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+:	${GIT_Profile:=vonschutter}
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::

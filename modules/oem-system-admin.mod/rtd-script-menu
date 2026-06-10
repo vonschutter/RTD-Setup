@@ -1,38 +1,53 @@
 #!/bin/bash
-#
-#::                                   A D M I N   C O M M A N D
+
+
+#::                                           RTD Script Menu
+#::                               G R A P H I C A L    L A U N C H E R
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::// RTD Script Menu //:::::::::::::::::::::::::::::::::::::::::// Linux //:::::::::
-#:: Author(s):    RTD
-#:: Version:      1.00
+#::::::::::::::::::::::::::::::::::::::::::// RTD Script Menu //::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#:: Module:     oem-system-admin.mod
+#:: Script:     rtd-script-menu
+#:: Author(s):  RTD Team (vonschutter)
+#:: Version:    1.0
 #::
-#:: Purpose:      Present a simple graphical list of RTD scripts installed under
-#::               the active RTD module tree and launch the selected script.
+#:: Purpose:    Show a Zenity-based picker for installed RTD scripts under the active RTD module tree.
 #::
-#:: Value:        Useful on systems where the user knows RTD tools are installed
-#::               but does not remember the exact command names or paths.
+#:: Usage:      rtd-script-menu [--help]
 #::
-#:: Usage:        Run the script, select a tool from the Zenity list, and the
-#::               selected script will be executed.
+#:: Requires:   bash, find, zenity, and installed RTD module scripts under /opt/<tla>/modules.
 #::
-#:: Examples:
-#::               rtd-script-menu
-#::
+#:: Notes:      The organization prefix is inferred from the first three characters of the script name.
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Safety Check             ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+	echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
+	return 1 2>/dev/null || exit 1
+fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::          Script Settings                 ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-# Variables that govern the behavior or the script and location of files are
-# set here. There should be no reason to change any of this abcent strong preferences.
+
+:	${GIT_Profile:=vonschutter}
+_scriptname=$(basename $0)
+_tla=${_scriptname:0:3}
 
 
-# Put a convenient link to the logs where logs are normally found...
-# capture the 3 first letters as org TLA (Three Letter Acronym)
-export _scriptname=$(basename $0)
-export _tla=${_scriptname:0:3}
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Initialization           ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 	cat <<EOF
@@ -48,7 +63,7 @@ fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Execute tasks                   ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
