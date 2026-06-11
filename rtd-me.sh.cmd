@@ -124,6 +124,8 @@ _GIT_PROFILE="${_GIT_PROFILE:-vonschutter}"
 # Shared repository and log settings.
 _RTD_SETUP_GIT_URL="https://github.com/${_GIT_PROFILE}/${_TLA_UPPER}-Setup.git"
 _RTD_SETUP_RAW_URL="https://raw.githubusercontent.com/${_GIT_PROFILE}/${_TLA_UPPER}-Setup/main"
+_BOOTSTRAP_GUI_URL="${_RTD_SETUP_RAW_URL}/core/rtd-bootstrap-progress-gtk.py"
+_BOOTSTRAP_GUI_BANNER_URL="${_RTD_SETUP_RAW_URL}/core/Media_files/rtd-bootstrap-gui-banner.png"
 _LOG_DIR="/var/log/${_TLA_LOWER}"
 _LOGFILE="${_LOG_DIR}/${_SCRIPTNAME}-$(date +%Y-%m-%d)-oem.log"
 
@@ -149,6 +151,69 @@ fi
 
 "${_SUDO[@]}" mkdir -p "${_LOG_DIR}" 2>/dev/null || true
 
+fetch_to_stdout() {
+	local url="$1"
+
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL "$url"
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO- "$url"
+	else
+		return 1
+	fi
+}
+
+ensure_linux_bootstrap_packages() {
+	local packages=()
+
+	if command -v apt-get >/dev/null 2>&1; then
+		packages=(git zip curl wget python3 python3-gi gir1.2-gtk-3.0)
+		apt-get install -y "${packages[@]}"
+	elif command -v dnf >/dev/null 2>&1; then
+		packages=(git zip curl wget python3 python3-gobject gtk3)
+		dnf install -y "${packages[@]}"
+	elif command -v yum >/dev/null 2>&1; then
+		packages=(git zip curl wget python3 python3-gobject gtk3)
+		yum install -y "${packages[@]}"
+	elif command -v zypper >/dev/null 2>&1; then
+		packages=(git zip curl wget python3 python3-gobject-Gdk typelib-1_0-Gtk-3_0)
+		zypper --non-interactive install -y "${packages[@]}"
+	else
+		printf "No supported package manager found for bootstrap dependencies.\n" >&2
+		return 1
+	fi
+	printf "RTD_STEP:deps:done\n"
+}
+
+gtk_bootstrap_ready() {
+	[[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]] || return 1
+	command -v python3 >/dev/null 2>&1 || return 1
+	python3 -c 'import gi; gi.require_version("Gtk", "3.0"); gi.require_version("Gdk", "3.0"); gi.require_version("GdkPixbuf", "2.0"); from gi.repository import Gdk, GdkPixbuf, Gtk, Pango' >/dev/null 2>&1
+}
+
+try_bootstrap_gui() {
+	local marker rc
+
+	[[ "${RTD_BOOTSTRAP_NO_GUI:-0}" != "1" ]] || return 90
+	[[ "$OSTYPE" == *"linux"* ]] || return 90
+	[[ -r "$0" ]] || return 90
+	gtk_bootstrap_ready || return 90
+
+	marker="$(mktemp "/tmp/${_TLA_LOWER}-bootstrap-gui.XXXXXX" 2>/dev/null || printf "/tmp/%s-bootstrap-gui.%s" "${_TLA_LOWER}" "$$")"
+	rm -f "$marker"
+	fetch_to_stdout "${_BOOTSTRAP_GUI_URL}" |
+		RTD_BOOTSTRAP_BANNER_URL="${_BOOTSTRAP_GUI_BANNER_URL}" \
+		RTD_BOOTSTRAP_GUI_STARTED_FILE="$marker" \
+		python3 - "$0" "$@"
+	rc=$?
+	if [[ -f "$marker" ]]; then
+		rm -f "$marker"
+		return "$rc"
+	fi
+	rm -f "$marker"
+	return 90
+}
+
 
 
 
@@ -170,37 +235,44 @@ if [[ "$OSTYPE" == *"linux"* ]]; then
 	if [ "$UID" -ne 0 ]; then
 		exec "${_SUDO[@]}" -E bash "$0" "$@"
 	fi
+	ensure_linux_bootstrap_packages || printf "Continuing with existing terminal bootstrap path.\n"
+	if [[ "${RTD_BOOTSTRAP_NO_GUI:-0}" != "1" ]]; then
+		try_bootstrap_gui "$@"
+		_gui_rc=$?
+		if [[ "$_gui_rc" -ne 90 ]]; then
+			exit "$_gui_rc"
+		fi
+	fi
 	{
+	printf "RTD_STEP:admin:done\n"
 	printf "🌎 Linux OS Found: Attempting to get instructions for Linux: \n executing $0"
 	printf "📦 Verifying that the required software to continue is available and installing if not there..."
-	for d in git zip; do 
-		if ! command -v "$d" &>/dev/null; then
-			for pkgmgr in apt yum dnf zypper; do
-				if hash "${pkgmgr}" &>/dev/null; then
-				"${pkgmgr}" install -y "$d" && break
-				fi
-			done
-		fi
-	done
+	ensure_linux_bootstrap_packages
 	
 	rm -rf "${_CONFIG_TMP_DIR}"
 	if git clone --depth=1 "${_RTD_SETUP_GIT_URL}" "${_CONFIG_TMP_DIR}" ; then
 		printf "✅ Instructions successfully retrieved..."
+		printf "RTD_STEP:clone:done\n"
 		if [[ -d "${_CONFIG_DIR}"  ]] ; then
 			_BackupFolderName="${_CONFIG_DIR}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"
 			mv "${_CONFIG_DIR}" "${_BackupFolderName}"
 			zip -m -r -5 "${_BackupFolderName}.zip" "${_BackupFolderName}"
 			rm -rf "${_BackupFolderName}"
+			printf "RTD_STEP:backup:done\n"
 		fi
 		mv "${_CONFIG_TMP_DIR}" "${_CONFIG_DIR}" ; rm -rf "${_CONFIG_DIR}/.git"
+			printf "RTD_STEP:install:done\n"
 			if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
 				echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
 				exit 1
 			fi
 		source "${_CONFIG_CORE_DIR}/_rtd_library"
 		oem::register_all_tools
+		printf "RTD_STEP:register:done\n"
 		ln -s -f "${_LOG_DIR}" -T "${_CONFIG_LOG_LINK}"
+		printf "RTD_STEP:stage2:start\n"
 		bash "${_CONFIG_CORE_DIR}/${_LINUX_SCRIPT}" "$@"
+		printf "RTD_STEP:complete:done\n"
 	else
 		printf "💥 Failed to retrieve instructions correctly! "
 		exit 1

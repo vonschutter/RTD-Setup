@@ -8,7 +8,7 @@ RTD Power Tools is a collection of interactive administration utilities for Linu
 
 | I want to... | Command | What it does | Important note |
 | --- | --- | --- | --- |
-| Update installed software | `rtd-update-system` | Updates native packages, Flatpaks, and snaps when configured | May require a reboot |
+| Update installed software | `rtd-update-system`  | Updates native packages, Flatpaks, and snaps when configured | May require a reboot |
 | See updates installed today | `rtd-update-system --show` | Displays package activity for today | Read-only |
 | Update RTD Power Tools | `rtd-self-update` | Backs up and synchronizes the installed RTD files | Changes `/opt/rtd` |
 | Install software by role | `rtd-oem-bundle-manager` | Installs selected application/configuration bundles | Downloads and installs software |
@@ -25,14 +25,14 @@ See the full [tool reference](docs/TOOLS.md) or start with the [example workflow
 
 Download and run the bootstrap script:
 
-```bash
+```
 curl -fsSL https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/rtd-me.sh.cmd -o rtd-me.sh.cmd
 bash ./rtd-me.sh.cmd
 ```
 
 The installer may request administrator privileges to install tools and dependencies under `/opt/rtd`. After installation, list available commands with shell completion:
 
-```bash
+```
 rtd<TAB><TAB>
 ```
 
@@ -42,7 +42,7 @@ For first-run guidance, privilege expectations, and log locations, read [Getting
 
 Set up and maintain a desktop workstation:
 
-```bash
+```
 rtd-oem-bundle-manager
 rtd-oem-tweaks
 rtd-update-system
@@ -50,14 +50,14 @@ rtd-update-system
 
 Back up a computer before reinstalling its operating system:
 
-```bash
+```
 rtd-oem-backup-linux-config
 rtd-ventoy-usb
 ```
 
 Support a Linux computer over SSH:
 
-```bash
+```
 rtd-simple-support-tool
 rtd-update-system --show
 ```
