@@ -1101,8 +1101,8 @@ recipe:_OEM:_Themes_and_Tweaks () {
 				fi
 				source ${_OEM_DIR}/core/_rtd_library
 			gnome::set_ui_common_tweaks_for_user
-			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR} -name Wayland.jpg)
-			gsettings set org.gnome.desktop.background picture-uri-dark file://$(find ${_OEM_DIR} -name Wayland-dark.jpg)
+			gsettings set org.gnome.desktop.background picture-uri file://$(find ${_OEM_DIR} -name ${DEFAULT_WALLPAPER:-"Wayland.jpg"})
+			gsettings set org.gnome.desktop.background picture-uri-dark file://$(find ${_OEM_DIR} -name ${DEFAULT_WALLPAPER_DARK:-"Wayland-dark.jpg"})
 		EOF
 		
 		system::run_command_in_gnome_user_session /bin/bash ${tempfile}
@@ -1135,9 +1135,9 @@ recipe:_OEM:_Themes_and_Tweaks () {
 		for i in $(snap connections | grep gtk-common-themes:gtk-3-themes | awk '{print $2}'); do sudo snap connect $i gtk-theme-breeze:gtk-3-themes; done
 
 		# Set wallpaper and theme
-		sudo -H -E -u $SUDO_USER bash -c "source /opt/rtd/core/_rtd_library; kde::set_wallpaper ${_WALLPAPER_DIR}/Wayland.jpg"
+		sudo -H -E -u $SUDO_USER bash -c "source /opt/rtd/core/_rtd_library; kde::set_wallpaper ${_WALLPAPER_DIR}/${DEFAULT_WALLPAPER:-"Wayland.jpg"}"
 		sudo -H -E -u $SUDO_USER bash -c "source /opt/rtd/core/_rtd_library; kde::set_icon_theme --theme ${_KDE_DEFAULT_ICON_THEME:-default}"
-		# sudo -E -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c '/usr/bin/lookandfeeltool -a ${_KDE_DEFAULT_THEME:-default} --resetLayout'
+		sudo -E -H -u $SUDO_USER XDG_RUNTIME_DIR="/run/user/${SUDO_UID}" bash -c '/usr/bin/lookandfeeltool -a ${_KDE_DEFAULT_THEME:-default} --resetLayout'
 
 		# Save the current user's plasma configuration to be copied to new users if this system was built by an OEM process.
 		if [[ -e /opt/${_TLA,,} ]] ; then
