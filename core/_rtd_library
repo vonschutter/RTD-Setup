@@ -14835,9 +14835,13 @@ oem::ventoy::select_usb_device() {
 	local selection_index
 	local max_index
 	local tty_available=0
+	local graphical_session=0
 
 	if ! dependency::command_exists lsblk; then
 		return 1
+	fi
+	if [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
+		graphical_session=1
 	fi
 	if [[ -r /dev/tty ]]; then
 		tty_available=1
@@ -14889,7 +14893,16 @@ oem::ventoy::select_usb_device() {
 	oem::ventoy::select_usb_device::build_list
 	system::log_item "USB device candidates found: $((${#device_list[@]} / 2))"
 	while [[ ${#device_list[@]} -eq 0 ]]; do
-		if [[ $use_dialog -eq 1 ]]; then
+		if [[ $graphical_session -eq 1 ]] && command -v zenity >/dev/null 2>&1; then
+			zenity --info \
+				--title="RTD Ventoy USB Creator" \
+				--text="No removable USB drives were detected.\n\nInsert a USB drive and click OK to scan again." \
+				--width=420 || return 1
+		elif [[ $graphical_session -eq 1 ]] && command -v kdialog >/dev/null 2>&1; then
+			kdialog --title "RTD Ventoy USB Creator" --msgbox "No removable USB drives were detected.\n\nInsert a USB drive and click OK to scan again." || return 1
+		elif [[ $graphical_session -eq 1 ]] && command -v yad >/dev/null 2>&1; then
+			yad --center --title="RTD Ventoy USB Creator" --text="No removable USB drives were detected.\n\nInsert a USB drive and click OK to scan again." --button=OK:0 || return 1
+		elif [[ $use_dialog -eq 1 ]]; then
 			dialog::display_notice "No removable USB drives detected. Insert a USB drive and press OK."
 		else
 			printf '%s\n' "No removable USB drives detected. Insert a USB drive and press ENTER to retry." >&2
@@ -15103,6 +15116,7 @@ oem::ventoy::create_usb() {
 	local use_dialog=0
 	local reply
 	local ventoy_log
+	local confirmed="${RTD_VENTOY_CONFIRMED:-0}"
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
@@ -15189,24 +15203,28 @@ oem::ventoy::create_usb() {
 		fi
 	fi
 
-	if [[ $use_dialog -eq 1 ]]; then
-		if [[ $update_only -eq 1 ]]; then
-			dialog --backtitle "$BRANDING" --title "Confirm Ventoy Update" --yesno "Update Ventoy on:\n\n  $device\n\nExisting ISO files will be left in place.\n\nContinue?" "$HEIGHT" "$WIDTH"
-		else
-			dialog --backtitle "$BRANDING" --title "Confirm Ventoy Install" --yesno "Install Ventoy to:\n\n  $device\n\nALL DATA ON THIS DEVICE WILL BE LOST.\n\nContinue?" "$HEIGHT" "$WIDTH"
-		fi
+	if [[ "$confirmed" == "1" ]]; then
+		system::log_item "Ventoy device confirmation already completed by caller; skipping create_usb confirmation dialog."
 	else
-		if [[ $update_only -eq 1 ]]; then
-			printf '%b' "Update Ventoy on:\n\n  $device\n\nExisting ISO files will be left in place.\n\nContinue? [y/N]: " >&2
+		if [[ $use_dialog -eq 1 ]]; then
+			if [[ $update_only -eq 1 ]]; then
+				dialog --backtitle "$BRANDING" --title "Confirm Ventoy Update" --yesno "Update Ventoy on:\n\n  $device\n\nExisting ISO files will be left in place.\n\nContinue?" "$HEIGHT" "$WIDTH"
+			else
+				dialog --backtitle "$BRANDING" --title "Confirm Ventoy Install" --yesno "Install Ventoy to:\n\n  $device\n\nALL DATA ON THIS DEVICE WILL BE LOST.\n\nContinue?" "$HEIGHT" "$WIDTH"
+			fi
 		else
-			printf '%b' "Install Ventoy to:\n\n  $device\n\nALL DATA ON THIS DEVICE WILL BE LOST.\n\nContinue? [y/N]: " >&2
+			if [[ $update_only -eq 1 ]]; then
+				printf '%b' "Update Ventoy on:\n\n  $device\n\nExisting ISO files will be left in place.\n\nContinue? [y/N]: " >&2
+			else
+				printf '%b' "Install Ventoy to:\n\n  $device\n\nALL DATA ON THIS DEVICE WILL BE LOST.\n\nContinue? [y/N]: " >&2
+			fi
+			read -r reply < /dev/tty || return 1
+			[[ "$reply" =~ ^[Yy]$ ]]
 		fi
-		read -r reply < /dev/tty || return 1
-		[[ "$reply" =~ ^[Yy]$ ]]
-	fi
-	if [[ $? -ne 0 ]]; then
-		write_information "Ventoy operation canceled."
-		return 1
+		if [[ $? -ne 0 ]]; then
+			write_information "Ventoy operation canceled."
+			return 1
+		fi
 	fi
 
 	if [[ $update_only -eq 0 ]]; then
@@ -15517,10 +15535,15 @@ oem::ventoy::copy_isos() {
 	local mount_point=""
 	local overwrite=0
 	local -a sources=()
+	local -a iso_files=()
 	local src
+	local iso
 	local copied=0
 	local skipped=0
 	local failed=0
+	local processed=0
+	local total=0
+	local percent=0
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
@@ -15567,42 +15590,72 @@ oem::ventoy::copy_isos() {
 	for src in "${sources[@]}"; do
 		[[ -d "$src" ]] || continue
 		system::log_item "Scanning ISO source: ${src}"
-		while IFS= read -r iso; do
+		while IFS= read -r -d '' iso; do
 			[[ -f "$iso" ]] || continue
-			if [[ "$iso" == "$mount_point"* ]]; then
+			[[ "$iso" == "$mount_point"* ]] && continue
+			iso_files+=("$iso")
+		done < <(find "$src" -maxdepth 2 -type f \( -iname "*.iso" -o -iname "*.ISO" \) -print0)
+	done
+
+	total="${#iso_files[@]}"
+	write_status "ISO discovery complete: ${total} file(s) ready to evaluate."
+	printf 'RTD_PROGRESS phase=iso-copy percent=0 current=%q copied=0 skipped=0 failed=0 total=%s\n' "discovery-complete" "$total"
+
+	if [[ "$total" -eq 0 ]]; then
+		write_information "No ISO files found in the selected source paths."
+		system::log_item "ISO copy summary: copied=0 skipped=0 failed=0"
+		return 0
+	fi
+
+	for iso in "${iso_files[@]}"; do
+		local folder base dest_dir dest_name dest_path src_size dest_size
+		local current_index start_percent
+
+		current_index=$((processed + 1))
+		start_percent=$((processed * 100 / total))
+		folder="$(oem::ventoy::classify_iso "$iso")"
+
+		base="$(basename "$iso")"
+		base="${base// /_}"
+		dest_name="$base"
+
+		dest_dir="$mount_point/$folder"
+		dest_path="$dest_dir/$dest_name"
+		mkdir -p "$dest_dir"
+
+		write_status "ISO copy progress: ${start_percent}% (${current_index}/${total}) current: ${base}"
+		printf 'RTD_PROGRESS phase=iso-copy percent=%s current=%q copied=%s skipped=%s failed=%s total=%s\n' "$start_percent" "$base" "$copied" "$skipped" "$failed" "$total"
+
+		if [[ -f "$dest_path" && $overwrite -eq 0 ]]; then
+			src_size=$(stat -c%s "$iso" 2>/dev/null || echo 0)
+			dest_size=$(stat -c%s "$dest_path" 2>/dev/null || echo 0)
+			if [[ "$src_size" -eq "$dest_size" ]]; then
+				write_information "Skipping existing ISO: $dest_path"
+				((skipped++))
+				((processed++))
+				percent=$((processed * 100 / total))
+				write_status "ISO copy progress: ${percent}% (${processed}/${total}) skipped: ${base}"
+				printf 'RTD_PROGRESS phase=iso-copy percent=%s current=%q copied=%s skipped=%s failed=%s total=%s\n' "$percent" "$base" "$copied" "$skipped" "$failed" "$total"
 				continue
 			fi
+		fi
 
-			local folder base dest_dir dest_name dest_path src_size dest_size
-			folder="$(oem::ventoy::classify_iso "$iso")"
-
-			base="$(basename "$iso")"
-			base="${base// /_}"
-			dest_name="$base"
-
-			dest_dir="$mount_point/$folder"
-			dest_path="$dest_dir/$dest_name"
-			mkdir -p "$dest_dir"
-
-			if [[ -f "$dest_path" && $overwrite -eq 0 ]]; then
-				src_size=$(stat -c%s "$iso" 2>/dev/null || echo 0)
-				dest_size=$(stat -c%s "$dest_path" 2>/dev/null || echo 0)
-				if [[ "$src_size" -eq "$dest_size" ]]; then
-					write_information "Skipping existing ISO: $dest_path"
-					((skipped++))
-					continue
-				fi
-			fi
-
-			write_status "Copying ISO: $iso -> $dest_path"
-			if ! dialog::copy_with_progress "$iso" "$dest_path" "$mount_point"; then
-				write_warning "Failed to copy ISO: $iso"
-				((failed++))
-				continue
-			fi
-			((copied++))
-			sync -f "$dest_path" &>/dev/null || sync "$mount_point" &>/dev/null || sync
-		done < <(find "$src" -maxdepth 2 -type f \( -iname "*.iso" -o -iname "*.ISO" \))
+		write_status "Copying ISO: $iso -> $dest_path"
+		if ! dialog::copy_with_progress "$iso" "$dest_path" "$mount_point"; then
+			write_warning "Failed to copy ISO: $iso"
+			((failed++))
+			((processed++))
+			percent=$((processed * 100 / total))
+			write_status "ISO copy progress: ${percent}% (${processed}/${total}) failed: ${base}"
+			printf 'RTD_PROGRESS phase=iso-copy percent=%s current=%q copied=%s skipped=%s failed=%s total=%s\n' "$percent" "$base" "$copied" "$skipped" "$failed" "$total"
+			continue
+		fi
+		((copied++))
+		((processed++))
+		percent=$((processed * 100 / total))
+		write_status "ISO copy progress: ${percent}% (${processed}/${total}) copied: ${base}"
+		printf 'RTD_PROGRESS phase=iso-copy percent=%s current=%q copied=%s skipped=%s failed=%s total=%s\n' "$percent" "$base" "$copied" "$skipped" "$failed" "$total"
+		sync -f "$dest_path" &>/dev/null || sync "$mount_point" &>/dev/null || sync
 	done
 
 	system::log_item "ISO copy summary: copied=${copied} skipped=${skipped} failed=${failed}"
@@ -15649,6 +15702,62 @@ EOF
 	return 0
 }
 
+oem::ventoy::find_rtd_theme_background() {
+	# Description:
+	#   Locate the project-shipped RTD Ventoy boot background asset.
+	local library_dir
+	local path
+
+	library_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+	for path in \
+		"${library_dir}/../modules/oem-ventoy.mod/Media_files/rtd-ventoy-background-1024x768.png" \
+		"${library_dir}/../../modules/oem-ventoy.mod/Media_files/rtd-ventoy-background-1024x768.png" \
+		"/opt/rtd/modules/oem-ventoy.mod/Media_files/rtd-ventoy-background-1024x768.png" \
+		"/opt/RTD-Setup/modules/oem-ventoy.mod/Media_files/rtd-ventoy-background-1024x768.png" \
+		"${HOME:-}/GIT/RTD-Setup/modules/oem-ventoy.mod/Media_files/rtd-ventoy-background-1024x768.png" \
+		"${HOME:-}/RTD-Setup/modules/oem-ventoy.mod/Media_files/rtd-ventoy-background-1024x768.png"; do
+		[[ -r "$path" ]] && { printf '%s' "$path"; return 0; }
+	done
+	return 1
+}
+
+oem::ventoy::install_rtd_theme_assets() {
+	# Description:
+	#   Install the RTD Ventoy theme asset directory on the USB data partition.
+	# Globals: None
+	# Arguments:
+	#   $1 - Mount point of the Ventoy data partition.
+	local mount_point="$1"
+	local theme_dir
+	local background_src
+	local background_dest
+
+	system::log_item "Installing RTD Ventoy theme assets at ${mount_point}"
+
+	if [[ -z "$mount_point" || ! -d "$mount_point" ]]; then
+		write_error "Invalid mount point: $mount_point"
+		return 1
+	fi
+
+	theme_dir="$mount_point/ventoy/rtd-theme"
+	background_dest="$theme_dir/background.png"
+	mkdir -p "$theme_dir" || return 1
+
+	if background_src="$(oem::ventoy::find_rtd_theme_background)"; then
+		cp -f "$background_src" "$background_dest" || {
+			write_warning "Unable to copy RTD Ventoy background asset; falling back to color-only theme."
+			rm -f "$background_dest"
+			return 0
+		}
+		sync -f "$background_dest" &>/dev/null || sync "$theme_dir" &>/dev/null || true
+		system::log_item "RTD Ventoy background installed: ${background_dest}"
+	else
+		write_warning "RTD Ventoy background asset was not found; falling back to color-only theme."
+		rm -f "$background_dest"
+	fi
+	return 0
+}
+
 oem::ventoy::write_menu_theme() {
 	# Description:
 	#   Write a minimal Ventoy theme file used only to show a top menu title.
@@ -15662,6 +15771,7 @@ oem::ventoy::write_menu_theme() {
 	# End of documentation
 	local mount_point="$1"
 	local theme_file
+	local desktop_line
 
 	system::log_item "Writing Ventoy menu title theme at ${mount_point}"
 
@@ -15670,57 +15780,78 @@ oem::ventoy::write_menu_theme() {
 		return 1
 	fi
 
-	mkdir -p "$mount_point/ventoy" || return 1
-	theme_file="$mount_point/ventoy/theme.txt"
+	mkdir -p "$mount_point/ventoy/rtd-theme" || return 1
+	theme_file="$mount_point/ventoy/rtd-theme/theme.txt"
+	if [[ -r "$mount_point/ventoy/rtd-theme/background.png" ]]; then
+		desktop_line='desktop-image: "background.png"'
+	else
+		desktop_line='desktop-color: "#111827"'
+	fi
 	cat >"$theme_file" <<EOF
-title-text: "${_FULLNAME:-RunTime Data}"
-title-font: "DejaVu Sans Bold 24"
+${desktop_line}
+title-text: ""
+title-font: "DejaVu Sans Bold 1"
 title-color: "#FFFFFF"
-desktop-color: "#2B2B2B"
+message-color: "#E5E7EB"
 
 + boot_menu {
   left = 8%
-  top = 14%
+  top = 30%
   width = 84%
-  height = 66%
+  height = 48%
   item_font = "DejaVu Sans 16"
   selected_item_font = "DejaVu Sans Bold 16"
-  item_color = "#D8DDE3"
-  selected_item_color = "#59B7FF"
+  item_color = "#E5E7EB"
+  selected_item_color = "#F97316"
   item_height = 34
-  item_padding = 12
+  item_padding = 10
   item_icon_space = 8
   item_spacing = 4
   scrollbar = true
+  scrollbar_width = 10
 }
 
-+ label {
++ progress_bar {
   id = "__timeout__"
   text = "@TIMEOUT_NOTIFICATION_SHORT@"
-  color = "#AAB4BE"
-  align = "center"
-  left = 8%
-  top = 83%
-  width = 84%
-  height = 20
-}
-
-+ label {
-  text = "@KEYMAP_SHORT@"
-  color = "#7F8C99"
-  align = "center"
-  left = 8%
+  left = 82%
+  width = 14%
   top = 88%
-  width = 84%
-  height = 20
+  text_color = "#F97316"
+  bar_style = "*"
+  highlight_style = "*"
 }
 
-+ hbox{
++ hbox {
   left = 8%
   top = 93%
   width = 84%
-  height = 20
-  + label {text = "@VTOY_GRUB2_MODE@" color = "#FF6B6B" align = "left"}
+  height = 25
+  + label {text = "@VTOY_HOTKEY_TIP@" color = "#94A3B8" align = "left"}
+}
+
++ hbox {
+  left = 8%
+  top = 96%
+  width = 84%
+  height = 25
+  + label {text = "@VTOY_GRUB2_MODE@" color = "#F97316" align = "left"}
+}
+
++ hbox {
+  left = 28%
+  top = 96%
+  width = 28%
+  height = 25
+  + label {text = "@VTOY_MEM_DISK@" color = "#F97316" align = "left"}
+}
+
++ hbox {
+  left = 52%
+  top = 96%
+  width = 28%
+  height = 25
+  + label {text = "@VTOY_WIMBOOT_MODE@" color = "#F97316" align = "left"}
 }
 EOF
 
@@ -15753,7 +15884,12 @@ oem::ventoy::write_control_config() {
 	cat >"$config_file" <<EOF
 {
   "theme": {
-    "file": "/ventoy/theme.txt"
+    "file": "/ventoy/rtd-theme/theme.txt",
+    "gfxmode": "1024x768",
+    "display_mode": "GUI",
+    "ventoy_left": "5%",
+    "ventoy_top": "95%",
+    "ventoy_color": "#94A3B8"
   },
   "control": [
     { "VTOY_DEFAULT_MENU_MODE": "1" },
@@ -15761,6 +15897,13 @@ oem::ventoy::write_control_config() {
   ]
 }
 EOF
+
+	if command -v python3 >/dev/null 2>&1; then
+		python3 -m json.tool "$config_file" >/dev/null 2>&1 || {
+			write_error "Generated Ventoy configuration is not valid JSON: $config_file"
+			return 1
+		}
+	fi
 
 	system::log_item "Ventoy control config written: ${config_file}"
 	return 0
@@ -15784,6 +15927,7 @@ oem::ventoy::brand_media() {
 	fi
 
 	oem::ventoy::write_partition_title "$mount_point" || return 1
+	oem::ventoy::install_rtd_theme_assets "$mount_point" || true
 	oem::ventoy::write_menu_theme "$mount_point" || return 1
 	oem::ventoy::write_control_config "$mount_point" || return 1
 
@@ -15799,12 +15943,14 @@ oem::ventoy::setup_usb() {
 	#   BRANDING, HEIGHT, WIDTH, LIST_HEIGHT
 	# Arguments:
 	#   --device <path>     : Target block device.
-	#   --version <ver>     : Ventoy version (default: latest).
-	#   --dest <dir>        : Ventoy download directory.
-	#   --overwrite         : Overwrite existing ISO copies.
-	# Outputs: Status messages.
-	# Returns:
-	#   0 on success; non-zero on failure.
+#   --version <ver>     : Ventoy version (default: latest).
+#   --dest <dir>        : Ventoy download directory.
+#   --overwrite         : Overwrite existing ISO copies.
+#   --sync-isos         : Copy ISO files and refresh RTD Ventoy config without
+#                         installing or updating Ventoy.
+# Outputs: Status messages.
+# Returns:
+#   0 on success; non-zero on failure.
 	# End of documentation
 	local device=""
 	local version="latest"
@@ -15840,6 +15986,10 @@ oem::ventoy::setup_usb() {
 			;;
 		--recreate)
 			action="recreate"
+			shift
+			;;
+		--sync-isos|--add-iso|--add-isos)
+			action="sync-isos"
 			shift
 			;;
 		--gpt)
@@ -15881,14 +16031,16 @@ oem::ventoy::setup_usb() {
 	if [[ -z "$device" ]]; then
 		device="$(oem::ventoy::select_usb_device)" || return 1
 	fi
-	ventoy_dir="$(oem::ventoy::download --version "$version" --dest "$download_dir")" || return 1
-	system::log_item "Using Ventoy directory: ${ventoy_dir}"
-	if [[ "$action" == "update" ]]; then
-		oem::ventoy::create_usb --device "$device" --ventoy-dir "$ventoy_dir" --update || return 1
-	elif [[ "$partition_style" == "gpt" ]]; then
-		oem::ventoy::create_usb --device "$device" --ventoy-dir "$ventoy_dir" --gpt --reserve-mib "$reserve_mib" --force || return 1
-	else
-		oem::ventoy::create_usb --device "$device" --ventoy-dir "$ventoy_dir" --mbr --reserve-mib "$reserve_mib" --force || return 1
+	if [[ "$action" != "sync-isos" ]]; then
+		ventoy_dir="$(oem::ventoy::download --version "$version" --dest "$download_dir")" || return 1
+		system::log_item "Using Ventoy directory: ${ventoy_dir}"
+		if [[ "$action" == "update" ]]; then
+			oem::ventoy::create_usb --device "$device" --ventoy-dir "$ventoy_dir" --update || return 1
+		elif [[ "$partition_style" == "gpt" ]]; then
+			oem::ventoy::create_usb --device "$device" --ventoy-dir "$ventoy_dir" --gpt --reserve-mib "$reserve_mib" --force || return 1
+		else
+			oem::ventoy::create_usb --device "$device" --ventoy-dir "$ventoy_dir" --mbr --reserve-mib "$reserve_mib" --force || return 1
+		fi
 	fi
 	if [[ -b "$device" ]]; then
 		if lsblk -dn -o PKNAME "$device" &>/dev/null; then
@@ -15917,8 +16069,10 @@ oem::ventoy::setup_usb() {
 		copy_args+=(--source "$src")
 	done
 
-	oem::ventoy::install_legacy_bios_fallback --mount "$mount_point" --ventoy-dir "$ventoy_dir" || return 1
-	if [[ "$action" == "recreate" ]]; then
+	if [[ "$action" != "sync-isos" ]]; then
+		oem::ventoy::install_legacy_bios_fallback --mount "$mount_point" --ventoy-dir "$ventoy_dir" || return 1
+	fi
+	if [[ "$action" == "recreate" || "$action" == "sync-isos" ]]; then
 		oem::ventoy::prepare_folders "$mount_point" || return 1
 		oem::ventoy::copy_isos "${copy_args[@]}" || return 1
 	fi
@@ -15933,6 +16087,9 @@ oem::ventoy::setup_usb() {
 	if [[ "$action" == "update" ]]; then
 		write_status "Ventoy USB update complete."
 		system::log_item "Ventoy USB update completed successfully for ${device}"
+	elif [[ "$action" == "sync-isos" ]]; then
+		write_status "Ventoy USB ISO sync complete."
+		system::log_item "Ventoy USB ISO sync completed successfully for ${device}"
 	else
 		write_status "Ventoy USB setup complete."
 		system::log_item "Ventoy USB setup completed successfully for ${device}"

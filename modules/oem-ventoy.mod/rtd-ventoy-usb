@@ -37,10 +37,12 @@ APP_PARTITION_STYLE="mbr"
 APP_RESERVE_MIB=0
 APP_OVERWRITE=0
 APP_ACTION=""
+APP_GUI_MODE="auto"
 APP_SHOW_HELP=0
 APP_SHOW_VERSION=0
 TARGET_DEVICE=""
 HAVE_DIALOG=0
+INITIAL_ARG_COUNT=$#
 declare -a APP_SOURCES=()
 declare -a SETUP_ARGS=()
 
@@ -135,11 +137,15 @@ Options:
                      Default: /var/lib/rtd/ventoy as root, otherwise ~/.cache/rtd/ventoy.
   --update           Update Ventoy in place and refresh /ventoy files without copying ISOs.
   --recreate         Wipe the USB device and recreate the full Ventoy USB layout.
+  --sync-isos        Add or refresh ISO files on an existing Ventoy USB without
+                     updating Ventoy or wiping the device.
   --mbr              Install Ventoy using MBR partition style (default, best for old BIOS).
   --gpt              Install Ventoy using GPT partition style.
   --reserve-mib <n>  Preserve MiB at end of disk to improve old BIOS compatibility.
   --source <path>    Extra ISO source directory to scan. Repeatable.
   --overwrite        Overwrite existing ISOs when copying to the Ventoy drive.
+  --gui              Launch the graphical frontend when available.
+  --no-gui           Force the terminal/dialog workflow.
   -h, --help         Show this help text and exit.
   -V, --script-version
                      Print script wrapper version.
@@ -147,6 +153,7 @@ Options:
 Examples:
   rtd-ventoy-usb
   rtd-ventoy-usb --device /dev/sdb --update
+  rtd-ventoy-usb --device /dev/sdb --sync-isos --source ~/Downloads
   rtd-ventoy-usb --device /dev/sdb --source /var/lib/libvirt/boot --overwrite
 
 ALL DATA ON THE TARGET DEVICE WILL BE ERASED.
@@ -182,6 +189,10 @@ set_default_dest() {
 
 require_dialog() {
 	HAVE_DIALOG=0
+	if [[ "${RTD_VENTOY_CONFIRMED:-0}" == "1" ]]; then
+		trace "dialog available=0 (confirmation already handled by caller)"
+		return 0
+	fi
 	if hash dialog 2>/dev/null && [[ -r /dev/tty ]] && [[ -n "${TERM:-}" && "${TERM:-}" != "dumb" ]]; then
 		HAVE_DIALOG=1
 	fi
@@ -302,6 +313,10 @@ parse_args() {
 			APP_ACTION="recreate"
 			shift
 			;;
+		--sync-isos|--add-iso|--add-isos)
+			APP_ACTION="sync-isos"
+			shift
+			;;
 		--mbr)
 			APP_PARTITION_STYLE="mbr"
 			shift
@@ -328,6 +343,14 @@ parse_args() {
 			APP_OVERWRITE=1
 			shift
 			;;
+		--gui)
+			APP_GUI_MODE="force"
+			shift
+			;;
+		--no-gui)
+			APP_GUI_MODE="never"
+			shift
+			;;
 		*)
 			write_error "Unknown option: $1"
 			return 1
@@ -336,8 +359,90 @@ parse_args() {
 	done
 
 	set_default_dest
-	trace "args action=${APP_ACTION:-prompt} device=${APP_DEVICE:-auto} version=${APP_VERSION} dest=${APP_DEST} style=${APP_PARTITION_STYLE} reserve_mib=${APP_RESERVE_MIB} overwrite=${APP_OVERWRITE} sources=${#APP_SOURCES[@]}"
+	trace "args action=${APP_ACTION:-prompt} device=${APP_DEVICE:-auto} version=${APP_VERSION} dest=${APP_DEST} style=${APP_PARTITION_STYLE} reserve_mib=${APP_RESERVE_MIB} overwrite=${APP_OVERWRITE} sources=${#APP_SOURCES[@]} gui=${APP_GUI_MODE}"
 	return 0
+}
+
+graphical_ventoy_frontend() {
+	local script_dir frontend
+	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	for frontend in \
+		"${script_dir}/ventoy-usb-gtk.py" \
+		"/opt/rtd/modules/oem-ventoy.mod/ventoy-usb-gtk.py" \
+		"/opt/RTD-Setup/modules/oem-ventoy.mod/ventoy-usb-gtk.py" \
+		"${HOME:-}/GIT/RTD-Setup/modules/oem-ventoy.mod/ventoy-usb-gtk.py" \
+		"${HOME:-}/RTD-Setup/modules/oem-ventoy.mod/ventoy-usb-gtk.py"; do
+		[[ -r "$frontend" ]] && { printf '%s' "$frontend"; return 0; }
+	done
+	return 1
+}
+
+gtk_frontend_ready() {
+	command -v python3 >/dev/null 2>&1 &&
+		python3 -c 'import gi; gi.require_version("Gtk", "3.0"); gi.require_version("Gdk", "3.0"); from gi.repository import Gdk, GLib, Gtk, Pango' >/dev/null 2>&1
+}
+
+install_python_gtk_dependencies() {
+	local distro
+
+	distro="$(system::distribution_type 2>/dev/null || true)"
+	case "$distro" in
+		ubuntu|debian)
+			software::check_native_package_dependency python3 python3-gi gir1.2-gtk-3.0
+			;;
+		fedora|redhat)
+			software::check_native_package_dependency python3 python3-gobject gtk3
+			;;
+		suse)
+			software::check_native_package_dependency python3 python3-gobject-Gdk typelib-1_0-Gtk-3_0
+			;;
+		*)
+			write_warning "Automatic Python GTK setup is not available for distribution family: ${distro:-unknown}."
+			return 1
+			;;
+	esac
+}
+
+should_launch_gui() {
+	local frontend
+
+	[[ "$APP_GUI_MODE" != "never" ]] || return 1
+	frontend="$(graphical_ventoy_frontend 2>/dev/null || true)"
+	if [[ -z "$frontend" ]]; then
+		trace "GTK frontend not found for auto GUI routing."
+		[[ "$APP_GUI_MODE" == "force" ]] && write_error "GTK frontend not found: ventoy-usb-gtk.py"
+		return 1
+	fi
+
+	[[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]] || {
+		trace "No DISPLAY/WAYLAND_DISPLAY available for auto GUI routing."
+		[[ "$APP_GUI_MODE" == "force" ]] && write_error "No graphical display session was detected."
+		return 1
+	}
+
+	if dependency::desktop gnome || dependency::desktop kde; then
+		[[ "$APP_GUI_MODE" == "force" || $INITIAL_ARG_COUNT -eq 0 ]]
+		return $?
+	fi
+
+	trace "Desktop is not GNOME/KDE for auto GUI routing."
+	[[ "$APP_GUI_MODE" == "force" ]] && write_error "Graphical frontend is only auto-routed for GNOME or KDE sessions."
+	return 1
+}
+
+launch_gui() {
+	local frontend
+	frontend="$(graphical_ventoy_frontend)" || return 1
+	if ! gtk_frontend_ready; then
+		write_information "Installing Python GTK components required by the RTD Ventoy USB GUI."
+		install_python_gtk_dependencies || return 1
+		hash -r
+	fi
+	gtk_frontend_ready || {
+		write_error "RTD Ventoy USB GUI requires python3, python3-gi, and GTK 3 bindings."
+		return 1
+	}
+	exec python3 "$frontend" "$@"
 }
 
 ui_select_action() {
@@ -356,6 +461,7 @@ ui_select_action() {
 			--checklist "Select exactly one action:" 18 86 4 \
 			"update" "Update Ventoy and refresh /ventoy files. Leave ISO files alone." off \
 			"recreate" "Wipe the USB and recreate Ventoy, folders, and ISO copy layout." on \
+			"sync-isos" "Add or refresh ISO files on an existing Ventoy USB. No wipe." off \
 			2>&1 1>&3)
 		resp=$?
 		exec 3>&-
@@ -365,7 +471,7 @@ ui_select_action() {
 			item="${item%\"}"
 			item="${item#\"}"
 			case "$item" in
-			update|recreate)
+			update|recreate|sync-isos)
 				APP_ACTION="$item"
 				((checked++))
 				;;
@@ -382,11 +488,13 @@ ui_select_action() {
 	printf '%s\n' "Choose Ventoy action:" >&2
 	printf '%s\n' "  1) update   - refresh Ventoy and /ventoy files only" >&2
 	printf '%s\n' "  2) recreate - wipe USB and rebuild Ventoy media" >&2
-	printf '%s' "Selection [1/2]: " >&2
+	printf '%s\n' "  3) sync-isos - add or refresh ISO files only" >&2
+	printf '%s' "Selection [1/2/3]: " >&2
 	read -r resp < /dev/tty || return 1
 	case "$resp" in
 	1) APP_ACTION="update" ;;
 	2|"") APP_ACTION="recreate" ;;
+	3) APP_ACTION="sync-isos" ;;
 	*) write_error "Invalid action selection."; return 1 ;;
 	esac
 	return 0
@@ -420,6 +528,7 @@ build_setup_args() {
 	SETUP_ARGS=(--device "$TARGET_DEVICE" --version "$APP_VERSION" --dest "$APP_DEST" "--${APP_PARTITION_STYLE}")
 	[[ "$APP_ACTION" == "update" ]] && SETUP_ARGS+=(--update)
 	[[ "$APP_ACTION" == "recreate" ]] && SETUP_ARGS+=(--recreate)
+	[[ "$APP_ACTION" == "sync-isos" ]] && SETUP_ARGS+=(--sync-isos)
 	[[ ${APP_RESERVE_MIB} -gt 0 ]] && SETUP_ARGS+=(--reserve-mib "$APP_RESERVE_MIB")
 	[[ $APP_OVERWRITE -eq 1 ]] && SETUP_ARGS+=(--overwrite)
 	for src in "${APP_SOURCES[@]}"; do
@@ -435,6 +544,7 @@ build_confirm_message() {
 	local source_text=$'\n  - Use default ISO discovery paths'
 	local style_text
 	local action_text
+	local download_text
 	local src
 
 	[[ $APP_OVERWRITE -eq 1 ]] && overwrite_text="yes"
@@ -449,11 +559,16 @@ build_confirm_message() {
 
 	summary="$(device_summary "$TARGET_DEVICE" 2>/dev/null || printf 'Target device: %s' "$TARGET_DEVICE")"
 	if [[ "$APP_ACTION" == "update" ]]; then
+		download_text="  - Download Ventoy (${APP_VERSION}) to ${APP_DEST}\n"
 		action_text="  - Update Ventoy in place on the selected device\n  - Leave existing ISO files and folders alone\n  - Refresh /ventoy files on the Ventoy data partition\n  - Refresh Ventoy legacy BIOS fallback boot files\n  - Do not recopy ISO files"
+	elif [[ "$APP_ACTION" == "sync-isos" ]]; then
+		download_text=""
+		action_text="  - Leave the Ventoy installation and partition layout unchanged\n  - Mount the existing Ventoy data partition\n  - Create or refresh standard RTD folders:\n      /ventoy\n      /Images/OEM\n      /Images/Commercial\n      /Images/OSS\n      /Images/Tools\n      /Data${source_text}\n  - Copy discovered ISO files to the Ventoy drive\n  - Overwrite existing copied ISOs: ${overwrite_text}\n  - Refresh /ventoy configuration files"
 	else
+		download_text="  - Download Ventoy (${APP_VERSION}) to ${APP_DEST}\n"
 		action_text="  - CLEAR the USB device and recreate the Ventoy partition layout\n  - Install Ventoy to the selected device using ${style_text}\n  - Preserve space at disk end: ${reserve_text}\n  - ERASE ALL DATA on the target device\n  - Keep the Ventoy data partition in Ventoy's native filesystem/layout\n  - Create standard RTD folders:\n      /ventoy\n      /Images/OEM\n      /Images/Commercial\n      /Images/OSS\n      /Images/Tools\n      /Data${source_text}\n  - Copy discovered ISO files to the Ventoy drive\n  - Overwrite existing copied ISOs: ${overwrite_text}"
 	fi
-	printf '%s' "Selected USB device:\n\n${summary}\n\nThis will:\n  - Download Ventoy (${APP_VERSION}) to ${APP_DEST}\n${action_text}\n  - Write /ventoy/ventoy.json with TreeView mode enabled\n  - Set the Ventoy search root to /Images\n\nProceed?"
+	printf '%s' "Selected USB device:\n\n${summary}\n\nThis will:\n${download_text}${action_text}\n  - Write /ventoy/ventoy.json with TreeView mode enabled\n  - Set the Ventoy search root to /Images\n\nProceed?"
 }
 
 run_setup() {
@@ -496,6 +611,13 @@ main() {
 	if [[ $APP_SHOW_HELP -eq 1 ]]; then
 		usage
 		return 0
+	fi
+
+	if should_launch_gui; then
+		launch_gui "$@"
+	fi
+	if [[ "$APP_GUI_MODE" == "force" ]]; then
+		return 1
 	fi
 
 	require_dialog
