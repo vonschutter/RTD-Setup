@@ -7,19 +7,21 @@
 #:: Author(s):    RTD
 #:: Version:      1.00
 #::
-#:: Purpose:      Load the RTD library, ensure the required CLI dependencies are
-#::               present, and launch the bundled OpenAI chat client.
+#:: Purpose:      Prefer a local Ollama-backed AI model, provisioning Ollama and
+#::               a default model when needed, with the bundled OpenAI chat
+#::               client kept as a remote fallback.
 #::
 #:: Value:        Provides a simple RTD entry point for interactive AI use from
 #::               the shell without requiring the user to manually locate or run
 #::               the underlying helper script.
 #::
-#:: Usage:        Run with no arguments for interactive mode, or pass the same
-#::               arguments supported by the bundled chat client.
+#:: Usage:        Run with no arguments for interactive mode, pass --model to
+#::               select and persist a local Ollama model, or pass prompt args.
 #::
 #:: Examples:
 #::               rtd-ai-chat
 #::               rtd-ai-chat --prompt "Summarize nftables logging"
+#::               rtd-ai-chat --model gemma4:e4b
 #::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
@@ -33,6 +35,36 @@ if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) ))
 	echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
 	return 1 2>/dev/null || exit 1
 fi
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Settings                 ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+RTD_AI_CHAT_CONFIG="${HOME:-}/.config/rtd/rtd-ai-chat.config"
+RTD_AI_CHAT_DEFAULT_MODEL="gemma4:e2b"
+RTD_AI_CHAT_MODEL=""
+RTD_AI_CHAT_MODEL_SELECTED=0
+RTD_AI_CHAT_PROMPT=""
+RTD_AI_CHAT_PROMPT_SEEN=0
+RTD_AI_CHAT_PROMPT_FROM_FILE=""
+RTD_AI_CHAT_PROMPT_FROM_FILE_SEEN=0
+RTD_AI_CHAT_STDIN_PROMPT=""
+RTD_AI_CHAT_STDIN_PROMPT_SEEN=0
+RTD_AI_CHAT_REMOTE_REASON=""
+RTD_AI_CHAT_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+declare -a RTD_AI_CHAT_FORWARD_ARGS=()
+
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Initialization           ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 
 
 rtd::bootstrap_library() {
@@ -111,25 +143,252 @@ rtd::bootstrap_library() {
 	return 1
 }
 
-if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+
+rtd_ai_chat::usage() {
 	cat <<EOF
 Usage:
-  $(basename "$0") [--help|-h] [chat-client-args...]
+  $(basename "$0") [--help|-h] [--model model-name] [chat-client-args...]
 
 Description:
-  Launch the bundled RTD AI chat helper after ensuring its CLI dependencies exist.
-EOF
-	exit 0
-fi
+  Prefer a local Ollama model for AI chat. If no local runtime is available,
+  the launcher attempts to install Ollama, pulls the selected/default model,
+  and runs locally. If local execution cannot be used, it falls back to the
+  bundled chatgpt.sh client.
 
-rtd::bootstrap_library "_rtd_library" || {
-	echo "Failed to load _rtd_library"
-	exit 1
+Options:
+  --model model-name  Select a local Ollama model. After a successful install
+                      or pull, this model is saved as the default in:
+                      ~/.config/rtd/rtd-ai-chat.config
+  -p, --prompt text   Send a single prompt to the local model when local mode
+                      is available. Other options are forwarded to chatgpt.sh
+                      only if remote fallback is needed.
+  -h, --help          Show this help.
+
+Default local model:
+  ${RTD_AI_CHAT_DEFAULT_MODEL}
+EOF
 }
 
-hash jq || software::check_native_package_dependency jq
-hash curl || software::check_native_package_dependency curl
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Functions                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+rtd_ai_chat::parse_args() {
+	local arg
+	while [[ $# -gt 0 ]]; do
+		arg="$1"
+		case "$arg" in
+			-h|--help)
+				rtd_ai_chat::usage
+				exit 0
+			;;
+			--model)
+				[[ -n "${2:-}" ]] || { echo "Missing value for --model" >&2; exit 1; }
+				RTD_AI_CHAT_MODEL="$2"
+				RTD_AI_CHAT_MODEL_SELECTED=1
+				shift 2
+			;;
+			-p|--prompt)
+				[[ -n "${2:-}" ]] || { echo "Missing value for $arg" >&2; exit 1; }
+				RTD_AI_CHAT_PROMPT="$2"
+				RTD_AI_CHAT_PROMPT_SEEN=1
+				RTD_AI_CHAT_FORWARD_ARGS+=("$arg" "$2")
+				shift 2
+			;;
+			--prompt-from-file)
+				[[ -n "${2:-}" ]] || { echo "Missing value for --prompt-from-file" >&2; exit 1; }
+				RTD_AI_CHAT_PROMPT_FROM_FILE="$2"
+				RTD_AI_CHAT_PROMPT_FROM_FILE_SEEN=1
+				RTD_AI_CHAT_FORWARD_ARGS+=("$arg" "$2")
+				shift 2
+			;;
+			*)
+				RTD_AI_CHAT_FORWARD_ARGS+=("$1")
+				shift
+			;;
+		esac
+	done
+}
+
+rtd_ai_chat::load_configured_model() {
+	local key value configured_model=""
+	[[ -r "$RTD_AI_CHAT_CONFIG" ]] || return 0
+	while IFS='=' read -r key value; do
+		[[ "$key" == "DEFAULT_MODEL" ]] || continue
+		configured_model="$value"
+		break
+	done <"$RTD_AI_CHAT_CONFIG"
+	[[ -n "$configured_model" ]] && RTD_AI_CHAT_MODEL="$configured_model"
+}
+
+rtd_ai_chat::save_default_model() {
+	local model="$1" config_dir
+	config_dir="$(dirname "$RTD_AI_CHAT_CONFIG")"
+	mkdir -p "$config_dir" || return 1
+	printf 'DEFAULT_MODEL=%s\n' "$model" >"$RTD_AI_CHAT_CONFIG"
+}
+
+rtd_ai_chat::has_ollama() {
+	command -v ollama >/dev/null 2>&1
+}
+
+rtd_ai_chat::ollama_responds() {
+	rtd_ai_chat::has_ollama || return 1
+	ollama list >/dev/null 2>&1 || ollama --version >/dev/null 2>&1
+}
+
+rtd_ai_chat::install_ollama() {
+	rtd_ai_chat::has_ollama && return 0
+	echo "No local AI runtime detected. Installing Ollama for local model support..."
+
+	if command -v software::check_native_package_dependency >/dev/null 2>&1; then
+		software::check_native_package_dependency ollama >/dev/null 2>&1 || true
+	fi
+	rtd_ai_chat::has_ollama && return 0
+
+	if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
+		if command -v software::check_native_package_dependency >/dev/null 2>&1; then
+			software::check_native_package_dependency curl >/dev/null 2>&1 || true
+		fi
+	fi
+
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL https://ollama.com/install.sh | sh
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO- https://ollama.com/install.sh | sh
+	else
+		return 1
+	fi
+
+	rtd_ai_chat::has_ollama
+}
+
+rtd_ai_chat::model_is_installed() {
+	local model="$1" base_model="${1%%:*}"
+	ollama list 2>/dev/null | awk 'NR > 1 {print $1}' | grep -Fxq "$model" && return 0
+	if [[ "$model" != *:* ]]; then
+		ollama list 2>/dev/null | awk 'NR > 1 {print $1}' | grep -Fxq "${base_model}:latest" && return 0
+	fi
+	return 1
+}
+
+rtd_ai_chat::ensure_model() {
+	local model="$1"
+	rtd_ai_chat::model_is_installed "$model" && return 0
+	echo "Pulling local AI model: $model"
+	ollama pull "$model"
+}
+
+rtd_ai_chat::resolve_chatgpt_fallback() {
+	local path
+	for path in \
+		"${RTD_AI_CHAT_SCRIPT_DIR}/chatgpt.sh" \
+		"/opt/rtd/modules/rtd-ai-chat.mod/chatgpt.sh" \
+		"/opt/RTD-Setup/modules/rtd-ai-chat.mod/chatgpt.sh"; do
+		[[ -r "$path" ]] && { printf '%s\n' "$path"; return 0; }
+	done
+	find /opt -name chatgpt.sh -type f 2>/dev/null | head -n 1
+}
+
+rtd_ai_chat::run_remote_fallback() {
+	local chatgpt_path
+	chatgpt_path="$(rtd_ai_chat::resolve_chatgpt_fallback)"
+	[[ -n "$chatgpt_path" && -r "$chatgpt_path" ]] || {
+		echo "Unable to run local AI and no chatgpt.sh fallback was found." >&2
+		[[ -n "$RTD_AI_CHAT_REMOTE_REASON" ]] && echo "Local failure: $RTD_AI_CHAT_REMOTE_REASON" >&2
+		return 1
+	}
+
+	echo "Falling back to bundled remote chat client: $chatgpt_path" >&2
+	[[ -n "$RTD_AI_CHAT_REMOTE_REASON" ]] && echo "Local fallback reason: $RTD_AI_CHAT_REMOTE_REASON" >&2
+	if ! command -v jq >/dev/null 2>&1 && command -v software::check_native_package_dependency >/dev/null 2>&1; then
+		software::check_native_package_dependency jq
+	fi
+	if ! command -v curl >/dev/null 2>&1 && command -v software::check_native_package_dependency >/dev/null 2>&1; then
+		software::check_native_package_dependency curl
+	fi
+	bash "$chatgpt_path" "${RTD_AI_CHAT_FORWARD_ARGS[@]}"
+}
+
+rtd_ai_chat::capture_stdin_prompt() {
+	[[ $RTD_AI_CHAT_PROMPT_SEEN -eq 0 && $RTD_AI_CHAT_PROMPT_FROM_FILE_SEEN -eq 0 ]] || return 0
+	[[ -t 0 ]] && return 0
+	RTD_AI_CHAT_STDIN_PROMPT="$(cat -)"
+	RTD_AI_CHAT_STDIN_PROMPT_SEEN=1
+	[[ -n "$RTD_AI_CHAT_STDIN_PROMPT" ]] && RTD_AI_CHAT_FORWARD_ARGS+=("--prompt" "$RTD_AI_CHAT_STDIN_PROMPT")
+}
+
+rtd_ai_chat::run_local() {
+	local model="$1" prompt=""
+
+	if [[ $RTD_AI_CHAT_PROMPT_FROM_FILE_SEEN -eq 1 ]]; then
+		[[ -r "$RTD_AI_CHAT_PROMPT_FROM_FILE" ]] || {
+			RTD_AI_CHAT_REMOTE_REASON="Prompt file is not readable: $RTD_AI_CHAT_PROMPT_FROM_FILE"
+			return 1
+		}
+		prompt="$(<"$RTD_AI_CHAT_PROMPT_FROM_FILE")"
+	elif [[ $RTD_AI_CHAT_PROMPT_SEEN -eq 1 ]]; then
+		prompt="$RTD_AI_CHAT_PROMPT"
+	elif [[ $RTD_AI_CHAT_STDIN_PROMPT_SEEN -eq 1 ]]; then
+		prompt="$RTD_AI_CHAT_STDIN_PROMPT"
+	fi
+
+	if [[ -n "$prompt" ]]; then
+		ollama run "$model" "$prompt"
+	else
+		ollama run "$model"
+	fi
+}
 
 
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::          Script Executive                ::::::::::::::::::::::
+#::::::::::::::                                          ::::::::::::::::::::::
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-bash $(find /opt -name chatgpt.sh) "$@"
+rtd_ai_chat::main() {
+	local model
+	rtd_ai_chat::parse_args "$@"
+	rtd_ai_chat::capture_stdin_prompt
+	rtd::bootstrap_library "_rtd_library" || echo "Warning: failed to load _rtd_library; continuing with built-in launcher logic." >&2
+	if [[ $RTD_AI_CHAT_MODEL_SELECTED -eq 0 ]]; then
+		rtd_ai_chat::load_configured_model
+	fi
+	model="${RTD_AI_CHAT_MODEL:-$RTD_AI_CHAT_DEFAULT_MODEL}"
+
+	if ! rtd_ai_chat::ollama_responds; then
+		if ! rtd_ai_chat::install_ollama; then
+			RTD_AI_CHAT_REMOTE_REASON="Ollama is not installed and could not be installed."
+			rtd_ai_chat::run_remote_fallback
+			return $?
+		fi
+	fi
+
+	if ! rtd_ai_chat::ollama_responds; then
+		RTD_AI_CHAT_REMOTE_REASON="Ollama is installed but did not respond to CLI checks."
+		rtd_ai_chat::run_remote_fallback
+		return $?
+	fi
+
+	if ! rtd_ai_chat::ensure_model "$model"; then
+		RTD_AI_CHAT_REMOTE_REASON="Unable to pull local model: $model"
+		rtd_ai_chat::run_remote_fallback
+		return $?
+	fi
+
+	if [[ $RTD_AI_CHAT_MODEL_SELECTED -eq 1 ]]; then
+		rtd_ai_chat::save_default_model "$model" || echo "Warning: unable to save default model to $RTD_AI_CHAT_CONFIG" >&2
+	fi
+
+	if ! rtd_ai_chat::run_local "$model"; then
+		RTD_AI_CHAT_REMOTE_REASON="Ollama local run failed for model: $model"
+		rtd_ai_chat::run_remote_fallback
+		return $?
+	fi
+}
+
+rtd_ai_chat::main "$@"
