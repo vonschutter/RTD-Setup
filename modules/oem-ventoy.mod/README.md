@@ -1,6 +1,6 @@
 # RTD Ventoy USB Creator 💾🧭
 
-![Ventoy Flow](Media_files/ScrRTDTerm.png?raw=true)
+![Ventoy Flow](Media_files/ScrRTDTerm.png)
 
 Interactive helper that wraps the Ventoy functions in `core/_rtd_library` to build a branded, multi-ISO USB stick in just a few steps.
 
