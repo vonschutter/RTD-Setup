@@ -1,7 +1,7 @@
 # RTD System Update
 < [Back](https://github.com/vonschutter/RTD-Setup/blob/main/README.md) |
 
-![RTD Update Screenshot](Media_files/Scr2.png?raw=true "Executing the Script")
+![RTD Update Screenshot](Media_files/Screenshot2.png?raw=true "Executing the Script")
 
 This module contains two companion scripts:
 - `rtd-update-system`: update OS packages (APT/YUM/Zypper/PKCON), snaps, and Flatpaks from one place
