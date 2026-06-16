@@ -15,7 +15,7 @@ RTD Power Tools is a collection of interactive administration utilities for Linu
 | Back up a user before a reinstall | `rtd-oem-backup-linux-config` | Builds encrypted archives of selected user data | Provide external or mounted storage |
 | Diagnose or maintain a remote system | `rtd-simple-support-tool` | Presents common support tasks in one menu | Some tasks elevate privileges |
 | View system hardware | `rtd-system-hardware-information` | Shows hardware and sensor information in a dashboard | Desktop UI required |
-| Build a multi-ISO boot USB | `rtd-ventoy-usb` | Installs Ventoy and copies installation media | Erases the selected drive |
+| Build a multi-ISO boot USB | `rtd-ventoy-usb` | Installs Ventoy and copies installation media | [Usage guide](modules/oem-ventoy.mod/USAGE.md); erases the selected drive |
 | Build or manage KVM guests | `rtd-vm-tool` | Creates, clones, starts, and maintains virtual machines | Requires KVM/libvirt |
 | Route network traffic through a VPN | `rtd-start-vpn-router` | Configures a Linux host as a VPN gateway | Changes routing/firewall rules; monitors an active service |
 
@@ -70,6 +70,7 @@ More detailed examples, including virtual machines and VPN gateways, are in [Use
 | --- | --- |
 | [Getting Started](docs/GETTING_STARTED.md) | Anyone installing or running RTD tools |
 | [Use Cases](docs/USE_CASES.md) | Users choosing tools for a real task |
+| [Ventoy USB Creator](modules/oem-ventoy.mod/USAGE.md) | Users creating, updating, or adding ISOs to a branded Ventoy USB |
 | [Tool Reference](docs/TOOLS.md) | Users looking up a specific `rtd-*` command |
 | [Modules](modules/README.md) | Contributors and users browsing module packages |
 | [Core Library](core/README.md) | Developers writing modules or using `_rtd_library` |
