@@ -12,7 +12,42 @@ The RunTime Data Ventoy USB tool uses the software from the open source Ventoy p
 
 ## Common CLI (Command Line) Tasks
 
-Should a graphical interface not be available RunTime Data's Ventoy tool is simple to use on teh command line. Please see below for common uses.
+Should a graphical interface not be available RunTime Data's Ventoy tool is simple to use on the command line. Please see below for common uses.
+
+Usage:
+
+```bash
+Create a fresh Ventoy USB drive with RTD defaults. The script will download Ventoy,
+either update Ventoy in place or recreate the selected USB device, keep the Ventoy
+data partition in its native layout, and write the RTD Ventoy configuration.
+
+Options:
+  --device <path>    Target USB block device (e.g., /dev/sdb). Prompts if omitted.
+  --version <ver>    Ventoy version to install (default: latest release).
+  --dest <dir>       Cache directory for Ventoy downloads.
+                     Default: /var/lib/rtd/ventoy as root, otherwise ~/.cache/rtd/ventoy.
+  --update           Update Ventoy in place and refresh /ventoy files without copying ISOs.
+  --recreate         Wipe the USB device and recreate the full Ventoy USB layout.
+  --sync-isos        Add or refresh ISO files on an existing Ventoy USB without
+                     updating Ventoy or wiping the device.
+  --mbr              Install Ventoy using MBR partition style (default, best for old BIOS).
+  --gpt              Install Ventoy using GPT partition style.
+  --reserve-mib <n>  Preserve MiB at end of disk to improve old BIOS compatibility.
+  --source <path>    Extra ISO source directory to scan. Repeatable.
+  --overwrite        Overwrite existing ISOs when copying to the Ventoy drive.
+  --gui              Launch the graphical frontend when available.
+  --no-gui           Force the terminal/dialog workflow.
+  -h, --help         Show this help text and exit.
+  -V, --script-version
+                     Print script wrapper version.
+
+Examples:
+  rtd-ventoy-usb
+  rtd-ventoy-usb --device /dev/sdb --update
+  rtd-ventoy-usb --device /dev/sdb --sync-isos --source ~/Downloads
+  rtd-ventoy-usb --device /dev/sdb --source /var/lib/libvirt/boot --overwrite
+
+```
 
 Create a new RunTime Data Ventoy USB drive:
 

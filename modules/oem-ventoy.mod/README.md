@@ -15,9 +15,23 @@ For usage manual and boot menu screenshots, see the [Ventoy USB usage guide](USA
 - 💿 Adds or refreshes ISOs on an existing Ventoy USB without recreating it.
 - 🎨 Applies a RunTime Data Ventoy boot theme.
 
-## Quickstart (CLI)
+## Quickstart
+
+### Installation (how to get the RTD Ventoy USB Tool)
+
+Please see "getting started" in the documentation section of this repository for details. For the impatient just run and the installer will add the RTD tools to you computer:
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/rtd-me.sh.cmd -o rtd-me.sh.cmd
+bash ./rtd-me.sh.cmd
+```
+
+The installer may request administrator privileges. Installed Linux tools and their module files are normally placed under `/opt/rtd`.
+
+### Start using the tool
+
+```bash
+# Just start the GUI Tool and get on with it
 rtd-ventoy-usb
 # or specify the device and allow overwrites
 rtd-ventoy-usb --device /dev/sdb --overwrite
