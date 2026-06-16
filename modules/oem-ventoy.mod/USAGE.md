@@ -49,13 +49,13 @@ Examples:
 
 ```
 
-Create a new RunTime Data Ventoy USB drive:
+Create a new RunTime Data Ventoy USB drive (answer questions in UI):
 
 ```bash
 rtd-ventoy-usb
 ```
 
-Force the graphical RunTime Data Ventoy workflow:
+Force the graphical RunTime Data Ventoy workflow (if you are using some uncommon graphical environment):
 
 ```bash
 rtd-ventoy-usb --gui
