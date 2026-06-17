@@ -1,375 +1,588 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-PUBLICATION="RTD Simple User Configuration Backup Tool"
-VERSION="1.00"
 #
-#::             RTD Ubuntu + derivatives backup script
+#::                                         RTD User Backup Tool
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::// Linux //::::::::
+#::::::::::::::::::::::::::::::::::::::://  RTD Management Tool   //::::::::::::::::::::::::::::::::::// Linux //::::::::
 #::
-#::     Author:   	SLS
-#::     Version 	1.02
-:	${GIT_Profile:=vonschutter}
+#::  ADMIN TOOL
 #::
-#::	Purpose: The purpose of the script is to backup a users setings
-#::              and dokuments to some useful location.
+#::  Purpose:
+#::    Create encrypted, compressed backups of user data and selected
+#::    desktop/application configuration for reinstall and migration work.
 #::
-#::	Value: Useful when preserving user-specific desktop settings, credentials,
-#::	       documents, and related profile data before reinstall, migration,
-#::	       repair work, or major system changes.
+#::  Value:
+#::    Provides a GUI-first backup workflow for users and a CLI backend for
+#::    scripted OEM/service work. Archives are compressed with zstd and
+#::    encrypted with GPG symmetric AES256.
 #::
-#::	Usage: Run the script and follow the prompts to choose what should be
-#::	       backed up and where the resulting archive set should be written.
+#::  Usage:
+#::    rtd-oem-backup-linux-config
+#::    rtd-oem-backup-linux-config --no-gui --list-profiles
+#::    rtd-oem-backup-linux-config --no-gui --estimate --profiles documents
+#::    rtd-oem-backup-linux-config --no-gui --backup --profiles documents \
+#::      --destination /media/$USER/Backup --passphrase-file /tmp/pass
 #::
-#::	Examples:
-#::	       rtd-oem-backup-linux-config
-#::	       sudo rtd-oem-backup-linux-config
-#::
-#:: This system configuration and installation script was originally developed
-#:: for RuntimeData, a small OEM in Buffalo Center, IA.
-#::
-#:: RTD admin scrips are placed in /opt/rtd/scripts. This configuration script is mainly built to use
-#:: functions in _rtd_functions and _rtd_recipies.
-#::       _rtd_functions -- contain usefull admin functions for scripts, such as "how to install software" on different systems.
-#::
-#::
+#::  Direct GitHub execution:
+#::    bash <(curl -fsSL https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/modules/system-user-backup.mod/rtd-oem-backup-linux-config)
+#::    bash <(wget -qO- https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/modules/system-user-backup.mod/rtd-oem-backup-linux-config)
 #::
 #::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-
-
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Script Safety Check             ::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
+#:: Safety Check
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
-	echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
+	echo "ERROR: Bash 4.4 or newer is required. Current shell: Bash ${BASH_VERSION}." >&2
 	return 1 2>/dev/null || exit 1
 fi
 
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Script Settings                 ::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#
-# You may comment out or edit items as you deem necessary.
-# Ensure that the  RTD Functions are available and load them...
-# This contains most of the intelligence used to perform this systems
-# maintenance.
-
-
-# Set the background tilte:
-BACKTITLE="$PUBLICATION"
-
-# Set the options to appear in the menu as choices:
-option_1="Gnome Desktop Setings"
-option_2="Gnome Credentials Manager"
-option_3="Remmina Configuration"
-option_4="Users Private Themes"
-option_5="Users Private Icons"
-option_6="Users Private Fonts "
-option_7="Users Private Documents"
-option_8="Users Private Pictures"
-option_9="Firefox Settings"
-option_10="Chrome Settings"
-option_11="All VirtualBox VMs"
-option_12="Teamviewer Configuration"
-option_13="Backup entire HOME folder"
-option_14="Backup All Virtual Machines (KVM)"
-
-
-
-
+set -o pipefail
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Script Functions                ::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
+#:: Settings
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+PUBLICATION="RTD User Backup Tool"
+SCRIPT_VERSION="2.1"
+SCRIPT_SOURCE="${BASH_SOURCE[0]}"
+SCRIPT_PATH="$(readlink -f "$SCRIPT_SOURCE" 2>/dev/null || printf '%s' "$SCRIPT_SOURCE")"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" 2>/dev/null && pwd || pwd)"
+RAW_BASE_URL="https://raw.githubusercontent.com/${_GIT_PROFILE:-${GIT_Profile:-vonschutter}}/RTD-Setup/main"
+BACKEND_URL="${RAW_BASE_URL}/modules/system-user-backup.mod/rtd-oem-backup-linux-config"
+GTK_FRONTEND_NAME="user-backup-gtk.py"
+GTK_FRONTEND="${SCRIPT_DIR}/${GTK_FRONTEND_NAME}"
+GTK_FRONTEND_URL="${RAW_BASE_URL}/modules/system-user-backup.mod/${GTK_FRONTEND_NAME}"
+RTD_CACHE_DIR="${XDG_CACHE_HOME:-${HOME:-/tmp}/.cache}/rtd/system-user-backup"
+DEFAULT_COMPRESSION_LEVEL=10
+BACKUP_USER="${SUDO_USER:-${USER:-$(id -un)}}"
+USER_HOME="${HOME:-}"
+if [[ ${EUID:-1} -eq 0 && -n "${SUDO_USER:-}" ]]; then
+	USER_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+fi
+
+declare -a SELECTED_PROFILES=()
+declare -a SOURCE_PATHS=()
+declare -a SOURCE_LABELS=()
+declare -a EXCLUDES=()
+declare -a GENERATED_PATHS=()
+DESTINATION=""
+PASSPHRASE_FILE=""
+COMPRESSION_LEVEL="$DEFAULT_COMPRESSION_LEVEL"
+GUI_BACKEND="$SCRIPT_PATH"
+NO_GUI=0
+FORCE_GUI=0
+ACTION=""
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:: RTD Library Bootstrap
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 rtd::bootstrap_library() {
-	if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
-		echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
-		return 1
-	fi
-	local library_name="${1:-_rtd_library}" minimum_version="" loaded_version path script_dir src_url tmp rc check
-	local -a checks=()
-
-	[[ $# -gt 0 && "${1:-}" != --* ]] && { library_name="$1"; shift; }
-	[[ $# -gt 0 && "${1:-}" != --* ]] && { minimum_version="$1"; shift; }
-	while [[ $# -gt 0 ]]; do
-		case "$1" in
-			--version|--check)
-				[[ -n "${2:-}" ]] || { echo "Missing value for $1" >&2; return 1; }
-				[[ "$1" == "--version" ]] && minimum_version="$2" || checks+=("$2")
-				shift 2
-			;;
-			*)
-				echo "Unknown rtd::bootstrap_library option: $1" >&2
-				return 1
-			;;
-		esac
-	done
-
-	[[ "$library_name" == "_rtd_library" && ${#checks[@]} -eq 0 ]] && checks=(system::log_item library::apply_rtd_defaults)
-
-	rtd::bootstrap_library::ok() {
-		loaded_version="${RTD_VERSION:-${RTDFUNCTIONS:-}}"
-		if [[ "$library_name" == "_rtd_library" && -n "$minimum_version" ]]; then
-			[[ -n "$loaded_version" ]] || return 1
-			[[ "$(printf '%s\n%s\n' "$minimum_version" "$loaded_version" | sort -V | tail -n 1)" == "$loaded_version" ]] || return 1
-		fi
-		for check in "${checks[@]}"; do declare -F "$check" >/dev/null 2>&1 || return 1; done
-	}
-
-	[[ "$library_name" == "_rtd_library" && -n "$loaded_version" ]] && rtd::bootstrap_library::ok && return 0
-
-	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	local library_name="${1:-_rtd_library}" path tmp rc
 	for path in \
-		"${script_dir}/${library_name}" \
-		"${script_dir}/../core/${library_name}" \
-		"${script_dir}/../../core/${library_name}" \
-		"/opt/${_TLA:-${_tla:-rtd}}/core/${library_name}" \
+		"${SCRIPT_DIR}/${library_name}" \
+		"${SCRIPT_DIR}/../core/${library_name}" \
+		"${SCRIPT_DIR}/../../core/${library_name}" \
 		"/opt/rtd/core/${library_name}" \
 		"${HOME:-}/GIT/RTD-Setup/core/${library_name}" \
 		"${HOME:-}/RTD-Setup/core/${library_name}"; do
 		[[ -r "$path" ]] || continue
 		# shellcheck source=/dev/null
-		source "$path" ""
-		rc=$?
-		[[ $rc -eq 0 ]] && rtd::bootstrap_library::ok && return 0
+		source "$path" "" >/dev/null 2>&1
+		declare -F system::log_item >/dev/null 2>&1 && return 0
 	done
-
-	src_url="https://github.com/${_GIT_PROFILE:-${GIT_Profile:-vonschutter}}/RTD-Setup/raw/main/core/${library_name}"
-	tmp="$(mktemp "/tmp/${library_name}.XXXXXX" 2>/dev/null || echo "/tmp/${library_name}.$$")"
+	tmp="$(mktemp "/tmp/${library_name}.XXXXXX")" || return 1
 	rc=0
 	if command -v curl >/dev/null 2>&1; then
-		curl -fsSL "$src_url" -o "$tmp" || rc=$?
+		curl -fsSL "${RAW_BASE_URL}/core/${library_name}" -o "$tmp" || rc=$?
 	elif command -v wget >/dev/null 2>&1; then
-		wget -qO "$tmp" "$src_url" || rc=$?
+		wget -qO "$tmp" "${RAW_BASE_URL}/core/${library_name}" || rc=$?
 	else
 		rc=1
 	fi
-	[[ ${rc:-0} -eq 0 ]] || { rm -f "$tmp"; return "$rc"; }
-
-	# shellcheck source=/dev/null
-	source "$tmp" ""
-	rc=$?
+	if (( rc == 0 )); then
+		# shellcheck source=/dev/null
+		source "$tmp" "" >/dev/null 2>&1
+		declare -F system::log_item >/dev/null 2>&1 || rc=1
+	fi
 	rm -f "$tmp"
-	[[ $rc -eq 0 ]] || return "$rc"
-	rtd::bootstrap_library::ok && return 0
-
-	echo "Loaded $library_name, but the requested version/functions are not available." >&2
-	return 1
+	return "$rc"
 }
 
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:: Logging Helpers
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-# Function to request an encryption phrase.
-# This prase will be used to encrypt the compressed archives.
-zenity_ask_for_encryption_pass_phrase () {
-	software::check_native_package_dependency zenity
-    	passtoken=$(zenity --title "Encryption Password" --password )
-    	if [[ -z "$passtoken" ]]; then
-                zenity --warning --text="Your settings likely contain sensitive information and should be encrypted! Please set a pass phrase"
-		zenity_ask_for_encryption_pass_phrase
-        fi
+log_info() { command -v write_information >/dev/null 2>&1 && write_information "$*" || printf '%s\n' "$*"; }
+log_status() { command -v write_status >/dev/null 2>&1 && write_status "$*" || printf '%s\n' "$*"; }
+log_warn() { command -v write_warning >/dev/null 2>&1 && write_warning "$*" || printf 'Warning: %s\n' "$*" >&2; }
+log_error() { command -v write_error >/dev/null 2>&1 && write_error "$*" || printf 'Error: %s\n' "$*" >&2; }
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:: Dependency Helpers
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+ensure_rtd_library() {
+	rtd::bootstrap_library "_rtd_library"
 }
 
-
-
-# Function to display the backup otions above. This is all done in a bit of a
-# round about way... but the idea is to prepare this setup to be flexible
-# for the future so that you only have one place to list the option while
-# more than one gui toolkit (dialog, zenity, whiptail) depending on your environment.
-zenity_show_list_of_user_backup_choices () {
-        cmd=( zenity  --list  --width=800 --height=400 --text "Please Select Whant to Backup" --title "$BACKTITLE" --checklist  --column "ON/OFF" --column "What to backup" --separator "," )
-        zstatus=FALSE
-        options=(    $zstatus "$option_1"
-                     $zstatus "$option_2"
-                     $zstatus "$option_3"
-                     $zstatus "$option_4"
-                     $zstatus "$option_5"
-                     $zstatus "$option_6"
-                     $zstatus "$option_7"
-                     $zstatus "$option_8"
-                     $zstatus "$option_9"
-                     $zstatus "$option_10"
-                     $zstatus "$option_11"
-                     $zstatus "$option_12"
-		     $zstatus "$option_13"
-		     $zstatus "$option_14"
-                   )
-
-       choices=$("${cmd[@]}" "${options[@]}" )
-}
-
-
-
-
-# Simple function to display a infromational notice when the tool is envoked.
-rtd_oem_user_backup_info_notice() {
-
-	zenity --info --width=800 --height=400 --text="
-
-The RTD User Backup tool is a simple tool to allow anyone to backup important files and/or the entire home folder to an external USB drive as a backup ahead of re-installing a PC from scratch.
-
-It is highly recommended to encrypt all content so that is cannot easily be stolen. Do remember the password or you will never be able to access the backed-up content ever again.
-
-You will need the following:
-1 - An external drive
-2 - A good password
-
-The RTD Backup tool will encrypt, compress and save all the information in the location provided.
-	"
-}
-
-
-
-# Dialog to request the destination of where to store the compressed and encrypted archive.
-rtd_oem_request_user_backup_destination() {
-	if [[ -z "$rtd_oem_user_backup_destination" ]]; then
-		export rtd_oem_user_backup_destination=$( zenity --width=800 --height=400 --text "$BACKTITLE" --file-selection --directory  )
-	elif [[ -n "$string" ]]; then
-		echo "Saving Backup to: $rtd_oem_user_backup_destination"
+ensure_commands() {
+	local missing=() cmd
+	ensure_rtd_library >/dev/null 2>&1 || true
+	if declare -F dependency::command_exists >/dev/null 2>&1; then
+		dependency::command_exists --auto "$@"
+		return $?
+	fi
+	for cmd in "$@"; do
+		command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
+	done
+	if [[ ${#missing[@]} -gt 0 ]]; then
+		log_error "Missing required command(s): ${missing[*]}"
+		return 1
 	fi
 }
 
-
-
-# Notify end user thes backup tasks are complete.
-rtd_oem_user_backup_info_notice_complete() {
-	zenity --info --width=800 --height=400 --text="
-Backup is complete. Please revise the list below.
-
-Backup archive(s) saved to:
-$rtd_oem_user_backup_destination
-
-Archives:
-$(ls $rtd_oem_user_backup_destination/*.7z )
-"
+ensure_backup_dependencies() {
+	ensure_commands tar zstd gpg sha256sum du mktemp pv
 }
 
-
-
-# Cleanup any potential junk left in the environment.
-rtd_oem_cleanup() {
-
-	unset rtd_oem_user_backup_destination
-	unset passtoken
+ensure_estimate_dependencies() {
+	ensure_commands du mktemp awk
 }
 
-
-
-# Function to execute the given backup and encryption task. Levels of compression and
-# other option may be set in the seting section of this script (tool)
-rtd_user_bak () {
-	rtd_oem_request_user_backup_destination
-	echo ... > $rtd_oem_user_backup_destination/flg
-	if [[ -e $rtd_oem_user_backup_destination/flg ]]; then
-		rm $rtd_oem_user_backup_destination/flg
-		if [[ -d $2 ]]; then
-			7z a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=32m -ms=on -mhe=on -p$passtoken $rtd_oem_user_backup_destination/`whoami`-"$1"-`date -u --iso-8601`.7z "${@:2}"
-		else
-			echo "Backup source $2 does not exist..."
-		fi
+ensure_profile_dependency() {
+	local command_name="$1"
+	ensure_rtd_library >/dev/null 2>&1 || true
+	if declare -F dependency::command_exists >/dev/null 2>&1; then
+		dependency::command_exists --auto "$command_name" >/dev/null 2>&1 || return 1
 	else
-		zenity --info --width=800 --height=400 --text="$rtd_oem_user_backup_destination is not writable! Plese select another destination."
-		rtd_oem_request_user_backup_destination
+		command -v "$command_name" >/dev/null 2>&1 || return 1
 	fi
 }
 
+install_gui_dependencies() {
+	local distro
+	ensure_rtd_library >/dev/null 2>&1 || return 1
+	declare -F software::check_native_package_dependency >/dev/null 2>&1 || return 1
+	declare -F system::distribution_type >/dev/null 2>&1 && distro="$(system::distribution_type 2>/dev/null || true)"
+	case "$distro" in
+		fedora|redhat) software::check_native_package_dependency python3 python3-gobject gtk3 ;;
+		suse) software::check_native_package_dependency python3 python3-gobject-Gdk typelib-1_0-Gtk-3_0 ;;
+		*) software::check_native_package_dependency python3 python3-gi gir1.2-gtk-3.0 ;;
+	esac
+}
 
+fetch_remote_file() {
+	local url="$1" dest="$2" tmp="${dest}.tmp.$$"
+	mkdir -p "$(dirname "$dest")" || return 1
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL "$url" -o "$tmp" || { rm -f "$tmp"; return 1; }
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO "$tmp" "$url" || { rm -f "$tmp"; return 1; }
+	else
+		ensure_commands curl || ensure_commands wget || return 1
+		fetch_remote_file "$url" "$dest"
+		return $?
+	fi
+	mv "$tmp" "$dest" || return 1
+	chmod 0700 "$dest" 2>/dev/null || true
+}
 
-# Function to do what the choices instruct. We read the output from
-# the choices and execute commands that accomplish the task requested.
-do_instructions_from_choices (){
-        IFS=$','
-	for choice in $choices
-	do
-		case $choice in
-	        "$option_1") rtd_user_bak "$option_1" ~/Templates ;;
-		"$option_2") rtd_user_bak "$option_2" ~/Templates ;;
-		"$option_3") rtd_user_bak "$option_3" ~/.local/share/remmina ~/.config/remmina	;;
-		"$option_4") rtd_user_bak "$option_4" ~/.themes ;;
-		"$option_5") rtd_user_bak "$option_5" ~/.icons ;;
-		"$option_6") rtd_user_bak "$option_6" ~/.fonts	;;
-		"$option_7") rtd_user_bak "$option_7" ~/Documents ;;
-		"$option_8") rtd_user_bak "$option_8" ~/Pictures ;;
-		"$option_9") rtd_user_bak "$option_9" ~/Templates ;;
-		"$option_10") rtd_user_bak "$option_10" ~/.config/google-chrome/Default/Preferences ;;
-		"$option_11") rtd_user_bak "$option_11" "~/VirtualBox VM's" ;;
-		"$option_12") rtd_user_bak "$option_12" ~/.config/teamviewer ;;
-		"$option_13") rtd_user_bak "$option_13" $HOME ;;
-		"$option_14")
-			echo $passtoken |sudo -S chmod 777 -R /var/lib/libvirt
-			rtd_user_bak "$option_14" /var/lib/libvirt
-			echo $passtoken |sudo -S  chmod 750 -R /var/lib/libvirt
-			echo $passtoken |sudo -S  chown -R libvirt-qemu /var/lib/libvirt
-		;;
+resolve_gtk_frontend() {
+	local candidate
+	for candidate in \
+		"${SCRIPT_DIR}/${GTK_FRONTEND_NAME}" \
+		"/opt/rtd/modules/system-user-backup.mod/${GTK_FRONTEND_NAME}" \
+		"/opt/RTD-Setup/modules/system-user-backup.mod/${GTK_FRONTEND_NAME}" \
+		"${HOME:-}/GIT/RTD-Setup/modules/system-user-backup.mod/${GTK_FRONTEND_NAME}" \
+		"${HOME:-}/RTD-Setup/modules/system-user-backup.mod/${GTK_FRONTEND_NAME}"; do
+		[[ -r "$candidate" ]] || continue
+		GTK_FRONTEND="$candidate"
+		return 0
+	done
+	candidate="${RTD_CACHE_DIR}/${GTK_FRONTEND_NAME}"
+	if [[ ! -r "$candidate" ]]; then
+		log_info "Fetching GTK frontend: ${GTK_FRONTEND_URL}"
+		fetch_remote_file "$GTK_FRONTEND_URL" "$candidate" || return 1
+	fi
+	GTK_FRONTEND="$candidate"
+}
+
+resolve_gui_backend() {
+	local cached="${RTD_CACHE_DIR}/rtd-oem-backup-linux-config"
+	case "$SCRIPT_PATH" in
+		/dev/fd/*|/proc/*/fd/*)
+			mkdir -p "$RTD_CACHE_DIR" || return 1
+			if [[ -r "$SCRIPT_PATH" ]]; then
+				cp "$SCRIPT_PATH" "$cached" || return 1
+			else
+				fetch_remote_file "$BACKEND_URL" "$cached" || return 1
+			fi
+			chmod 0700 "$cached" 2>/dev/null || true
+			GUI_BACKEND="$cached"
+			;;
+		*)
+			GUI_BACKEND="$SCRIPT_PATH"
+			;;
+	esac
+}
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:: Usage
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+usage() {
+	cat <<EOF
+Usage:
+  $(basename "$0") [--gui|--no-gui]
+  $(basename "$0") --list-profiles
+  $(basename "$0") --estimate --profiles <csv> [--user-home <path>]
+  $(basename "$0") --backup --profiles <csv> --destination <dir> --passphrase-file <file> [options]
+
+Options:
+  --profiles <csv>          Comma-separated profile ids to back up.
+  --destination <dir>       Destination directory for backup archives.
+  --passphrase-file <file>  File containing the encryption passphrase.
+  --compression-level <n>   zstd level 1-19, default ${DEFAULT_COMPRESSION_LEVEL}.
+  --user-home <path>        User home to back up, useful when run through pkexec.
+  --backup-user <name>      Username to include in archive metadata.
+  --gui                     Force GTK frontend.
+  --no-gui                  Force command-line backend behavior.
+  -h, --help                Show this help.
+EOF
+}
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:: Profile Definitions
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+profile_rows() {
+	cat <<'EOF'
+documents	Personal documents	~/Documents	false
+pictures	Pictures	~/Pictures	false
+desktop	Desktop files	~/Desktop	false
+downloads	Downloads	~/Downloads	false
+gnome	GNOME desktop settings	dconf dump plus GNOME config	false
+keyring	GNOME credentials and keyrings	~/.local/share/keyrings and ~/.gnupg	false
+remmina	Remmina configuration	Remmina config and connection files	false
+themes	User themes	~/.themes	false
+icons	User icons	~/.icons and ~/.local/share/icons	false
+fonts	User fonts	~/.fonts and ~/.local/share/fonts	false
+firefox	Firefox profiles	~/.mozilla/firefox	false
+chrome	Chrome profiles	~/.config/google-chrome	false
+virtualbox	VirtualBox virtual machines	~/VirtualBox VMs	false
+teamviewer	TeamViewer configuration	~/.config/teamviewer	false
+home	Entire home folder	~	false
+kvm	KVM/libvirt virtual machines	/var/lib/libvirt plus domain XML	true
+EOF
+}
+
+list_profiles() {
+	profile_rows
+}
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:: Source Selection
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+expand_path() {
+	local path="$1"
+	case "$path" in
+		"~") printf '%s' "$USER_HOME" ;;
+		\~/*) printf '%s/%s' "$USER_HOME" "${path#\~/}" ;;
+		*) printf '%s' "$path" ;;
+	esac
+}
+
+add_existing_source() {
+	local label="$1" path="$2" expanded
+	expanded="$(expand_path "$path")"
+	if [[ -e "$expanded" ]]; then
+		SOURCE_LABELS+=("$label")
+		SOURCE_PATHS+=("$expanded")
+	else
+		log_warn "Skipping missing source for ${label}: ${expanded}"
+	fi
+}
+
+add_common_excludes() {
+	local rel_home="${USER_HOME#/}"
+	EXCLUDES+=(
+		"--exclude=${rel_home}/.cache"
+		"--exclude=${rel_home}/.local/share/Trash"
+		"--exclude=${rel_home}/.thumbnails"
+		"--exclude=${rel_home}/.var/app/*/cache"
+		"--exclude=*.7z"
+		"--exclude=*.tar"
+		"--exclude=*.tar.zst"
+		"--exclude=*.tar.zst.gpg"
+	)
+}
+
+prepare_profile_sources() {
+	local profile staging_dir="$1" dconf_file domains_file
+	SOURCE_PATHS=()
+	SOURCE_LABELS=()
+	GENERATED_PATHS=()
+	EXCLUDES=()
+	add_common_excludes
+
+	for profile in "${SELECTED_PROFILES[@]}"; do
+		case "$profile" in
+			documents) add_existing_source "documents" "~/Documents" ;;
+			pictures) add_existing_source "pictures" "~/Pictures" ;;
+			desktop) add_existing_source "desktop" "~/Desktop" ;;
+			downloads) add_existing_source "downloads" "~/Downloads" ;;
+			gnome)
+				add_existing_source "gnome-config" "~/.config/gnome-session"
+				add_existing_source "gtk-config" "~/.config/gtk-3.0"
+				add_existing_source "gtk4-config" "~/.config/gtk-4.0"
+				if ensure_profile_dependency dconf; then
+					dconf_file="${staging_dir}/RTD_BACKUP_METADATA/generated/dconf-settings.ini"
+					mkdir -p "$(dirname "$dconf_file")"
+					if sudo -u "$BACKUP_USER" dconf dump / >"$dconf_file" 2>/dev/null || dconf dump / >"$dconf_file" 2>/dev/null; then
+						GENERATED_PATHS+=("$dconf_file")
+					fi
+				fi
+				;;
+			keyring)
+				add_existing_source "gnome-keyrings" "~/.local/share/keyrings"
+				add_existing_source "gnupg" "~/.gnupg"
+				;;
+			remmina)
+				add_existing_source "remmina-data" "~/.local/share/remmina"
+				add_existing_source "remmina-config" "~/.config/remmina"
+				;;
+			themes) add_existing_source "themes" "~/.themes" ;;
+			icons)
+				add_existing_source "icons" "~/.icons"
+				add_existing_source "local-icons" "~/.local/share/icons"
+				;;
+			fonts)
+				add_existing_source "fonts" "~/.fonts"
+				add_existing_source "local-fonts" "~/.local/share/fonts"
+				;;
+			firefox) add_existing_source "firefox" "~/.mozilla/firefox" ;;
+			chrome) add_existing_source "chrome" "~/.config/google-chrome" ;;
+			virtualbox) add_existing_source "virtualbox" "~/VirtualBox VMs" ;;
+			teamviewer) add_existing_source "teamviewer" "~/.config/teamviewer" ;;
+			home) add_existing_source "home" "~" ;;
+			kvm)
+				if [[ ${EUID:-1} -ne 0 ]]; then
+					log_error "The kvm profile requires root privileges. Run from the GTK frontend with authorization or use sudo."
+					return 1
+				fi
+				add_existing_source "libvirt" "/var/lib/libvirt"
+				if ensure_profile_dependency virsh; then
+					domains_file="${staging_dir}/RTD_BACKUP_METADATA/generated/libvirt-domains"
+					mkdir -p "$domains_file"
+					while IFS= read -r domain; do
+						[[ -n "$domain" ]] || continue
+						virsh dumpxml "$domain" >"${domains_file}/${domain}.xml" 2>/dev/null || true
+					done < <(virsh list --all --name 2>/dev/null)
+					GENERATED_PATHS+=("$domains_file")
+				fi
+				;;
+			*) log_warn "Unknown backup profile ignored: $profile" ;;
 		esac
 	done
 }
 
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:: Argument Helpers
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
+csv_to_profiles() {
+	local csv="$1" item
+	SELECTED_PROFILES=()
+	IFS=',' read -r -a SELECTED_PROFILES <<<"$csv"
+	for item in "${!SELECTED_PROFILES[@]}"; do
+		SELECTED_PROFILES[$item]="${SELECTED_PROFILES[$item]//[[:space:]]/}"
+	done
+}
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Sript Flow Control              ::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
+#:: Estimate
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#
-#
-# Software and configuration selections dialog. This will present a number of OEM defaults
-# and other preferences that can be added to a system at will. To remove software it is
-# recommended to use the native software tool (Gnome Software, Yast, or Discover).
-#
-# Option defaults may be set to "on" or "off"
 
-# "dialog" will be used to request interactive configuration...
-# Ensure that it is available:
-if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-	cat <<EOF
-Usage:
-  $(basename "$0") [--help|-h]
-
-Description:
-  Open the RTD Linux configuration backup workflow and guide you through the backup selections.
-EOF
-	exit 0
-fi
-
-trap "passtoken=nonsense" 0 1 2 5 15
-rtd::bootstrap_library "_rtd_library" || { echo "Failed to load _rtd_library"; exit 1; }
-rtd_oem_user_backup_info_notice
-zenity_ask_for_encryption_pass_phrase
-zenity_show_list_of_user_backup_choices
-do_instructions_from_choices
-rtd_oem_user_backup_info_notice_complete
-
-
-
+estimate_bytes() {
+	local staging_dir total=0 path size
+	ensure_estimate_dependencies >/dev/null 2>&1 || return 1
+	staging_dir="$(mktemp -d)" || return 1
+	prepare_profile_sources "$staging_dir" || { rm -rf "$staging_dir"; return 1; }
+	for path in "${SOURCE_PATHS[@]}" "${GENERATED_PATHS[@]}"; do
+		[[ -e "$path" ]] || continue
+		size="$(du -sb "$path" 2>/dev/null | awk '{print $1}')"
+		[[ "$size" =~ ^[0-9]+$ ]] && total=$((total + size))
+	done
+	rm -rf "$staging_dir"
+	printf '%s\n' "$total"
+}
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
-#::::::::::::::          Finalize.....                   ::::::::::::::::::::::
-#::::::::::::::                                          ::::::::::::::::::::::
+#:: Metadata
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-rtd_oem_cleanup
-exit
 
+json_escape() {
+	local s="$1"
+	s="${s//\\/\\\\}"
+	s="${s//\"/\\\"}"
+	s="${s//$'\n'/\\n}"
+	printf '%s' "$s"
+}
 
+write_manifest() {
+	local staging_dir="$1" manifest="$1/RTD_BACKUP_METADATA/manifest.json" profile path first=1
+	mkdir -p "$(dirname "$manifest")"
+	{
+		printf '{\n'
+		printf '  "tool": "rtd-oem-backup-linux-config",\n'
+		printf '  "version": "%s",\n' "$(json_escape "$SCRIPT_VERSION")"
+		printf '  "created_utc": "%s",\n' "$(date -u --iso-8601=seconds)"
+		printf '  "hostname": "%s",\n' "$(json_escape "$(hostname)")"
+		printf '  "backup_user": "%s",\n' "$(json_escape "$BACKUP_USER")"
+		printf '  "user_home": "%s",\n' "$(json_escape "$USER_HOME")"
+		printf '  "profiles": ['
+		for profile in "${SELECTED_PROFILES[@]}"; do
+			[[ $first -eq 0 ]] && printf ', '
+			printf '"%s"' "$(json_escape "$profile")"
+			first=0
+		done
+		printf '],\n'
+		printf '  "sources": [\n'
+		first=1
+		for path in "${SOURCE_PATHS[@]}" "${GENERATED_PATHS[@]}"; do
+			[[ -e "$path" ]] || continue
+			[[ $first -eq 0 ]] && printf ',\n'
+			printf '    "%s"' "$(json_escape "$path")"
+			first=0
+		done
+		printf '\n  ]\n'
+		printf '}\n'
+	} >"$manifest"
+	GENERATED_PATHS+=("$manifest")
+}
 
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:: Backup Creation
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
+create_backup() {
+	local staging_dir archive_base archive_path checksum_path passphrase estimate_bytes_value tar_rc passphrase path rel
+	local -a rel_paths=()
+	[[ -d "$DESTINATION" ]] || { log_error "Destination does not exist: $DESTINATION"; return 1; }
+	[[ -w "$DESTINATION" ]] || { log_error "Destination is not writable: $DESTINATION"; return 1; }
+	[[ -r "$PASSPHRASE_FILE" ]] || { log_error "Passphrase file is not readable."; return 1; }
+	[[ "$COMPRESSION_LEVEL" =~ ^[0-9]+$ && "$COMPRESSION_LEVEL" -ge 1 && "$COMPRESSION_LEVEL" -le 19 ]] ||
+		{ log_error "Compression level must be an integer from 1 to 19."; return 1; }
+	ensure_backup_dependencies || { log_error "Required backup software could not be installed or found."; return 1; }
 
+	staging_dir="$(mktemp -d)" || return 1
+	trap 'rm -rf "$staging_dir"' RETURN
+	prepare_profile_sources "$staging_dir" || return 1
+	[[ ${#SOURCE_PATHS[@]} -gt 0 || ${#GENERATED_PATHS[@]} -gt 0 ]] || { log_error "No existing backup sources were selected."; return 1; }
+	write_manifest "$staging_dir"
+	for path in "${SOURCE_PATHS[@]}"; do
+		[[ -e "$path" && "$path" = /* ]] || continue
+		rel="${path#/}"
+		rel_paths+=("$rel")
+	done
 
+	archive_base="${BACKUP_USER}-backup-$(date -u +%Y%m%dT%H%M%SZ)"
+	archive_path="${DESTINATION%/}/${archive_base}.tar.zst.gpg"
+	checksum_path="${archive_path}.sha256"
+	estimate_bytes_value="$(estimate_bytes 2>/dev/null || echo 0)"
+	passphrase="$(<"$PASSPHRASE_FILE")"
 
+	log_status "Creating encrypted backup archive: $archive_path"
+	printf 'RTD_PROGRESS phase=backup percent=5 current=%q\n' "Preparing archive"
 
+	{
+		tar -C / "${EXCLUDES[@]}" --ignore-failed-read --warning=no-file-changed --xattrs --acls --sparse -cf - "${rel_paths[@]}" -C "$staging_dir" RTD_BACKUP_METADATA |
+			pv -s "${estimate_bytes_value:-0}" 2>/dev/null |
+			zstd -T0 -"${COMPRESSION_LEVEL}" |
+			gpg --batch --yes --pinentry-mode loopback --passphrase-fd 3 --symmetric --cipher-algo AES256 -o "$archive_path" - 3<<<"$passphrase"
+	} || tar_rc=$?
+	unset passphrase
+	[[ ${tar_rc:-0} -eq 0 ]] || { log_error "Backup archive creation failed."; rm -f "$archive_path"; return 1; }
 
+	printf 'RTD_PROGRESS phase=backup percent=90 current=%q\n' "Writing checksum"
+	sha256sum "$archive_path" >"$checksum_path" || return 1
+	chmod 0600 "$archive_path" "$checksum_path" 2>/dev/null || true
+	printf 'RTD_PROGRESS phase=backup percent=100 current=%q\n' "Backup complete"
+	log_info "Backup complete: $archive_path"
+	log_info "Checksum: $checksum_path"
+}
 
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:: GTK Frontend
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
+gtk_frontend_ready() {
+	command -v python3 >/dev/null 2>&1 &&
+		python3 -c 'import gi; gi.require_version("Gtk", "3.0"); from gi.repository import Gtk' >/dev/null 2>&1
+}
+
+launch_gui() {
+	resolve_gtk_frontend || { log_error "GTK frontend not found and could not be fetched."; return 1; }
+	resolve_gui_backend || { log_error "Unable to prepare backend launcher for GTK frontend."; return 1; }
+	gtk_frontend_ready || {
+		install_gui_dependencies || true
+	}
+	gtk_frontend_ready || { log_error "Python GTK 3 bindings are required."; return 1; }
+	exec env RTD_USER_BACKUP_BACKEND="$GUI_BACKEND" python3 "$GTK_FRONTEND"
+}
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:: Argument Parsing
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+parse_args() {
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			-h|--help) usage; exit 0 ;;
+			--gui) FORCE_GUI=1; shift ;;
+			--no-gui) NO_GUI=1; shift ;;
+			--list-profiles) ACTION="list"; shift ;;
+			--estimate) ACTION="estimate"; shift ;;
+			--backup) ACTION="backup"; shift ;;
+			--profiles) csv_to_profiles "${2:-}"; shift 2 ;;
+			--destination) DESTINATION="${2:-}"; shift 2 ;;
+			--passphrase-file) PASSPHRASE_FILE="${2:-}"; shift 2 ;;
+			--compression-level) COMPRESSION_LEVEL="${2:-$DEFAULT_COMPRESSION_LEVEL}"; shift 2 ;;
+			--user-home) USER_HOME="${2:-$USER_HOME}"; shift 2 ;;
+			--backup-user) BACKUP_USER="${2:-$BACKUP_USER}"; shift 2 ;;
+			*) log_error "Unknown option: $1"; usage; return 1 ;;
+		esac
+	done
+}
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#:: Executive
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+main() {
+	parse_args "$@" || return 1
+	if [[ $FORCE_GUI -eq 1 || ( $# -eq 0 && $NO_GUI -eq 0 && ( -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ) ) ]]; then
+		launch_gui
+		return $?
+	fi
+	case "$ACTION" in
+		list) list_profiles ;;
+		estimate)
+			[[ ${#SELECTED_PROFILES[@]} -gt 0 ]] || { log_error "No profiles selected."; return 1; }
+			estimate_bytes
+			;;
+		backup)
+			[[ ${#SELECTED_PROFILES[@]} -gt 0 ]] || { log_error "No profiles selected."; return 1; }
+			create_backup
+			;;
+		*) usage; return 1 ;;
+	esac
+}
+
+main "$@"

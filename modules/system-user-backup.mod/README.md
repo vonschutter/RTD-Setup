@@ -1,68 +1,168 @@
-# RTD User Backup Tool:
-< [Back](https://github.com/vonschutter/RTD-Setup/blob/main/README.md) |
+# RTD User Backup Tool
 
-![link](Media_files/header-time.jpg "Tool User Backup")
+![Tool User Backup](Media_files/header-time.jpg)
 
-The RTD User Backup is a tool to simplify backup of a user's data in a local home folder.
-It will aks if you want ot back up some usual options:
+`rtd-oem-backup-linux-config` creates encrypted migration backups for user data, desktop settings, browser profiles, remote-access configuration, and virtual machine storage.
 
-```
- 1. Gnome Desktop Setings
- 2. Gnome Credentials Manager
- 3. Remmina Configuration
- 4. Users Private Themes
- 5. Users Private Icons
- 6. Users Private Fonts
- 7. Users Private Documents
- 8. Users Private Pictures
- 9. Firefox Settings
- 10. Chrome Settings
- 11. All VirtualBox VMs
- 12. Teamviewer Configuration
- 13. Backup entire HOME folder
- 14. Backup All Virtual Machines (KVM)
-```
+The public command launches a GTK frontend in graphical sessions. The same command also provides a backend CLI for scripted use.
 
-Any option or options may be selected. The files will be encrypted and highly compressed to a destination of choice.
-To use a nework location that location mst first me "mounted" on the local system first.
+## Common Use
 
-## Usage
 ```bash
 rtd-oem-backup-linux-config
 ```
-What happens:
-- Elevates with sudo when needed, then loads the shared `_rtd_library`
-- Presents a checklist (options above) via `dialog`
-- Creates an encrypted, compressed archive in the destination you choose (external drive or mounted network path)
-- Logs activity under `/var/log/rtd`
 
-## Screenshots:
+Force the GTK frontend:
 
-**Backup initial launch:**
-Information displayed when the app is launched.
-![link](Media_files/Scr1-d.png "Tool Backup initial launch")
+```bash
+rtd-oem-backup-linux-config --gui
+```
 
-**Backup Passphrase Prompt:**
-The too will insist that you provide a password to use as an encryption key for your backup. This s a requirement.
-you backup must be encrypted because the reason for using this tool is generally to manually bakup a users data to an
-external device before reinstalling the Operating System on the same machine or to move from one computer to the next.
+List available backup profiles:
 
-![link](Media_files/Scr2-d.png "Tool Backup Passphrase Prompt")
+```bash
+rtd-oem-backup-linux-config --no-gui --list-profiles
+```
 
-**Backup Choices**
-Backup choices are generally choosing the whole home folder of a user (99% of the time), but some choices are provided
-beyond that. It is possible to make a few selective choices beynod the whole home folder that make sense. It may be that the
-personal settings are not compatible with the upgraded system or the new system for some reason and it may just make sense to grab
-documents, pictures, videos, personal fonts, and any VM's. Please NOTE that KVM Virtual Machines reside in the system part outside
-of the users own data and the system password will be requested; unless the system password is used as the encryption password (it will then be automatic).
-![link](Media_files/Scr3-d.png "Tool Backup Options")
+Create a backup from the CLI:
 
-**Backup Destination Selection:**
-The backup requires a destination to be selected. This is usually an external disk or a large thumbdrive. This uses a hight level of
-compression to make the best use of the storage.
-![link](Media_files/Scr4-d.png "Tool Backup Destination Selection")
+```bash
+printf '%s' 'your strong passphrase' > /tmp/rtd-backup-pass
+chmod 600 /tmp/rtd-backup-pass
+rtd-oem-backup-linux-config --no-gui \
+  --backup \
+  --profiles documents,pictures,firefox \
+  --destination /media/$USER/BackupDrive \
+  --passphrase-file /tmp/rtd-backup-pass
+rm -f /tmp/rtd-backup-pass
+```
 
-**Backup Completion Notification:**
-Once all the backup tasks are completed (none of them are mutually exclusive) an notification of the location and filenamese
-will be displayed. The filenames include the date in the name.
-![link](Media_files/Scr5-d.png "Tool Backup Completion Notification")
+## Run Directly From GitHub
+
+The script can be run without installing the full repository. It bootstraps `_rtd_library` from the RTD repository when the library is not already present locally. In a graphical desktop session it also fetches the internal GTK helper, `user-backup-gtk.py`, into the RTD cache when the helper is not available beside the script. When launched through shell process substitution, the backend is also cached so the GUI can call a stable script path.
+
+Using `curl`:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/modules/system-user-backup.mod/rtd-oem-backup-linux-config)
+```
+
+Using `wget`:
+
+```bash
+bash <(wget -qO- https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/modules/system-user-backup.mod/rtd-oem-backup-linux-config)
+```
+
+Download first, then run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/modules/system-user-backup.mod/rtd-oem-backup-linux-config -o /tmp/rtd-oem-backup-linux-config
+bash /tmp/rtd-oem-backup-linux-config
+```
+
+CLI backup direct from GitHub:
+
+```bash
+printf '%s' 'your strong passphrase' > /tmp/rtd-backup-pass
+chmod 600 /tmp/rtd-backup-pass
+bash <(curl -fsSL https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/modules/system-user-backup.mod/rtd-oem-backup-linux-config) \
+  --no-gui \
+  --backup \
+  --profiles documents,pictures,firefox \
+  --destination /media/$USER/BackupDrive \
+  --passphrase-file /tmp/rtd-backup-pass
+rm -f /tmp/rtd-backup-pass
+```
+
+Direct execution requires `bash` 4.4 or newer and either `curl` or `wget` for bootstrap downloads. Runtime dependencies such as `zstd`, `gpg`, `pv`, `tar`, `sha256sum`, Python, and GTK bindings are checked through RTD `_rtd_library` dependency helpers and installed through the native package manager where possible.
+
+## Main Window
+
+![Tool User Backup](Media_files/Screenshot-main.png)
+
+## Backup Profiles
+
+- `documents` - `~/Documents`
+- `pictures` - `~/Pictures`
+- `desktop` - `~/Desktop`
+- `downloads` - `~/Downloads`
+- `gnome` - GNOME and GTK settings, including a `dconf dump`
+- `keyring` - GNOME keyrings and GnuPG configuration
+- `remmina` - Remmina connection/configuration files
+- `themes` - user themes
+- `icons` - user icon themes
+- `fonts` - user fonts
+- `firefox` - Firefox profiles
+- `chrome` - Chrome profiles
+- `virtualbox` - VirtualBox virtual machines
+- `teamviewer` - TeamViewer configuration
+- `home` - entire home folder, excluding common cache/trash/archive patterns
+- `kvm` - KVM/libvirt storage and domain XML; requires root authorization
+
+## Archive Format
+
+The default archive format is:
+
+```text
+tar + zstd + GPG symmetric AES256
+```
+
+Archives are written as:
+
+```text
+<user>-backup-<UTC timestamp>.tar.zst.gpg
+<user>-backup-<UTC timestamp>.tar.zst.gpg.sha256
+```
+
+Each archive includes:
+
+```text
+RTD_BACKUP_METADATA/manifest.json
+```
+
+The manifest records the tool version, timestamp, hostname, backup user, selected profiles, user home, and included source paths.
+
+## Restore
+
+Verify the checksum:
+
+```bash
+sha256sum -c user-backup.tar.zst.gpg.sha256
+```
+
+List archive contents:
+
+```bash
+gpg --decrypt user-backup.tar.zst.gpg | zstd -d | tar -tf -
+```
+
+Extract to a staging directory:
+
+```bash
+mkdir -p ~/Restore-Staging
+gpg --decrypt user-backup.tar.zst.gpg | zstd -d | tar -xpf - -C ~/Restore-Staging
+```
+
+Review the extracted files before copying them back into a live profile.
+
+## Safety Notes
+
+- Keep the passphrase. It cannot be recovered.
+- The passphrase is passed to GPG through a file descriptor, not as a command-line argument.
+- KVM backups require root because VM disk images are usually stored outside the user home.
+- The tool no longer changes `/var/lib/libvirt` permissions to perform KVM backups.
+- Backups exclude common cache, trash, and existing archive patterns when backing up a full home folder.
+
+## GUI
+
+The GTK frontend is implemented in `user-backup-gtk.py`. It is intentionally not named `rtd-*`, so it is not exposed as a separate system command.
+
+The GUI provides:
+
+- profile checklist
+- destination picker
+- passphrase confirmation
+- size estimation
+- compression level selector
+- live progress output
+- backend log stream
