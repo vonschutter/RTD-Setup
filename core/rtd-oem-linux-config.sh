@@ -76,7 +76,7 @@
 : ${_SCRIPTNAME="$(basename $0)"}
 : ${_TLA:="${_SCRIPTNAME:0:3}"}
 : ${_LOG_DIR:="/var/log/rtd"} ; mkdir -p ${_LOG_DIR}
-_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
 	echo "ERROR: RTD _rtd_library requires Bash 4.4 or newer. Current shell: Bash ${BASH_VERSION}." >&2
 	exit 1

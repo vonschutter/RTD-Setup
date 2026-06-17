@@ -3677,7 +3677,7 @@ system::prepare_environment_for_iso_creation() {
 		fi
 
 		current_dir="$(pwd)"
-		script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+		script_dir="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 
 		local tmp_base=""
 		local -a tmp_candidates=()
@@ -15987,7 +15987,7 @@ oem::ventoy::find_rtd_theme_background() {
 	local library_dir
 	local path
 
-	library_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+	library_dir="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" 2>/dev/null && pwd)"
 	for path in \
 		"${library_dir}/../modules/oem-ventoy.mod/Media_files/rtd-ventoy-background-1024x768.png" \
 		"${library_dir}/../../modules/oem-ventoy.mod/Media_files/rtd-ventoy-background-1024x768.png" \
@@ -16567,7 +16567,7 @@ system::create_physical_media_from_ubuntu_iso() {
 	}
 
 	trap cleanup SIGINT SIGTERM ERR EXIT
-	script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+	script_dir=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" &>/dev/null && pwd -P)
 	[[ ! -x "$(command -v date)" ]] && echo "💥 date command not found." && exit 1
 	today=$(date +"%Y-%m-%d")
 	destination_iso="${script_dir}/ubuntu-autoinstall-$today.iso"

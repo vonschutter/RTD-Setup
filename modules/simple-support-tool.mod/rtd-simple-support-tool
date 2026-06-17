@@ -183,7 +183,7 @@ rtd::bootstrap_library() {
 
 	[[ "$library_name" == "_rtd_library" && -n "$loaded_version" ]] && rtd::bootstrap_library::ok && return 0
 
-	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	script_dir="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 	for path in \
 		"${script_dir}/${library_name}" \
 		"${script_dir}/../core/${library_name}" \
@@ -501,7 +501,7 @@ show_make_media_gui_desktop () {
 rtd::find_vm_tool() {
 	local script_dir candidate command_path
 
-	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	script_dir="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 
 	for candidate in \
 		"${RTD_VM_TOOL:-}" \

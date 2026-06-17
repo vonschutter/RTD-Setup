@@ -62,7 +62,7 @@ _LOGFILE="${_LOG_DIR}/${_SCRIPTNAME}.log"
 echo "*********    $_SCRIPTNAME     ********** " >> "${_LOGFILE}"
 
 # Discover apps dir and save it...
-_APPS_DIR="$(dirname ${BASH_SOURCE[0]})/apps"
+_APPS_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/apps"
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -109,7 +109,7 @@ rtd::bootstrap_library() {
 
 	[[ "$library_name" == "_rtd_library" && -n "$loaded_version" ]] && rtd::bootstrap_library::ok && return 0
 
-	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	script_dir="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 	for path in \
 		"${script_dir}/${library_name}" \
 		"${script_dir}/../core/${library_name}" \
@@ -189,7 +189,7 @@ oem::run_payload ()
 					--yesno "\nWINE is needed to run windows programs on Linux. However, WINE is not installed. \
 					Please install WINE and try again. \n\n \
 					I could try to install Wine for you if you wish? \
-					$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )\
+					$( cd -- "$( dirname -- "$(readlink -f "${BASH_SOURCE[0]}")" )" &> /dev/null && pwd )\
 					Should I do that? " 20 80
 					response=$?
 					

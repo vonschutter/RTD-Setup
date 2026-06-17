@@ -462,8 +462,9 @@ apply_firewall_defaults() {
 }
 
 find_rtd_wallpaper_dir() {
-	local script_dir fallback_dir raw_base
-	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+	local script_path script_dir fallback_dir raw_base
+	script_path="$(realpath "${BASH_SOURCE[0]}" 2>/dev/null || readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")"
+	script_dir="$(cd "$(dirname "$script_path")" 2>/dev/null && pwd)"
 	for candidate in \
 		"${RTD_MACOS_WALLPAPER_SOURCE:-}" \
 		"${script_dir}/../wallpaper" \
