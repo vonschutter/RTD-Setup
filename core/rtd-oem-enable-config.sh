@@ -271,21 +271,24 @@ tty_login_banner() {
 	readonly ISSUE_FILE="/etc/issue"
 	: ${_OEM_TTY_LOGIN_BANNER:="$_TLA_UPPERCASE Enable Configuration Script"}
 	if [[ -n "${_OEM_TTY_LOGIN_BANNER}" ]]; then
-	system::log_item "Setting TTY login banner in ${ISSUE_FILE}..."
-	# If /etc/issue is a symlink (common on some systems to point to a dynamic issue file),
-	# removing and replacing it might be necessary if we want a static banner.
-	# However, if it's dynamic for a reason, overwriting might break things.
-	if [[ -L "$ISSUE_FILE" ]]; then
-		system::log_item "INFO: ${ISSUE_FILE} is a symlink. Removing it to set a static banner."
-		rm -f "$ISSUE_FILE" || { system::log_item "ERROR: Failed to remove symlink ${ISSUE_FILE}"; }
-	fi
-	# Use printf for safer writing
-	printf '%s\n' "${_OEM_TTY_LOGIN_BANNER}" > "$ISSUE_FILE" || {
-		system::log_item "⛔ ERROR: Failed to write to ${ISSUE_FILE}";
-	}
+		system::log_item "Setting TTY login banner in ${ISSUE_FILE}..."
+		# If /etc/issue is a symlink (common on some systems to point to a dynamic issue file),
+		# removing and replacing it might be necessary if we want a static banner.
+		# However, if it's dynamic for a reason, overwriting might break things.
+		if [[ -L "$ISSUE_FILE" ]]; then
+			system::log_item "INFO: ${ISSUE_FILE} is a symlink. Removing it to set a static banner."
+			rm -f "$ISSUE_FILE" || { system::log_item "ERROR: Failed to remove symlink ${ISSUE_FILE}"; }
+		fi
+		# Use printf for safer writing
+		printf '%s\n' "${_OEM_TTY_LOGIN_BANNER}" > "$ISSUE_FILE" || {
+			system::log_item "⛔ ERROR: Failed to write to ${ISSUE_FILE}";
+		}
 	else
-	system::log_item "WARNING: _OEM_TTY_LOGIN_BANNER is not set. Skipping /etc/issue update."
+		system::log_item "WARNING: _OEM_TTY_LOGIN_BANNER is not set. Skipping /etc/issue update."
 	fi
+	term::configure_tty_console_font --font ter-v24n --size 12x24 || {
+		system::log_item "⛔ ERROR: Failed to set TTY console font.";
+	}
 }
 
 
