@@ -8,7 +8,7 @@
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::// Linux //:::::::
 ::  Author(s):    SLS, KLS, NB.  Buffalo Center, IA & Avarua, Cook Islands
-::  Version:      2.61
+::  Version:      2.62
 ::
 ::
 ::  Purpose:    To collect and enable the use of code snippets in other scripts.
@@ -577,9 +577,14 @@ fi
 
 # If the vars exist but the functions do not, we clear the stale vars and loads normally.
 # That is the right defensive behavior for re-exec, byobu/tmux, sudo, and similar process-boundary cases.
-_RTD_LIBRARY_SELF_VERSION="2.61"
+_RTD_LIBRARY_SELF_VERSION="2.62"
 if [[ -n "${RTDFUNCTIONS:-}" && "${RTDFUNCTIONS}" == "${_RTD_LIBRARY_SELF_VERSION}" ]]; then
 	if declare -F system::log_item >/dev/null 2>&1 && declare -F library::apply_rtd_defaults >/dev/null 2>&1; then
+		if declare -F write_status >/dev/null 2>&1; then
+			write_status "📚 RTD Power Library ${RTDFUNCTIONS} already loaded"
+		else
+			echo "RTD Power Library ${RTDFUNCTIONS} already loaded"
+		fi
 		return 0 2>/dev/null || exit 0
 	fi
 	unset RTDFUNCTIONS RTD_VERSION
@@ -2631,6 +2636,7 @@ dependency::command_exists() {
 	# Arguments:
 	#	- Command names to check (e.g., "command1 command2").
 	#	- "--auto" (optional): Automatically installs missing commands without prompting.
+	#	- "--silent" (optional): Noninteractive mode; implies --auto and suppresses prompts.
 	# Outputs:
 	#	- Prompts the user to install missing commands if any (unless `--auto` is specified).
 	# Returns:
@@ -2638,11 +2644,12 @@ dependency::command_exists() {
 	#	- 1 if any commands are missing and not installed.
 	#
 	# Usage:
-	#	dependency::command_exists [--auto] "command1 command2"
+	#	dependency::command_exists [--auto] [--silent] "command1 command2"
 	#
 	# Example:
 	#	dependency::command_exists "curl git"
 	#	dependency::command_exists --auto "curl git"
+	#	dependency::command_exists 7z --silent
 	#
 	# Notes:
 	#	- This function detects the current session type (TTY, SSH, GUI, WAYLAND) to determine
@@ -2651,19 +2658,41 @@ dependency::command_exists() {
 	#	- Prompts the user to install missing commands and attempts to install them
 	#	  using `system::install_missing_commands`.
 	#	- The `--auto` flag suppresses prompts and automatically installs missing commands.
+	#	- The `--silent` flag is intended for unattended bundle runs and implies `--auto`.
 	#
 	# End of Documentation
 
 	local _auto_mode=0
-
-	# Check for the --auto flag
-	if [[ "$1" == "--auto" ]]; then
-		_auto_mode=1
-		shift
-	fi
+	local _silent_mode=0
+	local arg
 
 	# List of required commands from input
-	local required_commands=("$@")
+	local required_commands=()
+	for arg in "$@"; do
+		case "$arg" in
+			--auto)
+				_auto_mode=1
+				;;
+			--silent)
+				_auto_mode=1
+				_silent_mode=1
+				;;
+			--)
+				;;
+			--*)
+				write_error "Unknown dependency::command_exists option: $arg"
+				return 1
+				;;
+			*)
+				required_commands+=("$arg")
+				;;
+		esac
+	done
+
+	if [[ ${#required_commands[@]} -eq 0 ]]; then
+		write_error "No command specified to check."
+		return 1
+	fi
 
 	# Collect any missing commands
 	local missing_commands=()
@@ -2680,7 +2709,9 @@ dependency::command_exists() {
 
 	# If in auto mode, just install them (no prompt)
 	if [[ $_auto_mode -eq 1 ]]; then
-		write_status "Installing missing commands: ${missing_commands[*]}"
+		if [[ $_silent_mode -eq 0 ]]; then
+			write_status "Installing missing commands: ${missing_commands[*]}"
+		fi
 		system::install_missing_commands "${missing_commands[@]}"
 		return $?
 	fi
@@ -2716,6 +2747,36 @@ dependency::command_exists() {
 	# Attempt install, return based on success/failure
 	system::install_missing_commands "${missing_commands[@]}"
 	return $?
+}
+
+
+system::package_candidates_for_command() {
+	# Description: Prints native package candidates that commonly provide a command.
+	# Arguments: command name
+	# Outputs: one package name per line, ordered by preference for the current distribution.
+	local cmd="${1:-}"
+	local distro
+
+	[[ -n "$cmd" ]] || return 1
+	distro=$(system::distribution_type 2>/dev/null || printf '%s' unknown)
+
+	case "$distro:$cmd" in
+		ubuntu:7z | debian:7z | pop:7z | linuxmint:7z)
+			printf '%s\n' 7zip p7zip-full
+			;;
+		ubuntu:unrar | debian:unrar | pop:unrar | linuxmint:unrar)
+			printf '%s\n' unrar 7zip-rar
+			;;
+		redhat:7z | fedora:7z | centos:7z | rhel:7z)
+			printf '%s\n' 7zip p7zip p7zip-plugins
+			;;
+		suse:7z | opensuse:7z)
+			printf '%s\n' 7zip p7zip
+			;;
+		*)
+			printf '%s\n' "$cmd"
+			;;
+	esac
 }
 
 
@@ -8428,47 +8489,48 @@ system::install_missing_commands() {
 
 	local distro
 	local cmd
+	local status=0
 	distro=$(system::distribution_type)
 
-	for cmd in ${*}; do
+	for cmd in "$@"; do
+		[[ -n "$cmd" ]] || continue
+		if command -v "$cmd" >/dev/null 2>&1; then
+			write_status "Command '$cmd' is already available."
+			continue
+		fi
+
 		case "$distro" in
-		ubuntu | debian )
-			local pkg install_info snap_info 
+		ubuntu | debian | pop | linuxmint )
+			local pkg install_info snap_info installed=0
 
-			if command -v "$cmd" >/dev/null 2>&1; then
-				write_status "Command '$cmd' is already available."
-				return 0
-			fi
-			
-			if [[ -n "$cmd" ]]; then
-				pkg="$cmd"
-				write_status "Trying first APT package '$pkg' for command '$cmd'"
-				if software::add_native_package "$pkg"; then
-					write_status "Installed '$cmd' using package '$pkg'."
-					return 0
-				fi
-			else
-				write_warning "No deb package found matching the name of the command '$cmd'. Trying alternatives..."
-			fi
-			
 			write_warning "Command '$cmd' not found. Attempting to determine the providing package..."
-
-
-			wrrite_status "Trying to extract APT suggestion for the missing command: $cmd..."
+			write_status "Trying to extract APT suggestion for the missing command: $cmd..."
 
 			install_info="$(software::determine_package_name_from_cmd "$cmd")"
 
 			if [[ -n "$install_info" ]]; then
-				pkg="$install_info"
-				write_status "APT suggests installing '$pkg' for command '$cmd'"
-				if software::add_native_package "$pkg"; then
-					write_status "Installed '$cmd' using package '$pkg'."
-					return 0
-				else
-					write_warning "APT package '$pkg' failed to install."
+				write_status "APT suggests installing '$install_info' for command '$cmd'"
+				if software::add_native_package "$install_info" && command -v "$cmd" >/dev/null 2>&1; then
+					write_status "Installed '$cmd' using package '$install_info'."
+					continue
 				fi
+				write_warning "APT package '$install_info' failed to provide '$cmd'."
 			else
-				write_warning "No APT package suggestion found for '$cmd'."
+				write_warning "No APT package suggestion found for '$cmd'. Trying known package candidates..."
+			fi
+
+			while IFS= read -r pkg; do
+				[[ -n "$pkg" ]] || continue
+				write_status "Trying APT package '$pkg' for command '$cmd'"
+				if software::add_native_package "$pkg" && command -v "$cmd" >/dev/null 2>&1; then
+					write_status "Installed '$cmd' using package '$pkg'."
+					installed=1
+					break
+				fi
+			done < <(system::package_candidates_for_command "$cmd")
+
+			if [[ $installed -eq 1 ]]; then
+				continue
 			fi
 
 			# Try finding a Snap package as fallback
@@ -8477,11 +8539,11 @@ system::install_missing_commands() {
 				if snap_info=$(snap find "$cmd" 2>/dev/null | awk 'NR==2 {print $1}'); then
 					if [[ -n "$snap_info" ]]; then
 						write_status "Snap suggests package '$snap_info' for '$cmd'"
-						if software::from_snapcraft.io "$snap_info"; then
+						if software::from_snapcraft.io "$snap_info" && command -v "$cmd" >/dev/null 2>&1; then
 							write_status "Installed '$cmd' using Snap package '$snap_info'."
-							return 0
+							continue
 						else
-							write_error "Snap package '$snap_info' failed to install."
+							write_error "Snap package '$snap_info' failed to provide '$cmd'."
 						fi
 					else
 						write_warning "No relevant Snap packages found for '$cmd'."
@@ -8492,35 +8554,71 @@ system::install_missing_commands() {
 			fi
 
 			write_error "Unable to resolve or install the required command: '$cmd'"
-			return 1
+			status=1
 		;;
-		redhat )
+		redhat | fedora | centos | rhel )
 			# Fedora and RHEL
-			local pkg
-			pkg=$(dnf provides */$cmd | grep ' : ' | head -n1 | cut -d' ' -f1)
-			if [[ -n "$pkg" ]]; then
-				software::add_native_package "$pkg"
-				write_status "Installed '$cmd' using package $pkg"
-			fi
-		;;
-		suse )
-			# openSUSE / SUSE
-			for cmd in "${missing_commands[@]}"; do
-				cnf_output=$(cnf "$cmd" 2>&1)
-				if [[ $cnf_output == *"can be found in following package"* ]]; then
-					# Extracting package name
-					pkg=$(echo "$cnf_output" | grep -F 'sudo zypper install' | awk '{print $4}')
-					if [[ -n "$pkg" ]]; then
-						software::add_native_package "$pkg"
-						write_status "Installed '$cmd' using package '$pkg'."
-						return 0
-					else
-						write_error "Package for command '$cmd' not found."
-					fi
-				else
-					write_error "Command '$cmd' not found in cnf database."
+			local pkg install_info installed=0
+
+			write_warning "Command '$cmd' not found. Attempting to determine the providing package..."
+			write_status "Trying to extract DNF suggestion for the missing command: $cmd..."
+
+			install_info="$(software::determine_package_name_from_cmd "$cmd")"
+
+			if [[ -n "$install_info" ]]; then
+				write_status "DNF suggests installing '$install_info' for command '$cmd'"
+				if software::add_native_package "$install_info" && command -v "$cmd" >/dev/null 2>&1; then
+					write_status "Installed '$cmd' using package '$install_info'."
+					continue
 				fi
-			done
+				write_warning "DNF package '$install_info' failed to provide '$cmd'."
+			else
+				write_warning "No DNF package suggestion found for '$cmd'. Trying known package candidates..."
+			fi
+
+			while IFS= read -r pkg; do
+				[[ -n "$pkg" ]] || continue
+				if software::add_native_package "$pkg" && command -v "$cmd" >/dev/null 2>&1; then
+					write_status "Installed '$cmd' using package '$pkg'."
+					installed=1
+					break
+				fi
+			done < <(system::package_candidates_for_command "$cmd")
+			if [[ $installed -eq 1 ]]; then
+				continue
+			fi
+			pkg="$(software::determine_package_name_from_dnf_command "$cmd")"
+			if [[ -n "$pkg" ]] && software::add_native_package "$pkg" && command -v "$cmd" >/dev/null 2>&1; then
+				write_status "Installed '$cmd' using package '$pkg'."
+				continue
+			fi
+			write_error "Unable to resolve or install the required command: '$cmd'"
+			status=1
+		;;
+		suse | opensuse )
+			# openSUSE / SUSE
+			local cnf_output pkg installed=0
+			while IFS= read -r pkg; do
+				[[ -n "$pkg" ]] || continue
+				if software::add_native_package "$pkg" && command -v "$cmd" >/dev/null 2>&1; then
+					write_status "Installed '$cmd' using package '$pkg'."
+					installed=1
+					break
+				fi
+			done < <(system::package_candidates_for_command "$cmd")
+			if [[ $installed -eq 1 ]]; then
+				continue
+			fi
+			cnf_output=$(cnf "$cmd" 2>&1)
+			if [[ $cnf_output == *"can be found in following package"* ]]; then
+				pkg=$(echo "$cnf_output" | grep -F 'sudo zypper install' | awk '{print $4}')
+				if [[ -n "$pkg" ]] && software::add_native_package "$pkg" && command -v "$cmd" >/dev/null 2>&1; then
+					write_status "Installed '$cmd' using package '$pkg'."
+					continue
+				fi
+			fi
+			write_error "Unable to resolve or install the required command: '$cmd'"
+			status=1
 		;;
 		* )
 			write_error "Unsupported distribution: $distro"
@@ -8528,6 +8626,7 @@ system::install_missing_commands() {
 		;;
 		esac
 	done
+	return "$status"
 }
 
 system::keyboard_set_layout() {
@@ -16926,8 +17025,6 @@ tool::compress_all_items_here() {
 	#
 	# End of documentation
 
-
-	dependency::command_exists 7z
 	local -a items=()
 	local encrypt_requested=0
 	local no_prompt=0
@@ -16944,6 +17041,12 @@ tool::compress_all_items_here() {
 		--noprompt) no_prompt=1 ;;
 		esac
 	done
+
+	if (( no_prompt )); then
+		dependency::command_exists --silent 7z || return 1
+	else
+		dependency::command_exists 7z || return 1
+	fi
 
 	mapfile -d '' -t items < <(find . -maxdepth 1 -mindepth 1 ! -name ".*" ! -name "*.7z" -printf '%P\0')
 
@@ -17056,9 +17159,6 @@ tool::compress_provided_items() {
 	# Arguments:	No parameters required for basic function (user will be prompted).
 	#
 	# End of documentation
-	
-	dependency::command_exists 7z
-
 	local passtoken=""
 	local ret=0
 	local encrypt_requested=0
@@ -17078,6 +17178,12 @@ tool::compress_provided_items() {
 		*) items+=("$arg") ;;
 		esac
 	done
+
+	if (( no_prompt )); then
+		dependency::command_exists --silent 7z || return 1
+	else
+		dependency::command_exists 7z || return 1
+	fi
 
 	if [[ ${#items[@]} -eq 0 ]]; then
 		write_error "No files or folders were provided for compression."
@@ -20594,9 +20700,30 @@ software::ensure_restricted_codecs() {
 	# Usage: software::ensure_restricted_codecs
 	# End of documentation
 	write_status "Install all the required multimedia codecs..."
-	for i in libdvdcss2 ffmpeg; do
-		software::check_native_package_dependency $i || write_error "Failed to install restricted codecs..."
-	done
+	local distro status=0
+	distro=$(system::distribution_type 2>/dev/null || printf '%s' unknown)
+
+	case "$distro" in
+		ubuntu | debian | pop | linuxmint)
+			software::check_native_package_dependency ffmpeg || status=1
+			if software::is_native_package_available ubuntu-restricted-extras; then
+				software::add_native_package ubuntu-restricted-extras || status=1
+			fi
+			if software::is_native_package_available libdvd-pkg; then
+				software::add_native_package libdvd-pkg || status=1
+			else
+				write_warning "libdvd-pkg is not available; skipping DVD CSS helper install."
+			fi
+			;;
+		*)
+			for i in libdvdcss2 ffmpeg; do
+				software::check_native_package_dependency "$i" || status=1
+			done
+			;;
+	esac
+
+	[[ $status -eq 0 ]] || write_error "Failed to install restricted codecs..."
+	return "$status"
 }
 
 software::vendor_download_and_install() {
@@ -20615,14 +20742,26 @@ software::vendor_download_and_install() {
 	# 	   software::vendor_download_and_install https://download.teamviewer.com/download/linux/teamviewer.x86_64.rpm
 	# End of documentation
 
-	download_url="$1"
-	fetch_file() { wget -P ${_OEM_DIR:-"/opt/rtd"}/cache "${download_url}"; }
+	local download_url="$1"
+	local cache_dir="${_OEM_DIR:-"/opt/rtd"}/cache"
+	local package_file package_name
+	fetch_file() { wget -P "$cache_dir" "${download_url}"; }
 
 	echo "${FUNCNAME[0]}: getting package ${download_url}..."
+	mkdir -p "$cache_dir" || {
+		write_error "Unable to create cache directory: ${cache_dir}"
+		return 1
+	}
 	if hash wget; then
-		fetch_file
+		fetch_file || {
+			write_error "Unable to download requested file: ${download_url}"
+			return 1
+		}
 	elif software::check_native_package_dependency wget; then
-		fetch_file
+		fetch_file || {
+			write_error "Unable to download requested file: ${download_url}"
+			return 1
+		}
 	else
 		write_error "Unable to download requested file:  ${download_url}..."
 		write_error "Please check if wget is available since this is used to download files..."
@@ -20630,15 +20769,52 @@ software::vendor_download_and_install() {
 		return 1
 	fi
 
-	echo "${FUNCNAME[0]}: Installing package $(basename ${download_url}) ..."
-	if hash pkcon; then
-		pkcon install-local -y ${_OEM_DIR:-"/opt/rtd"}/cache/"$(basename "${download_url}")"
+	package_name="$(basename "${download_url%%\?*}")"
+	package_file="${cache_dir}/${package_name}"
+	[[ -s "$package_file" ]] || {
+		write_error "Downloaded package was not found or is empty: ${package_file}"
+		return 1
+	}
+
+	echo "${FUNCNAME[0]}: Installing package ${package_name} ..."
+	case "$package_name" in
+		*.deb)
+			if command -v apt-get >/dev/null 2>&1; then
+				apt-get -y install "$package_file"
+				return $?
+			fi
+			if command -v dpkg >/dev/null 2>&1; then
+				dpkg -i "$package_file" && return 0
+				apt-get -f -y install
+				return $?
+			fi
+			;;
+		*.rpm)
+			if command -v dnf >/dev/null 2>&1; then
+				dnf -y install "$package_file"
+				return $?
+			fi
+			if command -v zypper >/dev/null 2>&1; then
+				zypper install -y "$package_file"
+				return $?
+			fi
+			if command -v rpm >/dev/null 2>&1; then
+				rpm -Uvh "$package_file"
+				return $?
+			fi
+			;;
+	esac
+
+	if command -v pkgcli >/dev/null 2>&1; then
+		pkgcli --yes install "$package_file"
 		return $?
-	else
-		software::check_native_package_dependency packagekit-tools
-		pkcon install-local -y ${_OEM_DIR:-"/opt/rtd"}/cache/"$(basename "${download_url}")"
+	elif command -v pkcon >/dev/null 2>&1; then
+		pkcon install-local -y "$package_file"
 		return $?
 	fi
+
+	write_error "No supported local package installer found for ${package_file}"
+	return 1
 }
 
 
@@ -20710,6 +20886,29 @@ InstallSoftwareFromRepo() {
 	fi
 }
 
+software::determine_package_name_from_dnf_command() {
+	# Description: Resolve a command to a Fedora/RHEL package name without invoking
+	# PackageKit command-not-found, which can prompt on the controlling terminal.
+	local cmd="$1"
+	local capability pkg_name
+
+	[[ -n "$cmd" ]] || return 1
+	command -v dnf >/dev/null 2>&1 || return 1
+
+	for capability in "/usr/bin/$cmd" "/usr/sbin/$cmd" "/bin/$cmd" "/sbin/$cmd" "*/$cmd"; do
+		pkg_name="$(
+			dnf -q repoquery --whatprovides "$capability" --qf '%{name}' 2>/dev/null |
+				awk 'NF && $1 !~ /^(Last|Updating|Available|Installed)$/ {print $1; exit}'
+		)"
+		if [[ -n "$pkg_name" ]]; then
+			printf '%s\n' "$pkg_name"
+			return 0
+		fi
+	done
+
+	return 1
+}
+
 software::determine_package_name_from_cmd() {
 	# Description: Function to determine the package name from the command line.
 	# This function is used to determine the package name from the command line
@@ -20721,7 +20920,7 @@ software::determine_package_name_from_cmd() {
 	# Usage: software::determine_package_name_from_cmd
 	# End of documentation
 	local cmd="$1"
-	local pkg_name distro logfile
+	local pkg_name distro logfile install_info cnf_package
 
 	if [[ -z "$cmd" ]]; then
 		write_error "No command provided to determine package name."
@@ -20731,26 +20930,41 @@ software::determine_package_name_from_cmd() {
 	distro=$(system::distribution_type)
 	logfile=$(system::determine_logfile)
 
-	system::log_item "Checking for command-not-found package so that package name may be determined..."
-
-	if ! command -v command_not_found_handle ; then 
-		write_warning "command_not_found_handle not found. Attempting to install command-not-found package..."
-		software::add_native_package command-not-found || { 
-			write_error "Unable to install command-not-found package, unable to determine package name from command"
-			write_error "Please determine the name of the required package to satisfy the $cmd dependency, and use the software::add_native_package to install the missing package instead"
-			return 1 
-			}
-	fi
-
 	case "$distro" in
-		"ubuntu" | "debian")
-			pkg_name="$(command_not_found_handle "$cmd" 2>&1 | grep -i "apt" | awk '{print $3}' | head -n1)" &>>$logfile
+		"ubuntu" | "debian" | "pop" | "linuxmint")
+			system::log_item "Checking for command-not-found package so that package name may be determined..."
+			if ! declare -F command_not_found_handle >/dev/null 2>&1 && [[ -r /etc/bash.bashrc ]]; then
+				source /etc/bash.bashrc >/dev/null 2>&1 || true
+			fi
+			if ! declare -F command_not_found_handle >/dev/null 2>&1; then
+				write_warning "command_not_found_handle not found. Attempting to install command-not-found package..."
+				cnf_package="command-not-found"
+				software::add_native_package "$cnf_package" || {
+					write_error "Unable to install command-not-found package, unable to determine package name from command"
+					write_error "Please determine the name of the required package to satisfy the $cmd dependency, and use the software::add_native_package to install the missing package instead"
+					return 1
+				}
+				[[ -r /etc/bash.bashrc ]] && source /etc/bash.bashrc >/dev/null 2>&1 || true
+			fi
+			declare -F command_not_found_handle >/dev/null 2>&1 || return 1
+			install_info="$(command_not_found_handle "$cmd" 2>&1)"
+			printf '%s\n' "$install_info" >>"$logfile"
+			pkg_name="$(printf '%s\n' "$install_info" | sed -nE "s/.*Install package '([^']+)'.*/\\1/p" | head -n1)"
+			[[ -n "$pkg_name" ]] || pkg_name="$(printf '%s\n' "$install_info" | awk '/sudo[[:space:]]+apt[[:space:]]+install[[:space:]]+/ {print $NF; exit}')"
 			;;
-		"fedora" | "centos" | "rhel")
-			pkg_name="$(command_not_found_handle "$cmd" 2>&1 | grep -i "dnf" | awk '{print $3}' | head -n1)" &>>$logfile
+		"fedora" | "redhat" | "centos" | "rhel")
+			pkg_name="$(software::determine_package_name_from_dnf_command "$cmd")"
 			;;
-		"suse")
-			pkg_name="$(command_not_found_handle "$cmd" 2>&1 | grep -i "zypper" | awk '{print $3}' | head -n1)" &>>$logfile
+		"suse" | "opensuse")
+			system::log_item "Checking for command-not-found package so that package name may be determined..."
+			if ! declare -F command_not_found_handle >/dev/null 2>&1 && [[ -r /etc/profile.d/PackageKit.sh ]]; then
+				source /etc/profile.d/PackageKit.sh >/dev/null 2>&1 || true
+			fi
+			declare -F command_not_found_handle >/dev/null 2>&1 || return 1
+			install_info="$(command_not_found_handle "$cmd" 2>&1)"
+			printf '%s\n' "$install_info" >>"$logfile"
+			pkg_name="$(printf '%s\n' "$install_info" | sed -nE "s/.*Install package '([^']+)'.*/\\1/p" | head -n1)"
+			[[ -n "$pkg_name" ]] || pkg_name="$(printf '%s\n' "$install_info" | awk '/zypper[[:space:]]+install[[:space:]]+/ {print $NF; exit}')"
 			;;
 		*)
 			write_error "Unsupported distribution: $distro"

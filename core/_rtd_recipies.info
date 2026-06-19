@@ -268,14 +268,14 @@ recipe:_Internet_Browsing_Private () {
 			curl -fsSLo /usr/share/keyrings/mullvad-keyring.asc https://repository.mullvad.net/deb/mullvad-keyring.asc
 			echo "deb [signed-by=/usr/share/keyrings/mullvad-keyring.asc arch=$( dpkg --print-architecture )] https://repository.mullvad.net/deb/stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/mullvad.list
 			tool::up_2_date
-			software::add_native_package mullvad-browser
+			software::add_native_package mullvad-browser || software::from_flathub.org net.mullvad.MullvadBrowser $1
 		;;
 		"fedora" | "redhat" )
 			software::check_native_package_dependency dnf-utils
 			dnf config-manager addrepo --from-repofile=https://repository.mullvad.net/rpm/stable/mullvad.repo
 			dnf config-manager --add-repo https://repository.mullvad.net/rpm/stable/mullvad.repo
 			tool::up_2_date
-			software::add_native_package mullvad-browser
+			software::add_native_package mullvad-browser || software::from_flathub.org net.mullvad.MullvadBrowser $1
 		;;
 		"suse" )
 			write_warning "NOTE: This wrapper is not verified by, affiliated with, or supported by Mullvad AB."
@@ -364,7 +364,7 @@ recipe:_ADM:_Software_Stores () {
 
 	# App Outlet is a free and open-source application that allows you to discover and install applications
 	# from multiple sources including native, Flatpak, Snap, and AppImage formats.
-	software::from_flathub.org com.github.donadigo.appoutlet $1
+	# App Outlet is no longer published under its old Flathub ID; Bazaar covers Flatpak store discovery.
 
 	# GNOME Software is an app store and software center for installing applications and updates on Linux systems
 	software::add_native_package gnome-software $1
@@ -660,27 +660,28 @@ recipe:_ADM:_Compression_Tools () {
 	# been compressed. The ZIP file format permits a number of compression 
 	# algorithms, though DEFLATE is the most common.
 
+	local status=0
+
 	software::from_flathub.org io.github.peazip.PeaZip $1
 
 	
-	if hash dnf &>/dev/nul ; then 
+	if hash dnf &>/dev/null ; then
 		write_information "Fedora based software management found, assuming fedora based distribution..."
-		for i in p7zip-gui p7zip p7zip-plugins zip; do
-			software::add_native_package $i
-		done
-	elif hash zypper &>/dev/nul ; then 
+		software::add_native_package p7zip p7zip-plugins zip || status=1
+	elif hash zypper &>/dev/null ; then
 		write_information "OpenSUSE based software management found, assuming OpenSUSE based distribution..."
-		for i in 7zip rar zip ; do
-			software::add_native_package $i
-		done
-	elif hash apt &>/dev/nul ; then 
+		software::add_native_package 7zip rar zip || status=1
+	elif hash apt &>/dev/null ; then
 		write_information "Debian based software management found, assuming Debian based distribution..."
-		for i in p7zip-full p7zip-rar rar zip ; do
-			software::add_native_package $i
-		done
+		software::add_native_package 7zip rar zip || status=1
+		software::add_native_package 7zip-rar || write_warning "Optional 7zip RAR plugin is not available or failed to install."
 	else
 		write_error "No supported software management found, assuming unsupported distribution..."
+		status=1
 	fi
+
+	dependency::command_exists --silent 7z || status=1
+	return "$status"
 }
 
 
@@ -842,7 +843,8 @@ recipe:_OEM:_Restricted_Fonts () {
 	# wget "https://www.dropbox.com/s/y16d8wpb45yebv8/True_Type_Font_Pack.7z" -P /opt/rtd/cache/
 	# mkdir -p /usr/share/fonts/truetype/oem
 	# This bundle depends on teh compressions tools bundle...
-	recipe:_Compression_Tools
+	recipe:_ADM:_Compression_Tools "$@" || return 1
+	dependency::command_exists --silent 7z || return 1
 	bash $(find /opt -name plus-themes.sh) --fonts
 }
 
@@ -897,7 +899,7 @@ recipe:_Office:_Social_Collaboration_and_Communicaiton () {
 	# software::from_snapcraft.io skype $1	
 
 	# Send free messages and make free calls to other Viber users on any device and network, in any country!
-	software::from_flathub.com com.viber.Viber $1
+	software::from_flathub.org com.viber.Viber $1
 
 	# Fractal is a modern messaging app for the GNOME desktop, built around the Matrix protocol.
 	software::from_flathub.org org.gnome.Fractal $1
@@ -1164,11 +1166,11 @@ recipe:_RDP:_Team_Viewer_Remote_Desktop () {
 
 	# Download either a deb or an rpm depending on what package format this system supports.
 	# Team Viewer has a special package for SUSE; thus we check if OS is suse or not as well.
-	if hash apt &>/dev/nul; then
+	if hash apt &>/dev/null; then
 		software::vendor_download_and_install https://download.teamviewer.com/download/linux/teamviewer_amd64.deb
-	elif hash zypper &>/dev/nul; then
+	elif hash zypper &>/dev/null; then
 		software::vendor_download_and_install https://download.teamviewer.com/download/linux/teamviewer-suse.x86_64.rpm
-	elif hash dnf &>/dev/nul; then
+	elif hash dnf &>/dev/null; then
 		software::vendor_download_and_install https://download.teamviewer.com/download/linux/teamviewer.x86_64.rpm
 	else
 		write_error "No RPM or DEB package managment service was found! ..."
@@ -1249,12 +1251,13 @@ recipe:_CLOUD:_MEGA_Cloud_Storage () {
 		case $distro_type in
 			"ubuntu" | "pop" | "linuxmint" )
 				# Grab the Ubuntu name and version and format it like Mega does their download URL...
-				local distro_version=$(hostnamectl |grep -i Ubuntu |cut -f6 -d' '| cut -d. -f1,2)
+				distro_version=$(. /etc/os-release; printf '%s' "${VERSION_ID:-}")
 				URL="https://mega.nz/linux/repo/xUbuntu_${distro_version}/amd64/${product}-xUbuntu_${distro_version}_amd64.deb"
 				write_information "Downloading ${product} from: ${URL}"			
 			;;
 			"debian" )
-				URL="https://mega.nz/linux/repo/Debian_$(hostnamectl |grep -i Debian |cut -f5 -d' ')/amd64/${product}-Debian_$(hostnamectl |grep -i Debian |cut -f5 -d' ')_amd64.deb"
+				distro_version=$(. /etc/os-release; printf '%s' "${VERSION_ID%%.*}")
+				URL="https://mega.nz/linux/repo/Debian_${distro_version}/amd64/${product}-Debian_${distro_version}_amd64.deb"
 				write_information "Downloading ${product} from: ${URL}"
 			;;
 			"suse" | "opensuse" )
@@ -1298,14 +1301,14 @@ recipe:_CLOUD:_MEGA_Cloud_Storage () {
 recipe:_CLOUD:_Dropbox_Cloud_Storage (){
 	# File hosting service that offers cloud storage
 	write_status "Installing Dropbox Cloud Storage Sync..."
-	if hash apt &>/dev/nul; then
+	if hash apt &>/dev/null; then
 		write_warning "Please NOTE that Doropox only supports Ubuntu"
 		software::vendor_download_and_install https://www.dropbox.com/download?dl=packages/ubuntu/dropbox_2022.12.05_amd64.deb
 		InstallSoftwareFromRepo nautilus-dropbox
-	elif hash dnf &>/dev/nul; then 
+	elif hash dnf &>/dev/null; then
 		software::vendor_download_and_install https://www.dropbox.com/download?dl=packages/fedora/nautilus-dropbox-2022.12.05-1.fedora.x86_64.rpm
 		InstallSoftwareFromRepo nautilus-dropbox
-	elif hash zypper &>/dev/nul; then 
+	elif hash zypper &>/dev/null; then
 		write_error "SUSE is not supported by Dropbox. You may try to download and compile it yourself
 		at: https://help.dropbox.com/installs/linux-commands"
 	else 
@@ -1318,17 +1321,17 @@ recipe:_CLOUD:_Dropbox_Cloud_Storage (){
 recipe:_RDP:_Citrix_App (){
 	# Install Citrix Workspace
 	write_status "Installing Citrix Workspace..."
-	if hash apt &>/dev/nul; then
+	if hash apt &>/dev/null; then
 		write_warning "Please NOTE that Citrix only supports Ubuntu"
 		software::vendor_download_and_install "https://downloads.citrix.com/22439/icaclient_23.11.0.82_amd64.deb?__gda__=exp=1705538522~acl=/*~hmac=6a7fae42307cba95d027460b757da754de67be03b83e91475a1004be65bfbecd"
 		# Special requirement for Citrix Workspace on Ubuntu 20.04
 		if [[ "$(lsb_release -si)" == "Ubuntu" && "$(lsb_release -sr)" == "20.04" ]]; then
 			apt-get install libunwind-12 libc++-12-dev libc++1-12 libc++abi-12-dev libc++abi1-12 -y
 		fi
-	elif hash dnf &>/dev/nul; then
+	elif hash dnf &>/dev/null; then
 		write_warning "Please NOTE that Citrix only supports Ubuntu"
 		software::vendor_download_and_install "https://downloads.citrix.com/22439/ICAClient-rhel-23.11.0.82-0.x86_64.rpm?__gda__=exp=1705538522~acl=/*~hmac=6a7fae42307cba95d027460b757da754de67be03b83e91475a1004be65bfbecd"
-	elif hash zypper &>/dev/nul; then
+	elif hash zypper &>/dev/null; then
 		write_warning "Please NOTE that Citrix only supports Ubuntu"
 		software::vendor_download_and_install "https://downloads.citrix.com/22439/ICAClient-suse-23.11.0.82-0.x86_64.rpm?__gda__=exp=1705538522~acl=/*~hmac=6a7fae42307cba95d027460b757da754de67be03b83e91475a1004be65bfbecd"
 	else
@@ -1360,7 +1363,7 @@ recipe:_RDP:_Citrix_App (){
 	if virt-what ; then
 		write_warning "This computer is likely a Virtual Machine ( $(virt-what) ) and using Virtualbox inside a VM is not reccommended."
 	else
-		if hash apt &>/dev/nul ; then
+		if hash apt &>/dev/null ; then
 			write_information "--- Installing VirtualBox in Debian based system if available..."
 			# Unlike RPM based systems DEB's are allowed to ask questions in the middle of an install:
 			echo virtualbox virtualbox/module-compilation-allowed boolean true | /usr/bin/debconf-set-selections
@@ -1379,7 +1382,7 @@ recipe:_RDP:_Citrix_App (){
 			else
 				usermod -G vboxusers -a $SUDO_USER
 			fi
-		elif hash dnf &>/dev/nul; then
+		elif hash dnf &>/dev/null; then
 			write_information "Installing VirtualBox in a Red Hat based system if available..."
 			InstallSoftwareFromRepo VirtualBox
 			if wget -q https://www.virtualbox.org/download/oracle_vbox.asc -O- | rpm --import - ; then
@@ -1400,7 +1403,7 @@ recipe:_RDP:_Citrix_App (){
 			EOF
 			dnf -y install @development-tools kernel-devel kernel-headers dkms -y
 			dnf -y install VirtualBox
-		elif hash zypper &>/dev/nul ; then
+		elif hash zypper &>/dev/null ; then
 			write_information "Installing virtualbox in a SUSE based system..."
 			for i in virtualbox virtualbox-dkms virtualbox-ext-pack virtualbox-guest-additions-iso
 			do
