@@ -3286,7 +3286,7 @@ dialog::build_backtitle() {
 
 
 dependency::check_hardware_virtualization_support() {
-	# Description: Checks if the hardware supports virtualization (VT-x or AMD-V).
+	# Description: Checks whether KVM hardware acceleration is usable by this host.
 	#
 	# This function checks if the hardware on the system supports virtualization technologies
 	# such as Intel VT-x or AMD-V. It provides status messages indicating the presence or
@@ -3310,14 +3310,15 @@ dependency::check_hardware_virtualization_support() {
 	#	dependency::check_hardware_virtualization_support --quiet
 	#
 	# Notes:
-	#	- This function uses the `lscpu` command to check for virtualization support.
-	#	- It looks for the presence of 'vmx' (Intel VT-x) or 'svm' (AMD-V) flags in the CPU info.
+	#	- On x86, CPU flags are used to diagnose VT-x/AMD-V availability.
+	#	- On all architectures, an accessible /dev/kvm is the authoritative usability check.
+	#	- If available, virt-host-validate output is copied to the RTD log for troubleshooting.
 	#	- Status messages can be suppressed using the `--quiet` flag.
 	#
 	# End of Documentation
 
 	local _quiet_mode=0
-	if [[ "$1" == "--quiet" ]]; then
+	if [[ "${1:-}" == "--quiet" ]]; then
 		_quiet_mode=1
 	fi
 
@@ -3337,13 +3338,64 @@ dependency::check_hardware_virtualization_support() {
 		fi
 	}
 
-	if lscpu | grep -E 'vmx|svm' >/dev/null 2>&1; then
-		check_hardware_virtualization_support::_log_status "⛼ Hardware supports virtualization (VT-x or AMD-V)."
-		return 0
-	else
-		check_hardware_virtualization_support::_log_error "🚫 Hardware virtualization support (VT-x or AMD-V) not found. Virtual machines may not run efficiently."
+	local _arch _cpu_flags="" _module="" _validate_output="" _line
+	_arch=$(uname -m 2>/dev/null || printf 'unknown')
+	if [[ -r /proc/cpuinfo ]]; then
+		_cpu_flags=$(awk -F: '/^(flags|Features)[[:space:]]*:/ {print $2; exit}' /proc/cpuinfo)
+	elif command -v lscpu >/dev/null 2>&1; then
+		_cpu_flags=$(lscpu 2>/dev/null | awk -F: '/^(Flags|Features):/ {print $2; exit}')
+	fi
+
+	case "$_arch" in
+		x86_64|i?86)
+			if [[ " $_cpu_flags " == *" vmx "* ]]; then
+				_module="kvm_intel"
+			elif [[ " $_cpu_flags " == *" svm "* ]]; then
+				_module="kvm_amd"
+			elif [[ -c /dev/kvm ]]; then
+				check_hardware_virtualization_support::_log_status "CPU vmx/svm flags are not visible, but /dev/kvm is present; validating the KVM device directly."
+			else
+				check_hardware_virtualization_support::_log_error "🚫 CPU virtualization flags (vmx/svm) are not exposed on this ${_arch} host. Enable Intel VT-x or AMD-V/SVM in BIOS/UEFI."
+				system::log_item "Virtualization troubleshooting: verify firmware virtualization is enabled; if this is a VM, enable nested virtualization in the outer hypervisor."
+				return 1
+			fi
+			;;
+		aarch64|arm64|armv7l|ppc64*|s390x)
+			check_hardware_virtualization_support::_log_status "Checking KVM device support for ${_arch}; this architecture does not use x86 vmx/svm flags."
+			;;
+		*)
+			check_hardware_virtualization_support::_log_status "Checking KVM device support for architecture ${_arch}."
+			;;
+	esac
+
+	if [[ ! -e /dev/kvm ]] && command -v modprobe >/dev/null 2>&1; then
+		sudo modprobe kvm >/dev/null 2>&1 || system::log_item "Unable to load the generic kvm kernel module."
+		if [[ -n "$_module" ]]; then
+			sudo modprobe "$_module" >/dev/null 2>&1 || system::log_item "Unable to load ${_module}; inspect 'dmesg' for firmware or kernel diagnostics."
+		fi
+	fi
+
+	if [[ ! -c /dev/kvm ]]; then
+		check_hardware_virtualization_support::_log_error "🚫 /dev/kvm is unavailable; hardware-accelerated virtualization is not enabled."
+		system::log_item "Virtualization troubleshooting: enable virtualization in BIOS/UEFI, load kvm plus the CPU-specific module, and inspect 'dmesg | grep -i kvm'."
 		return 1
 	fi
+
+	if [[ ! -r /dev/kvm || ! -w /dev/kvm ]]; then
+		check_hardware_virtualization_support::_log_error "🚫 /dev/kvm exists but is not accessible to user $(id -un 2>/dev/null || printf unknown)."
+		system::log_item "Virtualization troubleshooting: inspect 'ls -l /dev/kvm', add the intended user to the kvm group, then log out and back in."
+		return 1
+	fi
+
+	if command -v virt-host-validate >/dev/null 2>&1; then
+		_validate_output=$(virt-host-validate qemu 2>&1 || true)
+		while IFS= read -r _line; do
+			[[ -n "$_line" ]] && system::log_item "virt-host-validate: ${_line}"
+		done <<<"$_validate_output"
+	fi
+
+	check_hardware_virtualization_support::_log_status "⛼ KVM hardware acceleration is available through /dev/kvm on ${_arch}."
+	return 0
 }
 
 dependency::check_if_running_in_vm() {
@@ -3380,7 +3432,7 @@ dependency::check_if_running_in_vm() {
 	# End of Documentation
 
 	local _quiet_mode=0
-	if [[ "$1" == "--quiet" ]]; then
+	if [[ "${1:-}" == "--quiet" ]]; then
 		_quiet_mode=1
 	fi
 
@@ -3400,8 +3452,9 @@ dependency::check_if_running_in_vm() {
 		fi
 	}
 
+	local _vm_type=""
 	if command -v virt-what >/dev/null 2>&1; then
-		local _vm_type=$(virt-what)
+		_vm_type=$(virt-what)
 		if [ -n "$_vm_type" ]; then
 			check_if_running_in_vm::_log_status "⛼ Running inside a virtual machine: $_vm_type"
 			return 2
@@ -3415,7 +3468,7 @@ dependency::check_if_running_in_vm() {
 		software::add_native_package "virt-what"
 		# Re-run virt-what after installation
 		if command -v virt-what >/dev/null 2>&1; then
-			local _vm_type=$(virt-what)
+			_vm_type=$(virt-what)
 			if [ -n "$_vm_type" ]; then
 				check_if_running_in_vm::_log_status "⛼ Running inside a virtual machine: $_vm_type"
 				return 2
@@ -3445,9 +3498,9 @@ dependency::virtualization() {
 	#	- Status messages indicating the presence or installation of virtualization software (unless --quiet is specified).
 	#	- Warnings if hardware virtualization is not supported or if running inside a VM.
 	# Returns:
-	#	- 0 if virtualization is supported on hardware.
-	#	- 1 if virtualization is not supported.
-	#	- 2 if virtualization is supported but the system is running in a VM.
+	#	- 0 if the required virtualization stack passes final verification.
+	#	- 1 if setup completed with one or more unresolved issues.
+	#	- 2 if the only unresolved issue is that the host is itself a VM.
 	#
 	# Usage:
 	#	dependency::virtualization [--quiet]
@@ -3458,14 +3511,15 @@ dependency::virtualization() {
 	#
 	# Notes:
 	#	- This function is designed to work on multiple Linux distributions including openSUSE, Fedora, RHEL, CentOS, Debian, and Ubuntu.
-	#	- Ensures that KVM and QEMU are available, and installs them if missing.
-	#	- Verifies hardware support for virtualization using `lscpu` command.
+	#	- Ensures that KVM, QEMU, libvirt, virt-install, and networking are available.
+	#	- Verifies KVM usability using CPU capabilities, kernel modules, and /dev/kvm.
 	#	- Checks if running inside a virtual machine using `virt-what`.
+	#	- Continues after individual failures and logs an actionable summary before returning.
 	#
 	# End of Documentation
 
 	local _quiet_mode=0
-	if [[ "$1" == "--quiet" ]]; then
+	if [[ "${1:-}" == "--quiet" ]]; then
 		_quiet_mode=1
 	fi
 
@@ -3485,85 +3539,229 @@ dependency::virtualization() {
 		fi
 	}
 
-	# Perform checks
-	dependency::check_hardware_virtualization_support
-	local _hv_support=$?
-	dependency::check_if_running_in_vm
-	local _vm_check=$?
+	local _distro _arch _hv_support=0 _vm_check=0 _dependency _unit _target_user="" _group _line
+	local _virt_validate_output="" _failure
+	local -a _packages=() _failures=() _modular_units=()
 
-	if [[ $_hv_support -eq 0 && $_vm_check -eq 0 ]]; then
-		write_status "✅ Virtualization support and environment check passed."
-	elif [[ $_hv_support -eq 1 ]]; then
+	dependency::virtualization::_record_failure() {
+		local message="$1"
+		local suggestion="${2:-}"
+		_failures+=("$message")
+		dependency::virtualization_log_error "$message"
+		[[ -n "$suggestion" ]] && system::log_item "Suggested action: ${suggestion}"
+	}
+
+	dependency::virtualization::_unit_exists() {
+		command -v systemctl >/dev/null 2>&1 && systemctl cat "$1" >/dev/null 2>&1
+	}
+
+	dependency::virtualization::_enable_unit() {
+		local unit="$1" diagnostics="" line
+		dependency::virtualization::_unit_exists "$unit" || return 2
+		if sudo systemctl enable --now "$unit" >/dev/null 2>&1 || sudo systemctl start "$unit" >/dev/null 2>&1; then
+			system::log_item "Virtualization unit is active or socket-enabled: ${unit}"
+			return 0
+		fi
+		diagnostics=$(sudo systemctl status "$unit" --no-pager --full 2>&1 || true)
+		while IFS= read -r line; do
+			[[ -n "$line" ]] && system::log_item "systemctl status ${unit}: ${line}"
+		done <<<"$diagnostics"
+		dependency::virtualization::_record_failure "Unable to activate virtualization unit ${unit}." "Run 'systemctl status ${unit}' and 'journalctl -u ${unit}' to inspect the failure."
 		return 1
-	elif [[ $_vm_check -eq 2 ]]; then
-		return 2
+	}
+
+	# Do not stop at the first failure. Package installation and service setup may
+	# still repair other parts of the host and provide more complete diagnostics.
+	dependency::check_hardware_virtualization_support "${1:-}"
+	_hv_support=$?
+	if [[ $_hv_support -ne 0 ]]; then
+		dependency::virtualization::_record_failure "Hardware-accelerated KVM is not currently usable." "Review the hardware diagnostics above, enable virtualization in firmware, and verify /dev/kvm permissions."
 	fi
 
-	local _OS_NAME=$(hostnamectl | awk '/Operating System/ {print $3}')
-	dependency::virtualization_log_status "${FUNCNAME[0]}: Checking for virtualization software..."
-
-	case $_OS_NAME in
-	openSUSE | Tumbleweed)
-		if ! command -v qemu-system-x86_64 >/dev/null 2>&1; then
-			dependency::virtualization_log_status "KVM or QEMU not found. Installing virtualization software for $_OS_NAME..."
-			software::add_native_package "kvm_server"
-			software::add_native_package "kvm_tools"
-			sudo systemctl enable --now libvirtd
-		else
-			dependency::virtualization_log_status "KVM and QEMU are available..."
-		fi
-
-		if ! command -v virt-install >/dev/null 2>&1; then
-			dependency::virtualization_log_status "virt-install not found. Installing virt-install for $_OS_NAME..."
-			software::add_native_package "virt-install"
-			:${BIN_VIRT_INSTALL:=$(type -P virt-install)}
-		else
-			dependency::virtualization_log_status "virt-install is available..."
-		fi
-		;;
-	Fedora | RHEL | CentOS)
-		if ! command -v qemu-system-x86_64 >/dev/null 2>&1; then
-			dependency::virtualization_log_status "KVM or QEMU not found. Installing virtualization software for $_OS_NAME..."
-			software::add_native_package "@virtualization"
-			sudo systemctl enable --now libvirtd
-		else
-			dependency::virtualization_log_status "KVM and QEMU are available..."
-		fi
-
-		if ! command -v virt-install >/dev/null 2>&1; then
-			dependency::virtualization_log_status "virt-install not found. Installing virt-install for $_OS_NAME..."
-			software::add_native_package "virt-install"
-			:${BIN_VIRT_INSTALL:=$(type -P virt-install)}
-		else
-			dependency::virtualization_log_status "virt-install is available..."
-		fi
-		;;
-	Debian | Ubuntu | TUXEDO | *)
-		if ! command -v qemu-system-x86_64 >/dev/null 2>&1; then
-			dependency::virtualization_log_status "KVM or QEMU not found. Installing virtualization software for $_OS_NAME..."
-			local _count=1
-			for _dependency in qemu-kvm libvirt-daemon bridge-utils virtinst libvirt-daemon-system libosinfo-bin; do
-				dependency::virtualization_log_status "${_count} - Verifying dependency (${_dependency})..."
-				software::add_native_package "$_dependency"
-				_count=$((_count + 1))
-			done
-			sudo systemctl enable --now libvirtd
-		else
-			dependency::virtualization_log_status "KVM and QEMU are available..."
-		fi
-
-		if ! command -v virt-install >/dev/null 2>&1; then
-			dependency::virtualization_log_status "virt-install not found. Installing virt-install for $_OS_NAME..."
-			software::add_native_package "virt-install"
-			:${BIN_VIRT_INSTALL:=$(type -P virt-install)}
-		else
-			dependency::virtualization_log_status "virt-install is available..."
-		fi
-		;;
+	dependency::check_if_running_in_vm "${1:-}"
+	_vm_check=$?
+	case $_vm_check in
+		1) dependency::virtualization::_record_failure "Unable to determine whether this host is itself virtualized." "Install virt-what manually or inspect systemd-detect-virt output." ;;
+		2) dependency::virtualization::_record_failure "This host is running inside a virtual machine." "Enable nested virtualization in the outer hypervisor and expose /dev/kvm before creating KVM guests." ;;
 	esac
+
+	_distro=$(system::distribution_type)
+	_arch=$(uname -m 2>/dev/null || printf 'unknown')
+	dependency::virtualization_log_status "${FUNCNAME[0]}: Checking virtualization software for distribution family '${_distro}'..."
+
+	case "$_distro" in
+		suse)
+			_packages=(pattern:kvm_server pattern:kvm_tools virt-install)
+			;;
+		fedora)
+			_packages=(qemu-kvm qemu-img libvirt-daemon-kvm libvirt-daemon-config-network libvirt-client virt-install)
+			;;
+		redhat)
+			_packages=(qemu-kvm qemu-img libvirt virt-install)
+			;;
+		ubuntu)
+			case "$_arch" in
+				x86_64|i?86) _packages=(qemu-kvm qemu-utils libvirt-daemon-system libvirt-clients virtinst) ;;
+				aarch64|arm64|armv7l) _packages=(qemu-system-arm qemu-utils libvirt-daemon-system libvirt-clients virtinst) ;;
+				*) _packages=(qemu-system qemu-utils libvirt-daemon-system libvirt-clients virtinst) ;;
+			esac
+			;;
+		debian)
+			case "$_arch" in
+				x86_64|i?86) _packages=(qemu-system-x86 qemu-utils libvirt-daemon-system libvirt-clients virtinst) ;;
+				aarch64|arm64|armv7l) _packages=(qemu-system-arm qemu-utils libvirt-daemon-system libvirt-clients virtinst) ;;
+				*) _packages=(qemu-system qemu-utils libvirt-daemon-system libvirt-clients virtinst) ;;
+			esac
+			;;
+		*)
+			dependency::virtualization::_record_failure "Unsupported distribution family '${_distro}'; no virtualization packages were selected." "Install QEMU/KVM, libvirt clients and daemon drivers, and virt-install using this distribution's package manager."
+			;;
+	esac
+
+	for _dependency in "${_packages[@]}"; do
+		dependency::virtualization_log_status "Verifying virtualization dependency (${_dependency})..."
+		if ! software::add_native_package "$_dependency"; then
+			dependency::virtualization::_record_failure "Could not install virtualization dependency '${_dependency}'." "Verify repositories, package-manager locks, and subscription/registration, then install '${_dependency}' manually."
+		fi
+	done
+
+	# RHEL 9+ and current Fedora use modular libvirt socket activation. Start every
+	# installed driver socket so qemu:///system networking and storage are usable.
+	# Preserve an already-active monolithic libvirtd installation (common after a
+	# RHEL 8 to 9 upgrade), because switching daemon models requires stopped VMs.
+	if [[ "$_distro" == "redhat" || "$_distro" == "fedora" ]]; then
+		_modular_units=(
+			virtqemud.socket virtqemud-ro.socket virtqemud-admin.socket
+			virtnetworkd.socket virtnetworkd-ro.socket virtnetworkd-admin.socket
+			virtnodedevd.socket virtnodedevd-ro.socket virtnodedevd-admin.socket
+			virtnwfilterd.socket virtnwfilterd-ro.socket virtnwfilterd-admin.socket
+			virtsecretd.socket virtsecretd-ro.socket virtsecretd-admin.socket
+			virtstoraged.socket virtstoraged-ro.socket virtstoraged-admin.socket
+			virtinterfaced.socket virtinterfaced-ro.socket virtinterfaced-admin.socket
+		)
+		local _modular_found=0 _monolithic_found=0
+		if dependency::virtualization::_unit_exists libvirtd.service && systemctl is-active --quiet libvirtd.service; then
+			_monolithic_found=1
+			dependency::virtualization_log_status "An active monolithic libvirtd installation was detected; preserving it to avoid disrupting running VMs."
+			dependency::virtualization::_enable_unit libvirtd.service || true
+		else
+			for _unit in "${_modular_units[@]}"; do
+				if dependency::virtualization::_unit_exists "$_unit"; then
+					_modular_found=1
+					dependency::virtualization::_enable_unit "$_unit" || true
+				fi
+			done
+		fi
+		if [[ $_modular_found -eq 0 && $_monolithic_found -eq 0 ]]; then
+			for _unit in libvirtd.service libvirtd.socket; do
+				if dependency::virtualization::_unit_exists "$_unit"; then
+					_monolithic_found=1
+					dependency::virtualization::_enable_unit "$_unit" || true
+					break
+				fi
+			done
+		fi
+		if [[ $_modular_found -eq 0 && $_monolithic_found -eq 0 ]]; then
+			dependency::virtualization::_record_failure "No modular libvirt sockets or monolithic libvirtd unit were found after package installation." "Verify the libvirt daemon packages, then inspect matching units with: systemctl list-unit-files 'virt*d*.socket' 'libvirtd*'."
+		fi
+	else
+		local _service_found=0
+		for _unit in libvirtd.service libvirtd.socket virtqemud.socket; do
+			if dependency::virtualization::_unit_exists "$_unit"; then
+				_service_found=1
+				dependency::virtualization::_enable_unit "$_unit" || true
+				break
+			fi
+		done
+		if [[ $_service_found -eq 0 ]]; then
+			dependency::virtualization::_record_failure "No supported libvirt service or socket was found." "Verify libvirt-daemon-system/kvm_tools installation and inspect available libvirt units."
+		fi
+	fi
+
+	# Configure access for the invoking non-root user. New group membership takes
+	# effect at the next login; continue setup using sudo in the current process.
+	if [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
+		_target_user="$SUDO_USER"
+	elif [[ ${EUID:-$(id -u)} -ne 0 ]]; then
+		_target_user=$(id -un)
+	fi
+	if [[ -n "$_target_user" ]]; then
+		for _group in libvirt kvm; do
+			if getent group "$_group" >/dev/null 2>&1; then
+				if ! id -nG "$_target_user" 2>/dev/null | tr ' ' '\n' | grep -Fxq "$_group"; then
+					if sudo usermod -aG "$_group" "$_target_user"; then
+						dependency::virtualization_log_status "Added ${_target_user} to ${_group}; log out and back in before using libvirt without sudo."
+					else
+						dependency::virtualization::_record_failure "Unable to add ${_target_user} to the ${_group} group." "Run 'sudo usermod -aG ${_group} ${_target_user}', then log out and back in."
+					fi
+				fi
+			else
+				system::log_item "Group '${_group}' is not present; package installation may be incomplete or this distribution may use polkit instead."
+			fi
+		done
+	fi
+
+	# Ensure the standard NAT network is usable when the distribution supplies it.
+	if command -v virsh >/dev/null 2>&1; then
+		if sudo virsh --connect qemu:///system net-info default >/dev/null 2>&1; then
+			sudo virsh --connect qemu:///system net-start default >/dev/null 2>&1 || true
+			if ! sudo virsh --connect qemu:///system net-autostart default >/dev/null 2>&1; then
+				dependency::virtualization::_record_failure "Unable to mark the libvirt 'default' network for autostart." "Run 'sudo virsh -c qemu:///system net-autostart default' and inspect the network definition."
+			fi
+			if ! sudo virsh --connect qemu:///system net-info default 2>/dev/null | grep -q 'Active:.*yes'; then
+				dependency::virtualization::_record_failure "The libvirt 'default' network is defined but inactive." "Run 'sudo virsh -c qemu:///system net-start default' and inspect virtnetworkd logs."
+			fi
+		else
+			local _network_diagnostics
+			_network_diagnostics=$(sudo virsh --connect qemu:///system net-info default 2>&1 || true)
+			[[ -n "$_network_diagnostics" ]] && system::log_item "virsh default-network diagnostics: ${_network_diagnostics}"
+			dependency::virtualization::_record_failure "The libvirt 'default' NAT network is not defined." "Install the distribution's libvirt network configuration package or define a suitable network/host bridge manually."
+		fi
+	else
+		dependency::virtualization::_record_failure "virsh is unavailable after package installation." "Install the libvirt client package for this distribution."
+	fi
+
+	if command -v virt-install >/dev/null 2>&1; then
+		: "${BIN_VIRT_INSTALL:=$(type -P virt-install)}"
+	else
+		dependency::virtualization::_record_failure "virt-install is unavailable after package installation." "Install virt-install (RPM/SUSE) or virtinst (Debian/Ubuntu)."
+	fi
+	command -v qemu-img >/dev/null 2>&1 || dependency::virtualization::_record_failure "qemu-img is unavailable after package installation." "Install qemu-utils, qemu-img, or the distribution's QEMU tools package."
+
+	if command -v virsh >/dev/null 2>&1; then
+		local _virsh_diagnostics=""
+		if ! _virsh_diagnostics=$(sudo virsh --connect qemu:///system list --all 2>&1); then
+			[[ -n "$_virsh_diagnostics" ]] && system::log_item "virsh qemu:///system diagnostics: ${_virsh_diagnostics}"
+			dependency::virtualization::_record_failure "The qemu:///system libvirt connection is not operational." "Run 'sudo virsh -c qemu:///system list --all' and inspect the active libvirt daemon/socket logs."
+		fi
+	fi
+
+	if command -v virt-host-validate >/dev/null 2>&1; then
+		_virt_validate_output=$(sudo virt-host-validate qemu 2>&1 || true)
+		while IFS= read -r _line; do
+			[[ -n "$_line" ]] && system::log_item "virt-host-validate: ${_line}"
+		done <<<"$_virt_validate_output"
+		if grep -Eq '^ *QEMU:.*: FAIL' <<<"$_virt_validate_output"; then
+			dependency::virtualization::_record_failure "virt-host-validate reported one or more QEMU failures." "Review each logged FAIL result and apply its recommended corrective action."
+		fi
+	else
+		system::log_item "virt-host-validate is unavailable; package/command and libvirt connection checks were used instead."
+	fi
+
+	if [[ ${#_failures[@]} -gt 0 ]]; then
+		dependency::virtualization_log_error "Virtualization setup completed with ${#_failures[@]} unresolved issue(s):"
+		for _failure in "${_failures[@]}"; do
+			system::log_item "Unresolved virtualization issue: ${_failure}"
+		done
+		[[ $_vm_check -eq 2 && ${#_failures[@]} -eq 1 ]] && return 2
+		return 1
+	fi
+
+	dependency::virtualization_log_status "✅ KVM/QEMU, libvirt, virt-install, and the default network are operational."
 	# Do not use a bare `wait` here. Callers may have unrelated background jobs
 	# such as process-substitution loggers; waiting for them can deadlock the VM
 	# build before it reaches virt-install.
+	return 0
 }
 
 system::prepare_environment_for_iso_creation() {
@@ -20832,12 +21030,77 @@ software::is_native_package_available() {
 	# Supported base distributions: Fedora . SuSE . Debian
 	# End of documentation
 
-	if hash yum 2>/dev/null; then
-		yum list available "$1" &>/dev/null && return 0 || return 1
-	elif hash zypper 2>/dev/null; then
-		if zypper se "${1}" | grep "${1}" &>/dev/null; then return 0; else return 1; fi
-	elif hash apt 2>/dev/null; then
-		apt -qq list "$1" 2>/dev/null | grep -q "$1" && return 0 || return 1
+	local request="${1:-}"
+	local name="$request"
+	local request_type="package" distro manager=""
+
+	[[ -n "$request" ]] || return 1
+
+	case "$request" in
+		@*)
+			request_type="group"
+			name="${request#@}"
+			;;
+		pattern:*)
+			request_type="pattern"
+			name="${request#pattern:}"
+			;;
+	esac
+
+	distro=$(system::distribution_type 2>/dev/null || printf 'unknown')
+	case "$distro" in
+		suse) command -v zypper >/dev/null 2>&1 && manager="zypper" ;;
+		ubuntu|debian) command -v apt-cache >/dev/null 2>&1 && manager="apt" ;;
+		fedora|redhat)
+			if command -v dnf >/dev/null 2>&1; then manager="dnf"; elif command -v yum >/dev/null 2>&1; then manager="yum"; fi
+			;;
+	esac
+	if [[ -z "$manager" ]]; then
+		if command -v dnf >/dev/null 2>&1; then manager="dnf"
+		elif command -v yum >/dev/null 2>&1; then manager="yum"
+		elif command -v zypper >/dev/null 2>&1; then manager="zypper"
+		elif command -v apt-cache >/dev/null 2>&1; then manager="apt"
+		elif command -v pkcon >/dev/null 2>&1; then manager="pkcon"
+		else return 3
+		fi
+	fi
+
+	if [[ "$manager" == "dnf" ]]; then
+		case "$request_type" in
+			group) dnf -q group info "$name" &>/dev/null && return 0 ;;
+			pattern) return 1 ;;
+			*)
+				dnf -q repoquery --available --qf '%{name}' "$name" 2>/dev/null | grep -Fxq "$name" ||
+					dnf -q list --available "$name" &>/dev/null
+				[[ $? -eq 0 ]] && return 0
+				;;
+		esac
+		return 1
+	elif [[ "$manager" == "yum" ]]; then
+		case "$request_type" in
+			group) yum -q group info "$name" &>/dev/null && return 0 ;;
+			pattern) return 1 ;;
+			*) yum -q list available "$name" &>/dev/null && return 0 ;;
+		esac
+		return 1
+	elif [[ "$manager" == "zypper" ]]; then
+		[[ "$request_type" == "group" ]] && return 1
+		if [[ "$request_type" == "pattern" ]] || zypper --non-interactive search --type pattern --match-exact "$name" 2>/dev/null | grep -Eq "(^|[[:space:]|])${name}([[:space:]|]|$)"; then
+			zypper --non-interactive search --type pattern --match-exact "$name" 2>/dev/null | grep -Eq "(^|[[:space:]|])${name}([[:space:]|]|$)"
+		else
+			zypper --non-interactive search --type package --match-exact "$name" 2>/dev/null | grep -Eq "(^|[[:space:]|])${name}([[:space:]|]|$)"
+		fi
+		[[ $? -eq 0 ]] && return 0
+		return 1
+	elif [[ "$manager" == "apt" ]]; then
+		[[ "$request_type" == "package" ]] || return 1
+		apt-cache show --no-all-versions "$name" &>/dev/null && return 0
+		return 1
+	elif [[ "$manager" == "pkcon" ]]; then
+		[[ "$request_type" == "package" ]] || return 1
+		pkcon resolve "$name" 2>/dev/null | grep -Fq "$name"
+		[[ $? -eq 0 ]] && return 0
+		return 1
 	else
 		return 3
 	fi
@@ -20992,7 +21255,8 @@ software::add_native_package() {
 	#   None
 	#
 	# Arguments:
-	#   $@ - One or more package names to install
+	#   $@ - Package requests. Use @group for DNF groups and pattern:name for
+	#        Zypper patterns. Unprefixed Zypper patterns are auto-detected.
 	#
 	# Outputs:
 	#   STDOUT: Installation status messages
@@ -21003,13 +21267,15 @@ software::add_native_package() {
 	#
 	# Usage:
 	#   software::add_native_package curl git htop
+	#   software::add_native_package @virtualization
+	#   software::add_native_package pattern:kvm_server pattern:kvm_tools
 	# End of documentation
 
 	security::ensure_admin
 
-	local pkgmgr install_cmd
-	local -a raw_packages packages filtered_packages failed_packages
-	local pkg
+	local pkgmgr distro
+	local -a raw_packages filtered_packages failed_packages
+	local pkg name request_type
 
 	mapfile -t raw_packages < <(printf '%s\n' "$@" | xargs -n1 | grep -Ev '^\s*$')
 	system::log_item "Called by ${FUNCNAME[0]} with arguments: ${raw_packages[*]}"
@@ -21021,21 +21287,35 @@ software::add_native_package() {
 	}
 
 
-	if command -v zypper >/dev/null 2>&1; then
-		pkgmgr="ZYPPER"
-		install_cmd="sudo zypper install -y"
-	elif command -v apt-get >/dev/null 2>&1; then
-		pkgmgr="APT"
-		install_cmd="sudo apt-get -y install"
-	elif command -v dnf >/dev/null 2>&1; then
-		pkgmgr="DNF"
-		install_cmd="sudo dnf -y install"
-        elif command -v pkcon >/dev/null 2>&1; then
-		pkgmgr="PKCON"
-		install_cmd="pkcon install -y"
-	else
-		write_error "No supported package manager found on this system."
-		return 3
+	distro=$(system::distribution_type)
+	case "$distro" in
+		suse)
+			command -v zypper >/dev/null 2>&1 && pkgmgr="ZYPPER"
+			;;
+		ubuntu|debian)
+			command -v apt-get >/dev/null 2>&1 && pkgmgr="APT"
+			;;
+		fedora|redhat)
+			if command -v dnf >/dev/null 2>&1; then pkgmgr="DNF"; elif command -v yum >/dev/null 2>&1; then pkgmgr="YUM"; fi
+			;;
+	esac
+
+	# Fallback for distributions not classified by system::distribution_type.
+	if [[ -z "$pkgmgr" ]]; then
+		if command -v zypper >/dev/null 2>&1; then
+			pkgmgr="ZYPPER"
+		elif command -v apt-get >/dev/null 2>&1; then
+			pkgmgr="APT"
+		elif command -v dnf >/dev/null 2>&1; then
+			pkgmgr="DNF"
+		elif command -v yum >/dev/null 2>&1; then
+			pkgmgr="YUM"
+		elif command -v pkcon >/dev/null 2>&1; then
+			pkgmgr="PKCON"
+		else
+			write_error "No supported package manager found on this system."
+			return 3
+		fi
 	fi
 
 	write_status "Detected package manager: ${pkgmgr}"
@@ -21068,36 +21348,47 @@ software::add_native_package() {
 			continue
 		fi
 
+		name="$pkg"
+		request_type="package"
+		case "$pkg" in
+			@*) request_type="group"; name="${pkg#@}" ;;
+			pattern:*) request_type="pattern"; name="${pkg#pattern:}" ;;
+		esac
+		if [[ "$pkgmgr" == "ZYPPER" && "$request_type" == "package" ]] && zypper --non-interactive search --type pattern --match-exact "$name" 2>/dev/null | grep -Eq "(^|[[:space:]|])${name}([[:space:]|]|$)"; then
+			request_type="pattern"
+		fi
+
 		if ! software::is_native_package_available "$pkg"; then
 			write_error "Package '$pkg' is not available in the repositories."
+			system::log_item "Package availability check failed: manager=${pkgmgr}, request=${pkg}, type=${request_type}. Verify enabled repositories and refresh package metadata."
 			failed_packages+=("$pkg")
 			continue
 		fi
 
-		write_status "📦 Installing: ${pkg} using ${pkgmgr}"
-		if ! ${install_cmd} "$pkg"; then
+		write_status "📦 Installing ${request_type}: ${name} using ${pkgmgr}"
+		local install_status=0
+		case "$pkgmgr:$request_type" in
+			DNF:group) sudo dnf -y group install "$name" || install_status=$? ;;
+			YUM:group) sudo yum -y group install "$name" || install_status=$? ;;
+			ZYPPER:pattern) sudo zypper --non-interactive install -y --type pattern "$name" || install_status=$? ;;
+			DNF:package) sudo dnf -y install "$name" || install_status=$? ;;
+			YUM:package) sudo yum -y install "$name" || install_status=$? ;;
+			ZYPPER:package) sudo zypper --non-interactive install -y "$name" || install_status=$? ;;
+			APT:package) sudo apt-get -y install "$name" || install_status=$? ;;
+			PKCON:package) pkcon install -y "$name" || install_status=$? ;;
+			*)
+				write_error "${request_type^} requests are not supported by ${pkgmgr}: ${pkg}"
+				install_status=1
+				;;
+		esac
+		if [[ $install_status -ne 0 ]]; then
 			write_error "❌ Failed to install: ${pkg}"
+			system::log_item "Installation failed: manager=${pkgmgr}, request=${pkg}, type=${request_type}, exit_status=${install_status}. Check repository configuration, package-manager locks, subscription/registration, and the preceding package-manager output."
 			failed_packages+=("$pkg")
 			continue
 		fi
 
 		write_information "✅ Successfully installed: ${pkg}"
-
-		case "$pkgmgr" in
-			"APT")
-				apt-get clean
-				apt-get --purge autoremove -y
-				;;
-			"DNF")
-				dnf clean all
-				;;
-			"ZYPPER")
-				zypper clean
-				;;
-			"PKCON")
-				pkcon clean
-				;;
-		esac
 	done
 
 	if [[ ${#failed_packages[@]} -gt 0 ]]; then
@@ -21433,12 +21724,73 @@ software::is_native_package_installed() {
 	#
 	# End of documentation
 
-	if hash dnf &>/dev/null; then
-		rpm -q "$1" &>/dev/null && return 0 || return 1
-	elif hash zypper &>/dev/null; then
-		zypper se -i "$1" &>/dev/null || return 1 && return 0
-	elif hash apt &>/dev/null; then
-		dpkg -l "$1" | tail -1 | grep "ii  $1" &>/dev/null && return 0 || return 1
+	local request="${1:-}"
+	local name="$request"
+	local request_type="package" distro manager=""
+
+	[[ -n "$request" ]] || return 1
+	case "$request" in
+		@*) request_type="group"; name="${request#@}" ;;
+		pattern:*) request_type="pattern"; name="${request#pattern:}" ;;
+	esac
+
+	distro=$(system::distribution_type 2>/dev/null || printf 'unknown')
+	case "$distro" in
+		suse) command -v zypper >/dev/null 2>&1 && manager="zypper" ;;
+		ubuntu|debian) command -v dpkg-query >/dev/null 2>&1 && manager="apt" ;;
+		fedora|redhat)
+			if command -v dnf >/dev/null 2>&1; then manager="dnf"; elif command -v yum >/dev/null 2>&1; then manager="yum"; fi
+			;;
+	esac
+	if [[ -z "$manager" ]]; then
+		if command -v dnf >/dev/null 2>&1; then manager="dnf"
+		elif command -v yum >/dev/null 2>&1; then manager="yum"
+		elif command -v zypper >/dev/null 2>&1; then manager="zypper"
+		elif command -v dpkg-query >/dev/null 2>&1; then manager="apt"
+		elif command -v pkcon >/dev/null 2>&1; then manager="pkcon"
+		else return 3
+		fi
+	fi
+
+	if [[ "$manager" == "dnf" ]]; then
+		if [[ "$request_type" == "group" ]]; then
+			dnf -q group info --installed "$name" &>/dev/null
+		elif [[ "$request_type" == "package" ]]; then
+			rpm -q "$name" &>/dev/null
+		else
+			return 1
+		fi
+		[[ $? -eq 0 ]] && return 0
+		return 1
+	elif [[ "$manager" == "yum" ]]; then
+		if [[ "$request_type" == "group" ]]; then
+			yum -q group info installed "$name" &>/dev/null
+		elif [[ "$request_type" == "package" ]]; then
+			rpm -q "$name" &>/dev/null
+		else
+			return 1
+		fi
+		[[ $? -eq 0 ]] && return 0
+		return 1
+	elif [[ "$manager" == "zypper" ]]; then
+		[[ "$request_type" == "group" ]] && return 1
+		if [[ "$request_type" == "pattern" ]] || zypper --non-interactive search --type pattern --match-exact "$name" 2>/dev/null | grep -Eq "(^|[[:space:]|])${name}([[:space:]|]|$)"; then
+			zypper --non-interactive search --installed-only --type pattern --match-exact "$name" 2>/dev/null | grep -Eq "(^|[[:space:]|])${name}([[:space:]|]|$)"
+		else
+			rpm -q "$name" &>/dev/null
+		fi
+		[[ $? -eq 0 ]] && return 0
+		return 1
+	elif [[ "$manager" == "apt" ]]; then
+		[[ "$request_type" == "package" ]] || return 1
+		[[ "$(dpkg-query -W -f='${Status}' "$name" 2>/dev/null)" == "install ok installed" ]]
+		[[ $? -eq 0 ]] && return 0
+		return 1
+	elif [[ "$manager" == "pkcon" ]]; then
+		[[ "$request_type" == "package" ]] || return 1
+		pkcon resolve --filter installed "$name" 2>/dev/null | grep -Fq "$name"
+		[[ $? -eq 0 ]] && return 0
+		return 1
 	else
 		return 3
 	fi
