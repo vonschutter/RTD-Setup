@@ -3539,9 +3539,10 @@ dependency::virtualization() {
 		fi
 	}
 
-	local _distro _arch _hv_support=0 _vm_check=0 _dependency _unit _target_user="" _group _line
+	local _distro _arch _qemu_system_command="" _hv_support=0 _vm_check=0 _dependency _capability _unit _target_user="" _group _line
 	local _virt_validate_output="" _failure
 	local -a _packages=() _failures=() _modular_units=()
+	local -A _package_capabilities=()
 
 	dependency::virtualization::_record_failure() {
 		local message="$1"
@@ -3587,24 +3588,45 @@ dependency::virtualization() {
 
 	_distro=$(system::distribution_type)
 	_arch=$(uname -m 2>/dev/null || printf 'unknown')
+	case "$_arch" in
+		x86_64|i?86) _qemu_system_command="qemu-system-x86_64" ;;
+		aarch64|arm64|armv7l) _qemu_system_command="qemu-system-aarch64" ;;
+	esac
 	dependency::virtualization_log_status "${FUNCNAME[0]}: Checking virtualization software for distribution family '${_distro}'..."
 
 	case "$_distro" in
 		suse)
 			_packages=(pattern:kvm_server pattern:kvm_tools virt-install)
+			_package_capabilities[pattern:kvm_server]="$_qemu_system_command"
+			_package_capabilities[pattern:kvm_tools]="virsh"
+			_package_capabilities[virt-install]="virt-install"
 			;;
 		fedora)
 			_packages=(qemu-kvm qemu-img libvirt-daemon-kvm libvirt-daemon-config-network libvirt-client virt-install)
+			_package_capabilities[qemu-kvm]="$_qemu_system_command"
+			_package_capabilities[qemu-img]="qemu-img"
+			_package_capabilities[libvirt-client]="virsh"
+			_package_capabilities[virt-install]="virt-install"
 			;;
 		redhat)
 			_packages=(qemu-kvm qemu-img libvirt virt-install)
+			_package_capabilities[qemu-kvm]="$_qemu_system_command"
+			_package_capabilities[qemu-img]="qemu-img"
+			_package_capabilities[virt-install]="virt-install"
 			;;
 		ubuntu)
 			case "$_arch" in
-				x86_64|i?86) _packages=(qemu-kvm qemu-utils libvirt-daemon-system libvirt-clients virtinst) ;;
+				x86_64|i?86)
+					_packages=(qemu-system-x86 qemu-utils libvirt-daemon-system libvirt-clients virtinst)
+					_package_capabilities[qemu-system-x86]="qemu-system-x86_64"
+					;;
 				aarch64|arm64|armv7l) _packages=(qemu-system-arm qemu-utils libvirt-daemon-system libvirt-clients virtinst) ;;
 				*) _packages=(qemu-system qemu-utils libvirt-daemon-system libvirt-clients virtinst) ;;
 			esac
+			_package_capabilities[qemu-system-arm]="qemu-system-aarch64"
+			_package_capabilities[qemu-utils]="qemu-img"
+			_package_capabilities[libvirt-clients]="virsh"
+			_package_capabilities[virtinst]="virt-install"
 			;;
 		debian)
 			case "$_arch" in
@@ -3612,6 +3634,11 @@ dependency::virtualization() {
 				aarch64|arm64|armv7l) _packages=(qemu-system-arm qemu-utils libvirt-daemon-system libvirt-clients virtinst) ;;
 				*) _packages=(qemu-system qemu-utils libvirt-daemon-system libvirt-clients virtinst) ;;
 			esac
+			_package_capabilities[qemu-system-x86]="qemu-system-x86_64"
+			_package_capabilities[qemu-system-arm]="qemu-system-aarch64"
+			_package_capabilities[qemu-utils]="qemu-img"
+			_package_capabilities[libvirt-clients]="virsh"
+			_package_capabilities[virtinst]="virt-install"
 			;;
 		*)
 			dependency::virtualization::_record_failure "Unsupported distribution family '${_distro}'; no virtualization packages were selected." "Install QEMU/KVM, libvirt clients and daemon drivers, and virt-install using this distribution's package manager."
@@ -3620,6 +3647,15 @@ dependency::virtualization() {
 
 	for _dependency in "${_packages[@]}"; do
 		dependency::virtualization_log_status "Verifying virtualization dependency (${_dependency})..."
+		_capability="${_package_capabilities[$_dependency]:-}"
+		if [[ -n "$_capability" ]] && command -v "$_capability" >/dev/null 2>&1; then
+			dependency::virtualization_log_status "Capability '${_capability}' is already available; skipping package request '${_dependency}'."
+			continue
+		fi
+		if software::is_native_package_installed "$_dependency"; then
+			dependency::virtualization_log_status "Package or pattern '${_dependency}' is already installed."
+			continue
+		fi
 		if ! software::add_native_package "$_dependency"; then
 			dependency::virtualization::_record_failure "Could not install virtualization dependency '${_dependency}'." "Verify repositories, package-manager locks, and subscription/registration, then install '${_dependency}' manually."
 		fi
@@ -21094,7 +21130,10 @@ software::is_native_package_available() {
 		return 1
 	elif [[ "$manager" == "apt" ]]; then
 		[[ "$request_type" == "package" ]] || return 1
-		apt-cache show --no-all-versions "$name" &>/dev/null && return 0
+		# apt-cache show also succeeds for virtual package names that have no
+		# installable candidate. Require a concrete candidate from apt policy.
+		apt-cache policy "$name" 2>/dev/null |
+			awk '/^[[:space:]]*Candidate:/ {found=1; if ($2 != "(none)") usable=1} END {exit !(found && usable)}' && return 0
 		return 1
 	elif [[ "$manager" == "pkcon" ]]; then
 		[[ "$request_type" == "package" ]] || return 1

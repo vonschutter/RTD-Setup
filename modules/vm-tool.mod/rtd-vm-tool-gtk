@@ -223,12 +223,23 @@ vmtoolgtk::parse_args() {
 vmtoolgtk::launch_terminal_payload() {
 	local title="$1"
 	local payload="$2"
-	local terminal terminal_geometry xterm_font xterm_font_size rc
+	local terminal terminal_geometry xterm_font xterm_font_size rc runner
 	local -a attempted_terminals=()
 
 	terminal_geometry="${RTD_VM_GTK_TERMINAL_GEOMETRY:-132x42}"
+	runner=$(mktemp "${TMPDIR:-/tmp}/rtd-vm-tool-gtk.XXXXXX") || {
+		vmtoolgtk::show_error "Unable to create the temporary terminal action runner. Check that ${TMPDIR:-/tmp} is writable."
+		return 1
+	}
+	if ! printf '#!/usr/bin/env bash\nrm -f -- "$0"\n%s\n' "${payload}" >"${runner}" || ! chmod 700 "${runner}"; then
+		rm -f -- "${runner}"
+		vmtoolgtk::show_error "Unable to prepare the terminal action runner."
+		return 1
+	fi
+	vmtoolgtk::log "Prepared terminal action runner: ${runner}"
 
 	if ! vmtoolgtk::find_terminal_emulator >/dev/null; then
+		rm -f -- "${runner}"
 		vmtoolgtk::show_error "No supported terminal emulator was found. Install x-terminal-emulator, gnome-terminal, kgx, tilix, xfce4-terminal, mate-terminal, konsole, or xterm."
 		return 1
 	fi
@@ -240,33 +251,36 @@ vmtoolgtk::launch_terminal_payload() {
 		case "${terminal}" in
 			gnome-terminal)
 				if [[ "${EUID}" -eq 0 && "$(command -v dbus-run-session || true)" ]]; then
-					dbus-run-session -- "${terminal}" --wait --geometry="${terminal_geometry}" --title="${title}" -- bash -lc "${payload}"
+					dbus-run-session -- "${terminal}" --wait --geometry="${terminal_geometry}" --title="${title}" -- "${runner}"
 				else
-					"${terminal}" --geometry="${terminal_geometry}" --title="${title}" -- bash -lc "${payload}"
+					"${terminal}" --geometry="${terminal_geometry}" --title="${title}" -- "${runner}"
 				fi
 				;;
 			tilix)
-				"${terminal}" --geometry="${terminal_geometry}" --title="${title}" -- bash -lc "${payload}"
+				"${terminal}" --geometry="${terminal_geometry}" --title="${title}" --command="${runner}"
 				;;
-			xfce4-terminal|mate-terminal)
-				"${terminal}" --geometry="${terminal_geometry}" --title="${title}" -- bash -lc "${payload}"
+			xfce4-terminal)
+				"${terminal}" --geometry="${terminal_geometry}" --title="${title}" --command="${runner}"
+				;;
+			mate-terminal)
+				"${terminal}" --geometry="${terminal_geometry}" --title="${title}" -- "${runner}"
 				;;
 			kgx)
-				"${terminal}" --title="${title}" bash -lc "${payload}"
+				"${terminal}" --title="${title}" -- "${runner}"
 				;;
 			konsole)
-				"${terminal}" --geometry "${terminal_geometry}" --new-tab -p tabtitle="${title}" -e bash -lc "${payload}"
+				"${terminal}" --geometry "${terminal_geometry}" --new-tab -p tabtitle="${title}" -e "${runner}"
 				;;
 			x-terminal-emulator)
-				"${terminal}" -e bash -lc "${payload}"
+				"${terminal}" -e "${runner}"
 				;;
 			xterm|uxterm|lxterm)
 				xterm_font="$(vmtoolgtk::find_terminal_font)"
 				xterm_font_size="${RTD_VM_GTK_XTERM_FONT_SIZE:-14}"
-				"${terminal}" -u8 -fa "${xterm_font}" -fs "${xterm_font_size}" -geometry "${terminal_geometry}" -T "${title}" -e bash -lc "${payload}"
+				"${terminal}" -u8 -fa "${xterm_font}" -fs "${xterm_font_size}" -geometry "${terminal_geometry}" -T "${title}" -e "${runner}"
 				;;
 			*)
-				"${terminal}" -e bash -lc "${payload}"
+				"${terminal}" -e "${runner}"
 				;;
 		esac
 		rc=$?
@@ -279,6 +293,7 @@ vmtoolgtk::launch_terminal_payload() {
 		vmtoolgtk::log "Terminal launch failed with status ${rc}: ${terminal} (${title}); trying next terminal."
 	done < <(vmtoolgtk::terminal_candidates)
 
+	rm -f -- "${runner}"
 	vmtoolgtk::show_error "Failed to launch the terminal-backed action. Tried: ${attempted_terminals[*]:-none}."
 	return 1
 }
