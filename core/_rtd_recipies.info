@@ -925,13 +925,13 @@ recipe:_OEM:_Remove_non_western_latin_fonts () {
 }
 
 recipe:_SEC:_Password_Management () {
-	# Password management software (Bitwarden, KeePassXC)...
+	# Password management (KeePassXC: manage your passwords in a secure way)
 	# DEFAULT=TRUE
-	# Loop through each item in this list of software and perform an install
-	# using the relevant packaging system.
-	software::from_flathub.org org.keepassxc.KeePassXC $1
-	software::from_flathub.org com.bitwarden.desktop $1
 
+	# KeePassXC is a free and open-source password manager that helps you manage your passwords 
+	# in a secure way. You can store all your passwords in one database, which is locked with a 
+	# master key or a key file. The databases are encrypted using the best encryption algorithms currently known (AES-256).
+	software::from_flathub.org org.keepassxc.KeePassXC $1
 }
 
 recipe:_SEC:_Secure_Storage () {
@@ -960,11 +960,11 @@ recipe:_SEC:_Proton_Suite_of_Ecrypted_Services () {
 	# Loop through each item in this list of software and perform an install
 	# using the relevant packaging system.
 
+
+
 	local distribution_type fedora_version package
 	if [[ "${1:-}" == "--remove" ]]; then
-		software::from_snapcraft.io proton-mail --remove
-		software::from_snapcraft.io proton-pass --remove
-		software::from_snapcraft.io protonmail-bridge --remove
+
 		for package in proton-vpn-gnome-desktop proton-vpn-cli proton-authenticator protonvpn-stable-release; do
 			software::remove_native_software_package "${package}"
 		done
@@ -972,9 +972,9 @@ recipe:_SEC:_Proton_Suite_of_Ecrypted_Services () {
 	fi
 
 	# These packages provide Proton desktop apps on distributions beyond the native package targets below.
-	software::from_snapcraft.io proton-mail
-	software::from_snapcraft.io proton-pass
-	if software::from_snapcraft.io protonmail-bridge; then
+	software::from_snapcraft.io proton-mail $1
+	software::from_snapcraft.io proton-pass $1
+	if software::from_snapcraft.io protonmail-bridge $1 ; then
 		snap connect protonmail-bridge:password-manager-service || write_warning "Connect protonmail-bridge:password-manager-service manually before using Bridge."
 	fi
 
@@ -1039,7 +1039,7 @@ recipe:_SEC:_VPN_Software () {
 
 recipe:_ADM:_Advanced_Terminals () {
 	# Advanced terminal apps (Wave AI Terminal, Tilix)...
-	# DEFAULT=TRUE
+	# DEFAULT=FALSE
 
 	software::add_native_package tilix $1
 	software::from_snapcraft.io waveterm $1

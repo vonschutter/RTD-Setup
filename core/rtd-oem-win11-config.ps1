@@ -15,6 +15,7 @@
 # ::		- Remove Windows consumer bloat and sponsored content when using the Aggressive preset.
 # ::		- Reduce background activity, telemetry, advertising surfaces, and suggestions.
 # ::		- Apply conservative performance-focused service defaults suitable for VM and VDI use.
+# ::		- Install the standard RTD application set and virtualization guest tools.
 # ::
 # ::		NOTE: This script intentionally keeps Windows Defender, Windows Update, Store dependencies,
 # ::		      WebView2, networking, event logging, and core management services.
@@ -22,6 +23,7 @@
 # :: Usage: 	Run from an elevated PowerShell session, or allow the script to relaunch itself elevated:
 # ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-win11-config.ps1
 # ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-win11-config.ps1 -Preset Minimal
+# ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-win11-config.ps1 -SkipSoftware
 # ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-win11-config.ps1 -Restart
 # ::
 # :: Presets:	Aggressive  Default. Removes consumer apps and disables non-essential noise.
@@ -59,7 +61,9 @@ param(
     [ValidateSet("Aggressive", "Minimal")]
     [string]$Preset = "Aggressive",
 
-    [switch]$Restart
+    [switch]$Restart,
+
+    [switch]$SkipSoftware
 )
 
 $ErrorActionPreference = "Continue"
@@ -68,6 +72,8 @@ $Script:RestartRequired = $false
 $Script:RtdRoot = "C:\RTD"
 $Script:LogDir = Join-Path $Script:RtdRoot "log"
 $Script:SetupLog = "C:\setup.log"
+$Script:ChocoExe = $null
+$Script:SoftwareFailures = New-Object System.Collections.Generic.List[string]
 
 # Centralized logging keeps the console, setup log, and RTD log aligned. Most
 # actions are best-effort on Windows images because exact components vary by
@@ -115,6 +121,9 @@ function Start-RtdElevated {
     )
     if ($Restart) {
         $arguments += "-Restart"
+    }
+    if ($SkipSoftware) {
+        $arguments += "-SkipSoftware"
     }
 
     Start-Process -FilePath "powershell.exe" -ArgumentList $arguments -Verb RunAs
@@ -601,6 +610,224 @@ function Remove-RtdWindows11BloatApps {
     $Script:RestartRequired = $true
 }
 
+# Install Chocolatey only when it is not already available. The bootstrap command
+# follows Chocolatey's documented administrative PowerShell installation method.
+function Initialize-RtdChocolatey {
+    $existing = Get-Command "choco.exe" -ErrorAction SilentlyContinue
+    if ($existing) {
+        $Script:ChocoExe = $existing.Source
+        Write-RtdLog "Chocolatey is already available at $($Script:ChocoExe)." "OK"
+        return $true
+    }
+
+    Write-RtdLog "Chocolatey is not installed; bootstrapping the package manager."
+    try {
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        $installer = (New-Object System.Net.WebClient).DownloadString("https://community.chocolatey.org/install.ps1")
+        Invoke-Expression $installer | Out-Host
+
+        $machinePath = [Environment]::GetEnvironmentVariable("Path", [EnvironmentVariableTarget]::Machine)
+        $userPath = [Environment]::GetEnvironmentVariable("Path", [EnvironmentVariableTarget]::User)
+        $env:Path = "$machinePath;$userPath"
+
+        $installed = Get-Command "choco.exe" -ErrorAction SilentlyContinue
+        if (-not $installed) {
+            $defaultChoco = Join-Path $env:ProgramData "chocolatey\bin\choco.exe"
+            if (Test-Path $defaultChoco) {
+                $Script:ChocoExe = $defaultChoco
+            } else {
+                throw "Chocolatey bootstrap completed but choco.exe could not be located."
+            }
+        } else {
+            $Script:ChocoExe = $installed.Source
+        }
+
+        Write-RtdLog "Chocolatey installation completed: $($Script:ChocoExe)." "OK"
+        return $true
+    } catch {
+        $message = "Chocolatey installation failed: $($_.Exception.Message)"
+        $Script:SoftwareFailures.Add($message)
+        Write-RtdLog $message "ERROR"
+        return $false
+    }
+}
+
+# Chocolatey installation is idempotent, so this helper can safely request the
+# desired package on both clean images and previously configured workstations.
+function Install-RtdChocolateyPackage {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Package,
+
+        [Parameter(Mandatory = $true)]
+        [string]$DisplayName,
+
+        [string[]]$PackageParameters = @()
+    )
+
+    if (-not $Script:ChocoExe -or -not (Test-Path $Script:ChocoExe)) {
+        $message = "Cannot install $DisplayName because Chocolatey is unavailable."
+        $Script:SoftwareFailures.Add($message)
+        Write-RtdLog $message "ERROR"
+        return $false
+    }
+
+    Write-RtdLog "Ensuring software is installed: $DisplayName ($Package)."
+    $chocoArguments = @("install", $Package, "-y", "--no-progress", "--no-desktopshortcuts")
+    if ($PackageParameters -and $PackageParameters.Count -gt 0) {
+        $chocoArguments += @("--params", ($PackageParameters -join " "))
+    }
+
+    try {
+        & $Script:ChocoExe @chocoArguments | Out-Host
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -in @(0, 1641, 3010)) {
+            Write-RtdLog "$DisplayName is installed (Chocolatey exit code $exitCode)." "OK"
+            if ($exitCode -in @(1641, 3010)) {
+                $Script:RestartRequired = $true
+            }
+            return $true
+        }
+
+        throw "Chocolatey returned exit code $exitCode."
+    } catch {
+        $message = "Installation failed for ${DisplayName}: $($_.Exception.Message)"
+        $Script:SoftwareFailures.Add($message)
+        Write-RtdLog $message "ERROR"
+        return $false
+    }
+}
+
+# Windows includes Hyper-V integration components. Other detected hypervisors
+# receive the same guest utilities requested by the Windows 10 configuration.
+function Install-RtdVirtualizationGuestTools {
+    try {
+        $computerSystem = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
+        $virtualizationIdentity = "$($computerSystem.Manufacturer) $($computerSystem.Model)"
+        Write-RtdLog "Computer system identity: $virtualizationIdentity."
+
+        switch -Regex ($virtualizationIdentity) {
+            "VMware" {
+                Install-RtdChocolateyPackage "vmware-tools" "VMware Tools" | Out-Null
+                break
+            }
+            "VirtualBox" {
+                Install-RtdChocolateyPackage "virtualbox-guest-additions-guest.install" "VirtualBox Guest Additions" | Out-Null
+                break
+            }
+            "QEMU|KVM|Red Hat" {
+                Install-RtdChocolateyPackage "qemu-guest-agent" "QEMU Guest Agent" | Out-Null
+                Install-RtdChocolateyPackage "spice-agent" "SPICE Guest Agent" | Out-Null
+                Set-RtdRegistryValue "HKLM:\Software\Policies\Microsoft\Windows NT\Driver Signing" "BehaviorOnFailedVerify" 1
+                break
+            }
+            "Microsoft Corporation.*Virtual Machine|Hyper-V" {
+                Write-RtdLog "Hyper-V guest detected; integration services are built into Windows 11." "OK"
+                break
+            }
+            default {
+                Write-RtdLog "No supported virtual-machine platform was detected; guest-tool installation is not required."
+            }
+        }
+    } catch {
+        Write-RtdLog "Virtualization guest-tool detection failed: $($_.Exception.Message)" "WARN"
+    }
+}
+
+# Preserve the Windows 10 workflow's O&O ShutUp10++ deployment while using the
+# current Windows 11-oriented recommended profile. Verify the signed executable
+# before applying the downloaded configuration silently.
+function Install-RtdShutUp10 {
+    $toolDirectory = Join-Path $Script:RtdRoot "tools\OOSU10"
+    $executable = Join-Path $toolDirectory "OOSU10.exe"
+    $configuration = Join-Path $toolDirectory "ooshutup10-recommended.cfg"
+
+    try {
+        New-Item -Path $toolDirectory -ItemType Directory -Force | Out-Null
+        Invoke-WebRequest -Uri "https://dl5.oo-software.com/files/ooshutup10/OOSU10.exe" -OutFile $executable -UseBasicParsing -ErrorAction Stop
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/config/ooshutup10_recommended.cfg" -OutFile $configuration -UseBasicParsing -ErrorAction Stop
+
+        $signature = Get-AuthenticodeSignature -FilePath $executable
+        if ($signature.Status -ne "Valid") {
+            throw "Authenticode validation returned $($signature.Status)."
+        }
+
+        $process = Start-Process -FilePath $executable -ArgumentList @($configuration, "/quiet") -Wait -PassThru
+        if ($process.ExitCode -ne 0) {
+            throw "O&O ShutUp10++ returned exit code $($process.ExitCode)."
+        }
+
+        Write-RtdLog "O&O ShutUp10++ recommended settings were applied." "OK"
+        return $true
+    } catch {
+        $message = "O&O ShutUp10++ deployment failed: $($_.Exception.Message)"
+        $Script:SoftwareFailures.Add($message)
+        Write-RtdLog $message "ERROR"
+        return $false
+    }
+}
+
+# The Windows 10 workflow enabled the legacy Windows Media Player optional
+# feature. Retain that behavior when the feature exists on the Windows 11 image.
+function Enable-RtdWindowsMediaPlayer {
+    try {
+        $feature = Get-WindowsOptionalFeature -Online -FeatureName "WindowsMediaPlayer" -ErrorAction Stop
+        if ($feature.State -eq "Enabled") {
+            Write-RtdLog "Windows Media Player optional feature is already enabled." "OK"
+            return
+        }
+
+        Enable-WindowsOptionalFeature -Online -FeatureName "WindowsMediaPlayer" -NoRestart -All -ErrorAction Stop | Out-Null
+        $Script:RestartRequired = $true
+        Write-RtdLog "Windows Media Player optional feature was enabled." "OK"
+    } catch {
+        Write-RtdLog "Windows Media Player optional feature is unavailable or could not be enabled: $($_.Exception.Message)" "WARN"
+    }
+}
+
+# Install the software selected by default in rtd-oem-win10-config.ps1. Optional
+# commented bundles (games, graphics, PDF tools, and LibreOffice) remain excluded.
+function Install-RtdWindows11Software {
+    Write-RtdLog "Starting standard RTD software deployment."
+
+    if (Initialize-RtdChocolatey) {
+        $software = @(
+            @{ Package = "chocolatey-core.extension"; Name = "Chocolatey Core Extension"; Parameters = @() },
+            @{ Package = "chocolateygui"; Name = "Chocolatey GUI"; Parameters = @() },
+            @{ Package = "7zip"; Name = "7-Zip"; Parameters = @() },
+            @{ Package = "vscode"; Name = "Visual Studio Code"; Parameters = @() },
+            @{ Package = "filezilla"; Name = "FileZilla"; Parameters = @() },
+            @{ Package = "putty"; Name = "PuTTY"; Parameters = @() },
+            @{ Package = "notepadplusplus"; Name = "Notepad++"; Parameters = @() },
+            @{ Package = "vlc"; Name = "VLC media player"; Parameters = @() },
+            @{ Package = "brave"; Name = "Brave Browser"; Parameters = @() },
+            @{ Package = "firefox"; Name = "Mozilla Firefox"; Parameters = @("/NoDesktopShortcut") },
+            @{ Package = "microsoft-office-deployment"; Name = "Microsoft Office Deployment Tool"; Parameters = @() }
+        )
+
+        foreach ($item in $software) {
+            Install-RtdChocolateyPackage -Package $item.Package -DisplayName $item.Name -PackageParameters $item.Parameters | Out-Null
+        }
+
+        Install-RtdVirtualizationGuestTools
+    } else {
+        Write-RtdLog "Chocolatey-dependent application installs were skipped after bootstrap failure." "ERROR"
+    }
+
+    Install-RtdShutUp10 | Out-Null
+    Enable-RtdWindowsMediaPlayer
+
+    if ($Script:SoftwareFailures.Count -gt 0) {
+        Write-RtdLog "Software deployment completed with $($Script:SoftwareFailures.Count) failure(s)." "WARN"
+        foreach ($failure in $Script:SoftwareFailures) {
+            Write-RtdLog "Software deployment issue: $failure" "WARN"
+        }
+    } else {
+        Write-RtdLog "Standard RTD software deployment completed successfully." "OK"
+    }
+}
+
 # Minimal keeps Windows app payloads intact while reducing telemetry, ads,
 # background app behavior, gaming overlays, and noisy shell/Edge defaults.
 function Run-RtdWindows11Minimal {
@@ -657,6 +884,12 @@ switch ($Preset) {
         Write-RtdLog "Running Windows 11 Aggressive preset."
         Run-RtdWindows11Aggressive
     }
+}
+
+if ($SkipSoftware) {
+    Write-RtdLog "Software deployment was skipped because -SkipSoftware was specified."
+} else {
+    Install-RtdWindows11Software
 }
 
 Complete-RtdWindows11Config
