@@ -75,6 +75,7 @@ $Script:SetupLog = "C:\setup.log"
 $Script:ChocoExe = $null
 $Script:SoftwareFailures = New-Object System.Collections.Generic.List[string]
 $Script:WarningCount = 0
+$Script:VirtualizationPlatform = $null
 
 # Centralized logging keeps the console, setup log, and RTD log aligned. Most
 # actions are best-effort on Windows images because exact components vary by
@@ -720,39 +721,166 @@ function Install-RtdChocolateyPackage {
     }
 }
 
-# Windows includes Hyper-V integration components. Other detected hypervisors
-# receive the same guest utilities requested by the Windows 10 configuration.
-function Install-RtdVirtualizationGuestTools {
+# Detect the active virtualization platform from a few stable hardware identity
+# sources. Manufacturer/model is usually enough, while BIOS and baseboard text
+# help when vendors expose generic values through Win32_ComputerSystem.
+function Get-RtdVirtualizationPlatform {
     try {
         $computerSystem = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
-        $virtualizationIdentity = "$($computerSystem.Manufacturer) $($computerSystem.Model)"
-        Write-RtdLog "Computer system identity: $virtualizationIdentity."
+        $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction SilentlyContinue
+        $baseBoard = Get-CimInstance -ClassName Win32_BaseBoard -ErrorAction SilentlyContinue
+
+        $fingerprintParts = @(
+            $computerSystem.Manufacturer,
+            $computerSystem.Model,
+            $bios.Manufacturer,
+            ($bios.SMBIOSBIOSVersion -join " "),
+            $bios.Version,
+            $baseBoard.Manufacturer,
+            $baseBoard.Product
+        ) | Where-Object { $_ -and $_.ToString().Trim() }
+
+        $virtualizationIdentity = ($fingerprintParts -join " ").Trim()
+        Write-RtdLog "Virtualization detection fingerprint: $virtualizationIdentity."
 
         switch -Regex ($virtualizationIdentity) {
-            "VMware" {
-                Install-RtdChocolateyPackage "vmware-tools" "VMware Tools" | Out-Null
-                break
-            }
-            "VirtualBox" {
-                Install-RtdChocolateyPackage "virtualbox-guest-additions-guest.install" "VirtualBox Guest Additions" | Out-Null
-                break
-            }
-            "QEMU|KVM|Red Hat" {
-                Install-RtdChocolateyPackage "qemu-guest-agent" "QEMU Guest Agent" | Out-Null
-                Install-RtdChocolateyPackage "spice-agent" "SPICE Guest Agent" | Out-Null
-                Set-RtdRegistryValue "HKLM:\Software\Policies\Microsoft\Windows NT\Driver Signing" "BehaviorOnFailedVerify" 1
-                break
-            }
-            "Microsoft Corporation.*Virtual Machine|Hyper-V" {
-                Write-RtdLog "Hyper-V guest detected; integration services are built into Windows 11." "OK"
-                break
-            }
-            default {
-                Write-RtdLog "No supported virtual-machine platform was detected; guest-tool installation is not required."
-            }
+            "Microsoft Corporation.*Virtual|Hyper-V" { return "hyperv" }
+            "VMware" { return "vmware" }
+            "VirtualBox|Oracle" { return "virtualbox" }
+            "QEMU|KVM|Red Hat|RHV|oVirt|Bochs|Proxmox" { return "kvm" }
+            "Xen" { return "xen" }
+            default { return "physical" }
         }
     } catch {
         Write-RtdLog "Virtualization guest-tool detection failed: $($_.Exception.Message)" "WARN"
+        return "unknown"
+    }
+}
+
+# Query the virtio-win archive index, select the numerically highest release,
+# and build the download URL for the guest-tools bundle. Fallback entries are
+# kept because the upstream listing service is occasionally filtered or mirrored.
+function Get-RtdLatestVirtioGuestTools {
+    $indexCandidates = @(
+        "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/?C=M;O=D",
+        "https://fedora-virt.repo.nfrance.com/virtio-win/direct-downloads/archive-virtio/"
+    )
+
+    $artifactTemplates = @(
+        "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/{0}/virtio-win-guest-tools.exe",
+        "https://fedora-virt.repo.nfrance.com/virtio-win/direct-downloads/archive-virtio/{0}/virtio-win-guest-tools.exe",
+        "https://fedora-virt.repo.nfrance.com/virtio-win/direct-downloads/latest-virtio/virtio-win-guest-tools.exe"
+    )
+
+    $releasePattern = 'virtio-win-(\d+)\.(\d+)\.(\d+)(?:-(\d+))?/'
+    $releases = New-Object System.Collections.Generic.List[object]
+
+    foreach ($indexUrl in $indexCandidates) {
+        try {
+            Write-RtdLog "Inspecting virtio-win archive index: $indexUrl"
+            $response = Invoke-WebRequest -Uri $indexUrl -UseBasicParsing -ErrorAction Stop
+            foreach ($match in [regex]::Matches($response.Content, $releasePattern)) {
+                $revision = if ($match.Groups[4].Success) { [int]$match.Groups[4].Value } else { 0 }
+                $releases.Add([pscustomobject]@{
+                    Version = $match.Value.TrimEnd("/")
+                    Major = [int]$match.Groups[1].Value
+                    Minor = [int]$match.Groups[2].Value
+                    Patch = [int]$match.Groups[3].Value
+                    Revision = $revision
+                })
+            }
+        } catch {
+            Write-RtdLog "Could not inspect virtio-win archive index $indexUrl: $($_.Exception.Message)" "WARN"
+        }
+    }
+
+    $latestRelease = $releases |
+        Sort-Object Major, Minor, Patch, Revision -Descending |
+        Select-Object -First 1
+
+    if ($latestRelease) {
+        foreach ($template in $artifactTemplates[0..1]) {
+            $url = $template -f $latestRelease.Version
+            try {
+                Write-RtdLog "Validating virtio guest-tools download URL: $url"
+                $head = Invoke-WebRequest -Uri $url -Method Head -UseBasicParsing -ErrorAction Stop
+                if ($head.StatusCode -ge 200 -and $head.StatusCode -lt 400) {
+                    return [pscustomobject]@{
+                        Version = $latestRelease.Version
+                        Url = $url
+                    }
+                }
+            } catch {
+                Write-RtdLog "virtio guest-tools URL check failed for $url: $($_.Exception.Message)" "WARN"
+            }
+        }
+    }
+
+    $fallbackVersion = if ($latestRelease) { $latestRelease.Version } else { "latest-virtio" }
+    return [pscustomobject]@{
+        Version = $fallbackVersion
+        Url = $artifactTemplates[2]
+    }
+}
+
+# Use the upstream guest-tools bundle for KVM/QEMU guests instead of depending
+# on Chocolatey packages that may lag behind the virtio driver release cadence.
+function Install-RtdVirtioGuestTools {
+    $download = Get-RtdLatestVirtioGuestTools
+    $installerPath = Join-Path (Join-Path $Script:RtdRoot "cache") "virtio-win-guest-tools.exe"
+
+    try {
+        New-Item -Path (Split-Path $installerPath -Parent) -ItemType Directory -Force | Out-Null
+        Write-RtdLog "Downloading virtio guest tools release $($download.Version) from $($download.Url)."
+        Invoke-WebRequest -Uri $download.Url -OutFile $installerPath -UseBasicParsing -ErrorAction Stop
+
+        $process = Start-Process -FilePath $installerPath -ArgumentList @("/passive", "/norestart", "/log", (Join-Path $Script:LogDir "virtio_log.txt")) -Wait -PassThru
+        if ($process.ExitCode -in @(0, 1641, 3010)) {
+            Write-RtdLog "virtio guest tools installed successfully from release $($download.Version) (exit code $($process.ExitCode))." "OK"
+            if ($process.ExitCode -in @(1641, 3010)) {
+                $Script:RestartRequired = $true
+            }
+            return $true
+        }
+
+        throw "virtio guest tools installer returned exit code $($process.ExitCode)."
+    } catch {
+        $message = "virtio guest tools installation failed: $($_.Exception.Message)"
+        $Script:SoftwareFailures.Add($message)
+        Write-RtdLog $message "ERROR"
+        return $false
+    }
+}
+
+# Windows includes Hyper-V integration components. Other detected hypervisors
+# receive the same guest utilities requested by the Windows 10 configuration.
+function Install-RtdVirtualizationGuestTools {
+    $platform = Get-RtdVirtualizationPlatform
+    $Script:VirtualizationPlatform = $platform
+
+    switch ($platform) {
+        "vmware" {
+            Install-RtdChocolateyPackage "vmware-tools" "VMware Tools" | Out-Null
+        }
+        "virtualbox" {
+            Install-RtdChocolateyPackage "virtualbox-guest-additions-guest.install" "VirtualBox Guest Additions" | Out-Null
+        }
+        "kvm" {
+            Set-RtdRegistryValue "HKLM:\Software\Policies\Microsoft\Windows NT\Driver Signing" "BehaviorOnFailedVerify" 1
+            Install-RtdVirtioGuestTools | Out-Null
+        }
+        "hyperv" {
+            Write-RtdLog "Hyper-V guest detected; integration services are built into Windows 11." "OK"
+        }
+        "xen" {
+            Write-RtdLog "Xen guest detected, but no RTD-managed guest-tools package is currently defined. Install the vendor tools manually if this image requires them." "WARN"
+        }
+        "unknown" {
+            Write-RtdLog "Virtualization detection did not complete cleanly. Guest-tool installation was skipped." "WARN"
+        }
+        default {
+            Write-RtdLog "No supported virtual-machine platform was detected; guest-tool installation is not required."
+        }
     }
 }
 
@@ -830,12 +958,11 @@ function Install-RtdWindows11Software {
         foreach ($item in $software) {
             Install-RtdChocolateyPackage -Package $item.Package -DisplayName $item.Name -PackageParameters $item.Parameters | Out-Null
         }
-
-        Install-RtdVirtualizationGuestTools
     } else {
         Write-RtdLog "Chocolatey-dependent application installs were skipped after bootstrap failure." "ERROR"
     }
 
+    Install-RtdVirtualizationGuestTools
     Install-RtdShutUp10 | Out-Null
     Enable-RtdWindowsMediaPlayer
 

@@ -2961,12 +2961,11 @@ If ($args) {
 # Call the desired tweak functions
 $tweaks | ForEach-Object { Invoke-Expression $_ } *>&1 | Out-File C:\setup.log
 
-Set-Wallpaper c:\rtd\wallpaper\Default.jpg 
+Set-Wallpaper c:\rtd\wallpaper\Wayland.jpg 
 
 ### Restart Computer when all changes are made  ###
 If (([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator")) {
 	RestartPC
 	Exit
 }
-
 

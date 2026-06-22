@@ -402,7 +402,6 @@ exit $?
 	set CACHE_DIR=C:\%_TLA%\cache
 	set CORE_DIR=C:\%_TLA%\core
         set WALLPAPER_URL=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/wallpaper/Wayland.jpg
-        set VIRTIO_URL=https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.285-1/virtio-win-guest-tools.exe
 	set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
 	set _STAGE2FILE=rtd-oem-win10-config.ps1
 	set _WINDOWS_BUILD=0
@@ -462,12 +461,8 @@ exit $?
 	echo Please wait...
 	if exist A:\autounattend.xml copy /y A:\*.* %CORE_DIR%\
 
-	@title: "Download and install virtio-drivers"
-	powershell -Command "(New-Object Net.WebClient).DownloadFile('%VIRTIO_URL%', '%CACHE_DIR%\virtio-win-gt-x64.msi')"
-        msiexec /i %CACHE_DIR%\virtio-win-gt-x64.msii /passive /norestart /l*v %LOG_DIR%\virtio_log.txt
-
-        @title "Fetch Wallpaper for default background"
-        powershell -Command "(New-Object Net.WebClient).DownloadFile('%WALLPAPER_URL%', '%WALLPAPER_DIR%\Default.jpg')"
+	@title "Fetch Wallpaper for default background"
+        powershell -Command "& {(New-Object Net.WebClient).DownloadFile('%WALLPAPER_URL%', '%WALLPAPER_DIR%\Wayland.jpg'); Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name Wallpaper -Value '%WALLPAPER_DIR%\Wayland.jpg'; Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name WallpaperStyle -Value '10'; Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name TileWallpaper -Value '0'; rundll32.exe user32.dll, UpdatePerUserSystemParameters}"
 
 	@title "Set network profiles to Private"
         powershell -Command "& {Get-ChildItem -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles' | ForEach-Object {Set-ItemProperty -Path $_.PSParentPath -Name 'Category' -Value 1}}"
@@ -501,12 +496,8 @@ exit $?
         powershell -Command "& {Get-ChildItem -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles' | ForEach-Object {Set-ItemProperty -Path $_.PSParentPath -Name 'Category' -Value 1}}"
 
         @title "POWERSHELL: Fetch Wallpaper for default background"
-        powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %WALLPAPER_URL% -OutFile %WALLPAPER_DIR%\Default.jpg"
+        powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest %WALLPAPER_URL% -OutFile %WALLPAPER_DIR%\Wayland.jpg; Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name Wallpaper -Value '%WALLPAPER_DIR%\Wayland.jpg'; Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name WallpaperStyle -Value '10'; Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name TileWallpaper -Value '0'; rundll32.exe user32.dll, UpdatePerUserSystemParameters}"
 
-        @title "POWERSHELL: Download and install virtio-drivers"
-        powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %VIRTIO_URL% -OutFile %CACHE_DIR%\virtio-win-guest-tools.exe"
-        %CACHE_DIR%\virtio-win-guest-tools.exe /passive /norestart /log %LOG_DIR%\virtio_log.txt
-    
 	if exist %CORE_DIR%\%_STAGE2FILE% (
 		@title "CMD: %_STAGE2FILE% File found locally..."
 		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\%_STAGE2FILE%

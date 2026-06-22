@@ -31795,17 +31795,34 @@ template::rtd_me_sh_cmd() {
 	#
 	# End of Documentation
 
-	# Template for the rtd_me.sh.cmd script
+	# Prefer the repository copy of rtd-me.sh.cmd so the generated artifact stays
+	# aligned with the checked-in launcher. Fall back to the embedded template if
+	# the source file is unavailable or the copy operation fails.
 	local outfile=${2}
+	local source_cmd
+
+	if [[ -z "${outfile}" ]]; then
+		write_error "template::rtd_me_sh_cmd requires an output file path."
+		return 1
+	fi
+
 	write_information "Writing out the rtd_me.sh.cmd script to ${outfile}"
 
-	cat >>${outfile} <<'EOF'
+	source_cmd="$(find /opt -name 'rtd-me.sh.cmd' -type f 2>/dev/null | head -n 1)"
+
+	if [[ -n "${source_cmd:-}" && -f "${source_cmd}" ]]; then
+		if cp -f "${source_cmd}" "${outfile}"; then
+			write_information "Copied ${source_cmd} to ${outfile}"
+			return 0
+		fi
+		write_warning "Could not copy ${source_cmd} to ${outfile}; falling back to embedded template."
+	else
+		write_warning "No repository copy of rtd-me.sh.cmd was found; falling back to embedded template."
+	fi
+
+	cat >"${outfile}" <<'EOF'
 
 :INIT
-	:::::::::::::::::::::::::::::::::::::::::::::::::::
-	::	Script startup components; tasks that always
-	::	need to be done when the initializes.
-	::
         @echo off
 	echo Welcome to %COMSPEC%
 	echo This is a windows script!
@@ -31813,12 +31830,6 @@ template::rtd_me_sh_cmd() {
 	:: %debug%
 
 :SETINGS
-	::::::::::::::::::::::::::::::::::::::::::::::::::::::
-	::  ***             Settings               ***      ::
-	::::::::::::::::::::::::::::::::::::::::::::::::::::::
-	::
-
-	:: gather some info...
 	setlocal EnableDelayedExpansion
 		set "ScriptName=%~nx0"
 		set "ScriptPath=%~dp0"
@@ -31843,7 +31854,6 @@ template::rtd_me_sh_cmd() {
 	set CACHE_DIR=C:\%_TLA%\cache
 	set CORE_DIR=C:\%_TLA%\core
         set WALLPAPER_URL=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/wallpaper/Wayland.jpg
-        set VIRTIO_URL=https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-guest-tools.exe
 	set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
 	set _STAGE2FILE=rtd-oem-win10-config.ps1
 	set _WINDOWS_BUILD=0
@@ -31862,18 +31872,10 @@ template::rtd_me_sh_cmd() {
         ver >>%LOG_DIR%\%_TLA%.log
 
 :GetInterestingThigsToDoOnThisSystem
-	:: Given that Microsoft Windows has been detected and the CMD shell portion of this script is executed,
-	:: the second stage script must be downloaded from an online location. Depending on the version of windows
-	:: there are different methods available to get and run remote files. All versions of windows do not necessarily
-	:: support power-shell scripting. Therefore the base of this activity is coded in simple command CMD.EXE shell scripting
-	::
-	:: Table of evaluating version of windows and calling the appropriate action given the version of windows found.
-	:: In this case it is easier to manage a straight table than a for loop or array:
-
 	:: DOS Based versions of Windows:
-	:: ver | find "4.0" > nul && goto CMD1 	rem Windows 95
-	:: ver | find "4.10" > nul && goto CMD1 rem Windows 98
-	:: ver | find "4.90" > nul && goto CMD1	rem Windows ME
+	ver | find "4.0" > nul && goto CMD1 	rem Windows 95
+	ver | find "4.10" > nul && goto CMD1    rem Windows 98
+	ver | find "4.90" > nul && goto CMD1	rem Windows ME
 
 	:: Windows 32 and 64 Bit versions:
 	ver | find "NT 4.0" > nul && call :CMD1 Windows NT 4.0
@@ -31892,23 +31894,16 @@ template::rtd_me_sh_cmd() {
 	ver | find "NT 6.3" > nul && call :PS2 Windows Server 2012 R2
 	ver | find "NT 10.0" > nul && call :PS2 Windows Server 2016 and up...
 
-	goto end
+goto end
 
 
 :PS1
-	:: Procedure to get the second stage in Windows 7. Windows 7, by default has a different version of
-	:: PowerShell installed. Therefore a slightly different syntax must be used.
-	:: get stage 2 and run it...
-	@title Found %* >>%LOG_DIR%\rtd.log
+	@title Found %* 
 	echo Please wait...
 	if exist A:\autounattend.xml copy /y A:\*.* %CORE_DIR%\
 
-	@title: "Download and install virtio-drivers"
-	powershell -Command "(New-Object Net.WebClient).DownloadFile('%VIRTIO_URL%', '%CACHE_DIR%\virtio-win-gt-x64.msi')"
-        msiexec /i %CACHE_DIR%\virtio-win-gt-x64.msii /passive /norestart /l*v %LOG_DIR%\virtio_log.txt
-
-        @title "Fetch Wallpaper for default background"
-        powershell -Command "(New-Object Net.WebClient).DownloadFile('%WALLPAPER_URL%', '%WALLPAPER_DIR%\Default.jpg')"
+	@title "Fetch Wallpaper for default background"
+        powershell -Command "& {(New-Object Net.WebClient).DownloadFile('%WALLPAPER_URL%', '%WALLPAPER_DIR%\Wayland.jpg'); Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name Wallpaper -Value '%WALLPAPER_DIR%\Wayland.jpg'; Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name WallpaperStyle -Value '10'; Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name TileWallpaper -Value '0'; rundll32.exe user32.dll, UpdatePerUserSystemParameters}"
 
 	@title "Set network profiles to Private"
         powershell -Command "& {Get-ChildItem -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles' | ForEach-Object {Set-ItemProperty -Path $_.PSParentPath -Name 'Category' -Value 1}}"
@@ -31922,32 +31917,17 @@ template::rtd_me_sh_cmd() {
 		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
 	)
 
-	powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
-	:: if exist %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1 (
-	:: 	@title "CMD: _Chris-Titus-Post-Windows-Install-App.ps1 File found locally..."
-	:: 	powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1
-	:: 	) else (
-	:: 	@title "CMD: Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet..."
-	:: 	powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
-	:: )
-	goto end
+goto end
 
 
 :PS2
-	:: Procedure to get the second stage configuration script in all version of windows after 7.
-	:: These version of windows have a more modern version of PowerShell.
-	:: get stage 2 and run it...
 	echo Found %*
 	if exist A:\autounattend.xml copy /y A:\*.* %CORE_DIR%\
 	@title "POWERSHELL: seting NETWORK Config"
         powershell -Command "& {Get-ChildItem -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles' | ForEach-Object {Set-ItemProperty -Path $_.PSParentPath -Name 'Category' -Value 1}}"
 
         @title "POWERSHELL: Fetch Wallpaper for default background"
-        powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %WALLPAPER_URL% -OutFile %WALLPAPER_DIR%\Default.jpg"
-
-        @title "POWERSHELL: Download and install virtio-drivers"
-        powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %VIRTIO_URL% -OutFile %CACHE_DIR%\virtio-win-guest-tools.exe"
-        %CACHE_DIR%\virtio-win-guest-tools.exe /passive /norestart /log %LOG_DIR%\virtio_log.txt
+        powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest %WALLPAPER_URL% -OutFile %WALLPAPER_DIR%\Wayland.jpg; Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name Wallpaper -Value '%WALLPAPER_DIR%\Wayland.jpg'; Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name WallpaperStyle -Value '10'; Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name TileWallpaper -Value '0'; rundll32.exe user32.dll, UpdatePerUserSystemParameters}"
 
 	if exist %CORE_DIR%\%_STAGE2FILE% (
 		@title "CMD: %_STAGE2FILE%File found locally..."
@@ -31968,7 +31948,7 @@ template::rtd_me_sh_cmd() {
 	:: 	@title "CMD: Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet..."
 	:: 	powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
 	:: )
-	goto end
+goto end
 
 
 :CMD1
@@ -31982,37 +31962,25 @@ template::rtd_me_sh_cmd() {
 	wget -O %TEMP%\%_STAGE2FILE% %_STAGE2LOC%/%_STAGE2FILE%
 	powershell -ExecutionPolicy UnRestricted -File %TEMP%\%_STAGE2FILE%
 
-	goto end
-
-
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-::::::::::::::                                          ::::::::::::::::::::::
-::::::::::::::            ERROR handling Below          ::::::::::::::::::::::
-::::::::::::::                                          ::::::::::::::::::::::
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-
+goto end
 
 :DispErr
 	set _ERRMSG=%*
 	@title %0 -- !!%_ERRMSG%!!
-	echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-	echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-	echo ::                            Message                                          ::
-	echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 	echo.
 	echo.
 	echo        %_ERRMSG%
 	echo        Presently I know what to do for Linux, and Windows 7 and beyond...
-	echo.
-	echo ::                                                                             ::
-	echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-	echo :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+	echo        If you are seeing this message it means you are running an unsupported version of Windows.
+	echo        Please reach out to the author of this script and let them know you would like support
 	pause
 goto end
 
 :end
 EOF
+
+	return 0
 }
 
 template::config_menu_cmd() {
