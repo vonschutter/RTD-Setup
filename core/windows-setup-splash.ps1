@@ -1,4 +1,4 @@
-# RTD Windows Setup graphical launcher
+# RunTime Data Windows Setup graphical launcher
 #
 # This WPF frontend keeps the configuration worker usable from a terminal while
 # providing an elevated, splash-style progress experience for interactive runs.
@@ -20,10 +20,12 @@ param(
 $ErrorActionPreference = "Stop"
 $Script:WorkerProcess = $null
 $Script:WorkerRunning = $false
+$Script:SysprepInProgress = $false
 $Script:CompletedWithWarnings = $false
 $Script:LineQueue = New-Object 'System.Collections.Concurrent.ConcurrentQueue[string]'
 $Script:WorkerUrl = "https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/rtd-oem-win11-config.ps1"
 $Script:BannerUrl = "https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/Media_files/rtd-bootstrap-gui-banner.png"
+$Script:FrontendLog = "C:\RTD\log\windows-setup-splash.log"
 
 function Test-SetupAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -61,7 +63,7 @@ function Start-SetupElevated {
     } catch {
         [System.Windows.MessageBox]::Show(
             "Administrative access is required to configure Windows.`n`n$($_.Exception.Message)",
-            "RTD Windows Setup",
+            "RunTime Data Windows Setup",
             [System.Windows.MessageBoxButton]::OK,
             [System.Windows.MessageBoxImage]::Error
         ) | Out-Null
@@ -145,7 +147,7 @@ try {
 } catch {
     [System.Windows.MessageBox]::Show(
         "The Windows configuration script could not be located or downloaded.`n`n$($_.Exception.Message)",
-        "RTD Windows Setup",
+        "RunTime Data Windows Setup",
         [System.Windows.MessageBoxButton]::OK,
         [System.Windows.MessageBoxImage]::Error
     ) | Out-Null
@@ -156,8 +158,8 @@ $Script:ResolvedBanner = Resolve-SetupBanner
 [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="RTD Windows Setup" Width="1040" Height="760"
-        WindowStartupLocation="CenterScreen" ResizeMode="CanMinimize"
+        Title="RunTime Data Windows Setup" Width="1040" Height="760"
+        WindowStartupLocation="CenterScreen" WindowState="Maximized" ResizeMode="CanResize"
         Background="#07111F" FontFamily="Segoe UI" Foreground="#EAF3FF">
     <Window.Resources>
         <Style TargetType="Button">
@@ -197,7 +199,7 @@ $Script:ResolvedBanner = Resolve-SetupBanner
                 </Rectangle.Fill>
             </Rectangle>
             <StackPanel Margin="42,0,42,27" VerticalAlignment="Bottom">
-                <TextBlock Text="RTD SYSTEM SETUP" FontSize="13" FontWeight="Bold"
+                <TextBlock Text="RUNTIME DATA SYSTEM SETUP" FontSize="13" FontWeight="Bold"
                            Foreground="#58D8FF"/>
                 <TextBlock Text="Prepare Windows 11" FontSize="36" FontWeight="SemiBold"
                            Foreground="White" Margin="0,5,0,0"/>
@@ -225,7 +227,13 @@ $Script:ResolvedBanner = Resolve-SetupBanner
                     </ComboBox>
                     <TextBlock x:Name="PresetDescription" TextWrapping="Wrap" Foreground="#7F9AB5"
                                FontSize="12" Margin="0,9,0,16"/>
-                    <CheckBox x:Name="InstallSoftwareChoice" Content="Install standard RTD software" IsChecked="True"/>
+                    <CheckBox x:Name="InstallSoftwareChoice" Content="Install standard RunTime Data software" IsChecked="True"/>
+                    <CheckBox x:Name="ActivateChoice"
+                              Content="Activate Windows and Office using configured KMS/licensing"
+                              ToolTip="Uses only the product keys and organizational KMS host already configured on this system."/>
+                    <CheckBox x:Name="SysprepChoice"
+                              Content="Reseal for cloning (Sysprep/OOBE)"
+                              ToolTip="Generalizes the installation and shuts down. The next boot asks for a user name and password."/>
                     <CheckBox x:Name="RestartChoice" Content="Restart automatically when finished"/>
                     <Border Background="#102A42" CornerRadius="7" Padding="12" Margin="0,18,0,0">
                         <TextBlock Text="You can minimize this window while setup continues. Detailed logs are written to C:\RTD\log."
@@ -292,7 +300,8 @@ $reader = New-Object System.Xml.XmlNodeReader $xaml
 $window = [Windows.Markup.XamlReader]::Load($reader)
 
 $controlNames = @(
-    "BannerImage", "PresetChoice", "PresetDescription", "InstallSoftwareChoice", "RestartChoice",
+    "BannerImage", "PresetChoice", "PresetDescription", "InstallSoftwareChoice", "ActivateChoice",
+    "SysprepChoice", "RestartChoice",
     "CurrentStatus", "InitializeDot", "InitializeText", "TuningDot", "TuningText",
     "SoftwareDot", "SoftwareText", "CompleteDot", "CompleteText", "SetupProgress",
     "ActivityOutput", "FooterStatus", "StartButton"
@@ -378,6 +387,118 @@ function Add-SetupOutput {
     }
     $Script:ActivityOutput.AppendText($Line + [Environment]::NewLine)
     $Script:ActivityOutput.ScrollToEnd()
+    try {
+        New-Item -Path (Split-Path -Parent $Script:FrontendLog) -ItemType Directory -Force | Out-Null
+        Add-Content -LiteralPath $Script:FrontendLog -Value ("{0:yyyy-MM-dd HH:mm:ss} {1}" -f (Get-Date), $Line) -Encoding UTF8
+    } catch {
+        # UI output remains available if persistent logging is temporarily unavailable.
+    }
+}
+
+function Invoke-SetupCscript {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ScriptPath,
+
+        [Parameter(Mandatory = $true)]
+        [string[]]$ScriptArguments,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Description
+    )
+
+    Add-SetupOutput $Description
+    try {
+        $cscript = Join-Path $env:SystemRoot "System32\cscript.exe"
+        $output = & $cscript "//NoLogo" $ScriptPath @ScriptArguments 2>&1
+        foreach ($line in @($output)) {
+            Add-SetupOutput ([string]$line)
+        }
+        if ($LASTEXITCODE -ne 0) {
+            Add-SetupOutput "$Description failed with exit code $LASTEXITCODE."
+            return $false
+        }
+        return $true
+    } catch {
+        Add-SetupOutput "$Description failed: $($_.Exception.Message)"
+        return $false
+    }
+}
+
+function Invoke-ConfiguredLicenseActivation {
+    $succeeded = $true
+    $Script:CurrentStatus.Text = "Activating Windows and Office using configured licensing..."
+    $Script:FooterStatus.Text = "Using existing product keys and configured licensing service"
+
+    $windowsLicenseScript = Join-Path $env:SystemRoot "System32\slmgr.vbs"
+    if (Test-Path -LiteralPath $windowsLicenseScript -PathType Leaf) {
+        if (-not (Invoke-SetupCscript -ScriptPath $windowsLicenseScript -ScriptArguments @("/ato") -Description "Requesting Windows activation...")) {
+            $succeeded = $false
+        }
+    } else {
+        Add-SetupOutput "Windows activation script was not found at '$windowsLicenseScript'."
+        $succeeded = $false
+    }
+
+    $officeLicenseCandidates = @(
+        (Join-Path $env:ProgramFiles "Microsoft Office\root\Office16\OSPP.VBS"),
+        (Join-Path $env:ProgramFiles "Microsoft Office\Office16\OSPP.VBS"),
+        (Join-Path $env:ProgramFiles "Microsoft Office\Office15\OSPP.VBS")
+    )
+    if (${env:ProgramFiles(x86)}) {
+        $officeLicenseCandidates += @(
+            (Join-Path ${env:ProgramFiles(x86)} "Microsoft Office\root\Office16\OSPP.VBS"),
+            (Join-Path ${env:ProgramFiles(x86)} "Microsoft Office\Office16\OSPP.VBS"),
+            (Join-Path ${env:ProgramFiles(x86)} "Microsoft Office\Office15\OSPP.VBS")
+        )
+    }
+    $officeLicenseScript = $officeLicenseCandidates |
+        Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) } |
+        Select-Object -First 1
+
+    if ($officeLicenseScript) {
+        if (-not (Invoke-SetupCscript -ScriptPath $officeLicenseScript -ScriptArguments @("/act") -Description "Requesting Microsoft Office activation...")) {
+            $succeeded = $false
+        }
+    } else {
+        Add-SetupOutput "Office volume-licensing script OSPP.VBS was not found. Office activation was skipped."
+        Add-SetupOutput "Install a volume-licensed Office edition or activate the installed retail/subscription edition through its supported account workflow."
+        $succeeded = $false
+    }
+
+    if (-not $succeeded) {
+        Add-SetupOutput "Activation was not fully completed. Verify the installed license editions, product keys, DNS/KMS configuration, and network access, then retry activation."
+        $Script:CompletedWithWarnings = $true
+    }
+    return $succeeded
+}
+
+function Invoke-SetupSysprep {
+    $sysprep = Join-Path $env:SystemRoot "System32\Sysprep\Sysprep.exe"
+    if (-not (Test-Path -LiteralPath $sysprep -PathType Leaf)) {
+        Add-SetupOutput "Sysprep was not found at '$sysprep'. The system was not resealed."
+        $Script:CompletedWithWarnings = $true
+        return $false
+    }
+
+    $Script:SysprepInProgress = $true
+    $Script:CurrentStatus.Text = "Generalizing Windows and preparing the out-of-box experience..."
+    $Script:FooterStatus.Text = "The system will shut down when Sysprep completes"
+    Add-SetupOutput "Starting Sysprep with /generalize /oobe /shutdown /quiet."
+    try {
+        $process = Start-Process -FilePath $sysprep -ArgumentList @("/generalize", "/oobe", "/shutdown", "/quiet") -Wait -PassThru
+        if ($process.ExitCode -ne 0) {
+            throw "Sysprep exited with code $($process.ExitCode)."
+        }
+        Add-SetupOutput "Sysprep completed. Waiting for Windows to shut down."
+        return $true
+    } catch {
+        $Script:SysprepInProgress = $false
+        $Script:CompletedWithWarnings = $true
+        Add-SetupOutput "Sysprep failed: $($_.Exception.Message)"
+        Add-SetupOutput "Review C:\Windows\System32\Sysprep\Panther\setuperr.log and setupact.log, resolve the reported package or servicing issue, and run Sysprep again."
+        return $false
+    }
 }
 
 function Read-SetupMarker {
@@ -475,6 +596,8 @@ function Complete-SetupFrontend {
     $Script:StartButton.Content = "Close"
     $Script:PresetChoice.IsEnabled = $false
     $Script:InstallSoftwareChoice.IsEnabled = $false
+    $Script:ActivateChoice.IsEnabled = $false
+    $Script:SysprepChoice.IsEnabled = $false
     $Script:RestartChoice.IsEnabled = $false
 
     if ($ExitCode -ne 0) {
@@ -483,17 +606,47 @@ function Complete-SetupFrontend {
         $Script:FooterStatus.Text = "Worker exit code: $ExitCode"
         $Script:StartButton.Background = "#F6B94A"
         Add-SetupOutput "Configuration process exited with code $ExitCode."
-    } elseif ($Script:CompletedWithWarnings) {
+    } else {
+        if ($Script:ActivateChoice.IsChecked) {
+            Invoke-ConfiguredLicenseActivation | Out-Null
+        }
+
+        if ($Script:SysprepChoice.IsChecked) {
+            if (Invoke-SetupSysprep) {
+                Set-SetupStep "Complete" "Done"
+                $Script:SetupProgress.Value = 100
+                $Script:CurrentStatus.Text = "System resealed successfully. Waiting for Windows to shut down."
+                $Script:FooterStatus.Text = "Ready to capture or clone after shutdown"
+                $Script:StartButton.IsEnabled = $false
+                return
+            }
+        }
+    }
+
+    if ($ExitCode -eq 0 -and $Script:CompletedWithWarnings) {
         $Script:SetupProgress.Value = 100
         $Script:CurrentStatus.Text = "Setup completed with warnings. Review the log for unresolved items."
         $Script:FooterStatus.Text = "Completed with warnings"
         $Script:StartButton.Background = "#F6B94A"
-    } else {
+    } elseif ($ExitCode -eq 0) {
         Set-SetupStep "Complete" "Done"
         $Script:SetupProgress.Value = 100
         $Script:CurrentStatus.Text = "Windows setup completed successfully."
         $Script:FooterStatus.Text = "Setup complete"
         $Script:StartButton.Background = "#36D399"
+    }
+
+    if ($ExitCode -eq 0 -and $Script:RestartChoice.IsChecked -and $Script:ActivateChoice.IsChecked -and -not $Script:SysprepChoice.IsChecked) {
+        try {
+            Add-SetupOutput "Activation attempt complete. Windows will restart in 5 seconds."
+            $Script:CurrentStatus.Text = "Setup complete. Windows is restarting..."
+            $Script:FooterStatus.Text = "Restart scheduled"
+            Start-Process -FilePath (Join-Path $env:SystemRoot "System32\shutdown.exe") -ArgumentList @("/r", "/t", "5", "/d", "p:2:4") | Out-Null
+        } catch {
+            $Script:CompletedWithWarnings = $true
+            Add-SetupOutput "Windows could not be restarted automatically: $($_.Exception.Message)"
+            $Script:FooterStatus.Text = "Restart Windows manually"
+        }
     }
 }
 
@@ -512,7 +665,7 @@ function Start-SetupWorker {
     if (-not $Script:InstallSoftwareChoice.IsChecked) {
         $arguments += "-SkipSoftware"
     }
-    if ($Script:RestartChoice.IsChecked) {
+    if ($Script:RestartChoice.IsChecked -and -not $Script:ActivateChoice.IsChecked -and -not $Script:SysprepChoice.IsChecked) {
         $arguments += "-Restart"
     }
 
@@ -539,6 +692,8 @@ function Start-SetupWorker {
         $Script:CompletedWithWarnings = $false
         $Script:PresetChoice.IsEnabled = $false
         $Script:InstallSoftwareChoice.IsEnabled = $false
+        $Script:ActivateChoice.IsEnabled = $false
+        $Script:SysprepChoice.IsEnabled = $false
         $Script:RestartChoice.IsEnabled = $false
         $Script:StartButton.IsEnabled = $false
         $Script:StartButton.Content = "Setup running"
@@ -555,10 +710,33 @@ function Start-SetupWorker {
 }
 
 $Script:PresetChoice.Add_SelectionChanged({ Update-PresetDescription })
+$Script:SysprepChoice.Add_Checked({
+    $Script:RestartChoice.IsChecked = $false
+    $Script:RestartChoice.IsEnabled = $false
+    $Script:ActivateChoice.IsChecked = $false
+    $Script:ActivateChoice.IsEnabled = $false
+})
+$Script:SysprepChoice.Add_Unchecked({
+    if (-not $Script:WorkerRunning) {
+        $Script:RestartChoice.IsEnabled = $true
+        $Script:ActivateChoice.IsEnabled = $true
+    }
+})
 $Script:StartButton.Add_Click({
     if ($Script:StartButton.Content -eq "Close") {
         $window.Close()
     } else {
+        if ($Script:SysprepChoice.IsChecked) {
+            $confirmation = [System.Windows.MessageBox]::Show(
+                "After setup, Sysprep will generalize this installation and shut down the computer.`n`nThe next boot will start the Windows out-of-box experience and request a new user account. Activation must be performed on the deployed clone after OOBE. Continue?",
+                "Confirm system reseal",
+                [System.Windows.MessageBoxButton]::YesNo,
+                [System.Windows.MessageBoxImage]::Warning
+            )
+            if ($confirmation -ne [System.Windows.MessageBoxResult]::Yes) {
+                return
+            }
+        }
         Start-SetupWorker
     }
 })
@@ -578,10 +756,10 @@ $timer.Start()
 
 $window.Add_Closing({
     param($sender, $eventArgs)
-    if ($Script:WorkerRunning) {
+    if ($Script:WorkerRunning -or $Script:SysprepInProgress) {
         [System.Windows.MessageBox]::Show(
-            "Windows configuration is still running. Minimize this window and allow the current operation to finish.",
-            "Setup is still running",
+            "Windows configuration or system resealing is still running. Minimize this window and allow the current operation to finish.",
+            "RunTime Data setup is still running",
             [System.Windows.MessageBoxButton]::OK,
             [System.Windows.MessageBoxImage]::Warning
         ) | Out-Null

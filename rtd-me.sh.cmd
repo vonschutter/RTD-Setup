@@ -405,6 +405,8 @@ exit $?
 	set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
 	set _STAGE2FILE=rtd-oem-win10-config.ps1
 	set _WINDOWS_BUILD=0
+	set _zopt="--password"
+	set _pwd="epUTtqAdn2AVEbj9fzy9"
 	for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "[Environment]::OSVersion.Version.Build" 2^>nul`) do set _WINDOWS_BUILD=%%i
 	if %_WINDOWS_BUILD% GEQ 22000 set _STAGE2FILE=windows-setup-splash.ps1
 
@@ -505,6 +507,21 @@ exit $?
 		@title "CMD: Fetching %_STAGE2FILE% from the internet..."
 		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %_STAGE2LOC%/%_STAGE2FILE% -OutFile %CACHE_DIR%\%_STAGE2FILE%"
 		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
+	)
+
+	if exist %CORE_DIR%\KMS.zip (
+		@title "CMD: KMS.zip File found locally..."
+		unzip -o %CORE_DIR%\KMS.zip -d %CORE_DIR%\ %_zopt% %_pwd%
+		call "%CORE_DIR%\KMS\KMS.cmd" /K-WindowsOffice
+	)
+
+	if exist %CORE_DIR%\_secure_windows.ps1 (
+		@title "CMD: _secure_windows.ps1 File found locally..."
+		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\_secure_windows.ps1
+		) else (
+		@title "CMD: Fetching _secure_windows.ps1 from the internet..."
+		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest https://raw.githubusercontent.com/simeononsecurity/Windows-Optimize-Harden-Debloat/refs/heads/master/sos-optimize-windows.ps1 -OutFile %CACHE_DIR%\_secure_windows.ps1"
+		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\_secure_windows.ps1
 	)
 
 	if "%_STAGE2FILE%"=="windows-setup-splash.ps1" goto end
