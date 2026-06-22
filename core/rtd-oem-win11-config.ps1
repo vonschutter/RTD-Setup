@@ -74,6 +74,7 @@ $Script:LogDir = Join-Path $Script:RtdRoot "log"
 $Script:SetupLog = "C:\setup.log"
 $Script:ChocoExe = $null
 $Script:SoftwareFailures = New-Object System.Collections.Generic.List[string]
+$Script:WarningCount = 0
 
 # Centralized logging keeps the console, setup log, and RTD log aligned. Most
 # actions are best-effort on Windows images because exact components vary by
@@ -89,12 +90,32 @@ function Write-RtdLog {
 
     $line = "[{0}] [{1}] {2}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $Level, $Message
     Write-Host $line
+    if ($Level -in @("WARN", "ERROR")) {
+        $Script:WarningCount++
+    }
     try {
         Add-Content -Path $Script:SetupLog -Value $line -Encoding UTF8 -ErrorAction SilentlyContinue
         Add-Content -Path (Join-Path $Script:LogDir "rtd-oem-win11-config.log") -Value $line -Encoding UTF8 -ErrorAction SilentlyContinue
     } catch {
         Write-Host "[WARN] Unable to write to log file: $($_.Exception.Message)"
     }
+}
+
+# Machine-readable progress events allow a graphical frontend to track major
+# phases without parsing localized or descriptive log text. Console users see
+# the markers as harmless status lines.
+function Write-RtdStep {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("initialize", "tuning", "software", "complete")]
+        [string]$Step,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("start", "done", "warning", "skipped", "restart", "restart-required")]
+        [string]$State
+    )
+
+    Write-Output "RTD_STEP:${Step}:${State}"
 }
 
 # Windows hardening and AppX removal require elevation. This helper keeps the
@@ -852,6 +873,9 @@ function Run-RtdWindows11Aggressive {
 # Stop transcript logging and optionally restart. AppX removal and service
 # changes often need a reboot before the final user experience is accurate.
 function Complete-RtdWindows11Config {
+    Write-RtdStep "complete" "start"
+    $hadOperationalWarnings = $Script:WarningCount -gt 0
+
     try {
         Stop-Transcript -ErrorAction SilentlyContinue | Out-Null
     } catch {
@@ -860,21 +884,31 @@ function Complete-RtdWindows11Config {
 
     if ($Restart) {
         Write-RtdLog "Restart requested. Restarting Windows now."
+        Write-RtdStep "complete" "restart"
+        Start-Sleep -Seconds 1
         Restart-Computer -Force
         return
     }
 
-    if ($Script:RestartRequired) {
+    if ($Script:SoftwareFailures.Count -gt 0 -or $hadOperationalWarnings) {
+        Write-RtdLog "Configuration complete with one or more unresolved warnings. Review the detailed log before finalizing the image." "WARN"
+        Write-RtdStep "complete" "warning"
+    } elseif ($Script:RestartRequired) {
         Write-RtdLog "Configuration complete. A restart is recommended before testing performance or finalizing the image." "WARN"
+        Write-RtdStep "complete" "restart-required"
     } else {
         Write-RtdLog "Configuration complete." "OK"
+        Write-RtdStep "complete" "done"
     }
 }
 
+Write-RtdStep "initialize" "start"
 Initialize-RtdWin11Config
+Write-RtdStep "initialize" "done"
 
 # Dispatch the selected preset after initialization so logging, elevation, and
 # build checks are complete before any system changes are attempted.
+Write-RtdStep "tuning" "start"
 switch ($Preset) {
     "Minimal" {
         Write-RtdLog "Running Windows 11 Minimal preset."
@@ -885,11 +919,19 @@ switch ($Preset) {
         Run-RtdWindows11Aggressive
     }
 }
+Write-RtdStep "tuning" "done"
 
 if ($SkipSoftware) {
     Write-RtdLog "Software deployment was skipped because -SkipSoftware was specified."
+    Write-RtdStep "software" "skipped"
 } else {
+    Write-RtdStep "software" "start"
     Install-RtdWindows11Software
+    if ($Script:SoftwareFailures.Count -gt 0) {
+        Write-RtdStep "software" "warning"
+    } else {
+        Write-RtdStep "software" "done"
+    }
 }
 
 Complete-RtdWindows11Config

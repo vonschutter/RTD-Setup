@@ -407,7 +407,7 @@ exit $?
 	set _STAGE2FILE=rtd-oem-win10-config.ps1
 	set _WINDOWS_BUILD=0
 	for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "[Environment]::OSVersion.Version.Build" 2^>nul`) do set _WINDOWS_BUILD=%%i
-	if %_WINDOWS_BUILD% GEQ 22000 set _STAGE2FILE=rtd-oem-win11-config.ps1
+	if %_WINDOWS_BUILD% GEQ 22000 set _STAGE2FILE=windows-setup-splash.ps1
 
 	md %TEMP%
 	md %LOG_DIR%
@@ -516,7 +516,7 @@ exit $?
 		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
 	)
 
-	if "%_STAGE2FILE%"=="rtd-oem-win11-config.ps1" goto end
+	if "%_STAGE2FILE%"=="windows-setup-splash.ps1" goto end
 
 	if exist %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1 (
 		@title "CMD: _Chris-Titus-Post-Windows-Install-App.ps1 File found locally..."
