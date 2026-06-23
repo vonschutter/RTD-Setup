@@ -23,7 +23,7 @@ $Script:WorkerRunning = $false
 $Script:SysprepInProgress = $false
 $Script:CompletedWithWarnings = $false
 $Script:LineQueue = New-Object 'System.Collections.Concurrent.ConcurrentQueue[string]'
-$Script:WorkerUrl = "https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/rtd-oem-win11-config.ps1"
+$Script:WorkerUrl = "https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/windows-setup.ps1"
 $Script:BannerUrl = "https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/Media_files/rtd-bootstrap-gui-banner.png"
 $Script:FrontendLog = "C:\RTD\log\windows-setup-splash.log"
 
@@ -108,8 +108,8 @@ function Resolve-SetupWorker {
     }
 
     $cacheDirectory = "C:\RTD\cache"
-    $downloadPath = Join-Path $cacheDirectory "rtd-oem-win11-config.ps1"
-    $siblingWorker = Join-Path $PSScriptRoot "rtd-oem-win11-config.ps1"
+    $downloadPath = Join-Path $cacheDirectory "windows-setup.ps1"
+    $siblingWorker = Join-Path $PSScriptRoot "windows-setup.ps1"
     $resolvedScriptDirectory = [System.IO.Path]::GetFullPath($PSScriptRoot).TrimEnd("\")
     $resolvedCacheDirectory = [System.IO.Path]::GetFullPath($cacheDirectory).TrimEnd("\")
 
@@ -120,7 +120,7 @@ function Resolve-SetupWorker {
     if ($resolvedScriptDirectory -ne $resolvedCacheDirectory) {
         $bundledCandidates += $siblingWorker
     }
-    $bundledCandidates += "C:\RTD\core\rtd-oem-win11-config.ps1"
+    $bundledCandidates += "C:\RTD\core\windows-setup.ps1"
 
     foreach ($candidate in $bundledCandidates | Select-Object -Unique) {
         if ($candidate -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
@@ -137,7 +137,13 @@ function Resolve-SetupWorker {
     $temporaryPath = "$downloadPath.download"
     try {
         Remove-Item -LiteralPath $temporaryPath -Force -ErrorAction SilentlyContinue
-        Invoke-WebRequest -Uri $Script:WorkerUrl -OutFile $temporaryPath -UseBasicParsing -ErrorAction Stop
+        $cacheBuster = (Get-Date).ToUniversalTime().Ticks
+        $downloadUrl = "{0}?rtd_cache_bust={1}" -f $Script:WorkerUrl, $cacheBuster
+        $requestHeaders = @{
+            "Cache-Control" = "no-cache, no-store"
+            "Pragma" = "no-cache"
+        }
+        Invoke-WebRequest -Uri $downloadUrl -Headers $requestHeaders -OutFile $temporaryPath -UseBasicParsing -ErrorAction Stop
         if (-not (Test-Path -LiteralPath $temporaryPath -PathType Leaf) -or (Get-Item -LiteralPath $temporaryPath).Length -eq 0) {
             throw "The downloaded configuration script is empty."
         }
@@ -255,7 +261,7 @@ $Script:ResolvedBanner = Resolve-SetupBanner
             <StackPanel Margin="42,0,42,27" VerticalAlignment="Bottom">
                 <TextBlock Text="RUNTIME DATA SYSTEM SETUP" FontSize="13" FontWeight="Bold"
                            Foreground="#58D8FF"/>
-                <TextBlock Text="Prepare Windows 11" FontSize="36" FontWeight="SemiBold"
+                <TextBlock Text="Prepare Windows" FontSize="36" FontWeight="SemiBold"
                            Foreground="White" Margin="0,5,0,0"/>
                 <TextBlock Text="System tuning, essential applications, and virtual-machine integration"
                            FontSize="14" Foreground="#C7DDF4" Margin="0,5,0,0"/>

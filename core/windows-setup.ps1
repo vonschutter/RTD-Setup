@@ -3,7 +3,7 @@
 # ::
 # ::             			A D M I N   S C R I P T
 # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-# :::::::::::::::::::::::::::::::::::// OEM Windows 11 Configuration Script //:::::::::::::::::::::::::// Windows //::::::
+# :::::::::::::::::::::::::::::::::::// OEM Windows Configuration Script //:::::::::::::::::::::::::// Windows //::::::
 # ::
 # :: Author:			RTD Team
 # :: Version: 			1.0
@@ -11,7 +11,7 @@
 # :: 	This Script Source:	https://github.com/vonschutter/RTD-Setup
 # ::
 # :: Purpose: 	The purpose of the script is to:
-# ::		- Configure a fresh Windows 11 VM, VDI, or workstation for RTD use.
+# ::		- Configure a fresh Windows VM, VDI, or workstation for RTD use.
 # ::		- Remove Windows consumer bloat and sponsored content when using the Aggressive preset.
 # ::		- Reduce background activity, telemetry, advertising surfaces, and suggestions.
 # ::		- Apply conservative performance-focused service defaults suitable for VM and VDI use.
@@ -21,10 +21,10 @@
 # ::		      WebView2, networking, event logging, and core management services.
 # ::
 # :: Usage: 	Run from an elevated PowerShell session, or allow the script to relaunch itself elevated:
-# ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-win11-config.ps1
-# ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-win11-config.ps1 -Preset Minimal
-# ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-win11-config.ps1 -SkipSoftware
-# ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-win11-config.ps1 -Restart
+# ::		powershell.exe -ExecutionPolicy Bypass -File .\windows-setup.ps1
+# ::		powershell.exe -ExecutionPolicy Bypass -File .\windows-setup.ps1 -Preset Minimal
+# ::		powershell.exe -ExecutionPolicy Bypass -File .\windows-setup.ps1 -SkipSoftware
+# ::		powershell.exe -ExecutionPolicy Bypass -File .\windows-setup.ps1 -Restart
 # ::
 # :: Presets:	Aggressive  Default. Removes consumer apps and disables non-essential noise.
 # ::		Minimal     Keeps bundled apps but disables telemetry, ads, and suggestions.
@@ -70,12 +70,14 @@ $ErrorActionPreference = "Continue"
 $ProgressPreference = "SilentlyContinue"
 $Script:RestartRequired = $false
 $Script:RtdRoot = "C:\RTD"
-$Script:LogDir = Join-Path $Script:RtdRoot "log"
+$Script:LogDir = [System.IO.Path]::Combine($Script:RtdRoot, "log")
 $Script:SetupLog = "C:\setup.log"
 $Script:ChocoExe = $null
 $Script:SoftwareFailures = New-Object System.Collections.Generic.List[string]
 $Script:WarningCount = 0
 $Script:VirtualizationPlatform = $null
+$Script:WindowsIdentity = $null
+$Script:WallpaperUrl = "https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/wallpaper/Wayland.jpg"
 
 # Centralized logging keeps the console, setup log, and RTD log aligned. Most
 # actions are best-effort on Windows images because exact components vary by
@@ -96,7 +98,7 @@ function Write-RtdLog {
     }
     try {
         Add-Content -Path $Script:SetupLog -Value $line -Encoding UTF8 -ErrorAction SilentlyContinue
-        Add-Content -Path (Join-Path $Script:LogDir "rtd-oem-win11-config.log") -Value $line -Encoding UTF8 -ErrorAction SilentlyContinue
+        Add-Content -Path (Join-Path $Script:LogDir "windows-setup.log") -Value $line -Encoding UTF8 -ErrorAction SilentlyContinue
     } catch {
         Write-Host "[WARN] Unable to write to log file: $($_.Exception.Message)"
     }
@@ -134,7 +136,7 @@ function Start-RtdElevated {
         return
     }
 
-    Write-Host "RTD Windows 11 configuration requires administrative privileges. Relaunching elevated..."
+    Write-Host "RunTime Data Windows configuration requires administrative privileges. Relaunching elevated..."
     $arguments = @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
@@ -152,10 +154,65 @@ function Start-RtdElevated {
     exit
 }
 
-# Prepare the RTD working folders and transcript before changing system state.
-# The Windows build warning catches accidental use on Windows 10 without blocking
-# an administrator who deliberately runs the script.
-function Initialize-RtdWin11Config {
+# Return stable OS identity data without treating a marketing name as a feature
+# switch. Tests may supply registry/CIM fixtures; production calls query Windows.
+function Get-RtdWindowsIdentity {
+    param(
+        [hashtable]$CurrentVersion,
+        [psobject]$OperatingSystem
+    )
+
+    if (-not $CurrentVersion) {
+        $properties = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion" -ErrorAction Stop
+        $CurrentVersion = @{
+            ProductName = [string]$properties.ProductName
+            EditionID = [string]$properties.EditionID
+            DisplayVersion = [string]$properties.DisplayVersion
+            CurrentBuildNumber = [string]$properties.CurrentBuildNumber
+            UBR = $properties.UBR
+            InstallationType = [string]$properties.InstallationType
+        }
+    }
+    if (-not $OperatingSystem) {
+        $OperatingSystem = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+    }
+
+    $build = 0
+    [void][int]::TryParse([string]$CurrentVersion.CurrentBuildNumber, [ref]$build)
+    $installationType = [string]$CurrentVersion.InstallationType
+    $productName = [string]$CurrentVersion.ProductName
+    $family = "FutureOrUnknown"
+    if ($installationType -match "Server") {
+        $family = "WindowsServer"
+    } elseif ($build -lt 10240) {
+        $family = "LegacyWindows"
+    } elseif ($build -lt 22000) {
+        $family = "Windows10"
+    } elseif ($productName -match "Windows 11" -or $productName -match "Windows 10") {
+        # Some Windows 11 builds retain "Windows 10" in CurrentVersion.ProductName
+        # for compatibility. Build 22000 remains the reliable family boundary.
+        $family = "Windows11"
+    }
+
+    return [pscustomobject]@{
+        ProductName = $productName
+        EditionID = [string]$CurrentVersion.EditionID
+        DisplayVersion = [string]$CurrentVersion.DisplayVersion
+        InstallationType = $installationType
+        Build = $build
+        UBR = [int]$CurrentVersion.UBR
+        Version = [string]$OperatingSystem.Version
+        Architecture = [string]$OperatingSystem.OSArchitecture
+        Caption = [string]$OperatingSystem.Caption
+        Family = $family
+        IsSupportedBaseline = $build -ge 10240
+        IsFutureOrUnknown = $family -eq "FutureOrUnknown"
+    }
+}
+
+# Prepare the working folders, record exact OS identity, and apply shared
+# personalization. Windows 10 and newer use one capability-driven path.
+function Initialize-RtdWindowsConfig {
     Start-RtdElevated
 
     New-Item -Path $Script:RtdRoot -ItemType Directory -Force | Out-Null
@@ -163,16 +220,25 @@ function Initialize-RtdWin11Config {
     New-Item -Path $Script:SetupLog -ItemType File -Force | Out-Null
 
     try {
-        Start-Transcript -Path (Join-Path $Script:LogDir "rtd-oem-win11-config-transcript.log") -Append -ErrorAction SilentlyContinue | Out-Null
+        Start-Transcript -Path (Join-Path $Script:LogDir "windows-setup-transcript.log") -Append -ErrorAction SilentlyContinue | Out-Null
     } catch {
         Write-RtdLog "Transcript logging could not be started: $($_.Exception.Message)" "WARN"
     }
 
-    $build = [Environment]::OSVersion.Version.Build
-    Write-RtdLog "Detected Windows build $build."
-    if ($build -lt 22000) {
-        Write-RtdLog "This script is intended for Windows 11 build 22000 or newer. Continuing because PowerShell execution was requested explicitly." "WARN"
+    try {
+        $Script:WindowsIdentity = Get-RtdWindowsIdentity
+        $identity = $Script:WindowsIdentity
+        Write-RtdLog "Detected Windows: product='$($identity.ProductName)'; caption='$($identity.Caption)'; edition='$($identity.EditionID)'; display version='$($identity.DisplayVersion)'; installation type='$($identity.InstallationType)'; build=$($identity.Build).$($identity.UBR); architecture='$($identity.Architecture)'; family='$($identity.Family)'."
+        if (-not $identity.IsSupportedBaseline) {
+            Write-RtdLog "Build $($identity.Build) predates the Windows 10 baseline. Setup will continue best-effort, but this OS is unsupported." "WARN"
+        } elseif ($identity.IsFutureOrUnknown) {
+            Write-RtdLog "This Windows release is newer than or outside the explicitly classified Windows families. Continuing with capability detection rather than falling back to a legacy script." "WARN"
+        }
+    } catch {
+        Write-RtdLog "Windows identity detection failed: $($_.Exception.Message). Capability detection will continue." "WARN"
     }
+
+    Set-RtdWindowsWallpaper
 }
 
 # Registry writes are wrapped so policy edits are idempotent and missing keys are
@@ -222,6 +288,128 @@ function Remove-RtdRegistryValue {
         }
     } catch {
         Write-RtdLog "Registry value removal failed: $Path\$Name ($($_.Exception.Message))" "WARN"
+    }
+}
+
+# Download and validate the shared wallpaper independently of the bootstrap.
+function Save-RtdWallpaper {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Destination
+    )
+
+    $directory = Split-Path -Parent $Destination
+    $temporaryPath = "$Destination.download"
+    New-Item -Path $directory -ItemType Directory -Force | Out-Null
+    Remove-Item -LiteralPath $temporaryPath -Force -ErrorAction SilentlyContinue
+    try {
+        $cacheBuster = (Get-Date).ToUniversalTime().Ticks
+        $url = "{0}?rtd_cache_bust={1}" -f $Script:WallpaperUrl, $cacheBuster
+        Invoke-WebRequest -Uri $url -OutFile $temporaryPath -UseBasicParsing -ErrorAction Stop
+        $file = Get-Item -LiteralPath $temporaryPath -ErrorAction Stop
+        if ($file.Length -lt 10KB) {
+            throw "Downloaded wallpaper is unexpectedly small ($($file.Length) bytes)."
+        }
+        $stream = [System.IO.File]::OpenRead($temporaryPath)
+        try {
+            $header = New-Object byte[] 3
+            [void]$stream.Read($header, 0, $header.Length)
+        } finally {
+            $stream.Dispose()
+        }
+        if (-not ($header[0] -eq 0xFF -and $header[1] -eq 0xD8 -and $header[2] -eq 0xFF)) {
+            throw "Downloaded wallpaper is not a valid JPEG file."
+        }
+        Move-Item -LiteralPath $temporaryPath -Destination $Destination -Force
+        Write-RtdLog "Wallpaper downloaded to '$Destination' (SHA-256=$((Get-FileHash -LiteralPath $Destination -Algorithm SHA256).Hash))." "OK"
+        return $true
+    } catch {
+        Remove-Item -LiteralPath $temporaryPath -Force -ErrorAction SilentlyContinue
+        Write-RtdLog "Wallpaper download failed: $($_.Exception.Message)" "WARN"
+        return $false
+    }
+}
+
+function Set-RtdCurrentUserWallpaper {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    try {
+        Set-RtdRegistryValue "HKCU:\Control Panel\Desktop" "Wallpaper" $Path "String"
+        Set-RtdRegistryValue "HKCU:\Control Panel\Desktop" "WallpaperStyle" "10" "String"
+        Set-RtdRegistryValue "HKCU:\Control Panel\Desktop" "TileWallpaper" "0" "String"
+        if (-not ("RtdWallpaperNativeMethods" -as [type])) {
+            Add-Type -TypeDefinition @"
+using System.Runtime.InteropServices;
+public static class RtdWallpaperNativeMethods
+{
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool SystemParametersInfo(int action, int parameter, string value, int flags);
+}
+"@
+        }
+        if (-not [RtdWallpaperNativeMethods]::SystemParametersInfo(20, 0, $Path, 3)) {
+            throw "SystemParametersInfo failed with Win32 error $([Runtime.InteropServices.Marshal]::GetLastWin32Error())."
+        }
+        Write-RtdLog "Current-user wallpaper applied for '$([Security.Principal.WindowsIdentity]::GetCurrent().Name)'." "OK"
+    } catch {
+        Write-RtdLog "Current-user wallpaper could not be applied: $($_.Exception.Message)" "WARN"
+    }
+}
+
+function Set-RtdDefaultUserWallpaper {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $hiveName = "RTD_DefaultUser"
+    $hiveRoot = "Registry::HKEY_USERS\$hiveName"
+    $desktopKey = "$hiveRoot\Control Panel\Desktop"
+    $hiveFile = Join-Path $env:SystemDrive "Users\Default\NTUSER.DAT"
+    $mountedByThisProcess = $false
+    try {
+        if (-not (Test-Path -LiteralPath $hiveFile -PathType Leaf)) {
+            throw "Default-user hive was not found at '$hiveFile'."
+        }
+        if (-not (Test-Path $hiveRoot)) {
+            & reg.exe load "HKU\$hiveName" $hiveFile | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                throw "reg.exe could not load the default-user hive (exit code $LASTEXITCODE)."
+            }
+            $mountedByThisProcess = $true
+        }
+
+        New-Item -Path $desktopKey -Force | Out-Null
+        New-ItemProperty -Path $desktopKey -Name "Wallpaper" -Value $Path -PropertyType String -Force | Out-Null
+        New-ItemProperty -Path $desktopKey -Name "WallpaperStyle" -Value "10" -PropertyType String -Force | Out-Null
+        New-ItemProperty -Path $desktopKey -Name "TileWallpaper" -Value "0" -PropertyType String -Force | Out-Null
+        Remove-ItemProperty -Path $desktopKey -Name "TranscodedImageCache" -Force -ErrorAction SilentlyContinue
+        Remove-ItemProperty -Path $desktopKey -Name "TranscodedImageCount" -Force -ErrorAction SilentlyContinue
+        $cachedWallpaper = Join-Path $env:SystemDrive "Users\Default\AppData\Roaming\Microsoft\Windows\Themes\TranscodedWallpaper"
+        Remove-Item -LiteralPath $cachedWallpaper -Force -ErrorAction SilentlyContinue
+        Write-RtdLog "Default-user wallpaper configured for accounts created after Sysprep/OOBE." "OK"
+    } catch {
+        Write-RtdLog "Default-user wallpaper could not be configured: $($_.Exception.Message)" "WARN"
+    } finally {
+        if ($mountedByThisProcess) {
+            [GC]::Collect()
+            [GC]::WaitForPendingFinalizers()
+            & reg.exe unload "HKU\$hiveName" | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Write-RtdLog "Default-user registry hive could not be unloaded. Restart Windows before capturing the image." "WARN"
+            }
+        }
+    }
+}
+
+function Set-RtdWindowsWallpaper {
+    $wallpaperPath = Join-Path (Join-Path $Script:RtdRoot "wallpaper") "Wayland.jpg"
+    if ((Test-Path -LiteralPath $wallpaperPath -PathType Leaf) -or (Save-RtdWallpaper -Destination $wallpaperPath)) {
+        Set-RtdCurrentUserWallpaper -Path $wallpaperPath
+        Set-RtdDefaultUserWallpaper -Path $wallpaperPath
     }
 }
 
@@ -277,8 +465,8 @@ function Disable-RtdScheduledTask {
 # Reduce diagnostic collection and feedback prompts. This combines policy keys,
 # current-user privacy settings, telemetry services, and known scheduled tasks
 # that periodically collect compatibility or customer-experience data.
-function Disable-RtdWindows11Telemetry {
-    Write-RtdLog "Disabling Windows 11 telemetry and feedback collection."
+function Disable-RtdWindowsTelemetry {
+    Write-RtdLog "Disabling Windows telemetry and feedback collection."
 
     # Machine policy keys apply broadly and survive new user creation.
     Set-RtdRegistryValue "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection" "AllowTelemetry" 0
@@ -317,8 +505,8 @@ function Disable-RtdWindows11Telemetry {
 # Disable Windows consumer-content pipelines. These settings reduce start-menu
 # suggestions, lock-screen promotions, File Explorer sync-provider prompts, and
 # web-backed search results that create noise in a managed VM/VDI image.
-function Disable-RtdWindows11SuggestionsAndAds {
-    Write-RtdLog "Disabling Windows 11 suggestions, ads, consumer content, and web search noise."
+function Disable-RtdWindowsSuggestionsAndAds {
+    Write-RtdLog "Disabling Windows suggestions, ads, consumer content, and web search noise."
 
     Set-RtdRegistryValue "HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent" "DisableWindowsConsumerFeatures" 1
     Set-RtdRegistryValue "HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent" "DisableConsumerAccountStateContent" 1
@@ -370,7 +558,7 @@ function Disable-RtdWindows11SuggestionsAndAds {
 
 # Remove taskbar and shell entry points for cloud/news/chat features that are
 # not useful in most RTD workstation images and often start background processes.
-function Disable-RtdWindows11CopilotWidgetsChat {
+function Disable-RtdWindowsCopilotWidgetsChat {
     Write-RtdLog "Disabling Copilot, Widgets, Chat, and related taskbar entry points."
 
     Set-RtdRegistryValue "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" "TurnOffWindowsCopilot" 1
@@ -384,7 +572,7 @@ function Disable-RtdWindows11CopilotWidgetsChat {
 
 # Restrict Store/UWP apps from running in the background and accessing common
 # sensor-style capabilities. The AppPrivacy value 2 means "force deny" by policy.
-function Disable-RtdWindows11BackgroundApps {
+function Disable-RtdWindowsBackgroundApps {
     Write-RtdLog "Disabling background app execution where policy allows it."
 
     Set-RtdRegistryValue "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications" "GlobalUserDisabled" 1
@@ -398,7 +586,7 @@ function Disable-RtdWindows11BackgroundApps {
 
 # Turn off game capture and Xbox services. These features are useful on gaming
 # workstations but add background services and overlays to standard VM/VDI images.
-function Disable-RtdWindows11Gaming {
+function Disable-RtdWindowsGaming {
     Write-RtdLog "Disabling Game DVR, Game Bar, and Xbox background services."
 
     Set-RtdRegistryValue "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\GameDVR" "AppCaptureEnabled" 0
@@ -418,7 +606,7 @@ function Disable-RtdWindows11Gaming {
 # OneDrive is removed only in the Aggressive preset. The policy blocks sync for
 # future users, startup entries prevent relaunch, and setup /uninstall removes
 # the installed client when present.
-function Disable-RtdWindows11OneDrive {
+function Disable-RtdWindowsOneDrive {
     Write-RtdLog "Disabling and uninstalling OneDrive."
 
     Set-RtdRegistryValue "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive" "DisableFileSyncNGSC" 1
@@ -445,7 +633,7 @@ function Disable-RtdWindows11OneDrive {
 # Apply user-facing defaults that make an image easier to support: less visual
 # overhead, file extensions visible, hidden files visible, left-aligned taskbar,
 # and no Explorer startup delay.
-function Set-RtdWindows11PerformanceUi {
+function Set-RtdWindowsPerformanceUi {
     Write-RtdLog "Applying performance-focused Explorer, UI, and privacy defaults."
 
     Set-RtdRegistryValue "HKCU:\Control Panel\Desktop" "DragFullWindows" "0" "String"
@@ -460,9 +648,82 @@ function Set-RtdWindows11PerformanceUi {
     Set-RtdRegistryValue "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Serialize" "StartupDelayInMSec" 0
 }
 
+# Preserve the safe, still-useful parts of the former Windows 10 baseline.
+# Every OS component is checked before invocation so newer Windows releases can
+# continue without requiring another version-named script.
+function Set-RtdWindowsCompatibilityBaseline {
+    Write-RtdLog "Applying capability-gated Windows compatibility and security defaults."
+
+    # SMB1 and LLMNR are legacy discovery/protocol surfaces. Keep SMB2/3 and the
+    # firewall enabled; the former script's SMB-server and firewall changes are
+    # intentionally not carried forward.
+    try {
+        if (Get-Command "Get-WindowsOptionalFeature" -ErrorAction SilentlyContinue) {
+            $smb1 = Get-WindowsOptionalFeature -Online -FeatureName "SMB1Protocol" -ErrorAction SilentlyContinue
+            if ($smb1 -and $smb1.State -eq "Enabled") {
+                Disable-WindowsOptionalFeature -Online -FeatureName "SMB1Protocol" -NoRestart -ErrorAction Stop | Out-Null
+                $Script:RestartRequired = $true
+                Write-RtdLog "SMB1 optional feature disabled." "OK"
+            } elseif ($smb1) {
+                Write-RtdLog "SMB1 optional feature is already disabled or absent." "OK"
+            }
+        } elseif (Get-Command "Set-SmbServerConfiguration" -ErrorAction SilentlyContinue) {
+            Set-SmbServerConfiguration -EnableSMB1Protocol $false -Force -ErrorAction Stop | Out-Null
+            Write-RtdLog "SMB1 server protocol disabled through the SMB cmdlet." "OK"
+        } else {
+            Write-RtdLog "SMB1 management capability is unavailable; no SMB change was attempted."
+        }
+    } catch {
+        Write-RtdLog "SMB1 could not be disabled: $($_.Exception.Message)" "WARN"
+    }
+    Set-RtdRegistryValue "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\DNSClient" "EnableMulticast" 0
+
+    # Retain remote-assistance, shared-experience, and removable-media hardening
+    # without enabling/disabling Remote Desktop itself.
+    Set-RtdRegistryValue "HKLM:\SYSTEM\CurrentControlSet\Control\Remote Assistance" "fAllowToGetHelp" 0
+    Set-RtdRegistryValue "HKLM:\SOFTWARE\Policies\Microsoft\Windows\System" "EnableCdp" 0
+    Set-RtdRegistryValue "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\AutoplayHandlers" "DisableAutoplay" 1
+    Set-RtdRegistryValue "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" "NoDriveTypeAutoRun" 255
+
+    # Preserve the useful end-user defaults from the Windows 10 worker.
+    Set-RtdRegistryValue "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" "AppsUseLightTheme" 0
+    Set-RtdRegistryValue "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" "SystemUsesLightTheme" 0
+    Set-RtdRegistryValue "HKCU:\Control Panel\Accessibility\StickyKeys" "Flags" "506" "String"
+    Set-RtdRegistryValue "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\ControlPanel" "StartupPage" 1
+    Set-RtdRegistryValue "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\ControlPanel" "AllItemsIconView" 1
+    Set-RtdRegistryValue "Registry::HKEY_USERS\.DEFAULT\Control Panel\Keyboard" "InitialKeyboardIndicators" "2147483650" "String"
+
+    # Active-hours values are used only when the Windows Update UX key exists.
+    $updateUxPath = "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings"
+    if (Test-Path $updateUxPath) {
+        Set-RtdRegistryValue $updateUxPath "ActiveHoursStart" 8
+        Set-RtdRegistryValue $updateUxPath "ActiveHoursEnd" 2
+    } else {
+        Write-RtdLog "Windows Update UX active-hours capability is absent; active hours were not changed."
+    }
+
+    # Set connected non-domain networks private when the networking cmdlets are
+    # available. Domain-authenticated profiles retain their managed category.
+    if ((Get-Command "Get-NetConnectionProfile" -ErrorAction SilentlyContinue) -and
+        (Get-Command "Set-NetConnectionProfile" -ErrorAction SilentlyContinue)) {
+        try {
+            $profiles = Get-NetConnectionProfile -ErrorAction Stop |
+                Where-Object { $_.NetworkCategory -ne "DomainAuthenticated" }
+            foreach ($profile in $profiles) {
+                Set-NetConnectionProfile -InterfaceIndex $profile.InterfaceIndex -NetworkCategory Private -ErrorAction Stop
+                Write-RtdLog "Network profile '$($profile.Name)' set to Private." "OK"
+            }
+        } catch {
+            Write-RtdLog "Network profiles could not be set to Private: $($_.Exception.Message)" "WARN"
+        }
+    } else {
+        Write-RtdLog "Network profile cmdlets are unavailable; network category was not changed."
+    }
+}
+
 # Edge is left installed because Windows components depend on it, but first-run,
 # sidebar, shopping, suggestions, feedback, and diagnostic reporting are reduced.
-function Set-RtdWindows11EdgePolicy {
+function Set-RtdWindowsEdgePolicy {
     Write-RtdLog "Reducing Microsoft Edge first-run, sidebar, shopping, and feedback noise."
 
     $edgePolicyPath = "HKLM:\SOFTWARE\Policies\Microsoft\Edge"
@@ -479,8 +740,8 @@ function Set-RtdWindows11EdgePolicy {
 # Tune non-essential services for VM/VDI use. Services that are rarely useful in
 # a managed image are disabled; support-adjacent services are left manual so an
 # administrator can still start them when needed.
-function Optimize-RtdWindows11Services {
-    Write-RtdLog "Optimizing non-essential Windows 11 services."
+function Optimize-RtdWindowsServices {
+    Write-RtdLog "Optimizing non-essential Windows services."
 
     $disableServices = @(
         "MapsBroker",
@@ -572,11 +833,11 @@ function Remove-RtdAppxPackagePattern {
     }
 }
 
-# Curated consumer AppX package list for Windows 11. The list avoids core
+# Curated consumer AppX package list for Windows. The list avoids core
 # platform components such as Store dependencies, WebView2, Defender, Update,
 # networking, and management tooling.
-function Remove-RtdWindows11BloatApps {
-    Write-RtdLog "Removing Windows 11 consumer AppX packages."
+function Remove-RtdWindowsBloatApps {
+    Write-RtdLog "Removing Windows consumer AppX packages."
 
     $bloatPackages = @(
         "Clipchamp.Clipchamp",
@@ -760,6 +1021,38 @@ function Get-RtdVirtualizationPlatform {
 # Query the virtio-win archive index, select the numerically highest release,
 # and build the download URL for the guest-tools bundle. Fallback entries are
 # kept because the upstream listing service is occasionally filtered or mirrored.
+function Resolve-RtdSecureDownloadUrl {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Url
+    )
+
+    try {
+        $request = [System.Net.HttpWebRequest]::Create($Url)
+        $request.Method = "HEAD"
+        $request.AllowAutoRedirect = $false
+        $response = $request.GetResponse()
+        try {
+            $location = $response.Headers["Location"]
+        } finally {
+            $response.Close()
+        }
+        if (-not $location) {
+            return $Url
+        }
+
+        $resolved = (New-Object System.Uri -ArgumentList ([System.Uri]$Url), $location).AbsoluteUri
+        $resolvedUri = [System.Uri]$resolved
+        if ($resolvedUri.Host -eq "fedorapeople.org" -and $resolvedUri.Scheme -eq "http") {
+            $resolved = "https://{0}{1}" -f $resolvedUri.Host, $resolvedUri.PathAndQuery
+        }
+        return $resolved
+    } catch {
+        Write-RtdLog "Could not resolve secure redirect for ${Url}: $($_.Exception.Message)" "WARN"
+        return $Url
+    }
+}
+
 function Get-RtdLatestVirtioGuestTools {
     $indexCandidates = @(
         "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/?C=M;O=D",
@@ -769,7 +1062,7 @@ function Get-RtdLatestVirtioGuestTools {
     $artifactTemplates = @(
         "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/{0}/virtio-win-guest-tools.exe",
         "https://fedora-virt.repo.nfrance.com/virtio-win/direct-downloads/archive-virtio/{0}/virtio-win-guest-tools.exe",
-        "https://fedora-virt.repo.nfrance.com/virtio-win/direct-downloads/latest-virtio/virtio-win-guest-tools.exe"
+        "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/latest-virtio/virtio-win-guest-tools.exe"
     )
 
     $releasePattern = 'virtio-win-(\d+)\.(\d+)\.(\d+)(?:-(\d+))?/'
@@ -798,28 +1091,209 @@ function Get-RtdLatestVirtioGuestTools {
         Sort-Object Major, Minor, Patch, Revision -Descending |
         Select-Object -First 1
 
+    $qemuAgentUrl = Resolve-RtdSecureDownloadUrl "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/latest-qemu-ga/qemu-ga-x86_64.msi"
     if ($latestRelease) {
-        foreach ($template in $artifactTemplates[0..1]) {
-            $url = $template -f $latestRelease.Version
-            try {
-                Write-RtdLog "Validating virtio guest-tools download URL: $url"
-                $head = Invoke-WebRequest -Uri $url -Method Head -UseBasicParsing -ErrorAction Stop
-                if ($head.StatusCode -ge 200 -and $head.StatusCode -lt 400) {
-                    return [pscustomobject]@{
-                        Version = $latestRelease.Version
-                        Url = $url
-                    }
-                }
-            } catch {
-                Write-RtdLog "virtio guest-tools URL check failed for ${url}: $($_.Exception.Message)" "WARN"
-            }
+        $url = $artifactTemplates[0] -f $latestRelease.Version
+        Write-RtdLog "Selected virtio guest-tools release $($latestRelease.Version) at exact HTTPS archive URL $url."
+        return [pscustomobject]@{
+            Version = $latestRelease.Version
+            Url = $url
+            MsiUrl = ($url -replace 'virtio-win-guest-tools\.exe$', 'virtio-win-gt-x64.msi')
+            QemuAgentUrl = $qemuAgentUrl
         }
     }
 
     $fallbackVersion = if ($latestRelease) { $latestRelease.Version } else { "latest-virtio" }
+    $fallbackUrl = Resolve-RtdSecureDownloadUrl $artifactTemplates[2]
     return [pscustomobject]@{
         Version = $fallbackVersion
-        Url = $artifactTemplates[2]
+        Url = $fallbackUrl
+        MsiUrl = ($fallbackUrl -replace 'virtio-win-guest-tools\.exe$', 'virtio-win-gt-x64.msi')
+        QemuAgentUrl = $qemuAgentUrl
+    }
+}
+
+function Assert-RtdInstallerFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $file = Get-Item -LiteralPath $Path -ErrorAction Stop
+    if ($file.Length -lt 1MB) {
+        throw "The downloaded installer is unexpectedly small ($($file.Length) bytes)."
+    }
+
+    $stream = [System.IO.File]::OpenRead($Path)
+    try {
+        $header = New-Object byte[] 8
+        $bytesRead = $stream.Read($header, 0, $header.Length)
+    } finally {
+        $stream.Dispose()
+    }
+    if ($bytesRead -lt 8) {
+        throw "The downloaded installer has an incomplete file header."
+    }
+
+    $extension = [System.IO.Path]::GetExtension($Path).ToLowerInvariant()
+    if ($extension -eq ".exe" -and -not ($header[0] -eq 0x4D -and $header[1] -eq 0x5A)) {
+        throw "The downloaded EXE does not have a valid Windows PE header."
+    }
+    if ($extension -eq ".msi") {
+        [byte[]]$msiHeader = @(0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1)
+        for ($index = 0; $index -lt $msiHeader.Length; $index++) {
+            if ($header[$index] -ne $msiHeader[$index]) {
+                throw "The downloaded MSI does not have a valid Windows Installer compound-file header."
+            }
+        }
+    }
+
+    $signature = Get-AuthenticodeSignature -LiteralPath $Path
+    if ($signature.Status -eq "HashMismatch") {
+        throw "Authenticode reports a hash mismatch; the installer is corrupted."
+    }
+    $signer = if ($signature.SignerCertificate) { $signature.SignerCertificate.Subject } else { "unsigned outer installer" }
+    if (-not $signature.SignerCertificate) {
+        Write-RtdLog "Installer '$Path' has no outer Authenticode signature; binary structure and HTTP content length will be used for transport-integrity validation."
+    }
+    Write-RtdLog "Validated installer '$Path': SHA-256=$((Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash); signer=$signer; signature status=$($signature.Status)." "OK"
+}
+
+function Save-RtdInstallerDownload {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Url,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Destination
+    )
+
+    $destinationDirectory = Split-Path -Parent $Destination
+    $destinationName = [System.IO.Path]::GetFileNameWithoutExtension($Destination)
+    $destinationExtension = [System.IO.Path]::GetExtension($Destination)
+    $partialPath = Join-Path $destinationDirectory ("{0}.partial{1}" -f $destinationName, $destinationExtension)
+    $failures = New-Object System.Collections.Generic.List[string]
+    $downloadMethods = @("BITS", "curl", "WebClient")
+    $expectedLength = 0
+    try {
+        $sizeRequest = [System.Net.HttpWebRequest]::Create($Url)
+        $sizeRequest.Method = "HEAD"
+        $sizeResponse = $sizeRequest.GetResponse()
+        try {
+            $expectedLength = [int64]$sizeResponse.ContentLength
+        } finally {
+            $sizeResponse.Close()
+        }
+        if ($expectedLength -gt 0) {
+            Write-RtdLog "Remote installer content length is $expectedLength bytes."
+        }
+    } catch {
+        Write-RtdLog "Remote installer size could not be determined before download: $($_.Exception.Message)" "WARN"
+    }
+
+    foreach ($method in $downloadMethods) {
+        Remove-Item -LiteralPath $partialPath -Force -ErrorAction SilentlyContinue
+        try {
+            Write-RtdLog "Downloading '$Url' with $method."
+            switch ($method) {
+                "BITS" {
+                    Import-Module BitsTransfer -ErrorAction Stop
+                    Start-BitsTransfer -Source $Url -Destination $partialPath -ErrorAction Stop
+                }
+                "curl" {
+                    $curl = Join-Path $env:SystemRoot "System32\curl.exe"
+                    if (-not (Test-Path -LiteralPath $curl -PathType Leaf)) {
+                        throw "curl.exe is unavailable."
+                    }
+                    & $curl --fail --location --retry 3 --retry-delay 2 --output $partialPath $Url
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "curl.exe returned exit code $LASTEXITCODE."
+                    }
+                }
+                "WebClient" {
+                    $client = New-Object System.Net.WebClient
+                    try {
+                        $client.Headers["Cache-Control"] = "no-cache"
+                        $client.DownloadFile($Url, $partialPath)
+                    } finally {
+                        $client.Dispose()
+                    }
+                }
+            }
+
+            Assert-RtdInstallerFile -Path $partialPath
+            $actualLength = (Get-Item -LiteralPath $partialPath).Length
+            if ($expectedLength -gt 0 -and $actualLength -ne $expectedLength) {
+                throw "Downloaded length $actualLength does not match the server content length $expectedLength."
+            }
+            Move-Item -LiteralPath $partialPath -Destination $Destination -Force
+            Write-RtdLog "Installer download completed successfully with $method." "OK"
+            return
+        } catch {
+            $failure = "${method}: $($_.Exception.Message)"
+            $failures.Add($failure)
+            Write-RtdLog "Installer download attempt failed using ${failure}" "WARN"
+        }
+    }
+
+    Remove-Item -LiteralPath $partialPath -Force -ErrorAction SilentlyContinue
+    throw "All installer download methods failed for '$Url': $($failures -join ' | ')"
+}
+
+function Invoke-RtdMsiInstall {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$InstallerPath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$LogPath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$DisplayName
+    )
+
+    Write-RtdLog "Installing $DisplayName from '$InstallerPath'."
+    $arguments = @(
+        "/i", ('"{0}"' -f $InstallerPath),
+        "/qn", "/norestart",
+        "/L*v", ('"{0}"' -f $LogPath)
+    )
+    $process = Start-Process -FilePath (Join-Path $env:SystemRoot "System32\msiexec.exe") -ArgumentList $arguments -Wait -PassThru
+    if ($process.ExitCode -notin @(0, 1638, 1641, 3010)) {
+        throw "$DisplayName installer returned exit code $($process.ExitCode). Review '$LogPath'."
+    }
+    if ($process.ExitCode -in @(1641, 3010)) {
+        $Script:RestartRequired = $true
+    }
+    Write-RtdLog "$DisplayName installation completed with exit code $($process.ExitCode)." "OK"
+}
+
+function Get-RtdKvmGuestComponentStatus {
+    $qemuService = Get-Service -Name "qemu-ga" -ErrorAction SilentlyContinue
+    $spiceService = Get-Service -Name "vdservice" -ErrorAction SilentlyContinue
+    return [pscustomobject]@{
+        QemuAgentInstalled = $null -ne $qemuService
+        SpiceAgentInstalled = $null -ne $spiceService
+        QemuAgentStatus = if ($qemuService) { [string]$qemuService.Status } else { "NotInstalled" }
+        SpiceAgentStatus = if ($spiceService) { [string]$spiceService.Status } else { "NotInstalled" }
+    }
+}
+
+function Start-RtdKvmGuestServices {
+    foreach ($serviceName in @("qemu-ga", "vdservice")) {
+        $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+        if (-not $service) {
+            continue
+        }
+        try {
+            Set-Service -Name $serviceName -StartupType Automatic -ErrorAction Stop
+            if ($service.Status -ne "Running") {
+                Start-Service -Name $serviceName -ErrorAction Stop
+            }
+            Write-RtdLog "KVM guest service '$serviceName' is configured for automatic startup." "OK"
+        } catch {
+            Write-RtdLog "KVM guest service '$serviceName' could not be started: $($_.Exception.Message)" "WARN"
+        }
     }
 }
 
@@ -827,29 +1301,69 @@ function Get-RtdLatestVirtioGuestTools {
 # on Chocolatey packages that may lag behind the virtio driver release cadence.
 function Install-RtdVirtioGuestTools {
     $download = Get-RtdLatestVirtioGuestTools
-    $installerPath = Join-Path (Join-Path $Script:RtdRoot "cache") "virtio-win-guest-tools.exe"
+    $cacheDirectory = Join-Path $Script:RtdRoot "cache"
+    $installerPath = Join-Path $cacheDirectory "virtio-win-guest-tools.exe"
+    $bundleMsiPath = Join-Path $cacheDirectory "virtio-win-gt-x64.msi"
+    $qemuAgentMsiPath = Join-Path $cacheDirectory "qemu-ga-x86_64.msi"
+    $bundleInstalled = $false
 
     try {
-        New-Item -Path (Split-Path $installerPath -Parent) -ItemType Directory -Force | Out-Null
+        New-Item -Path $cacheDirectory -ItemType Directory -Force | Out-Null
         Write-RtdLog "Downloading virtio guest tools release $($download.Version) from $($download.Url)."
-        Invoke-WebRequest -Uri $download.Url -OutFile $installerPath -UseBasicParsing -ErrorAction Stop
+        Save-RtdInstallerDownload -Url $download.Url -Destination $installerPath
 
-        $process = Start-Process -FilePath $installerPath -ArgumentList @("/passive", "/norestart", "/log", (Join-Path $Script:LogDir "virtio_log.txt")) -Wait -PassThru
-        if ($process.ExitCode -in @(0, 1641, 3010)) {
+        $process = Start-Process -FilePath $installerPath -ArgumentList @("/quiet", "/norestart", "/log", (Join-Path $Script:LogDir "virtio-bundle.log")) -Wait -PassThru
+        if ($process.ExitCode -in @(0, 1638, 1641, 3010)) {
             Write-RtdLog "virtio guest tools installed successfully from release $($download.Version) (exit code $($process.ExitCode))." "OK"
+            $bundleInstalled = $true
+            $Script:RestartRequired = $true
             if ($process.ExitCode -in @(1641, 3010)) {
                 $Script:RestartRequired = $true
             }
-            return $true
+        } else {
+            Write-RtdLog "virtio guest-tools bundle returned exit code $($process.ExitCode); the MSI fallback will be attempted." "WARN"
         }
-
-        throw "virtio guest tools installer returned exit code $($process.ExitCode)."
     } catch {
-        $message = "virtio guest tools installation failed: $($_.Exception.Message)"
+        Write-RtdLog "virtio guest-tools bundle attempt failed: $($_.Exception.Message). The MSI fallback will be attempted." "WARN"
+    }
+
+    Start-Sleep -Seconds 2
+    $status = Get-RtdKvmGuestComponentStatus
+    if (-not $bundleInstalled -or -not $status.QemuAgentInstalled -or -not $status.SpiceAgentInstalled) {
+        try {
+            Write-RtdLog "Guest component verification requires the x64 virtio MSI fallback (QEMU agent: $($status.QemuAgentStatus); SPICE agent: $($status.SpiceAgentStatus))." "WARN"
+            Save-RtdInstallerDownload -Url $download.MsiUrl -Destination $bundleMsiPath
+            Invoke-RtdMsiInstall -InstallerPath $bundleMsiPath -LogPath (Join-Path $Script:LogDir "virtio-msi.log") -DisplayName "VirtIO/SPICE guest tools"
+            $Script:RestartRequired = $true
+        } catch {
+            Write-RtdLog "VirtIO/SPICE MSI fallback failed: $($_.Exception.Message)" "WARN"
+        }
+    }
+
+    $status = Get-RtdKvmGuestComponentStatus
+    if (-not $status.QemuAgentInstalled) {
+        try {
+            Write-RtdLog "QEMU Guest Agent service is missing; installing the current standalone Fedora QEMU agent."
+            Save-RtdInstallerDownload -Url $download.QemuAgentUrl -Destination $qemuAgentMsiPath
+            Invoke-RtdMsiInstall -InstallerPath $qemuAgentMsiPath -LogPath (Join-Path $Script:LogDir "qemu-ga-msi.log") -DisplayName "QEMU Guest Agent"
+        } catch {
+            Write-RtdLog "Standalone QEMU Guest Agent installation failed: $($_.Exception.Message)" "WARN"
+        }
+    }
+
+    Start-RtdKvmGuestServices
+    $status = Get-RtdKvmGuestComponentStatus
+    Write-RtdLog "KVM guest component status: QEMU Guest Agent=$($status.QemuAgentStatus); SPICE agent=$($status.SpiceAgentStatus)."
+
+    if (-not $status.QemuAgentInstalled -or -not $status.SpiceAgentInstalled) {
+        $message = "KVM guest integration is incomplete after installation attempts (QEMU Guest Agent=$($status.QemuAgentStatus); SPICE agent=$($status.SpiceAgentStatus)). Review virtio-bundle.log, virtio-msi.log, and qemu-ga-msi.log in $($Script:LogDir)."
         $Script:SoftwareFailures.Add($message)
         Write-RtdLog $message "ERROR"
         return $false
     }
+
+    Write-RtdLog "VirtIO drivers, QEMU Guest Agent, and SPICE guest agent are installed." "OK"
+    return $true
 }
 
 # Windows includes Hyper-V integration components. Other detected hypervisors
@@ -870,7 +1384,7 @@ function Install-RtdVirtualizationGuestTools {
             Install-RtdVirtioGuestTools | Out-Null
         }
         "hyperv" {
-            Write-RtdLog "Hyper-V guest detected; integration services are built into Windows 11." "OK"
+            Write-RtdLog "Hyper-V guest detected; integration services are built into Windows." "OK"
         }
         "xen" {
             Write-RtdLog "Xen guest detected, but no RTD-managed guest-tools package is currently defined. Install the vendor tools manually if this image requires them." "WARN"
@@ -885,7 +1399,7 @@ function Install-RtdVirtualizationGuestTools {
 }
 
 # Preserve the Windows 10 workflow's O&O ShutUp10++ deployment while using the
-# current Windows 11-oriented recommended profile. Verify the signed executable
+# current Windows-oriented recommended profile. Verify the signed executable
 # before applying the downloaded configuration silently.
 function Install-RtdShutUp10 {
     $toolDirectory = Join-Path $Script:RtdRoot "tools\OOSU10"
@@ -918,7 +1432,7 @@ function Install-RtdShutUp10 {
 }
 
 # The Windows 10 workflow enabled the legacy Windows Media Player optional
-# feature. Retain that behavior when the feature exists on the Windows 11 image.
+# feature. Retain that behavior when the feature exists on the Windows image.
 function Enable-RtdWindowsMediaPlayer {
     try {
         $feature = Get-WindowsOptionalFeature -Online -FeatureName "WindowsMediaPlayer" -ErrorAction Stop
@@ -935,10 +1449,10 @@ function Enable-RtdWindowsMediaPlayer {
     }
 }
 
-# Install the software selected by default in rtd-oem-win10-config.ps1. Optional
-# commented bundles (games, graphics, PDF tools, and LibreOffice) remain excluded.
-function Install-RtdWindows11Software {
-    Write-RtdLog "Starting standard RTD software deployment."
+# Install the standard Windows application set. Optional bundles such as games,
+# graphics tools, PDF tools, and LibreOffice remain excluded.
+function Install-RtdWindowsSoftware {
+    Write-RtdLog "Starting standard RunTime Data software deployment."
 
     if (Initialize-RtdChocolatey) {
         $software = @(
@@ -962,7 +1476,6 @@ function Install-RtdWindows11Software {
         Write-RtdLog "Chocolatey-dependent application installs were skipped after bootstrap failure." "ERROR"
     }
 
-    Install-RtdVirtualizationGuestTools
     Install-RtdShutUp10 | Out-Null
     Enable-RtdWindowsMediaPlayer
 
@@ -978,28 +1491,29 @@ function Install-RtdWindows11Software {
 
 # Minimal keeps Windows app payloads intact while reducing telemetry, ads,
 # background app behavior, gaming overlays, and noisy shell/Edge defaults.
-function Run-RtdWindows11Minimal {
-    Disable-RtdWindows11Telemetry
-    Disable-RtdWindows11SuggestionsAndAds
-    Disable-RtdWindows11CopilotWidgetsChat
-    Disable-RtdWindows11BackgroundApps
-    Disable-RtdWindows11Gaming
-    Set-RtdWindows11PerformanceUi
-    Set-RtdWindows11EdgePolicy
+function Run-RtdWindowsMinimal {
+    Set-RtdWindowsCompatibilityBaseline
+    Disable-RtdWindowsTelemetry
+    Disable-RtdWindowsSuggestionsAndAds
+    Disable-RtdWindowsCopilotWidgetsChat
+    Disable-RtdWindowsBackgroundApps
+    Disable-RtdWindowsGaming
+    Set-RtdWindowsPerformanceUi
+    Set-RtdWindowsEdgePolicy
 }
 
 # Aggressive starts with Minimal, then removes OneDrive, tunes services, and
 # removes consumer AppX payloads for a cleaner VM/VDI template.
-function Run-RtdWindows11Aggressive {
-    Run-RtdWindows11Minimal
-    Disable-RtdWindows11OneDrive
-    Optimize-RtdWindows11Services
-    Remove-RtdWindows11BloatApps
+function Run-RtdWindowsAggressive {
+    Run-RtdWindowsMinimal
+    Disable-RtdWindowsOneDrive
+    Optimize-RtdWindowsServices
+    Remove-RtdWindowsBloatApps
 }
 
 # Stop transcript logging and optionally restart. AppX removal and service
 # changes often need a reboot before the final user experience is accurate.
-function Complete-RtdWindows11Config {
+function Complete-RtdWindowsConfig {
     Write-RtdStep "complete" "start"
     $hadOperationalWarnings = $Script:WarningCount -gt 0
 
@@ -1030,7 +1544,7 @@ function Complete-RtdWindows11Config {
 }
 
 Write-RtdStep "initialize" "start"
-Initialize-RtdWin11Config
+Initialize-RtdWindowsConfig
 Write-RtdStep "initialize" "done"
 
 # Dispatch the selected preset after initialization so logging, elevation, and
@@ -1038,22 +1552,29 @@ Write-RtdStep "initialize" "done"
 Write-RtdStep "tuning" "start"
 switch ($Preset) {
     "Minimal" {
-        Write-RtdLog "Running Windows 11 Minimal preset."
-        Run-RtdWindows11Minimal
+        Write-RtdLog "Running Windows Minimal preset."
+        Run-RtdWindowsMinimal
     }
     default {
-        Write-RtdLog "Running Windows 11 Aggressive preset."
-        Run-RtdWindows11Aggressive
+        Write-RtdLog "Running Windows Aggressive preset."
+        Run-RtdWindowsAggressive
     }
 }
 Write-RtdStep "tuning" "done"
 
 if ($SkipSoftware) {
-    Write-RtdLog "Software deployment was skipped because -SkipSoftware was specified."
-    Write-RtdStep "software" "skipped"
+    Write-RtdStep "software" "start"
+    Write-RtdLog "Standard application deployment was skipped because -SkipSoftware was specified; required virtualization guest integration will still be checked."
+    Install-RtdVirtualizationGuestTools
+    if ($Script:SoftwareFailures.Count -gt 0) {
+        Write-RtdStep "software" "warning"
+    } else {
+        Write-RtdStep "software" "done"
+    }
 } else {
     Write-RtdStep "software" "start"
-    Install-RtdWindows11Software
+    Install-RtdVirtualizationGuestTools
+    Install-RtdWindowsSoftware
     if ($Script:SoftwareFailures.Count -gt 0) {
         Write-RtdStep "software" "warning"
     } else {
@@ -1061,4 +1582,4 @@ if ($SkipSoftware) {
     }
 }
 
-Complete-RtdWindows11Config
+Complete-RtdWindowsConfig

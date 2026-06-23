@@ -398,19 +398,15 @@ exit $?
 	set _TLA=RTD
 	set TEMP=C:\%_TLA%\temp
 	set LOG_DIR=C:\%_TLA%\log
-	set WALLPAPER_DIR=C:\%_TLA%\wallpaper
 	set CACHE_DIR=C:\%_TLA%\cache
 	set CORE_DIR=C:\%_TLA%\core
-        set WALLPAPER_URL=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/wallpaper/Wayland.jpg
 	set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
-	set _STAGE2FILE=rtd-oem-win10-config.ps1
-	set _WINDOWS_BUILD=0
+	set _STAGE2FILE=windows-setup-splash.ps1
 	set _zopt="--password"
 	set _pwd="epUTtqAdn2AVEbj9fzy9"
 
 	md %TEMP%
 	md %LOG_DIR%
-	md %WALLPAPER_DIR%
         md %CACHE_DIR%
 	md %CORE_DIR%
 
@@ -443,7 +439,7 @@ exit $?
 	ver | find "6.2" > nul && call :PS2 Windows 8
 	ver | find "6.3" > nul && call :PS2 Windows 8
 	ver | find "6.3" > nul && call :PS2 Windows 8
-	ver | find "10.0" > nul && if %_WINDOWS_BUILD% GEQ 22000 (call :PS2 Windows 11) else (call :PS2 Windows 10)
+	ver | find "10.0" > nul && call :PS2 Windows 10 or newer
 
 	:: Windows Server OS Versions:
 	ver | find "NT 6.2" > nul && call :PS2 Windows Server 2012
@@ -461,18 +457,12 @@ exit $?
 	echo Please wait...
 	if exist A:\autounattend.xml copy /y A:\*.* %CORE_DIR%\
 
-	@title "Fetch Wallpaper for default background"
-        powershell -Command "& {(New-Object Net.WebClient).DownloadFile('%WALLPAPER_URL%', '%WALLPAPER_DIR%\Wayland.jpg'); Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name Wallpaper -Value '%WALLPAPER_DIR%\Wayland.jpg'; Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name WallpaperStyle -Value '10'; Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name TileWallpaper -Value '0'; rundll32.exe user32.dll, UpdatePerUserSystemParameters}"
-
-	@title "Set network profiles to Private"
-        powershell -Command "& {Get-ChildItem -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles' | ForEach-Object {Set-ItemProperty -Path $_.PSParentPath -Name 'Category' -Value 1}}"
- 
 	if exist %CORE_DIR%\%_STAGE2FILE% (
 		echo File found locally...
 		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\%_STAGE2FILE%
 		) else (
 		echo Fetching %_STAGE2FILE% from the internet...
-		powershell -Command "(New-Object Net.WebClient).DownloadFile('%_STAGE2LOC%/%_STAGE2FILE%', '%CACHE_DIR%\%_STAGE2FILE%')"
+		powershell -Command "$stage2Url='%_STAGE2LOC%/%_STAGE2FILE%?rtd_cache_bust=' + [DateTime]::UtcNow.Ticks; (New-Object Net.WebClient).DownloadFile($stage2Url, '%CACHE_DIR%\%_STAGE2FILE%')"
 		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
 	)
 
@@ -491,20 +481,13 @@ exit $?
 	:: These version of windows have a more modern version of PowerShell.
 	:: get stage 2 and run it...
 	echo Found %*
-	set _STAGE2FILE=windows-setup-splash.ps1
 	if exist A:\autounattend.xml copy /y A:\*.* %CORE_DIR%\
-	@title "POWERSHELL: seting NETWORK Config"
-        powershell -Command "& {Get-ChildItem -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles' | ForEach-Object {Set-ItemProperty -Path $_.PSParentPath -Name 'Category' -Value 1}}"
-
-        @title "POWERSHELL: Fetch Wallpaper for default background"
-        powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest %WALLPAPER_URL% -OutFile %WALLPAPER_DIR%\Wayland.jpg; Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name Wallpaper -Value '%WALLPAPER_DIR%\Wayland.jpg'; Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name WallpaperStyle -Value '10'; Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name TileWallpaper -Value '0'; rundll32.exe user32.dll, UpdatePerUserSystemParameters}"
-
 	if exist %CORE_DIR%\%_STAGE2FILE% (
 		@title "CMD: %_STAGE2FILE% File found locally..."
 		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\%_STAGE2FILE%
 		) else (
 		@title "CMD: Fetching %_STAGE2FILE% from the internet..."
-		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest %_STAGE2LOC%/%_STAGE2FILE% -OutFile %CACHE_DIR%\%_STAGE2FILE%"
+		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $stage2Url='%_STAGE2LOC%/%_STAGE2FILE%?rtd_cache_bust=' + [DateTime]::UtcNow.Ticks; Invoke-WebRequest -Uri $stage2Url -Headers @{'Cache-Control'='no-cache, no-store';'Pragma'='no-cache'} -OutFile '%CACHE_DIR%\%_STAGE2FILE%'"
 		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
 	)
 
