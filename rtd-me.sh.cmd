@@ -402,9 +402,6 @@ exit $?
 	set CORE_DIR=C:\%_TLA%\core
 	set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
 	set _STAGE2FILE=rtd-oem-windows-setup-splash.ps1
-	set _zopt="--password"
-	set _pwd="epUTtqAdn2AVEbj9fzy9"
-
 	md %TEMP%
 	md %LOG_DIR%
         md %CACHE_DIR%
@@ -456,11 +453,6 @@ exit $?
 	@title Found %* >>%LOG_DIR%\rtd.log
 	echo Please wait...
 	if exist A:\autounattend.xml copy /y A:\*.* %CORE_DIR%\
-	if exist %CORE_DIR%\_KMS.zip (
-		@title "CMD: Extracting _KMS.zip..."
-		unzip -o %CORE_DIR%\_KMS.zip -d %CORE_DIR%\ %_zopt% %_pwd%
-	)
-
 	if exist %CORE_DIR%\%_STAGE2FILE% (
 		echo File found locally...
 		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\%_STAGE2FILE%
@@ -486,12 +478,6 @@ exit $?
 	:: get stage 2 and run it...
 	echo Found %*
 	if exist A:\autounattend.xml copy /y A:\*.* %CORE_DIR%\
-	if exist %CORE_DIR%\_KMS.zip (
-		@title "CMD: Extracting _KMS.zip..."
-		winget install --exact --id 7zip.7zip --source winget --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
-		"%ProgramFiles%\7-Zip\7z.exe" x "%CORE_DIR%\_KMS.zip" -o"%CORE_DIR%\" -p%_pwd% -y
-	)
-
 	if exist %CORE_DIR%\%_STAGE2FILE% (
 		@title "CMD: %_STAGE2FILE% File found locally..."
 		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\%_STAGE2FILE%

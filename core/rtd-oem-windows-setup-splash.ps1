@@ -10,6 +10,8 @@ param(
 
     [switch]$SkipSoftware,
 
+    [switch]$SkipGuestTools,
+
     [switch]$Restart,
 
     [switch]$ApplyDodSecureDefaults,
@@ -35,6 +37,27 @@ function Test-SetupAdministrator {
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
+function Test-SetupVirtualMachine {
+    try {
+        $computerSystem = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
+        $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction SilentlyContinue
+        $baseBoard = Get-CimInstance -ClassName Win32_BaseBoard -ErrorAction SilentlyContinue
+        $fingerprint = @(
+            $computerSystem.Manufacturer,
+            $computerSystem.Model,
+            $bios.Manufacturer,
+            ($bios.SMBIOSBIOSVersion -join " "),
+            $bios.Version,
+            $baseBoard.Manufacturer,
+            $baseBoard.Product
+        ) | Where-Object { $_ -and $_.ToString().Trim() }
+
+        return (($fingerprint -join " ") -match "Microsoft Corporation.*Virtual|Hyper-V|VMware|VirtualBox|Oracle|QEMU|KVM|Red Hat|RHV|oVirt|Bochs|Proxmox|Xen")
+    } catch {
+        return $false
+    }
+}
+
 function Start-SetupElevated {
     if (Test-SetupAdministrator) {
         return
@@ -49,6 +72,9 @@ function Start-SetupElevated {
     )
     if ($SkipSoftware) {
         $arguments += "-SkipSoftware"
+    }
+    if ($SkipGuestTools) {
+        $arguments += "-SkipGuestTools"
     }
     if ($Restart) {
         $arguments += "-Restart"
@@ -293,6 +319,9 @@ $Script:ResolvedBanner = Resolve-SetupBanner
                     <TextBlock x:Name="PresetDescription" TextWrapping="Wrap" Foreground="#7F9AB5"
                                FontSize="10" Margin="0,5,0,8"/>
                     <CheckBox x:Name="InstallSoftwareChoice" Content="Install standard RunTime Data software" IsChecked="True"/>
+                    <CheckBox x:Name="GuestToolsChoice"
+                              Content="Install virtual-machine guest tools"
+                              ToolTip="Selected automatically when supported virtual-machine hardware is detected."/>
                     <CheckBox x:Name="ActivateChoice"
                               Content="Activate Windows and Office"
                               ToolTip="Runs KMS.cmd to activate Windows and Office."/>
@@ -368,7 +397,7 @@ $reader = New-Object System.Xml.XmlNodeReader $xaml
 $window = [Windows.Markup.XamlReader]::Load($reader)
 
 $controlNames = @(
-    "BannerImage", "PresetChoice", "PresetDescription", "InstallSoftwareChoice", "ActivateChoice",
+    "BannerImage", "PresetChoice", "PresetDescription", "InstallSoftwareChoice", "GuestToolsChoice", "ActivateChoice",
     "DodSecureChoice", "SysprepChoice", "RestartChoice",
     "CurrentStatus", "InitializeDot", "InitializeText", "TuningDot", "TuningText",
     "SoftwareDot", "SoftwareText", "CompleteDot", "CompleteText", "SetupProgress",
@@ -395,6 +424,7 @@ if ($Preset -eq "Minimal") {
     $Script:PresetChoice.SelectedIndex = 1
 }
 $Script:InstallSoftwareChoice.IsChecked = -not $SkipSoftware
+$Script:GuestToolsChoice.IsChecked = (Test-SetupVirtualMachine) -and -not $SkipGuestTools
 $Script:DodSecureChoice.IsChecked = [bool]$ApplyDodSecureDefaults
 $Script:RestartChoice.IsChecked = [bool]$Restart
 
@@ -505,7 +535,11 @@ function Invoke-SetupSysprep {
         if ($process.ExitCode -ne 0) {
             throw "Sysprep exited with code $($process.ExitCode)."
         }
-        Add-SetupOutput "Sysprep completed. Waiting for Windows to shut down."
+        # Sysprep /shutdown cannot finish closing the interactive session while
+        # this frontend still reports that resealing is in progress and rejects
+        # its own close event.
+        $Script:SysprepInProgress = $false
+        Add-SetupOutput "Sysprep completed. Closing the setup frontend so Windows can shut down."
         return $true
     } catch {
         $Script:SysprepInProgress = $false
@@ -611,6 +645,7 @@ function Complete-SetupFrontend {
     $Script:StartButton.Content = "Close"
     $Script:PresetChoice.IsEnabled = $false
     $Script:InstallSoftwareChoice.IsEnabled = $false
+    $Script:GuestToolsChoice.IsEnabled = $false
     $Script:ActivateChoice.IsEnabled = $false
     $Script:DodSecureChoice.IsEnabled = $false
     $Script:SysprepChoice.IsEnabled = $false
@@ -633,7 +668,9 @@ function Complete-SetupFrontend {
                 $Script:SetupProgress.Value = 100
                 $Script:CurrentStatus.Text = "System resealed successfully. Waiting for Windows to shut down."
                 $Script:FooterStatus.Text = "Ready to capture or clone after shutdown"
-                $Script:StartButton.IsEnabled = $false
+                $Script:StartButton.IsEnabled = $true
+                $Script:StartButton.Content = "Close"
+                $window.Close()
                 return
             }
         }
@@ -681,6 +718,9 @@ function Start-SetupWorker {
     if (-not $Script:InstallSoftwareChoice.IsChecked) {
         $arguments += "-SkipSoftware"
     }
+    if (-not $Script:GuestToolsChoice.IsChecked) {
+        $arguments += "-SkipGuestTools"
+    }
     if ($Script:DodSecureChoice.IsChecked) {
         $arguments += "-ApplyDodSecureDefaults"
     }
@@ -711,6 +751,7 @@ function Start-SetupWorker {
         $Script:CompletedWithWarnings = $false
         $Script:PresetChoice.IsEnabled = $false
         $Script:InstallSoftwareChoice.IsEnabled = $false
+        $Script:GuestToolsChoice.IsEnabled = $false
         $Script:ActivateChoice.IsEnabled = $false
         $Script:DodSecureChoice.IsEnabled = $false
         $Script:SysprepChoice.IsEnabled = $false

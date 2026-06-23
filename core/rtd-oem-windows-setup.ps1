@@ -65,6 +65,8 @@ param(
 
     [switch]$SkipSoftware,
 
+    [switch]$SkipGuestTools,
+
     [switch]$ApplyDodSecureDefaults
 )
 
@@ -151,6 +153,9 @@ function Start-RtdElevated {
     }
     if ($SkipSoftware) {
         $arguments += "-SkipSoftware"
+    }
+    if ($SkipGuestTools) {
+        $arguments += "-SkipGuestTools"
     }
     if ($ApplyDodSecureDefaults) {
         $arguments += "-ApplyDodSecureDefaults"
@@ -1495,6 +1500,66 @@ function Install-RtdWindowsSoftware {
     }
 }
 
+# The password-protected KMS archive is expanded only after the standard
+# application phase has installed 7-Zip. Activation itself remains an explicit
+# frontend choice and is performed after this worker exits.
+function Expand-RtdKmsArchive {
+    $coreDirectory = Join-Path $Script:RtdRoot "core"
+    $archivePath = Join-Path $coreDirectory "_KMS.zip"
+    if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
+        Write-RtdLog "KMS archive was not present at '$archivePath'; extraction was skipped."
+        return $true
+    }
+
+    $sevenZipCandidates = @()
+    foreach ($root in @($env:ProgramFiles, ${env:ProgramFiles(x86)})) {
+        if ($root) {
+            $sevenZipCandidates += Join-Path $root "7-Zip\7z.exe"
+        }
+    }
+    if ($env:ChocolateyInstall) {
+        $sevenZipCandidates += Join-Path $env:ChocolateyInstall "bin\7z.exe"
+    }
+    $sevenZipCandidates = $sevenZipCandidates |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+    $sevenZip = $sevenZipCandidates | Select-Object -First 1
+    if (-not $sevenZip) {
+        $sevenZipCommand = Get-Command "7z.exe" -ErrorAction SilentlyContinue
+        if ($sevenZipCommand) {
+            $sevenZip = $sevenZipCommand.Source
+        }
+    }
+
+    if (-not $sevenZip) {
+        Write-RtdLog "KMS archive could not be extracted because 7-Zip is unavailable after application installation." "WARN"
+        return $false
+    }
+
+    try {
+        $arguments = @(
+            "x",
+            $archivePath,
+            "-o$coreDirectory",
+            "-pepUTtqAdn2AVEbj9fzy9",
+            "-y"
+        )
+        $process = Start-Process -FilePath $sevenZip -ArgumentList $arguments -Wait -PassThru -NoNewWindow
+        if ($process.ExitCode -ne 0) {
+            throw "7-Zip exited with code $($process.ExitCode)."
+        }
+
+        $kmsScript = Join-Path $coreDirectory "KMS.cmd"
+        if (-not (Test-Path -LiteralPath $kmsScript -PathType Leaf)) {
+            throw "The archive was extracted, but KMS.cmd was not found at '$kmsScript'."
+        }
+        Write-RtdLog "KMS activation files were extracted successfully." "OK"
+        return $true
+    } catch {
+        Write-RtdLog "KMS archive extraction failed: $($_.Exception.Message)" "WARN"
+        return $false
+    }
+}
+
 # Reject incomplete or syntactically invalid hardening scripts before they are
 # executed. This is especially important for cached files left by an interrupted
 # download.
@@ -1691,24 +1756,25 @@ switch ($Preset) {
 }
 Write-RtdStep "tuning" "done"
 
+Write-RtdStep "software" "start"
 if ($SkipSoftware) {
-    Write-RtdStep "software" "start"
-    Write-RtdLog "Standard application deployment was skipped because -SkipSoftware was specified; required virtualization guest integration will still be checked."
-    Install-RtdVirtualizationGuestTools
-    if ($Script:SoftwareFailures.Count -gt 0) {
-        Write-RtdStep "software" "warning"
-    } else {
-        Write-RtdStep "software" "done"
-    }
+    Write-RtdLog "Standard application deployment was skipped because -SkipSoftware was specified."
 } else {
-    Write-RtdStep "software" "start"
-    Install-RtdVirtualizationGuestTools
     Install-RtdWindowsSoftware
-    if ($Script:SoftwareFailures.Count -gt 0) {
-        Write-RtdStep "software" "warning"
-    } else {
-        Write-RtdStep "software" "done"
-    }
+}
+
+Expand-RtdKmsArchive | Out-Null
+
+if ($SkipGuestTools) {
+    Write-RtdLog "Virtual-machine guest-tool installation was skipped because -SkipGuestTools was specified."
+} else {
+    Install-RtdVirtualizationGuestTools
+}
+
+if ($Script:SoftwareFailures.Count -gt 0) {
+    Write-RtdStep "software" "warning"
+} else {
+    Write-RtdStep "software" "done"
 }
 
 if ($ApplyDodSecureDefaults) {
