@@ -76,28 +76,82 @@ function Initialize-SetupTransportSecurity {
         [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
 }
 
-function Resolve-SetupWorker {
-    $candidates = @()
-    if ($WorkerPath) {
-        $candidates += $WorkerPath
-    }
-    $candidates += @(
-        (Join-Path $PSScriptRoot "rtd-oem-win11-config.ps1"),
-        "C:\RTD\core\rtd-oem-win11-config.ps1",
-        "C:\RTD\cache\rtd-oem-win11-config.ps1"
+function Assert-SetupPowerShellSyntax {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
     )
 
-    foreach ($candidate in $candidates | Select-Object -Unique) {
-        if ($candidate -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
-            return (Resolve-Path -LiteralPath $candidate).Path
+    $tokens = $null
+    $parseErrors = $null
+    [System.Management.Automation.Language.Parser]::ParseFile(
+        $Path,
+        [ref]$tokens,
+        [ref]$parseErrors
+    ) | Out-Null
+
+    if ($parseErrors.Count -gt 0) {
+        $details = $parseErrors | ForEach-Object {
+            "line $($_.Extent.StartLineNumber): $($_.Message)"
         }
+        throw "PowerShell syntax validation failed for '$Path': $($details -join '; ')"
+    }
+}
+
+function Resolve-SetupWorker {
+    if ($WorkerPath) {
+        if (Test-Path -LiteralPath $WorkerPath -PathType Leaf) {
+            Assert-SetupPowerShellSyntax -Path $WorkerPath
+            return (Resolve-Path -LiteralPath $WorkerPath).Path
+        }
+        throw "The explicitly requested configuration script was not found: $WorkerPath"
     }
 
     $cacheDirectory = "C:\RTD\cache"
     $downloadPath = Join-Path $cacheDirectory "rtd-oem-win11-config.ps1"
+    $siblingWorker = Join-Path $PSScriptRoot "rtd-oem-win11-config.ps1"
+    $resolvedScriptDirectory = [System.IO.Path]::GetFullPath($PSScriptRoot).TrimEnd("\")
+    $resolvedCacheDirectory = [System.IO.Path]::GetFullPath($cacheDirectory).TrimEnd("\")
+
+    # Trust a worker distributed beside the frontend unless both files are in
+    # the download cache. Cached workers are refreshed below to prevent stale
+    # or partially downloaded scripts from being reused indefinitely.
+    $bundledCandidates = @()
+    if ($resolvedScriptDirectory -ne $resolvedCacheDirectory) {
+        $bundledCandidates += $siblingWorker
+    }
+    $bundledCandidates += "C:\RTD\core\rtd-oem-win11-config.ps1"
+
+    foreach ($candidate in $bundledCandidates | Select-Object -Unique) {
+        if ($candidate -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            try {
+                Assert-SetupPowerShellSyntax -Path $candidate
+                return (Resolve-Path -LiteralPath $candidate).Path
+            } catch {
+                # Try the downloadable worker when a bundled copy is invalid.
+            }
+        }
+    }
+
     New-Item -Path $cacheDirectory -ItemType Directory -Force | Out-Null
-    Invoke-WebRequest -Uri $Script:WorkerUrl -OutFile $downloadPath -UseBasicParsing
-    return $downloadPath
+    $temporaryPath = "$downloadPath.download"
+    try {
+        Remove-Item -LiteralPath $temporaryPath -Force -ErrorAction SilentlyContinue
+        Invoke-WebRequest -Uri $Script:WorkerUrl -OutFile $temporaryPath -UseBasicParsing -ErrorAction Stop
+        if (-not (Test-Path -LiteralPath $temporaryPath -PathType Leaf) -or (Get-Item -LiteralPath $temporaryPath).Length -eq 0) {
+            throw "The downloaded configuration script is empty."
+        }
+        Assert-SetupPowerShellSyntax -Path $temporaryPath
+        Move-Item -LiteralPath $temporaryPath -Destination $downloadPath -Force
+        return $downloadPath
+    } catch {
+        Remove-Item -LiteralPath $temporaryPath -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $downloadPath -PathType Leaf) {
+            Assert-SetupPowerShellSyntax -Path $downloadPath
+            return (Resolve-Path -LiteralPath $downloadPath).Path
+        }
+        throw
+    }
 }
 
 function Resolve-SetupBanner {

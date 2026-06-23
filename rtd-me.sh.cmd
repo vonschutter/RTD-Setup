@@ -407,8 +407,6 @@ exit $?
 	set _WINDOWS_BUILD=0
 	set _zopt="--password"
 	set _pwd="epUTtqAdn2AVEbj9fzy9"
-	for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "[Environment]::OSVersion.Version.Build" 2^>nul`) do set _WINDOWS_BUILD=%%i
-	if %_WINDOWS_BUILD% GEQ 22000 set _STAGE2FILE=windows-setup-splash.ps1
 
 	md %TEMP%
 	md %LOG_DIR%
@@ -493,6 +491,7 @@ exit $?
 	:: These version of windows have a more modern version of PowerShell.
 	:: get stage 2 and run it...
 	echo Found %*
+	set _STAGE2FILE=windows-setup-splash.ps1
 	if exist A:\autounattend.xml copy /y A:\*.* %CORE_DIR%\
 	@title "POWERSHELL: seting NETWORK Config"
         powershell -Command "& {Get-ChildItem -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles' | ForEach-Object {Set-ItemProperty -Path $_.PSParentPath -Name 'Category' -Value 1}}"
@@ -524,17 +523,7 @@ exit $?
 		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\_secure_windows.ps1
 	)
 
-	if "%_STAGE2FILE%"=="windows-setup-splash.ps1" goto end
-
-	if exist %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1 (
-		@title "CMD: _Chris-Titus-Post-Windows-Install-App.ps1 File found locally..."
-		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1
-		) else (
-		@title "CMD: Fetching _Chris-Titus-Post-Windows-Install-App.ps1 from the internet..."
-		powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
-	)
 	goto end
-
 
 :CMD1
 	:: Pre windows 7 instruction go here (except vista)...

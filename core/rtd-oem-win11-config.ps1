@@ -790,7 +790,7 @@ function Get-RtdLatestVirtioGuestTools {
                 })
             }
         } catch {
-            Write-RtdLog "Could not inspect virtio-win archive index $indexUrl: $($_.Exception.Message)" "WARN"
+            Write-RtdLog "Could not inspect virtio-win archive index ${indexUrl}: $($_.Exception.Message)" "WARN"
         }
     }
 
@@ -811,7 +811,7 @@ function Get-RtdLatestVirtioGuestTools {
                     }
                 }
             } catch {
-                Write-RtdLog "virtio guest-tools URL check failed for $url: $($_.Exception.Message)" "WARN"
+                Write-RtdLog "virtio guest-tools URL check failed for ${url}: $($_.Exception.Message)" "WARN"
             }
         }
     }
