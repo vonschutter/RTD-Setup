@@ -223,7 +223,7 @@ $Script:ResolvedBanner = Resolve-SetupBanner
 [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="RunTime Data Windows Setup" Width="1040" Height="760"
+        Title="RunTime Data Windows Setup" Width="1000" Height="700" MinWidth="900" MinHeight="640"
         WindowStartupLocation="CenterScreen" WindowState="Maximized" ResizeMode="CanResize"
         Background="#07111F" FontFamily="Segoe UI" Foreground="#EAF3FF">
     <Window.Resources>
@@ -236,20 +236,20 @@ $Script:ResolvedBanner = Resolve-SetupBanner
         </Style>
         <Style TargetType="CheckBox">
             <Setter Property="Foreground" Value="#D7E7FA"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Margin" Value="0,7,0,7"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="0,3,0,3"/>
         </Style>
         <Style TargetType="ComboBox">
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Padding" Value="10,7"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="8,4"/>
         </Style>
     </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="224"/>
+            <RowDefinition Height="166"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="82"/>
+            <RowDefinition Height="62"/>
         </Grid.RowDefinitions>
 
         <Grid Grid.Row="0" ClipToBounds="True">
@@ -263,39 +263,39 @@ $Script:ResolvedBanner = Resolve-SetupBanner
                     </LinearGradientBrush>
                 </Rectangle.Fill>
             </Rectangle>
-            <StackPanel Margin="42,0,42,27" VerticalAlignment="Bottom">
-                <TextBlock Text="RUNTIME DATA SYSTEM SETUP" FontSize="13" FontWeight="Bold"
+            <StackPanel Margin="30,0,30,18" VerticalAlignment="Bottom">
+                <TextBlock Text="RUNTIME DATA SYSTEM SETUP" FontSize="11" FontWeight="Bold"
                            Foreground="#58D8FF"/>
-                <TextBlock Text="Prepare Windows" FontSize="36" FontWeight="SemiBold"
-                           Foreground="White" Margin="0,5,0,0"/>
+                <TextBlock Text="Prepare Windows" FontSize="30" FontWeight="SemiBold"
+                           Foreground="White" Margin="0,2,0,0"/>
                 <TextBlock Text="System tuning, essential applications, and virtual-machine integration"
-                           FontSize="14" Foreground="#C7DDF4" Margin="0,5,0,0"/>
+                           FontSize="12" Foreground="#C7DDF4" Margin="0,2,0,0"/>
             </StackPanel>
         </Grid>
 
-        <Grid Grid.Row="1" Margin="34,25,34,18">
+        <Grid Grid.Row="1" Margin="24,14,24,10">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300"/>
-                <ColumnDefinition Width="22"/>
+                <ColumnDefinition Width="340"/>
+                <ColumnDefinition Width="16"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" Background="#0D1C2D" CornerRadius="12" Padding="22">
+            <Border Grid.Column="0" Background="#0D1C2D" CornerRadius="10" Padding="16,14">
                 <StackPanel>
-                    <TextBlock Text="Setup options" FontSize="20" FontWeight="SemiBold"/>
+                    <TextBlock Text="Setup options" FontSize="18" FontWeight="SemiBold"/>
                     <TextBlock Text="Choose how this Windows image should be prepared."
-                               Foreground="#8FA8C2" TextWrapping="Wrap" Margin="0,5,0,20"/>
-                    <TextBlock Text="Configuration preset" Foreground="#B9CDE1" Margin="0,0,0,7"/>
+                               Foreground="#8FA8C2" TextWrapping="Wrap" FontSize="11" Margin="0,3,0,10"/>
+                    <TextBlock Text="Configuration preset" Foreground="#B9CDE1" FontSize="11" Margin="0,0,0,4"/>
                     <ComboBox x:Name="PresetChoice" SelectedIndex="0">
                         <ComboBoxItem Content="Aggressive"/>
                         <ComboBoxItem Content="Minimal"/>
                     </ComboBox>
                     <TextBlock x:Name="PresetDescription" TextWrapping="Wrap" Foreground="#7F9AB5"
-                               FontSize="12" Margin="0,9,0,16"/>
+                               FontSize="10" Margin="0,5,0,8"/>
                     <CheckBox x:Name="InstallSoftwareChoice" Content="Install standard RunTime Data software" IsChecked="True"/>
                     <CheckBox x:Name="ActivateChoice"
-                              Content="Activate Windows and Office using configured KMS/licensing"
-                              ToolTip="Uses only the product keys and organizational KMS host already configured on this system."/>
+                              Content="Activate Windows and Office"
+                              ToolTip="Runs KMS.cmd to activate Windows and Office."/>
                     <CheckBox x:Name="DodSecureChoice"
                               Content="Apply DOD Secure Defaults"
                               ToolTip="Applies DOD/STIG-oriented hardening. This can disable Windows services, protocols, remote access, and application features."/>
@@ -303,14 +303,14 @@ $Script:ResolvedBanner = Resolve-SetupBanner
                               Content="Reseal for cloning (Sysprep/OOBE)"
                               ToolTip="Generalizes the installation and shuts down. The next boot asks for a user name and password."/>
                     <CheckBox x:Name="RestartChoice" Content="Restart automatically when finished"/>
-                    <Border Background="#102A42" CornerRadius="7" Padding="12" Margin="0,18,0,0">
+                    <Border Background="#102A42" CornerRadius="6" Padding="8" Margin="0,8,0,0">
                         <TextBlock Text="You can minimize this window while setup continues. Detailed logs are written to C:\RTD\log."
-                                   Foreground="#9DB8D2" TextWrapping="Wrap" FontSize="12"/>
+                                   Foreground="#9DB8D2" TextWrapping="Wrap" FontSize="10"/>
                     </Border>
                 </StackPanel>
             </Border>
 
-            <Border Grid.Column="2" Background="#0D1C2D" CornerRadius="12" Padding="22">
+            <Border Grid.Column="2" Background="#0D1C2D" CornerRadius="10" Padding="16,14">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -318,26 +318,26 @@ $Script:ResolvedBanner = Resolve-SetupBanner
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <TextBlock Text="Configuration progress" FontSize="20" FontWeight="SemiBold"/>
+                    <TextBlock Text="Configuration progress" FontSize="18" FontWeight="SemiBold"/>
                     <TextBlock x:Name="CurrentStatus" Grid.Row="1" Text="Ready to configure this system."
-                               Foreground="#8FA8C2" Margin="0,5,0,16"/>
+                               Foreground="#8FA8C2" FontSize="11" Margin="0,3,0,9"/>
                     <StackPanel Grid.Row="2">
-                        <Grid Margin="0,0,0,13">
+                        <Grid Margin="0,0,0,8">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="28"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                             <Ellipse x:Name="InitializeDot" Width="13" Height="13" Fill="#3A5068"/>
                             <TextBlock x:Name="InitializeText" Grid.Column="1" Text="Preparing the environment" Foreground="#9CB1C7"/>
                         </Grid>
-                        <Grid Margin="0,0,0,13">
+                        <Grid Margin="0,0,0,8">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="28"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                             <Ellipse x:Name="TuningDot" Width="13" Height="13" Fill="#3A5068"/>
                             <TextBlock x:Name="TuningText" Grid.Column="1" Text="Applying Windows configuration" Foreground="#9CB1C7"/>
                         </Grid>
-                        <Grid Margin="0,0,0,13">
+                        <Grid Margin="0,0,0,8">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="28"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                             <Ellipse x:Name="SoftwareDot" Width="13" Height="13" Fill="#3A5068"/>
                             <TextBlock x:Name="SoftwareText" Grid.Column="1" Text="Installing applications and guest tools" Foreground="#9CB1C7"/>
                         </Grid>
-                        <Grid Margin="0,0,0,18">
+                        <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="28"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                             <Ellipse x:Name="CompleteDot" Width="13" Height="13" Fill="#3A5068"/>
                             <TextBlock x:Name="CompleteText" Grid.Column="1" Text="Finalizing setup" Foreground="#9CB1C7"/>
@@ -345,7 +345,7 @@ $Script:ResolvedBanner = Resolve-SetupBanner
                         <ProgressBar x:Name="SetupProgress" Height="8" Minimum="0" Maximum="100" Value="0"
                                      Foreground="#20C8F6" Background="#22364A" BorderThickness="0"/>
                     </StackPanel>
-                    <Border Grid.Row="3" Background="#07131F" CornerRadius="7" Padding="12" Margin="0,18,0,0">
+                    <Border Grid.Row="3" Background="#07131F" CornerRadius="6" Padding="9" Margin="0,10,0,0">
                         <TextBox x:Name="ActivityOutput" Background="Transparent" BorderThickness="0"
                                  Foreground="#AFC5DB" FontFamily="Consolas" FontSize="11"
                                  IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
@@ -354,7 +354,7 @@ $Script:ResolvedBanner = Resolve-SetupBanner
             </Border>
         </Grid>
 
-        <Grid Grid.Row="2" Margin="34,0,34,18">
+        <Grid Grid.Row="2" Margin="24,0,24,10">
             <TextBlock x:Name="FooterStatus" Text="Administrative access ready"
                        VerticalAlignment="Center" Foreground="#6F8CA8" FontSize="12"/>
             <Button x:Name="StartButton" Content="Start setup" HorizontalAlignment="Right"

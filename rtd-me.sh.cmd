@@ -488,8 +488,10 @@ exit $?
 	if exist A:\autounattend.xml copy /y A:\*.* %CORE_DIR%\
 	if exist %CORE_DIR%\_KMS.zip (
 		@title "CMD: Extracting _KMS.zip..."
-		unzip -o %CORE_DIR%\_KMS.zip -d %CORE_DIR%\ %_zopt% %_pwd%
+		winget install --exact --id 7zip.7zip --source winget --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
+		"%ProgramFiles%\7-Zip\7z.exe" x "%CORE_DIR%\_KMS.zip" -o"%CORE_DIR%\" -p%_pwd% -y
 	)
+
 	if exist %CORE_DIR%\%_STAGE2FILE% (
 		@title "CMD: %_STAGE2FILE% File found locally..."
 		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\%_STAGE2FILE%
