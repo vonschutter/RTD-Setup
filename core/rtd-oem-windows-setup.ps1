@@ -21,10 +21,10 @@
 # ::		      WebView2, networking, event logging, and core management services.
 # ::
 # :: Usage: 	Run from an elevated PowerShell session, or allow the script to relaunch itself elevated:
-# ::		powershell.exe -ExecutionPolicy Bypass -File .\windows-setup.ps1
-# ::		powershell.exe -ExecutionPolicy Bypass -File .\windows-setup.ps1 -Preset Minimal
-# ::		powershell.exe -ExecutionPolicy Bypass -File .\windows-setup.ps1 -SkipSoftware
-# ::		powershell.exe -ExecutionPolicy Bypass -File .\windows-setup.ps1 -Restart
+# ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-windows-setup.ps1
+# ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-windows-setup.ps1 -Preset Minimal
+# ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-windows-setup.ps1 -SkipSoftware
+# ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-windows-setup.ps1 -Restart
 # ::
 # :: Presets:	Aggressive  Default. Removes consumer apps and disables non-essential noise.
 # ::		Minimal     Keeps bundled apps but disables telemetry, ads, and suggestions.
@@ -63,7 +63,9 @@ param(
 
     [switch]$Restart,
 
-    [switch]$SkipSoftware
+    [switch]$SkipSoftware,
+
+    [switch]$ApplyDodSecureDefaults
 )
 
 $ErrorActionPreference = "Continue"
@@ -78,6 +80,7 @@ $Script:WarningCount = 0
 $Script:VirtualizationPlatform = $null
 $Script:WindowsIdentity = $null
 $Script:WallpaperUrl = "https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/wallpaper/Wayland.jpg"
+$Script:DodSecureDefaultsUrl = "https://raw.githubusercontent.com/simeononsecurity/Windows-Optimize-Harden-Debloat/refs/heads/master/sos-optimize-windows.ps1"
 
 # Centralized logging keeps the console, setup log, and RTD log aligned. Most
 # actions are best-effort on Windows images because exact components vary by
@@ -148,6 +151,9 @@ function Start-RtdElevated {
     }
     if ($SkipSoftware) {
         $arguments += "-SkipSoftware"
+    }
+    if ($ApplyDodSecureDefaults) {
+        $arguments += "-ApplyDodSecureDefaults"
     }
 
     Start-Process -FilePath "powershell.exe" -ArgumentList $arguments -Verb RunAs
@@ -1489,6 +1495,129 @@ function Install-RtdWindowsSoftware {
     }
 }
 
+# Reject incomplete or syntactically invalid hardening scripts before they are
+# executed. This is especially important for cached files left by an interrupted
+# download.
+function Test-RtdPowerShellScriptSyntax {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        return $false
+    }
+
+    try {
+        if ((Get-Item -LiteralPath $Path -ErrorAction Stop).Length -eq 0) {
+            return $false
+        }
+        $tokens = $null
+        $parseErrors = $null
+        [System.Management.Automation.Language.Parser]::ParseFile(
+            $Path,
+            [ref]$tokens,
+            [ref]$parseErrors
+        ) | Out-Null
+        if ($parseErrors.Count -gt 0) {
+            $details = $parseErrors | ForEach-Object {
+                "line $($_.Extent.StartLineNumber): $($_.Message)"
+            }
+            Write-RtdLog "PowerShell syntax validation failed for '$Path': $($details -join '; ')" "WARN"
+            return $false
+        }
+        return $true
+    } catch {
+        Write-RtdLog "Could not validate PowerShell script '$Path': $($_.Exception.Message)" "WARN"
+        return $false
+    }
+}
+
+# Prefer a script shipped with RTD. If it is unavailable, download the current
+# upstream version into the cache and retain a previously validated cache copy
+# as an offline fallback.
+function Resolve-RtdDodSecureDefaultsScript {
+    $repositoryRoot = Split-Path -Parent $PSScriptRoot
+    $bundledCandidates = @(
+        (Join-Path $PSScriptRoot "_secure_windows.ps1"),
+        (Join-Path $repositoryRoot "modules\windows.mod\_secure_windows.ps1"),
+        "C:\RTD\core\_secure_windows.ps1",
+        "C:\RTD\modules\windows.mod\_secure_windows.ps1"
+    )
+
+    foreach ($candidate in $bundledCandidates | Select-Object -Unique) {
+        if (Test-RtdPowerShellScriptSyntax -Path $candidate) {
+            Write-RtdLog "Using bundled DOD secure-defaults script: $candidate"
+            return (Resolve-Path -LiteralPath $candidate).Path
+        }
+    }
+
+    $cacheDirectory = Join-Path $Script:RtdRoot "cache"
+    $cachePath = Join-Path $cacheDirectory "_secure_windows.ps1"
+    $temporaryPath = "$cachePath.download"
+    New-Item -Path $cacheDirectory -ItemType Directory -Force | Out-Null
+
+    try {
+        [System.Net.ServicePointManager]::SecurityProtocol =
+            [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        Remove-Item -LiteralPath $temporaryPath -Force -ErrorAction SilentlyContinue
+        $downloadUrl = "{0}?rtd_cache_bust={1}" -f $Script:DodSecureDefaultsUrl, (Get-Date).ToUniversalTime().Ticks
+        $headers = @{
+            "Cache-Control" = "no-cache, no-store"
+            "Pragma" = "no-cache"
+        }
+        Write-RtdLog "Downloading the current DOD secure-defaults script from its upstream project."
+        Invoke-WebRequest -Uri $downloadUrl -Headers $headers -OutFile $temporaryPath -UseBasicParsing -ErrorAction Stop
+        if (-not (Test-RtdPowerShellScriptSyntax -Path $temporaryPath)) {
+            throw "The downloaded hardening script failed validation."
+        }
+        Move-Item -LiteralPath $temporaryPath -Destination $cachePath -Force
+        return $cachePath
+    } catch {
+        Remove-Item -LiteralPath $temporaryPath -Force -ErrorAction SilentlyContinue
+        Write-RtdLog "Could not download the current DOD secure-defaults script: $($_.Exception.Message)" "WARN"
+        if (Test-RtdPowerShellScriptSyntax -Path $cachePath) {
+            Write-RtdLog "Using the previously validated cached DOD secure-defaults script: $cachePath" "WARN"
+            return (Resolve-Path -LiteralPath $cachePath).Path
+        }
+        throw "No valid local or downloadable DOD secure-defaults script is available."
+    }
+}
+
+# Run the third-party hardening script in a child PowerShell process. Its use of
+# exit or terminating errors therefore cannot abort the unified RTD setup worker.
+function Invoke-RtdDodSecureDefaults {
+    Write-RtdLog "Applying DOD Secure Defaults. This operation can take a significant amount of time."
+    try {
+        $scriptPath = Resolve-RtdDodSecureDefaultsScript
+        $powershellExe = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+        if (-not (Test-Path -LiteralPath $powershellExe -PathType Leaf)) {
+            $powershellExe = "powershell.exe"
+        }
+
+        & $powershellExe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $scriptPath 2>&1 |
+            ForEach-Object {
+                if ($null -ne $_ -and -not [string]::IsNullOrWhiteSpace([string]$_)) {
+                    Write-RtdLog "[DOD] $_"
+                }
+            }
+        $hardeningExitCode = $LASTEXITCODE
+        if ($hardeningExitCode -ne 0) {
+            throw "The DOD secure-defaults script exited with code $hardeningExitCode."
+        }
+
+        $Script:RestartRequired = $true
+        Write-RtdLog "DOD Secure Defaults were applied successfully." "OK"
+        return $true
+    } catch {
+        $message = "DOD Secure Defaults could not be fully applied: $($_.Exception.Message)"
+        $Script:SoftwareFailures.Add($message)
+        Write-RtdLog $message "ERROR"
+        Write-RtdLog "Review C:\RTD\log\windows-setup.log, confirm internet access, and rerun the setup with 'Apply DOD Secure Defaults' selected." "WARN"
+        return $false
+    }
+}
+
 # Minimal keeps Windows app payloads intact while reducing telemetry, ads,
 # background app behavior, gaming overlays, and noisy shell/Edge defaults.
 function Run-RtdWindowsMinimal {
@@ -1580,6 +1709,10 @@ if ($SkipSoftware) {
     } else {
         Write-RtdStep "software" "done"
     }
+}
+
+if ($ApplyDodSecureDefaults) {
+    Invoke-RtdDodSecureDefaults | Out-Null
 }
 
 Complete-RtdWindowsConfig

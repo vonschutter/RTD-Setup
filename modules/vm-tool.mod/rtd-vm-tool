@@ -132,16 +132,8 @@ declare -a RTD_VM_CLONE_ARGS=()
 # VOLUME_TITLE=
 
 
-# Set location to where to log information:
-# in the system log directory in a file named the same as this script.
-# The global variable _LOGFILE is used by _rtd_library to log information.
-
-_LOGFILE="/var/log/rtd/$( basename $0 ).log"
-export _LOGFILE
-touch "$_LOGFILE" 2>/dev/null || {
-	echo "ERROR: Failed to create log file at $_LOGFILE. Please check permissions and try again."
-	exit 1
-}
+# _rtd_library initializes _LOGFILE through system::determine_logfile when it
+# is bootstrapped. Do not write to a privileged log path before that point.
 
 rtd::bootstrap_library() {
 	if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then

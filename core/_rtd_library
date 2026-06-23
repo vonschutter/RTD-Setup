@@ -256,7 +256,7 @@ oem:
 133  oem::create_single_launcher                                 ;           Function to create a single .desktop file for an application.
 134  oem::deploy_themes                                          ;           Downloads and deploys themes from GitHub.
 135  oem::distro_release_upgrade                                 ;           Attempts an OS release upgrade on Ubuntu, Pop!_OS, Debian, SUSE, or Fedora.
-136  oem::register_all_tools                                     ;           Function to register all OEM scripts on the current device.
+136  oem::register_all_tools                                     ;           Register public module tools and remove legacy links to internal core scripts.
 137  oem::register_wallpapers_for_gnome                          ;           Validate the input directory.
 138  oem::remove_non_western_latin_fonts                         ;           a simple function to remove known
 139  oem::rtd_reset_default_environment_config                   ;           Function to reset temporary configurations to their original settings as provided by the distributor.
@@ -11917,9 +11917,9 @@ oem::deploy_themes() {
 
 
 oem::register_all_tools() {
-	# Description: Function to register all OEM scripts on the current device.
-	# It will find all the ${_TLA} powertools locations and make a link for each script to
-	# the system /bin directory. This assures that all tools can be easily accessed from any terminal.
+	# Description: Register public module tools on the current device.
+	# Only module entry points are linked into the system command path. Files in
+	# core are implementation details and must not be exposed as terminal commands.
 	#
 	#
 	# Globals: ${_MODS_DIR}
@@ -12031,26 +12031,28 @@ oem::register_all_tools() {
 	done
 	shopt -u nullglob
 
-	write_status "Creating links to ${_OEM_DIR:-"/opt/rtd"}/core/*.sh"
-	for f in "${_OEM_DIR:-"/opt/rtd"}"/core/*.sh; do
-		[[ -e $f ]] || continue
-		chmod +x "$f" || write_warning "Could not set executable on $f"
-		dest="${link_target}/$(basename "$f")"
-		target=$(readlink -f "${dest}" 2>/dev/null || true)
-		if [[ "${target}" == "$(readlink -f "$f")" ]]; then
-			continue
-		fi
-		ln -sf "$f" "$dest"
-		if [[ "${link_target}" != "/bin" ]]; then
-			legacy="/bin/$(basename "$f")"
-			if [[ -L "${legacy}" ]]; then
-				legacy_target=$(readlink -f "${legacy}" 2>/dev/null || true)
-				if [[ "${legacy_target}" == "$(readlink -f "$f")" ]]; then
-					rm -f "${legacy}"
+
+	# Remove links created by older releases that exposed core implementation
+	# scripts directly in the terminal. Only symlinks resolving inside core are
+	# removed; regular files and public module links are left untouched.
+	local _core_dir
+	local _link_dir
+	local _link
+	local _link_target
+	_core_dir=$(readlink -f "${_OEM_DIR:-"/opt/rtd"}/core" 2>/dev/null || true)
+	if [[ -n "${_core_dir}" ]]; then
+		for _link_dir in /usr/local/bin /bin; do
+			[[ -d "${_link_dir}" ]] || continue
+			for _link in "${_link_dir}"/*; do
+				[[ -L "${_link}" ]] || continue
+				_link_target=$(readlink -f "${_link}" 2>/dev/null || true)
+				if [[ "${_link_target}" == "${_core_dir}/"* ]]; then
+					write_status "Removing unsafe core command link ${_link}"
+					rm -f "${_link}" || write_warning "Could not remove core command link ${_link}"
 				fi
-			fi
-		fi
-	done
+			done
+		done
+	fi
 	return
 }
 
@@ -19252,6 +19254,7 @@ security::ensure_admin() {
 	local _ensure_admin_should_exit=1
 	local elevated_xdg_data_dirs="${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 	local flatpak_export_path=""
+	local invoking_user="${USER:-$(id -un)}"
 	[[ $- == *i* ]] && _ensure_admin_should_exit=0
 
 	# Keep Flatpak desktop exports visible when the requested command is relaunched as root.
@@ -19269,10 +19272,10 @@ security::ensure_admin() {
 	done
 
 	# Determine if we are in a graphical session
-	if [ -n "$XDG_SESSION_TYPE" ] && [ "$XDG_SESSION_TYPE" = "wayland" ]; then
+	if [[ "${XDG_SESSION_TYPE:-}" == "wayland" ]]; then
 		system::log_item "👌 A Wayland session is running."
 		graphical_session=true
-	elif [ -n "$DISPLAY" ]; then
+	elif [[ -n "${DISPLAY:-}" ]]; then
 		system::log_item "👌 An X session is running."
 		graphical_session=true
 	else
@@ -19281,7 +19284,7 @@ security::ensure_admin() {
 	fi
 
 	# Secret (undocumented) options for testing
-	case $1 in
+	case "${1:-}" in
 		--auto)
 			system::log_item "🔐 Authenticating using automatic determination of metod..."
 			;;
@@ -19303,9 +19306,9 @@ security::ensure_admin() {
 			# When sourced interactively, $0 is usually the bash binary; re-running that path as a script
 			# causes "cannot execute binary file". In that case, just run the requested command with sudo.
 			if [[ "$(basename "$0")" == "bash" ]]; then
-				sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" XDG_DATA_DIRS="$elevated_xdg_data_dirs" "$@" || pause::for_input 1 "Thre was an error running the requested command with sudo."
+				sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$invoking_user" XDG_DATA_DIRS="$elevated_xdg_data_dirs" "$@" || pause::for_input 1 "Thre was an error running the requested command with sudo."
 			else
-				sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" XDG_DATA_DIRS="$elevated_xdg_data_dirs" bash "$(readlink -f "$0")" "$@" || pause::for_input 1 "There was an error running the requested command with sudo."
+				sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$invoking_user" XDG_DATA_DIRS="$elevated_xdg_data_dirs" bash "$(readlink -f "$0")" "$@" || pause::for_input 1 "There was an error running the requested command with sudo."
 			fi
 			local rc=$?
 			if (( _ensure_admin_should_exit )); then
@@ -19319,13 +19322,14 @@ security::ensure_admin() {
 	# Attempt to elevate privileges
 	if [ "$graphical_session" = true ]; then
 		system::log_item "🔐 Using pkexec for privilege escalation..."
-			local pkexec_env=(env DISPLAY="$DISPLAY")
+			local pkexec_env=(env)
+			[[ -n "${DISPLAY:-}" ]] && pkexec_env+=("DISPLAY=$DISPLAY")
 			[[ -n "${XAUTHORITY:-}" ]] && pkexec_env+=("XAUTHORITY=$XAUTHORITY")
 			[[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]] && pkexec_env+=("DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS")
 			[[ -n "${XDG_RUNTIME_DIR:-}" ]] && pkexec_env+=("XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR")
 			pkexec_env+=("XDG_DATA_DIRS=$elevated_xdg_data_dirs")
 			[[ -n "${WAYLAND_DISPLAY:-}" ]] && pkexec_env+=("WAYLAND_DISPLAY=$WAYLAND_DISPLAY")
-			pkexec_env+=("SUDO_USER=$USER")
+			pkexec_env+=("SUDO_USER=$invoking_user")
 			# If sourced, $0 is the bash binary; re-running it as a script fails. Run the requested
 			# command directly under pkexec in that case.
 			if [[ "$(basename "$0")" == "bash" ]]; then
@@ -19354,7 +19358,7 @@ security::ensure_admin() {
 				export HISTIGNORE='*sudo -S*'
 				echo "${token}" | sudo -S -v || security::ensure_admin
 				local preserve_env_list="DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,XDG_DATA_DIRS,WAYLAND_DISPLAY"
-				sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" XDG_DATA_DIRS="$elevated_xdg_data_dirs" bash "$(readlink -f "$0")" "$@" || pause::for_input 1
+				sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$invoking_user" XDG_DATA_DIRS="$elevated_xdg_data_dirs" bash "$(readlink -f "$0")" "$@" || pause::for_input 1
 				rc=$?
 				;;
 				1) echo "Request cancelled" ; rc=1 ;;
@@ -19370,7 +19374,7 @@ security::ensure_admin() {
 			system::log_item "🔐 No dialog installed: authenticating using plain sudo..."
 			write_warning "🔐 This script needs administrative access..."
 			local preserve_env_list="DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,XDG_DATA_DIRS,WAYLAND_DISPLAY"
-			sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$USER" XDG_DATA_DIRS="$elevated_xdg_data_dirs" bash "$(readlink -f "$0")" "$@" || pause::for_input 1
+			sudo --preserve-env=${preserve_env_list} -H env SUDO_USER="$invoking_user" XDG_DATA_DIRS="$elevated_xdg_data_dirs" bash "$(readlink -f "$0")" "$@" || pause::for_input 1
 			local rc=$?
 			if (( _ensure_admin_should_exit )); then
 				exit $rc
@@ -29370,7 +29374,7 @@ kvm::make_vm_now_from_microsoft() {
 	# Select the appropriate Windows ISO and UEFI boot option based on requested Windows version...
 	case ${target_winver} in
 	win12)
-		: ${WindowsMedia="/var/lib/libvirt/boot/Win11_English_x64.iso"}
+		: ${WindowsMedia="/var/lib/libvirt/boot/Win12_English_x64.iso"}
 		boot_options="uefi,cdrom,hd,menu=off"
 		;;
 	win11)
@@ -29461,7 +29465,7 @@ kvm::make_vm_now_from_microsoft() {
 				write_information "Copy the Windows.mod files files to the floppy disk..."
 				for i in $(find /opt/${_TLA,,} -type d -name "windows.mod")/_*; do
 					if [[ -e "${i}" ]]; then
-						command -v mcopy >/dev/null && mcopy -o -i "${WindowsInstructions}" "${i}" ::/ || pause::for_input 1
+						mcopy -o -i "${WindowsInstructions}" "${i}" ::/ || pause::for_input 1
 						write_status "Copied ${i} to the floppy disk..."
 					else
 						write_warning "No files found in ${i} to copy to the floppy disk..."
@@ -31853,7 +31857,7 @@ template::rtd_me_sh_cmd() {
 	set CACHE_DIR=C:\%_TLA%\cache
 	set CORE_DIR=C:\%_TLA%\core
 	set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
-	set _STAGE2FILE=windows-setup-splash.ps1
+	set _STAGE2FILE=rtd-oem-windows-setup-splash.ps1
 
 	md %TEMP%
 	md %LOG_DIR%
@@ -31920,7 +31924,7 @@ goto end
 		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
 	)
 
-	if "%_STAGE2FILE%"=="windows-setup-splash.ps1" goto end
+	if "%_STAGE2FILE%"=="rtd-oem-windows-setup-splash.ps1" goto end
 
 	powershell -Command "iwr -useb https://raw.githubusercontent.com/ChrisTitusTech/winutil/main/winutil.ps1 | iex"
 	:: if exist %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1 (

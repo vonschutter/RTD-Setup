@@ -15,8 +15,8 @@ This document is for module authors and maintainers. Users looking for commands 
 | `rtd-oem-enable-config.sh` | Registration/configuration path used during automated installs |
 | `rtd-oem-linux-config.sh` | Linux workstation, server, or VM configuration entry point |
 | `rtd-oem-macos-config.sh` | macOS configuration entry point |
-| `windows-setup.ps1` | Unified, capability-driven Windows 10+ configuration worker |
-| `windows-setup-splash.ps1` | Interactive Windows WPF setup frontend |
+| `rtd-oem-windows-setup.ps1` | Unified, capability-driven Windows 10+ configuration worker |
+| `rtd-oem-windows-setup-splash.ps1` | Interactive Windows WPF setup frontend |
 
 ## What `_rtd_library` Provides
 

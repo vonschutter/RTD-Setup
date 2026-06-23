@@ -634,7 +634,6 @@ EOF
 	esac
 	# shellcheck source=/dev/null
 	source "${RTD_VM_TUI_SCRIPT}"
-	(( restore_nounset )) && set -u
 
 	vmtoolgtk::parse_args "$@" || exit 1
 
@@ -642,8 +641,11 @@ EOF
 		vmtoolgtk::show_error "Failed to load _rtd_library."
 		exit 1
 	fi
+	(( restore_nounset )) && set -u
 
-	security::ensure_admin
+	# Preserve the original GTK options when the library re-executes this script
+	# through pkexec or sudo.
+	security::ensure_admin "$@" || exit 1
 
 	if [[ -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
 		vmtoolgtk::show_error "No graphical session detected."

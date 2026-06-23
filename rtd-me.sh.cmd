@@ -401,7 +401,7 @@ exit $?
 	set CACHE_DIR=C:\%_TLA%\cache
 	set CORE_DIR=C:\%_TLA%\core
 	set _STAGE2LOC=https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/
-	set _STAGE2FILE=windows-setup-splash.ps1
+	set _STAGE2FILE=rtd-oem-windows-setup-splash.ps1
 	set _zopt="--password"
 	set _pwd="epUTtqAdn2AVEbj9fzy9"
 
@@ -456,6 +456,10 @@ exit $?
 	@title Found %* >>%LOG_DIR%\rtd.log
 	echo Please wait...
 	if exist A:\autounattend.xml copy /y A:\*.* %CORE_DIR%\
+	if exist %CORE_DIR%\_KMS.zip (
+		@title "CMD: Extracting _KMS.zip..."
+		unzip -o %CORE_DIR%\_KMS.zip -d %CORE_DIR%\ %_zopt% %_pwd%
+	)
 
 	if exist %CORE_DIR%\%_STAGE2FILE% (
 		echo File found locally...
@@ -482,6 +486,10 @@ exit $?
 	:: get stage 2 and run it...
 	echo Found %*
 	if exist A:\autounattend.xml copy /y A:\*.* %CORE_DIR%\
+	if exist %CORE_DIR%\_KMS.zip (
+		@title "CMD: Extracting _KMS.zip..."
+		unzip -o %CORE_DIR%\_KMS.zip -d %CORE_DIR%\ %_zopt% %_pwd%
+	)
 	if exist %CORE_DIR%\%_STAGE2FILE% (
 		@title "CMD: %_STAGE2FILE% File found locally..."
 		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\%_STAGE2FILE%
@@ -489,21 +497,6 @@ exit $?
 		@title "CMD: Fetching %_STAGE2FILE% from the internet..."
 		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $stage2Url='%_STAGE2LOC%/%_STAGE2FILE%?rtd_cache_bust=' + [DateTime]::UtcNow.Ticks; Invoke-WebRequest -Uri $stage2Url -Headers @{'Cache-Control'='no-cache, no-store';'Pragma'='no-cache'} -OutFile '%CACHE_DIR%\%_STAGE2FILE%'"
 		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
-	)
-
-	if exist %CORE_DIR%\KMS.zip (
-		@title "CMD: KMS.zip File found locally..."
-		unzip -o %CORE_DIR%\KMS.zip -d %CORE_DIR%\ %_zopt% %_pwd%
-		call "%CORE_DIR%\KMS\KMS.cmd" /K-WindowsOffice
-	)
-
-	if exist %CORE_DIR%\_secure_windows.ps1 (
-		@title "CMD: _secure_windows.ps1 File found locally..."
-		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\_secure_windows.ps1
-		) else (
-		@title "CMD: Fetching _secure_windows.ps1 from the internet..."
-		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest https://raw.githubusercontent.com/simeononsecurity/Windows-Optimize-Harden-Debloat/refs/heads/master/sos-optimize-windows.ps1 -OutFile %CACHE_DIR%\_secure_windows.ps1"
-		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\_secure_windows.ps1
 	)
 
 	goto end

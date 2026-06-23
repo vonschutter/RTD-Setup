@@ -46,4 +46,4 @@ What happens:
 - by default, backs up `/opt/rtd` to a timestamped directory under `/opt/backup` and synchronizes new content into place with `rsync`, retaining unmatched local files
 - theme updates likewise stage, back up, and synchronize themes into place without removing unmatched local files
 - offers `Refresh/Reinitialize` when a clean replacement is needed; that path archives the previous install as a timestamped zip
-- registers the tools and recreates desktop/menu entries; logs to `/var/log/rtd`
+- registers public module tools, removes legacy terminal links to internal core scripts, and recreates desktop/menu entries; logs to `/var/log/rtd`

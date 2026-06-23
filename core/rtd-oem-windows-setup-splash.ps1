@@ -12,6 +12,8 @@ param(
 
     [switch]$Restart,
 
+    [switch]$ApplyDodSecureDefaults,
+
     [switch]$AutoStart,
 
     [string]$WorkerPath
@@ -23,7 +25,7 @@ $Script:WorkerRunning = $false
 $Script:SysprepInProgress = $false
 $Script:CompletedWithWarnings = $false
 $Script:LineQueue = New-Object 'System.Collections.Concurrent.ConcurrentQueue[string]'
-$Script:WorkerUrl = "https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/windows-setup.ps1"
+$Script:WorkerUrl = "https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/rtd-oem-windows-setup.ps1"
 $Script:BannerUrl = "https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/Media_files/rtd-bootstrap-gui-banner.png"
 $Script:FrontendLog = "C:\RTD\log\windows-setup-splash.log"
 
@@ -50,6 +52,9 @@ function Start-SetupElevated {
     }
     if ($Restart) {
         $arguments += "-Restart"
+    }
+    if ($ApplyDodSecureDefaults) {
+        $arguments += "-ApplyDodSecureDefaults"
     }
     if ($AutoStart) {
         $arguments += "-AutoStart"
@@ -108,8 +113,8 @@ function Resolve-SetupWorker {
     }
 
     $cacheDirectory = "C:\RTD\cache"
-    $downloadPath = Join-Path $cacheDirectory "windows-setup.ps1"
-    $siblingWorker = Join-Path $PSScriptRoot "windows-setup.ps1"
+    $downloadPath = Join-Path $cacheDirectory "rtd-oem-windows-setup.ps1"
+    $siblingWorker = Join-Path $PSScriptRoot "rtd-oem-windows-setup.ps1"
     $resolvedScriptDirectory = [System.IO.Path]::GetFullPath($PSScriptRoot).TrimEnd("\")
     $resolvedCacheDirectory = [System.IO.Path]::GetFullPath($cacheDirectory).TrimEnd("\")
 
@@ -120,7 +125,7 @@ function Resolve-SetupWorker {
     if ($resolvedScriptDirectory -ne $resolvedCacheDirectory) {
         $bundledCandidates += $siblingWorker
     }
-    $bundledCandidates += "C:\RTD\core\windows-setup.ps1"
+    $bundledCandidates += "C:\RTD\core\rtd-oem-windows-setup.ps1"
 
     foreach ($candidate in $bundledCandidates | Select-Object -Unique) {
         if ($candidate -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
@@ -291,6 +296,9 @@ $Script:ResolvedBanner = Resolve-SetupBanner
                     <CheckBox x:Name="ActivateChoice"
                               Content="Activate Windows and Office using configured KMS/licensing"
                               ToolTip="Uses only the product keys and organizational KMS host already configured on this system."/>
+                    <CheckBox x:Name="DodSecureChoice"
+                              Content="Apply DOD Secure Defaults"
+                              ToolTip="Applies DOD/STIG-oriented hardening. This can disable Windows services, protocols, remote access, and application features."/>
                     <CheckBox x:Name="SysprepChoice"
                               Content="Reseal for cloning (Sysprep/OOBE)"
                               ToolTip="Generalizes the installation and shuts down. The next boot asks for a user name and password."/>
@@ -361,7 +369,7 @@ $window = [Windows.Markup.XamlReader]::Load($reader)
 
 $controlNames = @(
     "BannerImage", "PresetChoice", "PresetDescription", "InstallSoftwareChoice", "ActivateChoice",
-    "SysprepChoice", "RestartChoice",
+    "DodSecureChoice", "SysprepChoice", "RestartChoice",
     "CurrentStatus", "InitializeDot", "InitializeText", "TuningDot", "TuningText",
     "SoftwareDot", "SoftwareText", "CompleteDot", "CompleteText", "SetupProgress",
     "ActivityOutput", "FooterStatus", "StartButton"
@@ -387,6 +395,7 @@ if ($Preset -eq "Minimal") {
     $Script:PresetChoice.SelectedIndex = 1
 }
 $Script:InstallSoftwareChoice.IsChecked = -not $SkipSoftware
+$Script:DodSecureChoice.IsChecked = [bool]$ApplyDodSecureDefaults
 $Script:RestartChoice.IsChecked = [bool]$Restart
 
 function Update-PresetDescription {
@@ -455,82 +464,28 @@ function Add-SetupOutput {
     }
 }
 
-function Invoke-SetupCscript {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$ScriptPath,
+function Invoke-ConfiguredLicenseActivation {
+    $Script:CurrentStatus.Text = "Activating Windows and Office..."
+    $Script:FooterStatus.Text = "Running KMS.cmd"
+    Add-SetupOutput "Activating Windows and Office..."
 
-        [Parameter(Mandatory = $true)]
-        [string[]]$ScriptArguments,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Description
-    )
-
-    Add-SetupOutput $Description
     try {
-        $cscript = Join-Path $env:SystemRoot "System32\cscript.exe"
-        $output = & $cscript "//NoLogo" $ScriptPath @ScriptArguments 2>&1
+        $output = & $env:ComSpec /d /c 'call "%CORE_DIR%\KMS.cmd" /K-WindowsOffice' 2>&1
         foreach ($line in @($output)) {
             Add-SetupOutput ([string]$line)
         }
-        if ($LASTEXITCODE -ne 0) {
-            Add-SetupOutput "$Description failed with exit code $LASTEXITCODE."
-            return $false
+        if ($LASTEXITCODE -eq 0) {
+            return $true
         }
-        return $true
+
+        Add-SetupOutput "Windows and Office activation failed with exit code $LASTEXITCODE."
+        $Script:CompletedWithWarnings = $true
+        return $false
     } catch {
-        Add-SetupOutput "$Description failed: $($_.Exception.Message)"
+        Add-SetupOutput "Windows and Office activation failed: $($_.Exception.Message)"
+        $Script:CompletedWithWarnings = $true
         return $false
     }
-}
-
-function Invoke-ConfiguredLicenseActivation {
-    $succeeded = $true
-    $Script:CurrentStatus.Text = "Activating Windows and Office using configured licensing..."
-    $Script:FooterStatus.Text = "Using existing product keys and configured licensing service"
-
-    $windowsLicenseScript = Join-Path $env:SystemRoot "System32\slmgr.vbs"
-    if (Test-Path -LiteralPath $windowsLicenseScript -PathType Leaf) {
-        if (-not (Invoke-SetupCscript -ScriptPath $windowsLicenseScript -ScriptArguments @("/ato") -Description "Requesting Windows activation...")) {
-            $succeeded = $false
-        }
-    } else {
-        Add-SetupOutput "Windows activation script was not found at '$windowsLicenseScript'."
-        $succeeded = $false
-    }
-
-    $officeLicenseCandidates = @(
-        (Join-Path $env:ProgramFiles "Microsoft Office\root\Office16\OSPP.VBS"),
-        (Join-Path $env:ProgramFiles "Microsoft Office\Office16\OSPP.VBS"),
-        (Join-Path $env:ProgramFiles "Microsoft Office\Office15\OSPP.VBS")
-    )
-    if (${env:ProgramFiles(x86)}) {
-        $officeLicenseCandidates += @(
-            (Join-Path ${env:ProgramFiles(x86)} "Microsoft Office\root\Office16\OSPP.VBS"),
-            (Join-Path ${env:ProgramFiles(x86)} "Microsoft Office\Office16\OSPP.VBS"),
-            (Join-Path ${env:ProgramFiles(x86)} "Microsoft Office\Office15\OSPP.VBS")
-        )
-    }
-    $officeLicenseScript = $officeLicenseCandidates |
-        Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) } |
-        Select-Object -First 1
-
-    if ($officeLicenseScript) {
-        if (-not (Invoke-SetupCscript -ScriptPath $officeLicenseScript -ScriptArguments @("/act") -Description "Requesting Microsoft Office activation...")) {
-            $succeeded = $false
-        }
-    } else {
-        Add-SetupOutput "Office volume-licensing script OSPP.VBS was not found. Office activation was skipped."
-        Add-SetupOutput "Install a volume-licensed Office edition or activate the installed retail/subscription edition through its supported account workflow."
-        $succeeded = $false
-    }
-
-    if (-not $succeeded) {
-        Add-SetupOutput "Activation was not fully completed. Verify the installed license editions, product keys, DNS/KMS configuration, and network access, then retry activation."
-        $Script:CompletedWithWarnings = $true
-    }
-    return $succeeded
 }
 
 function Invoke-SetupSysprep {
@@ -657,6 +612,7 @@ function Complete-SetupFrontend {
     $Script:PresetChoice.IsEnabled = $false
     $Script:InstallSoftwareChoice.IsEnabled = $false
     $Script:ActivateChoice.IsEnabled = $false
+    $Script:DodSecureChoice.IsEnabled = $false
     $Script:SysprepChoice.IsEnabled = $false
     $Script:RestartChoice.IsEnabled = $false
 
@@ -725,6 +681,9 @@ function Start-SetupWorker {
     if (-not $Script:InstallSoftwareChoice.IsChecked) {
         $arguments += "-SkipSoftware"
     }
+    if ($Script:DodSecureChoice.IsChecked) {
+        $arguments += "-ApplyDodSecureDefaults"
+    }
     if ($Script:RestartChoice.IsChecked -and -not $Script:ActivateChoice.IsChecked -and -not $Script:SysprepChoice.IsChecked) {
         $arguments += "-Restart"
     }
@@ -753,6 +712,7 @@ function Start-SetupWorker {
         $Script:PresetChoice.IsEnabled = $false
         $Script:InstallSoftwareChoice.IsEnabled = $false
         $Script:ActivateChoice.IsEnabled = $false
+        $Script:DodSecureChoice.IsEnabled = $false
         $Script:SysprepChoice.IsEnabled = $false
         $Script:RestartChoice.IsEnabled = $false
         $Script:StartButton.IsEnabled = $false
@@ -786,6 +746,17 @@ $Script:StartButton.Add_Click({
     if ($Script:StartButton.Content -eq "Close") {
         $window.Close()
     } else {
+        if ($Script:DodSecureChoice.IsChecked) {
+            $confirmation = [System.Windows.MessageBox]::Show(
+                "DOD secure defaults apply extensive STIG-oriented hardening. They may disable services, legacy protocols, remote access, or application features and can require additional site-specific configuration.`n`nContinue with DOD secure defaults?",
+                "Confirm DOD security hardening",
+                [System.Windows.MessageBoxButton]::YesNo,
+                [System.Windows.MessageBoxImage]::Warning
+            )
+            if ($confirmation -ne [System.Windows.MessageBoxResult]::Yes) {
+                return
+            }
+        }
         if ($Script:SysprepChoice.IsChecked) {
             $confirmation = [System.Windows.MessageBox]::Show(
                 "After setup, Sysprep will generalize this installation and shut down the computer.`n`nThe next boot will start the Windows out-of-box experience and request a new user account. Activation must be performed on the deployed clone after OOBE. Continue?",
