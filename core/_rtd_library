@@ -7619,6 +7619,31 @@ oem::task::auto_install_iso_windows() {
 		system::prepare_environment_for_iso_creation --cleanup
 		return 1
 	fi
+	if ! template::sysprep_unattend_xml --write "$oem_dir/unattend.xml"; then
+		write_error "Failed to create Sysprep unattend.xml"
+		system::prepare_environment_for_iso_creation --cleanup
+		return 1
+	fi
+
+	local setup_worker_source=""
+	local setup_worker_candidate=""
+	for setup_worker_candidate in \
+		"$(dirname "${BASH_SOURCE[0]}")/rtd-oem-windows-setup.ps1" \
+		"/opt/${_TLA,,}/core/rtd-oem-windows-setup.ps1"; do
+		if [[ -f "$setup_worker_candidate" ]]; then
+			setup_worker_source="$setup_worker_candidate"
+			break
+		fi
+	done
+	if [[ -n "$setup_worker_source" ]]; then
+		cp -f "$setup_worker_source" "$oem_dir/rtd-oem-windows-setup.ps1" || {
+			write_error "Failed to include rtd-oem-windows-setup.ps1 in the Windows OEM payload."
+			system::prepare_environment_for_iso_creation --cleanup
+			return 1
+		}
+	else
+		write_warning "rtd-oem-windows-setup.ps1 was not found locally; the installed VM will download it at runtime."
+	fi
 
 	local tla_lower="${_TLA:-RTD}"
 	tla_lower="${tla_lower,,}"
@@ -29337,7 +29362,7 @@ kvm::make_vm_now_from_microsoft() {
 	# End of Documentation
 
 	# Check for optional default T-Shirts size overrides...
-	local _cpu _mem _dsk _saveto AutoUnattend PostTasks ConfigMenu WindowsMedia boot_options _virt_net
+	local _cpu _mem _dsk _saveto AutoUnattend SysprepUnattend PostTasks ConfigMenu WindowsSetupWorker WindowsSetupWorkerCandidate WindowsMedia boot_options _virt_net
 
 	# Set default values for VM T-Shirts sizes...
 	: ${_cpu="${_cpu:-2}"}
@@ -29354,11 +29379,21 @@ kvm::make_vm_now_from_microsoft() {
 	fi
 	: ${_saveto="$(mktemp -d /tmp/WinConfig.XXXXXX)"}
 	: ${AutoUnattend="${_saveto}/autounattend.xml"}
+	: ${SysprepUnattend="${_saveto}/unattend.xml"}
 	: ${PostTasks="${_saveto}/rtd-me-sh.cmd"}
 	: ${ConfigMenu="${_saveto}/_config_menu.cmd"}
 	: ${preferred_video="${5:-"qxl"}"}
 	: ${RTD_GUI:="dialog"}
 	: ${_TLA:="$(basename "$0" | cut -c1-3)"}
+	WindowsSetupWorker=""
+	for WindowsSetupWorkerCandidate in \
+		"$(dirname "${BASH_SOURCE[0]}")/rtd-oem-windows-setup.ps1" \
+		"$(find /opt -path '*/core/rtd-oem-windows-setup.ps1' -type f 2>/dev/null | head -n 1)"; do
+		if [[ -n "$WindowsSetupWorkerCandidate" && -f "$WindowsSetupWorkerCandidate" ]]; then
+			WindowsSetupWorker="$WindowsSetupWorkerCandidate"
+			break
+		fi
+	done
 
 	boot_options="cdrom,hd,menu=off"
 
@@ -29435,6 +29470,19 @@ kvm::make_vm_now_from_microsoft() {
 			pause::for_input 1 "Install will not be fully automatic: Please press [ENTER] to continue..."
 		fi
 
+		# Generate the answer file consumed when the configured template is
+		# generalized for cloning and boots into OOBE.
+		write_information "Generate Sysprep OOBE instructions ${SysprepUnattend}..."
+		if ! template::sysprep_unattend_xml --write "${SysprepUnattend}"; then
+			write_error "Failed to create the Sysprep unattend.xml file..."
+			pause::for_input 1 "Cloned Windows guests may require the full online OOBE: Please press [ENTER] to continue..."
+		fi
+
+		if [[ -z "${WindowsSetupWorker:-}" || ! -f "${WindowsSetupWorker}" ]]; then
+			write_error "rtd-oem-windows-setup.ps1 was not found beside _rtd_library or under /opt and cannot be included on the Windows instruction floppy."
+			pause::for_input 1 "The VM will have to download its Windows setup worker: Please press [ENTER] to continue..."
+		fi
+
 		# Generate rtd-me-sh.cmd
 		write_information "Generate post install bootstrap script ${PostTasks}..."
 		if ! template::rtd_me_sh_cmd --write "${PostTasks}"; then
@@ -29461,6 +29509,11 @@ kvm::make_vm_now_from_microsoft() {
 				mcopy -o -i "${WindowsInstructions}" "${PostTasks}" ::/ || pause::for_input 1
 				mcopy -o -i "${WindowsInstructions}" "${ConfigMenu}" ::/ || pause::for_input 1
 				mcopy -o -i "${WindowsInstructions}" "${AutoUnattend}" ::/ || pause::for_input 1
+				mcopy -o -i "${WindowsInstructions}" "${SysprepUnattend}" ::/ || pause::for_input 1
+				if [[ -n "${WindowsSetupWorker:-}" && -f "${WindowsSetupWorker}" ]]; then
+					mcopy -o -i "${WindowsInstructions}" "${WindowsSetupWorker}" ::/ || pause::for_input 1
+					write_status "Copied ${WindowsSetupWorker} to the floppy disk..."
+				fi
 
 				write_information "Copy the Windows.mod files files to the floppy disk..."
 				for i in $(find /opt/${_TLA,,} -type d -name "windows.mod")/_*; do
@@ -29496,6 +29549,8 @@ kvm::make_vm_now_from_microsoft() {
 	🌎 - ${WindowsInstructions} \n
 	🌎 - ${PostTasks} \n
 	🌎 - ${ConfigMenu} \n
+	🌎 - ${SysprepUnattend} \n
+	🌎 - ${WindowsSetupWorker:-download at runtime} \n
 	🖥️ - Using the network: ${virt_net:=default} \n
 	🖥️ - Memory: ${_mem} \n
 	🖥️ - CPU's: ${_cpu} \n
@@ -32101,6 +32156,72 @@ if exist %RUN_DIR%\%MAS_ACTIVATION_SCRIPT% (
 goto MENU 
 EOF
 }
+
+template::sysprep_unattend_xml() {
+	# Description:
+	#   Write the answer file used by Sysprep when a prepared Windows VM is
+	#   generalized for cloning. The resulting OOBE suppresses Microsoft-account
+	#   sign-in and Express-settings pages while leaving local user creation to
+	#   the person booting the clone.
+	# Arguments:
+	#   --write <file> - Destination for the generated unattend.xml.
+	# Returns:
+	#   0 on success; 1 for invalid arguments or a write failure.
+	# Usage:
+	#   template::sysprep_unattend_xml --write /tmp/unattend.xml
+	# End of Documentation
+
+	local target_file=""
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--write)
+			[[ -n "${2:-}" ]] || {
+				write_error "template::sysprep_unattend_xml --write requires a destination file."
+				return 1
+			}
+			target_file="$2"
+			shift 2
+			;;
+		*)
+			write_error "Incorrect syntax; use: ${FUNCNAME[0]} --write </path/to/unattend.xml>"
+			return 1
+			;;
+		esac
+	done
+
+	[[ -n "$target_file" ]] || {
+		write_error "template::sysprep_unattend_xml requires --write </path/to/unattend.xml>."
+		return 1
+	}
+	mkdir -p "$(dirname "$target_file")" || return 1
+
+	cat >"$target_file" <<'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<unattend xmlns="urn:schemas-microsoft-com:unattend">
+  <settings pass="oobeSystem">
+    <component name="Microsoft-Windows-Shell-Setup"
+               processorArchitecture="amd64"
+               publicKeyToken="31bf3856ad364e35"
+               language="neutral"
+               versionScope="nonSxS">
+      <OOBE>
+        <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
+        <HideEULAPage>true</HideEULAPage>
+        <ProtectYourPC>3</ProtectYourPC>
+      </OOBE>
+    </component>
+  </settings>
+</unattend>
+EOF
+
+	if [[ ! -s "$target_file" ]]; then
+		write_error "Failed to write Sysprep answer file: $target_file"
+		return 1
+	fi
+	write_information "Wrote Sysprep OOBE answer file: $target_file"
+	return 0
+}
+
 
 template::autounattend_xml() {
 	# Description:

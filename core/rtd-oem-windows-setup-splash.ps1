@@ -522,8 +522,24 @@ function Invoke-ConfiguredLicenseActivation {
 
 function Invoke-SetupSysprep {
     $sysprep = Join-Path $env:SystemRoot "System32\Sysprep\Sysprep.exe"
+    $unattend = "C:\RTD\core\unattend.xml"
     if (-not (Test-Path -LiteralPath $sysprep -PathType Leaf)) {
         Add-SetupOutput "Sysprep was not found at '$sysprep'. The system was not resealed."
+        $Script:CompletedWithWarnings = $true
+        return $false
+    }
+    if (-not (Test-Path -LiteralPath $unattend -PathType Leaf)) {
+        Add-SetupOutput "Sysprep answer file was not found at '$unattend'. The system was not resealed."
+        $Script:CompletedWithWarnings = $true
+        return $false
+    }
+    try {
+        $parsedUnattend = [xml](Get-Content -LiteralPath $unattend -Raw -ErrorAction Stop)
+        if (-not $parsedUnattend.unattend) {
+            throw "The XML does not contain an unattend root element."
+        }
+    } catch {
+        Add-SetupOutput "Sysprep answer file is not valid XML: $($_.Exception.Message)"
         $Script:CompletedWithWarnings = $true
         return $false
     }
@@ -531,9 +547,9 @@ function Invoke-SetupSysprep {
     $Script:SysprepInProgress = $true
     $Script:CurrentStatus.Text = "Generalizing Windows and preparing the out-of-box experience..."
     $Script:FooterStatus.Text = "The system will shut down when Sysprep completes"
-    Add-SetupOutput "Starting Sysprep with /generalize /oobe /shutdown /quiet."
+    Add-SetupOutput "Starting Sysprep with /generalize /oobe /shutdown /unattend:$unattend /quiet."
     try {
-        $process = Start-Process -FilePath $sysprep -ArgumentList @("/generalize", "/oobe", "/shutdown", "/quiet") -Wait -PassThru
+        $process = Start-Process -FilePath $sysprep -ArgumentList @("/generalize", "/oobe", "/shutdown", "/unattend:$unattend", "/quiet") -Wait -PassThru
         if ($process.ExitCode -ne 0) {
             throw "Sysprep exited with code $($process.ExitCode)."
         }
