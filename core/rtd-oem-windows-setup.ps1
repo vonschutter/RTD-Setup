@@ -23,11 +23,13 @@
 # :: Usage: 	Run from an elevated PowerShell session, or allow the script to relaunch itself elevated:
 # ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-windows-setup.ps1
 # ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-windows-setup.ps1 -Preset Minimal
+# ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-windows-setup.ps1 -Preset LeaveDefaults
 # ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-windows-setup.ps1 -SkipSoftware
 # ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-windows-setup.ps1 -Restart
 # ::
 # :: Presets:	Aggressive  Default. Removes consumer apps and disables non-essential noise.
 # ::		Minimal     Keeps bundled apps but disables telemetry, ads, and suggestions.
+# ::		LeaveDefaults  Leaves Windows settings unchanged while allowing selected software and tools to install.
 # ::
 # :: Background: This script is shared in the hopes that someone will find it useful. To encourage sharing changes
 # :: 		 back to the source this script is released under the GPL v3. (see source location for details)
@@ -58,7 +60,7 @@
 
 [CmdletBinding()]
 param(
-    [ValidateSet("Aggressive", "Minimal")]
+    [ValidateSet("Aggressive", "Minimal", "LeaveDefaults")]
     [string]$Preset = "Aggressive",
 
     [switch]$Restart,
@@ -302,8 +304,12 @@ function Initialize-RtdWindowsConfig {
         Write-RtdLog "Windows identity detection failed: $($_.Exception.Message). Capability detection will continue." "WARN"
     }
 
-    Mount-RtdDefaultUserHive
-    Set-RtdWindowsWallpaper
+    if ($Preset -eq "LeaveDefaults") {
+        Write-RtdLog "Leave Defaults preset selected; wallpaper and default-profile customization were skipped."
+    } else {
+        Mount-RtdDefaultUserHive
+        Set-RtdWindowsWallpaper
+    }
 }
 
 # Registry writes are wrapped so policy edits are idempotent and missing keys are
@@ -1527,6 +1533,7 @@ function Install-RtdWindowsSoftware {
             @{ Package = "vscode"; Name = "Visual Studio Code"; Parameters = @() },
             @{ Package = "filezilla"; Name = "FileZilla"; Parameters = @() },
             @{ Package = "putty"; Name = "PuTTY"; Parameters = @() },
+            @{ Package = "rustdesk"; Name = "RustDesk remote desktop support"; Parameters = @() },
             @{ Package = "vlc"; Name = "VLC media player"; Parameters = @() },
             @{ Package = "brave"; Name = "Brave Browser"; Parameters = @() },
             @{ Package = "firefox"; Name = "Mozilla Firefox"; Parameters = @("/NoDesktopShortcut") },
@@ -1540,8 +1547,12 @@ function Install-RtdWindowsSoftware {
         Write-RtdLog "Chocolatey-dependent application installs were skipped after bootstrap failure." "ERROR"
     }
 
-    Install-RtdShutUp10 | Out-Null
-    Enable-RtdWindowsMediaPlayer
+    if ($Preset -eq "LeaveDefaults") {
+        Write-RtdLog "Leave Defaults preset selected; O&O ShutUp10++ and optional-feature changes were skipped."
+    } else {
+        Install-RtdShutUp10 | Out-Null
+        Enable-RtdWindowsMediaPlayer
+    }
 
     if ($Script:SoftwareFailures.Count -gt 0) {
         Write-RtdLog "Software deployment completed with $($Script:SoftwareFailures.Count) failure(s)." "WARN"
@@ -1797,18 +1808,23 @@ Write-RtdStep "initialize" "done"
 
 # Dispatch the selected preset after initialization so logging, elevation, and
 # build checks are complete before any system changes are attempted.
-Write-RtdStep "tuning" "start"
-switch ($Preset) {
-    "Minimal" {
-        Write-RtdLog "Running Windows Minimal preset."
-        Run-RtdWindowsMinimal
+if ($Preset -eq "LeaveDefaults") {
+    Write-RtdLog "Leave Defaults preset selected; Windows tuning and optimization were skipped."
+    Write-RtdStep "tuning" "skipped"
+} else {
+    Write-RtdStep "tuning" "start"
+    switch ($Preset) {
+        "Minimal" {
+            Write-RtdLog "Running Windows Minimal preset."
+            Run-RtdWindowsMinimal
+        }
+        default {
+            Write-RtdLog "Running Windows Aggressive preset."
+            Run-RtdWindowsAggressive
+        }
     }
-    default {
-        Write-RtdLog "Running Windows Aggressive preset."
-        Run-RtdWindowsAggressive
-    }
+    Write-RtdStep "tuning" "done"
 }
-Write-RtdStep "tuning" "done"
 
 Write-RtdStep "software" "start"
 if ($SkipGuestTools) {

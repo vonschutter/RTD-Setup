@@ -5,7 +5,7 @@
 
 [CmdletBinding()]
 param(
-    [ValidateSet("Aggressive", "Minimal")]
+    [ValidateSet("Aggressive", "Minimal", "LeaveDefaults")]
     [string]$Preset = "Aggressive",
 
     [switch]$SkipSoftware,
@@ -315,8 +315,9 @@ $Script:ResolvedBanner = Resolve-SetupBanner
                                Foreground="#8FA8C2" TextWrapping="Wrap" FontSize="11" Margin="0,3,0,10"/>
                     <TextBlock Text="Configuration preset" Foreground="#B9CDE1" FontSize="11" Margin="0,0,0,4"/>
                     <ComboBox x:Name="PresetChoice" SelectedIndex="0">
-                        <ComboBoxItem Content="Aggressive"/>
-                        <ComboBoxItem Content="Minimal"/>
+                        <ComboBoxItem Content="Aggressive" Tag="Aggressive"/>
+                        <ComboBoxItem Content="Minimal" Tag="Minimal"/>
+                        <ComboBoxItem Content="Leave Defaults" Tag="LeaveDefaults"/>
                     </ComboBox>
                     <TextBlock x:Name="PresetDescription" TextWrapping="Wrap" Foreground="#7F9AB5"
                                FontSize="10" Margin="0,5,0,8"/>
@@ -422,8 +423,9 @@ if ($Script:ResolvedBanner) {
     }
 }
 
-if ($Preset -eq "Minimal") {
-    $Script:PresetChoice.SelectedIndex = 1
+switch ($Preset) {
+    "Minimal" { $Script:PresetChoice.SelectedIndex = 1 }
+    "LeaveDefaults" { $Script:PresetChoice.SelectedIndex = 2 }
 }
 $Script:InstallSoftwareChoice.IsChecked = -not $SkipSoftware
 $Script:GuestToolsChoice.IsChecked = (Test-SetupVirtualMachine) -and -not $SkipGuestTools
@@ -431,11 +433,17 @@ $Script:DodSecureChoice.IsChecked = [bool]$ApplyDodSecureDefaults
 $Script:RestartChoice.IsChecked = [bool]$Restart
 
 function Update-PresetDescription {
-    $selectedPreset = $Script:PresetChoice.SelectedItem.Content
-    if ($selectedPreset -eq "Minimal") {
-        $Script:PresetDescription.Text = "Keeps bundled applications while reducing telemetry, advertising, and background activity."
-    } else {
-        $Script:PresetDescription.Text = "Removes consumer applications and applies performance-focused VM and VDI defaults."
+    $selectedPreset = [string]$Script:PresetChoice.SelectedItem.Tag
+    switch ($selectedPreset) {
+        "Minimal" {
+            $Script:PresetDescription.Text = "Keeps bundled applications while reducing telemetry, advertising, and background activity."
+        }
+        "LeaveDefaults" {
+            $Script:PresetDescription.Text = "Leaves Windows settings and personalization unchanged. Selected applications and guest tools can still be installed."
+        }
+        default {
+            $Script:PresetDescription.Text = "Removes consumer applications and applies performance-focused VM and VDI defaults."
+        }
     }
 }
 
@@ -596,6 +604,11 @@ function Read-SetupMarker {
             Set-SetupStep "Tuning" "Done"
             $Script:SetupProgress.Value = 58
         }
+        "tuning:skipped" {
+            Set-SetupStep "Tuning" "Skipped"
+            $Script:TuningText.Text = "Windows configuration left at defaults"
+            $Script:SetupProgress.Value = 58
+        }
         "software:start" {
             Set-SetupStep "Software" "Active"
             $Script:CurrentStatus.Text = "Installing standard applications and integration tools..."
@@ -731,7 +744,8 @@ function Start-SetupWorker {
         $Script:AutoStartTimer = $null
     }
 
-    $selectedPreset = [string]$Script:PresetChoice.SelectedItem.Content
+    $selectedPreset = [string]$Script:PresetChoice.SelectedItem.Tag
+    $selectedPresetDisplay = [string]$Script:PresetChoice.SelectedItem.Content
     $arguments = @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
@@ -783,7 +797,7 @@ function Start-SetupWorker {
         $Script:StartButton.Content = "Setup running"
         $Script:FooterStatus.Text = "Do not turn off this computer"
         $Script:ActivityOutput.Clear()
-        Add-SetupOutput "Starting $selectedPreset Windows configuration..."
+        Add-SetupOutput "Starting $selectedPresetDisplay Windows configuration..."
     } catch {
         $Script:CurrentStatus.Text = "The configuration process could not be started."
         $Script:FooterStatus.Text = $_.Exception.Message
