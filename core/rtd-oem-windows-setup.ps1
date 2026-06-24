@@ -1435,10 +1435,14 @@ function Install-RtdVirtualizationGuestTools {
 
     switch ($platform) {
         "vmware" {
-            Install-RtdChocolateyPackage "vmware-tools" "VMware Tools" | Out-Null
+            if (Initialize-RtdChocolatey) {
+                Install-RtdChocolateyPackage "vmware-tools" "VMware Tools" | Out-Null
+            }
         }
         "virtualbox" {
-            Install-RtdChocolateyPackage "virtualbox-guest-additions-guest.install" "VirtualBox Guest Additions" | Out-Null
+            if (Initialize-RtdChocolatey) {
+                Install-RtdChocolateyPackage "virtualbox-guest-additions-guest.install" "VirtualBox Guest Additions" | Out-Null
+            }
         }
         "kvm" {
             Set-RtdRegistryValue "HKLM:\Software\Policies\Microsoft\Windows NT\Driver Signing" "BehaviorOnFailedVerify" 1
@@ -1807,6 +1811,13 @@ switch ($Preset) {
 Write-RtdStep "tuning" "done"
 
 Write-RtdStep "software" "start"
+if ($SkipGuestTools) {
+    Write-RtdLog "Virtual-machine guest-tool installation was skipped because -SkipGuestTools was specified."
+} else {
+    Write-RtdLog "Installing virtualization guest tools before the standard application set."
+    Install-RtdVirtualizationGuestTools
+}
+
 if ($SkipSoftware) {
     Write-RtdLog "Standard application deployment was skipped because -SkipSoftware was specified."
 } else {
@@ -1814,12 +1825,6 @@ if ($SkipSoftware) {
 }
 
 Expand-RtdKmsArchive | Out-Null
-
-if ($SkipGuestTools) {
-    Write-RtdLog "Virtual-machine guest-tool installation was skipped because -SkipGuestTools was specified."
-} else {
-    Install-RtdVirtualizationGuestTools
-}
 
 if ($Script:SoftwareFailures.Count -gt 0) {
     Write-RtdStep "software" "warning"
