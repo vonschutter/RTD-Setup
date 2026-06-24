@@ -1473,7 +1473,6 @@ function Install-RtdWindowsSoftware {
             @{ Package = "vscode"; Name = "Visual Studio Code"; Parameters = @() },
             @{ Package = "filezilla"; Name = "FileZilla"; Parameters = @() },
             @{ Package = "putty"; Name = "PuTTY"; Parameters = @() },
-            @{ Package = "notepadplusplus"; Name = "Notepad++"; Parameters = @() },
             @{ Package = "vlc"; Name = "VLC media player"; Parameters = @() },
             @{ Package = "brave"; Name = "Brave Browser"; Parameters = @() },
             @{ Package = "firefox"; Name = "Mozilla Firefox"; Parameters = @("/NoDesktopShortcut") },

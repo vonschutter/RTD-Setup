@@ -26,6 +26,8 @@ $Script:WorkerProcess = $null
 $Script:WorkerRunning = $false
 $Script:SysprepInProgress = $false
 $Script:CompletedWithWarnings = $false
+$Script:AutoStartTimer = $null
+$Script:AutoStartRemainingSeconds = 300
 $Script:LineQueue = New-Object 'System.Collections.Concurrent.ConcurrentQueue[string]'
 $Script:WorkerUrl = "https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/rtd-oem-windows-setup.ps1"
 $Script:BannerUrl = "https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/Media_files/rtd-bootstrap-gui-banner.png"
@@ -708,6 +710,11 @@ function Start-SetupWorker {
         return
     }
 
+    if ($Script:AutoStartTimer) {
+        $Script:AutoStartTimer.Stop()
+        $Script:AutoStartTimer = $null
+    }
+
     $selectedPreset = [string]$Script:PresetChoice.SelectedItem.Content
     $arguments = @(
         "-NoProfile",
@@ -841,6 +848,34 @@ $window.Add_Closing({
 
 Update-PresetDescription
 if ($AutoStart) {
-    $window.Add_ContentRendered({ Start-SetupWorker })
+    $window.Add_ContentRendered({
+        if ($Script:AutoStartTimer) {
+            return
+        }
+
+        $Script:FooterStatus.Text = "Setup starts automatically in 05:00"
+        $Script:AutoStartTimer = New-Object System.Windows.Threading.DispatcherTimer
+        $Script:AutoStartTimer.Interval = [TimeSpan]::FromSeconds(1)
+        $Script:AutoStartTimer.Add_Tick({
+            if ($Script:WorkerRunning) {
+                $Script:AutoStartTimer.Stop()
+                $Script:AutoStartTimer = $null
+                return
+            }
+
+            $Script:AutoStartRemainingSeconds--
+            if ($Script:AutoStartRemainingSeconds -le 0) {
+                $Script:AutoStartTimer.Stop()
+                $Script:AutoStartTimer = $null
+                Start-SetupWorker
+                return
+            }
+
+            $minutes = [Math]::Floor($Script:AutoStartRemainingSeconds / 60)
+            $seconds = $Script:AutoStartRemainingSeconds % 60
+            $Script:FooterStatus.Text = "Setup starts automatically in {0:00}:{1:00}" -f $minutes, $seconds
+        })
+        $Script:AutoStartTimer.Start()
+    })
 }
 $window.ShowDialog() | Out-Null

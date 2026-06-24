@@ -455,11 +455,11 @@ exit $?
 	if exist A:\autounattend.xml copy /y A:\*.* %CORE_DIR%\
 	if exist %CORE_DIR%\%_STAGE2FILE% (
 		echo File found locally...
-		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\%_STAGE2FILE%
+		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\%_STAGE2FILE% -AutoStart
 		) else (
 		echo Fetching %_STAGE2FILE% from the internet...
 		powershell -Command "$stage2Url='%_STAGE2LOC%/%_STAGE2FILE%?rtd_cache_bust=' + [DateTime]::UtcNow.Ticks; (New-Object Net.WebClient).DownloadFile($stage2Url, '%CACHE_DIR%\%_STAGE2FILE%')"
-		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
+		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE% -AutoStart
 	)
 
 	if exist %CORE_DIR%\_Chris-Titus-Post-Windows-Install-App.ps1 (
@@ -480,11 +480,11 @@ exit $?
 	if exist A:\autounattend.xml copy /y A:\*.* %CORE_DIR%\
 	if exist %CORE_DIR%\%_STAGE2FILE% (
 		@title "CMD: %_STAGE2FILE% File found locally..."
-		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\%_STAGE2FILE%
+		powershell -ExecutionPolicy UnRestricted -File %CORE_DIR%\%_STAGE2FILE% -AutoStart
 		) else (
 		@title "CMD: Fetching %_STAGE2FILE% from the internet..."
 		powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $stage2Url='%_STAGE2LOC%/%_STAGE2FILE%?rtd_cache_bust=' + [DateTime]::UtcNow.Ticks; Invoke-WebRequest -Uri $stage2Url -Headers @{'Cache-Control'='no-cache, no-store';'Pragma'='no-cache'} -OutFile '%CACHE_DIR%\%_STAGE2FILE%'"
-		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE%
+		powershell -ExecutionPolicy UnRestricted -File %CACHE_DIR%\%_STAGE2FILE% -AutoStart
 	)
 
 	goto end
