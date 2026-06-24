@@ -1071,20 +1071,28 @@ dialog::display_summary_message() {
 	#
 	# End of Documentation
 
-	if ! hash dialog &>/dev/null; then
-		system::log_item "dialog not found..."
-		software::check_native_package_dependency dialog &>/dev/null || return 1
-	else
-		system::log_item "dialog found..."
-	fi
+	case ${1:-} in
+		--txt)
+			echo "${_summary_message}"
+			system::pause "Press [Enter] to continue..." 0
+			;;
+		*)
+			if ! hash dialog &>/dev/null; then
+				system::log_item "dialog not found..."
+				software::check_native_package_dependency dialog &>/dev/null || return 1
+			else
+				system::log_item "dialog found..."
+			fi
 
-	system::log_item "Displaying summary message TITLE: $1 and the message: ${_summary_message}"
-	if echo "${FUNCNAME[1]}" | grep "make_kvm_virtual_machine"; then
-		dialog --backtitle "$BRANDING" --colors --no-collapse --title "$1" --msgbox "\n ${_summary_message} \n" 0 0
-	else
-		dialog --backtitle "$BRANDING" --colors --no-collapse --title "$1" --msgbox "${_summary_message}" "${HEIGHT:-"20"}" "${WIDTH:-"80"}"
-	fi
-	clear
+			system::log_item "Displaying summary message TITLE: $1 and the message: ${_summary_message}"
+			if echo "${FUNCNAME[1]}" | grep "make_kvm_virtual_machine"; then
+				dialog --backtitle "$BRANDING" --colors --no-collapse --title "$1" --msgbox "\n ${_summary_message} \n" 0 0
+			else
+				dialog --backtitle "$BRANDING" --colors --no-collapse --title "$1" --msgbox "${_summary_message}" "${HEIGHT:-"20"}" "${WIDTH:-"80"}"
+			fi
+			clear
+			;;
+	esac
 
 	return 0
 }
@@ -29590,19 +29598,20 @@ kvm::make_vm_now_from_microsoft() {
 	system::log_item "Attempt to automatically satisfy the Windows "Press any key to boot from CD or DVD" prompt."
 	if command -v virsh >/dev/null 2>&1; then
 		(
-			sleep 8
+			sleep 5
 			if virsh --connect qemu:///system list --name | grep -Fxq "${vm_name}"; then
 				virsh --connect qemu:///system send-key "${vm_name}" KEY_ENTER KEY_ENTER KEY_ENTER >/dev/null 2>&1 \
-					|| system::log_item "Failed to auto-send boot key for ${vm_name}"
+				|| system::log_item "Failed to auto-send boot key for ${vm_name}"
+				sleep 5
+				virsh --connect qemu:///system send-key "${vm_name}" KEY_ENTER KEY_ENTER KEY_ENTER >/dev/null 2>&1 \
+				|| system::log_item "Failed to auto-send boot key for ${vm_name}"
 			fi
 		) &
 	else
 		system::log_item "virsh not available; unable to auto-send boot key for ${vm_name}"
 	fi
-	dialog::display_summary_message "NOTICE!"
+	dialog::display_summary_message --txt
 
-
-	
 	rm -f "${PostTasks}" || system::log_item "Failed to remove ${PostTasks}..."
 	rm -f "${ConfigMenu}" || system::log_item "Failed to remove ${ConfigMenu}..."
 	for i in WindowsInstructions CONFIG WindowsMedia AutoUnattend PostTasks ConfigMenu target_winver mem_size boot_options cpu_count disk_size preferred_video disk_path; do unset $i; done

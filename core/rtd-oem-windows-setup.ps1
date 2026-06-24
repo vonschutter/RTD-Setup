@@ -83,6 +83,10 @@ $Script:VirtualizationPlatform = $null
 $Script:WindowsIdentity = $null
 $Script:WallpaperUrl = "https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/wallpaper/Wayland.jpg"
 $Script:DodSecureDefaultsUrl = "https://raw.githubusercontent.com/simeononsecurity/Windows-Optimize-Harden-Debloat/refs/heads/master/sos-optimize-windows.ps1"
+$Script:DefaultUserHiveName = "RTD_DefaultUser"
+$Script:DefaultUserHiveRoot = "Registry::HKEY_USERS\$($Script:DefaultUserHiveName)"
+$Script:DefaultUserHiveAvailable = $false
+$Script:DefaultUserHiveMountedByScript = $false
 
 # Centralized logging keeps the console, setup log, and RTD log aligned. Most
 # actions are best-effort on Windows images because exact components vary by
@@ -221,6 +225,55 @@ function Get-RtdWindowsIdentity {
     }
 }
 
+# New local/domain profiles are copied from C:\Users\Default. Mount its registry
+# hive for the duration of setup so every HKCU tweak can also be written to the
+# profile template. HKEY_USERS\.DEFAULT is not the new-user template; it belongs
+# to the logon/system desktop and must not be used as an HKCU substitute.
+function Mount-RtdDefaultUserHive {
+    $hiveFile = Join-Path $env:SystemDrive "Users\Default\NTUSER.DAT"
+    try {
+        if (-not (Test-Path -LiteralPath $hiveFile -PathType Leaf)) {
+            throw "Default-user hive was not found at '$hiveFile'."
+        }
+
+        if (Test-Path $Script:DefaultUserHiveRoot) {
+            $Script:DefaultUserHiveAvailable = $true
+            Write-RtdLog "Using the already-mounted default-user registry hive."
+            return
+        }
+
+        & reg.exe load "HKU\$($Script:DefaultUserHiveName)" $hiveFile | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "reg.exe could not load the default-user hive (exit code $LASTEXITCODE)."
+        }
+
+        $Script:DefaultUserHiveAvailable = $true
+        $Script:DefaultUserHiveMountedByScript = $true
+        Write-RtdLog "Default-user registry hive mounted; HKCU tweaks will also apply to future users." "OK"
+    } catch {
+        $Script:DefaultUserHiveAvailable = $false
+        Write-RtdLog "Future-user defaults cannot be configured: $($_.Exception.Message)" "WARN"
+    }
+}
+
+function Dismount-RtdDefaultUserHive {
+    if (-not $Script:DefaultUserHiveMountedByScript) {
+        return
+    }
+
+    $Script:DefaultUserHiveAvailable = $false
+    [GC]::Collect()
+    [GC]::WaitForPendingFinalizers()
+    & reg.exe unload "HKU\$($Script:DefaultUserHiveName)" | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-RtdLog "Default-user registry hive could not be unloaded. Restart Windows before capturing the image." "WARN"
+        return
+    }
+
+    $Script:DefaultUserHiveMountedByScript = $false
+    Write-RtdLog "Default-user registry hive unloaded." "OK"
+}
+
 # Prepare the working folders, record exact OS identity, and apply shared
 # personalization. Windows 10 and newer use one capability-driven path.
 function Initialize-RtdWindowsConfig {
@@ -249,6 +302,7 @@ function Initialize-RtdWindowsConfig {
         Write-RtdLog "Windows identity detection failed: $($_.Exception.Message). Capability detection will continue." "WARN"
     }
 
+    Mount-RtdDefaultUserHive
     Set-RtdWindowsWallpaper
 }
 
@@ -271,14 +325,22 @@ function Set-RtdRegistryValue {
         [string]$Type = "DWord"
     )
 
-    try {
-        if (-not (Test-Path $Path)) {
-            New-Item -Path $Path -Force | Out-Null
-        }
+    $targetPaths = @($Path)
+    if ($Path.StartsWith("HKCU:\", [System.StringComparison]::OrdinalIgnoreCase) -and
+        $Script:DefaultUserHiveAvailable) {
+        $targetPaths += "$($Script:DefaultUserHiveRoot)\$($Path.Substring(6))"
+    }
 
-        New-ItemProperty -Path $Path -Name $Name -Value $Value -PropertyType $Type -Force | Out-Null
-    } catch {
-        Write-RtdLog "Registry write failed: $Path\$Name -> $Value ($($_.Exception.Message))" "WARN"
+    foreach ($targetPath in $targetPaths) {
+        try {
+            if (-not (Test-Path $targetPath)) {
+                New-Item -Path $targetPath -Force | Out-Null
+            }
+
+            New-ItemProperty -Path $targetPath -Name $Name -Value $Value -PropertyType $Type -Force | Out-Null
+        } catch {
+            Write-RtdLog "Registry write failed: $targetPath\$Name -> $Value ($($_.Exception.Message))" "WARN"
+        }
     }
 }
 
@@ -293,12 +355,20 @@ function Remove-RtdRegistryValue {
         [string]$Name
     )
 
-    try {
-        if (Test-Path $Path) {
-            Remove-ItemProperty -Path $Path -Name $Name -Force -ErrorAction SilentlyContinue
+    $targetPaths = @($Path)
+    if ($Path.StartsWith("HKCU:\", [System.StringComparison]::OrdinalIgnoreCase) -and
+        $Script:DefaultUserHiveAvailable) {
+        $targetPaths += "$($Script:DefaultUserHiveRoot)\$($Path.Substring(6))"
+    }
+
+    foreach ($targetPath in $targetPaths) {
+        try {
+            if (Test-Path $targetPath) {
+                Remove-ItemProperty -Path $targetPath -Name $Name -Force -ErrorAction SilentlyContinue
+            }
+        } catch {
+            Write-RtdLog "Registry value removal failed: $targetPath\$Name ($($_.Exception.Message))" "WARN"
         }
-    } catch {
-        Write-RtdLog "Registry value removal failed: $Path\$Name ($($_.Exception.Message))" "WARN"
     }
 }
 
@@ -376,21 +446,10 @@ function Set-RtdDefaultUserWallpaper {
         [string]$Path
     )
 
-    $hiveName = "RTD_DefaultUser"
-    $hiveRoot = "Registry::HKEY_USERS\$hiveName"
-    $desktopKey = "$hiveRoot\Control Panel\Desktop"
-    $hiveFile = Join-Path $env:SystemDrive "Users\Default\NTUSER.DAT"
-    $mountedByThisProcess = $false
+    $desktopKey = "$($Script:DefaultUserHiveRoot)\Control Panel\Desktop"
     try {
-        if (-not (Test-Path -LiteralPath $hiveFile -PathType Leaf)) {
-            throw "Default-user hive was not found at '$hiveFile'."
-        }
-        if (-not (Test-Path $hiveRoot)) {
-            & reg.exe load "HKU\$hiveName" $hiveFile | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-                throw "reg.exe could not load the default-user hive (exit code $LASTEXITCODE)."
-            }
-            $mountedByThisProcess = $true
+        if (-not $Script:DefaultUserHiveAvailable) {
+            throw "Default-user registry hive is unavailable."
         }
 
         New-Item -Path $desktopKey -Force | Out-Null
@@ -404,15 +463,6 @@ function Set-RtdDefaultUserWallpaper {
         Write-RtdLog "Default-user wallpaper configured for accounts created after Sysprep/OOBE." "OK"
     } catch {
         Write-RtdLog "Default-user wallpaper could not be configured: $($_.Exception.Message)" "WARN"
-    } finally {
-        if ($mountedByThisProcess) {
-            [GC]::Collect()
-            [GC]::WaitForPendingFinalizers()
-            & reg.exe unload "HKU\$hiveName" | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-                Write-RtdLog "Default-user registry hive could not be unloaded. Restart Windows before capturing the image." "WARN"
-            }
-        }
     }
 }
 
@@ -1708,6 +1758,7 @@ function Run-RtdWindowsAggressive {
 # changes often need a reboot before the final user experience is accurate.
 function Complete-RtdWindowsConfig {
     Write-RtdStep "complete" "start"
+    Dismount-RtdDefaultUserHive
     $hadOperationalWarnings = $Script:WarningCount -gt 0
 
     try {
