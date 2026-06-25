@@ -67,6 +67,21 @@ vmtoolgtk::log() {
 	printf '%(%Y/%m/%d %H:%M:%S)T rtd-vm-tool-gtk: %s\n' -1 "${message}" >>"${logfile}" 2>/dev/null || true
 }
 
+vmtoolgtk::with_legacy_nounset() {
+	local restore_nounset=0
+	local rc
+
+	case "$-" in
+		*u*) restore_nounset=1; set +u ;;
+	esac
+
+	"$@"
+	rc=$?
+
+	(( restore_nounset )) && set -u
+	return "${rc}"
+}
+
 vmtoolgtk::prompt_yes_no() {
 	local title="$1"
 	local message="$2"
@@ -95,7 +110,8 @@ This interface mirrors the main menu tree from the terminal VM tool:
 - Tool Settings
 - Maintenance
 
-Selected tasks are executed through the existing RTD VM backend in a terminal window so the existing installer and VM workflows remain intact."
+Clone deployment uses GTK dialogs for template selection and optional CI/CD settings.
+Template creation, settings, and maintenance workflows still open the existing backend in a terminal window where those workflows require it."
 }
 
 vmtoolgtk::show_menu() {
@@ -383,7 +399,8 @@ vmtoolgtk::start_stop_vm_menu() {
 					"Start VM" \
 					"Start \"${selection}\"?\n\nCurrent state: ${state:-unknown}" || continue
 				if virsh start "${selection}"; then
-					kvm::wait_for_domain_start --domain "${selection}" --timeout 90 || write_warning "Start signal sent but no start event observed for ${selection}."
+					vmtoolgtk::with_legacy_nounset kvm::wait_for_domain_start --domain "${selection}" --timeout 90 ||
+						vmtoolgtk::with_legacy_nounset write_warning "Start signal sent but no start event observed for ${selection}."
 					latest_state="$(virsh domstate "${selection}" 2>/dev/null || echo unknown)"
 					vmtoolgtk::show_info "Launch requested for \"${selection}\".\n\nLatest state: ${latest_state}"
 				else
@@ -395,7 +412,7 @@ vmtoolgtk::start_stop_vm_menu() {
 					"Stop VM" \
 					"Stop \"${selection}\" gracefully?\n\nCurrent state: ${state}" || continue
 				if virsh shutdown "${selection}"; then
-					if vmtool::wait_for_vm_stop "${selection}" 45; then
+					if vmtoolgtk::with_legacy_nounset vmtool::wait_for_vm_stop "${selection}" 45; then
 						vmtoolgtk::show_info "\"${selection}\" is now stopped."
 					elif vmtoolgtk::prompt_yes_no \
 						"Force Stop?" \
@@ -415,6 +432,233 @@ vmtoolgtk::start_stop_vm_menu() {
 				;;
 		esac
 	done
+}
+
+vmtoolgtk::select_clone_template() {
+	local pattern="$1"
+	local title="$2"
+	local prompt="$3"
+	local empty_message="$4"
+	local vm_list template_name
+	local -a menu_entries=()
+
+	if ! command -v virsh >/dev/null 2>&1; then
+		vmtoolgtk::show_error "virsh was not found. Install libvirt clients/tools before cloning VMs."
+		return 1
+	fi
+
+	vm_list="$(virsh list --all --name | grep -i '^Template' | grep -Ei -- "${pattern}" || true)"
+	if [[ -z "${vm_list}" ]]; then
+		vmtoolgtk::show_info "${empty_message}"
+		return 1
+	fi
+
+	while IFS= read -r template_name; do
+		[[ -z "${template_name}" ]] && continue
+			menu_entries+=("${template_name}" "$(vmtoolgtk::with_legacy_nounset kvm::clone_template_vm::_display_template_label "${template_name}")")
+	done <<< "${vm_list}"
+
+	if (( ${#menu_entries[@]} == 0 )); then
+		vmtoolgtk::show_info "${empty_message}"
+		return 1
+	fi
+
+	zenity --list \
+		--title "${title}" \
+		--text "${prompt}" \
+		--width 1040 \
+		--height 560 \
+		--column "Template" \
+		--column "Details" \
+		--print-column=1 \
+		"${menu_entries[@]}"
+}
+
+vmtoolgtk::prompt_cicd_options() {
+	local task_selection llm_selection llm_models
+	local repo_default playbook_default
+	local -a task_menu_entries=()
+	local -a checklist_entries=()
+	local -a mapped_tasks=()
+	local -a selected_roles=()
+
+	RTD_CICD_ENABLE=0
+	RTD_CICD_REPO="${RTD_ANSIBLE_REPO:-https://github.com/vonschutter/RTD-Ansible.git}"
+	RTD_CICD_PLAYBOOK="${RTD_ANSIBLE_PLAYBOOK:-playbooks/server-auto-config.yml}"
+	RTD_CICD_TASKS="openssh-server"
+	RTD_CICD_LLM_VARIANT="none"
+	RTD_CICD_LLM_MODELS=""
+
+	if ! vmtoolgtk::prompt_yes_no "CI/CD" "Seed the cloned server VM with a CI/CD ISO and auto-run ansible-pull on first boot?"; then
+		return 0
+	fi
+
+	repo_default="${RTD_CICD_REPO}"
+	playbook_default="${RTD_CICD_PLAYBOOK}"
+	RTD_CICD_REPO="$(zenity --entry \
+		--title "CI/CD Settings" \
+		--text "Ansible repo URL:" \
+		--width 760 \
+		--entry-text "${repo_default}")" || return 0
+	RTD_CICD_REPO="${RTD_CICD_REPO:-$repo_default}"
+
+	RTD_CICD_PLAYBOOK="$(zenity --entry \
+		--title "CI/CD Settings" \
+		--text "Ansible playbook path:" \
+		--width 760 \
+		--entry-text "${playbook_default}")" || return 0
+	RTD_CICD_PLAYBOOK="${RTD_CICD_PLAYBOOK:-$playbook_default}"
+
+	vmtoolgtk::with_legacy_nounset vmtool::ensure_ansible_repo || vmtoolgtk::with_legacy_nounset write_warning "Using fallback CI/CD role menu because RTD-Ansible is not available."
+	vmtoolgtk::with_legacy_nounset vmtool::build_server_role_menu task_menu_entries
+
+	local i label desc state checked
+	for (( i=0; i<${#task_menu_entries[@]}; i+=3 )); do
+		label="${task_menu_entries[i]}"
+		desc="${task_menu_entries[i+1]}"
+		state="${task_menu_entries[i+2]}"
+		checked="FALSE"
+		[[ "${state}" == "ON" ]] && checked="TRUE"
+		checklist_entries+=("${checked}" "${label}" "${desc}")
+	done
+
+	task_selection="$(zenity --list \
+		--checklist \
+		--title "CI/CD Server Roles" \
+		--text "Select server meta-packages to apply." \
+		--width 760 \
+		--height 520 \
+		--separator='|' \
+		--column "Apply" \
+		--column "Role" \
+		--column "Description" \
+		"${checklist_entries[@]}")" || return 0
+
+	local item mapped
+	IFS='|' read -ra selected_roles <<< "${task_selection}"
+	for item in "${selected_roles[@]}"; do
+		item="${item//\"/}"
+		[[ -z "${item}" ]] && continue
+		mapped="$(vmtoolgtk::with_legacy_nounset vmtool::map_role_to_server_task "${item}")"
+		[[ -n "${mapped}" ]] && mapped_tasks+=("${mapped}")
+	done
+	if (( ${#mapped_tasks[@]} == 0 )); then
+		mapped_tasks=("openssh-server")
+	fi
+	RTD_CICD_TASKS="$(IFS=','; echo "${mapped_tasks[*]}")"
+
+	llm_selection="$(zenity --list \
+		--title "CI/CD LLM Option" \
+		--text "Choose an optional LLM stack for the cloned server VM." \
+		--width 700 \
+		--height 320 \
+		--column "ID" \
+		--column "Option" \
+		--hide-column=1 \
+		--print-column=1 \
+		"none" "No LLM stack" \
+		"ollama" "Ollama service" \
+		"text-generation-webui" "text-generation-webui")" || llm_selection="none"
+	RTD_CICD_LLM_VARIANT="${llm_selection:-none}"
+
+	if [[ "${RTD_CICD_LLM_VARIANT}" == "ollama" ]]; then
+		llm_models="$(zenity --entry \
+			--title "Ollama Models" \
+			--text "Ollama models to pre-pull, comma-separated:" \
+			--width 560 \
+			--entry-text "llama3")" || llm_models=""
+		RTD_CICD_LLM_MODELS="${llm_models}"
+	else
+		RTD_CICD_LLM_MODELS=""
+	fi
+
+	RTD_CICD_ENABLE=1
+}
+
+vmtoolgtk::run_clone_with_progress() {
+	local title="$1"
+	local template_name="$2"
+	local clone_kind="$3"
+	local log_file rc_file pid rc last_line summary created_vm
+	shift 3
+	local -a clone_args=("$@")
+
+	log_file="$(mktemp "${TMPDIR:-/tmp}/rtd-vm-tool-gtk-clone.XXXXXX.log")" || {
+		vmtoolgtk::show_error "Unable to create a temporary clone log."
+		return 1
+	}
+	rc_file="$(mktemp "${TMPDIR:-/tmp}/rtd-vm-tool-gtk-clone.XXXXXX.rc")" || {
+		rm -f -- "${log_file}"
+		vmtoolgtk::show_error "Unable to create a temporary clone status file."
+		return 1
+	}
+	: > "${rc_file}"
+
+	(
+		set +u
+		if [[ "${clone_kind}" == "server" ]]; then
+			kvm::clone_server_template_vm --template "${template_name}" --post-clone-handler vmtool::post_clone_ansible_pull "${clone_args[@]}"
+		else
+			kvm::clone_vdi_template_vm --template "${template_name}" "${clone_args[@]}"
+		fi
+		printf '%s\n' "$?" > "${rc_file}"
+	) > "${log_file}" 2>&1 &
+	pid=$!
+
+	(
+		while kill -0 "${pid}" 2>/dev/null; do
+			last_line="$(tail -n 1 "${log_file}" 2>/dev/null || true)"
+			printf '# %s\n' "${last_line:-Working...}"
+			sleep 1
+		done
+		printf '100\n'
+	) | zenity --progress \
+		--title "${title}" \
+		--text "Starting clone..." \
+		--width 720 \
+		--pulsate \
+		--auto-close \
+		--no-cancel
+
+	wait "${pid}" 2>/dev/null || true
+	rc="$(cat "${rc_file}" 2>/dev/null || printf '1')"
+
+	if [[ "${rc}" == "0" ]]; then
+		created_vm="$(sed -n 's/.*new VM will be \([^[:space:]]*\).*/\1/p' "${log_file}" | tail -n 1)"
+		vmtoolgtk::show_info "Clone completed successfully.${created_vm:+\n\nCreated VM: ${created_vm}}"
+		rm -f -- "${log_file}" "${rc_file}"
+		return 0
+	fi
+
+	summary="$(tail -n 30 "${log_file}" 2>/dev/null || true)"
+	vmtoolgtk::show_error "Clone failed or was cancelled.\n\n${summary}"
+	rm -f -- "${log_file}" "${rc_file}"
+	return 1
+}
+
+vmtoolgtk::clone_server_template_menu() {
+	local template_name
+
+	template_name="$(vmtoolgtk::select_clone_template \
+		"server" \
+		"${VMTOOLGTK_TITLE} - Deploy Server VM" \
+		"Select a server template VM to clone." \
+		"No server template VMs were found. Create a server template first.")" || return 0
+
+	vmtoolgtk::prompt_cicd_options || return 0
+	vmtoolgtk::run_clone_with_progress "RTD VM Tool - Clone Server VM" "${template_name}" "server" "${RTD_VM_CLONE_ARGS[@]}"
+}
+
+vmtoolgtk::clone_vdi_template_menu() {
+	local template_name
+
+	template_name="$(vmtoolgtk::select_clone_template \
+		"VDI|workstation" \
+		"${VMTOOLGTK_TITLE} - Deploy Virtual Desktop VM" \
+		"Select a VDI template VM to clone." \
+		"No VDI template VMs were found. Create a VDI template first.")" || return 0
+
+	vmtoolgtk::run_clone_with_progress "RTD VM Tool - Clone VDI VM" "${template_name}" "vdi" "${RTD_VM_CLONE_ARGS[@]}"
 }
 
 vmtoolgtk::show_template_menu() {
@@ -553,7 +797,7 @@ vmtoolgtk::show_main_menu() {
 		local selection
 		selection="$(vmtoolgtk::show_menu \
 			"${VMTOOLGTK_TITLE} v${VMTOOLGTK_VERSION}" \
-			"Select a VM management task. Terminal-backed workflows open in a new terminal window." \
+			"Select a VM management task. Clone deployment uses GTK dialogs; backend-only workflows open in a terminal window." \
 			1020 560 \
 			"1" "✨ Deploy Server VM's" "Clone a server template into a working VM." \
 			"2" "✨ Deploy Virtual Desktop VM's" "Clone a VDI template into a working VM." \
@@ -565,14 +809,10 @@ vmtoolgtk::show_main_menu() {
 
 		case "${selection}" in
 			1)
-				vmtoolgtk::launch_tui_action \
-					"RTD VM Tool - Deploy Server VM" \
-					"vmtool::run_main_action 1"
+				vmtoolgtk::clone_server_template_menu
 				;;
 			2)
-				vmtoolgtk::launch_tui_action \
-					"RTD VM Tool - Deploy Virtual Desktop VM" \
-					"vmtool::run_main_action 2"
+				vmtoolgtk::clone_vdi_template_menu
 				;;
 			3)
 				vmtoolgtk::show_template_menu
@@ -645,14 +885,14 @@ EOF
 
 	# Preserve the original GTK options when the library re-executes this script
 	# through pkexec or sudo.
-	security::ensure_admin "$@" || exit 1
+	vmtoolgtk::with_legacy_nounset security::ensure_admin "$@" || exit 1
 
 	if [[ -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
 		vmtoolgtk::show_error "No graphical session detected."
 		exit 1
 	fi
 
-	vmtool::refresh_backtitle
+	vmtoolgtk::with_legacy_nounset vmtool::refresh_backtitle
 	vmtoolgtk::show_main_menu
 }
 

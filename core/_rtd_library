@@ -22067,7 +22067,7 @@ software::check_native_package_dependency() {
 	local pkg
 	local use_color=1
 
-	[[ "${TERMUITXT}" == "nocolor" ]] && use_color=0
+	[[ "${TERMUITXT:-}" == "nocolor" ]] && use_color=0
 
 	for pkg in "$@"; do
 		[[ -z "$pkg" ]] && continue
@@ -28074,6 +28074,14 @@ kvm::make_vm_now_from_fedora_org() {
 		write_error "❌ Failed to create VM disk image. Aborting VM creation."
 		return 1
 	}
+	kvm::template_metadata_write \
+		--vm "$vm_name" \
+		--os-family "fedora" \
+		--role "${_role:-unknown}" \
+		--support-level "install-automated-reseal-unverified" \
+		--automation-status "manual-finalization-required" \
+		--ready-to-clone "false" \
+		--notes "Fedora template creation is automated, but default bundle install plus first-boot reseal is not yet wired into the unattended build." || true
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in Kickstart: ${_preseed_file} \n
@@ -28222,6 +28230,14 @@ kvm::make_vm_now_from_redhat_com() {
 		write_error "❌ Failed to create VM disk image. Aborting VM creation."
 		return 1
 	}
+	kvm::template_metadata_write \
+		--vm "$vm_name" \
+		--os-family "almalinux" \
+		--role "${_role:-unknown}" \
+		--support-level "install-automated-reseal-unverified" \
+		--automation-status "manual-finalization-required" \
+		--ready-to-clone "false" \
+		--notes "AlmaLinux template creation is automated, but default bundle install plus end-user OOBE/reseal is not yet wired into the unattended build." || true
 
 	local alma_major="${_os_version%%.*}"
 	local os_variant="almalinux${alma_major}"
@@ -28354,6 +28370,14 @@ kvm::make_vm_now_from_opensuse_org() {
 		write_error "❌ Failed to create VM disk image. Aborting VM creation."
 		return 1
 	}
+	kvm::template_metadata_write \
+		--vm "$vm_name" \
+		--os-family "suse" \
+		--role "${_role:-unknown}" \
+		--support-level "install-automated-reseal-unverified" \
+		--automation-status "manual-finalization-required" \
+		--ready-to-clone "false" \
+		--notes "SUSE install is automated, but default bundle install plus firstboot reseal is not yet wired into the unattended build." || true
 
 	_summary_message="
 	The virtual machine (${vm_name}) \n
@@ -28513,6 +28537,14 @@ kvm::make_vm_now_from_debian_org() {
 		write_error "❌ Failed to create VM disk image. Aborting VM creation."
 		return 1
 	}
+	kvm::template_metadata_write \
+		--vm "$vm_name" \
+		--os-family "debian" \
+		--role "${_role:-${vm_usecase:-unknown}}" \
+		--support-level "install-automated-reseal-not-user-oobe" \
+		--automation-status "manual-finalization-required" \
+		--ready-to-clone "false" \
+		--notes "Debian install is automated, but current reseal path uses cloud-init cleanup rather than a full graphical end-user OOBE prompt." || true
 
 	_summary_message="
 	The virtual machine (${vm_name}) \n
@@ -28547,14 +28579,15 @@ kvm::make_vm_now_from_debian_org() {
 	disown "${virt_pid}"
 
 	kvm::wait_for_domain_definition "${vm_name}" 60 20 || true
-	virsh set-lifecycle-action "${vm_name}" reboot restart --config --live || true
-	virsh set-lifecycle-action "${vm_name}" poweroff restart --config --live || true  # Debian installer now powers off after build; restart instead
+	# virsh set-lifecycle-action "${vm_name}" reboot restart --config --live || true
+	# virsh set-lifecycle-action "${vm_name}" poweroff restart --config --live || true  # Debian installer now powers off after build; restart instead
 
 	if ! kvm::wait_for_domain_start --domain "${vm_name}"; then
 		write_warning "Domain '${vm_name}' did not emit a start event within the expected window."
+		pause::for_input "⌛ "
 	fi
 
-	dialog::display_summary_message "NOTICE!"
+	dialog::display_summary_message --txt ""
 
 	for i in PRESEED_FILE vm_kernel vm_initrd source_url ui_diplay_style vm_name vm_usecase distro disk_path; do unset $i; done
 
@@ -28639,6 +28672,14 @@ kvm::make_vm_now_from_kali_org() {
 		write_error "❌ Failed to create VM disk image. Aborting VM creation."
 		return 1
 	}
+	kvm::template_metadata_write \
+		--vm "$vm_name" \
+		--os-family "kali" \
+		--role "${vm_usecase:-unknown}" \
+		--support-level "install-automated-reseal-unverified" \
+		--automation-status "manual-finalization-required" \
+		--ready-to-clone "false" \
+		--notes "Kali template creation is automated, but default bundle install plus end-user OOBE/reseal is not yet wired into the unattended build." || true
 
 	_summary_message="
 	The virtual machine (${vm_name}) \n
@@ -28673,6 +28714,7 @@ kvm::make_vm_now_from_kali_org() {
 
 	if ! kvm::wait_for_domain_start --domain "${vm_name}"; then
 		write_warning "Domain '${vm_name}' did not emit a start event within the expected window."
+		pause::for_input "⌛ "
 	fi
 
 	dialog::display_summary_message "NOTICE!"
@@ -28832,6 +28874,14 @@ kvm::make_vm_now_from_zorin() {
 		dialog::display_error "💥 - Failed to create VM disk image. Please press [OK] to continue..."
 		return 1
 	}
+	kvm::template_metadata_write \
+		--vm "$vm_name" \
+		--os-family "zorin" \
+		--role "${_role:-unknown}" \
+		--support-level "install-automated-reseal-unverified" \
+		--automation-status "manual-finalization-required" \
+		--ready-to-clone "false" \
+		--notes "Zorin template creation is automated, but default bundle install plus end-user OOBE/reseal is not yet wired into the unattended build." || true
 
 	system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --ask ${_ask:-"NO"} || (dialog::display_error "💥 - An ERROR has occurred. Unable to create preseed file. Please press [OK] to continue..." && return 1)
 
@@ -29064,6 +29114,14 @@ kvm::make_vm_now_from_ubuntu_com() {
 		write_error "❌ Failed to create VM disk image. Aborting VM creation."
 		return 1
 	}
+	kvm::template_metadata_write \
+		--vm "$vm_name" \
+		--os-family "ubuntu" \
+		--role "${_role:-unknown}" \
+		--support-level "$([[ "${_role,,}" == "vdi" ]] && printf 'fully-automated-guest-finalizer' || printf 'install-automated-reseal-manual')" \
+		--automation-status "$([[ "${_role,,}" == "vdi" ]] && printf 'auto-finalizer-pending' || printf 'install-started')" \
+		--ready-to-clone "false" \
+		--notes "$([[ "${_role,,}" == "vdi" ]] && printf 'Wait until the guest shuts down after default bundle install and reseal before cloning.' || printf 'Template installation is automated; final reseal behavior depends on selected role.')" || true
 
 	# Prepare the summary message for the VM creation...
 	_summary_message="
@@ -29549,6 +29607,14 @@ kvm::make_vm_now_from_microsoft() {
 		write_error "❌ Failed to create VM disk image. Aborting VM creation."
 		return 1
 	}
+	kvm::template_metadata_write \
+		--vm "$vm_name" \
+		--os-family "windows" \
+		--role "${CONFIG:-VDI}" \
+		--support-level "install-automated-sysprep-available" \
+		--automation-status "windows-setup-pending" \
+		--ready-to-clone "false" \
+		--notes "Run the Windows OEM setup through Sysprep/OOBE reseal before cloning; default bundle manager is Linux-only." || true
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in: ${AutoUnattend} \n
@@ -29734,6 +29800,105 @@ kvm::backup_all_running_vm() {
 	fi
 }
 
+kvm::template_metadata_dir() {
+	printf '%s\n' "${RTD_VM_TEMPLATE_METADATA_DIR:-/var/lib/rtd/libvirt/vm-templates}"
+}
+
+kvm::template_metadata_safe_name() {
+	local vm_name="${1:-}"
+	vm_name="${vm_name//\//_}"
+	vm_name="${vm_name//\\/_}"
+	vm_name="${vm_name// /_}"
+	printf '%s' "${vm_name:-unknown-template}"
+}
+
+kvm::template_metadata_json_escape() {
+	local value="${1:-}"
+	value="${value//\\/\\\\}"
+	value="${value//\"/\\\"}"
+	value="${value//$'\n'/\\n}"
+	value="${value//$'\r'/\\r}"
+	value="${value//$'\t'/\\t}"
+	printf '%s' "$value"
+}
+
+kvm::template_metadata_path() {
+	local vm_name="${1:?}"
+	printf '%s/%s.json\n' "$(kvm::template_metadata_dir)" "$(kvm::template_metadata_safe_name "$vm_name")"
+}
+
+kvm::template_metadata_write() {
+	local vm_name="" os_family="" role="" support_level="" automation_status="" ready_to_clone="false" notes=""
+	local created_at
+	created_at="$(date --iso-8601=seconds 2>/dev/null || date)"
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--vm) vm_name="${2:-}"; shift 2 ;;
+			--os-family) os_family="${2:-}"; shift 2 ;;
+			--role) role="${2:-}"; shift 2 ;;
+			--support-level) support_level="${2:-}"; shift 2 ;;
+			--automation-status) automation_status="${2:-}"; shift 2 ;;
+			--ready-to-clone) ready_to_clone="${2:-false}"; shift 2 ;;
+			--notes) notes="${2:-}"; shift 2 ;;
+			*) write_warning "Ignoring unknown template metadata option '$1'."; shift ;;
+		esac
+	done
+
+	[[ -n "$vm_name" ]] || { write_warning "Template metadata write skipped: missing VM name."; return 1; }
+
+	local metadata_dir metadata_path
+	metadata_dir="$(kvm::template_metadata_dir)"
+	metadata_path="$(kvm::template_metadata_path "$vm_name")"
+	mkdir -p "$metadata_dir" || {
+		write_warning "Unable to create template metadata directory: ${metadata_dir}"
+		return 1
+	}
+
+	cat >"$metadata_path" <<EOF
+{
+  "schema": "rtd.vm-template.defaults.v1",
+  "vm_name": "$(kvm::template_metadata_json_escape "$vm_name")",
+  "os_family": "$(kvm::template_metadata_json_escape "$os_family")",
+  "role": "$(kvm::template_metadata_json_escape "$role")",
+  "support_level": "$(kvm::template_metadata_json_escape "$support_level")",
+  "automation_status": "$(kvm::template_metadata_json_escape "$automation_status")",
+  "ready_to_clone": $( [[ "${ready_to_clone,,}" == "true" ]] && printf 'true' || printf 'false' ),
+  "default_bundles_source": "_rtd_recipies.info",
+  "default_bundle_install_command": "rtd-oem-bundle-manager --noninteractive",
+  "notes": "$(kvm::template_metadata_json_escape "$notes")",
+  "updated_at": "$(kvm::template_metadata_json_escape "$created_at")"
+}
+EOF
+	write_information "Template metadata written: ${metadata_path}"
+}
+
+kvm::template_metadata_read_label() {
+	local vm_name="${1:-}" metadata_path ready automation support notes domstate
+	[[ -n "$vm_name" ]] || return 1
+	metadata_path="$(kvm::template_metadata_path "$vm_name")"
+	[[ -r "$metadata_path" ]] || return 1
+
+	ready="$(grep -E '"ready_to_clone"[[:space:]]*:' "$metadata_path" | head -n 1 | sed -E 's/.*:[[:space:]]*([^, ]+).*/\1/')"
+	automation="$(grep -E '"automation_status"[[:space:]]*:' "$metadata_path" | head -n 1 | sed -E 's/.*:[[:space:]]*"([^"]*)".*/\1/')"
+	support="$(grep -E '"support_level"[[:space:]]*:' "$metadata_path" | head -n 1 | sed -E 's/.*:[[:space:]]*"([^"]*)".*/\1/')"
+	notes="$(grep -E '"notes"[[:space:]]*:' "$metadata_path" | head -n 1 | sed -E 's/.*:[[:space:]]*"([^"]*)".*/\1/')"
+
+	if [[ "$ready" != "true" && "$automation" == "auto-finalizer-pending" ]] && command -v virsh >/dev/null 2>&1; then
+		domstate="$(virsh domstate "$vm_name" 2>/dev/null || true)"
+		if [[ "${domstate,,}" == *"shut off"* ]]; then
+			printf 'Ready: auto-finalizer-completed (inferred: template is shut off)'
+			return 0
+		fi
+	fi
+
+	if [[ "$ready" == "true" ]]; then
+		printf 'Ready: %s%s' "${automation:-automated}" "${support:+ (${support})}"
+	else
+		printf 'Manual setup required: %s%s' "${automation:-not finalized}" "${notes:+ - ${notes}}"
+	fi
+}
+
 kvm::clone_template_vm::_build_customize_args() {
 	# Description:
 	#   Helper function to split a virt-customize option string into an array.
@@ -29840,6 +30005,11 @@ kvm::clone_template_vm::_display_template_label() {
 	#   kvm::clone_template_vm::_display_template_label "Template_ubuntu_server__base"
 	# End of documentation
 	local template_name="$1"
+	local metadata_label=""
+	if metadata_label="$(kvm::template_metadata_read_label "$template_name" 2>/dev/null)" && [[ -n "$metadata_label" ]]; then
+		echo "$metadata_label"
+		return 0
+	fi
 	local core="${template_name#Template_}"
 	core="${core%%__*}"
 	core="${core%_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9]}"
@@ -29862,6 +30032,7 @@ kvm::clone_template_vm::_clone_from_category() {
 	#   $4 - Error message shown when no templates are found.
 	#   $5 - Success label ("VM", "VDI VM", etc.).
 	#   $@ - Optional: --sysprep flag and/or --customize "<virt-customize options or script>".
+	#        --template <template-vm-name> : clone this template without opening the dialog menu.
 	#        --post-clone-handler <function> : function called with new VM name after successful clone.
 	#
 	# Outputs:
@@ -29885,6 +30056,7 @@ kvm::clone_template_vm::_clone_from_category() {
 	local enable_sysprep=0
 	local customize_spec=""
 	local post_clone_handler=""
+	local selected_template=""
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 			--sysprep)
@@ -29899,6 +30071,15 @@ kvm::clone_template_vm::_clone_from_category() {
 				fi
 				customize_spec="$2"
 				system::log_item "customize_spec requested by ${FUNCNAME[1]} ='${customize_spec}'"
+				shift 2
+				;;
+			--template)
+				if [[ -z "${2:-}" ]]; then
+					write_error "--template requires an additional argument specifying the source template VM name."
+					return 1
+				fi
+				selected_template="$2"
+				system::log_item "selected_template requested by ${FUNCNAME[1]} ='${selected_template}'"
 				shift 2
 				;;
 			--post-clone-handler)
@@ -29924,11 +30105,11 @@ kvm::clone_template_vm::_clone_from_category() {
 
 	write_status "clone_from_category: pattern=${pattern} title='${menu_title}' prompt='${menu_prompt}'"
 
-	if ! command -v virsh >/dev/null || ! command -v "$RTD_GUI" >/dev/null; then
+	if ! command -v virsh >/dev/null || { [[ -z "$selected_template" ]] && ! command -v "$RTD_GUI" >/dev/null; }; then
 		write_error "❌ Required software not found: may I install it for you?"
 		read -rp "Press Enter to continue..."
 		software::check_native_package_dependency virsh dialog
-		if ! command -v virsh >/dev/null || ! command -v "$RTD_GUI" >/dev/null; then
+		if ! command -v virsh >/dev/null || { [[ -z "$selected_template" ]] && ! command -v "$RTD_GUI" >/dev/null; }; then
 			write_error "❌ Required commands not found: virsh or dialog wrapper ($RTD_GUI), please install them manually."
 			return 1
 		fi
@@ -29952,7 +30133,11 @@ kvm::clone_template_vm::_clone_from_category() {
 	fi
 
 	if ! vm_list=$(virsh list --all --name | grep -i '^Template' | grep -Ei -- "$pattern"); then
-		dialog::display_error "$empty_message"
+		if [[ -z "$selected_template" ]]; then
+			dialog::display_error "$empty_message"
+		else
+			write_error "$empty_message"
+		fi
 		write_warning "clone_from_category: no matching templates for pattern '${pattern}'"
 		return 1
 	fi
@@ -29969,19 +30154,29 @@ kvm::clone_template_vm::_clone_from_category() {
 		return 1
 	fi
 
+	if [[ -n "$selected_template" ]] && ! grep -Fxq -- "$selected_template" <<< "$vm_list"; then
+		write_error "❌ Selected template '$selected_template' does not match this clone category."
+		return 1
+	fi
+
 	while true; do
 		write_status "clone_from_category: launching selection dialog (entries=${#menu_entries[@]})"
 
-		exec 3>&1
-		selected_tag=$("$RTD_GUI" \
-			--backtitle "$BACKTITLE" --cancel-button "Back" \
-			--title "$menu_title" \
-			--menu "$menu_prompt" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
-			"${menu_entries[@]}" \
-			2>&1 1>&3)
-		exit_status=$?
-		exec 3>&-
-		clear
+		if [[ -n "$selected_template" ]]; then
+			selected_tag="$selected_template"
+			exit_status=0
+		else
+			exec 3>&1
+			selected_tag=$("$RTD_GUI" \
+				--backtitle "$BACKTITLE" --cancel-button "Back" \
+				--title "$menu_title" \
+				--menu "$menu_prompt" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
+				"${menu_entries[@]}" \
+				2>&1 1>&3)
+			exit_status=$?
+			exec 3>&-
+			clear
+		fi
 
 		write_status "clone_from_category: dialog exit_status=${exit_status} selected_tag='${selected_tag}'"
 
@@ -30076,6 +30271,15 @@ kvm::clone_template_vm::_clone_from_category() {
 			write_status "clone_from_category: invoking post-clone handler '${post_clone_handler}' for ${new_name}"
 			if ! "$post_clone_handler" "$new_name"; then
 				write_warning "Post-clone handler '${post_clone_handler}' reported a problem for '$new_name'."
+			fi
+		fi
+
+		if [[ "${RTD_VM_CLONE_AUTOSTART:-true}" == "true" ]]; then
+			write_status "▶ Starting cloned ${success_label} '${new_name}'..."
+			if virsh start "$new_name" >/dev/null 2>&1; then
+				write_information "✅ Started cloned ${success_label} '${new_name}'"
+			else
+				write_warning "Cloned ${success_label} '${new_name}' was created but could not be started automatically."
 			fi
 		fi
 
@@ -33238,7 +33442,7 @@ common_vdi_post_config=$(cat <<EOF
 
         # Clone RTD Setup & Execute OEM Config
         - curtin in-target --target=/target -- /bin/bash -c 'rm -rf /tmp/rtd-setup-clone ; for i in {1..5}; do git clone --depth=1 ${GIT_RTD_SRC_URL} /tmp/rtd-setup-clone && break || { echo "RTD clone failed on attempt \$i, retrying..." ; rm -rf /tmp/rtd-setup-clone ; sleep 10; }; done ; test -f /tmp/rtd-setup-clone/core/rtd-oem-enable-config.sh'
-        - curtin in-target --target=/target -- /bin/bash -c 'rm -rf ${_OEM_DIR:-"/opt/rtd"} ; mkdir -p ${_OEM_DIR:-"/opt/rtd"} ; cp -a /tmp/rtd-setup-clone/. ${_OEM_DIR:-"/opt/rtd"}/ ; chmod 755 ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-linux-config.sh ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'rm -rf ${_OEM_DIR:-"/opt/rtd"} ; mkdir -p ${_OEM_DIR:-"/opt/rtd"} ; cp -a /tmp/rtd-setup-clone/. ${_OEM_DIR:-"/opt/rtd"}/ ; chmod 755 ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-linux-config.sh ${_OEM_DIR:-"/opt/rtd"}/core/rtd-vm-template-finalize-linux.sh ; mkdir -p /var/lib/${_TLA:-rtd} ; touch /var/lib/${_TLA:-rtd}/template-autofinalize ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c 'bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ; exit 0'
 EOF
 )
@@ -34380,7 +34584,9 @@ write_host() {
 	#
 	#
 	# End of documentation
-	_option=$1
+	local _option="${1:-}"
+	local _text=""
+	local color=""
 
 	case ${_option} in
 	--endcolor|--reset) color="$(tput sgr0)" ;;
@@ -34412,10 +34618,10 @@ write_host() {
 	--purple|--P|--Purple) color="$(tput setaf 5)" ;;
 	--Bpurple|--BP|--BPurple|--purple-bold) color="$(tput bold; tput setaf 5)" ;;
 	--Dpurple|--DP|--DPurple|--purple-dim) color="$(tput dim; tput setaf 5)" ;;
-	*) local _text="$1" ;;
+	*) _text="${1:-}" ;;
 	esac
 
-	[[ -z "${_text}" ]] && local _text="$(tput sgr0)${color} $2 $(tput sgr0)"
+	[[ -z "${_text}" ]] && _text="$(tput sgr0)${color} ${2:-} $(tput sgr0)"
 	echo -e "${_text} "
 }
 
@@ -34437,7 +34643,7 @@ write_error() {
 		return 0
 	fi
 
-	if [[ "${TERMUITXT}" == "nocolor" ]]; then
+	if [[ "${TERMUITXT:-}" == "nocolor" ]]; then
 		printf '💥 %s: %s\n' "${FUNCNAME[1]}" "${text}"
 	else
 		write_host --red "💥 ${FUNCNAME[1]}: ${text}"
@@ -34467,7 +34673,7 @@ write_warning() {
 		return 0
 	fi
 
-	if [[ "${TERMUITXT}" == "nocolor" ]]; then
+	if [[ "${TERMUITXT:-}" == "nocolor" ]]; then
 		printf '⚠ %s: %s\n' "${FUNCNAME[1]}" "${text}"
 	else
 		write_host --yellow "⚠ ${FUNCNAME[1]}: ${text}"
@@ -34497,7 +34703,7 @@ write_status() {
 		return 0
 	fi
 
-	if [[ "${TERMUITXT}" == "nocolor" ]]; then
+	if [[ "${TERMUITXT:-}" == "nocolor" ]]; then
 		printf '✓ %s: %s\n' " ${FUNCNAME[1]}" "${text}"
 	else
 		write_host --green "✓  ${FUNCNAME[1]}: ${text}"
@@ -34527,7 +34733,7 @@ write_information() {
 		return 0
 	fi
 
-	if [[ "${TERMUITXT}" == "nocolor" ]]; then
+	if [[ "${TERMUITXT:-}" == "nocolor" ]]; then
 		printf '🛈  %s: %s\n' "${FUNCNAME[1]}" "${text}"
 	else
 		write_host --blue "🛈  ${FUNCNAME[1]}: ${text}"

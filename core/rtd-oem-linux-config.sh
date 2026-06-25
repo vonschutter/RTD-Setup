@@ -85,6 +85,7 @@ source "${_SCRIPT_DIR}/_rtd_library" || { echo "Failed to source _rtd_library"; 
 
 # Determine log file directory
 _LOGFILE=${_LOG_DIR}/$( basename $0).log
+: "${RTD_TEMPLATE_AUTOFINALIZE_MARKER:=/var/lib/rtd/template-autofinalize}"
 
 # Normally all choices are checked. Pass the variable "false" to this script to default
 # to unchecked. If none is passed, a default will be used.
@@ -246,6 +247,17 @@ oem_linux_config ()
 		fi
 
 		system::wait_for_internet_availability
+
+		if [[ -f "${RTD_TEMPLATE_AUTOFINALIZE_MARKER}" ]]; then
+			write_information "🧰 RTD template auto-finalize marker found: ${RTD_TEMPLATE_AUTOFINALIZE_MARKER}"
+			if [[ -f "${_SCRIPT_DIR}/rtd-vm-template-finalize-linux.sh" ]]; then
+				chmod 755 "${_SCRIPT_DIR}/rtd-vm-template-finalize-linux.sh" 2>/dev/null || true
+				bash "${_SCRIPT_DIR}/rtd-vm-template-finalize-linux.sh"
+				return $?
+			fi
+			write_error "Template auto-finalize was requested, but ${_SCRIPT_DIR}/rtd-vm-template-finalize-linux.sh was not found."
+			return 1
+		fi
 
 		for i in $_requirements ; do 
 			software::check_native_package_dependency $i

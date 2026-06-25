@@ -17,6 +17,7 @@
 #::               rtd-oem-bundle-manager-2
 #::               rtd-oem-bundle-manager-2 --install-menu
 #::               rtd-oem-bundle-manager-2 --remove-menu
+#::               rtd-oem-bundle-manager-2 --noninteractive
 #::
 #::
 #::
@@ -485,6 +486,75 @@ bm2::install_bundles() {
 	rm -f "${snapshot_file}" "${result_file}"
 }
 
+bm2::default_installable_bundles() {
+	local line selected bundle description clean_bundle
+	local -a record=()
+	while IFS= read -r line; do
+		line="$(bm2::trim "$line")"
+		[[ -n "$line" ]] || continue
+		record+=("$line")
+		((${#record[@]} == 3)) || continue
+
+		selected="${record[0]}"
+		bundle="${record[1]}"
+		description="${record[2]}"
+		record=()
+
+		case "$(bm2::trim "$selected")" in
+			true|TRUE)
+				clean_bundle="$(bm2::trim "$bundle")"
+				[[ -n "$clean_bundle" ]] && printf '%s\n' "$clean_bundle"
+				;;
+		esac
+	done < <(software::list_bundles --zformat-installable)
+}
+
+bm2::install_default_bundles_noninteractive() {
+	local completed_file total count current_bundle current_bundle_full_name failures=0
+	local -a default_bundles=()
+
+	completed_file="$(bm2::completed_file)"
+	mapfile -t default_bundles < <(bm2::default_installable_bundles)
+	total=${#default_bundles[@]}
+
+	if (( total == 0 )); then
+		printf 'No default RTD software bundles are currently selected.\n'
+		return 0
+	fi
+
+	printf 'Installing %s default RTD software bundle(s).\n' "$total"
+	count=0
+	for current_bundle in "${default_bundles[@]}"; do
+		[[ -n "${current_bundle}" ]] || continue
+		((count++))
+		current_bundle_full_name="${bundle_prefix:-recipe:_}${current_bundle}"
+
+		if ! declare -F "${current_bundle_full_name}" >/dev/null 2>&1; then
+			printf 'Failed\t%s\tmissing recipe function %s\n' "${current_bundle}" "${current_bundle_full_name}" | tee -a "${_LOGFILE}"
+			((failures++))
+			continue
+		fi
+
+		printf '[%s/%s] Installing %s\n' "$count" "$total" "$current_bundle"
+		bm2::log "Bundle Manager 2 noninteractive installing ${current_bundle}"
+		if "${current_bundle_full_name}" >>"${_LOGFILE}" 2>&1; then
+			grep -Fxq "${current_bundle}" "${completed_file}" || printf '%s\n' "${current_bundle}" >>"${completed_file}"
+			printf 'Installed\t%s\n' "${current_bundle}"
+		else
+			printf 'Failed\t%s\tsee %s\n' "${current_bundle}" "${_LOGFILE}"
+			((failures++))
+		fi
+	done
+
+	if (( failures > 0 )); then
+		printf 'Completed with %s failed default bundle(s). Log: %s\n' "$failures" "${_LOGFILE}" >&2
+		return 1
+	fi
+
+	printf 'Default RTD software bundle installation completed. Log: %s\n' "${_LOGFILE}"
+	return 0
+}
+
 bm2::remove_bundles() {
 	local selection completed_file total count current_bundle current_bundle_full_name result_file
 	selection="$(bm2::select_bundles --zformat-removable "Remove Bundles" "Select installed bundles to remove. Removal runs the same recipe with --remove." "Installed")" || return 0
@@ -544,12 +614,15 @@ bm2::summary() {
 bm2::help() {
 	cat <<EOF
 Usage:
-  ${_SCRIPTNAME} [--install-menu|--remove-menu|--installed|--about|--help]
+  ${_SCRIPTNAME} [--install-menu|--remove-menu|--installed|--about|--noninteractive|--help]
 
 Description:
   Experimental YAD-first RTD bundle manager. It uses the current
   software::list_bundles --zformat-* output and does not change the library
   zformat contract used by the original bundle manager.
+
+  --noninteractive installs the bundles already marked as default/recommended
+  in _rtd_recipies.info without showing the YAD UI.
 EOF
 }
 
@@ -574,6 +647,11 @@ bm2::main() {
 		echo "Failed to load _rtd_library" >&2
 		exit 1
 	}
+	if [[ "${1:-}" == "--noninteractive" || "${1:-}" == "--install-defaults" ]]; then
+		bm2::ensure_admin
+		bm2::install_default_bundles_noninteractive
+		return
+	fi
 	bm2::ensure_yad || exit 1
 	bm2::ensure_admin
 
