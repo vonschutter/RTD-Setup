@@ -40,7 +40,9 @@ readonly TLA_LOWERCASE="${TLA_UPPERCASE,,}"  # e.g., rtd
 readonly BASE_DIR="/opt/${TLA_LOWERCASE}"
 readonly CORE_DIR="${BASE_DIR}/core"
 readonly CONFIG_DIR="${BASE_DIR}/config"
-readonly LOG_DIR_PATH="/var/log/${_TLA,,}"
+readonly LOG_DIR_PATH="/var/log/${TLA_LOWERCASE}"
+readonly TEMPLATE_WORKFLOW_CONFIG="${CONFIG_DIR}/vm-template-workflow.json"
+readonly TEMPLATE_AUTOFINALIZE_MARKER="/var/lib/${TLA_LOWERCASE}/template-autofinalize"
 
 readonly LIBRARY_PATH="${CORE_DIR}/_rtd_library"
 readonly FAILLOG_PATH="${BASE_DIR}/faillog.log"
@@ -106,7 +108,26 @@ EOF
 		system::log_item "⛔ ERROR: Failed to set TTY login banner. Check permissions or file system."
 	}
 
-	system::add_or_remove_login_script --add "${CORE_DIR}/rtd-oem-linux-config.sh"
+	local template_supported="false"
+	local template_reason="This distribution is not currently configured for fully automated RTD template finalization."
+	local template_launcher="${CORE_DIR}/rtd-oem-linux-config.sh"
+
+	if rtd_oem_enable::template_workflow_supported; then
+		template_supported="true"
+		template_reason="Automated RTD default bundle install and reseal are supported for this distribution."
+		template_launcher="${CORE_DIR}/rtd-vm-template-finalize-linux.sh"
+		system::ensure_directory_exists "/var/lib/${TLA_LOWERCASE}" || exit 1
+		touch "${TEMPLATE_AUTOFINALIZE_MARKER}" || {
+			system::log_item "⛔ ERROR: Failed to create template auto-finalize marker ${TEMPLATE_AUTOFINALIZE_MARKER}"
+			exit 1
+		}
+	else
+		system::log_item "⚠ ${template_reason}"
+	fi
+
+	rtd_oem_enable::write_template_workflow_config "${template_supported}" "${template_launcher}" "${template_reason}"
+
+	system::add_or_remove_login_script --add "${template_launcher}"
 	system::toggle_oem_auto_elevated_privilege --enable
 	system::toggle_oem_auto_login --enable
 	system::set_oem_elevated_privilege_gui --enable
@@ -137,6 +158,75 @@ EOF
 
 	system::log_item "✅ OEM Enable Configuration script completed."
 	exit 0
+}
+
+rtd_oem_enable::json_escape() {
+	local value="${1:-}"
+	value="${value//\\/\\\\}"
+	value="${value//\"/\\\"}"
+	value="${value//$'\n'/\\n}"
+	value="${value//$'\r'/\\r}"
+	value="${value//$'\t'/\\t}"
+	printf '%s' "$value"
+}
+
+rtd_oem_enable::distribution_id() {
+	if [[ -r /etc/os-release ]]; then
+		# shellcheck source=/dev/null
+		. /etc/os-release
+		printf '%s' "${ID,,}"
+	else
+		printf 'unknown'
+	fi
+}
+
+rtd_oem_enable::distribution_like() {
+	if [[ -r /etc/os-release ]]; then
+		# shellcheck source=/dev/null
+		. /etc/os-release
+		printf '%s' "${ID_LIKE,,}"
+	else
+		printf 'unknown'
+	fi
+}
+
+rtd_oem_enable::template_workflow_supported() {
+	local os_id os_like
+	os_id="$(rtd_oem_enable::distribution_id)"
+	os_like="$(rtd_oem_enable::distribution_like)"
+
+	case "$os_id" in
+		ubuntu|kubuntu|zorin|linuxmint|pop|elementary|fedora|opensuse*|suse|sles*)
+			return 0
+			;;
+	esac
+
+	[[ "$os_like" == *"ubuntu"* || "$os_like" == *"suse"* || "$os_like" == *"fedora"* || "$os_like" == *"rhel"* || "$os_like" == *"centos"* ]]
+}
+
+rtd_oem_enable::write_template_workflow_config() {
+	local supported="${1:-false}" launcher="${2:-}" reason="${3:-}"
+	local os_id os_like timestamp
+	os_id="$(rtd_oem_enable::distribution_id)"
+	os_like="$(rtd_oem_enable::distribution_like)"
+	timestamp="$(date --iso-8601=seconds 2>/dev/null || date)"
+
+	system::ensure_directory_exists "$CONFIG_DIR" || return 1
+	cat >"${TEMPLATE_WORKFLOW_CONFIG}" <<EOF
+{
+  "schema": "rtd.vm-template.workflow.v1",
+  "supported": ${supported},
+  "distribution_id": "$(rtd_oem_enable::json_escape "$os_id")",
+  "distribution_like": "$(rtd_oem_enable::json_escape "$os_like")",
+  "auto_finalize_marker": "$(rtd_oem_enable::json_escape "$TEMPLATE_AUTOFINALIZE_MARKER")",
+  "login_launcher": "$(rtd_oem_enable::json_escape "$launcher")",
+  "default_bundle_command": "rtd-oem-bundle-manager --noninteractive",
+  "post_oobe_login_action": "rtd-oem-linux-config.sh --first-login-bundle-manager",
+  "reason": "$(rtd_oem_enable::json_escape "$reason")",
+  "updated_at": "$(rtd_oem_enable::json_escape "$timestamp")"
+}
+EOF
+	system::log_item "RTD VM template workflow config written to ${TEMPLATE_WORKFLOW_CONFIG}"
 }
 
 

@@ -28078,10 +28078,10 @@ kvm::make_vm_now_from_fedora_org() {
 		--vm "$vm_name" \
 		--os-family "fedora" \
 		--role "${_role:-unknown}" \
-		--support-level "install-automated-reseal-unverified" \
-		--automation-status "manual-finalization-required" \
+		--support-level "fully-automated-guest-finalizer" \
+		--automation-status "auto-finalizer-pending" \
 		--ready-to-clone "false" \
-		--notes "Fedora template creation is automated, but default bundle install plus first-boot reseal is not yet wired into the unattended build." || true
+		--notes "Wait until the guest shuts down after default bundle install and reseal before cloning." || true
 
 	_summary_message="The virtual machine (${vm_name}) \n
 	📋 - Using the instructions in Kickstart: ${_preseed_file} \n
@@ -28374,10 +28374,10 @@ kvm::make_vm_now_from_opensuse_org() {
 		--vm "$vm_name" \
 		--os-family "suse" \
 		--role "${_role:-unknown}" \
-		--support-level "install-automated-reseal-unverified" \
-		--automation-status "manual-finalization-required" \
+		--support-level "fully-automated-guest-finalizer" \
+		--automation-status "auto-finalizer-pending" \
 		--ready-to-clone "false" \
-		--notes "SUSE install is automated, but default bundle install plus firstboot reseal is not yet wired into the unattended build." || true
+		--notes "Wait until the guest shuts down after default bundle install and reseal before cloning." || true
 
 	_summary_message="
 	The virtual machine (${vm_name}) \n
@@ -28878,10 +28878,10 @@ kvm::make_vm_now_from_zorin() {
 		--vm "$vm_name" \
 		--os-family "zorin" \
 		--role "${_role:-unknown}" \
-		--support-level "install-automated-reseal-unverified" \
-		--automation-status "manual-finalization-required" \
+		--support-level "fully-automated-guest-finalizer" \
+		--automation-status "auto-finalizer-pending" \
 		--ready-to-clone "false" \
-		--notes "Zorin template creation is automated, but default bundle install plus end-user OOBE/reseal is not yet wired into the unattended build." || true
+		--notes "Wait until the guest shuts down after default bundle install and reseal before cloning." || true
 
 	system::make_preseed_cfg --role ${_role} --saveto ${_saveto} --ask ${_ask:-"NO"} || (dialog::display_error "💥 - An ERROR has occurred. Unable to create preseed file. Please press [OK] to continue..." && return 1)
 
@@ -29118,10 +29118,10 @@ kvm::make_vm_now_from_ubuntu_com() {
 		--vm "$vm_name" \
 		--os-family "ubuntu" \
 		--role "${_role:-unknown}" \
-		--support-level "$([[ "${_role,,}" == "vdi" ]] && printf 'fully-automated-guest-finalizer' || printf 'install-automated-reseal-manual')" \
-		--automation-status "$([[ "${_role,,}" == "vdi" ]] && printf 'auto-finalizer-pending' || printf 'install-started')" \
+		--support-level "fully-automated-guest-finalizer" \
+		--automation-status "auto-finalizer-pending" \
 		--ready-to-clone "false" \
-		--notes "$([[ "${_role,,}" == "vdi" ]] && printf 'Wait until the guest shuts down after default bundle install and reseal before cloning.' || printf 'Template installation is automated; final reseal behavior depends on selected role.')" || true
+		--notes "Wait until the guest shuts down after default bundle install and reseal before cloning." || true
 
 	# Prepare the summary message for the VM creation...
 	_summary_message="
@@ -33442,7 +33442,7 @@ common_vdi_post_config=$(cat <<EOF
 
         # Clone RTD Setup & Execute OEM Config
         - curtin in-target --target=/target -- /bin/bash -c 'rm -rf /tmp/rtd-setup-clone ; for i in {1..5}; do git clone --depth=1 ${GIT_RTD_SRC_URL} /tmp/rtd-setup-clone && break || { echo "RTD clone failed on attempt \$i, retrying..." ; rm -rf /tmp/rtd-setup-clone ; sleep 10; }; done ; test -f /tmp/rtd-setup-clone/core/rtd-oem-enable-config.sh'
-        - curtin in-target --target=/target -- /bin/bash -c 'rm -rf ${_OEM_DIR:-"/opt/rtd"} ; mkdir -p ${_OEM_DIR:-"/opt/rtd"} ; cp -a /tmp/rtd-setup-clone/. ${_OEM_DIR:-"/opt/rtd"}/ ; chmod 755 ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-linux-config.sh ${_OEM_DIR:-"/opt/rtd"}/core/rtd-vm-template-finalize-linux.sh ; mkdir -p /var/lib/${_TLA:-rtd} ; touch /var/lib/${_TLA:-rtd}/template-autofinalize ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'rm -rf ${_OEM_DIR:-"/opt/rtd"} ; mkdir -p ${_OEM_DIR:-"/opt/rtd"} ; cp -a /tmp/rtd-setup-clone/. ${_OEM_DIR:-"/opt/rtd"}/ ; chmod 755 ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-linux-config.sh ${_OEM_DIR:-"/opt/rtd"}/core/rtd-vm-template-finalize-linux.sh ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c 'bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ; exit 0'
 EOF
 )

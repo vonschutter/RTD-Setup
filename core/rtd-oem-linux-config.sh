@@ -86,6 +86,7 @@ source "${_SCRIPT_DIR}/_rtd_library" || { echo "Failed to source _rtd_library"; 
 # Determine log file directory
 _LOGFILE=${_LOG_DIR}/$( basename $0).log
 : "${RTD_TEMPLATE_AUTOFINALIZE_MARKER:=/var/lib/rtd/template-autofinalize}"
+: "${RTD_POST_OOBE_BUNDLE_AUTOSTART:=/etc/xdg/autostart/rtd-oobe-bundle-manager.desktop}"
 
 # Normally all choices are checked. Pass the variable "false" to this script to default
 # to unchecked. If none is passed, a default will be used.
@@ -287,15 +288,37 @@ oem_linux_config ()
 	fi
 }
 
+oem_first_login_bundle_manager() {
+	if [[ ! $UID -eq 0 ]]; then
+		echo -e "🛡️ This script needs administrative access..."
+		sudo -E bash "$0" --first-login-bundle-manager
+		return $?
+	fi
+
+	write_information "🚀 Launching RTD bundle manager for first user login..."
+	rm -f "${RTD_POST_OOBE_BUNDLE_AUTOSTART}" 2>/dev/null || true
+
+	system::wait_for_internet_availability
+	if ! hash zenity &>/dev/null ; then software::check_native_package_dependency zenity || exit 1 ; fi
+	if ! hash yad &>/dev/null  ; then software::check_native_package_dependency yad || write_warning "YAD is not installed. Some features will not be available." ; fi
+
+	bash "${_MODS_DIR}/oem-bundle-manager.mod/rtd-oem-bundle-manager"
+}
+
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 	cat <<EOF
 Usage:
-  $(basename "$0") [--help|-h]
+  $(basename "$0") [--help|-h|--first-login-bundle-manager]
 
 Description:
   Run the RTD OEM Linux configuration and software setup workflow.
 EOF
 	exit 0
+fi
+
+if [[ "${1:-}" == "--first-login-bundle-manager" ]]; then
+	oem_first_login_bundle_manager
+	exit $?
 fi
 
 oem_linux_config $zstatus
