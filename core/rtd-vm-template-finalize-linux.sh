@@ -21,6 +21,7 @@ set -o pipefail
 : "${RTD_TEMPLATE_AUTOFINALIZE_MARKER:=/var/lib/${_TLA}/template-autofinalize}"
 : "${RTD_POST_OOBE_BUNDLE_AUTOSTART:=/etc/skel/.config/autostart/rtd-oobe-bundle-manager.desktop}"
 : "${RTD_POST_OOBE_BUNDLE_WRAPPER:=/usr/local/bin/rtd-oobe-bundle-manager-first-login}"
+: "${RTD_POST_OOBE_BUNDLE_SUDOERS:=/etc/sudoers.d/90-rtd-oobe-bundle-manager}"
 
 mkdir -p "${_LOG_DIR}" "${RTD_TEMPLATE_STATUS_DIR}"
 touch "${_LOGFILE}"
@@ -64,19 +65,67 @@ rtd_template_finalize::manual_instruction() {
 	fi
 }
 
+rtd_template_finalize::start_splash() {
+	local text="${1:-RTD is finishing template setup. Please wait.}"
+	RTD_TEMPLATE_SPLASH_PID=""
+
+	if command -v yad >/dev/null 2>&1 && [[ -n "${DISPLAY:-}" ]]; then
+		yad --info \
+			--title="RunTime Data - Template Finalization" \
+			--maximized \
+			--no-buttons \
+			--on-top \
+			--center \
+			--text="<span font='24'><b>${text}</b></span>\n\nInstalling updates, applying default RTD bundles, and preparing this VM for OEM first boot." \
+			>/dev/null 2>&1 &
+		RTD_TEMPLATE_SPLASH_PID=$!
+	elif command -v zenity >/dev/null 2>&1 && [[ -n "${DISPLAY:-}" ]]; then
+		zenity --info \
+			--title="RunTime Data - Template Finalization" \
+			--width=1200 \
+			--height=800 \
+			--no-wrap \
+			--text="${text}\n\nInstalling updates, applying default RTD bundles, and preparing this VM for OEM first boot." \
+			>/dev/null 2>&1 &
+		RTD_TEMPLATE_SPLASH_PID=$!
+	fi
+}
+
+rtd_template_finalize::stop_splash() {
+	if [[ -n "${RTD_TEMPLATE_SPLASH_PID:-}" ]]; then
+		kill "${RTD_TEMPLATE_SPLASH_PID}" >/dev/null 2>&1 || true
+		wait "${RTD_TEMPLATE_SPLASH_PID}" 2>/dev/null || true
+		RTD_TEMPLATE_SPLASH_PID=""
+	fi
+}
+
+rtd_template_finalize::full_software_update() {
+	rtd_template_finalize::write_status "system-update" "running" "Running full system update before default bundle install"
+	if declare -F software::update_system_txt >/dev/null 2>&1; then
+		software::update_system_txt >>"${_LOGFILE}" 2>&1 || {
+			rtd_template_finalize::write_status "system-update" "warning" "Full system update returned a non-zero status; continuing with bundle installation"
+			return 0
+		}
+	else
+		rtd_template_finalize::write_status "system-update" "skipped" "software::update_system_txt is not available"
+	fi
+}
+
 rtd_template_finalize::configure_post_oobe_bundle_manager() {
 	mkdir -p "${RTD_POST_OOBE_BUNDLE_AUTOSTART%/*}"
+	rtd_template_finalize::configure_post_oobe_sudoers
+
 	cat >"${RTD_POST_OOBE_BUNDLE_WRAPPER}" <<EOF
 #!/bin/bash
 rm -f "\${HOME}/.config/autostart/rtd-oobe-bundle-manager.desktop" >/dev/null 2>&1 || true
-exec sudo -E bash "${_OEM_DIR}/core/rtd-oem-linux-config.sh" --first-login-bundle-manager
+exec sudo -n -E /bin/bash "${_OEM_DIR}/core/rtd-oem-linux-config.sh" --first-login-bundle-manager
 EOF
 	chmod 755 "${RTD_POST_OOBE_BUNDLE_WRAPPER}" 2>/dev/null || true
 
 	cat >"${RTD_POST_OOBE_BUNDLE_AUTOSTART}" <<EOF
 [Desktop Entry]
 Type=Application
-Exec=/usr/bin/xterm -fa Monospace -fs 12 -e "${RTD_POST_OOBE_BUNDLE_WRAPPER}"
+Exec=${RTD_POST_OOBE_BUNDLE_WRAPPER}
 Terminal=false
 Hidden=false
 X-GNOME-Autostart-enabled=true
@@ -84,6 +133,22 @@ Name=RTD Bundle Manager
 Comment=Select optional RTD software bundles on first login
 EOF
 	chmod 644 "${RTD_POST_OOBE_BUNDLE_AUTOSTART}" 2>/dev/null || true
+}
+
+rtd_template_finalize::configure_post_oobe_sudoers() {
+	local target_script="${_OEM_DIR}/core/rtd-oem-linux-config.sh"
+	cat >"${RTD_POST_OOBE_BUNDLE_SUDOERS}" <<EOF
+%sudo ALL=(root) NOPASSWD: SETENV: /bin/bash ${target_script} --first-login-bundle-manager
+%sudo ALL=(root) NOPASSWD: SETENV: /usr/bin/bash ${target_script} --first-login-bundle-manager
+%wheel ALL=(root) NOPASSWD: SETENV: /bin/bash ${target_script} --first-login-bundle-manager
+%wheel ALL=(root) NOPASSWD: SETENV: /usr/bin/bash ${target_script} --first-login-bundle-manager
+EOF
+	chmod 440 "${RTD_POST_OOBE_BUNDLE_SUDOERS}" 2>/dev/null || true
+	if command -v visudo >/dev/null 2>&1 && ! visudo -cf "${RTD_POST_OOBE_BUNDLE_SUDOERS}" >/dev/null 2>&1; then
+		rm -f "${RTD_POST_OOBE_BUNDLE_SUDOERS}"
+		rtd_template_finalize::write_status "post-oobe-sudoers" "failed" "Failed to validate ${RTD_POST_OOBE_BUNDLE_SUDOERS}"
+		return 1
+	fi
 }
 
 rtd_template_finalize::disable_temporary_oem_autologin() {
@@ -168,12 +233,16 @@ rtd_template_finalize::main() {
 	if [[ ${EUID} -ne 0 ]]; then
 		exec sudo -E bash "$0" "$@"
 	fi
+	trap rtd_template_finalize::stop_splash EXIT
 
 	if ! rtd_template_finalize::supported; then
 		rtd_template_finalize::manual_instruction
 		rm -f "${RTD_TEMPLATE_AUTOFINALIZE_MARKER}" 2>/dev/null || true
 		return 1
 	fi
+
+	rtd_template_finalize::start_splash "RTD is finishing this VM template"
+	rtd_template_finalize::full_software_update
 
 	rtd_template_finalize::write_status "bundle-install" "running" "Installing default RTD bundles"
 	if [[ ! -x "$bundle_manager" ]]; then

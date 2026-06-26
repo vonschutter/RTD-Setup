@@ -87,6 +87,8 @@ source "${_SCRIPT_DIR}/_rtd_library" || { echo "Failed to source _rtd_library"; 
 _LOGFILE=${_LOG_DIR}/$( basename $0).log
 : "${RTD_TEMPLATE_AUTOFINALIZE_MARKER:=/var/lib/rtd/template-autofinalize}"
 : "${RTD_POST_OOBE_BUNDLE_AUTOSTART:=rtd-oobe-bundle-manager.desktop}"
+: "${RTD_POST_OOBE_BUNDLE_WRAPPER:=/usr/local/bin/rtd-oobe-bundle-manager-first-login}"
+: "${RTD_POST_OOBE_BUNDLE_SUDOERS:=/etc/sudoers.d/90-rtd-oobe-bundle-manager}"
 
 # Normally all choices are checked. Pass the variable "false" to this script to default
 # to unchecked. If none is passed, a default will be used.
@@ -287,6 +289,8 @@ oem_first_login_bundle_manager() {
 	fi
 	rm -f "/etc/xdg/autostart/${RTD_POST_OOBE_BUNDLE_AUTOSTART}" 2>/dev/null || true
 	rm -f "/etc/skel/.config/autostart/${RTD_POST_OOBE_BUNDLE_AUTOSTART}" 2>/dev/null || true
+	rm -f "${RTD_POST_OOBE_BUNDLE_SUDOERS}" 2>/dev/null || true
+	rm -f "${RTD_POST_OOBE_BUNDLE_WRAPPER}" 2>/dev/null || true
 
 	system::wait_for_internet_availability
 	if ! hash zenity &>/dev/null ; then software::check_native_package_dependency zenity || exit 1 ; fi
