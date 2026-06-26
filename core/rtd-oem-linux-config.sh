@@ -86,7 +86,7 @@ source "${_SCRIPT_DIR}/_rtd_library" || { echo "Failed to source _rtd_library"; 
 # Determine log file directory
 _LOGFILE=${_LOG_DIR}/$( basename $0).log
 : "${RTD_TEMPLATE_AUTOFINALIZE_MARKER:=/var/lib/rtd/template-autofinalize}"
-: "${RTD_POST_OOBE_BUNDLE_AUTOSTART:=/etc/xdg/autostart/rtd-oobe-bundle-manager.desktop}"
+: "${RTD_POST_OOBE_BUNDLE_AUTOSTART:=rtd-oobe-bundle-manager.desktop}"
 
 # Normally all choices are checked. Pass the variable "false" to this script to default
 # to unchecked. If none is passed, a default will be used.
@@ -109,34 +109,19 @@ _requirements="dialog wget curl rsync git"
 complete_setup () {
 	#conditional default value option for the OEM reaseal
 	local ConditionalResealOption=""
+	local _distro_type _pretty_name="system"
+	_distro_type="$(system::distribution_type 2>/dev/null || printf 'unknown')"
 	if [[ -r /etc/os-release ]]; then
 		# shellcheck source=/dev/null
 		. /etc/os-release
-		local _os_id="${ID,,}"
-		local _os_like="${ID_LIKE,,}"
-		local _pretty_name="${PRETTY_NAME:-${NAME:-system}}"
-		local _reseal_supported="false"
-
-		case "${_os_id}" in
-			ubuntu | kubuntu | zorin | linuxmint | pop | elementary | debian | fedora | opensuse* | suse | sles*)
-				_reseal_supported="true"
-				;;
-		esac
-
-		if [[ "${_reseal_supported}" != "true" && -n "${_os_like}" ]]; then
-			if [[ "${_os_like}" == *"debian"* || "${_os_like}" == *"ubuntu"* ]]; then
-				_reseal_supported="true"
-			elif [[ "${_os_like}" == *"fedora"* || "${_os_like}" == *"rhel"* || "${_os_like}" == *"centos"* ]]; then
-				_reseal_supported="true"
-			elif [[ "${_os_like}" == *"suse"* ]]; then
-				_reseal_supported="true"
-			fi
-		fi
-
-		if [[ "${_reseal_supported}" == "true" ]]; then
-			ConditionalResealOption="Reseal ${_pretty_name} and prepare for delivery to new user"
-		fi
+		_pretty_name="${PRETTY_NAME:-${NAME:-system}}"
 	fi
+
+	case "${_distro_type}" in
+		ubuntu|debian|fedora|redhat|suse)
+			ConditionalResealOption="Reseal ${_pretty_name} and prepare for delivery to new user"
+			;;
+	esac
 
 	local _options_input="Restart system and start using it now\nExit now and do no more\n"
 	if [[ -n "${ConditionalResealOption}" ]]; then
@@ -296,7 +281,12 @@ oem_first_login_bundle_manager() {
 	fi
 
 	write_information "🚀 Launching RTD bundle manager for first user login..."
-	rm -f "${RTD_POST_OOBE_BUNDLE_AUTOSTART}" 2>/dev/null || true
+	rm -f "${HOME:-}/.config/autostart/${RTD_POST_OOBE_BUNDLE_AUTOSTART}" 2>/dev/null || true
+	if [[ -n "${SUDO_USER:-}" && -d "/home/${SUDO_USER}" ]]; then
+		rm -f "/home/${SUDO_USER}/.config/autostart/${RTD_POST_OOBE_BUNDLE_AUTOSTART}" 2>/dev/null || true
+	fi
+	rm -f "/etc/xdg/autostart/${RTD_POST_OOBE_BUNDLE_AUTOSTART}" 2>/dev/null || true
+	rm -f "/etc/skel/.config/autostart/${RTD_POST_OOBE_BUNDLE_AUTOSTART}" 2>/dev/null || true
 
 	system::wait_for_internet_availability
 	if ! hash zenity &>/dev/null ; then software::check_native_package_dependency zenity || exit 1 ; fi

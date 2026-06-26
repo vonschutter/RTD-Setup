@@ -170,45 +170,22 @@ rtd_oem_enable::json_escape() {
 	printf '%s' "$value"
 }
 
-rtd_oem_enable::distribution_id() {
-	if [[ -r /etc/os-release ]]; then
-		# shellcheck source=/dev/null
-		. /etc/os-release
-		printf '%s' "${ID,,}"
-	else
-		printf 'unknown'
-	fi
-}
-
-rtd_oem_enable::distribution_like() {
-	if [[ -r /etc/os-release ]]; then
-		# shellcheck source=/dev/null
-		. /etc/os-release
-		printf '%s' "${ID_LIKE,,}"
-	else
-		printf 'unknown'
-	fi
-}
-
 rtd_oem_enable::template_workflow_supported() {
-	local os_id os_like
-	os_id="$(rtd_oem_enable::distribution_id)"
-	os_like="$(rtd_oem_enable::distribution_like)"
+	local distro_type
+	distro_type="$(system::distribution_type 2>/dev/null || printf 'unknown')"
 
-	case "$os_id" in
-		ubuntu|kubuntu|zorin|linuxmint|pop|elementary|fedora|opensuse*|suse|sles*)
+	case "$distro_type" in
+		ubuntu|fedora|redhat|suse)
 			return 0
 			;;
 	esac
-
-	[[ "$os_like" == *"ubuntu"* || "$os_like" == *"suse"* || "$os_like" == *"fedora"* || "$os_like" == *"rhel"* || "$os_like" == *"centos"* ]]
+	return 1
 }
 
 rtd_oem_enable::write_template_workflow_config() {
 	local supported="${1:-false}" launcher="${2:-}" reason="${3:-}"
-	local os_id os_like timestamp
-	os_id="$(rtd_oem_enable::distribution_id)"
-	os_like="$(rtd_oem_enable::distribution_like)"
+	local distro_type timestamp
+	distro_type="$(system::distribution_type 2>/dev/null || printf 'unknown')"
 	timestamp="$(date --iso-8601=seconds 2>/dev/null || date)"
 
 	system::ensure_directory_exists "$CONFIG_DIR" || return 1
@@ -216,8 +193,7 @@ rtd_oem_enable::write_template_workflow_config() {
 {
   "schema": "rtd.vm-template.workflow.v1",
   "supported": ${supported},
-  "distribution_id": "$(rtd_oem_enable::json_escape "$os_id")",
-  "distribution_like": "$(rtd_oem_enable::json_escape "$os_like")",
+  "distribution_type": "$(rtd_oem_enable::json_escape "$distro_type")",
   "auto_finalize_marker": "$(rtd_oem_enable::json_escape "$TEMPLATE_AUTOFINALIZE_MARKER")",
   "login_launcher": "$(rtd_oem_enable::json_escape "$launcher")",
   "default_bundle_command": "rtd-oem-bundle-manager --noninteractive",

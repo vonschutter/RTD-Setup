@@ -19,7 +19,8 @@ set -o pipefail
 : "${RTD_TEMPLATE_STATUS_DIR:=/var/lib/${_TLA}/vm-template}"
 : "${RTD_TEMPLATE_STATUS_FILE:=${RTD_TEMPLATE_STATUS_DIR}/status.json}"
 : "${RTD_TEMPLATE_AUTOFINALIZE_MARKER:=/var/lib/${_TLA}/template-autofinalize}"
-: "${RTD_POST_OOBE_BUNDLE_AUTOSTART:=/etc/xdg/autostart/rtd-oobe-bundle-manager.desktop}"
+: "${RTD_POST_OOBE_BUNDLE_AUTOSTART:=/etc/skel/.config/autostart/rtd-oobe-bundle-manager.desktop}"
+: "${RTD_POST_OOBE_BUNDLE_WRAPPER:=/usr/local/bin/rtd-oobe-bundle-manager-first-login}"
 
 mkdir -p "${_LOG_DIR}" "${RTD_TEMPLATE_STATUS_DIR}"
 touch "${_LOGFILE}"
@@ -37,45 +38,22 @@ rtd_template_finalize::json_escape() {
 	printf '%s' "$value"
 }
 
-rtd_template_finalize::distribution_id() {
-	if [[ -r /etc/os-release ]]; then
-		# shellcheck source=/dev/null
-		. /etc/os-release
-		printf '%s' "${ID,,}"
-	else
-		printf 'unknown'
-	fi
-}
-
-rtd_template_finalize::distribution_like() {
-	if [[ -r /etc/os-release ]]; then
-		# shellcheck source=/dev/null
-		. /etc/os-release
-		printf '%s' "${ID_LIKE,,}"
-	else
-		printf 'unknown'
-	fi
-}
-
 rtd_template_finalize::supported() {
-	local os_id os_like
-	os_id="$(rtd_template_finalize::distribution_id)"
-	os_like="$(rtd_template_finalize::distribution_like)"
+	local distro_type
+	distro_type="$(system::distribution_type 2>/dev/null || printf 'unknown')"
 
-	case "$os_id" in
-		ubuntu|kubuntu|zorin|linuxmint|pop|elementary|fedora|opensuse*|suse|sles*)
+	case "$distro_type" in
+		ubuntu|fedora|redhat|suse)
 			return 0
 			;;
 	esac
-
-	[[ "$os_like" == *"ubuntu"* || "$os_like" == *"suse"* || "$os_like" == *"fedora"* || "$os_like" == *"rhel"* || "$os_like" == *"centos"* ]]
+	return 1
 }
 
 rtd_template_finalize::manual_instruction() {
-	local os_id os_like message
-	os_id="$(rtd_template_finalize::distribution_id)"
-	os_like="$(rtd_template_finalize::distribution_like)"
-	message="RTD automated template finalization is not enabled for this distribution (${os_id}; like: ${os_like}). Install desired default bundles manually, run any global configuration needed for future users, then run the appropriate distro reseal/OOBE preparation manually before cloning."
+	local distro_type message
+	distro_type="$(system::distribution_type 2>/dev/null || printf 'unknown')"
+	message="RTD automated template finalization is not enabled for this distribution type (${distro_type}). Install desired default bundles manually, run any global configuration needed for future users, then run the appropriate distro reseal/OOBE preparation manually before cloning."
 
 	rtd_template_finalize::write_status "unsupported" "manual-required" "$message"
 	printf '%s\n' "$message" | tee -a "${_LOGFILE}" >&2
@@ -88,10 +66,17 @@ rtd_template_finalize::manual_instruction() {
 
 rtd_template_finalize::configure_post_oobe_bundle_manager() {
 	mkdir -p "${RTD_POST_OOBE_BUNDLE_AUTOSTART%/*}"
+	cat >"${RTD_POST_OOBE_BUNDLE_WRAPPER}" <<EOF
+#!/bin/bash
+rm -f "\${HOME}/.config/autostart/rtd-oobe-bundle-manager.desktop" >/dev/null 2>&1 || true
+exec sudo -E bash "${_OEM_DIR}/core/rtd-oem-linux-config.sh" --first-login-bundle-manager
+EOF
+	chmod 755 "${RTD_POST_OOBE_BUNDLE_WRAPPER}" 2>/dev/null || true
+
 	cat >"${RTD_POST_OOBE_BUNDLE_AUTOSTART}" <<EOF
 [Desktop Entry]
 Type=Application
-Exec=/usr/bin/xterm -fa Monospace -fs 12 -e sudo -E bash "${_OEM_DIR}/core/rtd-oem-linux-config.sh" --first-login-bundle-manager
+Exec=/usr/bin/xterm -fa Monospace -fs 12 -e "${RTD_POST_OOBE_BUNDLE_WRAPPER}"
 Terminal=false
 Hidden=false
 X-GNOME-Autostart-enabled=true
@@ -106,6 +91,54 @@ rtd_template_finalize::disable_temporary_oem_autologin() {
 	system::toggle_oem_auto_login --disable || true
 	system::toggle_oem_auto_elevated_privilege --disable || true
 	system::set_oem_elevated_privilege_gui --disable || true
+	rtd_template_finalize::scrub_oem_autologin
+}
+
+rtd_template_finalize::scrub_oem_autologin() {
+	local file
+	local -a autologin_files=(
+		/etc/xdg/autostart/oem-run.desktop
+		/etc/sddm.conf.d/10-rtd-autologin.conf
+		/etc/lightdm/lightdm.conf.d/10-rtd-autologin.conf
+		/etc/systemd/system/getty@tty1.service.d/override.conf
+	)
+
+	for file in "${autologin_files[@]}"; do
+		rm -f "$file" 2>/dev/null || true
+	done
+
+	for file in /etc/gdm3/custom.conf /etc/gdm3/daemon.conf /etc/gdm/custom.conf; do
+		[[ -f "$file" ]] || continue
+		sed -i \
+			-e 's/^[[:space:]]*AutomaticLoginEnable[[:space:]]*=.*/AutomaticLoginEnable=False/' \
+			-e '/^[[:space:]]*AutomaticLogin[[:space:]]*=/d' \
+			"$file" 2>/dev/null || true
+	done
+
+	for file in /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.d/*.conf; do
+		[[ -f "$file" ]] || continue
+		sed -i \
+			-e '/^[[:space:]]*autologin-user[[:space:]]*=/d' \
+			-e '/^[[:space:]]*autologin-user-timeout[[:space:]]*=/d' \
+			"$file" 2>/dev/null || true
+	done
+
+	for file in /etc/sddm.conf /etc/sddm.conf.d/*.conf; do
+		[[ -f "$file" ]] || continue
+		sed -i \
+			-e '/^[[:space:]]*User[[:space:]]*=[[:space:]]*tangarora[[:space:]]*$/d' \
+			-e '/^[[:space:]]*Session[[:space:]]*=.*$/d' \
+			"$file" 2>/dev/null || true
+	done
+
+	if [[ -f /etc/sysconfig/displaymanager ]]; then
+		sed -i \
+			-e 's/^DISPLAYMANAGER_AUTOLOGIN=.*/DISPLAYMANAGER_AUTOLOGIN=""/' \
+			-e 's/^DISPLAYMANAGER_PASSWORD_LESS_LOGIN=.*/DISPLAYMANAGER_PASSWORD_LESS_LOGIN="no"/' \
+			/etc/sysconfig/displaymanager 2>/dev/null || true
+	fi
+
+	systemctl daemon-reload >/dev/null 2>&1 || true
 }
 
 rtd_template_finalize::write_status() {
