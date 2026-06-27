@@ -47,6 +47,13 @@ except (ImportError, ValueError) as error:
 
 BANNER_URL = os.environ.get("RTD_BOOTSTRAP_BANNER_URL", "")
 STARTED_FILE = os.environ.get("RTD_BOOTSTRAP_GUI_STARTED_FILE", "")
+WINDOW_TITLE = os.environ.get("RTD_BOOTSTRAP_WINDOW_TITLE", "RTD System Setup")
+HERO_TITLE = os.environ.get("RTD_BOOTSTRAP_HERO_TITLE", WINDOW_TITLE)
+HERO_SUBTITLE = os.environ.get(
+    "RTD_BOOTSTRAP_HERO_SUBTITLE",
+    "Preparing tools, configuration, and desktop integration.",
+)
+MAXIMIZED = os.environ.get("RTD_BOOTSTRAP_MAXIMIZED", "").lower() in {"1", "true", "yes"}
 TERMINAL_ESCAPE_RE = re.compile(
     r"\x1b(?:"
     r"\[[0-?]*[A-Za-z@^_`{}~]|"
@@ -88,7 +95,7 @@ def sanitize_terminal_output(text):
 
 class BootstrapProgressWindow(Gtk.Window):
     def __init__(self, script, args):
-        super().__init__(title="RTD System Setup")
+        super().__init__(title=WINDOW_TITLE)
         self.script = script
         self.args = args
         self.process = None
@@ -101,6 +108,8 @@ class BootstrapProgressWindow(Gtk.Window):
         self.build_css()
         self.add(self.build_window())
         self.show_all()
+        if MAXIMIZED:
+            self.maximize()
         self.mark_step("start")
         GLib.idle_add(self.start_process)
 
@@ -158,10 +167,10 @@ class BootstrapProgressWindow(Gtk.Window):
         copy.set_halign(Gtk.Align.START)
         copy.set_valign(Gtk.Align.CENTER)
         copy.set_margin_start(36)
-        title = Gtk.Label(label="RTD System Setup")
+        title = Gtk.Label(label=HERO_TITLE)
         title.get_style_context().add_class("hero-title")
         title.set_halign(Gtk.Align.START)
-        subtitle = Gtk.Label(label="Preparing tools, configuration, and desktop integration.")
+        subtitle = Gtk.Label(label=HERO_SUBTITLE)
         subtitle.get_style_context().add_class("hero-copy")
         subtitle.set_halign(Gtk.Align.START)
         copy.pack_start(title, False, False, 0)

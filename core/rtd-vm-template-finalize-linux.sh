@@ -22,6 +22,7 @@ set -o pipefail
 : "${RTD_POST_OOBE_BUNDLE_AUTOSTART:=/etc/skel/.config/autostart/rtd-oobe-bundle-manager.desktop}"
 : "${RTD_POST_OOBE_BUNDLE_WRAPPER:=/usr/local/bin/rtd-oobe-bundle-manager-first-login}"
 : "${RTD_POST_OOBE_BUNDLE_SUDOERS:=/etc/sudoers.d/90-rtd-oobe-bundle-manager}"
+: "${RTD_TEMPLATE_PROGRESS_GTK:=${_SCRIPT_DIR}/rtd-bootstrap-progress-gtk.py}"
 
 mkdir -p "${_LOG_DIR}" "${RTD_TEMPLATE_STATUS_DIR}"
 touch "${_LOGFILE}"
@@ -65,40 +66,6 @@ rtd_template_finalize::manual_instruction() {
 	fi
 }
 
-rtd_template_finalize::start_splash() {
-	local text="${1:-RTD is finishing template setup. Please wait.}"
-	RTD_TEMPLATE_SPLASH_PID=""
-
-	if command -v yad >/dev/null 2>&1 && [[ -n "${DISPLAY:-}" ]]; then
-		yad --info \
-			--title="RunTime Data - Template Finalization" \
-			--maximized \
-			--no-buttons \
-			--on-top \
-			--center \
-			--text="<span font='24'><b>${text}</b></span>\n\nInstalling updates, applying default RTD bundles, and preparing this VM for OEM first boot." \
-			>/dev/null 2>&1 &
-		RTD_TEMPLATE_SPLASH_PID=$!
-	elif command -v zenity >/dev/null 2>&1 && [[ -n "${DISPLAY:-}" ]]; then
-		zenity --info \
-			--title="RunTime Data - Template Finalization" \
-			--width=1200 \
-			--height=800 \
-			--no-wrap \
-			--text="${text}\n\nInstalling updates, applying default RTD bundles, and preparing this VM for OEM first boot." \
-			>/dev/null 2>&1 &
-		RTD_TEMPLATE_SPLASH_PID=$!
-	fi
-}
-
-rtd_template_finalize::stop_splash() {
-	if [[ -n "${RTD_TEMPLATE_SPLASH_PID:-}" ]]; then
-		kill "${RTD_TEMPLATE_SPLASH_PID}" >/dev/null 2>&1 || true
-		wait "${RTD_TEMPLATE_SPLASH_PID}" 2>/dev/null || true
-		RTD_TEMPLATE_SPLASH_PID=""
-	fi
-}
-
 rtd_template_finalize::full_software_update() {
 	rtd_template_finalize::write_status "system-update" "running" "Running full system update before default bundle install"
 	if declare -F software::update_system_txt >/dev/null 2>&1; then
@@ -109,6 +76,56 @@ rtd_template_finalize::full_software_update() {
 	else
 		rtd_template_finalize::write_status "system-update" "skipped" "software::update_system_txt is not available"
 	fi
+}
+
+rtd_template_finalize::run_with_progress_gui() {
+	if [[ "${RTD_TEMPLATE_FINALIZER_WORKER:-0}" == "1" || "${RTD_BOOTSTRAP_NO_GUI:-0}" == "1" ]]; then
+		return 1
+	fi
+	if [[ -z "${DISPLAY:-}" || ! -f "${RTD_TEMPLATE_PROGRESS_GTK}" || ! -x "${RTD_TEMPLATE_PROGRESS_GTK}" ]]; then
+		return 1
+	fi
+	if ! command -v python3 >/dev/null 2>&1; then
+		return 1
+	fi
+
+	RTD_BOOTSTRAP_WINDOW_TITLE="RunTime Data - Template Finalization" \
+	RTD_BOOTSTRAP_HERO_TITLE="RTD is finishing this VM template" \
+	RTD_BOOTSTRAP_HERO_SUBTITLE="Installing updates, applying default RTD bundles, and preparing OEM first boot." \
+	RTD_BOOTSTRAP_MAXIMIZED=1 \
+		python3 "${RTD_TEMPLATE_PROGRESS_GTK}" "$0" --run-finalization
+}
+
+rtd_template_finalize::run_finalization_tasks() {
+	if ! rtd_template_finalize::supported; then
+		rtd_template_finalize::manual_instruction
+		rm -f "${RTD_TEMPLATE_AUTOFINALIZE_MARKER}" 2>/dev/null || true
+		return 1
+	fi
+
+	rtd_template_finalize::full_software_update
+
+	rtd_template_finalize::write_status "bundle-install" "running" "Installing default RTD bundles"
+	local bundle_manager="${_OEM_DIR}/modules/oem-bundle-manager.mod/rtd-oem-bundle-manager"
+	if [[ ! -x "$bundle_manager" ]]; then
+		chmod 755 "$bundle_manager" 2>/dev/null || true
+	fi
+	if [[ ! -f "$bundle_manager" ]]; then
+		rtd_template_finalize::write_status "bundle-install" "failed" "Bundle manager not found at ${bundle_manager}"
+		printf 'Bundle manager not found at %s\n' "$bundle_manager" >&2
+		return 1
+	fi
+	if ! bash "$bundle_manager" --noninteractive >>"${_LOGFILE}" 2>&1; then
+		rtd_template_finalize::write_status "bundle-install" "failed" "Default bundle installation failed; see ${_LOGFILE}"
+		printf 'Default bundle installation failed; see %s\n' "${_LOGFILE}" >&2
+		return 1
+	fi
+
+	rtd_template_finalize::write_status "reseal" "running" "Running RTD OEM reseal"
+	rtd_template_finalize::configure_post_oobe_bundle_manager
+	rtd_template_finalize::disable_temporary_oem_autologin
+	rm -f "${RTD_TEMPLATE_AUTOFINALIZE_MARKER}" 2>/dev/null || true
+	system::rtd_oem_reseal
 }
 
 rtd_template_finalize::configure_post_oobe_bundle_manager() {
@@ -228,42 +245,19 @@ EOF
 }
 
 rtd_template_finalize::main() {
-	local bundle_manager="${_OEM_DIR}/modules/oem-bundle-manager.mod/rtd-oem-bundle-manager"
-
 	if [[ ${EUID} -ne 0 ]]; then
 		exec sudo -E bash "$0" "$@"
 	fi
-	trap rtd_template_finalize::stop_splash EXIT
 
-	if ! rtd_template_finalize::supported; then
-		rtd_template_finalize::manual_instruction
-		rm -f "${RTD_TEMPLATE_AUTOFINALIZE_MARKER}" 2>/dev/null || true
-		return 1
+	if [[ "${1:-}" == "--run-finalization" ]]; then
+		export RTD_TEMPLATE_FINALIZER_WORKER=1
+		rtd_template_finalize::run_finalization_tasks
+		return $?
 	fi
 
-	rtd_template_finalize::start_splash "RTD is finishing this VM template"
-	rtd_template_finalize::full_software_update
-
-	rtd_template_finalize::write_status "bundle-install" "running" "Installing default RTD bundles"
-	if [[ ! -x "$bundle_manager" ]]; then
-		chmod 755 "$bundle_manager" 2>/dev/null || true
+	if ! rtd_template_finalize::run_with_progress_gui; then
+		rtd_template_finalize::run_finalization_tasks
 	fi
-	if [[ ! -f "$bundle_manager" ]]; then
-		rtd_template_finalize::write_status "bundle-install" "failed" "Bundle manager not found at ${bundle_manager}"
-		printf 'Bundle manager not found at %s\n' "$bundle_manager" >&2
-		return 1
-	fi
-	if ! bash "$bundle_manager" --noninteractive >>"${_LOGFILE}" 2>&1; then
-		rtd_template_finalize::write_status "bundle-install" "failed" "Default bundle installation failed; see ${_LOGFILE}"
-		printf 'Default bundle installation failed; see %s\n' "${_LOGFILE}" >&2
-		return 1
-	fi
-
-	rtd_template_finalize::write_status "reseal" "running" "Running RTD OEM reseal"
-	rtd_template_finalize::configure_post_oobe_bundle_manager
-	rtd_template_finalize::disable_temporary_oem_autologin
-	rm -f "${RTD_TEMPLATE_AUTOFINALIZE_MARKER}" 2>/dev/null || true
-	system::rtd_oem_reseal
 }
 
 rtd_template_finalize::main "$@"
