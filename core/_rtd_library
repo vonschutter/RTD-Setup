@@ -839,6 +839,149 @@ dialog::check_menu_availability() {
 	fi
 }
 
+rtd_ui::backend() {
+	# Description:
+	#   Select the best available interactive UI backend for the current session.
+	#
+	# Graphical sessions prefer yad and then zenity. Terminal/server sessions, including
+	# sessions without DISPLAY or WAYLAND_DISPLAY, use dialog. RTD_UI_BACKEND may be set to
+	# yad, zenity, or dialog to force a specific backend when it is available.
+	#
+	# Globals:
+	#   - RTD_UI_BACKEND: Optional backend override.
+	#   - DISPLAY, WAYLAND_DISPLAY: Used to detect a graphical session.
+	# Arguments:
+	#   - None.
+	# Outputs:
+	#   - Prints one of: yad, zenity, dialog, text.
+	# Returns:
+	#   - 0 always.
+	#
+	# Usage:
+	#   backend=$(rtd_ui::backend)
+	# End of Documentation
+
+	case "${RTD_UI_BACKEND:-}" in
+		yad|zenity|dialog)
+			if type -P "${RTD_UI_BACKEND}" >/dev/null 2>&1; then
+				printf '%s\n' "${RTD_UI_BACKEND}"
+				return 0
+			fi
+			;;
+	esac
+
+	if [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
+		if type -P yad >/dev/null 2>&1; then
+			printf 'yad\n'
+			return 0
+		fi
+		if type -P zenity >/dev/null 2>&1; then
+			printf 'zenity\n'
+			return 0
+		fi
+	fi
+
+	if type -P dialog >/dev/null 2>&1; then
+		printf 'dialog\n'
+	else
+		printf 'text\n'
+	fi
+}
+
+rtd_ui::message() {
+	# Description:
+	#   Display an information, warning, or error message using the best available UI backend.
+	#
+	# Globals:
+	#   - BACKTITLE, BRANDING: Used for dialog backtitles when available.
+	# Arguments:
+	#   - --title <text>: Dialog/window title. Default: RTD.
+	#   - --type <info|warning|error>: Message severity. Default: info.
+	#   - --message <text>: Message body.
+	# Outputs:
+	#   - Displays a graphical, dialog, or terminal message.
+	# Returns:
+	#   - Backend exit status, or 0 for text fallback.
+	#
+	# Usage:
+	#   rtd_ui::message --title "Done" --message "Task completed."
+	# End of Documentation
+
+	local title="${BRANDING:-RTD}" type="info" message="" backend
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--title) title="${2:-$title}"; shift 2 ;;
+			--type) type="${2:-$type}"; shift 2 ;;
+			--message) message="${2:-}"; shift 2 ;;
+			*) message="${message}${message:+ }$1"; shift ;;
+		esac
+	done
+
+	backend="$(rtd_ui::backend)"
+	case "$backend" in
+		yad)
+			yad "--${type}" --title="$title" --width=640 --text="$message"
+			;;
+		zenity)
+			zenity "--${type}" --title="$title" --width=640 --text="$message"
+			;;
+		dialog)
+			dialog --backtitle "${BACKTITLE:-${BRANDING:-RTD}}" --title "$title" --msgbox "$message" "${HEIGHT:-12}" "${WIDTH:-70}"
+			;;
+		*)
+			printf '%s: %s\n' "$title" "$message"
+			;;
+	esac
+}
+
+rtd_ui::yes_no() {
+	# Description:
+	#   Ask a yes/no question using the best available UI backend.
+	#
+	# Globals:
+	#   - BACKTITLE, BRANDING: Used for dialog backtitles when available.
+	# Arguments:
+	#   - --title <text>: Dialog/window title. Default: Question.
+	#   - --message <text>: Question body.
+	# Outputs:
+	#   - Displays a graphical, dialog, or terminal prompt.
+	# Returns:
+	#   - 0 for yes, non-zero for no/cancel.
+	#
+	# Usage:
+	#   if rtd_ui::yes_no --title "Continue?" --message "Proceed now?"; then ...
+	# End of Documentation
+
+	local title="Question" message="" backend reply
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--title|--back-title) title="${2:-$title}"; shift 2 ;;
+			--message) message="${2:-}"; shift 2 ;;
+			*) message="${message}${message:+ }$1"; shift ;;
+		esac
+	done
+
+	backend="$(rtd_ui::backend)"
+	case "$backend" in
+		yad)
+			yad --question --title="$title" --width=560 --text="$message"
+			;;
+		zenity)
+			zenity --question --title="$title" --width=560 --text="$message"
+			;;
+		dialog)
+			dialog --backtitle "${BACKTITLE:-${BRANDING:-RTD}}" --title "$title" --yesno "$message" "${HEIGHT:-12}" "${WIDTH:-70}"
+			;;
+		*)
+			printf '%s\n%s [y/N] ' "$title" "$message" >&2
+			read -r reply
+			[[ "$reply" =~ ^[Yy] ]]
+			;;
+	esac
+}
+
 dialog::display_cmd_output() {
 	# Description: Displays the output of a command in a dialog box.
 	#
@@ -29998,6 +30141,7 @@ kvm::template_metadata_write() {
   "default_bundles_source": "_rtd_recipies.info",
   "default_bundle_install_command": "rtd-oem-bundle-manager --noninteractive",
   "notes": "$(kvm::template_metadata_json_escape "$notes")",
+  "created_at": "$(kvm::template_metadata_json_escape "$created_at")",
   "updated_at": "$(kvm::template_metadata_json_escape "$created_at")"
 }
 EOF
@@ -30005,7 +30149,7 @@ EOF
 }
 
 kvm::template_metadata_read_label() {
-	local vm_name="${1:-}" metadata_path ready automation support notes domstate
+	local vm_name="${1:-}" metadata_path ready automation support notes created_at updated_at domstate date_label
 	[[ -n "$vm_name" ]] || return 1
 	metadata_path="$(kvm::template_metadata_path "$vm_name")"
 	[[ -r "$metadata_path" ]] || return 1
@@ -30014,17 +30158,22 @@ kvm::template_metadata_read_label() {
 	automation="$(grep -E '"automation_status"[[:space:]]*:' "$metadata_path" | head -n 1 | sed -E 's/.*:[[:space:]]*"([^"]*)".*/\1/')"
 	support="$(grep -E '"support_level"[[:space:]]*:' "$metadata_path" | head -n 1 | sed -E 's/.*:[[:space:]]*"([^"]*)".*/\1/')"
 	notes="$(grep -E '"notes"[[:space:]]*:' "$metadata_path" | head -n 1 | sed -E 's/.*:[[:space:]]*"([^"]*)".*/\1/')"
+	created_at="$(grep -E '"created_at"[[:space:]]*:' "$metadata_path" | head -n 1 | sed -E 's/.*:[[:space:]]*"([^"]*)".*/\1/')"
+	updated_at="$(grep -E '"updated_at"[[:space:]]*:' "$metadata_path" | head -n 1 | sed -E 's/.*:[[:space:]]*"([^"]*)".*/\1/')"
+	updated_at="${created_at:-$updated_at}"
+	date_label="${updated_at%%T*}"
+	[[ -n "$date_label" && "$date_label" != "$updated_at" ]] || date_label="$updated_at"
 
-	if [[ "$ready" != "true" && "$automation" == "auto-finalizer-pending" ]] && command -v virsh >/dev/null 2>&1; then
+	if command -v virsh >/dev/null 2>&1; then
 		domstate="$(virsh domstate "$vm_name" 2>/dev/null || true)"
-		if [[ "${domstate,,}" == *"shut off"* ]]; then
-			printf 'Ready: auto-finalizer-completed (inferred: template is shut off)'
+		if [[ -n "$domstate" && "${domstate,,}" != *"shut off"* ]]; then
+			printf 'Wait for Power Off: %s%s' "${automation:-finalizer-running}" "${date_label:+ (${date_label})}"
 			return 0
 		fi
 	fi
 
 	if [[ "$ready" == "true" ]]; then
-		printf 'Ready: %s%s' "${automation:-automated}" "${support:+ (${support})}"
+		printf 'Ready: %s%s' "${automation:-automated}" "${date_label:+ (${date_label})}"
 	else
 		printf 'Manual setup required: %s%s' "${automation:-not finalized}" "${notes:+ - ${notes}}"
 	fi

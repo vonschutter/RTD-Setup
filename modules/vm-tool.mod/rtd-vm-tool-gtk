@@ -27,6 +27,20 @@ RTD_VM_GTK_ACTION_LOG="/var/log/rtd/rtd-vm-tool-gtk-actions.log"
 : "${RTD_VM_GTK_XTERM_FONT_SIZE:=14}"
 declare -a RTD_VM_CLONE_ARGS=()
 
+vmtoolgtk::gui_tool() {
+	if [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
+		if command -v yad >/dev/null 2>&1; then
+			printf 'yad\n'
+			return 0
+		fi
+		if command -v zenity >/dev/null 2>&1; then
+			printf 'zenity\n'
+			return 0
+		fi
+	fi
+	return 1
+}
+
 vmtoolgtk::find_tui_script() {
 	local script_dir candidate
 
@@ -47,17 +61,23 @@ vmtoolgtk::find_tui_script() {
 }
 
 vmtoolgtk::show_error() {
-	local message="$1"
-	if command -v zenity >/dev/null 2>&1; then
-		zenity --error --title "${VMTOOLGTK_TITLE}" --width 640 --text "${message}"
-	else
-		printf 'ERROR: %s\n' "${message}" >&2
-	fi
+	local message="$1" gui_tool
+	gui_tool="$(vmtoolgtk::gui_tool || true)"
+	case "${gui_tool}" in
+		yad) yad --error --title="${VMTOOLGTK_TITLE}" --width=640 --text="${message}" ;;
+		zenity) zenity --error --title "${VMTOOLGTK_TITLE}" --width 640 --text "${message}" ;;
+		*) printf 'ERROR: %s\n' "${message}" >&2 ;;
+	esac
 }
 
 vmtoolgtk::show_info() {
-	local message="$1"
-	zenity --info --title "${VMTOOLGTK_TITLE}" --width 720 --text "${message}"
+	local message="$1" gui_tool
+	gui_tool="$(vmtoolgtk::gui_tool || true)"
+	case "${gui_tool}" in
+		yad) yad --info --title="${VMTOOLGTK_TITLE}" --width=720 --text="${message}" ;;
+		zenity) zenity --info --title "${VMTOOLGTK_TITLE}" --width 720 --text "${message}" ;;
+		*) printf '%s\n' "${message}" ;;
+	esac
 }
 
 vmtoolgtk::log() {
@@ -85,11 +105,25 @@ vmtoolgtk::with_legacy_nounset() {
 vmtoolgtk::prompt_yes_no() {
 	local title="$1"
 	local message="$2"
+	local gui_tool reply
 
-	zenity --question \
-		--title "${title}" \
-		--width 560 \
-		--text "${message}"
+	gui_tool="$(vmtoolgtk::gui_tool || true)"
+	case "${gui_tool}" in
+		yad)
+			yad --question --title="${title}" --width=560 --text="${message}"
+			;;
+		zenity)
+			zenity --question \
+				--title "${title}" \
+				--width 560 \
+				--text "${message}"
+			;;
+		*)
+			printf '%s\n%s [y/N] ' "${title}" "${message}" >&2
+			read -r reply
+			[[ "${reply}" =~ ^[Yy] ]]
+			;;
+	esac
 }
 
 vmtoolgtk::show_about() {

@@ -12,6 +12,8 @@ param(
 
     [switch]$SkipGuestTools,
 
+    [switch]$SkipSysprep,
+
     [switch]$Restart,
 
     [switch]$ApplyDodSecureDefaults,
@@ -31,6 +33,9 @@ $Script:AutoStartRemainingSeconds = 300
 $Script:LineQueue = New-Object 'System.Collections.Concurrent.ConcurrentQueue[string]'
 $Script:WorkerUrl = "https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/rtd-oem-windows-setup.ps1"
 $Script:BannerUrl = "https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/core/Media_files/rtd-bootstrap-gui-banner.png"
+$Script:CoreDir = "C:\RTD\core"
+$Script:StatePath = Join-Path $Script:CoreDir "state.json"
+$Script:SetupState = $null
 $Script:FrontendLog = "C:\RTD\log\windows-setup-splash.log"
 
 function Test-SetupAdministrator {
@@ -78,6 +83,9 @@ function Start-SetupElevated {
     if ($SkipGuestTools) {
         $arguments += "-SkipGuestTools"
     }
+    if ($SkipSysprep) {
+        $arguments += "-SkipSysprep"
+    }
     if ($Restart) {
         $arguments += "-Restart"
     }
@@ -102,6 +110,91 @@ function Start-SetupElevated {
         ) | Out-Null
     }
     exit
+}
+
+function New-SetupDefaultState {
+    return [ordered]@{
+        Runs = 0
+        Completed = [ordered]@{}
+    }
+}
+
+function ConvertTo-SetupStateHashtable {
+    param(
+        [Parameter(Mandatory = $true)]
+        $InputObject
+    )
+
+    if ($InputObject -is [hashtable] -or $InputObject -is [System.Collections.Specialized.OrderedDictionary]) {
+        return $InputObject
+    }
+
+    $table = [ordered]@{}
+    foreach ($property in $InputObject.PSObject.Properties) {
+        if ($property.Value -is [pscustomobject]) {
+            $table[$property.Name] = ConvertTo-SetupStateHashtable -InputObject $property.Value
+        } else {
+            $table[$property.Name] = $property.Value
+        }
+    }
+    return $table
+}
+
+function Read-SetupState {
+    if (-not (Test-Path -LiteralPath $Script:StatePath -PathType Leaf)) {
+        return (New-SetupDefaultState)
+    }
+
+    try {
+        $state = ConvertFrom-Json -InputObject (Get-Content -LiteralPath $Script:StatePath -Raw -ErrorAction Stop) -ErrorAction Stop
+        $stateTable = ConvertTo-SetupStateHashtable -InputObject $state
+        if (-not $stateTable.Contains("Runs")) {
+            $stateTable["Runs"] = 0
+        }
+        if (-not $stateTable.Contains("Completed") -or -not $stateTable.Completed) {
+            $stateTable["Completed"] = [ordered]@{}
+        }
+        return $stateTable
+    } catch {
+        return (New-SetupDefaultState)
+    }
+}
+
+function Test-SetupStateCompleted {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    return $Script:SetupState.Completed.Contains($Name) -and [bool]$Script:SetupState.Completed[$Name].Completed
+}
+
+function Save-SetupState {
+    try {
+        New-Item -Path $Script:CoreDir -ItemType Directory -Force | Out-Null
+        if (-not $Script:SetupState.Contains("UpdatedAt")) {
+            $Script:SetupState["UpdatedAt"] = $null
+        }
+        $Script:SetupState["UpdatedAt"] = (Get-Date).ToUniversalTime().ToString("o")
+        $Script:SetupState | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $Script:StatePath -Encoding UTF8
+    } catch {
+        Add-SetupOutput "Could not update setup state '$($Script:StatePath)': $($_.Exception.Message)"
+        $Script:CompletedWithWarnings = $true
+    }
+}
+
+function Set-SetupStateCompleted {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    $Script:SetupState.Completed[$Name] = [ordered]@{
+        Completed = $true
+        Status = "completed"
+        CompletedAt = (Get-Date).ToUniversalTime().ToString("o")
+    }
+    Save-SetupState
 }
 
 function Initialize-SetupTransportSecurity {
@@ -410,6 +503,11 @@ foreach ($controlName in $controlNames) {
     Set-Variable -Name $controlName -Value $window.FindName($controlName) -Scope Script
 }
 
+$Script:SetupState = Read-SetupState
+if (-not $PSBoundParameters.ContainsKey("Preset") -and [int]$Script:SetupState.Runs -gt 0) {
+    $Preset = "LeaveDefaults"
+}
+
 if ($Script:ResolvedBanner) {
     try {
         $bitmap = New-Object System.Windows.Media.Imaging.BitmapImage
@@ -430,7 +528,14 @@ switch ($Preset) {
 $Script:InstallSoftwareChoice.IsChecked = -not $SkipSoftware
 $Script:GuestToolsChoice.IsChecked = (Test-SetupVirtualMachine) -and -not $SkipGuestTools
 $Script:DodSecureChoice.IsChecked = [bool]$ApplyDodSecureDefaults
+$Script:SysprepChoice.IsChecked = (-not $SkipSysprep) -and ([int]$Script:SetupState.Runs -eq 0) -and (-not (Test-SetupStateCompleted -Name "sysprep_reseal"))
 $Script:RestartChoice.IsChecked = [bool]$Restart
+if ($Script:SysprepChoice.IsChecked) {
+    $Script:RestartChoice.IsChecked = $false
+    $Script:RestartChoice.IsEnabled = $false
+    $Script:ActivateChoice.IsChecked = $false
+    $Script:ActivateChoice.IsEnabled = $false
+}
 
 function Update-PresetDescription {
     $selectedPreset = [string]$Script:PresetChoice.SelectedItem.Tag
@@ -561,6 +666,7 @@ function Invoke-SetupSysprep {
         if ($process.ExitCode -ne 0) {
             throw "Sysprep exited with code $($process.ExitCode)."
         }
+        Set-SetupStateCompleted -Name "sysprep_reseal"
         # Sysprep /shutdown cannot finish closing the interactive session while
         # this frontend still reports that resealing is in progress and rejects
         # its own close event.
@@ -750,7 +856,8 @@ function Start-SetupWorker {
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
         "-File", ('"{0}"' -f $Script:ResolvedWorker),
-        "-Preset", $selectedPreset
+        "-Preset", $selectedPreset,
+        "-SkipSysprep"
     )
     if (-not $Script:InstallSoftwareChoice.IsChecked) {
         $arguments += "-SkipSoftware"

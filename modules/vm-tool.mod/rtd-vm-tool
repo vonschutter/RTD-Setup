@@ -927,7 +927,7 @@ vmtool::install_gnome_boxes_integration() {
 
 	target_user="$(vmtool::gnome_boxes_target_user)"
 	if ! target_home="$(vmtool::gnome_boxes_target_home "$target_user")"; then
-		dialog::display_error "Unable to find a home directory for ${target_user:-the target user}."
+		rtd_ui::message --type error --title "GNOME Boxes Integration" --message "Unable to find a home directory for ${target_user:-the target user}."
 		return 1
 	fi
 	target_group="$(id -gn "$target_user" 2>/dev/null || printf '%s' "$target_user")"
@@ -994,7 +994,7 @@ Checked:
  - ${base_dirs[1]}
 
 Open GNOME Boxes once, then run this task again."
-		dialog::display_result "GNOME Boxes Integration"
+		rtd_ui::message --title "GNOME Boxes Integration" --message "$result"
 		return 0
 	fi
 
@@ -1006,7 +1006,7 @@ $(printf ' - %s\n' "${written_files[@]}")
 Flatpak /run/libvirt access: ${flatpak_override_status}
 
 Restart GNOME Boxes if it is already open."
-	dialog::display_result "GNOME Boxes Integration"
+	rtd_ui::message --title "GNOME Boxes Integration" --message "$result"
 }
 
 
@@ -1019,7 +1019,7 @@ vmtool::remove_gnome_boxes_integration() {
 
 	target_user="$(vmtool::gnome_boxes_target_user)"
 	if ! target_home="$(vmtool::gnome_boxes_target_home "$target_user")"; then
-		dialog::display_error "Unable to find a home directory for ${target_user:-the target user}."
+		rtd_ui::message --type error --title "GNOME Boxes Integration" --message "Unable to find a home directory for ${target_user:-the target user}."
 		return 1
 	fi
 
@@ -1061,7 +1061,7 @@ $(if (( ${#removed_files[@]} )); then printf ' - %s\n' "${removed_files[@]}"; el
 Flatpak /run/libvirt access: ${flatpak_override_status}
 
 Restart GNOME Boxes if it is already open."
-	dialog::display_result "GNOME Boxes Integration"
+	rtd_ui::message --title "GNOME Boxes Integration" --message "$result"
 }
 
 
@@ -1276,7 +1276,7 @@ RTD_CICD_ENABLE=0
 	RTD_CICD_LLM_VARIANT="none"
 	RTD_CICD_LLM_MODELS=""
 
-	if ! dialog::prompt_yes_no --title "CI/CD" --message "Seed cloned VM with CI/CD ISO and auto-run ansible-pull?"; then
+	if ! rtd_ui::yes_no --title "CI/CD" --message "Seed cloned VM with CI/CD ISO and auto-run ansible-pull?"; then
 		write_information "CI/CD seeding disabled for this run."
 		return 0
 	fi
@@ -1384,7 +1384,7 @@ vmtool::wait_for_vm_stop() {
 
 vmtool::start_stop_vm_menu() {
 	if ! command -v virsh >/dev/null 2>&1; then
-		dialog::display_error "❌ virsh not found. Please install libvirt-clients/libvirt-tools."
+		rtd_ui::message --type error --title "VM Tool" --message "❌ virsh not found. Please install libvirt-clients/libvirt-tools."
 		return 1
 	fi
 
@@ -1417,7 +1417,7 @@ vmtool::start_stop_vm_menu() {
 		done < <(virsh list --all --name | grep -vi '^Template' | sed '/^$/d')
 
 		if (( ${#menu_entries[@]} == 0 )); then
-			dialog::display_error "No non-Template VMs found to manage."
+			rtd_ui::message --type error --title "Start / Stop VMs" --message "No non-Template VMs found to manage."
 			return 0
 		fi
 
@@ -1434,44 +1434,44 @@ vmtool::start_stop_vm_menu() {
 
 		[[ -z "$selection" ]] && continue
 
-		state=$(virsh domstate "$selection" 2>/dev/null | tr '[:upper:]' '[:lower:]')
-		case "$state" in
-			shut*|off|"")
-				if ! dialog::prompt_yes_no --back-title "$BACKTITLE" --title "🚀 Start VM" --message "Start \"$selection\"?\n\nCurrent state: ${state:-unknown}"; then
-					continue
-				fi
-				if virsh start "$selection"; then
-					kvm::wait_for_domain_start --domain "$selection" --timeout 90 || write_warning "Start signal sent but no start event observed for $selection."
-					result="Launch requested for \"$selection\".\n\nLatest state: $(virsh domstate "$selection" 2>/dev/null || echo \"unknown\")"
-					dialog::display_result "VM Starting"
-				else
-					dialog::display_error "Failed to start \"$selection\"."
-				fi
-			;;
-			running|paused|pmsuspended*)
-				if ! dialog::prompt_yes_no --back-title "$BACKTITLE" --title "🛑 Stop VM" --message "Stop \"$selection\" gracefully?\n\nCurrent state: ${state}"; then
-					continue
-				fi
-				if virsh shutdown "$selection"; then
-					if vmtool::wait_for_vm_stop "$selection" 45; then
-						result="\"$selection\" is now stopped."
-						dialog::display_result "VM Stopped"
-					else
-						if dialog::prompt_yes_no --back-title "$BACKTITLE" --title "Force Stop?" --message "\"$selection\" did not stop within 45s.\nForce power off?"; then
-							if virsh destroy "$selection"; then
-								result="\"$selection\" was forcefully powered off."
-								dialog::display_result "VM Powered Off"
-							else
-								dialog::display_error "Failed to force stop \"$selection\"."
-							fi
-						fi
+			state=$(virsh domstate "$selection" 2>/dev/null | tr '[:upper:]' '[:lower:]')
+			case "$state" in
+				shut*|off|"")
+					if ! rtd_ui::yes_no --title "🚀 Start VM" --message "Start \"$selection\"?\n\nCurrent state: ${state:-unknown}"; then
+						continue
 					fi
-				else
-					dialog::display_error "Failed to send shutdown signal to \"$selection\"."
-				fi
+					if virsh start "$selection"; then
+						kvm::wait_for_domain_start --domain "$selection" --timeout 90 || write_warning "Start signal sent but no start event observed for $selection."
+						result="Launch requested for \"$selection\".\n\nLatest state: $(virsh domstate "$selection" 2>/dev/null || echo \"unknown\")"
+						rtd_ui::message --title "VM Starting" --message "$result"
+					else
+						rtd_ui::message --type error --title "VM Start Failed" --message "Failed to start \"$selection\"."
+					fi
+				;;
+				running|paused|pmsuspended*)
+					if ! rtd_ui::yes_no --title "🛑 Stop VM" --message "Stop \"$selection\" gracefully?\n\nCurrent state: ${state}"; then
+						continue
+					fi
+						if virsh shutdown "$selection"; then
+							if vmtool::wait_for_vm_stop "$selection" 45; then
+								result="\"$selection\" is now stopped."
+								rtd_ui::message --title "VM Stopped" --message "$result"
+							else
+								if rtd_ui::yes_no --title "Force Stop?" --message "\"$selection\" did not stop within 45s.\nForce power off?"; then
+									if virsh destroy "$selection"; then
+										result="\"$selection\" was forcefully powered off."
+										rtd_ui::message --title "VM Powered Off" --message "$result"
+									else
+										rtd_ui::message --type error --title "Force Stop Failed" --message "Failed to force stop \"$selection\"."
+									fi
+								fi
+							fi
+					else
+						rtd_ui::message --type error --title "Shutdown Failed" --message "Failed to send shutdown signal to \"$selection\"."
+					fi
 			;;
 			*)
-				dialog::display_error "Unknown state for \"$selection\"; cannot toggle automatically."
+				rtd_ui::message --type error --title "Unknown VM State" --message "Unknown state for \"$selection\"; cannot toggle automatically."
 			;;
 		esac
 	done
