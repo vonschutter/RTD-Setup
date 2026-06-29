@@ -115,7 +115,7 @@ fi
 # Valid choices are: "dialog", "whiptail".
 # RTD_GUI=dialog
 # export NEWT_COLORS='root=,gray '
-: ${RTD_GUI:="dialog --clear"}
+: ${RTD_GUI:="dialog"}
 
 
 
@@ -248,8 +248,8 @@ check_menu_availability ()
 # other systems use whiptail for the terminal to show menus and dialogs.
 # If nothing is found, then make sure it is available before continuing.
 # End of documentation
-	if hash dialog 2>/dev/null ; then
-		: "${RTD_GUI:=dialog --clear}"
+	if type -P dialog >/dev/null 2>&1 ; then
+		: "${RTD_GUI:=dialog}"
 		export RTD_GUI
 	elif hash whiptail 2>/dev/null ; then
 		: "${RTD_GUI:="whiptail --fb"}"

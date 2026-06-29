@@ -26,10 +26,18 @@
 # ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-windows-setup.ps1 -Preset LeaveDefaults
 # ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-windows-setup.ps1 -SkipSoftware
 # ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-windows-setup.ps1 -Restart
+# ::		powershell.exe -ExecutionPolicy Bypass -File .\rtd-oem-windows-setup.ps1 -SkipSysprep
 # ::
-# :: Presets:	Aggressive  Default. Removes consumer apps and disables non-essential noise.
+# :: Presets:	Aggressive  First-run default. Removes consumer apps and disables non-essential noise.
 # ::		Minimal     Keeps bundled apps but disables telemetry, ads, and suggestions.
 # ::		LeaveDefaults  Leaves Windows settings unchanged while allowing selected software and tools to install.
+# ::
+# :: State:	Default phases are recorded in C:\RTD\core\state.json. On later runs, the preset
+# ::		default changes to LeaveDefaults unless -Preset is passed explicitly, and completed
+# ::		default phases are skipped.
+# ::
+# :: Reseal:	By default, the first completed run attempts Sysprep /generalize /oobe /shutdown
+# ::		using C:\RTD\core\unattend.xml. Use -SkipSysprep to leave the system running.
 # ::
 # :: Background: This script is shared in the hopes that someone will find it useful. To encourage sharing changes
 # :: 		 back to the source this script is released under the GPL v3. (see source location for details)
@@ -69,6 +77,8 @@ param(
 
     [switch]$SkipGuestTools,
 
+    [switch]$SkipSysprep,
+
     [switch]$ApplyDodSecureDefaults
 )
 
@@ -76,11 +86,15 @@ $ErrorActionPreference = "Continue"
 $ProgressPreference = "SilentlyContinue"
 $Script:RestartRequired = $false
 $Script:RtdRoot = "C:\RTD"
+$Script:CoreDir = [System.IO.Path]::Combine($Script:RtdRoot, "core")
 $Script:LogDir = [System.IO.Path]::Combine($Script:RtdRoot, "log")
+$Script:StatePath = [System.IO.Path]::Combine($Script:CoreDir, "state.json")
+$Script:State = $null
 $Script:SetupLog = "C:\setup.log"
 $Script:ChocoExe = $null
 $Script:SoftwareFailures = New-Object System.Collections.Generic.List[string]
 $Script:WarningCount = 0
+$Script:SysprepResealStarted = $false
 $Script:VirtualizationPlatform = $null
 $Script:WindowsIdentity = $null
 $Script:WallpaperUrl = "https://raw.githubusercontent.com/vonschutter/RTD-Setup/main/wallpaper/Wayland.jpg"
@@ -89,6 +103,134 @@ $Script:DefaultUserHiveName = "RTD_DefaultUser"
 $Script:DefaultUserHiveRoot = "Registry::HKEY_USERS\$($Script:DefaultUserHiveName)"
 $Script:DefaultUserHiveAvailable = $false
 $Script:DefaultUserHiveMountedByScript = $false
+
+function New-RtdDefaultState {
+    return [ordered]@{
+        Schema = "rtd.windows-setup.state.v1"
+        CreatedAt = (Get-Date).ToUniversalTime().ToString("o")
+        UpdatedAt = $null
+        Runs = 0
+        LastPreset = $null
+        Completed = [ordered]@{}
+    }
+}
+
+function ConvertTo-RtdStateHashtable {
+    param(
+        [Parameter(Mandatory = $true)]
+        $InputObject
+    )
+
+    if ($InputObject -is [hashtable] -or $InputObject -is [System.Collections.Specialized.OrderedDictionary]) {
+        return $InputObject
+    }
+
+    $table = [ordered]@{}
+    foreach ($property in $InputObject.PSObject.Properties) {
+        if ($property.Value -is [pscustomobject]) {
+            $table[$property.Name] = ConvertTo-RtdStateHashtable -InputObject $property.Value
+        } else {
+            $table[$property.Name] = $property.Value
+        }
+    }
+    return $table
+}
+
+function Read-RtdSetupState {
+    if (-not (Test-Path -LiteralPath $Script:StatePath -PathType Leaf)) {
+        return (New-RtdDefaultState)
+    }
+
+    try {
+        $json = Get-Content -LiteralPath $Script:StatePath -Raw -ErrorAction Stop
+        if ([string]::IsNullOrWhiteSpace($json)) {
+            return (New-RtdDefaultState)
+        }
+
+        $state = ConvertFrom-Json -InputObject $json -ErrorAction Stop
+        $stateTable = ConvertTo-RtdStateHashtable -InputObject $state
+        if (-not $stateTable.Contains("Completed") -or -not $stateTable.Completed) {
+            $stateTable.Completed = [ordered]@{}
+        }
+        if (-not $stateTable.Contains("Runs")) {
+            $stateTable.Runs = 0
+        }
+        return $stateTable
+    } catch {
+        Write-Host "[WARN] Could not read RTD setup state '$($Script:StatePath)': $($_.Exception.Message)"
+        return (New-RtdDefaultState)
+    }
+}
+
+function Save-RtdSetupState {
+    try {
+        New-Item -Path $Script:CoreDir -ItemType Directory -Force | Out-Null
+        $Script:State.UpdatedAt = (Get-Date).ToUniversalTime().ToString("o")
+        $Script:State.LastPreset = $Preset
+        $Script:State | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $Script:StatePath -Encoding UTF8
+    } catch {
+        Write-RtdLog "Could not write RTD setup state '$($Script:StatePath)': $($_.Exception.Message)" "WARN"
+    }
+}
+
+function Test-RtdStateCompleted {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    return $Script:State.Completed.Contains($Name) -and [bool]$Script:State.Completed[$Name].Completed
+}
+
+function Set-RtdStateCompleted {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [string]$Status = "completed"
+    )
+
+    $Script:State.Completed[$Name] = [ordered]@{
+        Completed = $true
+        Status = $Status
+        CompletedAt = (Get-Date).ToUniversalTime().ToString("o")
+    }
+    Save-RtdSetupState
+}
+
+function Invoke-RtdDefaultOnce {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [scriptblock]$ScriptBlock
+    )
+
+    if (Test-RtdStateCompleted -Name $Name) {
+        Write-RtdLog "Default phase '$Name' was already completed once; skipping."
+        return $false
+    }
+
+    try {
+        & $ScriptBlock
+        if (-not $?) {
+            Write-RtdLog "Default phase '$Name' did not complete successfully; it will be attempted on a future run." "WARN"
+            return $false
+        }
+    } catch {
+        Write-RtdLog "Default phase '$Name' failed: $($_.Exception.Message)" "ERROR"
+        return $false
+    }
+
+    Set-RtdStateCompleted -Name $Name
+    return $true
+}
+
+$Script:State = Read-RtdSetupState
+if (-not $PSBoundParameters.ContainsKey("Preset") -and [int]$Script:State.Runs -gt 0) {
+    $Preset = "LeaveDefaults"
+}
 
 # Centralized logging keeps the console, setup log, and RTD log aligned. Most
 # actions are best-effort on Windows images because exact components vary by
@@ -162,6 +304,9 @@ function Start-RtdElevated {
     }
     if ($SkipGuestTools) {
         $arguments += "-SkipGuestTools"
+    }
+    if ($SkipSysprep) {
+        $arguments += "-SkipSysprep"
     }
     if ($ApplyDodSecureDefaults) {
         $arguments += "-ApplyDodSecureDefaults"
@@ -282,8 +427,10 @@ function Initialize-RtdWindowsConfig {
     Start-RtdElevated
 
     New-Item -Path $Script:RtdRoot -ItemType Directory -Force | Out-Null
+    New-Item -Path $Script:CoreDir -ItemType Directory -Force | Out-Null
     New-Item -Path $Script:LogDir -ItemType Directory -Force | Out-Null
     New-Item -Path $Script:SetupLog -ItemType File -Force | Out-Null
+    Save-RtdSetupState
 
     try {
         Start-Transcript -Path (Join-Path $Script:LogDir "windows-setup-transcript.log") -Append -ErrorAction SilentlyContinue | Out-Null
@@ -307,8 +454,16 @@ function Initialize-RtdWindowsConfig {
     if ($Preset -eq "LeaveDefaults") {
         Write-RtdLog "Leave Defaults preset selected; wallpaper and default-profile customization were skipped."
     } else {
-        Mount-RtdDefaultUserHive
-        Set-RtdWindowsWallpaper
+        if (Test-RtdStateCompleted -Name "personalization_defaults") {
+            Write-RtdLog "Personalization defaults were already completed once; wallpaper setup was skipped."
+            if (-not (Test-RtdStateCompleted -Name "windows_tuning")) {
+                Mount-RtdDefaultUserHive
+            }
+        } else {
+            Mount-RtdDefaultUserHive
+            Set-RtdWindowsWallpaper
+            Set-RtdStateCompleted -Name "personalization_defaults"
+        }
     }
 }
 
@@ -1769,17 +1924,132 @@ function Run-RtdWindowsAggressive {
     Remove-RtdWindowsBloatApps
 }
 
+function Test-RtdPendingReboot {
+    $paths = @(
+        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending",
+        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired",
+        "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager"
+    )
+
+    foreach ($path in $paths) {
+        try {
+            if ($path -like "*Session Manager") {
+                $value = (Get-ItemProperty -Path $path -Name "PendingFileRenameOperations" -ErrorAction SilentlyContinue).PendingFileRenameOperations
+                if ($value) {
+                    return $true
+                }
+            } elseif (Test-Path -LiteralPath $path) {
+                return $true
+            }
+        } catch {
+            Write-RtdLog "Pending-reboot check could not inspect '$path': $($_.Exception.Message)" "WARN"
+        }
+    }
+
+    return $false
+}
+
+function Test-RtdSysprepRequirements {
+    $sysprepExe = Join-Path $env:SystemRoot "System32\Sysprep\Sysprep.exe"
+    $unattendPath = Join-Path $Script:CoreDir "unattend.xml"
+    $requirementsMet = $true
+
+    if (-not (Test-RtdAdmin)) {
+        Write-RtdLog "Sysprep cannot run because the setup worker is not elevated." "ERROR"
+        $requirementsMet = $false
+    }
+
+    if (-not (Test-Path -LiteralPath $sysprepExe -PathType Leaf)) {
+        Write-RtdLog "Sysprep executable was not found at '$sysprepExe'." "ERROR"
+        $requirementsMet = $false
+    }
+
+    if (-not (Test-Path -LiteralPath $unattendPath -PathType Leaf)) {
+        Write-RtdLog "Sysprep unattend file was not found at '$unattendPath'." "ERROR"
+        $requirementsMet = $false
+    }
+
+    try {
+        $computerSystem = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
+        if ([bool]$computerSystem.PartOfDomain) {
+            Write-RtdLog "Sysprep reseal was skipped because this computer is joined to domain '$($computerSystem.Domain)'." "ERROR"
+            $requirementsMet = $false
+        }
+    } catch {
+        Write-RtdLog "Could not verify domain membership before Sysprep: $($_.Exception.Message)" "WARN"
+    }
+
+    if (Test-RtdPendingReboot) {
+        Write-RtdLog "A pending reboot was detected before Sysprep. Sysprep may fail until Windows is restarted." "WARN"
+    }
+
+    return [pscustomobject]@{
+        Ready = $requirementsMet
+        SysprepExe = $sysprepExe
+        UnattendPath = $unattendPath
+    }
+}
+
+function Invoke-RtdSysprepReseal {
+    Write-RtdLog "Preparing to reseal Windows with Sysprep."
+    $requirements = Test-RtdSysprepRequirements
+    if (-not $requirements.Ready) {
+        $message = "Sysprep reseal requirements were not met; Windows was not generalized."
+        $Script:SoftwareFailures.Add($message)
+        Write-RtdLog $message "ERROR"
+        return $false
+    }
+
+    try {
+        Dismount-RtdDefaultUserHive
+        try {
+            Stop-Transcript -ErrorAction SilentlyContinue | Out-Null
+        } catch {
+            # Ignore transcript shutdown errors before Sysprep.
+        }
+
+        $arguments = @(
+            "/generalize",
+            "/oobe",
+            "/shutdown",
+            "/unattend:$($requirements.UnattendPath)"
+        )
+        Write-RtdLog "Running Sysprep reseal: $($requirements.SysprepExe) $($arguments -join ' ')"
+        $process = Start-Process -FilePath $requirements.SysprepExe -ArgumentList $arguments -Wait -PassThru -NoNewWindow
+        if ($process.ExitCode -ne 0) {
+            throw "Sysprep exited with code $($process.ExitCode)."
+        }
+
+        $Script:SysprepResealStarted = $true
+        Write-RtdLog "Sysprep reseal completed successfully. Windows should shut down for template capture." "OK"
+        return $true
+    } catch {
+        $message = "Sysprep reseal failed: $($_.Exception.Message)"
+        $Script:SoftwareFailures.Add($message)
+        Write-RtdLog $message "ERROR"
+        return $false
+    }
+}
+
 # Stop transcript logging and optionally restart. AppX removal and service
 # changes often need a reboot before the final user experience is accurate.
 function Complete-RtdWindowsConfig {
     Write-RtdStep "complete" "start"
     Dismount-RtdDefaultUserHive
     $hadOperationalWarnings = $Script:WarningCount -gt 0
+    $Script:State.Runs = [int]$Script:State.Runs + 1
+    Save-RtdSetupState
 
     try {
         Stop-Transcript -ErrorAction SilentlyContinue | Out-Null
     } catch {
         # Ignore transcript shutdown errors.
+    }
+
+    if ($Script:SysprepResealStarted) {
+        Write-RtdLog "Sysprep reseal has requested shutdown; restart handling is skipped."
+        Write-RtdStep "complete" "done"
+        return
     }
 
     if ($Restart) {
@@ -1812,35 +2082,46 @@ if ($Preset -eq "LeaveDefaults") {
     Write-RtdLog "Leave Defaults preset selected; Windows tuning and optimization were skipped."
     Write-RtdStep "tuning" "skipped"
 } else {
-    Write-RtdStep "tuning" "start"
-    switch ($Preset) {
-        "Minimal" {
-            Write-RtdLog "Running Windows Minimal preset."
-            Run-RtdWindowsMinimal
+    $tuningRan = Invoke-RtdDefaultOnce -Name "windows_tuning" -ScriptBlock {
+        Write-RtdStep "tuning" "start"
+        switch ($Preset) {
+            "Minimal" {
+                Write-RtdLog "Running Windows Minimal preset."
+                Run-RtdWindowsMinimal
+            }
+            default {
+                Write-RtdLog "Running Windows Aggressive preset."
+                Run-RtdWindowsAggressive
+            }
         }
-        default {
-            Write-RtdLog "Running Windows Aggressive preset."
-            Run-RtdWindowsAggressive
-        }
+        Write-RtdStep "tuning" "done"
     }
-    Write-RtdStep "tuning" "done"
+    if (-not $tuningRan) {
+        Write-RtdStep "tuning" "skipped"
+    }
 }
 
 Write-RtdStep "software" "start"
 if ($SkipGuestTools) {
     Write-RtdLog "Virtual-machine guest-tool installation was skipped because -SkipGuestTools was specified."
 } else {
-    Write-RtdLog "Installing virtualization guest tools before the standard application set."
-    Install-RtdVirtualizationGuestTools
+    Invoke-RtdDefaultOnce -Name "guest_tools" -ScriptBlock {
+        Write-RtdLog "Installing virtualization guest tools before the standard application set."
+        Install-RtdVirtualizationGuestTools
+    } | Out-Null
 }
 
 if ($SkipSoftware) {
     Write-RtdLog "Standard application deployment was skipped because -SkipSoftware was specified."
 } else {
-    Install-RtdWindowsSoftware
+    Invoke-RtdDefaultOnce -Name "standard_software" -ScriptBlock {
+        Install-RtdWindowsSoftware
+    } | Out-Null
 }
 
-Expand-RtdKmsArchive | Out-Null
+Invoke-RtdDefaultOnce -Name "kms_expand" -ScriptBlock {
+    Expand-RtdKmsArchive | Out-Null
+} | Out-Null
 
 if ($Script:SoftwareFailures.Count -gt 0) {
     Write-RtdStep "software" "warning"
@@ -1849,7 +2130,19 @@ if ($Script:SoftwareFailures.Count -gt 0) {
 }
 
 if ($ApplyDodSecureDefaults) {
-    Invoke-RtdDodSecureDefaults | Out-Null
+    Invoke-RtdDefaultOnce -Name "dod_secure_defaults" -ScriptBlock {
+        Invoke-RtdDodSecureDefaults | Out-Null
+    } | Out-Null
+}
+
+if ($SkipSysprep) {
+    Write-RtdLog "Sysprep reseal was skipped because -SkipSysprep was specified."
+} else {
+    Invoke-RtdDefaultOnce -Name "sysprep_reseal" -ScriptBlock {
+        if (-not (Invoke-RtdSysprepReseal)) {
+            throw "Sysprep reseal failed."
+        }
+    } | Out-Null
 }
 
 Complete-RtdWindowsConfig

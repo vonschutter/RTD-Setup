@@ -69,6 +69,32 @@ $Green Usage: $Color_Off
 $Cyan $( basename ${0} ) $Color_Off
 "
 
+dialog::clear_screen() {
+	if [[ -n "${TERM:-}" && "${TERM:-}" != "dumb" ]] && command -v clear >/dev/null 2>&1 &&
+		{ clear >/dev/tty; } 2>/dev/null; then
+		return 0
+	fi
+
+	if { printf '\033[H\033[2J\033[3J' >/dev/tty; } 2>/dev/null; then
+		return 0
+	fi
+
+	if [[ -t 2 ]]; then
+		printf '\033[H\033[2J\033[3J' >&2
+	fi
+}
+
+dialog() {
+	local dialog_bin rc
+	dialog::clear_screen
+	dialog_bin="$(type -P dialog 2>/dev/null || true)"
+	[[ -n "${dialog_bin}" ]] || return 127
+	"${dialog_bin}" "$@"
+	rc=$?
+	dialog::clear_screen
+	return "${rc}"
+}
+
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::          Script Executive                ::::::::::::::::::::::
@@ -81,8 +107,8 @@ if [[ $1 == "--help" || $1 == "-h" ]]; then
         exit 0
 fi
 
-if command -v dialog &> /dev/null; then
-        dialog --clear --title "Organize Everything in This Folder" --yesno "\n This script will organize all files in the current directory by extension. \n \n OK to continue?" 12 80
+if type -P dialog &> /dev/null; then
+        dialog --title "Organize Everything in This Folder" --yesno "\n This script will organize all files in the current directory by extension. \n \n OK to continue?" 12 80
         response=$?
         clear
         case $response in

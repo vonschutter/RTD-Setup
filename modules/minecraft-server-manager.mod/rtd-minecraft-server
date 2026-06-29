@@ -45,7 +45,31 @@ MINECRAFT_VERSION=Latest
 MINECRAFT_HOME=~/bin/minecraft.server/Minecraft.$MINECRAFT_VERSION
 MINECRAFT_JAR=server.jar
 
+dialog::clear_screen() {
+	if [[ -n "${TERM:-}" && "${TERM:-}" != "dumb" ]] && command -v clear >/dev/null 2>&1 &&
+		{ clear >/dev/tty; } 2>/dev/null; then
+		return 0
+	fi
 
+	if { printf '\033[H\033[2J\033[3J' >/dev/tty; } 2>/dev/null; then
+		return 0
+	fi
+
+	if [[ -t 2 ]]; then
+		printf '\033[H\033[2J\033[3J' >&2
+	fi
+}
+
+dialog() {
+	local dialog_bin rc
+	dialog::clear_screen
+	dialog_bin="$(type -P dialog 2>/dev/null || true)"
+	[[ -n "${dialog_bin}" ]] || return 127
+	"${dialog_bin}" "$@"
+	rc=$?
+	dialog::clear_screen
+	return "${rc}"
+}
 
 
 
@@ -466,4 +490,3 @@ check_java
 # Start the server and monitor the server performance
 find_active_network_interface
 run_minecraft_server_manager
-

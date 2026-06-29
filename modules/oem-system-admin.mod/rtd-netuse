@@ -224,7 +224,7 @@ rtd::bootstrap_library() {
 
 prompt_text() {
 	local title="$1" msg="$2" default="$3" out
-	if command -v dialog >/dev/null 2>&1; then
+	if type -P dialog >/dev/null 2>&1; then
 		out=$(dialog --stdout --title "$title" --inputbox "$msg" 10 70 "$default")
 		local rc=$?
 		clear_screen
@@ -242,7 +242,7 @@ prompt_password() {
 	local title="$1" msg="$2" out
 	: "${title:=Password}"
 
-	if command -v dialog >/dev/null 2>&1; then
+	if type -P dialog >/dev/null 2>&1; then
 		out=$(dialog --stdout --insecure --title "$title" --passwordbox "$msg" 10 70)
 		local rc=$?
 		clear_screen
@@ -275,7 +275,7 @@ prompt_netuse_form() {
 	local output rc share_input list_input password_status
 	local -a fields=()
 
-	if command -v dialog >/dev/null 2>&1; then
+	if type -P dialog >/dev/null 2>&1; then
 		system::log_item "Opening dialog form for zero-argument run."
 		output=$(dialog --stdout \
 			--title "SMB Mount" \
