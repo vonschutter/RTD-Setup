@@ -1074,7 +1074,7 @@ dialog::display_summary_message() {
 	case ${1:-} in
 		--txt)
 			echo "${_summary_message}"
-			pause::for_input "==>" 
+			pause::for_input 1 "==>"
 			;;
 		*)
 			if ! hash dialog &>/dev/null; then
@@ -29706,7 +29706,6 @@ kvm::make_vm_now_from_microsoft() {
 		system::log_item "virsh not available; unable to auto-send boot key for ${vm_name}"
 	fi
 	dialog::display_summary_message --txt
-
 	rm -f "${PostTasks}" || system::log_item "Failed to remove ${PostTasks}..."
 	rm -f "${ConfigMenu}" || system::log_item "Failed to remove ${ConfigMenu}..."
 	for i in WindowsInstructions CONFIG WindowsMedia AutoUnattend PostTasks ConfigMenu target_winver mem_size boot_options cpu_count disk_size preferred_video disk_path; do unset $i; done
@@ -34518,8 +34517,9 @@ pause::for_input() {
 	# pause if the EXPRESSION failed.
 	#
 	# End of documentation
-	ERRMSG=$@
 
+	ERRMSG=$@
+	
 	if [ ! $1 -eq 0 ]; then
 		read -p "$ERRMSG: Press  [ ENTER ] to continue:"
 	fi
