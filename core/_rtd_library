@@ -935,6 +935,58 @@ rtd_ui::message() {
 	esac
 }
 
+rtd_ui::text_file() {
+	# Description:
+	#   Display a text file using the best available UI backend.
+	#
+	# Graphical sessions use yad or zenity scrollable text viewers. Terminal/server
+	# sessions use dialog textbox. This is intended for logs, summaries, and longer
+	# notices that should not be squeezed into a simple message box.
+	#
+	# Globals:
+	#   - BACKTITLE, BRANDING: Used for dialog backtitles when available.
+	# Arguments:
+	#   - --title <text>: Dialog/window title. Default: Text.
+	#   - --file <path>: Text file to display.
+	# Outputs:
+	#   - Displays a graphical, dialog, or terminal text view.
+	# Returns:
+	#   - Backend exit status, or 1 when no file is supplied.
+	#
+	# Usage:
+	#   rtd_ui::text_file --title "Log Output" --file "$log_file"
+	# End of Documentation
+
+	local title="Text" file="" backend
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--title) title="${2:-$title}"; shift 2 ;;
+			--file) file="${2:-}"; shift 2 ;;
+			*) shift ;;
+		esac
+	done
+
+	[[ -n "$file" && -f "$file" ]] || return 1
+
+	backend="$(rtd_ui::backend)"
+	case "$backend" in
+		yad)
+			yad --text-info --title="$title" --width=820 --height=560 --filename="$file" --button=OK:0
+			;;
+		zenity)
+			zenity --text-info --title="$title" --width=820 --height=560 --filename="$file"
+			;;
+		dialog)
+			dialog --backtitle "${BACKTITLE:-${BRANDING:-RTD}}" --title "$title" --textbox "$file" "${HEIGHT:-22}" "${WIDTH:-80}"
+			;;
+		*)
+			printf '%s\n' "$title"
+			cat "$file"
+			;;
+	esac
+}
+
 rtd_ui::yes_no() {
 	# Description:
 	#   Ask a yes/no question using the best available UI backend.
@@ -978,6 +1030,300 @@ rtd_ui::yes_no() {
 			printf '%s\n%s [y/N] ' "$title" "$message" >&2
 			read -r reply
 			[[ "$reply" =~ ^[Yy] ]]
+			;;
+	esac
+}
+
+rtd_ui::form() {
+	# Description:
+	#   Prompt for multiple text values using the best available UI backend.
+	#
+	# Graphical sessions use yad or zenity forms. Terminal/server sessions use dialog mixedform.
+	# Field values are printed one per line on STDOUT in the same order fields were declared.
+	#
+	# Globals:
+	#   - BACKTITLE, BRANDING: Used for dialog backtitles when available.
+	# Arguments:
+	#   - --title <text>: Dialog/window title.
+	#   - --text <text>: Prompt text.
+	#   - --field <label> <value>: Add a visible text field.
+	#   - --password-field <label> <value>: Add a hidden password field when the backend supports it.
+	# Outputs:
+	#   - Selected/input values, one per line.
+	# Returns:
+	#   - Backend exit status.
+	#
+	# Usage:
+	#   values=$(rtd_ui::form --title "Settings" --field "Name:" "$name")
+	# End of Documentation
+
+	local title="${BRANDING:-RTD}" text="" backend row label value reply
+	local -a labels=() values=() hidden=() dialog_args=() yad_args=() zenity_args=()
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--title) title="${2:-$title}"; shift 2 ;;
+			--text) text="${2:-}"; shift 2 ;;
+			--field)
+				labels+=("${2:-}")
+				values+=("${3:-}")
+				hidden+=(0)
+				shift 3
+				;;
+			--password-field)
+				labels+=("${2:-}")
+				values+=("${3:-}")
+				hidden+=(1)
+				shift 3
+				;;
+			*)
+				write_warning "Ignoring unknown rtd_ui::form option '$1'."
+				shift
+				;;
+		esac
+	done
+
+	backend="$(rtd_ui::backend)"
+	case "$backend" in
+		yad)
+			for row in "${!labels[@]}"; do
+				label="${labels[$row]}"
+				value="${values[$row]}"
+				if [[ "${hidden[$row]}" -eq 1 ]]; then
+					[[ -z "$value" ]] && value=" "
+					yad_args+=("--field=${label}:H" "$value")
+				else
+					yad_args+=("--field=${label}" "$value")
+				fi
+			done
+			yad --form --title="$title" --text="$text" --width=720 --separator=$'\n' "${yad_args[@]}"
+			;;
+		zenity)
+			for row in "${!labels[@]}"; do
+				label="${labels[$row]}"
+				if [[ "${hidden[$row]}" -eq 1 ]]; then
+					zenity_args+=("--add-password=${label}")
+				else
+					zenity_args+=("--add-entry=${label}")
+				fi
+			done
+			zenity --forms --title="$title" --text="$text" --width=720 --separator=$'\n' "${zenity_args[@]}"
+			;;
+		dialog)
+			for row in "${!labels[@]}"; do
+				label="${labels[$row]}"
+				value="${values[$row]}"
+				dialog_args+=("$label" "$((row + 1))" 1 "$value" "$((row + 1))" 40 128 0 "${hidden[$row]}")
+			done
+			dialog --backtitle "${BACKTITLE:-${BRANDING:-RTD}}" --title "$title" --mixedform "$text" "${HEIGHT:-22}" "${WIDTH:-80}" "${LIST_HEIGHT:-0}" "${dialog_args[@]}" 3>&1 1>&2 2>&3
+			;;
+		*)
+			for row in "${!labels[@]}"; do
+				label="${labels[$row]}"
+				value="${values[$row]}"
+				printf '%s [%s]: ' "$label" "$value" >&2
+				IFS= read -r reply
+				printf '%s\n' "${reply:-$value}"
+			done
+			;;
+	esac
+}
+
+rtd_ui::input() {
+	# Description:
+	#   Prompt for a single text value using the best available UI backend.
+	#
+	# Graphical sessions use yad or zenity entry dialogs. Terminal/server sessions use
+	# dialog inputbox. The chosen value is printed on STDOUT.
+	#
+	# Globals:
+	#   - BACKTITLE, BRANDING: Used for dialog backtitles when available.
+	# Arguments:
+	#   - --title <text>: Dialog/window title. Default: Input.
+	#   - --message <text>: Prompt text.
+	#   - --value <text>: Default value.
+	# Outputs:
+	#   - The entered value.
+	# Returns:
+	#   - Backend exit status.
+	#
+	# Usage:
+	#   value=$(rtd_ui::input --title "Repository" --message "URL" --value "$repo")
+	# End of Documentation
+
+	local title="Input" message="" value="" backend reply
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--title) title="${2:-$title}"; shift 2 ;;
+			--message) message="${2:-}"; shift 2 ;;
+			--value) value="${2:-}"; shift 2 ;;
+			*) message="${message}${message:+ }$1"; shift ;;
+		esac
+	done
+
+	backend="$(rtd_ui::backend)"
+	case "$backend" in
+		yad)
+			yad --entry --title="$title" --text="$message" --entry-text="$value" --width=640
+			;;
+		zenity)
+			zenity --entry --title="$title" --text="$message" --entry-text="$value" --width=640
+			;;
+		dialog)
+			dialog --backtitle "${BACKTITLE:-${BRANDING:-RTD}}" --title "$title" --inputbox "$message" "${HEIGHT:-12}" "${WIDTH:-70}" "$value" 3>&1 1>&2 2>&3
+			;;
+		*)
+			printf '%s [%s]: ' "$message" "$value" >&2
+			IFS= read -r reply
+			printf '%s\n' "${reply:-$value}"
+			;;
+	esac
+}
+
+rtd_ui::menu() {
+	# Description:
+	#   Prompt for one selection from a list using the best available UI backend.
+	#
+	# Menu entries are passed as value/label pairs. The selected value is printed on
+	# STDOUT. Graphical sessions use yad or zenity lists; terminal/server sessions use
+	# dialog menu.
+	#
+	# Globals:
+	#   - BACKTITLE, BRANDING: Used for dialog backtitles when available.
+	# Arguments:
+	#   - --title <text>: Dialog/window title. Default: Menu.
+	#   - --message <text>: Prompt text.
+	#   - --option <value> <label>: Add a selectable option.
+	# Outputs:
+	#   - Selected option value.
+	# Returns:
+	#   - Backend exit status.
+	#
+	# Usage:
+	#   choice=$(rtd_ui::menu --title "Mode" --option "auto" "Automatic")
+	# End of Documentation
+
+	local title="Menu" message="" backend i value label
+	local -a entries=() list_args=()
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--title) title="${2:-$title}"; shift 2 ;;
+			--message) message="${2:-}"; shift 2 ;;
+			--option)
+				entries+=("${2:-}" "${3:-}")
+				shift 3
+				;;
+			*) message="${message}${message:+ }$1"; shift ;;
+		esac
+	done
+
+	backend="$(rtd_ui::backend)"
+	case "$backend" in
+		yad)
+			for ((i = 0; i < ${#entries[@]}; i += 2)); do
+				list_args+=("${entries[$i]}" "${entries[$((i + 1))]}")
+			done
+			yad --list --title="$title" --text="$message" --width=760 --height=420 --column="Value" --column="Description" --print-column=1 "${list_args[@]}"
+			;;
+		zenity)
+			for ((i = 0; i < ${#entries[@]}; i += 2)); do
+				list_args+=("${entries[$i]}" "${entries[$((i + 1))]}")
+			done
+			zenity --list --title="$title" --text="$message" --width=760 --height=420 --column="Value" --column="Description" --print-column=1 "${list_args[@]}"
+			;;
+		dialog)
+			dialog --backtitle "${BACKTITLE:-${BRANDING:-RTD}}" --title "$title" --menu "$message" "${HEIGHT:-20}" "${WIDTH:-80}" "${LIST_HEIGHT:-12}" "${entries[@]}" 3>&1 1>&2 2>&3
+			;;
+		*)
+			for ((i = 0; i < ${#entries[@]}; i += 2)); do
+				printf '%s) %s\n' "${entries[$i]}" "${entries[$((i + 1))]}" >&2
+			done
+			printf '%s: ' "$message" >&2
+			IFS= read -r value
+			for ((i = 0; i < ${#entries[@]}; i += 2)); do
+				label="${entries[$((i + 1))]}"
+				[[ "$value" == "${entries[$i]}" || "$value" == "$label" ]] && { printf '%s\n' "${entries[$i]}"; return 0; }
+			done
+			return 1
+			;;
+	esac
+}
+
+rtd_ui::checklist() {
+	# Description:
+	#   Prompt for multiple selections using the best available UI backend.
+	#
+	# Checklist entries are passed as value/label/state triples where state is ON or OFF.
+	# Selected values are printed one per line. Graphical sessions use yad or zenity
+	# checklists; terminal/server sessions use dialog checklist.
+	#
+	# Globals:
+	#   - BACKTITLE, BRANDING: Used for dialog backtitles when available.
+	# Arguments:
+	#   - --title <text>: Dialog/window title. Default: Checklist.
+	#   - --message <text>: Prompt text.
+	#   - --option <value> <label> <ON|OFF>: Add a selectable option.
+	# Outputs:
+	#   - Selected values, one per line.
+	# Returns:
+	#   - Backend exit status.
+	#
+	# Usage:
+	#   selections=$(rtd_ui::checklist --title "Roles" --option "openssh" "SSH" ON)
+	# End of Documentation
+
+	local title="Checklist" message="" backend i state selected raw item
+	local -a entries=() list_args=()
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--title) title="${2:-$title}"; shift 2 ;;
+			--message) message="${2:-}"; shift 2 ;;
+			--option)
+				entries+=("${2:-}" "${3:-}" "${4:-OFF}")
+				shift 4
+				;;
+			*) message="${message}${message:+ }$1"; shift ;;
+		esac
+	done
+
+	backend="$(rtd_ui::backend)"
+	case "$backend" in
+		yad)
+			for ((i = 0; i < ${#entries[@]}; i += 3)); do
+				state="${entries[$((i + 2))]}"
+				[[ "$state" =~ ^[Oo][Nn]$ ]] && selected=TRUE || selected=FALSE
+				list_args+=("$selected" "${entries[$i]}" "${entries[$((i + 1))]}")
+			done
+			yad --list --checklist --title="$title" --text="$message" --width=760 --height=420 --separator=$'\n' --column="Select" --column="Value" --column="Description" --print-column=2 "${list_args[@]}"
+			;;
+		zenity)
+			for ((i = 0; i < ${#entries[@]}; i += 3)); do
+				state="${entries[$((i + 2))]}"
+				[[ "$state" =~ ^[Oo][Nn]$ ]] && selected=TRUE || selected=FALSE
+				list_args+=("$selected" "${entries[$i]}" "${entries[$((i + 1))]}")
+			done
+			zenity --list --checklist --title="$title" --text="$message" --width=760 --height=420 --separator=$'\n' --column="Select" --column="Value" --column="Description" --print-column=2 "${list_args[@]}"
+			;;
+		dialog)
+			raw=$(dialog --backtitle "${BACKTITLE:-${BRANDING:-RTD}}" --title "$title" --checklist "$message" "${HEIGHT:-20}" "${WIDTH:-80}" "${LIST_HEIGHT:-12}" "${entries[@]}" 3>&1 1>&2 2>&3) || return $?
+			for item in $raw; do
+				item=${item//\"/}
+				printf '%s\n' "$item"
+			done
+			;;
+		*)
+			for ((i = 0; i < ${#entries[@]}; i += 3)); do
+				state="${entries[$((i + 2))]}"
+				printf '[%s] %s - %s\n' "$state" "${entries[$i]}" "${entries[$((i + 1))]}" >&2
+			done
+			printf '%s (space-separated values): ' "$message" >&2
+			IFS= read -r raw
+			for item in $raw; do
+				printf '%s\n' "$item"
+			done
 			;;
 	esac
 }
@@ -10622,14 +10968,32 @@ system::toggle_oem_auto_login() {
 	mkdir -p "$_backup_dir"
 
 	local toggle=
+	local session_name="${RTD_OEM_SESSION:-}"
+	if [[ -z "$session_name" ]]; then
+		for candidate in cinnamon xubuntu mate Lubuntu plasma gnome ubuntu; do
+			if [[ -f "/usr/share/xsessions/${candidate}.desktop" ]]; then
+				session_name="$candidate"
+				break
+			fi
+		done
+	fi
+	[[ -z "$session_name" ]] && session_name="gnome"
+	local sddm_session="${session_name}.desktop"
 
 	__toggle_dm_autologin() {
 		local name="$1"
 		local file="$2"
 		local content="$3"
-		local fallback="$4"
+		local create_missing="${4:-0}"
 
-		if [[ ! -f "$file" ]]; then return 1; fi
+		if [[ ! -f "$file" ]]; then
+			if [[ "$_flip" == "off" ]]; then return 1; fi
+			if [[ "$create_missing" == "1" && -d "${file%/*}" ]]; then
+				: > "$file" || return 1
+			else
+				return 1
+			fi
+		fi
 
 		local backup_file="${_backup_dir}/${file##*/}.rtd-bak"
 
@@ -10650,15 +11014,16 @@ system::toggle_oem_auto_login() {
 		return 0
 	}
 
-	__toggle_dm_autologin "LightDM" "/etc/lightdm/lightdm.conf" \
+	__toggle_dm_autologin "LightDM" "/etc/lightdm/lightdm.conf.d/10-rtd-autologin.conf" \
 "[Seat:*]
 autologin-user=$user
-autologin-user-timeout=0" || true
+autologin-user-timeout=0
+user-session=$session_name" 1 || true
 
 	__toggle_dm_autologin "SDDM" "/etc/sddm.conf" \
 "[Autologin]
 User=$user
-Session=plasma.desktop" || true
+Session=$sddm_session" || true
 
 	__toggle_dm_autologin "GDM3 (Ubuntu)" "/etc/gdm3/custom.conf" \
 "[daemon]
@@ -10718,13 +11083,15 @@ EOF
 	fi
 	toggle=1
 
-	# Fallback: if no DM matched, drop in a basic SDDM config
+	# Fallback: if no DM matched, drop in a basic LightDM config.
 	if [[ -z "$toggle" ]]; then
-		write_warning "⚠️ No supported display manager config found. Creating fallback SDDM config..."
-		cat > /etc/sddm.conf <<-EOF
-[Autologin]
-User=$user
-Session=plasma.desktop
+		write_warning "⚠️ No supported display manager config found. Creating fallback LightDM config..."
+		mkdir -p /etc/lightdm/lightdm.conf.d
+		cat > /etc/lightdm/lightdm.conf.d/10-rtd-autologin.conf <<-EOF
+[Seat:*]
+autologin-user=$user
+autologin-user-timeout=0
+user-session=$session_name
 EOF
 	fi
 }
@@ -26810,6 +27177,8 @@ kvm::get_vm_config_preferences() {
 	# End of Documentation
 
 	local _config_file="${_OEM_USER_VM_PREFERENCES:-"/home/${SUDO_USER}/.config/rtd/build_defaults.inf"}"
+	local _stored_initial_user_password=""
+	local _saved_password_mask="********"
 	if [[ "$1" == "--ask" ]]; then
 		local _ask="YES"
 	else
@@ -26834,6 +27203,7 @@ kvm::get_vm_config_preferences() {
 
 	system::log_item "Load saved preferences from the config file overriding the _branding global config or defaults for preseed file..."
 	[[ -f "${_config_file}" ]] && system::read_config "${_config_file}" || system::log_item "Failed to load config file: ${_config_file}"
+	_stored_initial_user_password="${Preference_InitialUserPassword}"
 
 	# If OS Role is set (by function for auto install), then override the config file with the role:
 	[[ -n $_role ]] && Preference_Role="${_role}"
@@ -26841,26 +27211,27 @@ kvm::get_vm_config_preferences() {
 	# If the user has requested to be asked for the preseed file, then ask them:
 	if [[ "$_ask" == "YES" ]]; then
 		
-		system::log_item "'ask' is requested, requesting user input for the preseed file:"
-		preseed_choices=$(dialog --backtitle "$BRANDING" --title "RTD Preseed Creator" --mixedform "Enter your preferences in to the form below. Please note that the password fields do not show anything but will capture what you type in" "${HEIGHT:-"22"}" "${WIDTH:-"80"}" "${LIST_HEIGHT:-"0"}" \
-			"DiskEncryption (YES/NO):" 1 1 "${Preference_DiskEncryption}" 1 40 40 0 0 \
-			"Disk Unlock Password (temp):" 2 1 "${Preference_Disk_Password}" 2 40 40 0 0 \
-			"Admin User Name:" 3 1 "${Preference_InitialUser}" 3 40 40 0 0 \
-			"Admin User Full Name:" 4 1 "${Preference_InitialUserFullName}" 4 40 40 0 0 \
-			"Admin User Initial UserGroup:" 5 1 "${Preference_InitialUserGroup}" 5 40 40 0 0 \
-			"Admin User Password (8 30 char):" 6 1 "${Preference_InitialUserPassword}" 6 40 128 0 0 \
-			"Preferred Keyboard Layout:" 7 1 "${Preference_InitialKeyboardLayout}" 7 40 40 0 0 \
-			"Preferred Language" 8 1 "${Preference_InitialLanguage}" 8 40 40 0 0 \
-			"Preferred Encoding" 9 1 "${Preference_InitialLanguageEncoding}" 9 40 40 0 0 \
-			"Initial Time Zone:" 10 1 "${Preference_InitialTimeZone}" 10 40 40 0 0 \
-			"Wireless Network SSID:" 11 1 "${Preference_Wireless_ID}" 11 40 40 0 0 \
-			"Wireless Network Password:" 12 1 "${Preference_Wireless_Password}" 12 40 40 0 0 \
-			"Role (Default, KVM, Minecraft):" 13 1 "${Preference_Role}" 13 40 40 0 0 \
-			"Copy you ssh public key to host?" 14 1 "${Preference_CopySSHKey}" 14 40 40 0 0 \
-			3>&1 1>&2 2>&3)
-		exit_status=$?
+			system::log_item "'ask' is requested, requesting user input for the preseed file:"
+			preseed_choices=$(rtd_ui::form \
+				--title "RTD Preseed Creator" \
+				--text "Enter your preferences in to the form below. Leave the masked admin password unchanged to keep the saved password." \
+				--field "DiskEncryption (YES/NO):" "${Preference_DiskEncryption}" \
+				--password-field "Disk Unlock Password (temp):" "${Preference_Disk_Password}" \
+				--field "Admin User Name:" "${Preference_InitialUser}" \
+				--field "Admin User Full Name:" "${Preference_InitialUserFullName}" \
+				--field "Admin User Initial UserGroup:" "${Preference_InitialUserGroup}" \
+				--password-field "Admin User Password (8 30 char):" "${_saved_password_mask}" \
+				--field "Preferred Keyboard Layout:" "${Preference_InitialKeyboardLayout}" \
+				--field "Preferred Language" "${Preference_InitialLanguage}" \
+				--field "Preferred Encoding" "${Preference_InitialLanguageEncoding}" \
+				--field "Initial Time Zone:" "${Preference_InitialTimeZone}" \
+				--field "Wireless Network SSID:" "${Preference_Wireless_ID}" \
+				--password-field "Wireless Network Password:" "${Preference_Wireless_Password}" \
+				--field "Role (Default, KVM, Minecraft):" "${Preference_Role}" \
+				--field "Copy you ssh public key to host?" "${Preference_CopySSHKey}")
+			exit_status=$?
 
-		clear
+			clear
 
 		case $exit_status in
 		0)
@@ -26880,32 +27251,40 @@ kvm::get_vm_config_preferences() {
 			;;
 		esac
 
-		# Convert the dialog output to an array and assign the variables:
-		IFS=$'\n' read -r -d '' -a input_array <<<"$preseed_choices"
-		Preference_DiskEncryption=${input_array[0]}
-		Preference_Disk_Password=${input_array[1]}
-		Preference_InitialUser=${input_array[2]}
-		Preference_InitialUserFullName=${input_array[3]}
-		Preference_InitialUserGroup=${input_array[4]}
-		Preference_InitialUserPassword=${input_array[5]}
-		Preference_InitialKeyboardLayout=${input_array[6]}
-		Preference_InitialLanguage=${input_array[7]}
-		Preference_InitialLanguageEncoding=${input_array[8]}
-		Preference_InitialTimeZone=${input_array[9]}
-		Preference_Wireless_ID=${input_array[10]}
-		Preference_Wireless_Password=${input_array[11]}
-		Preference_Role=${input_array[12]}
-		Preference_CopySSHKey=${input_array[13]}
+			# Convert the form output to an array and assign the variables:
+			IFS=$'\n' read -r -d '' -a input_array <<<"$preseed_choices"$'\0'
+			Preference_DiskEncryption=${input_array[0]:-${Preference_DiskEncryption}}
+			Preference_Disk_Password=${input_array[1]:-${Preference_Disk_Password}}
+			Preference_InitialUser=${input_array[2]:-${Preference_InitialUser}}
+			Preference_InitialUserFullName=${input_array[3]:-${Preference_InitialUserFullName}}
+			Preference_InitialUserGroup=${input_array[4]:-${Preference_InitialUserGroup}}
+			if [[ "${input_array[5]:-}" == "${_saved_password_mask}" || -z "${input_array[5]:-}" ]]; then
+				Preference_InitialUserPassword="${_stored_initial_user_password:-${Preference_InitialUserPassword}}"
+			else
+				Preference_InitialUserPassword=${input_array[5]}
+			fi
+			Preference_InitialKeyboardLayout=${input_array[6]:-${Preference_InitialKeyboardLayout}}
+			Preference_InitialLanguage=${input_array[7]:-${Preference_InitialLanguage}}
+			Preference_InitialLanguageEncoding=${input_array[8]:-${Preference_InitialLanguageEncoding}}
+			Preference_InitialTimeZone=${input_array[9]:-${Preference_InitialTimeZone}}
+			Preference_Wireless_ID=${input_array[10]:-${Preference_Wireless_ID}}
+			Preference_Wireless_Password=${input_array[11]:-${Preference_Wireless_Password}}
+			Preference_Role=${input_array[12]:-${Preference_Role}}
+			Preference_CopySSHKey=${input_array[13]:-${Preference_CopySSHKey}}
 
-		# Encrypt the user/admin password before saving & for use in the preseed file
-		# If the password is already encrypted, then skip this step:
-		if [[ ${#Preference_InitialUserPassword} -ge 30 ]]; then
+		# Encrypt the user/admin password before saving & for use in preseed/cloud-init.
+		if [[ "${Preference_InitialUserPassword}" =~ ^\$[156]\$ || "${Preference_InitialUserPassword}" =~ ^\$y\$ ]]; then
 			system::log_item "Password appears to be encrypted already so skipping encryption..."
 		else
 			system::log_item "Password appears to be clear text, encrypting password..."
-			hash mpasswd || system::install_missing_commands "mkpasswd"
-
-			Preference_InitialUserPassword=$(printf "%s" "$Preference_InitialUserPassword" | mkpasswd -s -m sha-512)
+			if command -v mkpasswd >/dev/null 2>&1; then
+				Preference_InitialUserPassword=$(printf "%s" "$Preference_InitialUserPassword" | mkpasswd -s -m sha-512)
+			elif command -v openssl >/dev/null 2>&1; then
+				Preference_InitialUserPassword=$(printf "%s" "$Preference_InitialUserPassword" | openssl passwd -6 -stdin)
+			else
+				write_error "Unable to hash the VM user password. Install mkpasswd or openssl and retry."
+				return 1
+			fi
 			if system::update_config "$_config_file" "Preference_InitialUserPassword" "${Preference_InitialUserPassword}"; then
 				system::log_item "Stored encrypted password in user preferences: $_config_file"
 			else
@@ -26933,6 +27312,17 @@ kvm::get_vm_config_preferences() {
 
 		return $?
 	else
+		if [[ ! "${Preference_InitialUserPassword}" =~ ^\$[156]\$ && ! "${Preference_InitialUserPassword}" =~ ^\$y\$ ]]; then
+			system::log_item "Password from defaults is clear text, encrypting password for unattended install..."
+			if command -v mkpasswd >/dev/null 2>&1; then
+				Preference_InitialUserPassword=$(printf "%s" "$Preference_InitialUserPassword" | mkpasswd -s -m sha-512)
+			elif command -v openssl >/dev/null 2>&1; then
+				Preference_InitialUserPassword=$(printf "%s" "$Preference_InitialUserPassword" | openssl passwd -6 -stdin)
+			else
+				write_error "Unable to hash the VM user password. Install mkpasswd or openssl and retry."
+				return 1
+			fi
+		fi
 		write_information "Prompting for VM settings is not requested: ${_role} ${_task} automatically using defaults or parameter instructions..."
 		return 0
 	fi
@@ -27033,25 +27423,25 @@ kvm::get_vm_size_preferences() {
 
 	if [[ "$_ask" == "YES" ]]; then
 		system::log_item "'ask' is requested, requesting user input for VM sizing defaults:"
-		local sizing_choices exit_status
-		sizing_choices=$(dialog --backtitle "$BRANDING" --title "RTD VM Sizing Defaults" \
-			--mixedform "Update the default T-Shirt sizing values (CPU cores, Memory MB, Disk GB)." 24 80 0 \
-			"Small CPU Cores:" 1 1 "${Preference_TShirt_CPU_SMALL}" 1 40 10 0 0 \
-			"Small Memory (MB):" 2 1 "${Preference_TShirt_MEM_SMALL}" 2 40 10 0 0 \
-			"Small Disk (GB):" 3 1 "${Preference_TShirt_DSK_SMALL}" 3 40 10 0 0 \
-			"Medium CPU Cores:" 5 1 "${Preference_TShirt_CPU_MEDIUM}" 5 40 10 0 0 \
-			"Medium Memory (MB):" 6 1 "${Preference_TShirt_MEM_MEDIUM}" 6 40 10 0 0 \
-			"Medium Disk (GB):" 7 1 "${Preference_TShirt_DSK_MEDIUM}" 7 40 10 0 0 \
-			"Large CPU Cores:" 9 1 "${Preference_TShirt_CPU_LARGE}" 9 40 10 0 0 \
-			"Large Memory (MB):" 10 1 "${Preference_TShirt_MEM_LARGE}" 10 40 10 0 0 \
-			"Large Disk (GB):" 11 1 "${Preference_TShirt_DSK_LARGE}" 11 40 10 0 0 \
-			"XL CPU Cores:" 13 1 "${Preference_TShirt_CPU_XL}" 13 40 10 0 0 \
-			"XL Memory (MB):" 14 1 "${Preference_TShirt_MEM_XL}" 14 40 10 0 0 \
-			"XL Disk (GB):" 15 1 "${Preference_TShirt_DSK_XL}" 15 40 10 0 0 \
-			"XXL CPU Cores:" 17 1 "${Preference_TShirt_CPU_XXL}" 17 40 10 0 0 \
-			"XXL Memory (MB):" 18 1 "${Preference_TShirt_MEM_XXL}" 18 40 10 0 0 \
-			"XXL Disk (GB):" 19 1 "${Preference_TShirt_DSK_XXL}" 19 40 10 0 0 \
-			3>&1 1>&2 2>&3)
+			local sizing_choices exit_status
+			sizing_choices=$(rtd_ui::form \
+				--title "RTD VM Sizing Defaults" \
+				--text "Update the default T-Shirt sizing values (CPU cores, Memory MB, Disk GB)." \
+				--field "Small CPU Cores:" "${Preference_TShirt_CPU_SMALL}" \
+				--field "Small Memory (MB):" "${Preference_TShirt_MEM_SMALL}" \
+				--field "Small Disk (GB):" "${Preference_TShirt_DSK_SMALL}" \
+				--field "Medium CPU Cores:" "${Preference_TShirt_CPU_MEDIUM}" \
+				--field "Medium Memory (MB):" "${Preference_TShirt_MEM_MEDIUM}" \
+				--field "Medium Disk (GB):" "${Preference_TShirt_DSK_MEDIUM}" \
+				--field "Large CPU Cores:" "${Preference_TShirt_CPU_LARGE}" \
+				--field "Large Memory (MB):" "${Preference_TShirt_MEM_LARGE}" \
+				--field "Large Disk (GB):" "${Preference_TShirt_DSK_LARGE}" \
+				--field "XL CPU Cores:" "${Preference_TShirt_CPU_XL}" \
+				--field "XL Memory (MB):" "${Preference_TShirt_MEM_XL}" \
+				--field "XL Disk (GB):" "${Preference_TShirt_DSK_XL}" \
+				--field "XXL CPU Cores:" "${Preference_TShirt_CPU_XXL}" \
+				--field "XXL Memory (MB):" "${Preference_TShirt_MEM_XXL}" \
+				--field "XXL Disk (GB):" "${Preference_TShirt_DSK_XXL}")
 		exit_status=$?
 
 		clear
@@ -29571,17 +29961,23 @@ kvm::make_vm_now_from_ubuntu_com() {
 			unset _tgt_ubuntu_ver _summary_message iso_filename CloudConfigDir iso vm_name
 			return
 		else
-			system::log_item "Downloading the Ubuntu ISO if not already present to ${permanent_download_dir} for media-type server version ${_tgt_ubuntu_ver}"
-			if ! ubuntu::download_iso --dir "${permanent_download_dir}" --media-type desktop --version "${_tgt_ubuntu_ver}"; then
-				write_error "Failed to download the Ubuntu server ISO for ${_tgt_ubuntu_ver}."
+			local vdi_media_type="server"
+			local selected_desktop_payload="${_UserDesktopEnvironmentSelection:-${server_app:-ubuntu-desktop}}"
+			if [[ "${selected_desktop_payload}" == "ubuntu-desktop" ]]; then
+				vdi_media_type="desktop"
+			fi
+
+			system::log_item "Downloading the Ubuntu ISO if not already present to ${permanent_download_dir} for media-type ${vdi_media_type} version ${_tgt_ubuntu_ver}"
+			if ! ubuntu::download_iso --dir "${permanent_download_dir}" --media-type "${vdi_media_type}" --version "${_tgt_ubuntu_ver}"; then
+				write_error "Failed to download the Ubuntu ${vdi_media_type} ISO for ${_tgt_ubuntu_ver}."
 				return 1
 			fi
 			if [[ -z "${iso:-}" || ! -f "${iso}" ]]; then
-				write_error "Ubuntu server ISO missing after download."
+				write_error "Ubuntu ${vdi_media_type} ISO missing after download."
 				return 1
 			fi
-			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: using server autoinstall media for VDI build..."
-			system::log_item "🐧 Installing selected desktop payload as a server-app package: ${_UserDesktopEnvironmentSelection:-${server_app:-ubuntu-desktop}}"
+			system::log_item "Ubuntu version ${_tgt_ubuntu_ver}: using ${vdi_media_type} autoinstall media for VDI build..."
+			system::log_item "🐧 Installing selected desktop payload as a server-app package: ${selected_desktop_payload}"
 			if ! system::generate_cloudconfig --CloudConfigDir "${CloudConfigDir}" --vmname "${vm_name}" "$@"; then
 				write_error "Failed to generate the Ubuntu cloud-init configuration."
 				return 1
@@ -33749,6 +34145,48 @@ template::cloud_config() {
 	system::log_item "VM Name: $vm_name"
 	local cloud_hostname="${vm_hostname:-$vm_name}"
 	[[ -z "$cloud_hostname" ]] && cloud_hostname="${vm_name:-$(hostname)}"
+	local ubuntu_keyboard_layout="${Preference_InitialKeyboardLayout:-us}"
+	case "${ubuntu_keyboard_layout}" in
+		sv_SE|sv-SE|sv) ubuntu_keyboard_layout="se" ;;
+		en_US|en-US|en) ubuntu_keyboard_layout="us" ;;
+		en_GB|en-GB) ubuntu_keyboard_layout="gb" ;;
+		da_DK|da-DK|da) ubuntu_keyboard_layout="dk" ;;
+		nb_NO|nb-NO|nn_NO|nn-NO|no) ubuntu_keyboard_layout="no" ;;
+		fi_FI|fi-FI|fi) ubuntu_keyboard_layout="fi" ;;
+		de_DE|de-DE|de) ubuntu_keyboard_layout="de" ;;
+		fr_FR|fr-FR|fr) ubuntu_keyboard_layout="fr" ;;
+		es_ES|es-ES|es) ubuntu_keyboard_layout="es" ;;
+	esac
+	local vdi_autologin_session="gnome.desktop"
+	local vdi_lightdm_session="gnome"
+	local vdi_dm_autologin_config=""
+	case "${server_app}" in
+		kubuntu-desktop) vdi_autologin_session="plasma.desktop"; vdi_lightdm_session="plasma" ;;
+		xubuntu-desktop) vdi_autologin_session="xubuntu.desktop"; vdi_lightdm_session="xubuntu" ;;
+		ubuntu-mate-desktop) vdi_autologin_session="mate.desktop"; vdi_lightdm_session="mate" ;;
+		lubuntu-desktop) vdi_autologin_session="Lubuntu.desktop"; vdi_lightdm_session="Lubuntu" ;;
+		cinnamon-desktop-environment|cinnamon-core|ubuntucinnamon-desktop*) vdi_autologin_session="cinnamon.desktop"; vdi_lightdm_session="cinnamon" ;;
+	esac
+	case "${server_app}" in
+		kubuntu-desktop|lubuntu-desktop)
+			vdi_dm_autologin_config=$(cat <<EOF
+        - curtin in-target --target=/target -- /bin/bash -c 'printf "%s\n" "[Autologin]" "User=${Preference_InitialUser}" "Session=${vdi_autologin_session}" > /etc/sddm.conf.d/10-rtd-autologin.conf ; exit 0'
+EOF
+)
+			;;
+		ubuntu-desktop)
+			vdi_dm_autologin_config=$(cat <<EOF
+        - curtin in-target --target=/target -- /bin/bash -c 'printf "%s\n" "[daemon]" "AutomaticLoginEnable=True" "AutomaticLogin=${Preference_InitialUser}" > /etc/gdm3/custom.conf ; exit 0'
+EOF
+)
+			;;
+		*)
+			vdi_dm_autologin_config=$(cat <<EOF
+        - curtin in-target --target=/target -- /bin/bash -c 'printf "%s\n" "[Seat:*]" "autologin-user=${Preference_InitialUser}" "autologin-user-timeout=0" "user-session=${vdi_lightdm_session}" > /etc/lightdm/lightdm.conf.d/10-rtd-autologin.conf ; exit 0'
+EOF
+)
+			;;
+	esac
 
 # Define common installation tasks for manageable code
 common_vdi_pre_config=$(cat <<EOF
@@ -33784,9 +34222,7 @@ common_vdi_post_config=$(cat <<EOF
         # Configure first-login OEM setup directly; rtd-oem-enable-config.sh also refreshes these settings after clone.
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /etc/xdg/autostart /etc/sddm.conf.d /etc/lightdm/lightdm.conf.d /etc/gdm3 /etc/systemd/system/getty@tty1.service.d ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c 'printf "%s\n" "[Desktop Entry]" "Type=Application" "Exec=/usr/bin/xterm -fa Monospace -fs 12 -e sudo -E bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-linux-config.sh" "Terminal=false" "Hidden=false" "X-GNOME-Autostart-enabled=true" "Name=OEM Run" "Comment=OEM Setup" > /etc/xdg/autostart/oem-run.desktop ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c 'printf "%s\n" "[Autologin]" "User=${Preference_InitialUser}" "Session=plasma.desktop" > /etc/sddm.conf.d/10-rtd-autologin.conf ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c 'printf "%s\n" "[Seat:*]" "autologin-user=${Preference_InitialUser}" "autologin-user-timeout=0" > /etc/lightdm/lightdm.conf.d/10-rtd-autologin.conf ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c 'printf "%s\n" "[daemon]" "AutomaticLoginEnable=True" "AutomaticLogin=${Preference_InitialUser}" > /etc/gdm3/custom.conf ; exit 0'
+${vdi_dm_autologin_config}
         - curtin in-target --target=/target -- /bin/bash -c 'printf "%s\n" "[Service]" "ExecStart=" "ExecStart=-/sbin/agetty --noissue --autologin ${Preference_InitialUser} %I \\\$TERM" "Type=idle" > /etc/systemd/system/getty@tty1.service.d/override.conf ; exit 0'
 
         # Clone RTD Setup & Execute OEM Config
@@ -33827,7 +34263,7 @@ autoinstall:
         $([[ -n ${Preference_ssh_pub_key} ]] && echo authorized-keys:)
             $([[ -n ${Preference_ssh_pub_key} ]] && echo -) ${Preference_ssh_pub_key}
     keyboard:
-        layout: ${Preference_InitialKeyboardLayout}
+        layout: ${ubuntu_keyboard_layout}
     identity:
         hostname: "${cloud_hostname}"
         username: "${Preference_InitialUser}"
@@ -33963,7 +34399,8 @@ EOF
 	# -----------------------------------------------------------------------------------------
 
 cat >>${user_data_file} <<EOF
-        - sddm
+        - lightdm
+        - slick-greeter
         - wine
     late-commands:
 ${common_vdi_pre_config}
@@ -33971,8 +34408,10 @@ ${common_vdi_pre_config}
         # Install Cinnamon Desktop
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get update -y'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get upgrade -y'
-        - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..3}; do apt-get -y install cinnamon-desktop-environment && break || { printf "Attempt %d failed\n" "$i" >&2; sleep 5; }; done'
-        - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install plymouth-theme-ubuntucinnamon-spinner ; update-initramfs -u ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c "echo lightdm shared/default-x-display-manager select lightdm | debconf-set-selections"
+        - curtin in-target --target=/target -- /bin/bash -c 'for i in {1..3}; do apt-get -y install ubuntucinnamon-desktop-minimal update-manager adwaita-icon-theme && break || { printf "Attempt %d failed\n" "\$i" >&2; sleep 5; }; done'
+        - curtin in-target --target=/target -- /bin/bash -c 'systemctl enable lightdm.service ; systemctl set-default graphical.target ; systemctl disable gdm3.service sddm.service 2>/dev/null || true ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'update-initramfs -u ; exit 0'
 
 ${common_vdi_post_config}
 EOF

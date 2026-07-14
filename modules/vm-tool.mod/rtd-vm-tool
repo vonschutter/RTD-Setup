@@ -121,6 +121,7 @@ fi
 # RTD_GUI=dialog
 # export NEWT_COLORS='root=,gray '
 : ${RTD_GUI:="dialog"}
+: ${RTD_VM_TOOL_UI_MODE:="auto"}
 declare -a RTD_VM_CLONE_ARGS=()
 
 
@@ -226,25 +227,27 @@ rtd::bootstrap_library() {
 main() {
 	# This is the main function of this script. It is called when the script is executed
 
-	rtd::bootstrap_library "_rtd_library" "$RTD_REQUIRED_LIBRARY_VERSION" || {
-		echo "Failed to load _rtd_library version ${RTD_REQUIRED_LIBRARY_VERSION} or newer"
-		exit 1
-	}
-	vmtool::refresh_backtitle
-	security::ensure_admin
-
 	RTD_VM_CLONE_ARGS=()
+	local requested_ui_mode="${RTD_VM_TOOL_UI_MODE:-auto}"
 	local -a positional_args=()
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
+			--graphical|--gui)
+				requested_ui_mode="gui"
+				shift
+				;;
+			--text|--tui|--no-gui)
+				requested_ui_mode="tui"
+				shift
+				;;
 			--sysprep)
 				RTD_VM_CLONE_ARGS+=("--sysprep")
 				shift
 				;;
 			--customize)
 				if [[ -z "${2:-}" ]]; then
-					write_error "--customize requires an argument specifying virt-customize options or a script path."
+					echo "--customize requires an argument specifying virt-customize options or a script path." >&2
 					return 1
 				fi
 				RTD_VM_CLONE_ARGS+=("--customize" "$2")
@@ -263,9 +266,20 @@ main() {
 		set --
 	fi
 
+	rtd::bootstrap_library "_rtd_library" "$RTD_REQUIRED_LIBRARY_VERSION" || {
+		echo "Failed to load _rtd_library version ${RTD_REQUIRED_LIBRARY_VERSION} or newer"
+		exit 1
+	}
+	vmtool::refresh_backtitle
+	vmtool::configure_ui_mode "$requested_ui_mode" || exit 1
+
 	case ${1:-} in
 		about | --about | --help | -h )
-			display_notice
+			if [[ "${RTD_VM_TOOL_UI_MODE}" == "gui" ]]; then
+				vmtool::launch_gui --about
+			else
+				display_notice
+			fi
 			exit
 		;;
 		--first-run | -f )
@@ -274,7 +288,12 @@ main() {
 		;;
 		* )
 			write_status "Starting ${BRANDING}..."
-			launch_byobu "$@"
+			security::ensure_admin "$@"
+			if [[ "${RTD_VM_TOOL_UI_MODE}" == "gui" ]]; then
+				vmtool::launch_gui "$@"
+			else
+				launch_byobu "$@"
+			fi
 
 		;;
 	esac
@@ -292,6 +311,82 @@ main() {
 # they become cumbersome to manage, then it is sometimes helpful to sections
 # in some logical order.
 
+
+
+vmtool::has_graphical_session() {
+	[[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]
+}
+
+
+vmtool::has_graphical_backend() {
+	type -P zenity >/dev/null 2>&1 || type -P yad >/dev/null 2>&1
+}
+
+
+vmtool::configure_ui_mode() {
+	local requested="${1:-auto}"
+
+	case "$requested" in
+		gui|graphical)
+			if ! vmtool::has_graphical_session; then
+				write_error "GUI mode was requested, but no graphical session was detected."
+				return 1
+			fi
+			if ! vmtool::has_graphical_backend; then
+				write_error "GUI mode was requested, but neither zenity nor yad is available."
+				return 1
+			fi
+			RTD_VM_TOOL_UI_MODE="gui"
+			;;
+		tui|text|no-gui)
+			RTD_VM_TOOL_UI_MODE="tui"
+			;;
+		auto|"")
+			if vmtool::has_graphical_session && vmtool::has_graphical_backend; then
+				RTD_VM_TOOL_UI_MODE="gui"
+			else
+				RTD_VM_TOOL_UI_MODE="tui"
+			fi
+			;;
+		*)
+			write_error "Unknown VM tool UI mode: ${requested}"
+			return 1
+			;;
+	esac
+
+	if [[ "$RTD_VM_TOOL_UI_MODE" == "gui" ]]; then
+		if type -P yad >/dev/null 2>&1; then
+			RTD_UI_BACKEND="yad"
+		else
+			RTD_UI_BACKEND="zenity"
+		fi
+	else
+		RTD_UI_BACKEND="dialog"
+		RTD_GUI="dialog"
+	fi
+	export RTD_VM_TOOL_UI_MODE RTD_UI_BACKEND RTD_GUI
+	write_information "VM Tool UI mode selected: ${RTD_VM_TOOL_UI_MODE} (${RTD_UI_BACKEND})"
+}
+
+
+vmtool::launch_gui() {
+	local script_dir gtk_backend
+
+	script_dir="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+	gtk_backend="${script_dir}/rtd-vm-tool-gtk"
+	if [[ ! -r "$gtk_backend" ]]; then
+		write_error "GUI backend not found: ${gtk_backend}"
+		return 1
+	fi
+
+	RTD_VM_TOOL_GTK_BACKEND=1
+	RTD_VM_TUI_SCRIPT="$(readlink -f "${BASH_SOURCE[0]}")"
+	export RTD_VM_TOOL_GTK_BACKEND RTD_VM_TUI_SCRIPT
+
+	# shellcheck source=/dev/null
+	source "$gtk_backend"
+	vmtoolgtk::main "$@"
+}
 
 
 launch_byobu() {
@@ -361,9 +456,7 @@ vmtool::refresh_backtitle() {
 display_notice() {
 	system::log_item "INFO" "Displaying about information for $( basename $0 )"
 
-	$RTD_GUI --backtitle "$BACKTITLE" \
-	--title "About $( basename $0 ) " \
-	--msgbox "
+	rtd_ui::message --title "About $( basename $0 )" --message "
 	This tool is part of the RunTime Data System Support Tools.
 	The purpose of this tool is to simplify management of remote and local Linux systems.
 
@@ -378,7 +471,7 @@ display_notice() {
 	This tool is useful for support staff that do not live on the command line daily, and
 	can be used over ssh. If you do get disconnected the tool will remain active remotely
 	and you can easily reconnect to it by re-establishing your ssh connection and typing
-	the word: byobu in the terminal. "  ${HEIGHT} ${WIDTH} 2>&1
+	the word: byobu in the terminal. "
 	clear
 }
 
@@ -419,9 +512,7 @@ show_notice_on_fist_run() {
 
 	EOF
 
-	$RTD_GUI --backtitle "$BACKTITLE" --no-collapse \
-	--title "ABOUT $( basename $0 )" --textbox "$tmpfile" \
-	${HEIGHT} ${WIDTH} 2>&1
+	rtd_ui::text_file --title "ABOUT $( basename $0 )" --file "$tmpfile"
 	clear
 	rm -f "$tmpfile" 
 	
@@ -520,72 +611,72 @@ vmtool::run_vdi_template_action() {
 		1 )
 			if kvm::make_vm_now_from_ubuntu_com --role VDI --server-app ubuntu-desktop --ask YES --tshirt-size medium; then
 				vmtool::cleanup_after_action nomessage
-			else
-				dialog::display_error "Ubuntu GNOME VDI template creation failed. Review the on-screen error and log output before retrying."
-			fi
+				else
+					rtd_ui::message --type error --title "Template Creation Failed" --message "Ubuntu GNOME VDI template creation failed. Review the on-screen error and log output before retrying."
+				fi
 			;;
 		2 )
 			if kvm::make_vm_now_from_ubuntu_com --role VDI --server-app kubuntu-desktop --ask YES --tshirt-size medium; then
 				vmtool::cleanup_after_action nomessage
-			else
-				dialog::display_error "Ubuntu KDE VDI template creation failed. Review the on-screen error and log output before retrying."
-			fi
+				else
+					rtd_ui::message --type error --title "Template Creation Failed" --message "Ubuntu KDE VDI template creation failed. Review the on-screen error and log output before retrying."
+				fi
 			;;
 		3 )
 			if kvm::make_vm_now_from_ubuntu_com --role VDI --server-app xubuntu-desktop --ask YES --tshirt-size medium; then
 				vmtool::cleanup_after_action nomessage
-			else
-				dialog::display_error "Ubuntu XFCE VDI template creation failed. Review the on-screen error and log output before retrying."
-			fi
+				else
+					rtd_ui::message --type error --title "Template Creation Failed" --message "Ubuntu XFCE VDI template creation failed. Review the on-screen error and log output before retrying."
+				fi
 			;;
 		4 )
 			if kvm::make_vm_now_from_ubuntu_com --role VDI --server-app ubuntu-mate-desktop --ask YES --tshirt-size medium; then
 				vmtool::cleanup_after_action nomessage
-			else
-				dialog::display_error "Ubuntu MATE VDI template creation failed. Review the on-screen error and log output before retrying."
-			fi
+				else
+					rtd_ui::message --type error --title "Template Creation Failed" --message "Ubuntu MATE VDI template creation failed. Review the on-screen error and log output before retrying."
+				fi
 			;;
 		5 )
 			if kvm::make_vm_now_from_ubuntu_com --role VDI --server-app lubuntu-desktop --ask YES --tshirt-size medium; then
 				vmtool::cleanup_after_action nomessage
-			else
-				dialog::display_error "Ubuntu LXQt VDI template creation failed. Review the on-screen error and log output before retrying."
-			fi
+				else
+					rtd_ui::message --type error --title "Template Creation Failed" --message "Ubuntu LXQt VDI template creation failed. Review the on-screen error and log output before retrying."
+				fi
 			;;
 		6 )
 			if kvm::make_vm_now_from_ubuntu_com --role VDI --server-app cinnamon-desktop-environment --ask YES --tshirt-size medium; then
 				vmtool::cleanup_after_action nomessage
-			else
-				dialog::display_error "Ubuntu Cinnamon VDI template creation failed. Review the on-screen error and log output before retrying."
-			fi
+				else
+					rtd_ui::message --type error --title "Template Creation Failed" --message "Ubuntu Cinnamon VDI template creation failed. Review the on-screen error and log output before retrying."
+				fi
 			;;
 		7 )
 			if kvm::make_vm_now_from_debian_org --role workstation --DE gnome-desktop --tshirt-size small; then
 				vmtool::cleanup_after_action nomessage
-			else
-				dialog::display_error "Debian GNOME VDI template creation failed. Review the on-screen error and log output before retrying."
-			fi
+				else
+					rtd_ui::message --type error --title "Template Creation Failed" --message "Debian GNOME VDI template creation failed. Review the on-screen error and log output before retrying."
+				fi
 			;;
 		8 )
 			if kvm::make_vm_now_from_debian_org --role workstation --DE cinnamon-desktop --tshirt-size small; then
 				vmtool::cleanup_after_action nomessage
-			else
-				dialog::display_error "Debian Cinnamon VDI template creation failed. Review the on-screen error and log output before retrying."
-			fi
+				else
+					rtd_ui::message --type error --title "Template Creation Failed" --message "Debian Cinnamon VDI template creation failed. Review the on-screen error and log output before retrying."
+				fi
 			;;
 		9 )
 			if kvm::make_vm_now_from_debian_org --role workstation --DE kde-desktop --tshirt-size small; then
 				vmtool::cleanup_after_action nomessage
-			else
-				dialog::display_error "Debian KDE VDI template creation failed. Review the on-screen error and log output before retrying."
-			fi
+				else
+					rtd_ui::message --type error --title "Template Creation Failed" --message "Debian KDE VDI template creation failed. Review the on-screen error and log output before retrying."
+				fi
 			;;
 		10 )
 			if kvm::make_vm_now_from_debian_org --role workstation --DE lxde-desktop --tshirt-size small; then
 				vmtool::cleanup_after_action nomessage
-			else
-				dialog::display_error "Debian LXDE VDI template creation failed. Review the on-screen error and log output before retrying."
-			fi
+				else
+					rtd_ui::message --type error --title "Template Creation Failed" --message "Debian LXDE VDI template creation failed. Review the on-screen error and log output before retrying."
+				fi
 			;;
 		11 )
 			kvm::make_vm_now_from_fedora_org --role workstation --DE "@workstation-product-environment" --tshirt-size "${KVM_FEDORA_VDI_TSHIRT_SIZE:-medium}"
@@ -1086,9 +1177,9 @@ vmtool::run_cleanup_task() {
 	write_status "Running ${task_title} (${mode_label})..."
 	if ! ( TERMUITXT="nocolor" "$func_name" "${args[@]}" ) &>"$tmpfile"; then
 		local cleanup_status=$?
-		$RTD_GUI --backtitle "$BACKTITLE" --title "${task_title} (${mode_label}) failed" --textbox "$tmpfile" "$HEIGHT" "$WIDTH"
+		rtd_ui::text_file --title "${task_title} (${mode_label}) failed" --file "$tmpfile"
 		rm -f "$tmpfile"
-		write_warning "${task_title} (${mode_label}) failed with exit code ${cleanup_status}. See dialog for details."
+		write_warning "${task_title} (${mode_label}) failed with exit code ${cleanup_status}. See output for details."
 		return 1
 	fi
 
@@ -1121,11 +1212,11 @@ vmtool::run_cleanup_task() {
 	if (( listed == 0 )); then
 		summary_msg=${summary_msg:-"No items found in ${summary_dir}."}
 		write_status "${task_title} found nothing to remove; showing notice."
-		$RTD_GUI --backtitle "$BACKTITLE" --title "${task_title}${title_suffix}" --msgbox "${summary_msg}" "$HEIGHT" "$WIDTH"
+		rtd_ui::message --title "${task_title}${title_suffix}" --message "${summary_msg}"
 	else
 		printf "\n%s\n" "${summary_msg}" >>"$display_file"
-		write_status "Opening ${task_title} summary dialog (${task_title}${title_suffix})..."
-		$RTD_GUI --backtitle "$BACKTITLE" --title "${task_title}${title_suffix}" --textbox "$display_file" "$HEIGHT" "$WIDTH"
+		write_status "Opening ${task_title} summary (${task_title}${title_suffix})..."
+		rtd_ui::text_file --title "${task_title}${title_suffix}" --file "$display_file"
 	fi
 
 	rm -f "$tmpfile" "$display_file"
@@ -1283,57 +1374,53 @@ RTD_CICD_ENABLE=0
 
 	RTD_CICD_ENABLE=1
 
-	exec 3>&1
-		RTD_CICD_REPO=$($RTD_GUI --backtitle "$BACKTITLE" --inputbox "Ansible repo URL" "$HEIGHT" "$WIDTH" "$RTD_CICD_REPO" 2>&1 1>&3)
-		local exit_status=$?
-	exec 3>&-
+	local exit_status
+	RTD_CICD_REPO=$(rtd_ui::input --title "CI/CD" --message "Ansible repo URL" --value "$RTD_CICD_REPO")
+	exit_status=$?
 	[[ $exit_status -ne 0 ]] && { RTD_CICD_ENABLE=0; return 0; }
 
-	exec 3>&1
-		RTD_CICD_PLAYBOOK=$($RTD_GUI --backtitle "$BACKTITLE" --inputbox "Ansible playbook path" "$HEIGHT" "$WIDTH" "$RTD_CICD_PLAYBOOK" 2>&1 1>&3)
-		exit_status=$?
-	exec 3>&-
+	RTD_CICD_PLAYBOOK=$(rtd_ui::input --title "CI/CD" --message "Ansible playbook path" --value "$RTD_CICD_PLAYBOOK")
+	exit_status=$?
 	[[ $exit_status -ne 0 ]] && { RTD_CICD_ENABLE=0; return 0; }
 
 	local -a task_menu_entries=()
 	vmtool::ensure_ansible_repo || write_warning "Using fallback menu (RTD-Ansible clone missing)."
 	vmtool::build_server_role_menu task_menu_entries
 
-	exec 3>&1
+	local -a task_checklist_args=()
+	local idx
+	for ((idx = 0; idx < ${#task_menu_entries[@]}; idx += 3)); do
+		task_checklist_args+=(--option "${task_menu_entries[$idx]}" "${task_menu_entries[$((idx + 1))]}" "${task_menu_entries[$((idx + 2))]}")
+	done
+
 	local task_selection
-	task_selection=$($RTD_GUI --backtitle "$BACKTITLE" --checklist "Select server meta-packages to apply" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
-		"${task_menu_entries[@]}" 2>&1 1>&3)
-		exit_status=$?
-	exec 3>&-
+	task_selection=$(rtd_ui::checklist --title "CI/CD" --message "Select server meta-packages to apply" "${task_checklist_args[@]}")
+	exit_status=$?
 	[[ $exit_status -ne 0 ]] && { RTD_CICD_ENABLE=0; return 0; }
 	# Map selected role shorthands to server_task strings
 	local -a mapped_tasks=()
-	for item in $task_selection; do
-		item=${item//\"/}
+	local item
+	while IFS= read -r item; do
+		[[ -z "$item" ]] && continue
 		local mapped
 		mapped=$(vmtool::map_role_to_server_task "$item")
 		[[ -n "$mapped" ]] && mapped_tasks+=("$mapped")
-	done
+	done <<<"$task_selection"
 	if (( ${#mapped_tasks[@]} == 0 )); then
 		mapped_tasks=("openssh-server")
 	fi
 	RTD_CICD_TASKS=$(IFS=','; echo "${mapped_tasks[*]}")
 
-	exec 3>&1
-	RTD_CICD_LLM_VARIANT=$($RTD_GUI --backtitle "$BACKTITLE" --menu "LLM server option (optional)" "$HEIGHT" "$WIDTH" 6 \
-		"none" "No LLM stack" \
-		"ollama" "Ollama service (snap)" \
-		"text-generation-webui" "text-generation-webui" \
-		2>&1 1>&3)
-		exit_status=$?
-	exec 3>&-
+	RTD_CICD_LLM_VARIANT=$(rtd_ui::menu --title "CI/CD" --message "LLM server option (optional)" \
+		--option "none" "No LLM stack" \
+		--option "ollama" "Ollama service (snap)" \
+		--option "text-generation-webui" "text-generation-webui")
+	exit_status=$?
 	[[ $exit_status -ne 0 ]] && RTD_CICD_LLM_VARIANT="none"
 
 	if [[ "$RTD_CICD_LLM_VARIANT" == "ollama" ]]; then
-		exec 3>&1
-			RTD_CICD_LLM_MODELS=$($RTD_GUI --backtitle "$BACKTITLE" --inputbox "Ollama models to pre-pull (comma-separated)" "$HEIGHT" "$WIDTH" "llama3" 2>&1 1>&3)
-			exit_status=$?
-		exec 3>&-
+		RTD_CICD_LLM_MODELS=$(rtd_ui::input --title "CI/CD" --message "Ollama models to pre-pull (comma-separated)" --value "llama3")
+		exit_status=$?
 		[[ $exit_status -ne 0 ]] && RTD_CICD_LLM_MODELS=""
 	else
 		RTD_CICD_LLM_MODELS=""

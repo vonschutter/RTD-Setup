@@ -20,9 +20,9 @@ set -u
 : "${VMTOOLGTK_VERSION:=0.1}"
 : "${VMTOOLGTK_TITLE:=RunTime Data: VM Tool GTK}"
 
-RTD_VM_TUI_SCRIPT=""
-RTD_VM_TOOL_TRACE=0
-RTD_VM_GTK_ACTION_LOG="/var/log/rtd/rtd-vm-tool-gtk-actions.log"
+: "${RTD_VM_TUI_SCRIPT:=}"
+: "${RTD_VM_TOOL_TRACE:=0}"
+: "${RTD_VM_GTK_ACTION_LOG:=/var/log/rtd/rtd-vm-tool-gtk-actions.log}"
 : "${RTD_VM_GTK_TERMINAL_GEOMETRY:=132x42}"
 : "${RTD_VM_GTK_XTERM_FONT_SIZE:=14}"
 declare -a RTD_VM_CLONE_ARGS=()
@@ -126,13 +126,30 @@ vmtoolgtk::prompt_yes_no() {
 	esac
 }
 
+vmtoolgtk::entry() {
+	local title="$1"
+	local message="$2"
+	local default_value="${3:-}"
+	local gui_tool reply
+
+	gui_tool="$(vmtoolgtk::gui_tool || true)"
+	case "${gui_tool}" in
+		yad)
+			yad --entry --title="${title}" --text="${message}" --width=760 --entry-text="${default_value}"
+			;;
+		zenity)
+			zenity --entry --title "${title}" --text "${message}" --width 760 --entry-text "${default_value}"
+			;;
+		*)
+			printf '%s [%s]: ' "${message}" "${default_value}" >&2
+			read -r reply
+			printf '%s\n' "${reply:-$default_value}"
+			;;
+	esac
+}
+
 vmtoolgtk::show_about() {
-	zenity --info \
-		--title "${VMTOOLGTK_TITLE}" \
-		--width 760 \
-		--height 520 \
-		--no-wrap \
-		--text "<span size='large'><b>${VMTOOLGTK_TITLE}</b></span>
+	vmtoolgtk::show_info "<span size='large'><b>${VMTOOLGTK_TITLE}</b></span>
 
 A GTK menu front-end for the RTD VM tool.
 
@@ -153,20 +170,59 @@ vmtoolgtk::show_menu() {
 	local text="$2"
 	local width="${3:-980}"
 	local height="${4:-640}"
+	local gui_tool raw_selection normalized_selection idx
+	local -a menu_entries=()
 	shift 4
+	menu_entries=("$@")
 
-	zenity --list \
-		--title "${title}" \
-		--text "${text}" \
-		--width "${width}" \
-		--height "${height}" \
-		--column "ID" \
-		--column "Action" \
-		--column "Details" \
-		--cancel-label "Back" \
-		--hide-column=1 \
-		--print-column=1 \
-		"$@"
+	gui_tool="$(vmtoolgtk::gui_tool || true)"
+	case "${gui_tool}" in
+		yad)
+			raw_selection="$(yad --list \
+				--title="${title}" \
+				--text="${text}" \
+				--width="${width}" \
+				--height="${height}" \
+				--column="ID" \
+				--column="Action" \
+				--column="Details" \
+				--hide-column=1 \
+				--print-column=1 \
+				"${menu_entries[@]}")" || return $?
+			;;
+		zenity)
+			raw_selection="$(zenity --list \
+				--title "${title}" \
+				--text "${text}" \
+				--width "${width}" \
+				--height "${height}" \
+				--column "ID" \
+				--column "Action" \
+				--column "Details" \
+				--cancel-label "Back" \
+				--hide-column=1 \
+				--print-column=1 \
+				"${menu_entries[@]}")" || return $?
+			;;
+		*)
+			return 1
+			;;
+	esac
+
+	normalized_selection="${raw_selection%%$'\n'*}"
+	normalized_selection="${normalized_selection%%|*}"
+
+	for ((idx = 0; idx < ${#menu_entries[@]}; idx += 3)); do
+		if [[ "${normalized_selection}" == "${menu_entries[$idx]}" ||
+			"${raw_selection}" == "${menu_entries[$idx]}" ||
+			"${raw_selection}" == "${menu_entries[$((idx + 1))]}" ||
+			"${raw_selection}" == "${menu_entries[$((idx + 2))]}" ]]; then
+			printf '%s\n' "${menu_entries[$idx]}"
+			return 0
+		fi
+	done
+
+	printf '%s\n' "${normalized_selection}"
 }
 
 vmtoolgtk::find_terminal_emulator() {
@@ -354,6 +410,11 @@ vmtoolgtk::launch_tui_action() {
 	local action_snippet="$2"
 	local payload clone_args_snippet quoted_clone_args
 
+	if [[ -z "${RTD_VM_TUI_SCRIPT:-}" || ! -r "${RTD_VM_TUI_SCRIPT:-}" ]]; then
+		vmtoolgtk::show_error "Unable to locate the companion rtd-vm-tool script for this terminal-backed action."
+		return 1
+	fi
+
 	if (( ${#RTD_VM_CLONE_ARGS[@]} )); then
 		printf -v quoted_clone_args '%q ' "${RTD_VM_CLONE_ARGS[@]}"
 	else
@@ -363,12 +424,14 @@ vmtoolgtk::launch_tui_action() {
 
 	vmtoolgtk::log "Selected terminal-backed action: title=${title}; tui=${RTD_VM_TUI_SCRIPT}; action=${action_snippet}"
 
-	printf -v payload 'exec > >(tee -a %q) 2>&1; printf "\\n==== RTD VM GTK action: %%s ====\\n" "$(date "+%%F %%T")"; printf "Title: %%s\\nTUI script: %%s\\nAction: %%s\\n\\n" %q %q %q; source %q || { rc=$?; printf "\\nFailed to source TUI script (status %%s).\\n" "$rc"; if [[ -t 0 ]]; then read -r -p "Press Enter to close..." _; fi; exit "$rc"; }; RTD_GUI=dialog; RTD_VM_TOOL_EMBEDDED_ACTION=1; export RTD_GUI RTD_VM_TOOL_TRACE RTD_VM_TOOL_EMBEDDED_ACTION; rtd::bootstrap_library %q || { rc=$?; printf "\\nFailed to load _rtd_library (status %%s).\\n" "$rc"; if [[ -t 0 ]]; then read -r -p "Press Enter to close..." _; fi; exit "$rc"; }; vmtool::refresh_backtitle; %s; %s; rc=$?; printf "\\nExit status: %%s\\n" "$rc"; if [[ -t 0 ]]; then read -r -p "Press Enter to close..." _; fi; exit "$rc"' \
+	printf -v payload 'exec > >(tee -a %q) 2>&1; printf "\\n==== RTD VM GTK action: %%s ====\\n" "$(date "+%%F %%T")"; printf "Title: %%s\\nTUI script: %%s\\nAction: %%s\\n\\n" %q %q %q; source %q || { rc=$?; printf "\\nFailed to source TUI script (status %%s).\\n" "$rc"; if [[ -t 0 ]]; then read -r -p "Press Enter to close..." _; fi; exit "$rc"; }; RTD_GUI=dialog; RTD_UI_BACKEND=%q; RTD_VM_TOOL_UI_MODE=%q; RTD_VM_TOOL_EMBEDDED_ACTION=1; export RTD_GUI RTD_UI_BACKEND RTD_VM_TOOL_UI_MODE RTD_VM_TOOL_TRACE RTD_VM_TOOL_EMBEDDED_ACTION; rtd::bootstrap_library %q || { rc=$?; printf "\\nFailed to load _rtd_library (status %%s).\\n" "$rc"; if [[ -t 0 ]]; then read -r -p "Press Enter to close..." _; fi; exit "$rc"; }; vmtool::refresh_backtitle; %s; %s; rc=$?; printf "\\nExit status: %%s\\n" "$rc"; if [[ -t 0 ]]; then read -r -p "Press Enter to close..." _; fi; exit "$rc"' \
 		"${RTD_VM_GTK_ACTION_LOG}" \
 		"${title}" \
 		"${RTD_VM_TUI_SCRIPT}" \
 		"${action_snippet}" \
 		"${RTD_VM_TUI_SCRIPT}" \
+		"${RTD_UI_BACKEND:-zenity}" \
+		"${RTD_VM_TOOL_UI_MODE:-gui}" \
 		"_rtd_library" \
 		"${clone_args_snippet}" \
 		"${action_snippet}"
@@ -415,16 +478,10 @@ vmtoolgtk::start_stop_vm_menu() {
 			return 0
 		fi
 
-		selection="$(zenity --list \
-			--title "${VMTOOLGTK_TITLE} - Start / Stop VMs" \
-			--text "Select a VM to start or stop. Template images are hidden automatically." \
-			--width 920 \
-			--height 620 \
-			--column "VM" \
-			--column "State" \
-			--column "Action" \
-			--print-column=1 \
-			--cancel-label "Back" \
+		selection="$(vmtoolgtk::show_menu \
+			"${VMTOOLGTK_TITLE} - Start / Stop VMs" \
+			"Select a VM to start or stop. Template images are hidden automatically." \
+			920 620 \
 			"${menu_entries[@]}")" || return 0
 
 		[[ -z "${selection}" ]] && continue
@@ -499,20 +556,40 @@ vmtoolgtk::select_clone_template() {
 		return 1
 	fi
 
-	zenity --list \
-		--title "${title}" \
-		--text "${prompt}" \
-		--width 1040 \
-		--height 560 \
-		--column "Template" \
-		--column "Details" \
-		--print-column=1 \
-		--cancel-label "Back" \
-		"${menu_entries[@]}"
+	local gui_tool
+	gui_tool="$(vmtoolgtk::gui_tool || true)"
+	case "${gui_tool}" in
+		yad)
+			yad --list \
+				--title="${title}" \
+				--text="${prompt}" \
+				--width=1040 \
+				--height=560 \
+				--column="Template" \
+				--column="Details" \
+				--print-column=1 \
+				"${menu_entries[@]}"
+			;;
+		zenity)
+			zenity --list \
+				--title "${title}" \
+				--text "${prompt}" \
+				--width 1040 \
+				--height 560 \
+				--column "Template" \
+				--column "Details" \
+				--print-column=1 \
+				--cancel-label "Back" \
+				"${menu_entries[@]}"
+			;;
+		*)
+			return 1
+			;;
+	esac
 }
 
 vmtoolgtk::prompt_cicd_options() {
-	local task_selection llm_selection llm_models
+	local task_selection llm_selection llm_models gui_tool
 	local repo_default playbook_default
 	local -a task_menu_entries=()
 	local -a checklist_entries=()
@@ -532,20 +609,10 @@ vmtoolgtk::prompt_cicd_options() {
 
 	repo_default="${RTD_CICD_REPO}"
 	playbook_default="${RTD_CICD_PLAYBOOK}"
-	RTD_CICD_REPO="$(zenity --entry \
-		--title "CI/CD Settings" \
-		--text "Ansible repo URL:" \
-		--width 760 \
-		--cancel-label "Skip" \
-		--entry-text "${repo_default}")" || return 0
+	RTD_CICD_REPO="$(vmtoolgtk::entry "CI/CD Settings" "Ansible repo URL:" "${repo_default}")" || return 0
 	RTD_CICD_REPO="${RTD_CICD_REPO:-$repo_default}"
 
-	RTD_CICD_PLAYBOOK="$(zenity --entry \
-		--title "CI/CD Settings" \
-		--text "Ansible playbook path:" \
-		--width 760 \
-		--cancel-label "Skip" \
-		--entry-text "${playbook_default}")" || return 0
+	RTD_CICD_PLAYBOOK="$(vmtoolgtk::entry "CI/CD Settings" "Ansible playbook path:" "${playbook_default}")" || return 0
 	RTD_CICD_PLAYBOOK="${RTD_CICD_PLAYBOOK:-$playbook_default}"
 
 	vmtoolgtk::with_legacy_nounset vmtool::ensure_ansible_repo || vmtoolgtk::with_legacy_nounset write_warning "Using fallback CI/CD role menu because RTD-Ansible is not available."
@@ -561,18 +628,39 @@ vmtoolgtk::prompt_cicd_options() {
 		checklist_entries+=("${checked}" "${label}" "${desc}")
 	done
 
-	task_selection="$(zenity --list \
-		--checklist \
-		--title "CI/CD Server Roles" \
-		--text "Select server meta-packages to apply." \
-		--width 760 \
-		--height 520 \
-		--separator='|' \
-		--column "Apply" \
-		--column "Role" \
-		--column "Description" \
-		--cancel-label "Skip" \
-		"${checklist_entries[@]}")" || return 0
+	gui_tool="$(vmtoolgtk::gui_tool || true)"
+	case "${gui_tool}" in
+		yad)
+			task_selection="$(yad --list --checklist \
+				--title="CI/CD Server Roles" \
+				--text="Select server meta-packages to apply." \
+				--width=760 \
+				--height=520 \
+				--separator='|' \
+				--column="Apply" \
+				--column="Role" \
+				--column="Description" \
+				--print-column=2 \
+				"${checklist_entries[@]}")" || return 0
+			;;
+		zenity)
+			task_selection="$(zenity --list \
+				--checklist \
+				--title "CI/CD Server Roles" \
+				--text "Select server meta-packages to apply." \
+				--width 760 \
+				--height 520 \
+				--separator='|' \
+				--column "Apply" \
+				--column "Role" \
+				--column "Description" \
+				--cancel-label "Skip" \
+				"${checklist_entries[@]}")" || return 0
+			;;
+		*)
+			return 0
+			;;
+	esac
 
 	local item mapped
 	IFS='|' read -ra selected_roles <<< "${task_selection}"
@@ -587,28 +675,17 @@ vmtoolgtk::prompt_cicd_options() {
 	fi
 	RTD_CICD_TASKS="$(IFS=','; echo "${mapped_tasks[*]}")"
 
-	llm_selection="$(zenity --list \
-		--title "CI/CD LLM Option" \
-		--text "Choose an optional LLM stack for the cloned server VM." \
-		--width 700 \
-		--height 320 \
-		--column "ID" \
-		--column "Option" \
-		--hide-column=1 \
-		--print-column=1 \
-		--cancel-label "Skip" \
-		"none" "No LLM stack" \
-		"ollama" "Ollama service" \
-		"text-generation-webui" "text-generation-webui")" || llm_selection="none"
+	llm_selection="$(vmtoolgtk::show_menu \
+		"CI/CD LLM Option" \
+		"Choose an optional LLM stack for the cloned server VM." \
+		700 320 \
+		"none" "No LLM stack" "" \
+		"ollama" "Ollama service" "" \
+		"text-generation-webui" "text-generation-webui" "")" || llm_selection="none"
 	RTD_CICD_LLM_VARIANT="${llm_selection:-none}"
 
 	if [[ "${RTD_CICD_LLM_VARIANT}" == "ollama" ]]; then
-		llm_models="$(zenity --entry \
-			--title "Ollama Models" \
-			--text "Ollama models to pre-pull, comma-separated:" \
-			--width 560 \
-			--cancel-label "Skip" \
-			--entry-text "llama3")" || llm_models=""
+		llm_models="$(vmtoolgtk::entry "Ollama Models" "Ollama models to pre-pull, comma-separated:" "llama3")" || llm_models=""
 		RTD_CICD_LLM_MODELS="${llm_models}"
 	else
 		RTD_CICD_LLM_MODELS=""
@@ -647,20 +724,42 @@ vmtoolgtk::run_clone_with_progress() {
 	) > "${log_file}" 2>&1 &
 	pid=$!
 
-	(
-		while kill -0 "${pid}" 2>/dev/null; do
-			last_line="$(tail -n 1 "${log_file}" 2>/dev/null || true)"
-			printf '# %s\n' "${last_line:-Working...}"
-			sleep 1
-		done
-		printf '100\n'
-	) | zenity --progress \
-		--title "${title}" \
-		--text "Starting clone..." \
-		--width 720 \
-		--pulsate \
-		--auto-close \
-		--no-cancel
+	local gui_tool
+	gui_tool="$(vmtoolgtk::gui_tool || true)"
+	case "${gui_tool}" in
+		yad)
+			(
+				while kill -0 "${pid}" 2>/dev/null; do
+					last_line="$(tail -n 1 "${log_file}" 2>/dev/null || true)"
+					printf '# %s\n' "${last_line:-Working...}"
+					sleep 1
+				done
+				printf '100\n'
+			) | yad --progress \
+				--title="${title}" \
+				--text="Starting clone..." \
+				--width=720 \
+				--pulsate \
+				--auto-close \
+				--no-buttons
+			;;
+		zenity)
+			(
+				while kill -0 "${pid}" 2>/dev/null; do
+					last_line="$(tail -n 1 "${log_file}" 2>/dev/null || true)"
+					printf '# %s\n' "${last_line:-Working...}"
+					sleep 1
+				done
+				printf '100\n'
+			) | zenity --progress \
+				--title "${title}" \
+				--text "Starting clone..." \
+				--width 720 \
+				--pulsate \
+				--auto-close \
+				--no-cancel
+			;;
+	esac
 
 	wait "${pid}" 2>/dev/null || true
 	rc="$(cat "${rc_file}" 2>/dev/null || printf '1')"
@@ -875,7 +974,7 @@ vmtoolgtk::show_main_menu() {
 	done
 }
 
-main() {
+vmtoolgtk::main() {
 	if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 		cat <<EOF
 Usage:
@@ -892,50 +991,61 @@ Options:
   --about                   Show GTK about information and exit.
   --help, -h                Show this help text.
 EOF
-		exit 0
+		return 0
 	fi
 
-	command -v zenity >/dev/null 2>&1 || {
-		printf 'Missing required command: zenity\n' >&2
-		exit 1
+	vmtoolgtk::gui_tool >/dev/null || {
+		printf 'Missing required GUI command: install zenity or yad\n' >&2
+		return 1
 	}
 
 	if [[ "${1:-}" == "--about" || "${1:-}" == "about" ]]; then
 		vmtoolgtk::show_about
-		exit 0
+		return 0
 	fi
 
-	RTD_VM_TUI_SCRIPT="$(vmtoolgtk::find_tui_script)" || {
-		vmtoolgtk::show_error "Unable to locate the companion rtd-vm-tool script."
-		exit 1
-	}
+	if [[ "${RTD_VM_TOOL_GTK_BACKEND:-0}" != "1" ]]; then
+		RTD_VM_TUI_SCRIPT="$(vmtoolgtk::find_tui_script)" || {
+			vmtoolgtk::show_error "Unable to locate the companion rtd-vm-tool script."
+			return 1
+		}
+	fi
 
 	local restore_nounset=0
 	case "$-" in
 		*u*) restore_nounset=1; set +u ;;
 	esac
-	# shellcheck source=/dev/null
-	source "${RTD_VM_TUI_SCRIPT}"
+	if [[ "${RTD_VM_TOOL_GTK_BACKEND:-0}" != "1" ]]; then
+		# shellcheck source=/dev/null
+		source "${RTD_VM_TUI_SCRIPT}"
+	fi
 
-	vmtoolgtk::parse_args "$@" || exit 1
+	vmtoolgtk::parse_args "$@" || return 1
 
-	if ! rtd::bootstrap_library "_rtd_library"; then
-		vmtoolgtk::show_error "Failed to load _rtd_library."
-		exit 1
+	if [[ "${RTD_VM_TOOL_GTK_BACKEND:-0}" != "1" ]]; then
+		if ! rtd::bootstrap_library "_rtd_library"; then
+			vmtoolgtk::show_error "Failed to load _rtd_library."
+			return 1
+		fi
 	fi
 	(( restore_nounset )) && set -u
 
 	# Preserve the original GTK options when the library re-executes this script
 	# through pkexec or sudo.
-	vmtoolgtk::with_legacy_nounset security::ensure_admin "$@" || exit 1
+	if [[ "${RTD_VM_TOOL_GTK_BACKEND:-0}" != "1" ]]; then
+		vmtoolgtk::with_legacy_nounset security::ensure_admin "$@" || return 1
+	fi
 
 	if [[ -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
 		vmtoolgtk::show_error "No graphical session detected."
-		exit 1
+		return 1
 	fi
 
 	vmtoolgtk::with_legacy_nounset vmtool::refresh_backtitle
 	vmtoolgtk::show_main_menu
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+	script_dir="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+	exec "${script_dir}/rtd-vm-tool" --gui "$@"
+fi
