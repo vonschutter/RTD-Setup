@@ -293,6 +293,10 @@ oem_first_login_bundle_manager() {
 	rm -f "${RTD_POST_OOBE_BUNDLE_WRAPPER}" 2>/dev/null || true
 
 	system::wait_for_internet_availability
+	if [[ "$(system::rtd_oem_reseal::_virtualization_context)" == "virtual" ]]; then
+		write_information "🛠 Restoring virtualization guest integration after OEM configuration..."
+		system::rtd_oem_reseal::_install_guest_additions "${SUDO_USER:-}"
+	fi
 	if ! hash zenity &>/dev/null ; then software::check_native_package_dependency zenity || exit 1 ; fi
 	if ! hash yad &>/dev/null  ; then software::check_native_package_dependency yad || write_warning "YAD is not installed. Some features will not be available." ; fi
 

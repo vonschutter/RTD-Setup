@@ -11546,17 +11546,25 @@ system::rtd_oem_reseal::_install_guest_additions() {
 	# Globals:
 	#   None
 	# Arguments:
-	#   None
+	#   $1 - Optional active graphical-session user whose SPICE agent should be restarted.
 	# Outputs:
 	#   Status messages via write_status.
 	# Returns:
 	#   Always 0; errors are ignored to avoid breaking reseal workflows.
 	# Usage:
 	#   system::rtd_oem_reseal::_install_guest_additions
+	#   system::rtd_oem_reseal::_install_guest_additions "${SUDO_USER:-}"
 	# End of documentation
+
+	local _session_user="${1:-}" _session_uid _runtime_dir
 
 	write_status "🛠 Installing guest integration tools (qemu-guest-agent, spice-vdagent)..."
 	software::add_native_package qemu-guest-agent spice-vdagent || true
+	# OEM configuration may run an autoremove transaction. Keep the integration
+	# packages as explicit administrator choices on apt-based guests.
+	if command -v apt-mark >/dev/null 2>&1; then
+		apt-mark manual qemu-guest-agent spice-vdagent >>"${_LOGFILE}" 2>&1 || true
+	fi
 
 	write_status "🛠 Enabling guest integration services for next OEM/OOBE boot..."
 	if command -v systemctl >/dev/null 2>&1; then
@@ -11564,7 +11572,14 @@ system::rtd_oem_reseal::_install_guest_additions() {
 		systemctl enable qemu-guest-agent.service >>"${_LOGFILE}" 2>&1 || true
 		systemctl start qemu-guest-agent.service >>"${_LOGFILE}" 2>&1 || true
 
-		if systemctl list-unit-files spice-vdagentd.service >/dev/null 2>&1; then
+		# Ubuntu ships the SPICE daemon as a static, udev-activated socket. During
+		# oem-config's target transition that socket is stopped, but the virtio
+		# device is not added again, so udev cannot reactivate it. Make the socket
+		# an explicit member of sockets.target and also restore it immediately.
+		if systemctl cat spice-vdagentd.socket >/dev/null 2>&1; then
+			systemctl add-wants sockets.target spice-vdagentd.socket >>"${_LOGFILE}" 2>&1 || true
+			systemctl start spice-vdagentd.socket >>"${_LOGFILE}" 2>&1 || true
+		elif systemctl cat spice-vdagentd.service >/dev/null 2>&1; then
 			systemctl enable spice-vdagentd.service >>"${_LOGFILE}" 2>&1 || true
 			systemctl start spice-vdagentd.service >>"${_LOGFILE}" 2>&1 || true
 		fi
@@ -11572,7 +11587,7 @@ system::rtd_oem_reseal::_install_guest_additions() {
 
 	local spice_agent_bin
 	spice_agent_bin="$(command -v spice-vdagent 2>/dev/null || true)"
-	if [[ -n "${spice_agent_bin}" ]]; then
+	if [[ -n "${spice_agent_bin}" && ! -e /etc/xdg/autostart/spice-vdagent.desktop ]]; then
 		mkdir -p /etc/xdg/autostart
 		cat >/etc/xdg/autostart/spice-vdagent.desktop <<EOF
 [Desktop Entry]
@@ -11586,6 +11601,19 @@ Comment=SPICE guest clipboard and display integration
 EOF
 		chmod 644 /etc/xdg/autostart/spice-vdagent.desktop 2>/dev/null || true
 	fi
+
+	# If this is the first deployed-user login, restart the session unit now.
+	# It may already have exited after oem-config stopped the system socket.
+	[[ -n "${_session_user}" ]] || return 0
+	_session_uid="$(id -u "${_session_user}" 2>/dev/null || true)"
+	[[ -n "${_session_uid}" ]] || return 0
+	_runtime_dir="/run/user/${_session_uid}"
+	[[ -S "${_runtime_dir}/bus" ]] || return 0
+
+	runuser -u "${_session_user}" -- env \
+		XDG_RUNTIME_DIR="${_runtime_dir}" \
+		DBUS_SESSION_BUS_ADDRESS="unix:path=${_runtime_dir}/bus" \
+		systemctl --user restart spice-vdagent.service >>"${_LOGFILE}" 2>&1 || true
 }
 
 system::rtd_oem_reseal::_prepare_ubuntu_like() {
@@ -29836,6 +29864,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 	#     with the preseed.cfg file or the autoinstall.yaml file anyway as the documentation appears incomplete.
 	#
 	# End of Documentation
+	local install_status=0
 
 	# Set default values for VM T-Shirts sizes (may vary by OS)...
 	: ${all_params=${*}}                                  # Save all parameters for later use.
@@ -29990,6 +30019,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 					--disk path="${disk_path},format=qcow2" \
 					--os-variant="ubuntu${_tgt_ubuntu_ver::5}" \
 					--video "qxl" --channel "spicevmc" \
+					--channel "unix,target.type=virtio,target.name=org.qemu.guest_agent.0" \
 					--location="${iso},kernel=casper/vmlinuz.efi,initrd=casper/initrd" \
 					--extra-args="ks=file:/preseed.cfg auto=true priority=critical debian-installer/locale=en_US keyboard-configuration/layoutcode=${Preference_InitialKeyboardLayout} \
 					netcfg/get_hostname=${guest_hostname} console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
@@ -30034,6 +30064,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 					--disk path="${disk_path},format=qcow2" \
 					--os-variant="ubuntu${_tgt_ubuntu_ver::5}" \
 					--video "virtio" --channel "spicevmc" \
+					--channel "unix,target.type=virtio,target.name=org.qemu.guest_agent.0" \
 					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 					--extra-args="ks=file:/preseed.cfg auto=true priority=critical debconf/frontend=noninteractive debian-installer/locale=en_US keyboard-configuration/layoutcode=${Preference_InitialKeyboardLayout} \
 					netcfg/get_hostname=RTD-VDI console-setup/ask_detect=false ubiquity/reboot=true languagechooser/language-name=English countrychooser/shortlist=US \
@@ -30090,11 +30121,15 @@ kvm::make_vm_now_from_ubuntu_com() {
 					--disk path="${disk_path},format=qcow2" \
 					--os-variant="ubuntu24.04" \
 					--video "virtio" --channel "spicevmc" \
+					--channel "unix,target.type=virtio,target.name=org.qemu.guest_agent.0" \
 					--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-					--extra-args "autoinstall" \
-					--wait --noautoconsole \
-				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
+					--extra-args "autoinstall reboot=acpi noprompt noeject" \
+					--wait --noautoconsole
+			install_status=$?
+			if (( install_status != 0 )); then
+				write_error "Ubuntu installation failed for ${vm_name} (virt-install status ${install_status})."
+			fi
 			} >>"${_LOGFILE}" 2>&1 & disown
 
 			kvm::wait_for_domain_definition "${vm_name}" 60 3 || true
@@ -30146,12 +30181,15 @@ kvm::make_vm_now_from_ubuntu_com() {
 				--disk path="${disk_path},format=qcow2" \
 				--os-variant="ubuntu24.04" \
 				--video "virtio" --channel "spicevmc" \
+				--channel "unix,target.type=virtio,target.name=org.qemu.guest_agent.0" \
 				--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-				--extra-args "autoinstall reboot=acpi" \
-				--events on_reboot=restart,on_poweroff=destroy,on_crash=destroy \
-				--wait --noautoconsole \
-				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
+				--extra-args "autoinstall reboot=acpi noprompt noeject" \
+				--wait --noautoconsole
+			install_status=$?
+			if (( install_status != 0 )); then
+				write_error "Ubuntu installation failed for ${vm_name} (virt-install status ${install_status})."
+			fi
 			} >>"${_LOGFILE}" 2>&1 & disown
 
 			kvm::wait_for_domain_definition "${vm_name}" 60 3 || true
@@ -30201,12 +30239,15 @@ kvm::make_vm_now_from_ubuntu_com() {
 				--disk path="${disk_path},format=qcow2" \
 				--os-variant="ubuntu24.04" \
 				--video "virtio" --channel "spicevmc" \
+				--channel "unix,target.type=virtio,target.name=org.qemu.guest_agent.0" \
 				--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-				--extra-args "autoinstall reboot=acpi" \
-				--events on_reboot=restart,on_poweroff=destroy,on_crash=destroy \
-				--wait --noautoconsole \
-				|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
+				--extra-args "autoinstall reboot=acpi noprompt noeject" \
+				--wait --noautoconsole
+			install_status=$?
+			if (( install_status != 0 )); then
+				write_error "Ubuntu installation failed for ${vm_name} (virt-install status ${install_status})."
+			fi
 			} >>"${_LOGFILE}" 2>&1 & disown
 
 			kvm::wait_for_domain_definition "${vm_name}" 60 3 || true
@@ -34390,12 +34431,14 @@ EOF
 common_cleanup_config=$(cat <<EOF
         - echo '******************* Common Cleanup Post-Config ********************'
 
-        # Ensure installer media and loop devices are detached before reboot
+        # Do not detach loop devices or eject installation media here. These
+        # commands run in the live installer environment, where loop0 backs the
+        # active SquashFS and must remain readable until shutdown is complete.
         # - /bin/bash -c 'umount -lf /cdrom 2>/dev/null || true'
         # - /bin/bash -c 'umount -lf /media/cdrom 2>/dev/null || true'
         # - /bin/bash -c 'umount -lf /run/install/media 2>/dev/null || true'
         # - /bin/bash -c 'for d in /run/shutdown/mounts/*; do umount -lf "$d" 2>/dev/null || true; done'
-        - /bin/bash -c 'losetup -D 2>/dev/null || true'
+        # - /bin/bash -c 'losetup -D 2>/dev/null || true'
         # - /bin/bash -c 'eject -m 2>/dev/null || true'
 EOF
 )
