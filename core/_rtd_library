@@ -1204,7 +1204,7 @@ rtd_ui::menu() {
 	#   choice=$(rtd_ui::menu --title "Mode" --option "auto" "Automatic")
 	# End of Documentation
 
-	local title="Menu" message="" backend i value label
+	local title="Menu" message="" backend i value label raw status
 	local -a entries=() list_args=()
 
 	while [[ $# -gt 0 ]]; do
@@ -1225,13 +1225,23 @@ rtd_ui::menu() {
 			for ((i = 0; i < ${#entries[@]}; i += 2)); do
 				list_args+=("${entries[$i]}" "${entries[$((i + 1))]}")
 			done
-			yad --list --title="$title" --text="$message" --width=760 --height=420 --column="Value" --column="Description" --print-column=1 "${list_args[@]}"
+			raw=$(yad --list --title="$title" --text="$message" --width=760 --height=420 --column="Value" --column="Description" --print-column=1 "${list_args[@]}")
+			status=$?
+			(( status == 0 )) || return "$status"
+			raw="${raw%%$'\n'*}"
+			raw="${raw%%|*}"
+			printf '%s\n' "$raw"
 			;;
 		zenity)
 			for ((i = 0; i < ${#entries[@]}; i += 2)); do
 				list_args+=("${entries[$i]}" "${entries[$((i + 1))]}")
 			done
-			zenity --list --title="$title" --text="$message" --width=760 --height=420 --column="Value" --column="Description" --print-column=1 "${list_args[@]}"
+			raw=$(zenity --list --title="$title" --text="$message" --width=760 --height=420 --column="Value" --column="Description" --print-column=1 "${list_args[@]}")
+			status=$?
+			(( status == 0 )) || return "$status"
+			raw="${raw%%$'\n'*}"
+			raw="${raw%%|*}"
+			printf '%s\n' "$raw"
 			;;
 		dialog)
 			dialog --backtitle "${BACKTITLE:-${BRANDING:-RTD}}" --title "$title" --menu "$message" "${HEIGHT:-20}" "${WIDTH:-80}" "${LIST_HEIGHT:-12}" "${entries[@]}" 3>&1 1>&2 2>&3
@@ -20802,28 +20812,22 @@ software::updates_installed_today::flatpak() {
 }
 
 software::_flatpak_cmd() {
-	# Description: Internal scoped Flatpak command runner with optional pseudo-terminal output.
+	# Description: Internal scoped Flatpak command runner with stable, plain-text output.
 	# Globals: EUID (r), SUDO_USER (r)
-	# Dependencies: flatpak; optionally sudo and script.
-	# Arguments: Optional --tty, scope (--user or --system), Flatpak command, and command arguments.
+	# Dependencies: flatpak; optionally sudo.
+	# Arguments: Scope (--user or --system), Flatpak command, and command arguments.
 	# Outputs: Passes through Flatpak output.
 	# Returns: The exit status from the Flatpak command.
-	# Usage: software::_flatpak_cmd [--tty] --user list --app
+	# Usage: software::_flatpak_cmd --user list --app
 	# End of documentation
-	local use_tty=0
 	local scope=""
 	local requires_admin=0
-	local command_string=""
 	local flatpak_locale="C.UTF-8"
 	local flatpak_data_dirs="${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 	local target_home="${HOME:-/tmp}"
 	local export_path=""
 	local -a command=()
 
-	if [[ "${1:-}" == "--tty" ]]; then
-		use_tty=1
-		shift
-	fi
 	scope="${1:-}"
 	shift || return 1
 
@@ -20866,26 +20870,21 @@ software::_flatpak_cmd() {
 	fi
 
 	if [[ "$scope" == "--user" && $EUID -eq 0 && -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]] && hash sudo 2>/dev/null; then
-		command=(sudo -H -u "$SUDO_USER" env LC_ALL="$flatpak_locale" XDG_DATA_DIRS="$flatpak_data_dirs" flatpak "$@" "$scope")
+		command=(sudo -H -u "$SUDO_USER" env LC_ALL="$flatpak_locale" XDG_DATA_DIRS="$flatpak_data_dirs" FLATPAK_FANCY_OUTPUT=0 FLATPAK_TTY_PROGRESS=0 flatpak "$@" "$scope")
 	elif (( requires_admin )) && [[ $EUID -ne 0 ]] && hash sudo 2>/dev/null; then
-		command=(sudo env LC_ALL="$flatpak_locale" XDG_DATA_DIRS="$flatpak_data_dirs" flatpak "$@" "$scope")
+		command=(sudo env LC_ALL="$flatpak_locale" XDG_DATA_DIRS="$flatpak_data_dirs" FLATPAK_FANCY_OUTPUT=0 FLATPAK_TTY_PROGRESS=0 flatpak "$@" "$scope")
 	else
-		command=(env LC_ALL="$flatpak_locale" XDG_DATA_DIRS="$flatpak_data_dirs" flatpak "$@" "$scope")
+		command=(env LC_ALL="$flatpak_locale" XDG_DATA_DIRS="$flatpak_data_dirs" FLATPAK_FANCY_OUTPUT=0 FLATPAK_TTY_PROGRESS=0 flatpak "$@" "$scope")
 	fi
 
-	if (( use_tty )) && hash script 2>/dev/null; then
-		printf -v command_string '%q ' "${command[@]}"
-		script --quiet --return --flush --echo never --command "${command_string% }" /dev/null </dev/null
-	else
-		"${command[@]}"
-	fi
+	"${command[@]}"
 }
 
 software::_flatpak_filter_advisories() {
-	# Description: Removes Flatpak advisory blocks and leaked terminal replies from display output.
+	# Description: Produces stable line-oriented Flatpak output without advisories or terminal controls.
 	# Dependencies: perl.
 	# Arguments: None. Reads a Flatpak terminal transcript from STDIN.
-	# Outputs: Flatpak output without advisory blocks or cursor-position replies.
+	# Outputs: Plain Flatpak output without advisory blocks or terminal-control sequences.
 	# Returns: The perl exit status.
 	# Usage: software::_flatpak_filter_advisories < flatpak-output.log
 	# End of documentation
@@ -20898,7 +20897,9 @@ software::_flatpak_filter_advisories() {
 
 		sub emit_record {
 			my ($line, $separator) = @_;
-			$line =~ s/\e\[[0-9]+;[0-9]+R//g;
+			$line =~ s/\e\][^\a\e]*(?:\a|\e\\)//g;
+			$line =~ s/\e\[[0-?]*[ -\/]*[\@-~]//g;
+			$separator = "\n" if length $separator;
 
 			if ($suppress_note) {
 				if ($line =~ /^(Looking for updates|Nothing to do\.|[ \t]*ID[ \t]+Branch|Updating [0-9]+\/[0-9]+)/) {
@@ -20950,15 +20951,21 @@ software::update_flatpaks() {
 	local scope=""
 	local status=0
 	local command_status=0
-	local use_tty=1
+	local filter_status=0
+	local tee_status=0
 	local arg=""
-	local -a tty_arg=()
+	local have_assumeyes=0
+	local have_noninteractive=0
+	local -a update_args=("$@")
+	local -a pipeline_status=()
 
 	hash flatpak 2>/dev/null || return 0
 	for arg in "$@"; do
-		[[ "$arg" == "--noninteractive" ]] && use_tty=0
+		[[ "$arg" == "--noninteractive" ]] && have_noninteractive=1
+		[[ "$arg" == "-y" || "$arg" == "--assumeyes" ]] && have_assumeyes=1
 	done
-	(( use_tty )) && tty_arg=(--tty)
+	(( have_noninteractive )) || update_args+=(--noninteractive)
+	(( have_assumeyes )) || update_args+=(-y)
 
 	for scope in --user --system; do
 		write_status "Updating ${scope#--} Flatpak applications..."
@@ -20967,12 +20974,15 @@ software::update_flatpaks() {
 			return 1
 		}
 
-		# Interactive runs retain Flatpak's native progress bars through a PTY. The transcript
-		# is logged verbatim while advisory records are removed only from terminal output.
-		software::_flatpak_cmd "${tty_arg[@]}" "$scope" update "$@" 2>&1 |
-			tee "$output_file" |
-			software::_flatpak_filter_advisories
-		command_status=${PIPESTATUS[0]}
+		# Flatpak runs without a PTY so progress remains line-oriented and cannot issue
+		# cursor-position queries. The same sanitized transcript is displayed and logged.
+		software::_flatpak_cmd "$scope" update "${update_args[@]}" 2>&1 |
+			software::_flatpak_filter_advisories |
+			tee "$output_file"
+		pipeline_status=("${PIPESTATUS[@]}")
+		command_status=${pipeline_status[0]}
+		filter_status=${pipeline_status[1]}
+		tee_status=${pipeline_status[2]}
 
 		if logfile=$(system::determine_logfile 2>/dev/null); then
 			{
@@ -20982,7 +20992,15 @@ software::update_flatpaks() {
 			} >>"$logfile"
 		fi
 		rm -f -- "$output_file"
-		(( command_status == 0 )) || status=$command_status
+		if (( command_status != 0 )); then
+			status=$command_status
+		elif (( filter_status != 0 )); then
+			write_warning "Unable to filter Flatpak update output (status ${filter_status})."
+			status=$filter_status
+		elif (( tee_status != 0 )); then
+			write_warning "Unable to capture Flatpak update output (status ${tee_status})."
+			status=$tee_status
+		fi
 
 		write_status "Removing unused ${scope#--} Flatpak dependencies..."
 		output_file=$(mktemp "${TMPDIR:-/tmp}/rtd-flatpak-cleanup.XXXXXX") || {
@@ -20990,9 +21008,12 @@ software::update_flatpaks() {
 			return 1
 		}
 		software::_flatpak_cmd "$scope" uninstall --unused --noninteractive -y 2>&1 |
-			tee "$output_file" |
-			software::_flatpak_filter_advisories
-		command_status=${PIPESTATUS[0]}
+			software::_flatpak_filter_advisories |
+			tee "$output_file"
+		pipeline_status=("${PIPESTATUS[@]}")
+		command_status=${pipeline_status[0]}
+		filter_status=${pipeline_status[1]}
+		tee_status=${pipeline_status[2]}
 
 		if logfile=$(system::determine_logfile 2>/dev/null); then
 			{
@@ -21002,7 +21023,15 @@ software::update_flatpaks() {
 			} >>"$logfile"
 		fi
 		rm -f -- "$output_file"
-		(( command_status == 0 )) || status=$command_status
+		if (( command_status != 0 )); then
+			status=$command_status
+		elif (( filter_status != 0 )); then
+			write_warning "Unable to filter Flatpak cleanup output (status ${filter_status})."
+			status=$filter_status
+		elif (( tee_status != 0 )); then
+			write_warning "Unable to capture Flatpak cleanup output (status ${tee_status})."
+			status=$tee_status
+		fi
 	done
 
 	return "$status"
@@ -24651,42 +24680,166 @@ ubuntu::get_target_version() {
 	#   1 if version is invalid, canceled, or selection failed
 	#
 	# Dependencies:
-	#   wget, perl, dialog/whiptail
+	#   curl or wget, awk, sort, dialog/whiptail
 	#
 	# Usage:
 	#   ubuntu::get_target_version
 	#   printf "Selected version: %s\n" "$tgt_ubuntu_ver"
 	#
 	# End of Documentation:
-	# Determine available versions of Ubuntu to offer...
-	system::log_item "🔎 Retrieve list of available $ubuntu_flavor $_role versions..."
-	declare -a all_lts_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+.\d+)/ && print "$1\n"' | sort -Vu))
-	declare -a all_normal_versions=($(wget -O- releases.ubuntu.com -q | perl -ne '/Ubuntu (\d+.\d+)/ && print "$1\n"' | sort -Vu))
-	dist_logo="${ubuntulogo}"
+	local release_metadata=""
+	local release_listing=""
+	local dialog_status=0
+	local input_status=0
+	local release_choice=""
+	local release_choice_status=0
+	local latest_lts_version=""
+	local latest_release_version=""
+	local extra_option=""
+	local lts_version=""
+	local normal_version=""
+	local _selection_is_valid="no"
+	local dist_logo="${ubuntulogo:-}"
+	local -a all_lts_versions=()
+	local -a all_normal_versions=()
+	local -a published_versions=()
+	local -a menu_items=()
+
+	# Use meta-release to identify LTS releases, but use the releases mirror for
+	# the newest published release. meta-release can lag behind the mirror when a
+	# new interim release is published (for example, 26.10 after 26.04.1 LTS).
+	system::log_item "🔎 Retrieve list of available ${ubuntu_flavor:-Ubuntu} ${_role:-} versions..."
+	release_metadata=$(oem::task::iso::fetch_url "https://changelogs.ubuntu.com/meta-release") || release_metadata=""
+	if [[ -n "$release_metadata" ]]; then
+		mapfile -t all_lts_versions < <(
+			awk '
+				BEGIN { RS = ""; FS = "\n" }
+				/Supported:[[:space:]]*1/ {
+					for (i = 1; i <= NF; i++) {
+						if ($i ~ /^Version:[[:space:]]*.*[[:space:]]LTS[[:space:]]*$/) {
+							value = $i
+							sub(/^Version:[[:space:]]*/, "", value)
+							sub(/[[:space:]]+LTS[[:space:]]*$/, "", value)
+							print value
+						}
+					}
+				}
+			' <<< "$release_metadata" | sort -Vu
+		)
+		mapfile -t all_normal_versions < <(
+			awk '
+				BEGIN { RS = ""; FS = "\n" }
+				/Supported:[[:space:]]*1/ {
+					for (i = 1; i <= NF; i++) {
+						if ($i ~ /^Version:[[:space:]]*/) {
+							value = $i
+							sub(/^Version:[[:space:]]*/, "", value)
+							sub(/[[:space:]]+LTS[[:space:]]*$/, "", value)
+							print value
+							split(value, parts, ".")
+							print parts[1] "." parts[2]
+						}
+					}
+				}
+			' <<< "$release_metadata" | sort -Vu
+		)
+	fi
+
+	release_listing=$(oem::task::iso::fetch_url "https://releases.ubuntu.com/") || release_listing=""
+	if [[ -n "$release_listing" ]]; then
+		mapfile -t published_versions < <(
+			printf '%s\n' "$release_listing" |
+				grep -Eo 'href="[0-9]+\.[0-9]+(\.[0-9]+){0,2}/"' |
+				sed -E 's#href="([^"]+)/"#\1#' |
+				sort -Vu
+		)
+		if (( ${#published_versions[@]} > 0 )); then
+			all_normal_versions=("${published_versions[@]}")
+		fi
+	fi
+
+	if (( ${#all_lts_versions[@]} == 0 )); then
+		mapfile -t all_lts_versions < <(
+			printf '%s\n' "${all_normal_versions[@]}" |
+				awk -F. '$2 == "04" && ($1 % 2) == 0' |
+				sort -Vu
+		)
+	fi
+
+	if (( ${#all_lts_versions[@]} == 0 || ${#all_normal_versions[@]} == 0 )); then
+		write_error "⛔ - Unable to retrieve the available Ubuntu releases. Check network access to changelogs.ubuntu.com and releases.ubuntu.com, then try again."
+		return 1
+	fi
+	latest_lts_version="${all_lts_versions[-1]}"
+	if (( ${#published_versions[@]} > 0 )); then
+		latest_release_version="${published_versions[-1]}"
+	else
+		latest_release_version="${all_normal_versions[-1]}"
+	fi
 
 	# Check if a version of Ubuntu was specified, otherwise make sure it is (default to latest LTS)...
-	if [[ -z ${_tgt_ubuntu_ver} ]]; then
+	if [[ -z ${_tgt_ubuntu_ver:-} ]]; then
 		write_information "🐧 - No version of Ubuntu specified as a parameter..."
-		case ${_ask} in
+		case "${RTD_VM_PROMPT_UBUNTU_VERSION:-LEGACY}" in
+		YES|Yes|yes|TRUE|True|true|ON|On|on|1)
+			release_choice=$(rtd_ui::menu \
+				--title "Select Ubuntu Release" \
+				--message "Choose which Ubuntu release channel to install." \
+				--option "lts" "Latest LTS — Ubuntu ${latest_lts_version}" \
+				--option "latest" "Latest release — Ubuntu ${latest_release_version}")
+			release_choice_status=$?
+			if (( release_choice_status != 0 )); then
+				write_information "🐧 - Ubuntu release selection was cancelled."
+				return 1
+			fi
+			release_choice="${release_choice%%$'\n'*}"
+			release_choice="${release_choice%%|*}"
+
+			case "$release_choice" in
+				lts) _tgt_ubuntu_ver="$latest_lts_version" ;;
+				latest) _tgt_ubuntu_ver="$latest_release_version" ;;
+				*)
+					write_error "⛔ - Ubuntu release selection returned an invalid choice: ${release_choice:-empty}"
+					return 1
+					;;
+			esac
+			write_information "🐧 - Selected Ubuntu version: ${_tgt_ubuntu_ver}"
+			;;
+		NO|No|no|FALSE|False|false|OFF|Off|off|0)
+			_tgt_ubuntu_ver="$latest_lts_version"
+			write_information "🐧 - Ubuntu version prompting is disabled; using the latest LTS version: ${_tgt_ubuntu_ver}"
+			;;
+		*) ;;
+		esac
+
+		# Preserve the legacy selection behavior for callers outside the VM Tool,
+		# which do not set RTD_VM_PROMPT_UBUNTU_VERSION.
+		if [[ -z ${_tgt_ubuntu_ver:-} ]]; then
+		case ${_ask:-no} in
 		"yes" | "YES" | "Yes" | "y" | "Y")
 			write_information "🐧 - Requested to ask for Ubuntu version; prompting for version of Ubuntu to use..."
 			extra_option="Manually_specify"
 
-			# Display a menu to choose an Ubuntu version, including an option for manual entry
-			_tgt_ubuntu_ver=$($RTD_GUI --colors --title "Select Release Version of $ubuntu_flavor $_role" --menu "\n \Z1\n$dist_logo\Zn \n 👍 Please pick an available \Z1$ubuntu_flavor\Zn version from the list below or choose to manually specify a version. Long Term Support (LTS) Versions to choose from are as follows:\n\n " 35 90 $((${#all_lts_versions[@]} + 1)) \
-				$(for i in "${!all_lts_versions[@]}"; do echo "${all_lts_versions[$i]}" "$i"; done) "$extra_option" "$((${#all_lts_versions[@]} + 1))" 3>&1 1>&2 2>&3)
+			for lts_version in "${all_lts_versions[@]}"; do
+				menu_items+=("$lts_version" "Ubuntu $lts_version LTS")
+			done
+			menu_items+=("$extra_option" "Enter another supported version")
+
+			# Display a menu to choose an Ubuntu version, including an option for manual entry.
+			_tgt_ubuntu_ver=$("$RTD_GUI" --colors --title "Select Release Version of ${ubuntu_flavor:-Ubuntu} ${_role:-}" --menu "\n \Z1\n$dist_logo\Zn \n 👍 Please pick an available \Z1${ubuntu_flavor:-Ubuntu}\Zn version from the list below or choose to manually specify a version. Long Term Support (LTS) versions are as follows:\n\n " 35 90 "$(( ${#all_lts_versions[@]} + 1 ))" \
+				"${menu_items[@]}" 3>&1 1>&2 2>&3)
 			dialog_status=$?
 
 			# Handle the user's menu selection or cancellation based on the captured status
 			case $dialog_status in
-			$DIALOG_CANCEL)
+			"$DIALOG_CANCEL")
 				echo "Dialog was cancelled. ($dialog_status)"
 				write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
 				_tgt_ubuntu_ver=${all_lts_versions[-1]}
 				return 1
 				;;
-			$DIALOG_ESC)
-				echo "Dialog was escaped. ($dialog_status)"
+			"$DIALOG_ESC")
+				echo "Version selection dialog exited without a selection. ($dialog_status)"
 				write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
 				_tgt_ubuntu_ver=${all_lts_versions[-1]}
 				return 1
@@ -24695,18 +24848,19 @@ ubuntu::get_target_version() {
 
 			# Check if the user chose to manually specify a version
 			if [[ "${_tgt_ubuntu_ver}" == "${extra_option}" ]]; then
-				_tgt_ubuntu_ver=$($RTD_GUI --colors --title "Manual Version Input" --inputbox "\nPlease enter the desired Ubuntu version (e.g., 22.10):" 10 60 3>&1 1>&2 2>&3)
+				_tgt_ubuntu_ver=$("$RTD_GUI" --colors --title "Manual Version Input" --inputbox "\nPlease enter the desired Ubuntu version (e.g., 24.04):" 10 60 3>&1 1>&2 2>&3)
+				input_status=$?
 
 				# Capture and handle the exit status of the input dialog
-				case $? in
-				$DIALOG_CANCEL)
-					echo "Input was cancelled. ($dialog_status)"
+				case $input_status in
+				"$DIALOG_CANCEL")
+					echo "Input was cancelled. ($input_status)"
 					write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
 					_tgt_ubuntu_ver=${all_lts_versions[-1]}
 					return 1
 					;;
-				$DIALOG_ESC)
-					echo "Input was escaped. ($dialog_status)"
+				"$DIALOG_ESC")
+					echo "Version input dialog exited without a selection. ($input_status)"
 					write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
 					_tgt_ubuntu_ver=${all_lts_versions[-1]}
 					return 1
@@ -24720,13 +24874,14 @@ ubuntu::get_target_version() {
 			write_information "🐧 - No version of Ubuntu specified, so using the latest LTS version: ${all_lts_versions[-1]}"
 			_tgt_ubuntu_ver=${all_lts_versions[-1]}
 			;;
-		esac
+			esac
+		fi
 	fi
 
 	# Validate Ubuntu LTS version selections against available versions (manual selection may have occurred)...
 	for lts_version in "${all_lts_versions[@]}"; do
 		if [[ "${lts_version}" == "${_tgt_ubuntu_ver}" ]]; then
-			local _selection_is_valid="yes"
+			_selection_is_valid="yes"
 			write_information "🐧 - The version of Ubuntu selected is valid: ${_tgt_ubuntu_ver}"
 		fi
 	done
@@ -24734,7 +24889,7 @@ ubuntu::get_target_version() {
 	# Validate Ubuntu normal version selections against available versions (manual selection may have occurred)...
 	for normal_version in "${all_normal_versions[@]}"; do
 		if [[ "${normal_version}" == "${_tgt_ubuntu_ver}" ]]; then
-			local _selection_is_valid="yes"
+			_selection_is_valid="yes"
 			write_information "🐧 - The version of Ubuntu selected is valid: ${_tgt_ubuntu_ver}"
 		fi
 	done
@@ -29724,8 +29879,8 @@ kvm::make_vm_now_from_ubuntu_com() {
 		elif [[ -n "${_tgt_ubuntu_ver:-}" ]]; then
 			write_status "🔎 	- Using the Ubuntu fallback version: ${_tgt_ubuntu_ver}"
 		else
-			write_status "💥 - User pressed [ESC] or [Cancel] not selecting a version..."
-			write_status "💥 - Press [ENTER] to select default version of Ubuntu (Latest LTS release)"
+			write_status "💥 - Ubuntu version selection did not return a version."
+			write_status "💥 - Run again or specify an available Ubuntu version explicitly."
 			return 1
 		fi
 	fi

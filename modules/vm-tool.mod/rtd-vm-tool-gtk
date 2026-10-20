@@ -891,13 +891,22 @@ vmtoolgtk::show_vdi_template_menu() {
 
 vmtoolgtk::show_settings_menu() {
 	while true; do
-		local selection
+		local selection ubuntu_prompt_label ubuntu_prompt_description
+		if vmtool::ubuntu_version_prompt_enabled; then
+			ubuntu_prompt_label="🐧 Ubuntu version prompt: Enabled"
+			ubuntu_prompt_description="Ubuntu builds ask for the latest LTS or latest release."
+		else
+			ubuntu_prompt_label="🐧 Ubuntu version prompt: Disabled"
+			ubuntu_prompt_description="Ubuntu builds automatically use the latest LTS."
+		fi
+
 		selection="$(vmtoolgtk::show_menu \
 			"${VMTOOLGTK_TITLE} - Settings" \
 			"Choose which VM preference area to edit. The selected workflow opens in a terminal session." \
 			940 420 \
 			"1" "🔧 Manage VM T-Shirt sizes and defaults" "Edit default CPU, memory, and disk sizes." \
-			"2" "🦾 Manage VM Unattended install preferences" "Edit unattended-install defaults and user settings.")" || return 0
+			"2" "🦾 Manage VM Unattended install preferences" "Edit unattended-install defaults and user settings." \
+			"3" "$ubuntu_prompt_label" "$ubuntu_prompt_description")" || return 0
 
 		vmtoolgtk::launch_tui_action \
 			"RTD VM Tool - Settings ${selection}" \

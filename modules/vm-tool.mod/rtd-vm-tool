@@ -453,6 +453,89 @@ vmtool::refresh_backtitle() {
 }
 
 
+vmtool::settings_file() {
+	local target_user="${SUDO_USER:-${USER:-}}"
+	local target_home="${HOME:-/root}"
+
+	if [[ -n "${_OEM_USER_VM_PREFERENCES:-}" ]]; then
+		printf '%s\n' "${_OEM_USER_VM_PREFERENCES}"
+		return 0
+	fi
+
+	if [[ -n "$target_user" && "$target_user" != "root" ]]; then
+		target_home="$(getent passwd "$target_user" 2>/dev/null | cut -d: -f6)"
+		target_home="${target_home:-/home/${target_user}}"
+	fi
+
+	printf '%s/.config/rtd/build_defaults.inf\n' "${target_home%/}"
+}
+
+
+vmtool::load_tool_settings() {
+	local settings_file value="NO"
+
+	settings_file="$(vmtool::settings_file)" || return 1
+	if [[ -r "$settings_file" ]]; then
+		value=$(awk -F= '$1 == "Preference_PromptUbuntuVersion" { value = $2 } END { print value }' "$settings_file")
+	fi
+
+	case "${value^^}" in
+		YES|TRUE|ON|1) RTD_VM_PROMPT_UBUNTU_VERSION="YES" ;;
+		*) RTD_VM_PROMPT_UBUNTU_VERSION="NO" ;;
+	esac
+	export RTD_VM_PROMPT_UBUNTU_VERSION
+}
+
+
+vmtool::ubuntu_version_prompt_enabled() {
+	vmtool::load_tool_settings || return 1
+	[[ "${RTD_VM_PROMPT_UBUNTU_VERSION}" == "YES" ]]
+}
+
+
+vmtool::configure_ubuntu_version_prompt() {
+	local settings_file selection status target_user target_group
+
+	vmtool::load_tool_settings || return 1
+	settings_file="$(vmtool::settings_file)" || return 1
+	selection=$(rtd_ui::menu \
+		--title "Ubuntu Version Prompt" \
+		--message "Ask which Ubuntu release channel to install when creating an Ubuntu VM?\n\nCurrent setting: ${RTD_VM_PROMPT_UBUNTU_VERSION}" \
+		--option "YES" "Enabled — ask for latest LTS or latest release" \
+		--option "NO" "Disabled — automatically use the latest LTS")
+	status=$?
+	(( status == 0 )) || return "$status"
+	selection="${selection%%$'\n'*}"
+	selection="${selection%%|*}"
+
+	case "$selection" in
+		YES|NO) ;;
+		*)
+			write_error "Invalid Ubuntu version prompt setting: ${selection:-empty}"
+			return 1
+			;;
+	esac
+
+	if ! system::update_config "$settings_file" "Preference_PromptUbuntuVersion" "$selection"; then
+		write_error "Unable to save VM Tool settings to: ${settings_file}"
+		return 1
+	fi
+
+	RTD_VM_PROMPT_UBUNTU_VERSION="$selection"
+	export RTD_VM_PROMPT_UBUNTU_VERSION
+
+	# Keep a newly created per-user settings file writable by that user even
+	# though the VM Tool itself normally runs elevated.
+	target_user="${SUDO_USER:-}"
+	if [[ "${EUID:-$(id -u)}" -eq 0 && -n "$target_user" && "$target_user" != "root" ]]; then
+		target_group="$(id -gn "$target_user" 2>/dev/null || printf '%s' "$target_user")"
+		chown "${target_user}:${target_group}" "$settings_file" 2>/dev/null || true
+	fi
+
+	write_information "Ubuntu version prompt is now ${selection}. Saved to: ${settings_file}"
+}
+
+
 display_notice() {
 	system::log_item "INFO" "Displaying about information for $( basename $0 )"
 
@@ -535,6 +618,7 @@ vmtool::cleanup_after_action() {
 
 vmtool::run_server_template_action() {
 	local selection="$1"
+	vmtool::load_tool_settings || return 1
 
 	case "$selection" in
 		0 )
@@ -603,6 +687,7 @@ vmtool::run_server_template_action() {
 
 vmtool::run_vdi_template_action() {
 	local selection="$1"
+	vmtool::load_tool_settings || return 1
 
 	case "$selection" in
 		0 )
@@ -765,6 +850,9 @@ vmtool::run_settings_action() {
 		2 )
 			kvm::get_vm_config_preferences --ask
 			;;
+		3 )
+			vmtool::configure_ubuntu_version_prompt
+			;;
 	esac
 }
 
@@ -914,10 +1002,18 @@ manage_vdi_vm_templates() {
 
 show_settings_menu() {
 	while true; do
+		local ubuntu_prompt_label
+		if vmtool::ubuntu_version_prompt_enabled; then
+			ubuntu_prompt_label="🐧 Ubuntu version prompt: Enabled"
+		else
+			ubuntu_prompt_label="🐧 Ubuntu version prompt: Disabled"
+		fi
+
 		exec 3>&1
 		selection=$( $RTD_GUI --backtitle "$BACKTITLE" --cancel-button "Back" --title "Manage VM Preferences"  --menu "Please select which Preference to manage:" "$HEIGHT" "$WIDTH" "$LIST_HEIGHT" \
 		"1" "🔧 Manage VM T-Shirt sizes and defaults" \
 		"2" "🦾 Manage VM Unattended install preferences" \
+		"3" "$ubuntu_prompt_label" \
 		2>&1 1>&3)
 		exit_status=$?
 		exec 3>&-
