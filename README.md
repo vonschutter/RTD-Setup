@@ -74,6 +74,7 @@ More detailed examples, including virtual machines and VPN gateways, are in [Use
 | [Tool Reference](docs/TOOLS.md) | Users looking up a specific `rtd-*` command |
 | [Modules](modules/README.md) | Contributors and users browsing module packages |
 | [Core Library](core/README.md) | Developers writing modules or using `_rtd_library` |
+| [Repository Index](docs/REPOSITORY_INDEX.md) | Maintainers locating existing files and symbols before adding code |
 
 ## Other Platforms
 

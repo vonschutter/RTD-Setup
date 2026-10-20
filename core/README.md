@@ -1,6 +1,6 @@
 # RTD Core Library
 
-[Back to RTD Power Tools](../README.md) | [Module Index](../modules/README.md)
+[Back to RTD Power Tools](../README.md) | [Module Index](../modules/README.md) | [Repository Index](../docs/REPOSITORY_INDEX.md)
 
 This document is for module authors and maintainers. Users looking for commands to accomplish a system task should start with the [tool reference](../docs/TOOLS.md) or [use cases](../docs/USE_CASES.md).
 
