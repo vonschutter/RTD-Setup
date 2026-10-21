@@ -390,7 +390,7 @@ class VentoyWindow(Gtk.Window):
         if shutil.which("pkexec"):
             return ["pkexec", "env", "RTD_VENTOY_CONFIRMED=1", *args]
         if shutil.which("sudo"):
-            return ["sudo", "-E", "env", "RTD_VENTOY_CONFIRMED=1", *args]
+            return ["sudo", "env", "RTD_VENTOY_CONFIRMED=1", *args]
         return ["env", "RTD_VENTOY_CONFIRMED=1", *args]
 
     def refresh_command_preview(self) -> None:

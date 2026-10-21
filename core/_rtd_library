@@ -10682,11 +10682,11 @@ system::add_or_remove_login_script() {
 	_create_autostart_file() {
 		local exec_line
 		if command -v xterm >/dev/null 2>&1; then
-			exec_line="/usr/bin/xterm -fa Monospace -fs 12 -e sudo -E bash \"$script_path\""
+			exec_line="/usr/bin/xterm -fa Monospace -fs 12 -e sudo --preserve-env=DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,XDG_DATA_DIRS,WAYLAND_DISPLAY -H bash \"$script_path\""
 			write_information "📜 Creating autostart entry using xterm"
 		else
 			software::add_native_package xterm
-			exec_line="/usr/bin/xterm -fa Monospace -fs 12 -e sudo -E bash \"$script_path\""
+			exec_line="/usr/bin/xterm -fa Monospace -fs 12 -e sudo --preserve-env=DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,XDG_DATA_DIRS,WAYLAND_DISPLAY -H bash \"$script_path\""
 			write_information "📜 Creating autostart entry using default terminal"
 		fi
 
@@ -30124,7 +30124,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 					--channel "unix,target.type=virtio,target.name=org.qemu.guest_agent.0" \
 					--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-					--extra-args "autoinstall reboot=acpi noprompt noeject" \
+					--extra-args "autoinstall reboot=acpi noprompt" \
 					--wait --noautoconsole
 			install_status=$?
 			if (( install_status != 0 )); then
@@ -30184,7 +30184,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 				--channel "unix,target.type=virtio,target.name=org.qemu.guest_agent.0" \
 				--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-				--extra-args "autoinstall reboot=acpi noprompt noeject" \
+				--extra-args "autoinstall reboot=acpi noprompt" \
 				--wait --noautoconsole
 			install_status=$?
 			if (( install_status != 0 )); then
@@ -30242,7 +30242,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 				--channel "unix,target.type=virtio,target.name=org.qemu.guest_agent.0" \
 				--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
-				--extra-args "autoinstall reboot=acpi noprompt noeject" \
+				--extra-args "autoinstall reboot=acpi noprompt" \
 				--wait --noautoconsole
 			install_status=$?
 			if (( install_status != 0 )); then
@@ -34417,7 +34417,7 @@ common_vdi_post_config=$(cat <<EOF
 
         # Configure first-login OEM setup directly; rtd-oem-enable-config.sh also refreshes these settings after clone.
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /etc/xdg/autostart /etc/sddm.conf.d /etc/lightdm/lightdm.conf.d /etc/gdm3 /etc/systemd/system/getty@tty1.service.d ; exit 0'
-        - curtin in-target --target=/target -- /bin/bash -c 'printf "%s\n" "[Desktop Entry]" "Type=Application" "Exec=/usr/bin/xterm -fa Monospace -fs 12 -e sudo -E bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-linux-config.sh" "Terminal=false" "Hidden=false" "X-GNOME-Autostart-enabled=true" "Name=OEM Run" "Comment=OEM Setup" > /etc/xdg/autostart/oem-run.desktop ; exit 0'
+        - curtin in-target --target=/target -- /bin/bash -c 'printf "%s\n" "[Desktop Entry]" "Type=Application" "Exec=/usr/bin/xterm -fa Monospace -fs 12 -e sudo --preserve-env=DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,XDG_DATA_DIRS,WAYLAND_DISPLAY -H bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-linux-config.sh" "Terminal=false" "Hidden=false" "X-GNOME-Autostart-enabled=true" "Name=OEM Run" "Comment=OEM Setup" > /etc/xdg/autostart/oem-run.desktop ; exit 0'
 ${vdi_dm_autologin_config}
         - curtin in-target --target=/target -- /bin/bash -c 'printf "%s\n" "[Service]" "ExecStart=" "ExecStart=-/sbin/agetty --noissue --autologin ${Preference_InitialUser} %I \\\$TERM" "Type=idle" > /etc/systemd/system/getty@tty1.service.d/override.conf ; exit 0'
 
@@ -34431,9 +34431,14 @@ EOF
 common_cleanup_config=$(cat <<EOF
         - echo '******************* Common Cleanup Post-Config ********************'
 
-        # Do not detach loop devices or eject installation media here. These
-        # commands run in the live installer environment, where loop0 backs the
-        # active SquashFS and must remain readable until shutdown is complete.
+        # Casper's shutdown service ejects /cdrom even when noprompt is set;
+        # Ubuntu 26.10 does not implement a noeject kernel option. Removing its
+        # live-boot marker makes casper-stop exit before ejecting the virtual CD.
+        - /bin/rm -f /run/.casper-boot
+
+        # Do not detach loop devices, unmount, or eject installation media here.
+        # These commands run in the live installer environment, where loop0
+        # backs the active SquashFS and must remain readable through shutdown.
         # - /bin/bash -c 'umount -lf /cdrom 2>/dev/null || true'
         # - /bin/bash -c 'umount -lf /media/cdrom 2>/dev/null || true'
         # - /bin/bash -c 'umount -lf /run/install/media 2>/dev/null || true'
@@ -34546,6 +34551,7 @@ ${common_vdi_pre_config}
         - curtin in-target --target=/target -- apt install -y plymouth-theme-xubuntu-logo plymouth-theme-xubuntu-logo plymouth-theme-spinner plymouth-x11 ; update-initramfs -u ; exit 0
 
 ${common_vdi_post_config}
+${common_cleanup_config}
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -34569,6 +34575,7 @@ ${common_vdi_pre_config}
         - curtin in-target --target=/target -- systemctl disable systemd-networkd-wait-online.service ; exit 0
 
 ${common_vdi_post_config}
+${common_cleanup_config}
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -34589,6 +34596,7 @@ ${common_vdi_pre_config}
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install plymouth-theme-lubuntu-logo plymouth-theme-lubuntu-text ; update-initramfs -u ; || true'
  
 ${common_vdi_post_config}
+${common_cleanup_config}
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -34612,6 +34620,7 @@ ${common_vdi_pre_config}
         - curtin in-target --target=/target -- /bin/bash -c 'update-initramfs -u ; exit 0'
 
 ${common_vdi_post_config}
+${common_cleanup_config}
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;
@@ -34690,6 +34699,7 @@ cat >>${user_data_file} <<EOF
         - echo NAutoVTs=1 >> /etc/systemd/logind.conf
         - echo "Please run rtd-minecraft-server to start the Minecraft Server!" >> /target/etc/update-motd.d/00-header
         - echo rtd-minecraft-server >> /target/etc/profile
+${common_cleanup_config}
 EOF
 	# -----------------------------------------------------------------------------------------
 	;;

@@ -100,7 +100,7 @@ export zstatus="$1"
 # List of bare minimum managmement software that shuold be on a system
 _requirements="dialog wget curl rsync git"
 
-[ "$UID" -eq 0 ] || exec sudo -E -H /bin/bash "$0" "$@" 
+[ "$UID" -eq 0 ] || exec sudo --preserve-env=DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,XDG_DATA_DIRS,WAYLAND_DISPLAY -H /bin/bash "$0" "$@"
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::          Script Functions                ::::::::::::::::::::::
@@ -226,7 +226,7 @@ oem_linux_config ()
 	if [[ ! $UID -eq 0 ]]; then
 		echo -e "🛡️ This script needs administrative access..."
 		# Relaunch script in priviledged mode...
-		sudo -E bash $0 $*
+		sudo --preserve-env=DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,XDG_DATA_DIRS,WAYLAND_DISPLAY -H bash "$0" "$@"
 	else
 		if [ -z "${RTDFUNCTIONS}" ]; then
 			dependency_file _rtd_library || { echo "📚 Failed to find _rtd_library"; exit 1; }
@@ -278,7 +278,7 @@ oem_linux_config ()
 oem_first_login_bundle_manager() {
 	if [[ ! $UID -eq 0 ]]; then
 		echo -e "🛡️ This script needs administrative access..."
-		sudo -E bash "$0" --first-login-bundle-manager
+		sudo --preserve-env=DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,XDG_DATA_DIRS,WAYLAND_DISPLAY -H bash "$0" --first-login-bundle-manager
 		return $?
 	fi
 

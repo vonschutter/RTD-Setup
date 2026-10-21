@@ -135,7 +135,7 @@ rtd_template_finalize::configure_post_oobe_bundle_manager() {
 	cat >"${RTD_POST_OOBE_BUNDLE_WRAPPER}" <<EOF
 #!/bin/bash
 rm -f "\${HOME}/.config/autostart/rtd-oobe-bundle-manager.desktop" >/dev/null 2>&1 || true
-exec sudo -n -E /bin/bash "${_OEM_DIR}/core/rtd-oem-linux-config.sh" --first-login-bundle-manager
+exec sudo -n --preserve-env=DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,XDG_DATA_DIRS,WAYLAND_DISPLAY /bin/bash "${_OEM_DIR}/core/rtd-oem-linux-config.sh" --first-login-bundle-manager
 EOF
 	chmod 755 "${RTD_POST_OOBE_BUNDLE_WRAPPER}" 2>/dev/null || true
 
@@ -246,7 +246,7 @@ EOF
 
 rtd_template_finalize::main() {
 	if [[ ${EUID} -ne 0 ]]; then
-		exec sudo -E bash "$0" "$@"
+		exec sudo --preserve-env=DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,XDG_DATA_DIRS,WAYLAND_DISPLAY -H bash "$0" "$@"
 	fi
 
 	if [[ "${1:-}" == "--run-finalization" ]]; then

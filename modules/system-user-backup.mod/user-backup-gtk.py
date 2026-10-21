@@ -344,7 +344,14 @@ class BackupWindow(Gtk.Window):
             if shutil.which("pkexec"):
                 cmd = ["pkexec", "env", f"HOME={Path.home()}", f"USER={os.environ.get('USER','')}", *cmd]
             elif shutil.which("sudo"):
-                cmd = ["sudo", "-E", *cmd]
+                cmd = [
+                    "sudo",
+                    "env",
+                    f"HOME={Path.home()}",
+                    f"USER={os.environ.get('USER', '')}",
+                    f"LOGNAME={os.environ.get('LOGNAME', os.environ.get('USER', ''))}",
+                    *cmd,
+                ]
         self.output.get_buffer().set_text("")
         self.append_output("$ " + " ".join(shlex.quote(part) for part in cmd) + "\n\n")
         self.run_button.set_sensitive(False)
