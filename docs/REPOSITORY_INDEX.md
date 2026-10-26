@@ -2,7 +2,7 @@
 
 This generated catalog is the routing layer for repository work. Search it first, then open only the listed source files and symbols needed for the task.
 
-Snapshot: commit `36658ae` with working-tree changes; 302 indexed paths; 1372 extracted code symbols. `docs/REPOSITORY_INDEX.md` excludes itself from counts.
+Snapshot: commit `ef85e5d` with working-tree changes; 314 indexed paths; 1392 extracted code symbols. `docs/REPOSITORY_INDEX.md` excludes itself from counts.
 
 Regenerate after structural or symbol changes:
 
@@ -38,19 +38,19 @@ rg -n -F 'path_fragment' docs/REPOSITORY_INDEX.md
 | `core` | 30 | Shared implementation, OEM flows, metadata, signatures, and core media. |
 | `docs` | 3 | Getting-started, tool-reference, use-case, and generated repository documentation. |
 | `media_files` | 26 | Repository-wide screenshots and branding assets. |
-| `modules` | 236 | User-facing tools, compatibility commands, and module-local assets/docs. |
+| `modules` | 248 | User-facing tools, compatibility commands, and module-local assets/docs. |
 | `rtd-me.sh.cmd` | 1 | Cross-platform bootstrap/installation entry point. |
 | `wallpaper` | 2 | Shared light/dark wallpaper assets. |
 
 ### File kinds
 
-archive: 5, documentation: 50, file: 1, image: 155, metadata: 2, powershell: 4, python: 7, shell: 68, signature: 9, yml: 1
+archive: 5, documentation: 53, file: 2, image: 156, json: 1, metadata: 2, powershell: 4, python: 12, shell: 69, signature: 9, yml: 1
 
 ## Core Sources
 
 | Source | Lines | Symbols | Purpose |
 | --- | ---: | ---: | --- |
-| [`core/_rtd_library`](../core/_rtd_library) | 36580 | 468 | Shared Bash API: platform, package, desktop, security, media, and VM functions. |
+| [`core/_rtd_library`](../core/_rtd_library) | 36590 | 468 | Shared Bash API: platform, package, desktop, security, media, and VM functions. |
 | [`core/_rtd_recipies.info`](../core/_rtd_recipies.info) | 1436 | 41 | Software bundle recipes consumed by the bundle managers. |
 | [`core/_locations.info`](../core/_locations.info) | 392 | 0 | Tool registration and launcher metadata. |
 | [`core/_branding.info`](../core/_branding.info) | 373 | 0 | Shared product names, paths, URLs, and presentation defaults. |
@@ -67,6 +67,7 @@ archive: 5, documentation: 50, file: 1, image: 155, metadata: 2, powershell: 4, 
 | Module | Entry points | Purpose |
 | --- | --- | --- |
 | [Security-tool.mod](../modules/Security-tool.mod/README.md) | `rtd-security-tool` | Interactive security auditing and hardening actions. |
+| [Theme_Studio](../modules/Theme_Studio/README.md) | `rtd-theme-studio`, `studio.py`, `studio_gtk.py` | Browse and install GNOME themes/icons, compose looks, and recover user-local appearance changes. |
 | [gnome-shell-extension-installer.mod](../modules/gnome-shell-extension-installer.mod/README.md) | `rtd-gnome-shell-extension-installer` | Search for and install GNOME Shell extensions. |
 | [light-weight-office-games.mod](../modules/light-weight-office-games.mod/README.md) | `rtd-light-weight-office-games` | Install a curated group of lightweight desktop games. |
 | [macos-kvm.mod](../modules/macos-kvm.mod/README.md) | `macos-kvm-gtk.py`, `rtd-macos-kvm`, `rtd-macos-kvm-gui` | Prepare and define macOS recovery VMs on QEMU/KVM. |
@@ -530,42 +531,42 @@ Format: `symbol` — `path:line`. Symbols are grouped by source so searches retu
 - `template::AutoYast_xml` — `core/_rtd_library:33755`
 - `template::Agama_json` — `core/_rtd_library:33981`
 - `template::cloud_config` — `core/_rtd_library:34243`
-- `template::minecraft_server_launcher` — `core/_rtd_library:34719`
-- `software::check_native_package_dependency` — `core/_rtd_library:34772`
-- `install_software` — `core/_rtd_library:34793`
-- `setup_minecraft_root` — `core/_rtd_library:34813`
-- `run_minecraft_server_manager` — `core/_rtd_library:34831`
-- `check_java` — `core/_rtd_library:34861`
-- `find_active_network_interface` — `core/_rtd_library:34874`
-- `minecraft_update` — `core/_rtd_library:34892`
-- `announce.py` — `core/_rtd_library:34956`
-- `start.sh` — `core/_rtd_library:35019`
-- `server.properties` — `core/_rtd_library:35074`
-- `eula.txt` — `core/_rtd_library:35137`
-- `term::set_colors` — `core/_rtd_library:35258`
-- `pause::for_input` — `core/_rtd_library:35449`
-- `pause::a_given_time` — `core/_rtd_library:35485`
-- `write_host` — `core/_rtd_library:35538`
-- `write_error` — `core/_rtd_library:35614`
-- `write_warning` — `core/_rtd_library:35643`
-- `write_status` — `core/_rtd_library:35673`
-- `write_information` — `core/_rtd_library:35703`
-- `library::__cache_dir` — `core/_rtd_library:35733`
-- `library::__desc_cache_file` — `core/_rtd_library:35749`
-- `library::__load_desc_cache` — `core/_rtd_library:35764`
-- `library::__save_desc_cache` — `core/_rtd_library:35803`
-- `library::__build_header_desc_map` — `core/_rtd_library:35826`
-- `library::__get_function_description` — `core/_rtd_library:35857`
-- `library::__zformat_cache_file` — `core/_rtd_library:35911`
-- `library::__load_zformat_cache` — `core/_rtd_library:35926`
-- `library::__save_zformat_cache` — `core/_rtd_library:35944`
-- `library::list_loaded_internal_functions` — `core/_rtd_library:35961`
-- `library::check_status` — `core/_rtd_library:36084`
-- `library::apply_rtd_defaults` — `core/_rtd_library:36138`
-- `library::envcheck_report` — `core/_rtd_library:36219`
-- `library::list_loaded_software_functions` — `core/_rtd_library:36254`
-- `main` — `core/_rtd_library:36305`
-- `display_documentation` — `core/_rtd_library:36410`
+- `template::minecraft_server_launcher` — `core/_rtd_library:34729`
+- `software::check_native_package_dependency` — `core/_rtd_library:34782`
+- `install_software` — `core/_rtd_library:34803`
+- `setup_minecraft_root` — `core/_rtd_library:34823`
+- `run_minecraft_server_manager` — `core/_rtd_library:34841`
+- `check_java` — `core/_rtd_library:34871`
+- `find_active_network_interface` — `core/_rtd_library:34884`
+- `minecraft_update` — `core/_rtd_library:34902`
+- `announce.py` — `core/_rtd_library:34966`
+- `start.sh` — `core/_rtd_library:35029`
+- `server.properties` — `core/_rtd_library:35084`
+- `eula.txt` — `core/_rtd_library:35147`
+- `term::set_colors` — `core/_rtd_library:35268`
+- `pause::for_input` — `core/_rtd_library:35459`
+- `pause::a_given_time` — `core/_rtd_library:35495`
+- `write_host` — `core/_rtd_library:35548`
+- `write_error` — `core/_rtd_library:35624`
+- `write_warning` — `core/_rtd_library:35653`
+- `write_status` — `core/_rtd_library:35683`
+- `write_information` — `core/_rtd_library:35713`
+- `library::__cache_dir` — `core/_rtd_library:35743`
+- `library::__desc_cache_file` — `core/_rtd_library:35759`
+- `library::__load_desc_cache` — `core/_rtd_library:35774`
+- `library::__save_desc_cache` — `core/_rtd_library:35813`
+- `library::__build_header_desc_map` — `core/_rtd_library:35836`
+- `library::__get_function_description` — `core/_rtd_library:35867`
+- `library::__zformat_cache_file` — `core/_rtd_library:35921`
+- `library::__load_zformat_cache` — `core/_rtd_library:35936`
+- `library::__save_zformat_cache` — `core/_rtd_library:35954`
+- `library::list_loaded_internal_functions` — `core/_rtd_library:35971`
+- `library::check_status` — `core/_rtd_library:36094`
+- `library::apply_rtd_defaults` — `core/_rtd_library:36148`
+- `library::envcheck_report` — `core/_rtd_library:36229`
+- `library::list_loaded_software_functions` — `core/_rtd_library:36264`
+- `main` — `core/_rtd_library:36315`
+- `display_documentation` — `core/_rtd_library:36420`
 
 ### `core/_rtd_recipies.info`
 
@@ -613,15 +614,15 @@ Format: `symbol` — `path:line`. Symbols are grouped by source so searches retu
 
 ### `core/generate-repository-index.py`
 
-- `git` — `core/generate-repository-index.py:70`
-- `repository_paths` — `core/generate-repository-index.py:74`
-- `is_text` — `core/generate-repository-index.py:89`
-- `read_text` — `core/generate-repository-index.py:96`
-- `kind_for` — `core/generate-repository-index.py:103`
-- `declarations_for` — `core/generate-repository-index.py:124`
-- `entrypoints_for` — `core/generate-repository-index.py:145`
-- `markdown_escape` — `core/generate-repository-index.py:159`
-- `main` — `core/generate-repository-index.py:163`
+- `git` — `core/generate-repository-index.py:71`
+- `repository_paths` — `core/generate-repository-index.py:75`
+- `is_text` — `core/generate-repository-index.py:90`
+- `read_text` — `core/generate-repository-index.py:97`
+- `kind_for` — `core/generate-repository-index.py:104`
+- `declarations_for` — `core/generate-repository-index.py:125`
+- `entrypoints_for` — `core/generate-repository-index.py:146`
+- `markdown_escape` — `core/generate-repository-index.py:160`
+- `main` — `core/generate-repository-index.py:164`
 
 ### `core/rtd-bootstrap-progress-gtk.py`
 
@@ -789,6 +790,35 @@ Format: `symbol` — `path:line`. Symbols are grouped by source so searches retu
 - `security_menu` — `modules/Security-tool.mod/rtd-security-tool:159`
 - `display_help` — `modules/Security-tool.mod/rtd-security-tool:229`
 - `main` — `modules/Security-tool.mod/rtd-security-tool:239`
+
+### `modules/Theme_Studio/studio.py`
+
+- `StudioError` — `modules/Theme_Studio/studio.py:30`
+- `atomic_json` — `modules/Theme_Studio/studio.py:34`
+- `read_json` — `modules/Theme_Studio/studio.py:48`
+- `run` — `modules/Theme_Studio/studio.py:57`
+- `catalog` — `modules/Theme_Studio/studio.py:70`
+- `looks` — `modules/Theme_Studio/studio.py:74`
+- `extract_archive` — `modules/Theme_Studio/studio.py:96`
+- `copy_assets` — `modules/Theme_Studio/studio.py:141`
+- `normalize_build_links` — `modules/Theme_Studio/studio.py:193`
+- `Settings` — `modules/Theme_Studio/studio.py:209`
+- `Studio` — `modules/Theme_Studio/studio.py:265`
+- `quote` — `modules/Theme_Studio/studio.py:759`
+- `terminal` — `modules/Theme_Studio/studio.py:763`
+- `main` — `modules/Theme_Studio/studio.py:811`
+
+### `modules/Theme_Studio/studio_gtk.py`
+
+- `create_application` — `modules/Theme_Studio/studio_gtk.py:7`
+- `launch` — `modules/Theme_Studio/studio_gtk.py:315`
+
+### `modules/Theme_Studio/tests/test_studio.py`
+
+- `FakeSettings` — `modules/Theme_Studio/tests/test_studio.py:17`
+- `StudioTests` — `modules/Theme_Studio/tests/test_studio.py:54`
+- `ArchiveTests` — `modules/Theme_Studio/tests/test_studio.py:265`
+- `ImportTests` — `modules/Theme_Studio/tests/test_studio.py:313`
 
 ### `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer`
 
@@ -1514,7 +1544,7 @@ Format: `symbol` — `path:line`. Symbols are grouped by source so searches retu
 - `human_size` — `modules/system-user-backup.mod/user-backup-gtk.py:61`
 - `run_text` — `modules/system-user-backup.mod/user-backup-gtk.py:71`
 - `BackupWindow` — `modules/system-user-backup.mod/user-backup-gtk.py:80`
-- `main` — `modules/system-user-backup.mod/user-backup-gtk.py:437`
+- `main` — `modules/system-user-backup.mod/user-backup-gtk.py:444`
 
 ### `modules/theme-manager/rtd-theme-manager`
 
@@ -1711,7 +1741,7 @@ Format: `path` — kind, lines for text files, bytes. This covers every tracked 
 
 ### `README.md`
 
-- `README.md` — documentation, 87 lines, 4577 bytes
+- `README.md` — documentation, 88 lines, 4791 bytes
 
 ### `core`
 
@@ -1719,9 +1749,9 @@ Format: `path` — kind, lines for text files, bytes. This covers every tracked 
 - `core/README.md` — documentation, 102 lines, 4880 bytes
 - `core/_branding.info` — shell, 373 lines, 18376 bytes
 - `core/_locations.info` — shell, 392 lines, 20923 bytes
-- `core/_rtd_library` — shell, 36580 lines, 1350628 bytes
-- `core/_rtd_recipies.info` — shell, 1436 lines, 70498 bytes
-- `core/generate-repository-index.py` — python, 322 lines, 13229 bytes
+- `core/_rtd_library` — shell, 36590 lines, 1351323 bytes
+- `core/_rtd_recipies.info` — shell, 1436 lines, 70837 bytes
+- `core/generate-repository-index.py` — python, 323 lines, 13349 bytes
 - `core/image/README/1683618476060.png` — image, 80526 bytes
 - `core/image/README/1683618508270.png` — image, 63582 bytes
 - `core/image/README/1683622846033.png` — image, 166051 bytes
@@ -1731,11 +1761,11 @@ Format: `path` — kind, lines for text files, bytes. This covers every tracked 
 - `core/image/terminal.ico` — image, 71 lines, 7872 bytes
 - `core/rtd-bootstrap-progress-gtk.py` — python, 358 lines, 13738 bytes
 - `core/rtd-oem-enable-config.sh` — shell, 367 lines, 15111 bytes
-- `core/rtd-oem-linux-config.sh` — shell, 325 lines, 13728 bytes
+- `core/rtd-oem-linux-config.sh` — shell, 325 lines, 14043 bytes
 - `core/rtd-oem-macos-config.sh` — shell, 597 lines, 21831 bytes
 - `core/rtd-oem-windows-setup-splash.ps1` — powershell, 1018 lines, 41628 bytes
 - `core/rtd-oem-windows-setup.ps1` — powershell, 2148 lines, 93936 bytes
-- `core/rtd-vm-template-finalize-linux.sh` — shell, 263 lines, 10260 bytes
+- `core/rtd-vm-template-finalize-linux.sh` — shell, 263 lines, 10467 bytes
 - `core/sigs/AudioBookConverter.sig` — signature, 1 lines, 56 bytes
 - `core/sigs/RustDesk.sig` — signature, 1 lines, 46 bytes
 - `core/sigs/Teamviewer.sig` — signature, 1 lines, 48 bytes
@@ -1749,7 +1779,7 @@ Format: `path` — kind, lines for text files, bytes. This covers every tracked 
 ### `docs`
 
 - `docs/GETTING_STARTED.md` — documentation, 90 lines, 3646 bytes
-- `docs/TOOLS.md` — documentation, 93 lines, 7922 bytes
+- `docs/TOOLS.md` — documentation, 94 lines, 8139 bytes
 - `docs/USE_CASES.md` — documentation, 126 lines, 4791 bytes
 
 ### `media_files`
@@ -1783,12 +1813,24 @@ Format: `path` — kind, lines for text files, bytes. This covers every tracked 
 
 ### `modules`
 
-- `modules/README.md` — documentation, 38 lines, 2834 bytes
+- `modules/README.md` — documentation, 38 lines, 2894 bytes
 - `modules/Security-tool.mod/Media_files/README.md` — documentation, 3 lines, 119 bytes
 - `modules/Security-tool.mod/Media_files/Screenshot.png` — image, 61455 bytes
 - `modules/Security-tool.mod/Media_files/header-time.jpg` — image, 132397 bytes
 - `modules/Security-tool.mod/README.md` — documentation, 61 lines, 2264 bytes
 - `modules/Security-tool.mod/rtd-security-tool` — shell, 253 lines, 8321 bytes
+- `modules/Theme_Studio/.gitignore` — file, 2 lines, 23 bytes
+- `modules/Theme_Studio/Media_files/preview.png` — image, 202003 bytes
+- `modules/Theme_Studio/README.md` — documentation, 107 lines, 9092 bytes
+- `modules/Theme_Studio/REFERENCES.md` — documentation, 42 lines, 5339 bytes
+- `modules/Theme_Studio/VALIDATION.md` — documentation, 79 lines, 5414 bytes
+- `modules/Theme_Studio/catalog.json` — json, 571 lines, 11705 bytes
+- `modules/Theme_Studio/rtd-theme-studio` — shell, 5 lines, 199 bytes
+- `modules/Theme_Studio/studio.py` — python, 876 lines, 47661 bytes
+- `modules/Theme_Studio/studio_gtk.py` — python, 316 lines, 17368 bytes
+- `modules/Theme_Studio/tests/smoke_catalog.py` — python, 47 lines, 2186 bytes
+- `modules/Theme_Studio/tests/smoke_gtk.py` — python, 55 lines, 2500 bytes
+- `modules/Theme_Studio/tests/test_studio.py` — python, 474 lines, 22008 bytes
 - `modules/gnome-shell-extension-installer.mod/LICENSE` — file, 297 lines, 16054 bytes
 - `modules/gnome-shell-extension-installer.mod/README.md` — documentation, 32 lines, 1350 bytes
 - `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer` — shell, 650 lines, 22784 bytes
@@ -1814,7 +1856,7 @@ Format: `path` — kind, lines for text files, bytes. This covers every tracked 
 - `modules/macos-kvm.mod/THIRD_PARTY.md` — documentation, 36 lines, 1205 bytes
 - `modules/macos-kvm.mod/macos-kvm-gtk.py` — python, 504 lines, 20735 bytes
 - `modules/macos-kvm.mod/rtd-macos-kvm` — shell, 315 lines, 11393 bytes
-- `modules/macos-kvm.mod/rtd-macos-kvm-gui` — shell, 206 lines, 8126 bytes
+- `modules/macos-kvm.mod/rtd-macos-kvm-gui` — shell, 206 lines, 8123 bytes
 - `modules/minecraft-server-manager.mod/LICENSE.md` — documentation, 166 lines, 7652 bytes
 - `modules/minecraft-server-manager.mod/Media_files/Scr1.png` — image, 273241 bytes
 - `modules/minecraft-server-manager.mod/Media_files/header-time.jpg` — image, 132397 bytes
@@ -1899,7 +1941,7 @@ Format: `path` — kind, lines for text files, bytes. This covers every tracked 
 - `modules/oem-ventoy.mod/README.md` — documentation, 84 lines, 3704 bytes
 - `modules/oem-ventoy.mod/USAGE.md` — documentation, 120 lines, 4848 bytes
 - `modules/oem-ventoy.mod/rtd-ventoy-usb` — shell, 675 lines, 22130 bytes
-- `modules/oem-ventoy.mod/ventoy-usb-gtk.py` — python, 588 lines, 24364 bytes
+- `modules/oem-ventoy.mod/ventoy-usb-gtk.py` — python, 588 lines, 24358 bytes
 - `modules/rtd-ai-chat.mod/README.md` — documentation, 54 lines, 1986 bytes
 - `modules/rtd-ai-chat.mod/chatgpt.sh` — shell, 484 lines, 16995 bytes
 - `modules/rtd-ai-chat.mod/rtd-ai-chat` — shell, 394 lines, 14031 bytes
@@ -1987,7 +2029,7 @@ Format: `path` — kind, lines for text files, bytes. This covers every tracked 
 - `modules/system-user-backup.mod/Media_files/sys0.ico` — image, 199251 bytes
 - `modules/system-user-backup.mod/README.md` — documentation, 168 lines, 5143 bytes
 - `modules/system-user-backup.mod/rtd-oem-backup-linux-config` — shell, 588 lines, 21872 bytes
-- `modules/system-user-backup.mod/user-backup-gtk.py` — python, 444 lines, 18356 bytes
+- `modules/system-user-backup.mod/user-backup-gtk.py` — python, 451 lines, 18625 bytes
 - `modules/theme-manager/Media_files/main-window.png` — image, 474001 bytes
 - `modules/theme-manager/Media_files/profile-crisp-day.jpg` — image, 261758 bytes
 - `modules/theme-manager/Media_files/profile-crisp-evening.jpg` — image, 446434 bytes

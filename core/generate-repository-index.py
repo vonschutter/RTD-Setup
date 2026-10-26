@@ -29,6 +29,7 @@ CORE_PURPOSES = {
 }
 
 MODULE_PURPOSES = {
+    "Theme_Studio": "Browse and install GNOME themes/icons, compose looks, and recover user-local appearance changes.",
     "Security-tool.mod": "Interactive security auditing and hardening actions.",
     "gnome-shell-extension-installer.mod": "Search for and install GNOME Shell extensions.",
     "light-weight-office-games.mod": "Install a curated group of lightweight desktop games.",

@@ -15,6 +15,7 @@ RTD Power Tools is a collection of interactive administration utilities for Linu
 | Back up a user before a reinstall | `rtd-oem-backup-linux-config` | Builds encrypted archives of selected user data | Provide external or mounted storage |
 | Diagnose or maintain a remote system | `rtd-simple-support-tool` | Presents common support tasks in one menu | Some tasks elevate privileges |
 | View system hardware | `rtd-system-hardware-information` | Shows hardware and sensor information in a dashboard | Desktop UI required |
+| Customize the GNOME desktop | `rtd-theme-studio` | Browse looks, install themes/icons, mix appearance elements, and undo changes | [Theme Studio guide](modules/Theme_Studio/README.md); run as your desktop user |
 | Build a multi-ISO boot USB | `rtd-ventoy-usb` | Installs Ventoy and copies installation media | [Usage guide](modules/oem-ventoy.mod/USAGE.md); erases the selected drive |
 | Build or manage KVM guests | `rtd-vm-tool` | Creates, clones, starts, and maintains virtual machines | Requires KVM/libvirt |
 | Route network traffic through a VPN | `rtd-start-vpn-router` | Configures a Linux host as a VPN gateway | Changes routing/firewall rules; monitors an active service |
