@@ -1,5 +1,192 @@
 #!/usr/bin/env bash
 # RTD module: independent, user-local GNOME Theme Studio.
-set -euo pipefail
-SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
-exec python3 "$SCRIPT_DIR/studio.py" "$@"
+
+if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+	printf 'Theme Studio requires Bash 4.4 or newer (found %s).\n' "$BASH_VERSION" >&2
+	exit 1
+fi
+
+set -uo pipefail
+
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+readonly SCRIPT_PATH SCRIPT_DIR
+
+theme_studio::error() { printf 'Theme Studio: %s\n' "$*" >&2; }
+
+theme_studio::bootstrap_library() {
+	local path
+	for path in \
+		"${SCRIPT_DIR}/../../core/_rtd_library" \
+		"/opt/rtd/core/_rtd_library" \
+		"${HOME:-}/GIT/RTD-Setup/core/_rtd_library" \
+		"${HOME:-}/RTD-Setup/core/_rtd_library"; do
+		[[ -r "$path" ]] || continue
+		# shellcheck source=/dev/null
+		source "$path" ""
+		declare -F software::check_native_package_dependency >/dev/null 2>&1 && return 0
+	done
+	return 1
+}
+
+theme_studio::packages() {
+	local distro="$1"
+	case "$distro" in
+		ubuntu|debian)
+			printf '%s\n' python3 python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 \
+				bubblewrap sassc libglib2.0-dev-bin gtk2-engines-murrine \
+				gnome-themes-extra gnome-shell-extensions
+			;;
+		fedora|redhat)
+			printf '%s\n' python3 python3-gobject gtk4 libadwaita bubblewrap sassc \
+				glib2 gtk-murrine-engine gnome-themes-extra gnome-shell-extension-user-theme
+			;;
+		suse)
+			printf '%s\n' python3 python3-gobject-Gdk typelib-1_0-Gtk-4_0 \
+				typelib-1_0-Adw-1 bubblewrap sassc glib2-tools gtk2-engine-murrine \
+				gnome-shell-extension-user-theme
+			;;
+		*) return 1 ;;
+	esac
+}
+
+theme_studio::missing_capabilities() {
+	local -a missing=()
+	command -v python3 >/dev/null 2>&1 || missing+=("Python 3.10+")
+	if command -v python3 >/dev/null 2>&1; then
+		python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 10))' >/dev/null 2>&1 || missing+=("Python 3.10+")
+		python3 -c 'import gi; from gi.repository import Gio, GLib' >/dev/null 2>&1 || missing+=("Python GObject (Gio/GLib)")
+		python3 -c 'import gi; gi.require_version("Gtk", "4.0"); gi.require_version("Adw", "1"); from gi.repository import Adw, Gtk' >/dev/null 2>&1 || missing+=("GTK4 and Libadwaita introspection")
+	fi
+	command -v gsettings >/dev/null 2>&1 || missing+=("GSettings")
+	command -v bwrap >/dev/null 2>&1 || missing+=("Bubblewrap")
+	command -v sassc >/dev/null 2>&1 || missing+=("Sass compiler")
+	command -v glib-compile-resources >/dev/null 2>&1 || missing+=("GLib resource compiler")
+	((${#missing[@]} == 0)) || printf '%s\n' "${missing[@]}"
+}
+
+theme_studio::missing_packages() {
+	local distro="$1" package
+	while IFS= read -r package; do
+		[[ -n "$package" ]] || continue
+		software::is_native_package_installed "$package" && continue
+		# Only offer packages the configured repositories can actually resolve.
+		software::is_native_package_available "$package" && printf '%s\n' "$package"
+	done < <(theme_studio::packages "$distro")
+}
+
+theme_studio::manual_instructions() {
+	local distro="$1" details="$2" command_text
+	local -a packages=()
+	mapfile -t packages < <(theme_studio::packages "$distro" 2>/dev/null || true)
+	case "$distro" in
+		ubuntu|debian) command_text="sudo apt-get update && sudo apt-get install ${packages[*]}" ;;
+		fedora|redhat) command_text="sudo dnf install ${packages[*]}" ;;
+		suse) command_text="sudo zypper install ${packages[*]}" ;;
+		*) command_text="Install Python 3.10+, Python GObject, GTK4 and Libadwaita introspection bindings, bubblewrap, sassc, glib-compile-resources, Murrine, GNOME extra themes, and the GNOME User Themes extension with your system package manager." ;;
+	esac
+	local message="RTD could not satisfy all Theme Studio requirements automatically.\n\n${details}\n\nTry:\n${command_text}\n\nThen run ${SCRIPT_PATH} again. Check enabled repositories and any package-manager lock or network error if installation failed."
+	theme_studio::error "${message//$'\n'/ }"
+	if declare -F rtd_ui::message >/dev/null 2>&1; then
+		rtd_ui::message --title "Theme Studio requirements" --type error --message "$message" || true
+	fi
+}
+
+theme_studio::install_dependencies() {
+	local distro package rc=0
+	distro="$(system::distribution_type 2>/dev/null || printf unknown)"
+	local -a packages=()
+	mapfile -t packages < <(theme_studio::packages "$distro" 2>/dev/null || true)
+	((${#packages[@]} > 0)) || {
+		theme_studio::error "Automatic dependency installation is not available for distribution family: ${distro}."
+		return 1
+	}
+	for package in "${packages[@]}"; do
+		software::is_native_package_installed "$package" && continue
+		if software::is_native_package_available "$package"; then
+			software::check_native_package_dependency "$package" || rc=1
+		else
+			write_warning "Theme Studio dependency package is not available from configured repositories: ${package}"
+		fi
+	done
+	return "$rc"
+}
+
+theme_studio::confirm_install() {
+	local message="$1" backend="text"
+	if declare -F rtd_ui::backend >/dev/null 2>&1; then
+		backend="$(rtd_ui::backend)"
+	fi
+	# A PolicyKit authentication dialog is itself an explicit permission step
+	# when no question-capable UI is installed and this is a desktop launcher.
+	if [[ "$backend" == "text" && ! -t 0 && -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
+		return 0
+	fi
+	rtd_ui::yes_no --title "Install Theme Studio requirements?" --message "$message"
+}
+
+theme_studio::ensure_dependencies() {
+	theme_studio::bootstrap_library || {
+		theme_studio::manual_instructions unknown "The RTD dependency library could not be loaded from the checkout or /opt/rtd."
+		return 1
+	}
+
+	local distro capabilities_text packages_text prompt
+	distro="$(system::distribution_type 2>/dev/null || printf unknown)"
+	capabilities_text="$(theme_studio::missing_capabilities)"
+	packages_text="$(theme_studio::missing_packages "$distro" 2>/dev/null || true)"
+	[[ -n "$capabilities_text$packages_text" ]] || return 0
+
+	prompt="Theme Studio needs additional system components. RTD can install the supported requirements now."
+	[[ -n "$capabilities_text" ]] && prompt+=$'\n\nMissing capabilities:\n'"$capabilities_text"
+	[[ -n "$packages_text" ]] && prompt+=$'\n\nPackages to install:\n'"$packages_text"
+	prompt+=$'\n\nYour administrator password may be requested. Continue?'
+
+	if ! theme_studio::confirm_install "$prompt"; then
+		theme_studio::manual_instructions "$distro" "Installation was cancelled. Missing requirements: ${capabilities_text:-$packages_text}"
+		return 1
+	fi
+
+	if ((EUID == 0)); then
+		theme_studio::install_dependencies || true
+	elif [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]] && command -v pkexec >/dev/null 2>&1; then
+		( security::ensure_admin --gtk --setup-dependencies ) || true
+	else
+		( security::ensure_admin --sudo --setup-dependencies ) || true
+	fi
+	hash -r
+
+	capabilities_text="$(theme_studio::missing_capabilities)"
+	packages_text="$(theme_studio::missing_packages "$distro" 2>/dev/null || true)"
+	if [[ -n "$capabilities_text$packages_text" ]]; then
+		theme_studio::manual_instructions "$distro" "Still missing capabilities or packages: ${capabilities_text:-$packages_text}"
+		return 1
+	fi
+	return 0
+}
+
+theme_studio::main() {
+	if [[ "${1:-}" == "--setup-dependencies" ]]; then
+		theme_studio::bootstrap_library || {
+			theme_studio::error "Unable to load the RTD dependency installer."
+			return 1
+		}
+		if ((EUID != 0)); then
+			if [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]] && command -v pkexec >/dev/null 2>&1; then
+				security::ensure_admin --gtk --setup-dependencies
+			else
+				security::ensure_admin --sudo --setup-dependencies
+			fi
+			return $?
+		fi
+		theme_studio::install_dependencies
+		return $?
+	fi
+
+	theme_studio::ensure_dependencies || return 1
+	exec python3 "$SCRIPT_DIR/studio.py" "$@"
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+	theme_studio::main "$@"
+fi

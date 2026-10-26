@@ -22,7 +22,7 @@ rtd-theme-studio --terminal
 rtd-theme-studio --help
 ```
 
-Run as your logged-in GNOME desktop user, without sudo. The module does not install system dependencies or change the existing Theme Manager. Existing RTD registration discovers the executable automatically. Use **Library & Recovery → Add Theme Studio to app grid** for a user-local desktop launcher.
+Run as your logged-in GNOME desktop user, without sudo. At startup, Theme Studio checks its runtime, graphical, isolated-build, rendering, and GNOME Shell theme requirements. When resolvable components are missing, it explains what is needed, asks permission, and uses the RTD dependency installer plus the system package manager to install them. Only the privileged package installation runs as administrator; Theme Studio itself remains in the desktop user's session. Existing RTD registration discovers the executable automatically. Use **Library & Recovery → Add Theme Studio to app grid** for a user-local desktop launcher.
 
 ## Features
 
@@ -43,10 +43,10 @@ The paid product advertises exactly 1,057 variants. Its manifest is unavailable 
 - GUI: GTK4 and Libadwaita introspection bindings and a graphical display.
 - Source builds: Bubblewrap (`bwrap`) with unprivileged namespaces, Bash, standard Unix build tools, and `sassc` for GTK source themes. WhiteSur also requires `glib-compile-resources`. Some upstream themes require Murrine and gnome-themes-extra for rendering.
 - Internet access to GitHub's codeload service when installing a family. Applying installed components works offline.
-- Shell themes: the GNOME **User Themes** extension must already be installed and enabled. Newly enabled extensions may require logout/login. The app reports this prerequisite; it does not silently enable extensions or restart the Shell.
+- Shell themes: the launcher installs the distribution's GNOME **User Themes** extension package when it is available, but the extension must also be enabled in the user's session. Newly enabled extensions may require logout/login. The app reports this session prerequisite; it does not silently enable extensions or restart the Shell.
 - GNOME 47+ for native accent colors. Complete looks retain the existing accent on earlier releases and report that limitation. Explicit unsupported accent requests fail before settings change.
 
-Use your distribution's package tools to install missing prerequisites. Typical Debian/Ubuntu packages are `python3-gi`, `gir1.2-gtk-4.0`, `gir1.2-adw-1`, `bubblewrap`, `sassc`, and `libglib2.0-dev-bin`. Package names and namespace policy vary by distribution.
+The launcher resolves these requirements through `_rtd_library` on supported Debian/Ubuntu, Fedora/RHEL, and openSUSE/SUSE systems. It asks before changing system packages and verifies both packages and actual commands/imports afterward. If repository, package-manager, authorization, or distribution support prevents automatic installation, it reports the remaining capabilities and an exact distribution-appropriate command to try manually.
 
 GTK4 overrides are not a stable Libadwaita theming API. Application and GNOME Shell compatibility depends on the upstream theme and GNOME version. Flatpak/Snap applications may use independent themes; this module does not broaden their filesystem permissions. KDE, XFCE, Cinnamon and GDM/login-screen customization are outside this GNOME user-session module.
 
