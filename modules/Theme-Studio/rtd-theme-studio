@@ -34,16 +34,16 @@ theme_studio::packages() {
 	case "$distro" in
 		ubuntu|debian)
 			printf '%s\n' python3 python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 \
-				bubblewrap sassc libglib2.0-dev-bin gtk2-engines-murrine \
+				bubblewrap sassc libglib2.0-dev-bin libxml2-utils gtk2-engines-murrine \
 				gnome-themes-extra gnome-shell-extensions
 			;;
 		fedora|redhat)
 			printf '%s\n' python3 python3-gobject gtk4 libadwaita bubblewrap sassc \
-				glib2 gtk-murrine-engine gnome-themes-extra gnome-shell-extension-user-theme
+				glib2 libxml2 gtk-murrine-engine gnome-themes-extra gnome-shell-extension-user-theme
 			;;
 		suse)
 			printf '%s\n' python3 python3-gobject-Gdk typelib-1_0-Gtk-4_0 \
-				typelib-1_0-Adw-1 bubblewrap sassc glib2-tools gtk2-engine-murrine \
+				typelib-1_0-Adw-1 bubblewrap sassc glib2-tools libxml2-tools gtk2-engine-murrine \
 				gnome-shell-extension-user-theme
 			;;
 		*) return 1 ;;
@@ -62,6 +62,7 @@ theme_studio::missing_capabilities() {
 	command -v bwrap >/dev/null 2>&1 || missing+=("Bubblewrap")
 	command -v sassc >/dev/null 2>&1 || missing+=("Sass compiler")
 	command -v glib-compile-resources >/dev/null 2>&1 || missing+=("GLib resource compiler")
+	command -v xmllint >/dev/null 2>&1 || missing+=("XML command-line tools")
 	((${#missing[@]} == 0)) || printf '%s\n' "${missing[@]}"
 }
 
@@ -83,7 +84,7 @@ theme_studio::manual_instructions() {
 		ubuntu|debian) command_text="sudo apt-get update && sudo apt-get install ${packages[*]}" ;;
 		fedora|redhat) command_text="sudo dnf install ${packages[*]}" ;;
 		suse) command_text="sudo zypper install ${packages[*]}" ;;
-		*) command_text="Install Python 3.10+, Python GObject, GTK4 and Libadwaita introspection bindings, bubblewrap, sassc, glib-compile-resources, Murrine, GNOME extra themes, and the GNOME User Themes extension with your system package manager." ;;
+		*) command_text="Install Python 3.10+, Python GObject, GTK4 and Libadwaita introspection bindings, bubblewrap, sassc, glib-compile-resources, xmllint, Murrine, GNOME extra themes, and the GNOME User Themes extension with your system package manager." ;;
 	esac
 	local message="RTD could not satisfy all Theme Studio requirements automatically.\n\n${details}\n\nTry:\n${command_text}\n\nThen run ${SCRIPT_PATH} again. Check enabled repositories and any package-manager lock or network error if installation failed."
 	theme_studio::error "${message//$'\n'/ }"
@@ -183,7 +184,18 @@ theme_studio::main() {
 		return $?
 	fi
 
+	# Dependency setup is the only operation allowed as root.  In particular,
+	# never let an elevated helper continue into the per-user theme installer.
+	if ((EUID == 0)); then
+		theme_studio::error "Run Theme Studio as your logged-in desktop user, without sudo. Administrator access is requested separately when system dependencies are needed."
+		return 1
+	fi
+
 	theme_studio::ensure_dependencies || return 1
+	if ((EUID == 0)); then
+		theme_studio::error "Refusing to start the theme installer with administrator privileges."
+		return 1
+	fi
 	exec python3 "$SCRIPT_DIR/studio.py" "$@"
 }
 

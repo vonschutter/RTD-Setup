@@ -355,6 +355,12 @@ class ImportTests(unittest.TestCase):
                 self.studio.install('test', '--evil')
             download.assert_not_called()
 
+    def test_theme_install_refuses_root_before_download(self):
+        with patch('studio.os.geteuid', return_value=0), patch('studio.urllib.request.urlopen') as download:
+            with self.assertRaisesRegex(StudioError, 'administrator privileges'):
+                self.studio.install('test')
+            download.assert_not_called()
+
     def test_installed_family_reuse_and_missing_asset_repair_error(self):
         with patch('studio.catalog', return_value=[self.entry()]), patch('studio.urllib.request.urlopen', return_value=self.fixture()) as download:
             self.studio.install('test')

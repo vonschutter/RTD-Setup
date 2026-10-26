@@ -345,6 +345,8 @@ class Studio:
         return path
 
     def install(self, family_id, profile="default"):
+        if os.geteuid() == 0:
+            raise StudioError('Refusing to install a per-user theme with administrator privileges.')
         entry = next((e for e in catalog() if e['id'] == family_id), None)
         if not entry or not entry.get('revision'):
             raise StudioError('Unknown family or missing pinned source revision.')
@@ -432,6 +434,8 @@ class Studio:
                 return message
 
     def build(self, source, output, entry, profile="default"):
+        if os.geteuid() == 0:
+            raise StudioError('Refusing to build a per-user theme with administrator privileges.')
         if not shutil.which('bwrap'):
             raise StudioError('Source builds require bubblewrap (bwrap). Install it using your distribution tools, then retry.')
         missing = [command for command in entry.get('requires', []) if not shutil.which(command)]
@@ -459,7 +463,10 @@ class Studio:
             run(args)
             normalize_build_links(output, source)
         except StudioError as error:
-            raise StudioError(f'Isolated build failed; no desktop settings changed. Some themes need sassc and theme engines.\n{error}') from error
+            raise StudioError(
+                'Isolated build failed; no desktop settings changed. The build ran '
+                f'unprivileged as desktop UID {os.geteuid()}; /output is its temporary sandbox staging directory.\n{error}'
+            ) from error
 
     def uninstall(self, family_id):
         with self.lock():
@@ -835,6 +842,8 @@ def main(argv=None):
     if args.terminal and args.command:
         parser.error('--terminal cannot be combined with a subcommand')
     try:
+        if os.geteuid() == 0:
+            raise StudioError('Run Theme Studio as your logged-in desktop user, without sudo.')
         studio = Studio()
         if args.command == 'list':
             data = {'catalog': catalog, 'looks': lambda: looks() + [{'id': k, **v} for k, v in read_json(studio.assets / 'looks.json', {}).items()],
@@ -846,8 +855,6 @@ def main(argv=None):
                     data = {k: v for k, v in data.items() if args.search.lower() in (k + json.dumps(v)).lower()}
             print(json.dumps(data, indent=2))
             return 0
-        if os.geteuid() == 0:
-            raise StudioError('Run Theme Studio as your logged-in desktop user, without sudo.')
         desktop = os.environ.get('XDG_CURRENT_DESKTOP', '').lower()
         if desktop and 'gnome' not in desktop and 'ubuntu' not in desktop:
             raise StudioError('Theme Studio targets GNOME. Use your desktop’s native appearance settings.')

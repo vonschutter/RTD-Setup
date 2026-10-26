@@ -22,7 +22,7 @@ rtd-theme-studio --terminal
 rtd-theme-studio --help
 ```
 
-Run as your logged-in GNOME desktop user, without sudo. At startup, Theme Studio checks its runtime, graphical, isolated-build, rendering, and GNOME Shell theme requirements. When resolvable components are missing, it explains what is needed, asks permission, and uses the RTD dependency installer plus the system package manager to install them. Only the privileged package installation runs as administrator; Theme Studio itself remains in the desktop user's session. Existing RTD registration discovers the executable automatically. Use **Library & Recovery → Add Theme Studio to app grid** for a user-local desktop launcher.
+Run as your logged-in GNOME desktop user, without sudo. At startup, Theme Studio checks its runtime, graphical, isolated-build, rendering, and GNOME Shell theme requirements. When resolvable components are missing, it explains what is needed, asks permission, and uses the RTD dependency installer plus the system package manager to install them. Only the dependency helper is elevated, and it exits after installing system packages; downloads, isolated builds, theme copies, and desktop-setting changes run as the logged-in user. An upstream installer's `/output` path is a temporary Bubblewrap staging mount, not root's home or a system theme directory. Existing RTD registration discovers the executable automatically. Use **Library & Recovery → Add Theme Studio to app grid** for a user-local desktop launcher.
 
 ## Features
 
@@ -41,7 +41,7 @@ The paid product advertises exactly 1,057 variants. Its manifest is unavailable 
 
 - Linux with GNOME; Python 3.10+ and Python GObject bindings (`gi`, Gio/GLib).
 - GUI: GTK4 and Libadwaita introspection bindings and a graphical display.
-- Source builds: Bubblewrap (`bwrap`) with unprivileged namespaces, Bash, standard Unix build tools, and `sassc` for GTK source themes. WhiteSur also requires `glib-compile-resources`. Some upstream themes require Murrine and gnome-themes-extra for rendering.
+- Source builds: Bubblewrap (`bwrap`) with unprivileged namespaces, Bash, standard Unix build tools, and `sassc` for GTK source themes. WhiteSur also requires `glib-compile-resources` and `xmllint`. Some upstream themes require Murrine and gnome-themes-extra for rendering.
 - Internet access to GitHub's codeload service when installing a family. Applying installed components works offline.
 - Shell themes: the launcher installs the distribution's GNOME **User Themes** extension package when it is available, but the extension must also be enabled in the user's session. Newly enabled extensions may require logout/login. The app reports this session prerequisite; it does not silently enable extensions or restart the Shell.
 - GNOME 47+ for native accent colors. Complete looks retain the existing accent on earlier releases and report that limitation. Explicit unsupported accent requests fail before settings change.
