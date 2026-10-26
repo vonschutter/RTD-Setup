@@ -41,7 +41,7 @@ The paid product advertises exactly 1,057 variants. Its manifest is unavailable 
 
 - Linux with GNOME; Python 3.10+ and Python GObject bindings (`gi`, Gio/GLib).
 - GUI: GTK4 and Libadwaita introspection bindings and a graphical display.
-- Source builds: Bubblewrap (`bwrap`) with unprivileged namespaces, Bash, standard Unix build tools, and `sassc` for GTK source themes. WhiteSur also requires `glib-compile-resources` and `xmllint`. Some upstream themes require Murrine and gnome-themes-extra for rendering.
+- Source builds: Bubblewrap (`bwrap`) with unprivileged namespaces, Bash, standard Unix build tools, and `sassc` for GTK source themes. The sanitized build environment supplies `TERM=dumb` for upstream scripts that use terminal helpers. WhiteSur also requires `glib-compile-resources` and `xmllint`. Some upstream themes require Murrine and gnome-themes-extra for rendering.
 - Internet access to GitHub's codeload service when installing a family. Applying installed components works offline.
 - Shell themes: the launcher installs the distribution's GNOME **User Themes** extension package when it is available, but the extension must also be enabled in the user's session. Newly enabled extensions may require logout/login. The app reports this session prerequisite; it does not silently enable extensions or restart the Shell.
 - GNOME 47+ for native accent colors. Complete looks retain the existing accent on earlier releases and report that limitation. Explicit unsupported accent requests fail before settings change.

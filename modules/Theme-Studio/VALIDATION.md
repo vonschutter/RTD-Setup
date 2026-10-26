@@ -14,14 +14,14 @@ Validation performed on 2026-10-22. All appearance tests used temporary homes an
 
 ## Online source/build checks
 
-Each family was downloaded at its catalog commit, extracted and installed under a disposable home. Source installers ran inside the production Bubblewrap sandbox. No tests installed packages or changed system directories. After fixing importer issues, **32 of 33 families installed successfully**. WhiteSur GTK could not be built because this environment lacks `glib-compile-resources` and `xmllint`; the app reports those prerequisites and does not register partial assets.
+Each family was downloaded at its catalog commit, extracted and installed under a disposable home. Source installers ran inside the production Bubblewrap sandbox. No tests installed packages or changed system directories. After fixing importer and sandbox-environment issues, **33 of 33 families installed successfully**. WhiteSur GTK was retested with its build tools mounted from extracted distribution packages; the build produced 12 variants without changing the host system.
 
 The table reports the upstream **default profile**, not every possible build combination. Counts exclude system-installed themes. Default-profile installation success does not establish visual correctness on every GNOME release.
 
 | Family | Kind | Result | Installed variants |
 | --- | --- | --- | ---: |
 | Orchis | theme | Pass | 6 |
-| WhiteSur | theme | Missing glib-compile-resources and xmllint | — |
+| WhiteSur | theme | Pass | 12 |
 | Colloid | theme | Pass | 3 |
 | Graphite | theme | Pass | 3 |
 | Fluent | theme | Pass | 6 |
@@ -73,7 +73,7 @@ The catalog smoke test downloads large archives and needs build prerequisites, d
 
 ## Remaining limits
 
-- WhiteSur GTK's build remains unverified here until its missing GLib resource compiler and XML command-line tools are installed.
+- WhiteSur GTK requires a defined `TERM` even for a noninteractive build. The sandbox supplies the safe `dumb` terminal type while continuing to clear the rest of the caller environment.
 - Actual GNOME Shell/GTK application rendering and logout/login behavior were not tested by changing a live desktop. Compatibility remains dependent on GNOME version and upstream theme quality.
 - Native accent behavior on pre-GNOME-47 systems is covered through simulated schema absence, not a second installed GNOME version.
 - The paid product's exact 1,057-variant inventory and original assets are not public and are not reproduced. The module exposes independently sourced families and supported build profiles; it does not claim exact paid-product parity.

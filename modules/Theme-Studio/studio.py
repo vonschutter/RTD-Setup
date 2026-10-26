@@ -447,7 +447,8 @@ class Studio:
         # No user home, network, D-Bus, display, or writable system directories.
         args = ['bwrap', '--unshare-all', '--die-with-parent', '--new-session', '--cap-drop', 'ALL',
                 '--clearenv', '--setenv', 'PATH', '/usr/bin:/bin', '--setenv', 'HOME', '/home/builder',
-                '--setenv', 'LANG', 'C.UTF-8', '--setenv', 'BATCH_MODE', 'true', '--proc', '/proc', '--dev', '/dev', '--tmpfs', '/tmp',
+                '--setenv', 'LANG', 'C.UTF-8', '--setenv', 'TERM', 'dumb', '--setenv', 'BATCH_MODE', 'true',
+                '--proc', '/proc', '--dev', '/dev', '--tmpfs', '/tmp',
                 '--dir', '/home', '--dir', '/home/builder']
         for name in ('usr', 'bin', 'lib', 'lib64', 'etc'):
             path = Path('/') / name

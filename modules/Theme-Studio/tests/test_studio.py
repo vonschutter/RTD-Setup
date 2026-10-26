@@ -361,6 +361,20 @@ class ImportTests(unittest.TestCase):
                 self.studio.install('test')
             download.assert_not_called()
 
+    def test_source_build_has_safe_terminal_environment(self):
+        source = self.home / 'source'
+        output = self.home / 'output'
+        source.mkdir()
+        output.mkdir()
+        (source / 'install.sh').write_text('#!/usr/bin/env bash\n')
+        entry = {'requires': [], 'profiles': {'default': []}}
+        with patch('studio.shutil.which', return_value='/usr/bin/bwrap'), \
+                patch('studio.run') as execute, patch('studio.normalize_build_links'):
+            self.studio.build(source, output, entry)
+        command = execute.call_args.args[0]
+        term = command.index('TERM')
+        self.assertEqual(command[term - 1:term + 2], ['--setenv', 'TERM', 'dumb'])
+
     def test_installed_family_reuse_and_missing_asset_repair_error(self):
         with patch('studio.catalog', return_value=[self.entry()]), patch('studio.urllib.request.urlopen', return_value=self.fixture()) as download:
             self.studio.install('test')
