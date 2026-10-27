@@ -1,10 +1,10 @@
 # Theme Studio validation
 
-Validation performed on 2026-10-22. All appearance tests used temporary homes and fake or in-memory settings. The user's GNOME appearance was not changed.
+Validation performed through 2026-10-27. All appearance tests used temporary homes and fake or in-memory settings. The user's GNOME appearance was not changed.
 
 ## Automated and UI checks
 
-- **41 unit/regression tests** pass: snapshots, undo, rollback on injected failure, pending-change recovery, locking, GTK4 original-file and symlink preservation, saved GTK4 components, ownership and active-theme protection, catalog/preset consistency, archive traversal/link handling, import rollback, source notices, and relocated/cross-family icon links.
+- **45 unit/regression tests** pass: snapshots, undo, rollback on injected failure, pending-change recovery, locking, GTK4 original-file and symlink preservation, saved GTK4 components, ownership and active-theme protection, User Themes activation and next-login fallback, catalog/preset consistency, archive traversal/link handling, import rollback, source notices, and relocated/cross-family icon links.
 - **Native GTK4/Libadwaita smoke test** passes: opens the real window, checks 63 look/family cards, verifies the multi-column gallery, visits all five pages, searches, runs an asynchronous action, refreshes selectors and closes cleanly.
 - Inspected an actual [rendered application preview](Media_files/preview.png); fixed SVG intrinsic sizing that initially prevented the gallery from forming columns.
 - Real **Gio.Settings** validation/write/read roundtrip passes with `GSETTINGS_BACKEND=memory`.

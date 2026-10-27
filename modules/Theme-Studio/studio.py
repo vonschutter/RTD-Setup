@@ -23,6 +23,8 @@ HERE = Path(__file__).resolve().parent
 INTERFACE = 'org.gnome.desktop.interface'
 BACKGROUND = 'org.gnome.desktop.background'
 SHELL = 'org.gnome.shell.extensions.user-theme'
+GNOME_SHELL = 'org.gnome.shell'
+USER_THEME_UUID = 'user-theme@gnome-shell-extensions.gcampax.github.com'
 ACCENTS = ('blue', 'teal', 'green', 'yellow', 'orange', 'red', 'pink', 'purple', 'slate')
 COLORS = ('#3584e4', '#2190a4', '#3a944a', '#c88800', '#ed5b00', '#e62d42', '#d56199', '#9141ac', '#6f8396')
 
@@ -260,6 +262,36 @@ class Settings:
 
     def default(self, schema, key):
         return self.setting(schema).get_default_value(key).print_(True)
+
+    def get_boolean(self, schema, key):
+        if not self.has(schema, key):
+            raise StudioError(f'Setting is unavailable: {schema} / {key}')
+        return self.setting(schema).get_boolean(key)
+
+    def set_boolean(self, schema, key, value):
+        settings = self.setting(schema)
+        if not self.has(schema, key) or not settings.is_writable(key):
+            raise StudioError(f'Setting is unavailable or locked: {schema} / {key}')
+        if not settings.set_boolean(key, value):
+            raise StudioError(f'Could not write {schema} / {key}')
+        self.Gio.Settings.sync()
+        if settings.get_boolean(key) != value:
+            raise StudioError(f'GNOME did not persist {key}; check the session D-Bus connection.')
+
+    def get_strv(self, schema, key):
+        if not self.has(schema, key):
+            raise StudioError(f'Setting is unavailable: {schema} / {key}')
+        return list(self.setting(schema).get_strv(key))
+
+    def set_strv(self, schema, key, values):
+        settings = self.setting(schema)
+        if not self.has(schema, key) or not settings.is_writable(key):
+            raise StudioError(f'Setting is unavailable or locked: {schema} / {key}')
+        if not settings.set_strv(key, values):
+            raise StudioError(f'Could not write {schema} / {key}')
+        self.Gio.Settings.sync()
+        if list(settings.get_strv(key)) != list(values):
+            raise StudioError(f'GNOME did not persist {key}; check the session D-Bus connection.')
 
 
 class Studio:
@@ -633,10 +665,39 @@ class Studio:
 
     def check_shell(self):
         if not self.settings.has(SHELL, 'name'):
-            raise StudioError('Complete looks require the GNOME User Themes extension. Install and enable it first, or use Customize for GTK/icons only.')
-        enabled = run(['gnome-extensions', 'list', '--enabled']).splitlines()
-        if 'user-theme@gnome-shell-extensions.gcampax.github.com' not in enabled:
-            raise StudioError('Enable the GNOME User Themes extension, then log out/in if necessary.')
+            raise StudioError('Complete looks require the GNOME User Themes extension schema. Install the extension, log out and in, then retry; or use Customize for GTK/icons only.')
+        if not shutil.which('gnome-extensions'):
+            raise StudioError('The gnome-extensions command is missing. Install the GNOME Shell extension tools and retry.')
+
+        try:
+            discovered = set(run(['gnome-extensions', 'list']).splitlines())
+        except StudioError:
+            discovered = set()
+        roots = (self.data / 'gnome-shell/extensions', Path('/usr/local/share/gnome-shell/extensions'),
+                 Path('/usr/share/gnome-shell/extensions'))
+        files_installed = any((root / USER_THEME_UUID / 'metadata.json').is_file() for root in roots)
+        if USER_THEME_UUID not in discovered and not files_installed:
+            raise StudioError('GNOME User Themes was not installed. Re-run Theme Studio and allow RTD to install gnome-shell-extensions, then retry.')
+
+        # Enable extensions globally and preserve every UUID the user already enabled.
+        if self.settings.has(GNOME_SHELL, 'disable-user-extensions'):
+            self.settings.set_boolean(GNOME_SHELL, 'disable-user-extensions', False)
+        enabled_setting = self.settings.get_strv(GNOME_SHELL, 'enabled-extensions')
+        if USER_THEME_UUID not in enabled_setting:
+            self.settings.set_strv(GNOME_SHELL, 'enabled-extensions', enabled_setting + [USER_THEME_UUID])
+
+        # Ask the running Shell to activate it now. A Shell started before the
+        # package was installed may only discover it after the next login.
+        try:
+            run(['gnome-extensions', 'enable', USER_THEME_UUID])
+        except StudioError:
+            pass
+        try:
+            active_live = set(run(['gnome-extensions', 'list', '--active']).splitlines())
+        except StudioError:
+            active_live = set()
+        if USER_THEME_UUID not in active_live:
+            raise StudioError('GNOME User Themes is installed and enabled for this account, but it is not active in the running GNOME Shell. Log out and back in once, then retry; the enabled setting will be preserved. If it remains inactive, check extension compatibility in the Extensions app.')
 
     def apply_look(self, look_id):
         look = next((item for item in looks() if item['id'] == look_id), None)

@@ -10,7 +10,8 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from studio import (ACCENTS, BACKGROUND, INTERFACE, SHELL, Settings, Studio, StudioError,
+from studio import (ACCENTS, BACKGROUND, GNOME_SHELL, INTERFACE, SHELL, USER_THEME_UUID,
+                    Settings, Studio, StudioError,
                     atomic_json, catalog, extract_archive, looks, quote)
 
 
@@ -24,6 +25,8 @@ class FakeSettings:
                        (BACKGROUND, 'picture-uri'): quote('file:///original.png'),
                        (BACKGROUND, 'picture-uri-dark'): quote('file:///original.png'),
                        (BACKGROUND, 'picture-options'): quote('zoom'),
+                       (GNOME_SHELL, 'disable-user-extensions'): False,
+                       (GNOME_SHELL, 'enabled-extensions'): [],
                        (SHELL, 'name'): quote('')}
         self.defaults = self.values.copy()
         self.fail_once = None
@@ -49,6 +52,18 @@ class FakeSettings:
 
     def default(self, schema, key):
         return self.defaults[schema, key]
+
+    def get_boolean(self, schema, key):
+        return self.values[schema, key]
+
+    def set_boolean(self, schema, key, value):
+        self.values[schema, key] = value
+
+    def get_strv(self, schema, key):
+        return list(self.values[schema, key])
+
+    def set_strv(self, schema, key, values):
+        self.values[schema, key] = list(values)
 
 
 class StudioTests(unittest.TestCase):
@@ -121,6 +136,39 @@ class StudioTests(unittest.TestCase):
         with self.assertRaisesRegex(StudioError, 'GNOME 47'):
             self.studio.apply(mode='dark', accent='blue')
         self.assertEqual(self.settings.writes, [])
+
+    def test_shell_extension_is_enabled_without_losing_existing_extensions(self):
+        existing = 'example@extensions.test'
+        self.settings.values[GNOME_SHELL, 'disable-user-extensions'] = True
+        self.settings.values[GNOME_SHELL, 'enabled-extensions'] = [existing]
+        commands = []
+
+        def extension_command(argv, **_kwargs):
+            commands.append(argv)
+            if argv == ['gnome-extensions', 'list']:
+                return USER_THEME_UUID + '\n'
+            if argv == ['gnome-extensions', 'list', '--active']:
+                return USER_THEME_UUID + '\n'
+            return ''
+
+        with patch('studio.shutil.which', return_value='/usr/bin/gnome-extensions'), patch('studio.run', side_effect=extension_command):
+            self.studio.check_shell()
+        self.assertFalse(self.settings.values[GNOME_SHELL, 'disable-user-extensions'])
+        self.assertEqual(self.settings.values[GNOME_SHELL, 'enabled-extensions'], [existing, USER_THEME_UUID])
+        self.assertIn(['gnome-extensions', 'enable', USER_THEME_UUID], commands)
+
+    def test_shell_extension_queues_enable_when_current_shell_needs_login(self):
+        self.settings.values[GNOME_SHELL, 'enabled-extensions'] = []
+
+        def extension_command(argv, **_kwargs):
+            if argv == ['gnome-extensions', 'list']:
+                return USER_THEME_UUID + '\n'
+            return ''
+
+        with patch('studio.shutil.which', return_value='/usr/bin/gnome-extensions'), patch('studio.run', side_effect=extension_command):
+            with self.assertRaisesRegex(StudioError, 'Log out and back in once'):
+                self.studio.check_shell()
+        self.assertEqual(self.settings.values[GNOME_SHELL, 'enabled-extensions'], [USER_THEME_UUID])
 
     def test_invalid_accent_and_mode(self):
         for args in ({'mode': 'oops'}, {'accent': 'oops'}):
