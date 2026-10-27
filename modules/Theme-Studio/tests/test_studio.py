@@ -319,7 +319,9 @@ class ExtensionInstallerTests(unittest.TestCase):
             schemas = extension / 'schemas'
             schemas.mkdir(parents=True)
             metadata = extension / 'metadata.json'
-            metadata.write_text(json.dumps({'uuid': extension.name, 'settings-schema': 'org.example.test'}))
+            # Ubuntu/distro-patched metadata may omit settings-schema even
+            # though a schema XML is present beside the extension.
+            metadata.write_text(json.dumps({'uuid': extension.name}))
             metadata.chmod(0o600)
             (schemas / 'org.example.test.gschema.xml').write_text(
                 '<schemalist><schema id="org.example.test" path="/org/example/test/">'
@@ -331,7 +333,7 @@ class ExtensionInstallerTests(unittest.TestCase):
             self.assertTrue(metadata.stat().st_mode & 0o004)
             compiled = schemas / 'gschemas.compiled'
             self.assertTrue(compiled.is_file())
-            self.assertTrue(compiled.stat().st_mode & 0o004)
+            self.assertEqual(compiled.stat().st_mode & 0o777, 0o644)
 
 
 class ArchiveTests(unittest.TestCase):

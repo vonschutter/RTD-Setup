@@ -75,16 +75,19 @@ except (OSError, ValueError):
 print(value if isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_.-]+', value) else '')
 PY
 )"
-      [[ -n "$schema" ]] || continue
       schema_dir="$extension/schemas"
-      source_schema="/usr/share/glib-2.0/schemas/${schema}.gschema.xml"
       mkdir -p "$schema_dir" || { rc=1; continue; }
-      if [[ ! -f "$schema_dir/${schema}.gschema.xml" && -f "$source_schema" ]]; then
-        install -m 0644 "$source_schema" "$schema_dir/${schema}.gschema.xml" || { rc=1; continue; }
+      if [[ -n "$schema" ]]; then
+        source_schema="/usr/share/glib-2.0/schemas/${schema}.gschema.xml"
+        if [[ ! -f "$schema_dir/${schema}.gschema.xml" && -f "$source_schema" ]]; then
+          install -m 0644 "$source_schema" "$schema_dir/${schema}.gschema.xml" || { rc=1; continue; }
+        fi
       fi
+      # Compile any schema XML shipped beside the extension even when older or
+      # distro-patched metadata omits the settings-schema property.
       if compgen -G "$schema_dir/*.gschema.xml" >/dev/null; then
         glib-compile-schemas --strict "$schema_dir" || { rc=1; continue; }
-        chmod a+r "$schema_dir/gschemas.compiled" || rc=1
+        chmod 0644 "$schema_dir/gschemas.compiled" || rc=1
       fi
     done < <(find "$root" -mindepth 1 -maxdepth 1 -type d -print0)
   done
