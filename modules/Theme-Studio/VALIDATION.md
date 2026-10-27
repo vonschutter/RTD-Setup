@@ -4,7 +4,7 @@ Validation performed through 2026-10-27. All appearance tests used temporary hom
 
 ## Automated and UI checks
 
-- **46 unit/regression tests** pass: snapshots, undo, rollback on injected failure, pending-change recovery, locking, GTK4 original-file and symlink preservation, saved GTK4 components, ownership and active-theme protection, User Themes schema/permission repair, activation and next-login fallback, catalog/preset consistency, archive traversal/link handling, import rollback, source notices, and relocated/cross-family icon links.
+- **47 unit/regression tests** pass: snapshots, undo, rollback on injected failure, pending-change recovery, locking, GTK4 original-file and symlink preservation, saved GTK4 components, ownership and active-theme protection, local extension schema/permission repair, preservation of distribution system-schema lookup, User Themes activation and next-login fallback, catalog/preset consistency, archive traversal/link handling, import rollback, source notices, and relocated/cross-family icon links.
 - **Native GTK4/Libadwaita smoke test** passes: opens the real window, checks 63 look/family cards, verifies the multi-column gallery, visits all five pages, searches, runs an asynchronous action, refreshes selectors and closes cleanly.
 - Inspected an actual [rendered application preview](Media_files/preview.png); fixed SVG intrinsic sizing that initially prevented the gallery from forming columns.
 - Real **Gio.Settings** validation/write/read roundtrip passes with `GSETTINGS_BACKEND=memory`.

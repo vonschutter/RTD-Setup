@@ -36,7 +36,7 @@
    #################################################################
 
 repair_extension_schemas() {
-  local root extension metadata schema schema_dir source_schema rc=0
+  local root extension metadata schema_dir rc=0
   local -a roots=("$@")
 
   if [[ ${#roots[@]} -eq 0 ]]; then
@@ -46,7 +46,6 @@ repair_extension_schemas() {
       roots=("${XDG_DATA_HOME:-$HOME/.local/share}/gnome-shell/extensions")
     fi
   fi
-  command -v python3 >/dev/null || { echo "Missing required command: python3" >&2; return 1; }
   command -v glib-compile-schemas >/dev/null || { echo "Missing required command: glib-compile-schemas" >&2; return 1; }
 
   for root in "${roots[@]}"; do
@@ -63,28 +62,21 @@ repair_extension_schemas() {
       # Extension ZIPs can preserve owner-only modes when extracted as root.
       # GNOME Shell must be able to traverse directories and read extension files.
       chmod -R a+rX "$extension" || { rc=1; continue; }
-      schema="$(python3 - "$metadata" <<'PY'
-import json
-import re
-import sys
-
-try:
-    value = json.load(open(sys.argv[1], encoding='utf-8')).get('settings-schema', '')
-except (OSError, ValueError):
-    value = ''
-print(value if isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_.-]+', value) else '')
-PY
-)"
       schema_dir="$extension/schemas"
-      mkdir -p "$schema_dir" || { rc=1; continue; }
-      if [[ -n "$schema" ]]; then
-        source_schema="/usr/share/glib-2.0/schemas/${schema}.gschema.xml"
-        if [[ ! -f "$schema_dir/${schema}.gschema.xml" && -f "$source_schema" ]]; then
-          install -m 0644 "$source_schema" "$schema_dir/${schema}.gschema.xml" || { rc=1; continue; }
-        fi
+      [[ -d "$schema_dir" ]] || continue
+
+      # Distribution packages such as Ubuntu Dock deliberately keep their
+      # schemas in /usr/share/glib-2.0/schemas.  An empty local schemas directory
+      # shadows that system schema source and makes GNOME look for a nonexistent
+      # per-extension gschemas.compiled.  Remove only an empty directory; never
+      # manufacture a local schema directory for a package-managed extension.
+      if [[ -z "$(find "$schema_dir" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
+        rmdir "$schema_dir" || rc=1
+        continue
       fi
-      # Compile any schema XML shipped beside the extension even when older or
-      # distro-patched metadata omits the settings-schema property.
+
+      # Extensions which actually ship local schema XML need a local compiled
+      # cache.  Compile those without relying on an optional metadata property.
       if compgen -G "$schema_dir/*.gschema.xml" >/dev/null; then
         glib-compile-schemas --strict "$schema_dir" || { rc=1; continue; }
         chmod 0644 "$schema_dir/gschemas.compiled" || rc=1

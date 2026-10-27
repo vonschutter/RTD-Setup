@@ -335,6 +335,22 @@ class ExtensionInstallerTests(unittest.TestCase):
             self.assertTrue(compiled.is_file())
             self.assertEqual(compiled.stat().st_mode & 0o777, 0o644)
 
+    def test_repair_removes_empty_schema_directory_to_preserve_system_schema_lookup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'extensions'
+            extension = root / 'ubuntu-dock@ubuntu.com'
+            schemas = extension / 'schemas'
+            schemas.mkdir(parents=True)
+            metadata = extension / 'metadata.json'
+            metadata.write_text(json.dumps({
+                'uuid': extension.name,
+                'settings-schema': 'org.gnome.shell.extensions.dash-to-dock',
+            }))
+            installer = Path(__file__).resolve().parents[2] / 'gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer'
+            subprocess.run(['bash', str(installer), '--repair', str(root)], check=True,
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            self.assertFalse(schemas.exists())
+
 
 class ArchiveTests(unittest.TestCase):
     def archive(self, entries):

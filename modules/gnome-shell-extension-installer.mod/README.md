@@ -18,6 +18,7 @@ Options:
   --no-install            Saves the extension(s) in the current directory.
   --update                Check for new versions.
   --restart-shell         Restart GNOME Shell after the extensions are installed.
+  --repair [DIRECTORY...] Repair extension permissions and local schema caches.
   -h or --help            Print this message.
 
 Usage examples:
@@ -30,3 +31,9 @@ Usage examples:
 By default extensions are installed in `$HOME/.local/share/gnome-shell/extensions/`,
 except if the script is run with super user permission
 (then, it will be installed in `/usr/share/gnome-shell/extensions/`).
+
+`--repair` compiles a cache only when an extension actually ships local
+`schemas/*.gschema.xml` files. Distribution extensions such as Ubuntu Dock use
+the system schema source in `/usr/share/glib-2.0/schemas`; the repair removes an
+empty local `schemas/` directory because it would incorrectly shadow that
+system source.
