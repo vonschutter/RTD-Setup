@@ -3,6 +3,7 @@ import io
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -308,6 +309,29 @@ class StudioTests(unittest.TestCase):
         content = (self.studio.data / 'applications/rtd-theme-studio.desktop').read_text()
         self.assertIn('Type=Application', content)
         self.assertIn('rtd-theme-studio"', content)
+
+
+class ExtensionInstallerTests(unittest.TestCase):
+    def test_repair_normalizes_permissions_and_compiles_schema(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'extensions'
+            extension = root / 'test@example.invalid'
+            schemas = extension / 'schemas'
+            schemas.mkdir(parents=True)
+            metadata = extension / 'metadata.json'
+            metadata.write_text(json.dumps({'uuid': extension.name, 'settings-schema': 'org.example.test'}))
+            metadata.chmod(0o600)
+            (schemas / 'org.example.test.gschema.xml').write_text(
+                '<schemalist><schema id="org.example.test" path="/org/example/test/">'
+                '<key name="enabled" type="b"><default>false</default></key>'
+                '</schema></schemalist>')
+            installer = Path(__file__).resolve().parents[2] / 'gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer'
+            subprocess.run(['bash', str(installer), '--repair', str(root)], check=True,
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            self.assertTrue(metadata.stat().st_mode & 0o004)
+            compiled = schemas / 'gschemas.compiled'
+            self.assertTrue(compiled.is_file())
+            self.assertTrue(compiled.stat().st_mode & 0o004)
 
 
 class ArchiveTests(unittest.TestCase):

@@ -35,6 +35,68 @@
    #                                                               #
    #################################################################
 
+repair_extension_schemas() {
+  local root extension metadata schema schema_dir source_schema rc=0
+  local -a roots=("$@")
+
+  if [[ ${#roots[@]} -eq 0 ]]; then
+    if [[ $EUID -eq 0 ]]; then
+      roots=(/usr/share/gnome-shell/extensions /usr/local/share/gnome-shell/extensions)
+    else
+      roots=("${XDG_DATA_HOME:-$HOME/.local/share}/gnome-shell/extensions")
+    fi
+  fi
+  command -v python3 >/dev/null || { echo "Missing required command: python3" >&2; return 1; }
+  command -v glib-compile-schemas >/dev/null || { echo "Missing required command: glib-compile-schemas" >&2; return 1; }
+
+  for root in "${roots[@]}"; do
+    [[ -d "$root" ]] || continue
+    while IFS= read -r -d '' extension; do
+      metadata="$extension/metadata.json"
+      [[ -f "$metadata" ]] || continue
+      if [[ -L "$metadata" || -L "$extension/schemas" || -L "$extension/schemas/gschemas.compiled" ]]; then
+        echo "Refusing symlinked GNOME extension metadata/schema path: $extension" >&2
+        rc=1
+        continue
+      fi
+
+      # Extension ZIPs can preserve owner-only modes when extracted as root.
+      # GNOME Shell must be able to traverse directories and read extension files.
+      chmod -R a+rX "$extension" || { rc=1; continue; }
+      schema="$(python3 - "$metadata" <<'PY'
+import json
+import re
+import sys
+
+try:
+    value = json.load(open(sys.argv[1], encoding='utf-8')).get('settings-schema', '')
+except (OSError, ValueError):
+    value = ''
+print(value if isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_.-]+', value) else '')
+PY
+)"
+      [[ -n "$schema" ]] || continue
+      schema_dir="$extension/schemas"
+      source_schema="/usr/share/glib-2.0/schemas/${schema}.gschema.xml"
+      mkdir -p "$schema_dir" || { rc=1; continue; }
+      if [[ ! -f "$schema_dir/${schema}.gschema.xml" && -f "$source_schema" ]]; then
+        install -m 0644 "$source_schema" "$schema_dir/${schema}.gschema.xml" || { rc=1; continue; }
+      fi
+      if compgen -G "$schema_dir/*.gschema.xml" >/dev/null; then
+        glib-compile-schemas --strict "$schema_dir" || { rc=1; continue; }
+        chmod a+r "$schema_dir/gschemas.compiled" || rc=1
+      fi
+    done < <(find "$root" -mindepth 1 -maxdepth 1 -type d -print0)
+  done
+  return "$rc"
+}
+
+if [[ "${1:-}" == "--repair" ]]; then
+  shift
+  repair_extension_schemas "$@"
+  exit $?
+fi
+
 usage_guide() {
   cat << EOF
 Usage: $SCRIPT_NAME EXTENSION_ID [EXTENSION_ID...] [GNOME_VERSION] [OPTIONS]
@@ -45,6 +107,7 @@ Options:
   --no-install 			Saves the extension(s) in the current directory.
   --update 			Check for new versions.
   --restart-shell 		Restart Shell after installing all extensions.
+  --repair [DIRECTORY...]	Repair readable modes and compile extension schemas.
   -h or --help 			Print this message.
 
 Usage examples:
@@ -54,7 +117,7 @@ Usage examples:
   $SCRIPT_NAME -s "User Themes"	# Search "User Themes"
 
 Installation directory:
-  Extensions will be installed at '/usr/local/share/gnome-shell/extensions' if
+  Extensions will be installed at '/usr/share/gnome-shell/extensions' if
   the script is ran with super user privileges. If not, they will be installed
   at '$HOME/.local/share/gnome-shell/extensions'.
 EOF
@@ -77,6 +140,7 @@ extract_extension() {
   echo "[$1] Extracting extension"
   unzip -qq -o "$TMP_DIR/shell-$SELECTED_VERSION-extension-install.$3.zip" -d "$EXTENSIONS_PATH/$2"
   rm -f "$TMP_DIR/shell-$SELECTED_VERSION-extension-install.$3.zip"
+  repair_extension_schemas "$EXTENSIONS_PATH" || return 1
   return $CODE
 }
 
