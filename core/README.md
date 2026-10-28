@@ -14,6 +14,8 @@ This document is for module authors and maintainers. Users looking for commands 
 | `sigs/` | Hashes used when verifying packaged OEM applications |
 | `rtd-oem-enable-config.sh` | Registration/configuration path used during automated installs |
 | `rtd-oem-linux-config.sh` | Linux workstation, server, or VM configuration entry point |
+| `rtd-vm-template-finalize-linux.sh` | Default bundle installation and validated VM template reseal |
+| `rtd-prepare-oem-temporary-user.sh` | One-shot Ubuntu build-user transition required by Ubiquity OEM first boot |
 | `rtd-oem-macos-config.sh` | macOS configuration entry point |
 | `rtd-oem-windows-setup.ps1` | Unified, capability-driven Windows 10+ configuration worker |
 | `rtd-oem-windows-setup-splash.ps1` | Interactive Windows WPF setup frontend |

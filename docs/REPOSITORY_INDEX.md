@@ -2,7 +2,7 @@
 
 This generated catalog is the routing layer for repository work. Search it first, then open only the listed source files and symbols needed for the task.
 
-Snapshot: commit `ef85e5d` with working-tree changes; 314 indexed paths; 1392 extracted code symbols. `docs/REPOSITORY_INDEX.md` excludes itself from counts.
+Snapshot: commit `eb8b851` with working-tree changes; 316 indexed paths; 1407 extracted code symbols. `docs/REPOSITORY_INDEX.md` excludes itself from counts.
 
 Regenerate after structural or symbol changes:
 
@@ -35,7 +35,7 @@ rg -n -F 'path_fragment' docs/REPOSITORY_INDEX.md
 | `LICENSE` | 1 | Repository license text. |
 | `LICENSE.md` | 1 | License documentation. |
 | `README.md` | 1 | Primary user documentation and task routing. |
-| `core` | 30 | Shared implementation, OEM flows, metadata, signatures, and core media. |
+| `core` | 32 | Shared implementation, OEM flows, metadata, signatures, and core media. |
 | `docs` | 3 | Getting-started, tool-reference, use-case, and generated repository documentation. |
 | `media_files` | 26 | Repository-wide screenshots and branding assets. |
 | `modules` | 248 | User-facing tools, compatibility commands, and module-local assets/docs. |
@@ -44,19 +44,20 @@ rg -n -F 'path_fragment' docs/REPOSITORY_INDEX.md
 
 ### File kinds
 
-archive: 5, documentation: 53, file: 2, image: 156, json: 1, metadata: 2, powershell: 4, python: 12, shell: 69, signature: 9, yml: 1
+archive: 5, documentation: 53, file: 2, image: 156, json: 1, metadata: 2, powershell: 4, python: 13, shell: 70, signature: 9, yml: 1
 
 ## Core Sources
 
 | Source | Lines | Symbols | Purpose |
 | --- | ---: | ---: | --- |
-| [`core/_rtd_library`](../core/_rtd_library) | 36590 | 468 | Shared Bash API: platform, package, desktop, security, media, and VM functions. |
+| [`core/_rtd_library`](../core/_rtd_library) | 36680 | 469 | Shared Bash API: platform, package, desktop, security, media, and VM functions. |
 | [`core/_rtd_recipies.info`](../core/_rtd_recipies.info) | 1436 | 41 | Software bundle recipes consumed by the bundle managers. |
-| [`core/_locations.info`](../core/_locations.info) | 392 | 0 | Tool registration and launcher metadata. |
+| [`core/_locations.info`](../core/_locations.info) | 374 | 0 | Tool registration and launcher metadata. |
 | [`core/_branding.info`](../core/_branding.info) | 373 | 0 | Shared product names, paths, URLs, and presentation defaults. |
 | [`core/rtd-oem-enable-config.sh`](../core/rtd-oem-enable-config.sh) | 367 | 7 | Register and configure RTD during automated Linux installs. |
 | [`core/rtd-oem-linux-config.sh`](../core/rtd-oem-linux-config.sh) | 325 | 5 | Linux OEM workstation/server/VM configuration entry point. |
-| [`core/rtd-vm-template-finalize-linux.sh`](../core/rtd-vm-template-finalize-linux.sh) | 263 | 12 | Install default bundles and reseal Linux VM templates. |
+| [`core/rtd-vm-template-finalize-linux.sh`](../core/rtd-vm-template-finalize-linux.sh) | 267 | 12 | Install default bundles and reseal Linux VM templates. |
+| [`core/rtd-prepare-oem-temporary-user.sh`](../core/rtd-prepare-oem-temporary-user.sh) | 74 | 0 | Prepare RTD's temporary Ubuntu account for Ubiquity OEM first boot. |
 | [`core/rtd-bootstrap-progress-gtk.py`](../core/rtd-bootstrap-progress-gtk.py) | 358 | 3 | GTK progress UI for bootstrap and template finalization. |
 | [`core/rtd-oem-macos-config.sh`](../core/rtd-oem-macos-config.sh) | 597 | 29 | macOS OEM configuration entry point. |
 | [`core/rtd-oem-windows-setup.ps1`](../core/rtd-oem-windows-setup.ps1) | 2148 | 60 | Windows OEM setup and KVM guest integration. |
@@ -67,7 +68,7 @@ archive: 5, documentation: 53, file: 2, image: 156, json: 1, metadata: 2, powers
 | Module | Entry points | Purpose |
 | --- | --- | --- |
 | [Security-tool.mod](../modules/Security-tool.mod/README.md) | `rtd-security-tool` | Interactive security auditing and hardening actions. |
-| [Theme_Studio](../modules/Theme_Studio/README.md) | `rtd-theme-studio`, `studio.py`, `studio_gtk.py` | Browse and install GNOME themes/icons, compose looks, and recover user-local appearance changes. |
+| [Theme-Studio](../modules/Theme-Studio/README.md) | `rtd-theme-studio`, `studio.py`, `studio_gtk.py` | Module-local tool and assets. |
 | [gnome-shell-extension-installer.mod](../modules/gnome-shell-extension-installer.mod/README.md) | `rtd-gnome-shell-extension-installer` | Search for and install GNOME Shell extensions. |
 | [light-weight-office-games.mod](../modules/light-weight-office-games.mod/README.md) | `rtd-light-weight-office-games` | Install a curated group of lightweight desktop games. |
 | [macos-kvm.mod](../modules/macos-kvm.mod/README.md) | `macos-kvm-gtk.py`, `rtd-macos-kvm`, `rtd-macos-kvm-gui` | Prepare and define macOS recovery VMs on QEMU/KVM. |
@@ -99,474 +100,475 @@ Format: `symbol` — `path:line`. Symbols are grouped by source so searches retu
 
 ### `core/_rtd_library`
 
-- `dialog::clear_screen` — `core/_rtd_library:515`
-- `dialog::ensure_menu_command` — `core/_rtd_library:555`
-- `dialog` — `core/_rtd_library:591`
-- `display_gui` — `core/_rtd_library:780`
-- `dialog::check_menu_availability` — `core/_rtd_library:804`
-- `rtd_ui::backend` — `core/_rtd_library:841`
-- `rtd_ui::message` — `core/_rtd_library:890`
-- `rtd_ui::text_file` — `core/_rtd_library:937`
-- `rtd_ui::yes_no` — `core/_rtd_library:989`
-- `rtd_ui::form` — `core/_rtd_library:1036`
-- `rtd_ui::input` — `core/_rtd_library:1131`
-- `rtd_ui::menu` — `core/_rtd_library:1183`
-- `rtd_ui::checklist` — `core/_rtd_library:1263`
-- `dialog::display_cmd_output` — `core/_rtd_library:1340`
-- `dialog::copy_file_progress` — `core/_rtd_library:1368`
-- `dialog::copy_with_progress` — `core/_rtd_library:1514`
-- `dialog::display_notice` — `core/_rtd_library:1596`
-- `dialog::display_error` — `core/_rtd_library:1630`
-- `dialog::display_summary_message` — `core/_rtd_library:1664`
-- `dialog::display_result` — `core/_rtd_library:1710`
-- `dialog::prompt_yes_no` — `core/_rtd_library:1750`
-- `yad::display_cmd_output` — `core/_rtd_library:1827`
-- `yad::display_progressbar_pulsating` — `core/_rtd_library:1880`
-- `zenity::display_info` — `core/_rtd_library:1923`
-- `yad::display_info` — `core/_rtd_library:1957`
-- `zenity::display_url` — `core/_rtd_library:1991`
-- `yad::display_url` — `core/_rtd_library:2028`
-- `zenity::display_file` — `core/_rtd_library:2066`
-- `yad::display_file` — `core/_rtd_library:2102`
-- `term::animate_while_command` — `core/_rtd_library:2137`
-- `term::configure_tty_console_font` — `core/_rtd_library:2195`
-- `term::configure_tty_console_font::usage` — `core/_rtd_library:2245`
-- `term::configure_tty_console_font::find_font` — `core/_rtd_library:2319`
-- `term::start_animation` — `core/_rtd_library:2473`
-- `term::stop_animation` — `core/_rtd_library:2533`
-- `term::task_exec_list_output` — `core/_rtd_library:2560`
-- `term::err_no_menu_system_found` — `core/_rtd_library:2616`
-- `network::check_inet_access` — `core/_rtd_library:2695`
-- `network::get_oem_test_ips` — `core/_rtd_library:2764`
-- `network::whats_my_ipinfo` — `core/_rtd_library:2780`
-- `network::whats_my_external_ip` — `core/_rtd_library:2869`
-- `network::rsync_upload` — `core/_rtd_library:2934`
-- `network::rsync_download` — `core/_rtd_library:3060`
-- `dependency::command_exists` — `core/_rtd_library:3234`
-- `system::package_candidates_for_command` — `core/_rtd_library:3360`
-- `dependency::current_desktop` — `core/_rtd_library:3390`
-- `dependency::desktop` — `core/_rtd_library:3462`
-- `desktop::apply_user_tweaks` — `core/_rtd_library:3548`
-- `dependency::os_linux` — `core/_rtd_library:3651`
-- `dependency::search_local` — `core/_rtd_library:3723`
-- `dependency::file` — `core/_rtd_library:3797`
-- `dialog::build_backtitle` — `core/_rtd_library:3871`
-- `dependency::check_hardware_virtualization_support` — `core/_rtd_library:3895`
-- `check_hardware_virtualization_support::_log_status` — `core/_rtd_library:3933`
-- `check_hardware_virtualization_support::_log_error` — `core/_rtd_library:3941`
-- `dependency::check_if_running_in_vm` — `core/_rtd_library:4009`
-- `check_if_running_in_vm::_log_status` — `core/_rtd_library:4047`
-- `check_if_running_in_vm::_log_error` — `core/_rtd_library:4055`
-- `dependency::virtualization` — `core/_rtd_library:4094`
-- `dependency::virtualization_log_status` — `core/_rtd_library:4134`
-- `dependency::virtualization_log_error` — `core/_rtd_library:4142`
-- `dependency::virtualization::_record_failure` — `core/_rtd_library:4155`
-- `dependency::virtualization::_unit_exists` — `core/_rtd_library:4163`
-- `dependency::virtualization::_enable_unit` — `core/_rtd_library:4167`
-- `system::prepare_environment_for_iso_creation` — `core/_rtd_library:4411`
-- `oem::task::iso::fetch_url` — `core/_rtd_library:4656`
-- `oem::task::iso::sanitize_label` — `core/_rtd_library:4680`
-- `oem::task::iso::sanitize_volume_id` — `core/_rtd_library:4700`
-- `oem::task::iso::format_output_name` — `core/_rtd_library:4722`
-- `oem::task::iso::find_cached_iso` — `core/_rtd_library:4748`
-- `oem::task::iso::escape_ere` — `core/_rtd_library:4790`
-- `oem::task::iso::prepare_keyring` — `core/_rtd_library:4806`
-- `oem::task::iso::update_md5sum_entries` — `core/_rtd_library:4857`
-- `oem::task::iso::collect_boot_cfg_paths` — `core/_rtd_library:4888`
-- `oem::task::iso::inject_preseed_boot_params` — `core/_rtd_library:4935`
-- `oem::task::iso::tweak_autoinstall_menu_labels` — `core/_rtd_library:5061`
-- `oem::task::iso::inject_initrd` — `core/_rtd_library:5122`
-- `oem::task::iso::rebuild_initrd_simple` — `core/_rtd_library:5854`
-- `oem::task::iso::force_ubiquity_preseed` — `core/_rtd_library:6127`
-- `oem::task::iso::download_url` — `core/_rtd_library:6196`
-- `oem::task::iso::resolve_ubuntu_iso` — `core/_rtd_library:6256`
-- `oem::task::iso::verify_ubuntu_iso` — `core/_rtd_library:6439`
-- `oem::task::iso::resolve_debian_iso` — `core/_rtd_library:6511`
-- `oem::task::iso::verify_debian_iso` — `core/_rtd_library:6699`
-- `oem::task::iso::resolve_debian_netinst` — `core/_rtd_library:6771`
-- `oem::task::iso::extract_iso` — `core/_rtd_library:6788`
-- `oem::task::iso::extract_efi_boot_image` — `core/_rtd_library:6957`
-- `oem::task::iso::detect_boot_args` — `core/_rtd_library:7046`
-- `oem::task::iso::repack_iso` — `core/_rtd_library:7166`
-- `oem::task::iso::post_build_menu` — `core/_rtd_library:7325`
-- `oem::task::iso::ensure_grub_splash_fallback` — `core/_rtd_library:7403`
-- `oem::task::debian::tweak_boot_cfg` — `core/_rtd_library:7436`
-- `oem::task::debian::inject_initrd` — `core/_rtd_library:7474`
-- `oem::task::ubuntu::inject_cloud_config` — `core/_rtd_library:7492`
-- `oem::task::auto_install_iso_debian` — `core/_rtd_library:7583`
-- `oem::task::auto_install_iso_ubuntu` — `core/_rtd_library:7682`
-- `oem::task::auto_install_iso_zorin` — `core/_rtd_library:7890`
-- `oem::task::auto_install_iso_windows` — `core/_rtd_library:8101`
-- `system::download_and_manipulate_iso_debian` — `core/_rtd_library:8311`
-- `system::create_iso_image_debian` — `core/_rtd_library:8316`
-- `system::detect_session` — `core/_rtd_library:8443`
-- `system::laptop_detect` — `core/_rtd_library:8481`
-- `system::laptop_detect::_log` — `core/_rtd_library:8553`
-- `system::preseed_to_ubuntu_ks_cfg` — `core/_rtd_library:8697`
-- `system::make_preseed_cfg` — `core/_rtd_library:8729`
-- `system::generate_cloudconfig` — `core/_rtd_library:8854`
-- `system::generate_ks_cfg_file` — `core/_rtd_library:9034`
-- `system::generate_autoyast_file` — `core/_rtd_library:9212`
-- `system::install_missing_commands` — `core/_rtd_library:9318`
-- `system::keyboard_set_layout` — `core/_rtd_library:9500`
-- `system::check_file_limits` — `core/_rtd_library:9671`
-- `system::check_file_limits::spinner` — `core/_rtd_library:9715`
-- `system::distribution_type` — `core/_rtd_library:9773`
-- `system::check_required_variables` — `core/_rtd_library:9934`
-- `system::find_vm_bridge_gemini` — `core/_rtd_library:10000`
-- `system::find_vm_bridge` — `core/_rtd_library:10131`
-- `system::restart_sound` — `core/_rtd_library:10233`
-- `system::remove_old_kernel` — `core/_rtd_library:10268`
-- `system::oem_autounlock_disk` — `core/_rtd_library:10331`
-- `system::get_Windows_Product_Key` — `core/_rtd_library:10396`
-- `system::wait_for_internet_availability` — `core/_rtd_library:10414`
-- `system::io_on_notify_wait` — `core/_rtd_library:10508`
-- `system::display_spinner` — `core/_rtd_library:10552`
-- `_spinner` — `core/_rtd_library:10564`
-- `_start_spinner` — `core/_rtd_library:10617`
-- `_stop_spinner` — `core/_rtd_library:10625`
-- `system::add_or_remove_login_script` — `core/_rtd_library:10640`
-- `_create_autostart_file` — `core/_rtd_library:10681`
-- `_remove_autostart_file` — `core/_rtd_library:10727`
-- `util::validate_heredoc_tabs_only` — `core/_rtd_library:10760`
-- `system::update_config` — `core/_rtd_library:10820`
-- `system::read_config` — `core/_rtd_library:10866`
-- `system::generate_report_disk_space_used_by_directory` — `core/_rtd_library:10899`
-- `system::toggle_oem_auto_login` — `core/_rtd_library:10939`
-- `__toggle_dm_autologin` — `core/_rtd_library:10992`
-- `system::set_oem_elevated_privilege_gui` — `core/_rtd_library:11108`
-- `system::preserve_graphical_session_environment` — `core/_rtd_library:11230`
-- `system::toggle_oem_auto_elevated_privilege` — `core/_rtd_library:11315`
-- `system::make_system_recovery_partition` — `core/_rtd_library:11430`
-- `system::run_command_in_gnome_user_session` — `core/_rtd_library:11496`
-- `system::rtd_oem_reseal::_virtualization_context` — `core/_rtd_library:11516`
-- `system::rtd_oem_reseal::_install_guest_additions` — `core/_rtd_library:11542`
-- `system::rtd_oem_reseal::_prepare_ubuntu_like` — `core/_rtd_library:11618`
-- `system::rtd_oem_reseal::_prepare_debian` — `core/_rtd_library:11641`
-- `system::rtd_oem_reseal::_prepare_fedora` — `core/_rtd_library:11669`
-- `system::rtd_oem_reseal::_prepare_suse` — `core/_rtd_library:11694`
-- `system::rtd_oem_reseal::_finalize_shutdown` — `core/_rtd_library:11718`
-- `system::rtd_oem_reseal` — `core/_rtd_library:11741`
-- `system::create_swapfile` — `core/_rtd_library:11795`
-- `system::create_swapfile::usage_mesage` — `core/_rtd_library:11832`
-- `system::tune_system_power_profile` — `core/_rtd_library:11890`
-- `system::rtd_oem_find_live_release` — `core/_rtd_library:11947`
-- `system::validate_parameters` — `core/_rtd_library:12058`
-- `system::optimize_harddrive` — `core/_rtd_library:12099`
-- `_set_scheduler` — `core/_rtd_library:12113`
-- `system::optimize_startup` — `core/_rtd_library:12181`
-- `system::cleanup_and_finish` — `core/_rtd_library:12207`
-- `github::clone_repo_user` — `core/_rtd_library:12257`
-- `github::list_all_user_repositories` — `core/_rtd_library:12283`
-- `oem::rtd_reset_default_environment_config` — `core/_rtd_library:12307`
-- `oem::distro_release_upgrade` — `core/_rtd_library:12399`
-- `oem::remove_non_western_latin_fonts` — `core/_rtd_library:12545`
-- `oem::deploy_themes` — `core/_rtd_library:12576`
-- `oem::register_all_tools` — `core/_rtd_library:12630`
-- `oem::rtd_tools_make_launchers` — `core/_rtd_library:12771`
-- `oem::create_single_launcher` — `core/_rtd_library:12785`
-- `oem::rtd_tools_make_launchers_from_locations` — `core/_rtd_library:12862`
-- `__oem_launcher_flush_entry` — `core/_rtd_library:12904`
-- `oem::check_boot_splash_screen_enable` — `core/_rtd_library:12996`
-- `oem::setup_brand_splash_screen` — `core/_rtd_library:13017`
-- `gnome::set_tilix_ui_tweaks_for_user` — `core/_rtd_library:13199`
-- `gnome::set_power_configuraton_for_user` — `core/_rtd_library:13355`
-- `gnome::set_better_font_smoothing_for_user` — `core/_rtd_library:13385`
-- `gnome::set_better_usability_for_user` — `core/_rtd_library:13405`
-- `gnome::configure_dash_to_dock` — `core/_rtd_library:13426`
-- `gnome::configure_dash_to_panel` — `core/_rtd_library:13462`
-- `gnome::configure_nautilus` — `core/_rtd_library:13520`
-- `gnome::organize_overlay_menu` — `core/_rtd_library:13540`
-- `gnome::_apply_gtk4_theme` — `core/_rtd_library:13587`
-- `gnome::_reset_ui_theme_settings` — `core/_rtd_library:13615`
-- `gnome::ensure_window_buttons_visible` — `core/_rtd_library:13642`
-- `gnome::_reload_shell_theme` — `core/_rtd_library:13659`
-- `gnome::set_ui_common_tweaks_for_user` — `core/_rtd_library:13678`
-- `gnome::_apply_terminal_preferences` — `core/_rtd_library:13693`
-- `gnome::set_ui_tweaks_for_user` — `core/_rtd_library:13756`
-- `gnome::set_basic_extensions_enabled` — `core/_rtd_library:13785`
-- `gnome::set_startup_sound` — `core/_rtd_library:13895`
-- `desktop::enable_firefox_pip_global` — `core/_rtd_library:14170`
-- `gnome::set_ui_tweak_no_media_error` — `core/_rtd_library:14278`
-- `gnome::set_ui_mac_tweaks_for_user` — `core/_rtd_library:14311`
-- `gnome::set_ui_win10_tweaks_for_user` — `core/_rtd_library:14398`
-- `gnome::set_ui_corporate_crisp_tweaks_for_user` — `core/_rtd_library:14484`
-- `gnome::set_ui_moca_tweaks_for_user` — `core/_rtd_library:14574`
-- `oem::register_wallpapers_for_gnome` — `core/_rtd_library:14641`
-- `rtd_oem_turn_on_gui_network_management` — `core/_rtd_library:14690`
-- `system::_enable_service` — `core/_rtd_library:14711`
-- `system::ensure_directory_exists` — `core/_rtd_library:14763`
-- `system::_disable_service` — `core/_rtd_library:14782`
-- `system::_turn_on_gui_network_management` — `core/_rtd_library:14889`
-- `add_gnome3_favorite_app` — `core/_rtd_library:15060`
-- `kde::set_wallpaper` — `core/_rtd_library:15086`
-- `kde::_kwriteconfig_cmd` — `core/_rtd_library:15149`
-- `kde::_list_desktop_themes` — `core/_rtd_library:15165`
-- `kde::_desktop_theme_exists` — `core/_rtd_library:15181`
-- `kde::_default_desktop_theme` — `core/_rtd_library:15195`
-- `kde::_plasma_version_major` — `core/_rtd_library:15218`
-- `kde::_reload_shell` — `core/_rtd_library:15234`
-- `kde::set_global_look_and_feel` — `core/_rtd_library:15275`
-- `kde::set_color_scheme` — `core/_rtd_library:15342`
-- `kde::set_icon_theme` — `core/_rtd_library:15392`
-- `kde::set_cursor_theme` — `core/_rtd_library:15441`
-- `kde::set_layout_panel` — `core/_rtd_library:15497`
-- `kde::tune_fonts_antialias` — `core/_rtd_library:15543`
-- `kde::apply_window_rules` — `core/_rtd_library:15581`
-- `kde::set_startup_apps` — `core/_rtd_library:15647`
-- `create_physical_media_from_iso` — `core/_rtd_library:15702`
-- `util::add_iso_to_ventoy` — `core/_rtd_library:15851`
-- `util::add_iso_to_ventoy::build_device_list` — `core/_rtd_library:15876`
-- `oem::ventoy::resolve_latest_version` — `core/_rtd_library:15988`
-- `oem::ventoy::download` — `core/_rtd_library:16044`
-- `oem::ventoy::select_usb_device` — `core/_rtd_library:16146`
-- `oem::ventoy::select_usb_device::build_list` — `core/_rtd_library:16180`
-- `oem::ventoy::wipe_device` — `core/_rtd_library:16283`
-- `oem::ventoy::unmount_device_partitions` — `core/_rtd_library:16329`
-- `oem::ventoy::refresh_device_partitions` — `core/_rtd_library:16383`
-- `oem::ventoy::create_usb` — `core/_rtd_library:16421`
-- `oem::ventoy::detect_data_partition` — `core/_rtd_library:16603`
-- `oem::ventoy::create_ext4_data_partition` — `core/_rtd_library:16687`
-- `oem::ventoy::install_legacy_bios_fallback` — `core/_rtd_library:16731`
-- `oem::ventoy::prepare_folders` — `core/_rtd_library:16786`
-- `oem::ventoy::classify_iso` — `core/_rtd_library:16818`
-- `oem::ventoy::copy_isos` — `core/_rtd_library:16849`
-- `oem::ventoy::write_partition_title` — `core/_rtd_library:16992`
-- `oem::ventoy::find_rtd_theme_background` — `core/_rtd_library:17031`
-- `oem::ventoy::install_rtd_theme_assets` — `core/_rtd_library:17050`
-- `oem::ventoy::write_menu_theme` — `core/_rtd_library:17087`
-- `oem::ventoy::write_control_config` — `core/_rtd_library:17188`
-- `oem::ventoy::brand_media` — `core/_rtd_library:17238`
-- `oem::ventoy::setup_usb` — `core/_rtd_library:17265`
-- `rtd_oem_ubuntu_auto_install_iso_builder` — `core/_rtd_library:17426`
-- `system::process_vm_opt_args` — `core/_rtd_library:17435`
-- `system::find_download_ubuntu_iso` — `core/_rtd_library:17501`
-- `system::create_physical_media_from_ubuntu_iso` — `core/_rtd_library:17548`
-- `cleanup` — `core/_rtd_library:17571`
-- `log` — `core/_rtd_library:17579`
-- `die` — `core/_rtd_library:17583`
-- `usage` — `core/_rtd_library:17593`
-- `tool::_compress_7z_items` — `core/_rtd_library:17782`
-- `tool::_compress_7z_item_should_store` — `core/_rtd_library:17897`
-- `tool::_format_elapsed_time` — `core/_rtd_library:17929`
-- `tool::compress_all_items_here` — `core/_rtd_library:17958`
-- `tool::compress_provided_items` — `core/_rtd_library:18093`
-- `tool::recompress_all_items_in_folder` — `core/_rtd_library:18217`
-- `tool::recompress_provided_items` — `core/_rtd_library:18296`
-- `tool::up_2_date` — `core/_rtd_library:18362`
-- `tool::test_iso_boot_media` — `core/_rtd_library:18403`
-- `ssh::ensure_user_ssh_key` — `core/_rtd_library:18578`
-- `ssh::ensure_key_installed_on_remote` — `core/_rtd_library:18647`
-- `security::encrypt_disk_with_luks` — `core/_rtd_library:18731`
-- `disk::reencrypt_device` — `core/_rtd_library:18859`
-- `security::enable_firewall` — `core/_rtd_library:19007`
-- `security::check_if_password_pOwned` — `core/_rtd_library:19138`
-- `security::scan_for_malware` — `core/_rtd_library:19177`
-- `security::change_disk_pass` — `core/_rtd_library:19261`
-- `security::harden_ubuntu` — `core/_rtd_library:19286`
-- `security::configure_clamav` — `core/_rtd_library:19366`
-- `security::configure_fail2ban` — `core/_rtd_library:19454`
-- `security::configure_rkhunter` — `core/_rtd_library:19563`
-- `security::configure_auditd` — `core/_rtd_library:19644`
-- `security::configure_auditd::ensure_audit_rules_dir` — `core/_rtd_library:19680`
-- `security::sysctl_hardening` — `core/_rtd_library:19723`
-- `security::secure_password_policy` — `core/_rtd_library:19815`
-- `security::install_AIDE` — `core/_rtd_library:19869`
-- `security::ensure_admin` — `core/_rtd_library:19914`
-- `software::package_kit::add_package` — `core/_rtd_library:20152`
-- `software::package_kit::remove_package` — `core/_rtd_library:20209`
-- `software::list_bundles` — `core/_rtd_library:20236`
-- `software::ensure_gnome_software_store_available` — `core/_rtd_library:20300`
-- `software::refresh_flatpak_desktop_registration` — `core/_rtd_library:20359`
-- `software::ensure_flatpak_package_managment` — `core/_rtd_library:20478`
-- `software::enable_extra_repos` — `core/_rtd_library:20577`
-- `software::offer_reboot_if_required` — `core/_rtd_library:20643`
-- `software::updates_installed_today::native` — `core/_rtd_library:20751`
-- `software::updates_installed_today::snap` — `core/_rtd_library:20804`
-- `software::updates_installed_today::flatpak` — `core/_rtd_library:20821`
-- `software::_flatpak_cmd` — `core/_rtd_library:20841`
-- `software::_flatpak_filter_advisories` — `core/_rtd_library:20910`
-- `software::update_flatpaks` — `core/_rtd_library:20967`
-- `software::flatpak_list_eol_apps` — `core/_rtd_library:21067`
-- `software::report_updates_installed_today` — `core/_rtd_library:21100`
-- `software::show_updates_installed_today` — `core/_rtd_library:21129`
-- `software::update_system_txt` — `core/_rtd_library:21156`
-- `software::update_all_ui` — `core/_rtd_library:21242`
-- `Native_Software_Packages` — `core/_rtd_library:21259`
-- `Snap_Apps` — `core/_rtd_library:21295`
-- `Flatpak_Apps` — `core/_rtd_library:21307`
-- `software::from_flathub.org` — `core/_rtd_library:21352`
-- `software::from_snapcraft.io` — `core/_rtd_library:21481`
-- `software::from_snapcraft.io::_cleanup_tmp` — `core/_rtd_library:21532`
-- `software::from_snapcraft.io::_install_snap` — `core/_rtd_library:21540`
-- `software::add_software_task` — `core/_rtd_library:21642`
-- `software::ensure_restricted_codecs` — `core/_rtd_library:21663`
-- `software::vendor_download_and_install` — `core/_rtd_library:21698`
-- `fetch_file` — `core/_rtd_library:21718`
-- `software::is_native_package_available` — `core/_rtd_library:21789`
-- `InstallSoftwareFromRepo` — `core/_rtd_library:21883`
-- `display_message` — `core/_rtd_library:21901`
-- `software::determine_package_name_from_dnf_command` — `core/_rtd_library:21926`
-- `software::determine_package_name_from_cmd` — `core/_rtd_library:21949`
-- `software::add_native_package` — `core/_rtd_library:22016`
-- `software::native_management_availability_check` — `core/_rtd_library:22179`
-- `software::ensure_snap_package_managment` — `core/_rtd_library:22255`
-- `software::zypper_add_repo` — `core/_rtd_library:22421`
-- `software::is_native_package_installed` — `core/_rtd_library:22481`
-- `software::set_install_command` — `core/_rtd_library:22573`
-- `software::add_gnome_extensions` — `core/_rtd_library:22640`
-- `software::check_native_package_dependency` — `core/_rtd_library:22733`
-- `software::rtd_ppa_checker` — `core/_rtd_library:22804`
-- `software::remove_native_software_package` — `core/_rtd_library:22864`
-- `system::determine_logfile` — `core/_rtd_library:22960`
-- `system::log_item` — `core/_rtd_library:23085`
-- `software::update_system` — `core/_rtd_library:23173`
-- `display_software_installation_choices_gtk` — `core/_rtd_library:23251`
-- `software::display_bundle_install_choices_gtk` — `core/_rtd_library:23283`
-- `run_bundle_install` — `core/_rtd_library:23391`
-- `software::display_bundle_removal_choices_gtk` — `core/_rtd_library:23449`
-- `run_bundle_uninstall` — `core/_rtd_library:23524`
-- `rtd_server_setup_choices_services` — `core/_rtd_library:23560`
-- `rtd_server_setup_choices_productivity` — `core/_rtd_library:23625`
-- `oem::setup_choices_server` — `core/_rtd_library:23692`
-- `debian::download_iso` — `core/_rtd_library:23723`
-- `oem::task::iso::resolve_fedora_iso` — `core/_rtd_library:23821`
-- `oem::task::iso::verify_fedora_iso` — `core/_rtd_library:24058`
-- `fedora::download_iso` — `core/_rtd_library:24126`
-- `oem::task::iso::resolve_opensuse_iso` — `core/_rtd_library:24248`
-- `oem::task::iso::verify_opensuse_iso` — `core/_rtd_library:24442`
-- `opensuse::download_iso` — `core/_rtd_library:24521`
-- `ubuntu::enable_plymouth_theme` — `core/_rtd_library:24620`
-- `ubuntu::get_target_version` — `core/_rtd_library:24682`
-- `ubuntu::get_latest_release_version` — `core/_rtd_library:24939`
-- `ubuntu::download_iso` — `core/_rtd_library:25009`
-- `macoskvm::normalize_installer_version` — `core/_rtd_library:25114`
-- `macoskvm::normalize_modern_installer_version` — `core/_rtd_library:25146`
-- `macoskvm::is_modern_installer_version` — `core/_rtd_library:25174`
-- `macoskvm::version_label` — `core/_rtd_library:25188`
-- `macoskvm::check_modern_host_requirements` — `core/_rtd_library:25213`
-- `macoskvm::ensure_installer_dependencies` — `core/_rtd_library:25261`
-- `macoskvm::ensure_vm_dependencies` — `core/_rtd_library:25303`
-- `macoskvm::stage_boot_assets` — `core/_rtd_library:25392`
-- `macoskvm::ensure_system_disk` — `core/_rtd_library:25583`
-- `macoskvm::fetch_modern_installer_image` — `core/_rtd_library:25659`
-- `macoskvm::fetch_installer_image` — `core/_rtd_library:25800`
-- `macoskvm::define_vm` — `core/_rtd_library:25982`
-- `macoskvm::prepare_host` — `core/_rtd_library:26341`
-- `kvm::util::validate_vm_name` — `core/_rtd_library:26621`
-- `kvm::util::set_vm_name` — `core/_rtd_library:26642`
-- `kvm::util::config_label` — `core/_rtd_library:26772`
-- `kvm::util::read_common_options` — `core/_rtd_library:26813`
-- `kvm::util::read_distro_options` — `core/_rtd_library:26937`
-- `kvm::util::read_distro_options::process_all_params` — `core/_rtd_library:27009`
-- `kvm::get_vm_config_preferences` — `core/_rtd_library:27328`
-- `kvm::get_vm_size_preferences` — `core/_rtd_library:27514`
-- `kvm::get_kali_iso` — `core/_rtd_library:27690`
-- `mint::get_mint_lmde_iso` — `core/_rtd_library:27789`
-- `kvm::get_almalinux_boot_iso` — `core/_rtd_library:27848`
-- `kvm::get_fedora_workstation_iso` — `core/_rtd_library:27936`
-- `kvm::get_zorin_iso` — `core/_rtd_library:27989`
-- `kvm__get_zorin_iso__get_latest_directory` — `core/_rtd_library:28030`
-- `kvm__get_zorin_iso__get_highest_version_file` — `core/_rtd_library:28050`
-- `kvm__get_zorin_iso__download_file` — `core/_rtd_library:28073`
-- `kvm::mount_local_folder_to_guest` — `core/_rtd_library:28258`
-- `kvm::create_expanding_vm_hardisk` — `core/_rtd_library:28403`
-- `kvm::wait_for_domain_definition` — `core/_rtd_library:28482`
-- `kvm::wait_for_domain_start` — `core/_rtd_library:28530`
-- `kvm::cleanup_unused_qcow_images` — `core/_rtd_library:28606`
-- `kvm::cleanup_virtual_floppy_images` — `core/_rtd_library:28707`
-- `kvm::make_vm_now_from_fedora_org` — `core/_rtd_library:28778`
-- `kvm::make_vm_now_from_redhat_com` — `core/_rtd_library:28974`
-- `kvm::make_vm_now_from_opensuse_org` — `core/_rtd_library:29128`
-- `kvm::make_vm_now_from_debian_org` — `core/_rtd_library:29268`
-- `kvm::make_vm_now_from_kali_org` — `core/_rtd_library:29443`
-- `kvm::make_vm_now_from_zorin` — `core/_rtd_library:29573`
-- `kvm::make_vm_now_from_ubuntu_com` — `core/_rtd_library:29778`
-- `kvm::make_vm_now_from_microsoft` — `core/_rtd_library:30267`
-- `kvm::backup_all_running_vm` — `core/_rtd_library:30551`
-- `kvm::backup_all_running_vm::do_vm_backup` — `core/_rtd_library:30576`
-- `kvm::template_metadata_dir` — `core/_rtd_library:30668`
-- `kvm::template_metadata_safe_name` — `core/_rtd_library:30672`
-- `kvm::template_metadata_json_escape` — `core/_rtd_library:30680`
-- `kvm::template_metadata_path` — `core/_rtd_library:30690`
-- `kvm::template_metadata_write` — `core/_rtd_library:30695`
-- `kvm::template_metadata_read_label` — `core/_rtd_library:30742`
-- `kvm::clone_template_vm::_build_customize_args` — `core/_rtd_library:30773`
-- `kvm::clone_template_vm::_format_name_component` — `core/_rtd_library:30836`
-- `kvm::clone_template_vm::_display_template_label` — `core/_rtd_library:30865`
-- `kvm::clone_template_vm::_detach_install_media` — `core/_rtd_library:30891`
-- `kvm::clone_template_vm::_clone_from_category` — `core/_rtd_library:30959`
-- `kvm::clone_server_template_vm` — `core/_rtd_library:31232`
-- `kvm::clone_vdi_template_vm` — `core/_rtd_library:31262`
-- `kvm::cicd::_render_extra_vars` — `core/_rtd_library:31292`
-- `kvm::cicd::_render_user_data` — `core/_rtd_library:31332`
-- `kvm::cicd::_render_meta_data` — `core/_rtd_library:31375`
-- `kvm::cicd::_create_nocloud_iso` — `core/_rtd_library:31392`
-- `kvm::cicd::configure_vm_with_ansible_pull` — `core/_rtd_library:31424`
-- `whonix::init_context` — `core/_rtd_library:31581`
-- `whonix::version_ge` — `core/_rtd_library:31628`
-- `whonix::current_vm_version` — `core/_rtd_library:31647`
-- `whonix::discover_bundle` — `core/_rtd_library:31671`
-- `whonix::prepare_workdir` — `core/_rtd_library:31711`
-- `whonix::download_with_verify` — `core/_rtd_library:31733`
-- `whonix::download_bundle` — `core/_rtd_library:31768`
-- `whonix::extract_archive` — `core/_rtd_library:31788`
-- `whonix::detect_image_owner` — `core/_rtd_library:31833`
-- `whonix::stage_images` — `core/_rtd_library:31858`
-- `whonix::ensure_networks_defined` — `core/_rtd_library:31892`
-- `whonix::ensure_networks_running` — `core/_rtd_library:31930`
-- `whonix::add_extra_workstation` — `core/_rtd_library:31954`
-- `whonix::define_vms` — `core/_rtd_library:31984`
-- `whonix::maybe_skip_install` — `core/_rtd_library:32054`
-- `template::preseed_cfg::early_command` — `core/_rtd_library:32145`
-- `template::preseed_cfg::main` — `core/_rtd_library:32220`
-- `template::preseed_cfg::auto_disk_layout` — `core/_rtd_library:32433`
-- `template::preseed_cfg::expert_recipe` — `core/_rtd_library:32530`
-- `template::preseed_cfg::late_command` — `core/_rtd_library:32595`
-- `template::kickstart_cfg` — `core/_rtd_library:32749`
-- `template::rtd_me_sh_cmd` — `core/_rtd_library:32982`
-- `template::config_menu_cmd` — `core/_rtd_library:33179`
-- `template::sysprep_unattend_xml` — `core/_rtd_library:33313`
-- `template::autounattend_xml` — `core/_rtd_library:33378`
-- `template::AutoYast_xml` — `core/_rtd_library:33755`
-- `template::Agama_json` — `core/_rtd_library:33981`
-- `template::cloud_config` — `core/_rtd_library:34243`
-- `template::minecraft_server_launcher` — `core/_rtd_library:34729`
-- `software::check_native_package_dependency` — `core/_rtd_library:34782`
-- `install_software` — `core/_rtd_library:34803`
-- `setup_minecraft_root` — `core/_rtd_library:34823`
-- `run_minecraft_server_manager` — `core/_rtd_library:34841`
-- `check_java` — `core/_rtd_library:34871`
-- `find_active_network_interface` — `core/_rtd_library:34884`
-- `minecraft_update` — `core/_rtd_library:34902`
-- `announce.py` — `core/_rtd_library:34966`
-- `start.sh` — `core/_rtd_library:35029`
-- `server.properties` — `core/_rtd_library:35084`
-- `eula.txt` — `core/_rtd_library:35147`
-- `term::set_colors` — `core/_rtd_library:35268`
-- `pause::for_input` — `core/_rtd_library:35459`
-- `pause::a_given_time` — `core/_rtd_library:35495`
-- `write_host` — `core/_rtd_library:35548`
-- `write_error` — `core/_rtd_library:35624`
-- `write_warning` — `core/_rtd_library:35653`
-- `write_status` — `core/_rtd_library:35683`
-- `write_information` — `core/_rtd_library:35713`
-- `library::__cache_dir` — `core/_rtd_library:35743`
-- `library::__desc_cache_file` — `core/_rtd_library:35759`
-- `library::__load_desc_cache` — `core/_rtd_library:35774`
-- `library::__save_desc_cache` — `core/_rtd_library:35813`
-- `library::__build_header_desc_map` — `core/_rtd_library:35836`
-- `library::__get_function_description` — `core/_rtd_library:35867`
-- `library::__zformat_cache_file` — `core/_rtd_library:35921`
-- `library::__load_zformat_cache` — `core/_rtd_library:35936`
-- `library::__save_zformat_cache` — `core/_rtd_library:35954`
-- `library::list_loaded_internal_functions` — `core/_rtd_library:35971`
-- `library::check_status` — `core/_rtd_library:36094`
-- `library::apply_rtd_defaults` — `core/_rtd_library:36148`
-- `library::envcheck_report` — `core/_rtd_library:36229`
-- `library::list_loaded_software_functions` — `core/_rtd_library:36264`
-- `main` — `core/_rtd_library:36315`
-- `display_documentation` — `core/_rtd_library:36420`
+- `dialog::clear_screen` — `core/_rtd_library:516`
+- `dialog::ensure_menu_command` — `core/_rtd_library:556`
+- `dialog` — `core/_rtd_library:592`
+- `display_gui` — `core/_rtd_library:781`
+- `dialog::check_menu_availability` — `core/_rtd_library:805`
+- `rtd_ui::backend` — `core/_rtd_library:842`
+- `rtd_ui::message` — `core/_rtd_library:891`
+- `rtd_ui::text_file` — `core/_rtd_library:938`
+- `rtd_ui::yes_no` — `core/_rtd_library:990`
+- `rtd_ui::form` — `core/_rtd_library:1037`
+- `rtd_ui::input` — `core/_rtd_library:1132`
+- `rtd_ui::menu` — `core/_rtd_library:1184`
+- `rtd_ui::checklist` — `core/_rtd_library:1264`
+- `dialog::display_cmd_output` — `core/_rtd_library:1341`
+- `dialog::copy_file_progress` — `core/_rtd_library:1369`
+- `dialog::copy_with_progress` — `core/_rtd_library:1515`
+- `dialog::display_notice` — `core/_rtd_library:1597`
+- `dialog::display_error` — `core/_rtd_library:1631`
+- `dialog::display_summary_message` — `core/_rtd_library:1665`
+- `dialog::display_result` — `core/_rtd_library:1711`
+- `dialog::prompt_yes_no` — `core/_rtd_library:1751`
+- `yad::display_cmd_output` — `core/_rtd_library:1828`
+- `yad::display_progressbar_pulsating` — `core/_rtd_library:1881`
+- `zenity::display_info` — `core/_rtd_library:1924`
+- `yad::display_info` — `core/_rtd_library:1958`
+- `zenity::display_url` — `core/_rtd_library:1992`
+- `yad::display_url` — `core/_rtd_library:2029`
+- `zenity::display_file` — `core/_rtd_library:2067`
+- `yad::display_file` — `core/_rtd_library:2103`
+- `term::animate_while_command` — `core/_rtd_library:2138`
+- `term::configure_tty_console_font` — `core/_rtd_library:2196`
+- `term::configure_tty_console_font::usage` — `core/_rtd_library:2246`
+- `term::configure_tty_console_font::find_font` — `core/_rtd_library:2320`
+- `term::start_animation` — `core/_rtd_library:2474`
+- `term::stop_animation` — `core/_rtd_library:2534`
+- `term::task_exec_list_output` — `core/_rtd_library:2561`
+- `term::err_no_menu_system_found` — `core/_rtd_library:2617`
+- `network::check_inet_access` — `core/_rtd_library:2696`
+- `network::get_oem_test_ips` — `core/_rtd_library:2765`
+- `network::whats_my_ipinfo` — `core/_rtd_library:2781`
+- `network::whats_my_external_ip` — `core/_rtd_library:2870`
+- `network::rsync_upload` — `core/_rtd_library:2935`
+- `network::rsync_download` — `core/_rtd_library:3061`
+- `dependency::command_exists` — `core/_rtd_library:3235`
+- `system::package_candidates_for_command` — `core/_rtd_library:3361`
+- `dependency::current_desktop` — `core/_rtd_library:3391`
+- `dependency::desktop` — `core/_rtd_library:3463`
+- `desktop::apply_user_tweaks` — `core/_rtd_library:3549`
+- `dependency::os_linux` — `core/_rtd_library:3652`
+- `dependency::search_local` — `core/_rtd_library:3724`
+- `dependency::file` — `core/_rtd_library:3798`
+- `dialog::build_backtitle` — `core/_rtd_library:3872`
+- `dependency::check_hardware_virtualization_support` — `core/_rtd_library:3896`
+- `check_hardware_virtualization_support::_log_status` — `core/_rtd_library:3934`
+- `check_hardware_virtualization_support::_log_error` — `core/_rtd_library:3942`
+- `dependency::check_if_running_in_vm` — `core/_rtd_library:4010`
+- `check_if_running_in_vm::_log_status` — `core/_rtd_library:4048`
+- `check_if_running_in_vm::_log_error` — `core/_rtd_library:4056`
+- `dependency::virtualization` — `core/_rtd_library:4095`
+- `dependency::virtualization_log_status` — `core/_rtd_library:4135`
+- `dependency::virtualization_log_error` — `core/_rtd_library:4143`
+- `dependency::virtualization::_record_failure` — `core/_rtd_library:4156`
+- `dependency::virtualization::_unit_exists` — `core/_rtd_library:4164`
+- `dependency::virtualization::_enable_unit` — `core/_rtd_library:4168`
+- `system::prepare_environment_for_iso_creation` — `core/_rtd_library:4412`
+- `oem::task::iso::fetch_url` — `core/_rtd_library:4657`
+- `oem::task::iso::sanitize_label` — `core/_rtd_library:4681`
+- `oem::task::iso::sanitize_volume_id` — `core/_rtd_library:4701`
+- `oem::task::iso::format_output_name` — `core/_rtd_library:4723`
+- `oem::task::iso::find_cached_iso` — `core/_rtd_library:4749`
+- `oem::task::iso::escape_ere` — `core/_rtd_library:4791`
+- `oem::task::iso::prepare_keyring` — `core/_rtd_library:4807`
+- `oem::task::iso::update_md5sum_entries` — `core/_rtd_library:4858`
+- `oem::task::iso::collect_boot_cfg_paths` — `core/_rtd_library:4889`
+- `oem::task::iso::inject_preseed_boot_params` — `core/_rtd_library:4936`
+- `oem::task::iso::tweak_autoinstall_menu_labels` — `core/_rtd_library:5062`
+- `oem::task::iso::inject_initrd` — `core/_rtd_library:5123`
+- `oem::task::iso::rebuild_initrd_simple` — `core/_rtd_library:5855`
+- `oem::task::iso::force_ubiquity_preseed` — `core/_rtd_library:6128`
+- `oem::task::iso::download_url` — `core/_rtd_library:6197`
+- `oem::task::iso::resolve_ubuntu_iso` — `core/_rtd_library:6257`
+- `oem::task::iso::verify_ubuntu_iso` — `core/_rtd_library:6440`
+- `oem::task::iso::resolve_debian_iso` — `core/_rtd_library:6512`
+- `oem::task::iso::verify_debian_iso` — `core/_rtd_library:6700`
+- `oem::task::iso::resolve_debian_netinst` — `core/_rtd_library:6772`
+- `oem::task::iso::extract_iso` — `core/_rtd_library:6789`
+- `oem::task::iso::extract_efi_boot_image` — `core/_rtd_library:6958`
+- `oem::task::iso::detect_boot_args` — `core/_rtd_library:7047`
+- `oem::task::iso::repack_iso` — `core/_rtd_library:7167`
+- `oem::task::iso::post_build_menu` — `core/_rtd_library:7326`
+- `oem::task::iso::ensure_grub_splash_fallback` — `core/_rtd_library:7404`
+- `oem::task::debian::tweak_boot_cfg` — `core/_rtd_library:7437`
+- `oem::task::debian::inject_initrd` — `core/_rtd_library:7475`
+- `oem::task::ubuntu::inject_cloud_config` — `core/_rtd_library:7493`
+- `oem::task::auto_install_iso_debian` — `core/_rtd_library:7584`
+- `oem::task::auto_install_iso_ubuntu` — `core/_rtd_library:7683`
+- `oem::task::auto_install_iso_zorin` — `core/_rtd_library:7891`
+- `oem::task::auto_install_iso_windows` — `core/_rtd_library:8102`
+- `system::download_and_manipulate_iso_debian` — `core/_rtd_library:8312`
+- `system::create_iso_image_debian` — `core/_rtd_library:8317`
+- `system::detect_session` — `core/_rtd_library:8444`
+- `system::laptop_detect` — `core/_rtd_library:8482`
+- `system::laptop_detect::_log` — `core/_rtd_library:8554`
+- `system::preseed_to_ubuntu_ks_cfg` — `core/_rtd_library:8698`
+- `system::make_preseed_cfg` — `core/_rtd_library:8730`
+- `system::generate_cloudconfig` — `core/_rtd_library:8855`
+- `system::generate_ks_cfg_file` — `core/_rtd_library:9035`
+- `system::generate_autoyast_file` — `core/_rtd_library:9213`
+- `system::install_missing_commands` — `core/_rtd_library:9319`
+- `system::keyboard_set_layout` — `core/_rtd_library:9501`
+- `system::check_file_limits` — `core/_rtd_library:9672`
+- `system::check_file_limits::spinner` — `core/_rtd_library:9716`
+- `system::distribution_type` — `core/_rtd_library:9774`
+- `system::check_required_variables` — `core/_rtd_library:9935`
+- `system::find_vm_bridge_gemini` — `core/_rtd_library:10001`
+- `system::find_vm_bridge` — `core/_rtd_library:10132`
+- `system::restart_sound` — `core/_rtd_library:10234`
+- `system::remove_old_kernel` — `core/_rtd_library:10269`
+- `system::oem_autounlock_disk` — `core/_rtd_library:10332`
+- `system::get_Windows_Product_Key` — `core/_rtd_library:10397`
+- `system::wait_for_internet_availability` — `core/_rtd_library:10415`
+- `system::io_on_notify_wait` — `core/_rtd_library:10509`
+- `system::display_spinner` — `core/_rtd_library:10553`
+- `_spinner` — `core/_rtd_library:10565`
+- `_start_spinner` — `core/_rtd_library:10618`
+- `_stop_spinner` — `core/_rtd_library:10626`
+- `system::add_or_remove_login_script` — `core/_rtd_library:10641`
+- `_create_autostart_file` — `core/_rtd_library:10682`
+- `_remove_autostart_file` — `core/_rtd_library:10728`
+- `util::validate_heredoc_tabs_only` — `core/_rtd_library:10761`
+- `system::update_config` — `core/_rtd_library:10821`
+- `system::read_config` — `core/_rtd_library:10867`
+- `system::generate_report_disk_space_used_by_directory` — `core/_rtd_library:10900`
+- `system::toggle_oem_auto_login` — `core/_rtd_library:10940`
+- `__toggle_dm_autologin` — `core/_rtd_library:10993`
+- `system::set_oem_elevated_privilege_gui` — `core/_rtd_library:11109`
+- `system::preserve_graphical_session_environment` — `core/_rtd_library:11231`
+- `system::toggle_oem_auto_elevated_privilege` — `core/_rtd_library:11316`
+- `system::make_system_recovery_partition` — `core/_rtd_library:11431`
+- `system::run_command_in_gnome_user_session` — `core/_rtd_library:11497`
+- `system::rtd_oem_reseal::_virtualization_context` — `core/_rtd_library:11517`
+- `system::rtd_oem_reseal::_install_guest_additions` — `core/_rtd_library:11543`
+- `system::rtd_oem_reseal::_stage_ubuntu_oem_user` — `core/_rtd_library:11619`
+- `system::rtd_oem_reseal::_prepare_ubuntu_like` — `core/_rtd_library:11690`
+- `system::rtd_oem_reseal::_prepare_debian` — `core/_rtd_library:11727`
+- `system::rtd_oem_reseal::_prepare_fedora` — `core/_rtd_library:11755`
+- `system::rtd_oem_reseal::_prepare_suse` — `core/_rtd_library:11780`
+- `system::rtd_oem_reseal::_finalize_shutdown` — `core/_rtd_library:11804`
+- `system::rtd_oem_reseal` — `core/_rtd_library:11827`
+- `system::create_swapfile` — `core/_rtd_library:11881`
+- `system::create_swapfile::usage_mesage` — `core/_rtd_library:11918`
+- `system::tune_system_power_profile` — `core/_rtd_library:11976`
+- `system::rtd_oem_find_live_release` — `core/_rtd_library:12033`
+- `system::validate_parameters` — `core/_rtd_library:12144`
+- `system::optimize_harddrive` — `core/_rtd_library:12185`
+- `_set_scheduler` — `core/_rtd_library:12199`
+- `system::optimize_startup` — `core/_rtd_library:12267`
+- `system::cleanup_and_finish` — `core/_rtd_library:12293`
+- `github::clone_repo_user` — `core/_rtd_library:12343`
+- `github::list_all_user_repositories` — `core/_rtd_library:12369`
+- `oem::rtd_reset_default_environment_config` — `core/_rtd_library:12393`
+- `oem::distro_release_upgrade` — `core/_rtd_library:12485`
+- `oem::remove_non_western_latin_fonts` — `core/_rtd_library:12631`
+- `oem::deploy_themes` — `core/_rtd_library:12662`
+- `oem::register_all_tools` — `core/_rtd_library:12716`
+- `oem::rtd_tools_make_launchers` — `core/_rtd_library:12857`
+- `oem::create_single_launcher` — `core/_rtd_library:12871`
+- `oem::rtd_tools_make_launchers_from_locations` — `core/_rtd_library:12948`
+- `__oem_launcher_flush_entry` — `core/_rtd_library:12990`
+- `oem::check_boot_splash_screen_enable` — `core/_rtd_library:13082`
+- `oem::setup_brand_splash_screen` — `core/_rtd_library:13103`
+- `gnome::set_tilix_ui_tweaks_for_user` — `core/_rtd_library:13285`
+- `gnome::set_power_configuraton_for_user` — `core/_rtd_library:13441`
+- `gnome::set_better_font_smoothing_for_user` — `core/_rtd_library:13471`
+- `gnome::set_better_usability_for_user` — `core/_rtd_library:13491`
+- `gnome::configure_dash_to_dock` — `core/_rtd_library:13512`
+- `gnome::configure_dash_to_panel` — `core/_rtd_library:13548`
+- `gnome::configure_nautilus` — `core/_rtd_library:13606`
+- `gnome::organize_overlay_menu` — `core/_rtd_library:13626`
+- `gnome::_apply_gtk4_theme` — `core/_rtd_library:13673`
+- `gnome::_reset_ui_theme_settings` — `core/_rtd_library:13701`
+- `gnome::ensure_window_buttons_visible` — `core/_rtd_library:13728`
+- `gnome::_reload_shell_theme` — `core/_rtd_library:13745`
+- `gnome::set_ui_common_tweaks_for_user` — `core/_rtd_library:13764`
+- `gnome::_apply_terminal_preferences` — `core/_rtd_library:13779`
+- `gnome::set_ui_tweaks_for_user` — `core/_rtd_library:13842`
+- `gnome::set_basic_extensions_enabled` — `core/_rtd_library:13871`
+- `gnome::set_startup_sound` — `core/_rtd_library:13981`
+- `desktop::enable_firefox_pip_global` — `core/_rtd_library:14256`
+- `gnome::set_ui_tweak_no_media_error` — `core/_rtd_library:14364`
+- `gnome::set_ui_mac_tweaks_for_user` — `core/_rtd_library:14397`
+- `gnome::set_ui_win10_tweaks_for_user` — `core/_rtd_library:14484`
+- `gnome::set_ui_corporate_crisp_tweaks_for_user` — `core/_rtd_library:14570`
+- `gnome::set_ui_moca_tweaks_for_user` — `core/_rtd_library:14660`
+- `oem::register_wallpapers_for_gnome` — `core/_rtd_library:14727`
+- `rtd_oem_turn_on_gui_network_management` — `core/_rtd_library:14776`
+- `system::_enable_service` — `core/_rtd_library:14797`
+- `system::ensure_directory_exists` — `core/_rtd_library:14849`
+- `system::_disable_service` — `core/_rtd_library:14868`
+- `system::_turn_on_gui_network_management` — `core/_rtd_library:14975`
+- `add_gnome3_favorite_app` — `core/_rtd_library:15146`
+- `kde::set_wallpaper` — `core/_rtd_library:15172`
+- `kde::_kwriteconfig_cmd` — `core/_rtd_library:15235`
+- `kde::_list_desktop_themes` — `core/_rtd_library:15251`
+- `kde::_desktop_theme_exists` — `core/_rtd_library:15267`
+- `kde::_default_desktop_theme` — `core/_rtd_library:15281`
+- `kde::_plasma_version_major` — `core/_rtd_library:15304`
+- `kde::_reload_shell` — `core/_rtd_library:15320`
+- `kde::set_global_look_and_feel` — `core/_rtd_library:15361`
+- `kde::set_color_scheme` — `core/_rtd_library:15428`
+- `kde::set_icon_theme` — `core/_rtd_library:15478`
+- `kde::set_cursor_theme` — `core/_rtd_library:15527`
+- `kde::set_layout_panel` — `core/_rtd_library:15583`
+- `kde::tune_fonts_antialias` — `core/_rtd_library:15629`
+- `kde::apply_window_rules` — `core/_rtd_library:15667`
+- `kde::set_startup_apps` — `core/_rtd_library:15733`
+- `create_physical_media_from_iso` — `core/_rtd_library:15788`
+- `util::add_iso_to_ventoy` — `core/_rtd_library:15937`
+- `util::add_iso_to_ventoy::build_device_list` — `core/_rtd_library:15962`
+- `oem::ventoy::resolve_latest_version` — `core/_rtd_library:16074`
+- `oem::ventoy::download` — `core/_rtd_library:16130`
+- `oem::ventoy::select_usb_device` — `core/_rtd_library:16232`
+- `oem::ventoy::select_usb_device::build_list` — `core/_rtd_library:16266`
+- `oem::ventoy::wipe_device` — `core/_rtd_library:16369`
+- `oem::ventoy::unmount_device_partitions` — `core/_rtd_library:16415`
+- `oem::ventoy::refresh_device_partitions` — `core/_rtd_library:16469`
+- `oem::ventoy::create_usb` — `core/_rtd_library:16507`
+- `oem::ventoy::detect_data_partition` — `core/_rtd_library:16689`
+- `oem::ventoy::create_ext4_data_partition` — `core/_rtd_library:16773`
+- `oem::ventoy::install_legacy_bios_fallback` — `core/_rtd_library:16817`
+- `oem::ventoy::prepare_folders` — `core/_rtd_library:16872`
+- `oem::ventoy::classify_iso` — `core/_rtd_library:16904`
+- `oem::ventoy::copy_isos` — `core/_rtd_library:16935`
+- `oem::ventoy::write_partition_title` — `core/_rtd_library:17078`
+- `oem::ventoy::find_rtd_theme_background` — `core/_rtd_library:17117`
+- `oem::ventoy::install_rtd_theme_assets` — `core/_rtd_library:17136`
+- `oem::ventoy::write_menu_theme` — `core/_rtd_library:17173`
+- `oem::ventoy::write_control_config` — `core/_rtd_library:17274`
+- `oem::ventoy::brand_media` — `core/_rtd_library:17324`
+- `oem::ventoy::setup_usb` — `core/_rtd_library:17351`
+- `rtd_oem_ubuntu_auto_install_iso_builder` — `core/_rtd_library:17512`
+- `system::process_vm_opt_args` — `core/_rtd_library:17521`
+- `system::find_download_ubuntu_iso` — `core/_rtd_library:17587`
+- `system::create_physical_media_from_ubuntu_iso` — `core/_rtd_library:17634`
+- `cleanup` — `core/_rtd_library:17657`
+- `log` — `core/_rtd_library:17665`
+- `die` — `core/_rtd_library:17669`
+- `usage` — `core/_rtd_library:17679`
+- `tool::_compress_7z_items` — `core/_rtd_library:17868`
+- `tool::_compress_7z_item_should_store` — `core/_rtd_library:17983`
+- `tool::_format_elapsed_time` — `core/_rtd_library:18015`
+- `tool::compress_all_items_here` — `core/_rtd_library:18044`
+- `tool::compress_provided_items` — `core/_rtd_library:18179`
+- `tool::recompress_all_items_in_folder` — `core/_rtd_library:18303`
+- `tool::recompress_provided_items` — `core/_rtd_library:18382`
+- `tool::up_2_date` — `core/_rtd_library:18448`
+- `tool::test_iso_boot_media` — `core/_rtd_library:18489`
+- `ssh::ensure_user_ssh_key` — `core/_rtd_library:18664`
+- `ssh::ensure_key_installed_on_remote` — `core/_rtd_library:18733`
+- `security::encrypt_disk_with_luks` — `core/_rtd_library:18817`
+- `disk::reencrypt_device` — `core/_rtd_library:18945`
+- `security::enable_firewall` — `core/_rtd_library:19093`
+- `security::check_if_password_pOwned` — `core/_rtd_library:19224`
+- `security::scan_for_malware` — `core/_rtd_library:19263`
+- `security::change_disk_pass` — `core/_rtd_library:19347`
+- `security::harden_ubuntu` — `core/_rtd_library:19372`
+- `security::configure_clamav` — `core/_rtd_library:19452`
+- `security::configure_fail2ban` — `core/_rtd_library:19540`
+- `security::configure_rkhunter` — `core/_rtd_library:19649`
+- `security::configure_auditd` — `core/_rtd_library:19730`
+- `security::configure_auditd::ensure_audit_rules_dir` — `core/_rtd_library:19766`
+- `security::sysctl_hardening` — `core/_rtd_library:19809`
+- `security::secure_password_policy` — `core/_rtd_library:19901`
+- `security::install_AIDE` — `core/_rtd_library:19955`
+- `security::ensure_admin` — `core/_rtd_library:20000`
+- `software::package_kit::add_package` — `core/_rtd_library:20238`
+- `software::package_kit::remove_package` — `core/_rtd_library:20295`
+- `software::list_bundles` — `core/_rtd_library:20322`
+- `software::ensure_gnome_software_store_available` — `core/_rtd_library:20386`
+- `software::refresh_flatpak_desktop_registration` — `core/_rtd_library:20445`
+- `software::ensure_flatpak_package_managment` — `core/_rtd_library:20564`
+- `software::enable_extra_repos` — `core/_rtd_library:20663`
+- `software::offer_reboot_if_required` — `core/_rtd_library:20729`
+- `software::updates_installed_today::native` — `core/_rtd_library:20837`
+- `software::updates_installed_today::snap` — `core/_rtd_library:20890`
+- `software::updates_installed_today::flatpak` — `core/_rtd_library:20907`
+- `software::_flatpak_cmd` — `core/_rtd_library:20927`
+- `software::_flatpak_filter_advisories` — `core/_rtd_library:20996`
+- `software::update_flatpaks` — `core/_rtd_library:21053`
+- `software::flatpak_list_eol_apps` — `core/_rtd_library:21153`
+- `software::report_updates_installed_today` — `core/_rtd_library:21186`
+- `software::show_updates_installed_today` — `core/_rtd_library:21215`
+- `software::update_system_txt` — `core/_rtd_library:21242`
+- `software::update_all_ui` — `core/_rtd_library:21328`
+- `Native_Software_Packages` — `core/_rtd_library:21345`
+- `Snap_Apps` — `core/_rtd_library:21381`
+- `Flatpak_Apps` — `core/_rtd_library:21393`
+- `software::from_flathub.org` — `core/_rtd_library:21438`
+- `software::from_snapcraft.io` — `core/_rtd_library:21567`
+- `software::from_snapcraft.io::_cleanup_tmp` — `core/_rtd_library:21618`
+- `software::from_snapcraft.io::_install_snap` — `core/_rtd_library:21626`
+- `software::add_software_task` — `core/_rtd_library:21728`
+- `software::ensure_restricted_codecs` — `core/_rtd_library:21749`
+- `software::vendor_download_and_install` — `core/_rtd_library:21784`
+- `fetch_file` — `core/_rtd_library:21804`
+- `software::is_native_package_available` — `core/_rtd_library:21875`
+- `InstallSoftwareFromRepo` — `core/_rtd_library:21969`
+- `display_message` — `core/_rtd_library:21987`
+- `software::determine_package_name_from_dnf_command` — `core/_rtd_library:22012`
+- `software::determine_package_name_from_cmd` — `core/_rtd_library:22035`
+- `software::add_native_package` — `core/_rtd_library:22102`
+- `software::native_management_availability_check` — `core/_rtd_library:22265`
+- `software::ensure_snap_package_managment` — `core/_rtd_library:22341`
+- `software::zypper_add_repo` — `core/_rtd_library:22507`
+- `software::is_native_package_installed` — `core/_rtd_library:22567`
+- `software::set_install_command` — `core/_rtd_library:22659`
+- `software::add_gnome_extensions` — `core/_rtd_library:22726`
+- `software::check_native_package_dependency` — `core/_rtd_library:22819`
+- `software::rtd_ppa_checker` — `core/_rtd_library:22890`
+- `software::remove_native_software_package` — `core/_rtd_library:22950`
+- `system::determine_logfile` — `core/_rtd_library:23046`
+- `system::log_item` — `core/_rtd_library:23171`
+- `software::update_system` — `core/_rtd_library:23259`
+- `display_software_installation_choices_gtk` — `core/_rtd_library:23337`
+- `software::display_bundle_install_choices_gtk` — `core/_rtd_library:23369`
+- `run_bundle_install` — `core/_rtd_library:23477`
+- `software::display_bundle_removal_choices_gtk` — `core/_rtd_library:23535`
+- `run_bundle_uninstall` — `core/_rtd_library:23610`
+- `rtd_server_setup_choices_services` — `core/_rtd_library:23646`
+- `rtd_server_setup_choices_productivity` — `core/_rtd_library:23711`
+- `oem::setup_choices_server` — `core/_rtd_library:23778`
+- `debian::download_iso` — `core/_rtd_library:23809`
+- `oem::task::iso::resolve_fedora_iso` — `core/_rtd_library:23907`
+- `oem::task::iso::verify_fedora_iso` — `core/_rtd_library:24144`
+- `fedora::download_iso` — `core/_rtd_library:24212`
+- `oem::task::iso::resolve_opensuse_iso` — `core/_rtd_library:24334`
+- `oem::task::iso::verify_opensuse_iso` — `core/_rtd_library:24528`
+- `opensuse::download_iso` — `core/_rtd_library:24607`
+- `ubuntu::enable_plymouth_theme` — `core/_rtd_library:24706`
+- `ubuntu::get_target_version` — `core/_rtd_library:24768`
+- `ubuntu::get_latest_release_version` — `core/_rtd_library:25025`
+- `ubuntu::download_iso` — `core/_rtd_library:25095`
+- `macoskvm::normalize_installer_version` — `core/_rtd_library:25200`
+- `macoskvm::normalize_modern_installer_version` — `core/_rtd_library:25232`
+- `macoskvm::is_modern_installer_version` — `core/_rtd_library:25260`
+- `macoskvm::version_label` — `core/_rtd_library:25274`
+- `macoskvm::check_modern_host_requirements` — `core/_rtd_library:25299`
+- `macoskvm::ensure_installer_dependencies` — `core/_rtd_library:25347`
+- `macoskvm::ensure_vm_dependencies` — `core/_rtd_library:25389`
+- `macoskvm::stage_boot_assets` — `core/_rtd_library:25478`
+- `macoskvm::ensure_system_disk` — `core/_rtd_library:25669`
+- `macoskvm::fetch_modern_installer_image` — `core/_rtd_library:25745`
+- `macoskvm::fetch_installer_image` — `core/_rtd_library:25886`
+- `macoskvm::define_vm` — `core/_rtd_library:26068`
+- `macoskvm::prepare_host` — `core/_rtd_library:26427`
+- `kvm::util::validate_vm_name` — `core/_rtd_library:26707`
+- `kvm::util::set_vm_name` — `core/_rtd_library:26728`
+- `kvm::util::config_label` — `core/_rtd_library:26858`
+- `kvm::util::read_common_options` — `core/_rtd_library:26899`
+- `kvm::util::read_distro_options` — `core/_rtd_library:27023`
+- `kvm::util::read_distro_options::process_all_params` — `core/_rtd_library:27095`
+- `kvm::get_vm_config_preferences` — `core/_rtd_library:27414`
+- `kvm::get_vm_size_preferences` — `core/_rtd_library:27600`
+- `kvm::get_kali_iso` — `core/_rtd_library:27776`
+- `mint::get_mint_lmde_iso` — `core/_rtd_library:27875`
+- `kvm::get_almalinux_boot_iso` — `core/_rtd_library:27934`
+- `kvm::get_fedora_workstation_iso` — `core/_rtd_library:28022`
+- `kvm::get_zorin_iso` — `core/_rtd_library:28075`
+- `kvm__get_zorin_iso__get_latest_directory` — `core/_rtd_library:28116`
+- `kvm__get_zorin_iso__get_highest_version_file` — `core/_rtd_library:28136`
+- `kvm__get_zorin_iso__download_file` — `core/_rtd_library:28159`
+- `kvm::mount_local_folder_to_guest` — `core/_rtd_library:28344`
+- `kvm::create_expanding_vm_hardisk` — `core/_rtd_library:28489`
+- `kvm::wait_for_domain_definition` — `core/_rtd_library:28568`
+- `kvm::wait_for_domain_start` — `core/_rtd_library:28616`
+- `kvm::cleanup_unused_qcow_images` — `core/_rtd_library:28692`
+- `kvm::cleanup_virtual_floppy_images` — `core/_rtd_library:28793`
+- `kvm::make_vm_now_from_fedora_org` — `core/_rtd_library:28864`
+- `kvm::make_vm_now_from_redhat_com` — `core/_rtd_library:29060`
+- `kvm::make_vm_now_from_opensuse_org` — `core/_rtd_library:29214`
+- `kvm::make_vm_now_from_debian_org` — `core/_rtd_library:29354`
+- `kvm::make_vm_now_from_kali_org` — `core/_rtd_library:29529`
+- `kvm::make_vm_now_from_zorin` — `core/_rtd_library:29659`
+- `kvm::make_vm_now_from_ubuntu_com` — `core/_rtd_library:29864`
+- `kvm::make_vm_now_from_microsoft` — `core/_rtd_library:30353`
+- `kvm::backup_all_running_vm` — `core/_rtd_library:30637`
+- `kvm::backup_all_running_vm::do_vm_backup` — `core/_rtd_library:30662`
+- `kvm::template_metadata_dir` — `core/_rtd_library:30754`
+- `kvm::template_metadata_safe_name` — `core/_rtd_library:30758`
+- `kvm::template_metadata_json_escape` — `core/_rtd_library:30766`
+- `kvm::template_metadata_path` — `core/_rtd_library:30776`
+- `kvm::template_metadata_write` — `core/_rtd_library:30781`
+- `kvm::template_metadata_read_label` — `core/_rtd_library:30828`
+- `kvm::clone_template_vm::_build_customize_args` — `core/_rtd_library:30859`
+- `kvm::clone_template_vm::_format_name_component` — `core/_rtd_library:30922`
+- `kvm::clone_template_vm::_display_template_label` — `core/_rtd_library:30951`
+- `kvm::clone_template_vm::_detach_install_media` — `core/_rtd_library:30977`
+- `kvm::clone_template_vm::_clone_from_category` — `core/_rtd_library:31045`
+- `kvm::clone_server_template_vm` — `core/_rtd_library:31318`
+- `kvm::clone_vdi_template_vm` — `core/_rtd_library:31348`
+- `kvm::cicd::_render_extra_vars` — `core/_rtd_library:31378`
+- `kvm::cicd::_render_user_data` — `core/_rtd_library:31418`
+- `kvm::cicd::_render_meta_data` — `core/_rtd_library:31461`
+- `kvm::cicd::_create_nocloud_iso` — `core/_rtd_library:31478`
+- `kvm::cicd::configure_vm_with_ansible_pull` — `core/_rtd_library:31510`
+- `whonix::init_context` — `core/_rtd_library:31667`
+- `whonix::version_ge` — `core/_rtd_library:31714`
+- `whonix::current_vm_version` — `core/_rtd_library:31733`
+- `whonix::discover_bundle` — `core/_rtd_library:31757`
+- `whonix::prepare_workdir` — `core/_rtd_library:31797`
+- `whonix::download_with_verify` — `core/_rtd_library:31819`
+- `whonix::download_bundle` — `core/_rtd_library:31854`
+- `whonix::extract_archive` — `core/_rtd_library:31874`
+- `whonix::detect_image_owner` — `core/_rtd_library:31919`
+- `whonix::stage_images` — `core/_rtd_library:31944`
+- `whonix::ensure_networks_defined` — `core/_rtd_library:31978`
+- `whonix::ensure_networks_running` — `core/_rtd_library:32016`
+- `whonix::add_extra_workstation` — `core/_rtd_library:32040`
+- `whonix::define_vms` — `core/_rtd_library:32070`
+- `whonix::maybe_skip_install` — `core/_rtd_library:32140`
+- `template::preseed_cfg::early_command` — `core/_rtd_library:32231`
+- `template::preseed_cfg::main` — `core/_rtd_library:32306`
+- `template::preseed_cfg::auto_disk_layout` — `core/_rtd_library:32519`
+- `template::preseed_cfg::expert_recipe` — `core/_rtd_library:32616`
+- `template::preseed_cfg::late_command` — `core/_rtd_library:32681`
+- `template::kickstart_cfg` — `core/_rtd_library:32835`
+- `template::rtd_me_sh_cmd` — `core/_rtd_library:33068`
+- `template::config_menu_cmd` — `core/_rtd_library:33265`
+- `template::sysprep_unattend_xml` — `core/_rtd_library:33399`
+- `template::autounattend_xml` — `core/_rtd_library:33464`
+- `template::AutoYast_xml` — `core/_rtd_library:33841`
+- `template::Agama_json` — `core/_rtd_library:34067`
+- `template::cloud_config` — `core/_rtd_library:34329`
+- `template::minecraft_server_launcher` — `core/_rtd_library:34819`
+- `software::check_native_package_dependency` — `core/_rtd_library:34872`
+- `install_software` — `core/_rtd_library:34893`
+- `setup_minecraft_root` — `core/_rtd_library:34913`
+- `run_minecraft_server_manager` — `core/_rtd_library:34931`
+- `check_java` — `core/_rtd_library:34961`
+- `find_active_network_interface` — `core/_rtd_library:34974`
+- `minecraft_update` — `core/_rtd_library:34992`
+- `announce.py` — `core/_rtd_library:35056`
+- `start.sh` — `core/_rtd_library:35119`
+- `server.properties` — `core/_rtd_library:35174`
+- `eula.txt` — `core/_rtd_library:35237`
+- `term::set_colors` — `core/_rtd_library:35358`
+- `pause::for_input` — `core/_rtd_library:35549`
+- `pause::a_given_time` — `core/_rtd_library:35585`
+- `write_host` — `core/_rtd_library:35638`
+- `write_error` — `core/_rtd_library:35714`
+- `write_warning` — `core/_rtd_library:35743`
+- `write_status` — `core/_rtd_library:35773`
+- `write_information` — `core/_rtd_library:35803`
+- `library::__cache_dir` — `core/_rtd_library:35833`
+- `library::__desc_cache_file` — `core/_rtd_library:35849`
+- `library::__load_desc_cache` — `core/_rtd_library:35864`
+- `library::__save_desc_cache` — `core/_rtd_library:35903`
+- `library::__build_header_desc_map` — `core/_rtd_library:35926`
+- `library::__get_function_description` — `core/_rtd_library:35957`
+- `library::__zformat_cache_file` — `core/_rtd_library:36011`
+- `library::__load_zformat_cache` — `core/_rtd_library:36026`
+- `library::__save_zformat_cache` — `core/_rtd_library:36044`
+- `library::list_loaded_internal_functions` — `core/_rtd_library:36061`
+- `library::check_status` — `core/_rtd_library:36184`
+- `library::apply_rtd_defaults` — `core/_rtd_library:36238`
+- `library::envcheck_report` — `core/_rtd_library:36319`
+- `library::list_loaded_software_functions` — `core/_rtd_library:36354`
+- `main` — `core/_rtd_library:36405`
+- `display_documentation` — `core/_rtd_library:36510`
 
 ### `core/_rtd_recipies.info`
 
@@ -614,15 +616,15 @@ Format: `symbol` — `path:line`. Symbols are grouped by source so searches retu
 
 ### `core/generate-repository-index.py`
 
-- `git` — `core/generate-repository-index.py:71`
-- `repository_paths` — `core/generate-repository-index.py:75`
-- `is_text` — `core/generate-repository-index.py:90`
-- `read_text` — `core/generate-repository-index.py:97`
-- `kind_for` — `core/generate-repository-index.py:104`
-- `declarations_for` — `core/generate-repository-index.py:125`
-- `entrypoints_for` — `core/generate-repository-index.py:146`
-- `markdown_escape` — `core/generate-repository-index.py:160`
-- `main` — `core/generate-repository-index.py:164`
+- `git` — `core/generate-repository-index.py:72`
+- `repository_paths` — `core/generate-repository-index.py:76`
+- `is_text` — `core/generate-repository-index.py:91`
+- `read_text` — `core/generate-repository-index.py:98`
+- `kind_for` — `core/generate-repository-index.py:105`
+- `declarations_for` — `core/generate-repository-index.py:126`
+- `entrypoints_for` — `core/generate-repository-index.py:147`
+- `markdown_escape` — `core/generate-repository-index.py:161`
+- `main` — `core/generate-repository-index.py:165`
 
 ### `core/rtd-bootstrap-progress-gtk.py`
 
@@ -776,12 +778,16 @@ Format: `symbol` — `path:line`. Symbols are grouped by source so searches retu
 - `rtd_template_finalize::full_software_update` — `core/rtd-vm-template-finalize-linux.sh:68`
 - `rtd_template_finalize::run_with_progress_gui` — `core/rtd-vm-template-finalize-linux.sh:80`
 - `rtd_template_finalize::run_finalization_tasks` — `core/rtd-vm-template-finalize-linux.sh:98`
-- `rtd_template_finalize::configure_post_oobe_bundle_manager` — `core/rtd-vm-template-finalize-linux.sh:130`
-- `rtd_template_finalize::configure_post_oobe_sudoers` — `core/rtd-vm-template-finalize-linux.sh:154`
-- `rtd_template_finalize::disable_temporary_oem_autologin` — `core/rtd-vm-template-finalize-linux.sh:170`
-- `rtd_template_finalize::scrub_oem_autologin` — `core/rtd-vm-template-finalize-linux.sh:178`
-- `rtd_template_finalize::write_status` — `core/rtd-vm-template-finalize-linux.sh:225`
-- `rtd_template_finalize::main` — `core/rtd-vm-template-finalize-linux.sh:246`
+- `rtd_template_finalize::configure_post_oobe_bundle_manager` — `core/rtd-vm-template-finalize-linux.sh:134`
+- `rtd_template_finalize::configure_post_oobe_sudoers` — `core/rtd-vm-template-finalize-linux.sh:158`
+- `rtd_template_finalize::disable_temporary_oem_autologin` — `core/rtd-vm-template-finalize-linux.sh:174`
+- `rtd_template_finalize::scrub_oem_autologin` — `core/rtd-vm-template-finalize-linux.sh:182`
+- `rtd_template_finalize::write_status` — `core/rtd-vm-template-finalize-linux.sh:229`
+- `rtd_template_finalize::main` — `core/rtd-vm-template-finalize-linux.sh:250`
+
+### `core/tests/test_oem_handoff.py`
+
+- `UbuntuOemHandoffTests` — `core/tests/test_oem_handoff.py:16`
 
 ### `modules/Security-tool.mod/rtd-security-tool`
 
@@ -791,56 +797,72 @@ Format: `symbol` — `path:line`. Symbols are grouped by source so searches retu
 - `display_help` — `modules/Security-tool.mod/rtd-security-tool:229`
 - `main` — `modules/Security-tool.mod/rtd-security-tool:239`
 
-### `modules/Theme_Studio/studio.py`
+### `modules/Theme-Studio/rtd-theme-studio`
 
-- `StudioError` — `modules/Theme_Studio/studio.py:30`
-- `atomic_json` — `modules/Theme_Studio/studio.py:34`
-- `read_json` — `modules/Theme_Studio/studio.py:48`
-- `run` — `modules/Theme_Studio/studio.py:57`
-- `catalog` — `modules/Theme_Studio/studio.py:70`
-- `looks` — `modules/Theme_Studio/studio.py:74`
-- `extract_archive` — `modules/Theme_Studio/studio.py:96`
-- `copy_assets` — `modules/Theme_Studio/studio.py:141`
-- `normalize_build_links` — `modules/Theme_Studio/studio.py:193`
-- `Settings` — `modules/Theme_Studio/studio.py:209`
-- `Studio` — `modules/Theme_Studio/studio.py:265`
-- `quote` — `modules/Theme_Studio/studio.py:759`
-- `terminal` — `modules/Theme_Studio/studio.py:763`
-- `main` — `modules/Theme_Studio/studio.py:811`
+- `theme_studio::error` — `modules/Theme-Studio/rtd-theme-studio:14`
+- `theme_studio::bootstrap_library` — `modules/Theme-Studio/rtd-theme-studio:16`
+- `theme_studio::packages` — `modules/Theme-Studio/rtd-theme-studio:31`
+- `theme_studio::user_theme_schema_needs_repair` — `modules/Theme-Studio/rtd-theme-studio:58`
+- `theme_studio::missing_capabilities` — `modules/Theme-Studio/rtd-theme-studio:74`
+- `theme_studio::missing_packages` — `modules/Theme-Studio/rtd-theme-studio:92`
+- `theme_studio::manual_instructions` — `modules/Theme-Studio/rtd-theme-studio:102`
+- `theme_studio::install_dependencies` — `modules/Theme-Studio/rtd-theme-studio:119`
+- `theme_studio::confirm_install` — `modules/Theme-Studio/rtd-theme-studio:150`
+- `theme_studio::ensure_dependencies` — `modules/Theme-Studio/rtd-theme-studio:163`
+- `theme_studio::main` — `modules/Theme-Studio/rtd-theme-studio:203`
 
-### `modules/Theme_Studio/studio_gtk.py`
+### `modules/Theme-Studio/studio.py`
 
-- `create_application` — `modules/Theme_Studio/studio_gtk.py:7`
-- `launch` — `modules/Theme_Studio/studio_gtk.py:315`
+- `StudioError` — `modules/Theme-Studio/studio.py:32`
+- `atomic_json` — `modules/Theme-Studio/studio.py:36`
+- `read_json` — `modules/Theme-Studio/studio.py:50`
+- `run` — `modules/Theme-Studio/studio.py:59`
+- `catalog` — `modules/Theme-Studio/studio.py:72`
+- `looks` — `modules/Theme-Studio/studio.py:76`
+- `extract_archive` — `modules/Theme-Studio/studio.py:98`
+- `copy_assets` — `modules/Theme-Studio/studio.py:143`
+- `normalize_build_links` — `modules/Theme-Studio/studio.py:195`
+- `Settings` — `modules/Theme-Studio/studio.py:211`
+- `Studio` — `modules/Theme-Studio/studio.py:297`
+- `quote` — `modules/Theme-Studio/studio.py:828`
+- `terminal` — `modules/Theme-Studio/studio.py:832`
+- `main` — `modules/Theme-Studio/studio.py:880`
 
-### `modules/Theme_Studio/tests/test_studio.py`
+### `modules/Theme-Studio/studio_gtk.py`
 
-- `FakeSettings` — `modules/Theme_Studio/tests/test_studio.py:17`
-- `StudioTests` — `modules/Theme_Studio/tests/test_studio.py:54`
-- `ArchiveTests` — `modules/Theme_Studio/tests/test_studio.py:265`
-- `ImportTests` — `modules/Theme_Studio/tests/test_studio.py:313`
+- `create_application` — `modules/Theme-Studio/studio_gtk.py:7`
+- `launch` — `modules/Theme-Studio/studio_gtk.py:315`
+
+### `modules/Theme-Studio/tests/test_studio.py`
+
+- `FakeSettings` — `modules/Theme-Studio/tests/test_studio.py:19`
+- `StudioTests` — `modules/Theme-Studio/tests/test_studio.py:70`
+- `ExtensionInstallerTests` — `modules/Theme-Studio/tests/test_studio.py:314`
+- `ArchiveTests` — `modules/Theme-Studio/tests/test_studio.py:355`
+- `ImportTests` — `modules/Theme-Studio/tests/test_studio.py:403`
 
 ### `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer`
 
-- `usage_guide` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:37`
-- `enable_extension` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:62`
-- `extract_extension` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:73`
-- `install_version` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:82`
-- `move_file` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:96`
-- `download_version` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:103`
-- `check_version_availability` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:129`
-- `select_version` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:161`
-- `get_other_version` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:181`
-- `extract_info` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:193`
-- `download_info` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:208`
-- `extract_comments` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:236`
-- `download_comments` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:260`
-- `search_help` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:286`
-- `load_content` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:305`
-- `restart_shell` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:326`
-- `interactive_search` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:334`
-- `get_info_from_id` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:466`
-- `get_extension` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:475`
+- `repair_extension_schemas` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:37`
+- `usage_guide` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:94`
+- `enable_extension` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:120`
+- `extract_extension` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:131`
+- `install_version` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:141`
+- `move_file` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:155`
+- `download_version` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:162`
+- `check_version_availability` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:188`
+- `select_version` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:220`
+- `get_other_version` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:240`
+- `extract_info` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:252`
+- `download_info` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:267`
+- `extract_comments` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:295`
+- `download_comments` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:319`
+- `search_help` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:345`
+- `load_content` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:364`
+- `restart_shell` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:385`
+- `interactive_search` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:393`
+- `get_info_from_id` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:525`
+- `get_extension` — `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer:534`
 
 ### `modules/light-weight-office-games.mod/rtd-light-weight-office-games`
 
@@ -1746,12 +1768,12 @@ Format: `path` — kind, lines for text files, bytes. This covers every tracked 
 ### `core`
 
 - `core/Media_files/rtd-bootstrap-gui-banner.png` — image, 709083 bytes
-- `core/README.md` — documentation, 102 lines, 4880 bytes
+- `core/README.md` — documentation, 104 lines, 5099 bytes
 - `core/_branding.info` — shell, 373 lines, 18376 bytes
-- `core/_locations.info` — shell, 392 lines, 20923 bytes
-- `core/_rtd_library` — shell, 36590 lines, 1351323 bytes
+- `core/_locations.info` — shell, 374 lines, 20443 bytes
+- `core/_rtd_library` — shell, 36680 lines, 1355508 bytes
 - `core/_rtd_recipies.info` — shell, 1436 lines, 70837 bytes
-- `core/generate-repository-index.py` — python, 323 lines, 13349 bytes
+- `core/generate-repository-index.py` — python, 324 lines, 13466 bytes
 - `core/image/README/1683618476060.png` — image, 80526 bytes
 - `core/image/README/1683618508270.png` — image, 63582 bytes
 - `core/image/README/1683622846033.png` — image, 166051 bytes
@@ -1765,7 +1787,8 @@ Format: `path` — kind, lines for text files, bytes. This covers every tracked 
 - `core/rtd-oem-macos-config.sh` — shell, 597 lines, 21831 bytes
 - `core/rtd-oem-windows-setup-splash.ps1` — powershell, 1018 lines, 41628 bytes
 - `core/rtd-oem-windows-setup.ps1` — powershell, 2148 lines, 93936 bytes
-- `core/rtd-vm-template-finalize-linux.sh` — shell, 263 lines, 10467 bytes
+- `core/rtd-prepare-oem-temporary-user.sh` — shell, 74 lines, 2502 bytes
+- `core/rtd-vm-template-finalize-linux.sh` — shell, 267 lines, 10699 bytes
 - `core/sigs/AudioBookConverter.sig` — signature, 1 lines, 56 bytes
 - `core/sigs/RustDesk.sig` — signature, 1 lines, 46 bytes
 - `core/sigs/Teamviewer.sig` — signature, 1 lines, 48 bytes
@@ -1775,6 +1798,7 @@ Format: `path` — kind, lines for text files, bytes. This covers every tracked 
 - `core/sigs/YUMI-exFAT-1.0.1.5.exe.sig` — signature, 1 lines, 60 bytes
 - `core/sigs/unetbootin.sig` — signature, 1 lines, 48 bytes
 - `core/sigs/winimage.exe.sig` — signature, 1 lines, 50 bytes
+- `core/tests/test_oem_handoff.py` — python, 92 lines, 3413 bytes
 
 ### `docs`
 
@@ -1819,21 +1843,21 @@ Format: `path` — kind, lines for text files, bytes. This covers every tracked 
 - `modules/Security-tool.mod/Media_files/header-time.jpg` — image, 132397 bytes
 - `modules/Security-tool.mod/README.md` — documentation, 61 lines, 2264 bytes
 - `modules/Security-tool.mod/rtd-security-tool` — shell, 253 lines, 8321 bytes
-- `modules/Theme_Studio/.gitignore` — file, 2 lines, 23 bytes
-- `modules/Theme_Studio/Media_files/preview.png` — image, 202003 bytes
-- `modules/Theme_Studio/README.md` — documentation, 107 lines, 9092 bytes
-- `modules/Theme_Studio/REFERENCES.md` — documentation, 42 lines, 5339 bytes
-- `modules/Theme_Studio/VALIDATION.md` — documentation, 79 lines, 5414 bytes
-- `modules/Theme_Studio/catalog.json` — json, 571 lines, 11705 bytes
-- `modules/Theme_Studio/rtd-theme-studio` — shell, 5 lines, 199 bytes
-- `modules/Theme_Studio/studio.py` — python, 876 lines, 47661 bytes
-- `modules/Theme_Studio/studio_gtk.py` — python, 316 lines, 17368 bytes
-- `modules/Theme_Studio/tests/smoke_catalog.py` — python, 47 lines, 2186 bytes
-- `modules/Theme_Studio/tests/smoke_gtk.py` — python, 55 lines, 2500 bytes
-- `modules/Theme_Studio/tests/test_studio.py` — python, 474 lines, 22008 bytes
+- `modules/Theme-Studio/.gitignore` — file, 2 lines, 23 bytes
+- `modules/Theme-Studio/Media_files/preview.png` — image, 202003 bytes
+- `modules/Theme-Studio/README.md` — documentation, 107 lines, 10412 bytes
+- `modules/Theme-Studio/REFERENCES.md` — documentation, 42 lines, 5339 bytes
+- `modules/Theme-Studio/VALIDATION.md` — documentation, 79 lines, 5648 bytes
+- `modules/Theme-Studio/catalog.json` — json, 571 lines, 11705 bytes
+- `modules/Theme-Studio/rtd-theme-studio` — shell, 239 lines, 10068 bytes
+- `modules/Theme-Studio/studio.py` — python, 945 lines, 51532 bytes
+- `modules/Theme-Studio/studio_gtk.py` — python, 316 lines, 17368 bytes
+- `modules/Theme-Studio/tests/smoke_catalog.py` — python, 47 lines, 2186 bytes
+- `modules/Theme-Studio/tests/smoke_gtk.py` — python, 55 lines, 2500 bytes
+- `modules/Theme-Studio/tests/test_studio.py` — python, 584 lines, 27762 bytes
 - `modules/gnome-shell-extension-installer.mod/LICENSE` — file, 297 lines, 16054 bytes
-- `modules/gnome-shell-extension-installer.mod/README.md` — documentation, 32 lines, 1350 bytes
-- `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer` — shell, 650 lines, 22784 bytes
+- `modules/gnome-shell-extension-installer.mod/README.md` — documentation, 39 lines, 1752 bytes
+- `modules/gnome-shell-extension-installer.mod/rtd-gnome-shell-extension-installer` — shell, 709 lines, 25204 bytes
 - `modules/light-weight-office-games.mod/Media_files/light-weight-office-games-icon.png` — image, 32447 bytes
 - `modules/light-weight-office-games.mod/Media_files/light-weight-office-games-sidebar.png` — image, 282132 bytes
 - `modules/light-weight-office-games.mod/Media_files/screenshot-game-selection.png` — image, 153052 bytes

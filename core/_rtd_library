@@ -416,6 +416,7 @@ system:
 280  system::rtd_oem_reseal                                      ;           Function to reseal a newly installed system for delivery to end user.
 281  system::rtd_oem_reseal::_finalize_shutdown                  ;           Logs the shutdown context and powers the system off.
 282  system::rtd_oem_reseal::_install_guest_additions            ;           Ensures guest integration packages are installed regardless of distro.
+282a system::rtd_oem_reseal::_stage_ubuntu_oem_user              ;           Stage RTD's temporary build account for Ubiquity's required OEM first-boot identity.
 283  system::rtd_oem_reseal::_prepare_debian                     ;           Performs Debian-specific reseal tasks (cloud-init cleanup, host keys, etc.).
 284  system::rtd_oem_reseal::_prepare_fedora                     ;           Enables the Fedora/RHEL initial-setup workflow and guest tools.
 285  system::rtd_oem_reseal::_prepare_suse                       ;           Enables YaST firstboot and guest tools on SUSE-based distributions.
@@ -11616,6 +11617,77 @@ EOF
 		systemctl --user restart spice-vdagent.service >>"${_LOGFILE}" 2>&1 || true
 }
 
+system::rtd_oem_reseal::_stage_ubuntu_oem_user() {
+	# Description:
+	#   Stages a systemd prerequisite which renames RTD's temporary build user
+	#   to the account name required by Ubiquity's OEM first-boot display manager.
+	# Globals:
+	#   _TLA, _OEM_DIR
+	# Arguments:
+	#   $1 - Optional temporary build username; UID 1000 is used as a fallback.
+	# Returns:
+	#   0 when the handoff is staged or already uses user oem; 1 on validation
+	#   or file/service setup failure.
+	# Usage:
+	#   system::rtd_oem_reseal::_stage_ubuntu_oem_user "${SUDO_USER:-}"
+	# End of documentation
+	#
+	# Ubiquity's OEM first-boot display manager is hard-coded to run as user
+	# "oem" and only removes that account after successful end-user setup.
+	# RTD's autoinstall uses a normal temporary account, so rename it while no
+	# graphical session is active at the next boot, before oem-config starts.
+	local _temporary_user="${1:-}"
+	local _state_dir="/var/lib/${_TLA,,}"
+	local _state_file="${_state_dir}/oem-temporary-user"
+	local _helper="${_OEM_DIR:-/opt/${_TLA,,}}/core/rtd-prepare-oem-temporary-user.sh"
+	local _unit="/etc/systemd/system/rtd-prepare-oem-temporary-user.service"
+	local _dropin_dir="/etc/systemd/system/oem-config.service.d"
+
+	if [[ -z "${_temporary_user}" || "${_temporary_user}" == "root" ]]; then
+		_temporary_user="$(getent passwd 1000 2>/dev/null | cut -d: -f1)"
+	fi
+	if [[ "${_temporary_user}" == "oem" ]]; then
+		return 0
+	fi
+	if [[ ! "${_temporary_user}" =~ ^[a-z_][a-z0-9_-]*[$]?$ ]] || ! id "${_temporary_user}" >/dev/null 2>&1; then
+		write_error "Unable to identify the temporary Ubuntu build account required for OEM handoff."
+		return 1
+	fi
+	if id oem >/dev/null 2>&1; then
+		write_error "Cannot prepare Ubuntu OEM handoff: user 'oem' already exists alongside '${_temporary_user}'."
+		return 1
+	fi
+
+	mkdir -p "${_state_dir}" "${_dropin_dir}" || return 1
+	printf '%s\n' "${_temporary_user}" >"${_state_file}" || return 1
+	chmod 0600 "${_state_file}" || return 1
+	[[ -f "${_helper}" ]] || {
+		write_error "Ubuntu OEM account handoff helper is missing: ${_helper}"
+		return 1
+	}
+	chmod 0755 "${_helper}" || return 1
+
+	cat >"${_unit}" <<EOF
+[Unit]
+Description=Prepare RTD temporary account for Ubuntu OEM first boot
+Before=oem-config.service
+
+[Service]
+Type=oneshot
+ExecStart=${_helper}
+RemainAfterExit=yes
+EOF
+	chmod 0644 "${_unit}" || return 1
+
+	cat >"${_dropin_dir}/10-rtd-temporary-user.conf" <<EOF
+[Unit]
+Requires=rtd-prepare-oem-temporary-user.service
+After=rtd-prepare-oem-temporary-user.service
+EOF
+	chmod 0644 "${_dropin_dir}/10-rtd-temporary-user.conf" || return 1
+	systemctl daemon-reload || return 1
+}
+
 system::rtd_oem_reseal::_prepare_ubuntu_like() {
 	# Description:
 	#   Runs OEM reseal prep for Ubuntu-like distributions.
@@ -11632,8 +11704,22 @@ system::rtd_oem_reseal::_prepare_ubuntu_like() {
 	# End of documentation
 
 	local _virt="${1}"
-	software::add_native_package "oem-config-gtk"
-	oem-config-prepare
+	local _temporary_user="${SUDO_USER:-}"
+	software::add_native_package "oem-config-gtk" || return 1
+	command -v oem-config-prepare >/dev/null 2>&1 || {
+		write_error "Ubuntu OEM preparation is unavailable after installing oem-config-gtk."
+		return 1
+	}
+	oem-config-prepare --quiet || return 1
+	system::rtd_oem_reseal::_stage_ubuntu_oem_user "${_temporary_user}" || return 1
+	systemctl is-enabled --quiet oem-config.service || {
+		write_error "Ubuntu OEM preparation did not enable oem-config.service."
+		return 1
+	}
+	[[ "$(systemctl get-default 2>/dev/null)" == "oem-config.target" ]] || {
+		write_error "Ubuntu OEM preparation did not select oem-config.target for first boot."
+		return 1
+	}
 	if [[ "${_virt}" == "virtual" ]]; then
 		system::rtd_oem_reseal::_install_guest_additions
 	fi
@@ -11765,24 +11851,24 @@ system::rtd_oem_reseal() {
 
 	case "${_os_id}" in
 		ubuntu | kubuntu | zorin | linuxmint | pop | elementary)
-			system::rtd_oem_reseal::_prepare_ubuntu_like "${_virt}"
+			system::rtd_oem_reseal::_prepare_ubuntu_like "${_virt}" || return 1
 			;;
 		debian)
-			system::rtd_oem_reseal::_prepare_debian "${_virt}"
+			system::rtd_oem_reseal::_prepare_debian "${_virt}" || return 1
 			;;
 		fedora)
-			system::rtd_oem_reseal::_prepare_fedora "${_virt}"
+			system::rtd_oem_reseal::_prepare_fedora "${_virt}" || return 1
 			;;
 		opensuse* | suse | sles*)
-			system::rtd_oem_reseal::_prepare_suse "${_virt}"
+			system::rtd_oem_reseal::_prepare_suse "${_virt}" || return 1
 			;;
 		*)
 			if [[ "${_os_like}" == *"debian"* || "${_os_like}" == *"ubuntu"* ]]; then
-				system::rtd_oem_reseal::_prepare_ubuntu_like "${_virt}"
+				system::rtd_oem_reseal::_prepare_ubuntu_like "${_virt}" || return 1
 			elif [[ "${_os_like}" == *"suse"* ]]; then
-				system::rtd_oem_reseal::_prepare_suse "${_virt}"
+				system::rtd_oem_reseal::_prepare_suse "${_virt}" || return 1
 			elif [[ "${_os_like}" == *"fedora"* || "${_os_like}" == *"rhel"* || "${_os_like}" == *"centos"* ]]; then
-				system::rtd_oem_reseal::_prepare_fedora "${_virt}"
+				system::rtd_oem_reseal::_prepare_fedora "${_virt}" || return 1
 			else
 				write_warning "🤷‍♀️ I dont know of any OEM configuration for this distribution"
 				return 1
@@ -34410,6 +34496,10 @@ common_vdi_post_config=$(cat <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install spice-vdagent qemu-guest-agent xterm ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c 'apt-get -y install ansible ; exit 0'
         - curtin in-target --target=/target -- /bin/bash -c 'systemctl enable spice-vdagentd ; exit 0'
+
+        # Reserve UID/GID 1000 for the end user created by oem-config. RTD's
+        # temporary build account becomes Ubiquity's conventional UID 29999.
+        - curtin in-target --target=/target -- /bin/bash -ec 'build_user="${Preference_InitialUser}" ; build_group="\$(id -gn "\$build_user")" ; test "\$build_group" = "\$build_user" ; if test "\$(id -u "\$build_user")" != 29999 ; then if getent passwd 29999 >/dev/null ; then exit 1 ; fi ; usermod --uid 29999 "\$build_user" ; fi ; if test "\$(id -g "\$build_user")" != 29999 ; then if getent group 29999 >/dev/null ; then exit 1 ; fi ; groupmod --gid 29999 "\$build_group" ; fi ; chown -R "\$build_user:\$build_group" "/home/\$build_user"'
 
         # Ensure spice-vdagent autostarts in user sessions
         - curtin in-target --target=/target -- mkdir -p /etc/xdg/autostart

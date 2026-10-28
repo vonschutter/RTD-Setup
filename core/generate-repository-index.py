@@ -22,6 +22,7 @@ CORE_PURPOSES = {
     "core/rtd-oem-enable-config.sh": "Register and configure RTD during automated Linux installs.",
     "core/rtd-oem-linux-config.sh": "Linux OEM workstation/server/VM configuration entry point.",
     "core/rtd-vm-template-finalize-linux.sh": "Install default bundles and reseal Linux VM templates.",
+    "core/rtd-prepare-oem-temporary-user.sh": "Prepare RTD's temporary Ubuntu account for Ubiquity OEM first boot.",
     "core/rtd-bootstrap-progress-gtk.py": "GTK progress UI for bootstrap and template finalization.",
     "core/rtd-oem-macos-config.sh": "macOS OEM configuration entry point.",
     "core/rtd-oem-windows-setup.ps1": "Windows OEM setup and KVM guest integration.",

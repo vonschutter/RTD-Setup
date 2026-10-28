@@ -125,7 +125,11 @@ rtd_template_finalize::run_finalization_tasks() {
 	rtd_template_finalize::configure_post_oobe_bundle_manager
 	rtd_template_finalize::disable_temporary_oem_autologin
 	rm -f "${RTD_TEMPLATE_AUTOFINALIZE_MARKER}" 2>/dev/null || true
-	system::rtd_oem_reseal
+	if ! system::rtd_oem_reseal; then
+		rtd_template_finalize::write_status "reseal" "failed" "Ubuntu OEM handoff validation failed; template was not shut down"
+		printf 'OEM reseal failed; template remains running. See %s\n' "${_LOGFILE}" >&2
+		return 1
+	fi
 }
 
 rtd_template_finalize::configure_post_oobe_bundle_manager() {
