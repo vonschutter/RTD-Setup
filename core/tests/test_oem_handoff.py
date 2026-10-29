@@ -61,7 +61,11 @@ class UbuntuOemHandoffTests(unittest.TestCase):
         self.assertIn("it must remain available for GNOME Initial Setup", self.library)
 
     def test_poweroff_uses_logged_systemd_request_and_fallback(self):
-        self.assertIn('"${_systemctl_bin}" --no-block poweroff', self.library)
+        self.assertIn(
+            '"${_systemctl_bin}" --no-block --check-inhibitors=no poweroff',
+            self.library,
+        )
+        self.assertNotIn('"${_systemctl_bin}" --force poweroff', self.library)
         self.assertIn('"${_shutdown_bin}" -P now', self.library)
         self.assertIn('>>"${_LOGFILE}" 2>&1', self.library)
 

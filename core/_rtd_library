@@ -11841,8 +11841,13 @@ system::rtd_oem_reseal::_finalize_shutdown() {
 	# session. Preserve all command output so a rejected request is diagnosable.
 	_systemctl_bin="$(command -v systemctl 2>/dev/null || true)"
 	if [[ -n "${_systemctl_bin}" ]]; then
-		printf 'RTD OEM reseal: requesting power-off with %s --no-block poweroff\n' "${_systemctl_bin}" >>"${_LOGFILE}"
-		"${_systemctl_bin}" --no-block poweroff >>"${_LOGFILE}" 2>&1
+		printf 'RTD OEM reseal: requesting power-off with %s --no-block --check-inhibitors=no poweroff\n' "${_systemctl_bin}" >>"${_LOGFILE}"
+		# The finalizer runs inside the temporary GNOME build session, whose
+		# gnome-session-service intentionally owns a blocking shutdown inhibitor.
+		# OEM preparation and the ready state are already persisted at this point,
+		# so bypass that expected session inhibitor while retaining systemd's normal
+		# orderly power-off transaction. This is not the immediate --force path.
+		"${_systemctl_bin}" --no-block --check-inhibitors=no poweroff >>"${_LOGFILE}" 2>&1
 		_shutdown_status=$?
 		if (( _shutdown_status == 0 )); then
 			printf 'RTD OEM reseal: systemd accepted the power-off request.\n' >>"${_LOGFILE}"
