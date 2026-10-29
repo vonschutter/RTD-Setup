@@ -126,7 +126,7 @@ rtd_template_finalize::run_finalization_tasks() {
 	rtd_template_finalize::disable_temporary_oem_autologin
 	rm -f "${RTD_TEMPLATE_AUTOFINALIZE_MARKER}" 2>/dev/null || true
 	if ! system::rtd_oem_reseal; then
-		rtd_template_finalize::write_status "reseal" "failed" "Ubuntu OEM handoff validation failed; template was not shut down"
+		rtd_template_finalize::write_status "reseal" "failed" "Ubuntu native OEM preparation failed; template was not shut down and the recovery account remains available"
 		printf 'OEM reseal failed; template remains running. See %s\n' "${_LOGFILE}" >&2
 		return 1
 	fi
