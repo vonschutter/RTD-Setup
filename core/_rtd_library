@@ -11572,10 +11572,10 @@ system::rtd_oem_reseal::_install_guest_additions() {
 		systemctl enable qemu-guest-agent.service >>"${_LOGFILE}" 2>&1 || true
 		systemctl start qemu-guest-agent.service >>"${_LOGFILE}" 2>&1 || true
 
-		# Ubuntu ships the SPICE daemon as a static, udev-activated socket. During
-		# oem-config's target transition that socket is stopped, but the virtio
-		# device is not added again, so udev cannot reactivate it. Make the socket
-		# an explicit member of sockets.target and also restore it immediately.
+	# Ubuntu ships the SPICE daemon as a static, udev-activated socket. First-user
+	# setup and reseal transitions can stop that socket without adding the virtio
+	# device again, so udev cannot reactivate it. Make the socket an explicit
+	# member of sockets.target and also restore it immediately.
 		if systemctl cat spice-vdagentd.socket >/dev/null 2>&1; then
 			systemctl add-wants sockets.target spice-vdagentd.socket >>"${_LOGFILE}" 2>&1 || true
 			systemctl start spice-vdagentd.socket >>"${_LOGFILE}" 2>&1 || true
@@ -11603,7 +11603,7 @@ EOF
 	fi
 
 	# If this is the first deployed-user login, restart the session unit now.
-	# It may already have exited after oem-config stopped the system socket.
+	# It may already have exited while the system socket was unavailable.
 	[[ -n "${_session_user}" ]] || return 0
 	_session_uid="$(id -u "${_session_user}" 2>/dev/null || true)"
 	[[ -n "${_session_uid}" ]] || return 0
@@ -11635,17 +11635,8 @@ system::rtd_oem_reseal::_prepare_ubuntu_like() {
 	local _temporary_user="${SUDO_USER:-}"
 	local _temporary_uid=""
 	local _uid_1000_user=""
-	local _oem_uid=""
-	local _cleanup_command=""
-
-	# Ubuntu 25.10 and newer provide oem-config-prepare specifically for image
-	# builders. Its post-install script creates the dedicated `oem` account at
-	# UID 29999 and enables OEM first boot. Do not reproduce that lifecycle in
-	# RTD with user renames or boot-time helper services.
-	if ! apt-cache show oem-config-prepare >/dev/null 2>&1; then
-		write_error "Ubuntu does not provide the native oem-config-prepare package; refusing an unsafe OEM reseal."
-		return 1
-	fi
+	local _accounts_file=""
+	local _gdm_config=""
 
 	if [[ -z "${_temporary_user}" || "${_temporary_user}" == "root" ]]; then
 		_temporary_user="$(getent passwd 29998 2>/dev/null | cut -d: -f1)"
@@ -11659,52 +11650,85 @@ system::rtd_oem_reseal::_prepare_ubuntu_like() {
 		write_error "Temporary build account '${_temporary_user}' must use UID 29998 before OEM reseal; found UID ${_temporary_uid}."
 		return 1
 	fi
-	_cleanup_command="if getent passwd ${_temporary_user} >/dev/null; then userdel --force --remove ${_temporary_user}; fi; if getent group ${_temporary_user} >/dev/null; then groupdel ${_temporary_user} || true; fi"
-	command -v debconf-set-selections >/dev/null 2>&1 || {
-		write_error "debconf-set-selections is required to configure Ubuntu OEM completion."
-		return 1
-	}
-	{
-		printf 'oem-config oem-config/remove boolean true\n'
-		printf 'oem-config oem-config/late_command string %s\n' "${_cleanup_command}"
-	} | debconf-set-selections || {
-		write_error "Unable to register successful-OEM cleanup for '${_temporary_user}'."
-		return 1
-	}
 
 	_uid_1000_user="$(getent passwd 1000 2>/dev/null | cut -d: -f1)"
 	if [[ -n "${_uid_1000_user}" ]]; then
-		write_error "UID 1000 is occupied by '${_uid_1000_user}'; it must remain available for the end user created by OEM configuration."
-		return 1
-	fi
-	if ! id oem >/dev/null 2>&1 && getent passwd 29999 >/dev/null 2>&1; then
-		write_error "UID 29999 is occupied, but not by Ubuntu's OEM account."
+		write_error "UID 1000 is occupied by '${_uid_1000_user}'; it must remain available for GNOME Initial Setup to create the deployed user."
 		return 1
 	fi
 
-	software::add_native_package "oem-config-gtk" "oem-config-prepare" || return 1
-	command -v oem-config-prepare >/dev/null 2>&1 || {
-		write_error "Ubuntu OEM preparation is unavailable after installing the native OEM packages."
-		return 1
-	}
-	oem-config-prepare --quiet || return 1
-	_oem_uid="$(id -u oem 2>/dev/null || true)"
-	if [[ "${_oem_uid}" != "29999" || ! -d /home/oem ]]; then
-		write_error "Ubuntu's native OEM account was not created correctly (expected user oem, UID 29999, home /home/oem)."
+	# Modern Ubuntu's supported OEM flow is GDM's native GNOME Initial Setup
+	# session. It is a Wayland GNOME session and creates the first real account
+	# when AccountsService reports that the machine has no non-system users.
+	# The legacy oem-config GTK frontend starts ubiquity-dm, which hard-codes an
+	# X server and cannot work on Ubuntu images that only ship Xwayland.
+	if [[ ! -x /usr/sbin/gdm3 && ! -x /usr/sbin/gdm ]]; then
+		write_error "GNOME Display Manager is required for Ubuntu's native Wayland first-user setup; refusing to install or replace the current display manager automatically."
 		return 1
 	fi
-	[[ -e /var/lib/oem-config/run ]] || {
-		write_error "Ubuntu OEM preparation did not create /var/lib/oem-config/run."
+	software::add_native_package "gnome-initial-setup" || return 1
+	[[ -x /usr/libexec/gnome-initial-setup ]] || {
+		write_error "GNOME Initial Setup is unavailable after installing the native Ubuntu package."
 		return 1
 	}
-	systemctl is-enabled --quiet oem-config.service || {
-		write_error "Ubuntu OEM preparation did not enable oem-config.service."
+	[[ -f /usr/share/gnome-session/sessions/gnome-initial-setup.session ]] || {
+		write_error "GDM cannot start GNOME Initial Setup because its session definition is missing."
 		return 1
 	}
-	[[ "$(systemctl get-default 2>/dev/null)" == "oem-config.target" ]] || {
-		write_error "Ubuntu OEM preparation did not select oem-config.target for first boot."
+
+	# Keep the SSH recovery account through first boot, but exclude it from the
+	# AccountsService user list that GDM uses to decide whether to run its native
+	# new-user session. The existing post-OOBE login action removes this account
+	# after the deployed UID 1000 user has logged in successfully.
+	mkdir -p /var/lib/AccountsService/users || return 1
+	_accounts_file="/var/lib/AccountsService/users/${_temporary_user}"
+	printf '[User]\nSystemAccount=true\n' >"${_accounts_file}" || {
+		write_error "Unable to classify '${_temporary_user}' as RTD's temporary recovery account."
 		return 1
 	}
+	chmod 600 "${_accounts_file}" || return 1
+
+	# Remove remnants from an image that was previously prepared with the legacy
+	# Ubiquity OEM path. They must not override GDM at the next boot.
+	systemctl disable oem-config.service >>"${_LOGFILE}" 2>&1 || true
+	rm -f /var/lib/oem-config/run /run/gdm/gdm.ran-initial-setup
+	if [[ "$(id -u oem 2>/dev/null || true)" == "29999" ]]; then
+		userdel --force --remove oem >>"${_LOGFILE}" 2>&1 || {
+			write_error "Unable to remove the obsolete legacy OEM account."
+			return 1
+		}
+		getent group oem >/dev/null 2>&1 && groupdel oem >>"${_LOGFILE}" 2>&1 || true
+	fi
+
+	# Explicitly enable the native GDM initial-setup integration. Autologin has
+	# already been scrubbed by the finalizer, but enforce that invariant here so
+	# this function is also safe when called directly.
+	if [[ -f /etc/gdm3/custom.conf ]]; then
+		_gdm_config=/etc/gdm3/custom.conf
+	elif [[ -f /etc/gdm3/daemon.conf ]]; then
+		_gdm_config=/etc/gdm3/daemon.conf
+	else
+		mkdir -p /etc/gdm3
+		_gdm_config=/etc/gdm3/custom.conf
+		printf '[daemon]\n' >"${_gdm_config}"
+	fi
+	sed -i \
+		-e '/^[[:space:]]*InitialSetupEnable[[:space:]]*=/d' \
+		-e 's/^[[:space:]]*AutomaticLoginEnable[[:space:]]*=.*/AutomaticLoginEnable=False/' \
+		-e '/^[[:space:]]*AutomaticLogin[[:space:]]*=/d' \
+		"${_gdm_config}" || return 1
+	if grep -q '^\[daemon\][[:space:]]*$' "${_gdm_config}"; then
+		sed -i '/^\[daemon\][[:space:]]*$/a InitialSetupEnable=True' "${_gdm_config}" || return 1
+	else
+		printf '\n[daemon]\nInitialSetupEnable=True\n' >>"${_gdm_config}" || return 1
+	fi
+
+	systemctl enable gdm3.service >>"${_LOGFILE}" 2>&1 || systemctl enable gdm.service >>"${_LOGFILE}" 2>&1 || {
+		write_error "Unable to enable GDM for Ubuntu's native first-user setup."
+		return 1
+	}
+	systemctl set-default graphical.target >>"${_LOGFILE}" 2>&1 || return 1
+	[[ "$(systemctl get-default 2>/dev/null)" == "graphical.target" ]] || return 1
 	if [[ "${_virt}" == "virtual" ]]; then
 		system::rtd_oem_reseal::_install_guest_additions
 	fi
@@ -11797,29 +11821,74 @@ system::rtd_oem_reseal::_finalize_shutdown() {
 	# Outputs:
 	#   Status via write_status.
 	# Returns:
-	#   Does not return; triggers shutdown.
+	#   0 after a power-off transaction is queued; nonzero if every request fails.
 	# Usage:
 	#   system::rtd_oem_reseal::_finalize_shutdown "${_virt}"
 	# End of documentation
 	local _virt="${1}"
+	local _systemctl_bin=""
+	local _shutdown_bin=""
+	local _shutdown_status=1
 	if [[ "${_virt}" == "virtual" ]]; then
 		write_status "💻 This is a virtual machine. Shutting down..."
 	else
 		write_status "🖥️ This is a physical machine. Shutting down..."
 	fi
-	shutdown -h now
+
+	# Ask systemd directly and return as soon as the transaction is queued. The
+	# compatibility `shutdown` frontend has changed behaviour between systemd
+	# releases and may reject an otherwise valid request from a graphical OEM
+	# session. Preserve all command output so a rejected request is diagnosable.
+	_systemctl_bin="$(command -v systemctl 2>/dev/null || true)"
+	if [[ -n "${_systemctl_bin}" ]]; then
+		printf 'RTD OEM reseal: requesting power-off with %s --no-block poweroff\n' "${_systemctl_bin}" >>"${_LOGFILE}"
+		"${_systemctl_bin}" --no-block poweroff >>"${_LOGFILE}" 2>&1
+		_shutdown_status=$?
+		if (( _shutdown_status == 0 )); then
+			printf 'RTD OEM reseal: systemd accepted the power-off request.\n' >>"${_LOGFILE}"
+			return 0
+		fi
+		write_warning "systemd rejected the power-off request (status ${_shutdown_status}); trying the shutdown compatibility command."
+	fi
+
+	_shutdown_bin="$(command -v shutdown 2>/dev/null || true)"
+	if [[ -n "${_shutdown_bin}" ]]; then
+		printf 'RTD OEM reseal: requesting fallback power-off with %s -P now\n' "${_shutdown_bin}" >>"${_LOGFILE}"
+		"${_shutdown_bin}" -P now >>"${_LOGFILE}" 2>&1
+		_shutdown_status=$?
+		if (( _shutdown_status == 0 )); then
+			printf 'RTD OEM reseal: shutdown accepted the fallback power-off request.\n' >>"${_LOGFILE}"
+			return 0
+		fi
+	fi
+
+	write_error "Unable to queue the final power-off request (status ${_shutdown_status}). OEM preparation remains complete."
+	return "${_shutdown_status}"
 }
 
 system::rtd_oem_reseal() {
 	# Description:
 	# Function to reseal a newly installed system for delivery to end user.
 	# Globals: Requires distro-specific OEM tools or reseal packages to be available.
-	# Arguments: None
-	# Outputs: Logs reseal steps and powers the system off.
-	# Returns:
+	# Arguments:
+	#   --prepare-only - Complete distro-specific OEM preparation without
+	#                    requesting shutdown. Used by callers that persist a
+	#                    ready state before starting the power transition.
+	# Outputs: Logs reseal steps and, unless --prepare-only is used, requests power-off.
+	# Returns: 0 when preparation (and any requested power-off queueing) succeeds.
 	# Usage:
 
 	# End of documentation
+
+	local _prepare_only="false"
+	case "${1:-}" in
+	--prepare-only) _prepare_only="true" ;;
+	"") ;;
+	*)
+		write_error "Unknown OEM reseal option: ${1}"
+		return 2
+		;;
+	esac
 
 	if [[ ! -r /etc/os-release ]]; then
 		write_warning "🤷‍♀️ Unable to determine distribution for reseal (missing /etc/os-release)"
@@ -11861,6 +11930,9 @@ system::rtd_oem_reseal() {
 			;;
 	esac
 
+	if [[ "${_prepare_only}" == "true" ]]; then
+		return 0
+	fi
 	system::rtd_oem_reseal::_finalize_shutdown "${_virt}"
 }
 
@@ -34483,8 +34555,8 @@ common_vdi_post_config=$(cat <<EOF
         - curtin in-target --target=/target -- /bin/bash -c 'systemctl enable spice-vdagentd ; exit 0'
 
         # Keep UID/GID 1000 free for the deployed user. The build account remains
-        # available for SSH recovery at UID/GID 29998 until OEM setup succeeds;
-        # Ubuntu's native oem-config late command removes it only after success.
+        # available for SSH recovery at UID/GID 29998. During final reseal it is
+        # hidden from GDM; GNOME Initial Setup can then create the deployed user.
         - curtin in-target --target=/target -- /bin/bash -ec 'build_user="${Preference_InitialUser}" ; build_group="\$(id -gn "\$build_user")" ; test "\$build_group" = "\$build_user" ; if test "\$(id -u "\$build_user")" != 29998 ; then if getent passwd 29998 >/dev/null ; then exit 1 ; fi ; usermod --uid 29998 "\$build_user" ; fi ; if test "\$(id -g "\$build_user")" != 29998 ; then if getent group 29998 >/dev/null ; then exit 1 ; fi ; groupmod --gid 29998 "\$build_group" ; fi ; chown -R "\$build_user:\$build_group" "/home/\$build_user"'
 
         # Ensure spice-vdagent autostarts in user sessions

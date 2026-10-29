@@ -1,92 +1,81 @@
 #!/usr/bin/env python3
-"""Regression tests for the Ubuntu OEM temporary-account handoff."""
+"""Regression tests for RTD's native Ubuntu Wayland first-user handoff."""
 
 from __future__ import annotations
 
-import os
 import subprocess
-import tempfile
 import unittest
 from pathlib import Path
 
 
-HELPER = Path(__file__).resolve().parents[1] / 'rtd-prepare-oem-temporary-user.sh'
+CORE = Path(__file__).resolve().parents[1]
+LIBRARY = CORE / "_rtd_library"
+FINALIZER = CORE / "rtd-vm-template-finalize-linux.sh"
 
 
 class UbuntuOemHandoffTests(unittest.TestCase):
-    def command(self, directory: Path, name: str, body: str) -> None:
-        path = directory / name
-        path.write_text('#!/bin/bash\nset -eu\n' + body)
-        path.chmod(0o755)
+    @classmethod
+    def setUpClass(cls):
+        cls.library = LIBRARY.read_text()
+        cls.finalizer = FINALIZER.read_text()
 
-    def test_renames_user_group_and_home(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            commands = root / 'bin'
-            commands.mkdir()
-            state = root / 'oem-temporary-user'
-            state.write_text('tangarora\n')
-            log = root / 'commands.log'
-            group_renamed = root / 'group-renamed'
+    def test_library_has_valid_shell_syntax(self):
+        completed = subprocess.run(
+            ["bash", "-n", str(LIBRARY)],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
 
-            self.command(commands, 'getent', f'''
-case "$1:$2" in
-  passwd:tangarora) printf '%s\n' 'tangarora:x:1000:1000:RTD User:/home/tangarora:/bin/bash' ;;
-  passwd:oem) exit 2 ;;
-  passwd:29999) exit 2 ;;
-  group:tangarora) printf '%s\n' 'tangarora:x:1000:' ;;
-  group:oem) [[ -e '{group_renamed}' ]] || exit 2; printf '%s\n' 'oem:x:29999:' ;;
-  group:29999) exit 2 ;;
-  *) exit 2 ;;
-esac
-''')
-            self.command(commands, 'id', '''
-case "$1:$2" in
-  -gn:tangarora) printf '%s\n' tangarora ;;
-  -u:tangarora) printf '%s\n' 1000 ;;
-  -g:tangarora) printf '%s\n' 1000 ;;
-  *) exit 2 ;;
-esac
-''')
-            self.command(commands, 'groupmod', f'''
-printf 'groupmod:%s\n' "$*" >>'{log}'
-touch '{group_renamed}'
-''')
-            self.command(commands, 'usermod', f'''printf 'usermod:%s\n' "$*" >>'{log}'\n''')
-            self.command(commands, 'chown', f'''printf 'chown:%s\n' "$*" >>'{log}'\n''')
+    def test_uses_gdm_gnome_initial_setup_not_legacy_ubiquity(self):
+        self.assertIn(
+            'software::add_native_package "gnome-initial-setup"',
+            self.library,
+        )
+        self.assertIn("/usr/share/gnome-session/sessions/gnome-initial-setup.session", self.library)
+        self.assertIn("InitialSetupEnable=True", self.library)
+        prepare = self.library.split(
+            "system::rtd_oem_reseal::_prepare_ubuntu_like() {", 1
+        )[1].split("system::rtd_oem_reseal::_prepare_debian() {", 1)[0]
+        self.assertNotIn("oem-config-prepare --quiet", prepare)
+        self.assertNotIn('software::add_native_package "oem-config-gtk"', prepare)
 
-            environment = os.environ.copy()
-            environment['PATH'] = f'{commands}:/usr/bin:/bin'
-            environment['RTD_OEM_USER_STATE_FILE'] = str(state)
-            completed = subprocess.run(
-                ['bash', str(HELPER)], env=environment, text=True,
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+    def test_build_account_is_recovery_user_not_oem_user(self):
+        self.assertIn('usermod --uid 29998 "\\$build_user"', self.library)
+        self.assertIn('groupmod --gid 29998 "\\$build_group"', self.library)
+        self.assertNotIn('usermod --uid 29999 "\\$build_user"', self.library)
 
-            self.assertEqual(completed.returncode, 0, completed.stderr)
-            self.assertEqual(state.read_text(), 'oem\n')
-            calls = log.read_text().splitlines()
-            self.assertEqual(calls, [
-                'groupmod:--new-name oem tangarora',
-                'groupmod:--gid 29999 oem',
-                'usermod:--login oem tangarora',
-                'usermod:--uid 29999 oem',
-                'usermod:--home /home/oem --move-home oem',
-                'usermod:--gid oem oem',
-                'chown:-R oem:oem /home/oem',
-            ])
+    def test_recovery_account_is_hidden_then_removed_after_uid_1000_login(self):
+        self.assertIn("SystemAccount=true", self.library)
+        linux_config = (CORE / "rtd-oem-linux-config.sh").read_text()
+        self.assertIn("getent passwd 29998", linux_config)
+        self.assertIn('userdel --force --remove "${recovery_user}"', linux_config)
+        self.assertIn('== "1000"', linux_config)
+        self.assertNotIn("_stage_ubuntu_oem_user", self.library)
+        self.assertNotIn("rtd-prepare-oem-temporary-user.service", self.library)
 
-    def test_refuses_root(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            state = Path(temporary) / 'oem-temporary-user'
-            state.write_text('root\n')
-            environment = os.environ.copy()
-            environment['RTD_OEM_USER_STATE_FILE'] = str(state)
-            completed = subprocess.run(
-                ['bash', str(HELPER)], env=environment, text=True,
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
-            self.assertNotEqual(completed.returncode, 0)
-            self.assertIn('Refusing to rename root', completed.stderr)
+    def test_reseal_requires_uid_1000_to_be_free(self):
+        self.assertIn("getent passwd 1000", self.library)
+        self.assertIn("it must remain available for GNOME Initial Setup", self.library)
+
+    def test_poweroff_uses_logged_systemd_request_and_fallback(self):
+        self.assertIn('"${_systemctl_bin}" --no-block poweroff', self.library)
+        self.assertIn('"${_shutdown_bin}" -P now', self.library)
+        self.assertIn('>>"${_LOGFILE}" 2>&1', self.library)
+
+    def test_finalizer_separates_oem_readiness_from_poweroff_failure(self):
+        self.assertIn("system::rtd_oem_reseal --prepare-only", self.finalizer)
+        self.assertIn(
+            'write_status "reseal" "ready" "OEM preparation completed successfully;',
+            self.finalizer,
+        )
+        self.assertIn(
+            'write_status "poweroff" "failed" "OEM preparation completed, but',
+            self.finalizer,
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

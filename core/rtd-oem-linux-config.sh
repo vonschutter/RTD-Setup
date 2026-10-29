@@ -283,6 +283,26 @@ oem_first_login_bundle_manager() {
 	fi
 
 	write_information "🚀 Launching RTD bundle manager for first user login..."
+	# GNOME Initial Setup has now created and logged in the deployed account.
+	# Remove the hidden build/recovery account only after proving that this is a
+	# different UID 1000 user, so a failed first-user setup retains SSH recovery.
+	local deployed_user="${SUDO_USER:-}"
+	local recovery_user=""
+	if [[ -n "${deployed_user}" && "$(id -u "${deployed_user}" 2>/dev/null || true)" == "1000" ]]; then
+		recovery_user="$(getent passwd 29998 2>/dev/null | cut -d: -f1)"
+		if [[ -n "${recovery_user}" && "${recovery_user}" != "${deployed_user}" ]]; then
+			write_information "🧹 Removing completed-build recovery account ${recovery_user}..."
+			if userdel --force --remove "${recovery_user}" >>"${_LOGFILE}" 2>&1; then
+				getent group "${recovery_user}" >/dev/null 2>&1 && \
+					groupdel "${recovery_user}" >>"${_LOGFILE}" 2>&1 || true
+				rm -f "/var/lib/AccountsService/users/${recovery_user}" 2>/dev/null || true
+			else
+				write_warning "Unable to remove recovery account ${recovery_user}; manual cleanup is required."
+			fi
+		fi
+	else
+		write_warning "The first-login account is not the expected deployed UID 1000 user; preserving the recovery account."
+	fi
 	rm -f "${HOME:-}/.config/autostart/${RTD_POST_OOBE_BUNDLE_AUTOSTART}" 2>/dev/null || true
 	if [[ -n "${SUDO_USER:-}" && -d "/home/${SUDO_USER}" ]]; then
 		rm -f "/home/${SUDO_USER}/.config/autostart/${RTD_POST_OOBE_BUNDLE_AUTOSTART}" 2>/dev/null || true
