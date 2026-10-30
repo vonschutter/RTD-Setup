@@ -30273,10 +30273,15 @@ kvm::make_vm_now_from_ubuntu_com() {
 					--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 					--extra-args "autoinstall reboot=acpi noprompt" \
-					--wait --noautoconsole
+					--wait=-1 --noreboot --noautoconsole
 			install_status=$?
 			if (( install_status != 0 )); then
 				write_error "Ubuntu installation failed for ${vm_name} (virt-install status ${install_status})."
+			elif ! kvm::clone_template_vm::_detach_install_media "${vm_name}"; then
+				write_warning "Ubuntu installation completed, but one or more install-media devices could not be removed from ${vm_name}."
+			fi
+			if (( install_status == 0 )) && ! virsh start "${vm_name}" >/dev/null 2>&1; then
+				write_error "Ubuntu installation completed, but the media-free first boot could not be started for ${vm_name}."
 			fi
 			} >>"${_LOGFILE}" 2>&1 & disown
 
@@ -30333,10 +30338,15 @@ kvm::make_vm_now_from_ubuntu_com() {
 				--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 				--extra-args "autoinstall reboot=acpi noprompt" \
-				--wait --noautoconsole
+				--wait=-1 --noreboot --noautoconsole
 			install_status=$?
 			if (( install_status != 0 )); then
 				write_error "Ubuntu installation failed for ${vm_name} (virt-install status ${install_status})."
+			elif ! kvm::clone_template_vm::_detach_install_media "${vm_name}"; then
+				write_warning "Ubuntu installation completed, but one or more install-media devices could not be removed from ${vm_name}."
+			fi
+			if (( install_status == 0 )) && ! virsh start "${vm_name}" >/dev/null 2>&1; then
+				write_error "Ubuntu installation completed, but the media-free first boot could not be started for ${vm_name}."
 			fi
 			} >>"${_LOGFILE}" 2>&1 & disown
 
@@ -30391,10 +30401,15 @@ kvm::make_vm_now_from_ubuntu_com() {
 				--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 				--extra-args "autoinstall reboot=acpi noprompt" \
-				--wait --noautoconsole
+				--wait=-1 --noreboot --noautoconsole
 			install_status=$?
 			if (( install_status != 0 )); then
 				write_error "Ubuntu installation failed for ${vm_name} (virt-install status ${install_status})."
+			elif ! kvm::clone_template_vm::_detach_install_media "${vm_name}"; then
+				write_warning "Ubuntu installation completed, but one or more install-media devices could not be removed from ${vm_name}."
+			fi
+			if (( install_status == 0 )) && ! virsh start "${vm_name}" >/dev/null 2>&1; then
+				write_error "Ubuntu installation completed, but the media-free first boot could not be started for ${vm_name}."
 			fi
 			} >>"${_LOGFILE}" 2>&1 & disown
 
@@ -31039,11 +31054,12 @@ kvm::clone_template_vm::_display_template_label() {
 
 kvm::clone_template_vm::_detach_install_media() {
 	# Description:
-	#   Remove cloned install media devices from a VM definition after virt-clone.
+	#   Remove install media devices from a VM after installation or cloning.
 	#
-	# This detaches floppy and CD-ROM targets from the inactive clone configuration so
-	# template install media, autounattend floppies, NoCloud seed ISOs, or OS installer
-	# ISOs do not remain attached when a clone is first booted.
+	# For a running VM, CD-ROM media is first ejected from the live domain. All floppy
+	# and CD-ROM targets are then detached from the persistent configuration so template
+	# install media, autounattend floppies, NoCloud seed ISOs, or OS installer ISOs do
+	# not return on the next boot. For an inactive VM, the devices are detached directly.
 	#
 	# Globals:
 	#   - None.
@@ -31052,14 +31068,15 @@ kvm::clone_template_vm::_detach_install_media() {
 	# Outputs:
 	#   - Status/warning messages for each detach attempt.
 	# Returns:
-	#   - 0 if inspection completed; non-zero if the VM name is missing or XML cannot be read.
+	#   - 0 if no media remains; non-zero if inspection or any cleanup operation fails.
 	#
 	# Usage:
 	#   kvm::clone_template_vm::_detach_install_media "Windows_11_VDI_20260101_120000"
 	# End of documentation
 
-	local vm_name="${1:-}" xml
-	local -a media_targets=()
+	local vm_name="${1:-}" xml state media_entry media_type target
+	local cleanup_failed=0
+	local -a media_devices=()
 
 	[[ -n "$vm_name" ]] || {
 		write_warning "Install media cleanup skipped: missing VM name."
@@ -31071,38 +31088,62 @@ kvm::clone_template_vm::_detach_install_media() {
 		return 1
 	fi
 
-	while IFS= read -r target; do
-		[[ -n "$target" ]] && media_targets+=("$target")
+	while IFS= read -r media_entry; do
+		[[ -n "$media_entry" ]] && media_devices+=("$media_entry")
 	done < <(awk '
 		/<disk / {
 			in_disk=1
-			is_media=($0 ~ /device=.cdrom./ || $0 ~ /device=.floppy./)
+			device=""
+			if ($0 ~ /device=.cdrom./) { device="cdrom" }
+			else if ($0 ~ /device=.floppy./) { device="floppy" }
 		}
-		in_disk && is_media && /<target / {
+		in_disk && device != "" && /<target / {
 			target=$0
 			sub(/^.*dev=['\''"]/, "", target)
 			sub(/['\''"].*$/, "", target)
-			if (target != $0) { print target }
+			if (target != $0) { print device "|" target }
 		}
 		/<\/disk>/ {
 			in_disk=0
-			is_media=0
+			device=""
 		}
 	' <<<"$xml")
 
-	if (( ${#media_targets[@]} == 0 )); then
-		write_information "No cloned floppy or CD-ROM devices found on '$vm_name'."
+	if (( ${#media_devices[@]} == 0 )); then
+		write_information "No floppy or CD-ROM install media devices found on '$vm_name'."
 		return 0
 	fi
 
-	for target in "${media_targets[@]}"; do
-		write_status "Detaching cloned install media target '${target}' from '${vm_name}'."
+	state="$(virsh domstate "$vm_name" 2>/dev/null || true)"
+	for media_entry in "${media_devices[@]}"; do
+		IFS='|' read -r media_type target <<<"$media_entry"
+
+		if [[ "${state,,}" == "running" ]]; then
+			if [[ "$media_type" == "cdrom" ]]; then
+				write_status "Ejecting live install media target '${target}' from '${vm_name}'."
+				if ! virsh change-media "$vm_name" "$target" --eject --live --force >/dev/null 2>&1; then
+					write_warning "Could not eject live install media target '${target}' from '${vm_name}'."
+					cleanup_failed=1
+				fi
+			else
+				write_status "Detaching live install media target '${target}' from '${vm_name}'."
+				if ! virsh detach-disk "$vm_name" "$target" --live >/dev/null 2>&1; then
+					write_warning "Could not detach live install media target '${target}' from '${vm_name}'."
+					cleanup_failed=1
+				fi
+			fi
+		fi
+
+		write_status "Removing install media target '${target}' from the persistent definition of '${vm_name}'."
 		if virsh detach-disk "$vm_name" "$target" --config >/dev/null 2>&1; then
 			write_information "Detached install media target '${target}' from '${vm_name}'."
 		else
 			write_warning "Could not detach install media target '${target}' from '${vm_name}'."
+			cleanup_failed=1
 		fi
 	done
+
+	return "$cleanup_failed"
 }
 
 kvm::clone_template_vm::_clone_from_category() {
