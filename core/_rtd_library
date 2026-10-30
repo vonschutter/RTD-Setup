@@ -30053,8 +30053,6 @@ kvm::make_vm_now_from_ubuntu_com() {
 	#     with the preseed.cfg file or the autoinstall.yaml file anyway as the documentation appears incomplete.
 	#
 	# End of Documentation
-	local install_status=0
-
 	# Set default values for VM T-Shirts sizes (may vary by OS)...
 	: ${all_params=${*}}                                  # Save all parameters for later use.
 	: ${_flavor="ubuntu"}                                 # This is the default flavor of Ubuntu to use.
@@ -30315,18 +30313,12 @@ kvm::make_vm_now_from_ubuntu_com() {
 					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 					--extra-args "autoinstall reboot=acpi noprompt" \
 					--wait=-1 --noreboot --noautoconsole
-			install_status=$?
-			if (( install_status != 0 )); then
-				write_error "Ubuntu installation failed for ${vm_name} (virt-install status ${install_status})."
-			elif ! kvm::clone_template_vm::_detach_install_media "${vm_name}"; then
-				write_warning "Ubuntu installation completed, but one or more install-media devices could not be removed from ${vm_name}."
-			fi
-			if (( install_status == 0 )) && ! virsh start "${vm_name}" >/dev/null 2>&1; then
-				write_error "Ubuntu installation completed, but the media-free first boot could not be started for ${vm_name}."
-			fi
 			} >>"${_LOGFILE}" 2>&1 & disown
 
 			kvm::wait_for_domain_definition "${vm_name}" 60 3 || true
+			if ! kvm::clone_template_vm::_remove_install_media_from_config "${vm_name}"; then
+				write_warning "One or more install-media devices could not be removed from the persistent definition of ${vm_name}."
+			fi
 
 			if ! kvm::wait_for_domain_start --domain "${vm_name}"; then
 				write_warning "Domain '${vm_name}' did not emit a start event within the expected window."
@@ -30380,18 +30372,12 @@ kvm::make_vm_now_from_ubuntu_com() {
 				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 				--extra-args "autoinstall reboot=acpi noprompt" \
 				--wait=-1 --noreboot --noautoconsole
-			install_status=$?
-			if (( install_status != 0 )); then
-				write_error "Ubuntu installation failed for ${vm_name} (virt-install status ${install_status})."
-			elif ! kvm::clone_template_vm::_detach_install_media "${vm_name}"; then
-				write_warning "Ubuntu installation completed, but one or more install-media devices could not be removed from ${vm_name}."
-			fi
-			if (( install_status == 0 )) && ! virsh start "${vm_name}" >/dev/null 2>&1; then
-				write_error "Ubuntu installation completed, but the media-free first boot could not be started for ${vm_name}."
-			fi
 			} >>"${_LOGFILE}" 2>&1 & disown
 
 			kvm::wait_for_domain_definition "${vm_name}" 60 3 || true
+			if ! kvm::clone_template_vm::_remove_install_media_from_config "${vm_name}"; then
+				write_warning "One or more install-media devices could not be removed from the persistent definition of ${vm_name}."
+			fi
 
 			if ! kvm::wait_for_domain_start --domain "${vm_name}"; then
 				write_warning "Domain '${vm_name}' did not emit a start event within the expected window."
@@ -30443,18 +30429,12 @@ kvm::make_vm_now_from_ubuntu_com() {
 				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 				--extra-args "autoinstall reboot=acpi noprompt" \
 				--wait=-1 --noreboot --noautoconsole
-			install_status=$?
-			if (( install_status != 0 )); then
-				write_error "Ubuntu installation failed for ${vm_name} (virt-install status ${install_status})."
-			elif ! kvm::clone_template_vm::_detach_install_media "${vm_name}"; then
-				write_warning "Ubuntu installation completed, but one or more install-media devices could not be removed from ${vm_name}."
-			fi
-			if (( install_status == 0 )) && ! virsh start "${vm_name}" >/dev/null 2>&1; then
-				write_error "Ubuntu installation completed, but the media-free first boot could not be started for ${vm_name}."
-			fi
 			} >>"${_LOGFILE}" 2>&1 & disown
 
 			kvm::wait_for_domain_definition "${vm_name}" 60 3 || true
+			if ! kvm::clone_template_vm::_remove_install_media_from_config "${vm_name}"; then
+				write_warning "One or more install-media devices could not be removed from the persistent definition of ${vm_name}."
+			fi
 
 			if ! kvm::wait_for_domain_start --domain "${vm_name}"; then
 				write_warning "Domain '${vm_name}' did not emit a start event within the expected window."
@@ -31093,14 +31073,13 @@ kvm::clone_template_vm::_display_template_label() {
 	echo "Source: ${core}"
 }
 
-kvm::clone_template_vm::_detach_install_media() {
+kvm::clone_template_vm::_remove_install_media_from_config() {
 	# Description:
-	#   Remove install media devices from a VM after installation or cloning.
+	#   Remove install media devices from a VM's persistent libvirt definition.
 	#
-	# For a running VM, CD-ROM media is first ejected from the live domain. All floppy
-	# and CD-ROM targets are then detached from the persistent configuration so template
-	# install media, autounattend floppies, NoCloud seed ISOs, or OS installer ISOs do
-	# not return on the next boot. For an inactive VM, the devices are detached directly.
+	# The live domain is deliberately left unchanged so an installer can continue using
+	# its OS and NoCloud media. The devices disappear on the next cold boot because they
+	# are removed from the persistent configuration as soon as the domain is defined.
 	#
 	# Globals:
 	#   - None.
@@ -31112,10 +31091,10 @@ kvm::clone_template_vm::_detach_install_media() {
 	#   - 0 if no media remains; non-zero if inspection or any cleanup operation fails.
 	#
 	# Usage:
-	#   kvm::clone_template_vm::_detach_install_media "Windows_11_VDI_20260101_120000"
+	#   kvm::clone_template_vm::_remove_install_media_from_config "Windows_11_VDI_20260101_120000"
 	# End of documentation
 
-	local vm_name="${1:-}" xml state media_entry media_type target
+	local vm_name="${1:-}" xml target
 	local cleanup_failed=0
 	local -a media_devices=()
 
@@ -31124,13 +31103,13 @@ kvm::clone_template_vm::_detach_install_media() {
 		return 1
 	}
 
-	if ! xml="$(virsh dumpxml "$vm_name" 2>/dev/null)"; then
+	if ! xml="$(virsh dumpxml "$vm_name" --inactive 2>/dev/null)"; then
 		write_warning "Install media cleanup skipped: could not read libvirt XML for '$vm_name'."
 		return 1
 	fi
 
-	while IFS= read -r media_entry; do
-		[[ -n "$media_entry" ]] && media_devices+=("$media_entry")
+	while IFS= read -r target; do
+		[[ -n "$target" ]] && media_devices+=("$target")
 	done < <(awk '
 		/<disk / {
 			in_disk=1
@@ -31142,7 +31121,7 @@ kvm::clone_template_vm::_detach_install_media() {
 			target=$0
 			sub(/^.*dev=['\''"]/, "", target)
 			sub(/['\''"].*$/, "", target)
-			if (target != $0) { print device "|" target }
+			if (target != $0) { print target }
 		}
 		/<\/disk>/ {
 			in_disk=0
@@ -31155,26 +31134,7 @@ kvm::clone_template_vm::_detach_install_media() {
 		return 0
 	fi
 
-	state="$(virsh domstate "$vm_name" 2>/dev/null || true)"
-	for media_entry in "${media_devices[@]}"; do
-		IFS='|' read -r media_type target <<<"$media_entry"
-
-		if [[ "${state,,}" == "running" ]]; then
-			if [[ "$media_type" == "cdrom" ]]; then
-				write_status "Ejecting live install media target '${target}' from '${vm_name}'."
-				if ! virsh change-media "$vm_name" "$target" --eject --live --force >/dev/null 2>&1; then
-					write_warning "Could not eject live install media target '${target}' from '${vm_name}'."
-					cleanup_failed=1
-				fi
-			else
-				write_status "Detaching live install media target '${target}' from '${vm_name}'."
-				if ! virsh detach-disk "$vm_name" "$target" --live >/dev/null 2>&1; then
-					write_warning "Could not detach live install media target '${target}' from '${vm_name}'."
-					cleanup_failed=1
-				fi
-			fi
-		fi
-
+	for target in "${media_devices[@]}"; do
 		write_status "Removing install media target '${target}' from the persistent definition of '${vm_name}'."
 		if virsh detach-disk "$vm_name" "$target" --config >/dev/null 2>&1; then
 			write_information "Detached install media target '${target}' from '${vm_name}'."
@@ -31409,7 +31369,7 @@ kvm::clone_template_vm::_clone_from_category() {
 			return 1
 		fi
 		write_information "clone_from_category: virt-clone completed for ${new_name}"
-		kvm::clone_template_vm::_detach_install_media "$new_name" || true
+		kvm::clone_template_vm::_remove_install_media_from_config "$new_name" || true
 
 		if (( enable_sysprep )); then
 			write_status "🧼 Running virt-sysprep on '$new_name'..."

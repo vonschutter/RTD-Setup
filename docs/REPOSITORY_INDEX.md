@@ -494,7 +494,7 @@ Format: `symbol` — `path:line`. Symbols are grouped by source so searches retu
 - `kvm::clone_template_vm::_build_customize_args` — `core/_rtd_library:30844`
 - `kvm::clone_template_vm::_format_name_component` — `core/_rtd_library:30907`
 - `kvm::clone_template_vm::_display_template_label` — `core/_rtd_library:30936`
-- `kvm::clone_template_vm::_detach_install_media` — `core/_rtd_library:30962`
+- `kvm::clone_template_vm::_remove_install_media_from_config` — `core/_rtd_library:31076`
 - `kvm::clone_template_vm::_clone_from_category` — `core/_rtd_library:31030`
 - `kvm::clone_server_template_vm` — `core/_rtd_library:31303`
 - `kvm::clone_vdi_template_vm` — `core/_rtd_library:31333`
