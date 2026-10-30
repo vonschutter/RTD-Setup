@@ -69,6 +69,21 @@ class UbuntuOemHandoffTests(unittest.TestCase):
         self.assertIn('"${_shutdown_bin}" -P now', self.library)
         self.assertIn('>>"${_LOGFILE}" 2>&1', self.library)
 
+    def test_spice_agent_uses_one_session_launcher(self):
+        integration = self.library.split(
+            "system::rtd_oem_reseal::_install_guest_additions() {", 1
+        )[1].split("system::rtd_oem_reseal::_prepare_ubuntu_like() {", 1)[0]
+        self.assertIn("/usr/lib/systemd/user/spice-vdagent.service", integration)
+        self.assertIn("Hidden=true", integration)
+        self.assertIn("X-GNOME-Autostart-enabled=false", integration)
+        self.assertIn('pkill -u "${_session_uid}" -x spice-vdagent', integration)
+        self.assertIn("systemctl --user start spice-vdagent.service", integration)
+        self.assertIn("Hidden=false", integration)
+        self.assertNotIn(
+            "echo -e \"[Desktop Entry]\\nType=Application\\nExec=/usr/bin/spice-vdagent",
+            self.library,
+        )
+
     def test_finalizer_separates_oem_readiness_from_poweroff_failure(self):
         self.assertIn("system::rtd_oem_reseal --prepare-only", self.finalizer)
         self.assertIn(

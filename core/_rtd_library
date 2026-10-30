@@ -11557,6 +11557,8 @@ system::rtd_oem_reseal::_install_guest_additions() {
 	# End of documentation
 
 	local _session_user="${1:-}" _session_uid _runtime_dir
+	local _spice_agent_bin _spice_autostart="/etc/xdg/autostart/spice-vdagent.desktop"
+	local _spice_user_unit=""
 
 	write_status "🛠 Installing guest integration tools (qemu-guest-agent, spice-vdagent)..."
 	software::add_native_package qemu-guest-agent spice-vdagent || true
@@ -11585,25 +11587,55 @@ system::rtd_oem_reseal::_install_guest_additions() {
 		fi
 	fi
 
-	local spice_agent_bin
-	spice_agent_bin="$(command -v spice-vdagent 2>/dev/null || true)"
-	if [[ -n "${spice_agent_bin}" && ! -e /etc/xdg/autostart/spice-vdagent.desktop ]]; then
+	_spice_agent_bin="$(command -v spice-vdagent 2>/dev/null || true)"
+	for _spice_user_unit in \
+		/etc/systemd/user/spice-vdagent.service \
+		/usr/lib/systemd/user/spice-vdagent.service \
+		/lib/systemd/user/spice-vdagent.service; do
+		[[ -f "${_spice_user_unit}" ]] && break
+		_spice_user_unit=""
+	done
+
+	if [[ -n "${_spice_user_unit}" ]]; then
+		# Modern spice-vdagent packages start one session agent through the systemd
+		# user manager. Some releases also ship a legacy XDG entry; allowing both
+		# creates a reconnect loop, high CPU use, and an unbounded journal flood.
+		# Keep the package file in place for package-manager ownership, but make the
+		# XDG specification explicitly suppress it.
+		if [[ -f "${_spice_autostart}" ]]; then
+			if grep -q '^Hidden=' "${_spice_autostart}"; then
+				sed -i 's/^Hidden=.*/Hidden=true/' "${_spice_autostart}" || true
+			else
+				printf '\nHidden=true\n' >>"${_spice_autostart}" || true
+			fi
+			if grep -q '^X-GNOME-Autostart-enabled=' "${_spice_autostart}"; then
+				sed -i 's/^X-GNOME-Autostart-enabled=.*/X-GNOME-Autostart-enabled=false/' "${_spice_autostart}" || true
+			else
+				printf 'X-GNOME-Autostart-enabled=false\n' >>"${_spice_autostart}" || true
+			fi
+			chmod 644 "${_spice_autostart}" 2>/dev/null || true
+		fi
+		systemctl --global enable spice-vdagent.service >>"${_LOGFILE}" 2>&1 || true
+	elif [[ -n "${_spice_agent_bin}" ]]; then
+		# Older/non-systemd desktops need the XDG launcher. Rewrite it deliberately
+		# so a stale Hidden=true override from a previous package is reversible.
 		mkdir -p /etc/xdg/autostart
-		cat >/etc/xdg/autostart/spice-vdagent.desktop <<EOF
+		cat >"${_spice_autostart}" <<EOF
 [Desktop Entry]
 Type=Application
-Exec=${spice_agent_bin}
+Exec=${_spice_agent_bin}
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
 Name=Spice Agent
 Comment=SPICE guest clipboard and display integration
 EOF
-		chmod 644 /etc/xdg/autostart/spice-vdagent.desktop 2>/dev/null || true
+		chmod 644 "${_spice_autostart}" 2>/dev/null || true
 	fi
 
-	# If this is the first deployed-user login, restart the session unit now.
-	# It may already have exited while the system socket was unavailable.
+	# If this is the first deployed-user login, collapse any legacy XDG process
+	# and start exactly one systemd-managed session agent.
+	[[ -n "${_spice_user_unit}" ]] || return 0
 	[[ -n "${_session_user}" ]] || return 0
 	_session_uid="$(id -u "${_session_user}" 2>/dev/null || true)"
 	[[ -n "${_session_uid}" ]] || return 0
@@ -11613,7 +11645,16 @@ EOF
 	runuser -u "${_session_user}" -- env \
 		XDG_RUNTIME_DIR="${_runtime_dir}" \
 		DBUS_SESSION_BUS_ADDRESS="unix:path=${_runtime_dir}/bus" \
-		systemctl --user restart spice-vdagent.service >>"${_LOGFILE}" 2>&1 || true
+		systemctl --user stop spice-vdagent.service >>"${_LOGFILE}" 2>&1 || true
+	pkill -u "${_session_uid}" -x spice-vdagent >>"${_LOGFILE}" 2>&1 || true
+	runuser -u "${_session_user}" -- env \
+		XDG_RUNTIME_DIR="${_runtime_dir}" \
+		DBUS_SESSION_BUS_ADDRESS="unix:path=${_runtime_dir}/bus" \
+		systemctl --user daemon-reload >>"${_LOGFILE}" 2>&1 || true
+	runuser -u "${_session_user}" -- env \
+		XDG_RUNTIME_DIR="${_runtime_dir}" \
+		DBUS_SESSION_BUS_ADDRESS="unix:path=${_runtime_dir}/bus" \
+		systemctl --user start spice-vdagent.service >>"${_LOGFILE}" 2>&1 || true
 }
 
 system::rtd_oem_reseal::_prepare_ubuntu_like() {
@@ -34605,9 +34646,8 @@ common_vdi_post_config=$(cat <<EOF
         # hidden from GDM; GNOME Initial Setup can then create the deployed user.
         - curtin in-target --target=/target -- /bin/bash -ec 'build_user="${Preference_InitialUser}" ; build_group="\$(id -gn "\$build_user")" ; test "\$build_group" = "\$build_user" ; if test "\$(id -u "\$build_user")" != 29998 ; then if getent passwd 29998 >/dev/null ; then exit 1 ; fi ; usermod --uid 29998 "\$build_user" ; fi ; if test "\$(id -g "\$build_user")" != 29998 ; then if getent group 29998 >/dev/null ; then exit 1 ; fi ; groupmod --gid 29998 "\$build_group" ; fi ; chown -R "\$build_user:\$build_group" "/home/\$build_user"'
 
-        # Ensure spice-vdagent autostarts in user sessions
-        - curtin in-target --target=/target -- mkdir -p /etc/xdg/autostart
-        - curtin in-target --target=/target -- bash -c 'echo -e "[Desktop Entry]\nType=Application\nExec=/usr/bin/spice-vdagent\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\nName=Spice Agent" > /etc/xdg/autostart/spice-vdagent.desktop'
+        # The shared guest-integration finalizer selects exactly one SPICE
+        # session launcher: the packaged systemd user unit or an XDG fallback.
 
         # Configure first-login OEM setup directly; rtd-oem-enable-config.sh also refreshes these settings after clone.
         - curtin in-target --target=/target -- /bin/bash -c 'mkdir -p /etc/xdg/autostart /etc/sddm.conf.d /etc/lightdm/lightdm.conf.d /etc/gdm3 /etc/systemd/system/getty@tty1.service.d ; exit 0'
