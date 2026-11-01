@@ -11509,9 +11509,13 @@ system::run_command_in_gnome_user_session() {
 	# End of documentation
 	echo -------------------------- Begin as user: 🪪 $SUDO_USER ---------------------
 	echo "$*"
-	sudo -H -u "$SUDO_USER" DISPLAY=$DISPLAY DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u "$SUDO_USER")/bus $*
+	local rc=0
+	sudo -n -H -u "$SUDO_USER" env DISPLAY="${DISPLAY:-}" \
+		DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u "$SUDO_USER")/bus" \
+		XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" "$@" || rc=$?
 	echo " "
 	echo -------------------------- End as user: 🪪 $SUDO_USER ---------------------
+	return "$rc"
 }
 
 system::rtd_oem_reseal::_virtualization_context() {
@@ -14836,9 +14840,10 @@ oem::register_wallpapers_for_gnome() {
 		return 1
 	fi
 
-	local xml_file="oem-backgrounds.xml"
 	local dest_dir="/usr/share/gnome-background-properties"
-	local dest_file="${dest_dir}/${xml_file}"
+	local dest_file="${dest_dir}/oem-backgrounds.xml"
+	local xml_file
+	xml_file="$(mktemp "${TMPDIR:-/tmp}/rtd-backgrounds.XXXXXX")" || return 1
 
 	# Start with the XML header
 	cat >"$xml_file" <<-EOF
@@ -14848,8 +14853,8 @@ oem::register_wallpapers_for_gnome() {
 	EOF
 
 	# Safely iterate over .jpg and .png files
-	shopt -s nullglob
 	for i in "$_wallpaper_dir"/*.jpg "$_wallpaper_dir"/*.png; do
+		[[ -f "$i" ]] || continue
 		cat >>"$xml_file" <<-EOF
 			<wallpaper>
 			    <name>$(basename "$i")</name>
@@ -14861,18 +14866,20 @@ oem::register_wallpapers_for_gnome() {
 			</wallpaper>
 		EOF
 	done
-	shopt -u nullglob
 
 	# Finish with the XML footer
 	echo "</wallpapers>" >>"$xml_file"
 
 	# Ensure the destination directory exists
-	mkdir -p "$dest_dir"
-
-	# Use 'mv' instead of 'sed' to place the file to avoid unnecessary complexity
-	# and potential issues with file paths. If further processing is needed,
-	# it should be handled more explicitly.
-	mv "$xml_file" "$dest_file"
+	# This is a system-wide registration: callers must run it in the privileged
+	# install phase, not inside the desktop user's session. install replaces an
+	# existing read-only registry without an overwrite prompt and sets its mode.
+	if ! mkdir -p -- "$dest_dir" || ! command install -m 0644 -- "$xml_file" "$dest_file"; then
+		rm -f -- "$xml_file"
+		echo "Error: Unable to install wallpaper registry at $dest_file" >&2
+		return 1
+	fi
+	rm -f -- "$xml_file"
 
 	echo "Wallpapers registered successfully at $dest_file"
 }
