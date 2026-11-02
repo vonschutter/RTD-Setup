@@ -101,3 +101,17 @@ Package names can vary between distributions. Recipes may therefore use native p
 ## Automated Installation
 
 RTD functions also support templates and configuration scripts used when building installation media or KVM guests through Preseed, Kickstart, AutoYaST, or Autounattend workflows. These are implementation facilities for tools such as `rtd-vm-tool`; they are not required reading for normal command use.
+
+Modern Ubuntu VDI builds request an installer reboot and let `virt-install`
+start the installed disk once installation completes. Installation media is
+removed from the persistent VM definition while remaining available to the live
+installer. OEM autologin and the existing sudo authorization start the stage-two
+finalizer, which installs default bundles, prepares first-user setup, and powers
+off only after reseal succeeds. A failed bundle install or reseal leaves the VM
+running for diagnosis and retains the stage-two marker.
+
+Ubuntu GNOME builds use GDM's native first-user setup. Kubuntu and other Ubuntu
+desktops without GDM use Ubuntu's packaged `oem-config-debconf` frontend, selected
+through the native OEM service. Their delivery boot asks for first-user details
+on the console before returning to the existing desktop display manager; the
+wizard does not run during automated template finalization.

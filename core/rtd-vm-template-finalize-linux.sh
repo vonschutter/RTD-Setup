@@ -125,15 +125,15 @@ rtd_template_finalize::run_finalization_tasks() {
 	fi
 
 	rtd_template_finalize::write_status "reseal" "running" "Running RTD OEM reseal"
-	rtd_template_finalize::configure_post_oobe_bundle_manager
+	rtd_template_finalize::configure_post_oobe_bundle_manager || return 1
 	rtd_template_finalize::disable_temporary_oem_autologin
-	rm -f "${RTD_TEMPLATE_AUTOFINALIZE_MARKER}" 2>/dev/null || true
 	if ! system::rtd_oem_reseal --prepare-only; then
 		rtd_template_finalize::write_status "reseal" "failed" "Native first-user preparation failed; template was not shut down and the recovery account remains available"
 		printf 'OEM reseal failed; template remains running. See %s\n' "${_LOGFILE}" >&2
 		return 1
 	fi
 
+	rm -f "${RTD_TEMPLATE_AUTOFINALIZE_MARKER}" || return 1
 	rtd_template_finalize::write_status "reseal" "ready" "OEM preparation completed successfully; requesting final template power-off"
 	if ! system::rtd_oem_reseal::_finalize_shutdown "$(system::rtd_oem_reseal::_virtualization_context)"; then
 		rtd_template_finalize::write_status "poweroff" "failed" "OEM preparation completed, but the final power-off request failed; template remains ready for OEM first boot"
@@ -144,7 +144,7 @@ rtd_template_finalize::run_finalization_tasks() {
 
 rtd_template_finalize::configure_post_oobe_bundle_manager() {
 	mkdir -p "${RTD_POST_OOBE_BUNDLE_AUTOSTART%/*}"
-	rtd_template_finalize::configure_post_oobe_sudoers
+	rtd_template_finalize::configure_post_oobe_sudoers || return 1
 
 	cat >"${RTD_POST_OOBE_BUNDLE_WRAPPER}" <<EOF
 #!/bin/bash

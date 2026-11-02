@@ -10690,11 +10690,11 @@ system::add_or_remove_login_script() {
 	_create_autostart_file() {
 		local exec_line
 		if command -v xterm >/dev/null 2>&1; then
-			exec_line="/usr/bin/xterm -fa Monospace -fs 12 -e sudo --preserve-env=DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,XDG_DATA_DIRS,WAYLAND_DISPLAY -H bash \"$script_path\""
+			exec_line="/usr/bin/xterm -fa Monospace -fs 12 -e sudo -n --preserve-env=DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,XDG_DATA_DIRS,WAYLAND_DISPLAY -H bash \"$script_path\""
 			write_information "📜 Creating autostart entry using xterm"
 		else
 			software::add_native_package xterm
-			exec_line="/usr/bin/xterm -fa Monospace -fs 12 -e sudo --preserve-env=DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,XDG_DATA_DIRS,WAYLAND_DISPLAY -H bash \"$script_path\""
+			exec_line="/usr/bin/xterm -fa Monospace -fs 12 -e sudo -n --preserve-env=DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,XDG_DATA_DIRS,WAYLAND_DISPLAY -H bash \"$script_path\""
 			write_information "📜 Creating autostart entry using default terminal"
 		fi
 
@@ -11429,9 +11429,11 @@ system::toggle_oem_auto_elevated_privilege() {
 
 	# Validate sudoers file syntax
 	if [[ -f "${sudoers_file}" ]]; then
+		chmod 0440 "${sudoers_file}" || return 1
 		write_information "🚧 Validating sudoers file syntax..."
 		if ! visudo -cf "${sudoers_file}" &>/dev/null; then
 			write_error "⛔ Error: Syntax error in sudoers file."
+			return 1
 		else
 			write_information "🏆 Sudoers file syntax is valid."
 		fi
@@ -11676,6 +11678,41 @@ EOF
 		systemctl --user start spice-vdagent.service >>"${_LOGFILE}" 2>&1 || true
 }
 
+system::rtd_oem_reseal::_prepare_ubuntu_text() {
+	# Description: Prepare Ubuntu's packaged text-mode first-user setup for
+	# Plasma/other desktops. This preserves their display manager and needs no X server.
+	# Globals: _LOGFILE. Caller verifies the build account and reserves UID 1000.
+	# Arguments: Build/recovery username; virtualization context.
+	# Outputs: OEM first-boot target and frontend selection. Does not start the wizard.
+	# Returns: 0 only when native OEM preparation is enabled and verified.
+	# Usage: system::rtd_oem_reseal::_prepare_ubuntu_text builduser virtual
+	local build_user="${1}" virt="${2}"
+	[[ "$build_user" =~ ^[a-z_][a-z0-9_-]*[$]?$ ]] || return 1
+	command -v debconf-set-selections >/dev/null 2>&1 || return 1
+	# Preserve recovery access through reseal; remove it only after the deployed
+	# UID 1000 user's first desktop login (the existing RTD post-OOBE action).
+	software::add_native_package oem-config-debconf oem-config-prepare || return 1
+	command -v oem-config-prepare >/dev/null 2>&1 || return 1
+	[[ -f /usr/lib/ubiquity/ubiquity/frontend/debconf_ui.py ]] || return 1
+	printf 'oem-config oem-config/remove boolean true\n' | debconf-set-selections || return 1
+	mkdir -p /etc/systemd/system/oem-config.service.d || return 1
+	cat >/etc/systemd/system/oem-config.service.d/10-rtd-frontend.conf <<'EOF'
+[Service]
+Environment=FRONTEND=debconf_ui
+EOF
+	systemctl daemon-reload || return 1
+	oem-config-prepare --quiet >>"${_LOGFILE}" 2>&1 || return 1
+	mkdir -p /var/lib/oem-config || return 1
+	touch /var/lib/oem-config/run || return 1
+	[[ -e /var/lib/oem-config/run ]] || return 1
+	systemctl is-enabled --quiet oem-config.service || return 1
+	[[ "$(systemctl get-default)" == oem-config.target ]] || return 1
+	if [[ "$virt" == virtual ]]; then
+		system::rtd_oem_reseal::_install_guest_additions || return 1
+	fi
+	return 0
+}
+
 system::rtd_oem_reseal::_prepare_ubuntu_like() {
 	# Description:
 	#   Runs OEM reseal prep for Ubuntu-like distributions.
@@ -11723,8 +11760,8 @@ system::rtd_oem_reseal::_prepare_ubuntu_like() {
 	# The legacy oem-config GTK frontend starts ubiquity-dm, which hard-codes an
 	# X server and cannot work on Ubuntu images that only ship Xwayland.
 	if [[ ! -x /usr/sbin/gdm3 && ! -x /usr/sbin/gdm ]]; then
-		write_error "GNOME Display Manager is required for Ubuntu's native Wayland first-user setup; refusing to install or replace the current display manager automatically."
-		return 1
+		system::rtd_oem_reseal::_prepare_ubuntu_text "${_temporary_user}" "${_virt}"
+		return $?
 	fi
 	software::add_native_package "gnome-initial-setup" || return 1
 	[[ -x /usr/libexec/gnome-initial-setup ]] || {
@@ -15168,6 +15205,7 @@ PY
 		done <<<"$connections"
 	fi
 	write_status "Desktop networking configured for NetworkManager; original interface settings preserved."
+	return 0
 }
 
 system::_turn_on_gui_network_management() {
@@ -30360,7 +30398,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 					--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 					--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 					--extra-args "autoinstall reboot=acpi noprompt" \
-					--wait=-1 --noreboot --noautoconsole
+					--wait=-1 --noautoconsole
 			} >>"${_LOGFILE}" 2>&1 & disown
 
 			kvm::wait_for_domain_definition "${vm_name}" 60 3 || true
@@ -30419,7 +30457,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 				--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 				--extra-args "autoinstall reboot=acpi noprompt" \
-				--wait=-1 --noreboot --noautoconsole
+				--wait=-1 --noautoconsole
 			} >>"${_LOGFILE}" 2>&1 & disown
 
 			kvm::wait_for_domain_definition "${vm_name}" 60 3 || true
@@ -30476,7 +30514,7 @@ kvm::make_vm_now_from_ubuntu_com() {
 				--disk path="${CloudConfigDir}/CIDATA.iso,device=cdrom" \
 				--location="${iso},kernel=casper/vmlinuz,initrd=casper/initrd" \
 				--extra-args "autoinstall reboot=acpi noprompt" \
-				--wait=-1 --noreboot --noautoconsole
+				--wait=-1 --noautoconsole
 			} >>"${_LOGFILE}" 2>&1 & disown
 
 			kvm::wait_for_domain_definition "${vm_name}" 60 3 || true
@@ -34664,14 +34702,14 @@ common_vdi_post_config=$(cat <<EOF
 
         # Configure first-login OEM setup directly; rtd-oem-enable-config.sh also refreshes these settings after clone.
         - ${in_target} /bin/bash -c 'mkdir -p /etc/xdg/autostart /etc/sddm.conf.d /etc/lightdm/lightdm.conf.d /etc/gdm3 /etc/systemd/system/getty@tty1.service.d ; exit 0'
-        - ${in_target} /bin/bash -c 'printf "%s\n" "[Desktop Entry]" "Type=Application" "Exec=/usr/bin/xterm -fa Monospace -fs 12 -e sudo --preserve-env=DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,XDG_DATA_DIRS,WAYLAND_DISPLAY -H bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-linux-config.sh" "Terminal=false" "Hidden=false" "X-GNOME-Autostart-enabled=true" "Name=OEM Run" "Comment=OEM Setup" > /etc/xdg/autostart/oem-run.desktop ; exit 0'
+        - ${in_target} /bin/bash -c 'printf "%s\n" "[Desktop Entry]" "Type=Application" "Exec=/usr/bin/xterm -fa Monospace -fs 12 -e sudo -n --preserve-env=DISPLAY,DBUS_SESSION_BUS_ADDRESS,XAUTHORITY,XDG_RUNTIME_DIR,XDG_DATA_DIRS,WAYLAND_DISPLAY -H bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-linux-config.sh" "Terminal=false" "Hidden=false" "X-GNOME-Autostart-enabled=true" "Name=OEM Run" "Comment=OEM Setup" > /etc/xdg/autostart/oem-run.desktop ; exit 0'
 ${vdi_dm_autologin_config}
         - ${in_target} /bin/bash -c 'printf "%s\n" "[Service]" "ExecStart=" "ExecStart=-/sbin/agetty --noissue --autologin ${Preference_InitialUser} %I \\\$TERM" "Type=idle" > /etc/systemd/system/getty@tty1.service.d/override.conf ; exit 0'
 
         # Clone RTD Setup & Execute OEM Config
         - ${in_target} /bin/bash -c 'rm -rf /tmp/rtd-setup-clone ; for i in {1..5}; do git clone --depth=1 ${GIT_RTD_SRC_URL} /tmp/rtd-setup-clone && break || { echo "RTD clone failed on attempt \$i, retrying..." ; rm -rf /tmp/rtd-setup-clone ; sleep 10; }; done ; test -f /tmp/rtd-setup-clone/core/rtd-oem-enable-config.sh'
         - ${in_target} /bin/bash -c 'rm -rf ${_OEM_DIR:-"/opt/rtd"} ; mkdir -p ${_OEM_DIR:-"/opt/rtd"} ; cp -a /tmp/rtd-setup-clone/. ${_OEM_DIR:-"/opt/rtd"}/ ; chmod 755 ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-linux-config.sh ${_OEM_DIR:-"/opt/rtd"}/core/rtd-vm-template-finalize-linux.sh ; exit 0'
-        - ${in_target} /bin/bash -c 'bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ; exit 0'
+        - ${in_target} /bin/bash -c 'bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
 EOF
 )
 
@@ -34698,12 +34736,9 @@ EOF
 # make the main section of the cloud config file
 cat >>${user_data_file} <<EOF
 #cloud-config
-power_state:
-    mode: reboot
-    message: "RTD: Installation complete, rebooting..."
-    condition: true
 autoinstall:
     version: 1
+    shutdown: reboot
     timezone: geoip
     drivers:
         install: true
@@ -34893,7 +34928,7 @@ cat >>${user_data_file} <<EOF
         - ${in_target} /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
         - ${in_target} /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
         - ${in_target} /bin/bash -c 'apt-get -y install ${server_app} ; exit 0'
-        - ${in_target} /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ; exit 0'
+        - ${in_target} /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
 ${common_cleanup_config}
 EOF
 		# -----------------------------------------------------------------------------------------
@@ -34910,7 +34945,7 @@ cat >>${user_data_file} <<EOF
         - ${in_target} /bin/bash -c 'apt-get -y install ${server_app}'
         - ${in_target} /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
         - ${in_target} /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
-        - ${in_target} /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ; exit 0'
+        - ${in_target} /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
 ${common_cleanup_config}
 EOF
 	# -----------------------------------------------------------------------------------------
@@ -34934,7 +34969,7 @@ cat >>${user_data_file} <<EOF
         # Clone RTD Setup & Execute OEM Config
         - ${in_target} /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
         - ${in_target} /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
-        - ${in_target} /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ; exit 0'
+        - ${in_target} /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
 
         # Setup Minecraft Server and autologin to the console and launch the server
         - mkdir -p /target/etc/systemd/system/getty@tty1.service.d
@@ -34962,7 +34997,7 @@ ${common_vdi_pre_config}
         - ${in_target} apt-get install ${server_app:-"openssh-server"}
         - ${in_target} /bin/bash -c 'mkdir -p ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
         - ${in_target} /bin/bash -c 'git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} ; exit 0'
-        - ${in_target} /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh ; exit 0'
+        - ${in_target} /bin/bash -c '${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh'
 ${common_cleanup_config}
 EOF
 	# -----------------------------------------------------------------------------------------

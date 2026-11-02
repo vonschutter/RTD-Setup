@@ -22,7 +22,7 @@ class CloudConfigTests(unittest.TestCase):
             "template::cloud_config() {", 1
         )[1].split("template::minecraft_server_launcher() {", 1)[0]
 
-    def generate(self, role: str, app: str) -> list[str]:
+    def generate(self, role: str, app: str, document=False) -> list[str] | str:
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "user-data"
             script = """
@@ -46,11 +46,20 @@ template::cloud_config --vmname Test_VM --write "$1" --role "$2" --server-app "$
                 text=True, capture_output=True, check=False,
             )
             self.assertEqual(completed.returncode, 0, completed.stderr)
+            if document:
+                return output.read_text()
             return [
                 line.strip()[2:]
                 for line in output.read_text().splitlines()
                 if line.strip().startswith("- ") and "curtin in-target" in line
             ]
+
+    def test_installer_explicitly_reboots_into_installed_system(self):
+        document = self.generate("VDI", "kubuntu-desktop", document=True)
+        self.assertIn("autoinstall:\n    version: 1\n    shutdown: reboot", document)
+        # Subiquity owns the install reboot; a separate cloud-init power action
+        # in the live environment must not race the installer or stage two.
+        self.assertNotIn("\npower_state:", document)
 
     def test_target_commands_isolate_mounts_for_desktops_and_servers(self):
         cases = [
@@ -75,6 +84,8 @@ template::cloud_config --vmname Test_VM --write "$1" --role "$2" --server-app "$
                     # detect syntax errors hidden inside generated heredocs.
                     if "-c" in args or "-ec" in args:
                         index = args.index("-c") if "-c" in args else args.index("-ec")
+                        if args[index + 1].startswith(("bash /opt/rtd/core/rtd-oem-enable-config.sh", "/opt/rtd/core/rtd-oem-enable-config.sh")):
+                            self.assertNotIn('; exit 0', args[index + 1])
                         result = subprocess.run(
                             ["bash", "-n", "-c", args[index + 1]],
                             text=True, capture_output=True, check=False,

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import configparser
 import os
+import pwd
 import subprocess
 import tempfile
 import unittest
@@ -43,6 +44,28 @@ dependency::command_exists rtd-test-missing-dependency
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn("install:rtd-test-missing-dependency:noninteractive", result.stdout)
                 self.assertNotIn("UNEXPECTED-PROMPT", result.stderr)
+
+    def test_existing_oem_sudo_helper_writes_and_validates_authorization(self):
+        with tempfile.TemporaryDirectory() as directory:
+            policy = Path(directory) / "oem-sudoers"
+            function = library_function("system::toggle_oem_auto_elevated_privilege").replace(
+                "/etc/sudoers.d/99_sudo_include_file", str(policy)
+            )
+            source = """
+security::ensure_admin() { :; }
+write_status() { :; }
+write_information() { :; }
+write_warning() { :; }
+write_error() { :; }
+visudo() { return "$VISUDO_STATUS"; }
+""" + function + "\nsystem::toggle_oem_auto_elevated_privilege --enable\n"
+            user = pwd.getpwuid(os.getuid()).pw_name
+            result = self.run_shell(source, {"_OEM_USER": user, "VISUDO_STATUS": "0"})
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(f"{user} ALL=(ALL) NOPASSWD:ALL", policy.read_text())
+            self.assertEqual(policy.stat().st_mode & 0o777, 0o440)
+            invalid = self.run_shell(source, {"_OEM_USER": user, "VISUDO_STATUS": "1"})
+            self.assertNotEqual(invalid.returncode, 0)
 
     def test_automatic_install_uses_noninteractive_sudo_and_propagates_failure(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -148,6 +171,10 @@ systemctl() { echo "systemctl:$*"; }
             self.assertNotIn("netplan:apply", result.stdout)
             self.assertNotIn("systemctl:stop", result.stdout)
             self.assertEqual(target.stat().st_mode & 0o777, 0o600)
+            # Logging must not turn successful preparation into a fatal error:
+            # OEM setup still needs to install the sudo authorization afterward.
+            failed_log = self.run_shell(source.replace('write_status() { :; }', 'write_status() { return 1; }'))
+            self.assertEqual(failed_log.returncode, 0, failed_log.stderr)
             # Live handoff must restore NM addressing after networkd removes it.
             live = source.replace(
                 "\nsystem::prepare_ubuntu_desktop_networking\n",

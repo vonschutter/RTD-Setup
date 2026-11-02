@@ -76,6 +76,7 @@ export _OEM_DIR="${BASE_DIR}"
 
 system::ensure_directory_exists "$_LOG_DIR" || exit 1 # Exit if log dir can't be made
 system::ensure_directory_exists "$_CONFIG_DIR" || exit 1
+touch "$_LOGFILE" || exit 1
 
 main() {
 	if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
@@ -134,8 +135,8 @@ EOF
 
 	rtd_oem_enable::write_template_workflow_config "${template_supported}" "${template_launcher}" "${template_reason}"
 
-	system::add_or_remove_login_script --add "${template_launcher}"
-	system::toggle_oem_auto_elevated_privilege --enable
+	system::toggle_oem_auto_elevated_privilege --enable || exit 1
+	system::add_or_remove_login_script --add "${template_launcher}" || exit 1
 	system::toggle_oem_auto_login --enable
 	system::set_oem_elevated_privilege_gui --enable
 

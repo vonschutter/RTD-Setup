@@ -76,8 +76,9 @@ class InstallMediaCleanupTests(unittest.TestCase):
 
     def test_modern_ubuntu_paths_remove_media_after_domain_definition(self):
         self.assertEqual(
-            self.ubuntu_builder.count("--wait=-1 --noreboot --noautoconsole"), 3
+            self.ubuntu_builder.count("--wait=-1 --noautoconsole"), 3
         )
+        self.assertNotIn('--noreboot', self.ubuntu_builder)
         self.assertEqual(
             self.ubuntu_builder.count(
                 'kvm::clone_template_vm::_remove_install_media_from_config "${vm_name}"'
@@ -93,7 +94,7 @@ class InstallMediaCleanupTests(unittest.TestCase):
         self.assertEqual(len(sections), 4)
         for section in sections[:-1]:
             definition_position = section.rfind(definition)
-            installer_position = section.rfind("--wait=-1 --noreboot --noautoconsole")
+            installer_position = section.rfind("--wait=-1 --noautoconsole")
             self.assertGreater(definition_position, installer_position)
 
 
