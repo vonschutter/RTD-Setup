@@ -3246,6 +3246,7 @@ dependency::command_exists() {
 	#	- Command names to check (e.g., "command1 command2").
 	#	- "--auto" (optional): Automatically installs missing commands without prompting.
 	#	- "--silent" (optional): Noninteractive mode; implies --auto and suppresses prompts.
+	#	- RTD_NONINTERACTIVE=1 or DEBIAN_FRONTEND=noninteractive also enables automatic mode.
 	# Outputs:
 	#	- Prompts the user to install missing commands if any (unless `--auto` is specified).
 	# Returns:
@@ -3273,6 +3274,8 @@ dependency::command_exists() {
 
 	local _auto_mode=0
 	local _silent_mode=0
+	# This policy is inherited by child shells used for desktop configuration.
+	[[ "${RTD_NONINTERACTIVE:-0}" == "1" || "${DEBIAN_FRONTEND:-}" == "noninteractive" ]] && _auto_mode=1
 	local arg
 
 	# List of required commands from input
@@ -3321,7 +3324,12 @@ dependency::command_exists() {
 		if [[ $_silent_mode -eq 0 ]]; then
 			write_status "Installing missing commands: ${missing_commands[*]}"
 		fi
-		system::install_missing_commands "${missing_commands[@]}"
+		(
+			# Never turn an automatic dependency install into a sudo password prompt.
+			sudo() { command sudo -n "$@"; }
+			export DEBIAN_FRONTEND=noninteractive
+			system::install_missing_commands "${missing_commands[@]}" </dev/null
+		)
 		return $?
 	fi
 
@@ -10981,7 +10989,7 @@ system::toggle_oem_auto_login() {
 	local session_name="${RTD_OEM_SESSION:-}"
 	if [[ -z "$session_name" ]]; then
 		for candidate in cinnamon xubuntu mate Lubuntu plasma gnome ubuntu; do
-			if [[ -f "/usr/share/xsessions/${candidate}.desktop" ]]; then
+			if [[ -f "/usr/share/wayland-sessions/${candidate}.desktop" || -f "/usr/share/xsessions/${candidate}.desktop" ]]; then
 				session_name="$candidate"
 				break
 			fi
@@ -11034,6 +11042,12 @@ user-session=$session_name" 1 || true
 "[Autologin]
 User=$user
 Session=$sddm_session" || true
+
+	# Kubuntu's 20-kubuntu.conf resets User=. Our drop-in must load after it.
+	__toggle_dm_autologin "SDDM" "/etc/sddm.conf.d/99-rtd-autologin.conf" \
+"[Autologin]
+User=$user
+Session=$sddm_session" 1 || true
 
 	__toggle_dm_autologin "GDM3 (Ubuntu)" "/etc/gdm3/custom.conf" \
 "[daemon]
@@ -11511,6 +11525,7 @@ system::run_command_in_gnome_user_session() {
 	echo "$*"
 	local rc=0
 	sudo -n -H -u "$SUDO_USER" env DISPLAY="${DISPLAY:-}" \
+		RTD_NONINTERACTIVE="${RTD_NONINTERACTIVE:-0}" DEBIAN_FRONTEND="${DEBIAN_FRONTEND:-}" \
 		DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u "$SUDO_USER")/bus" \
 		XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" "$@" || rc=$?
 	echo " "
@@ -15086,6 +15101,75 @@ system::_disable_service() {
 
 
 
+system::prepare_ubuntu_desktop_networking() {
+	# Description: Select NetworkManager without discarding installer addressing,
+	# routes, DNS, MAC matching, or interface names. Preparation changes no live links.
+	# Globals: None. Requires root, Python/PyYAML, netplan, and NetworkManager.
+	# Arguments: --apply optionally activates the configuration on a running host.
+	# Outputs: Netplan override and diagnostic messages.
+	# Returns: 0 on success; non-zero on generation, validation, or activation failure.
+	# Usage: system::prepare_ubuntu_desktop_networking [--apply]
+	local apply=0 directory=/etc/netplan target temporary backup had_target=0 connections uuid name
+	case "${1:-}" in "") ;; --apply) apply=1 ;; *) return 2 ;; esac
+	[[ $EUID -eq 0 ]] || { write_error "Desktop network preparation requires root."; return 1; }
+	command -v netplan >/dev/null 2>&1 || return 1
+	mkdir -p "$directory" || return 1
+	target="$directory/99-rtd-network-manager.yaml"
+	temporary=$(mktemp "$directory/.rtd-network.XXXXXX") || return 1
+	if ! python3 - "$directory" "$temporary" <<'PY'
+import sys
+from pathlib import Path
+import yaml
+
+directory, output = map(Path, sys.argv[1:])
+network = {"version": 2, "renderer": "NetworkManager"}
+groups = ("ethernets", "wifis", "bridges", "bonds", "vlans", "tunnels", "modems")
+for base in (Path('/lib/netplan'), directory, Path('/run/netplan')):
+    for path in sorted(base.glob('*.yaml')):
+        if path.name == '99-rtd-network-manager.yaml':
+            continue
+        original = (yaml.safe_load(path.read_text()) or {}).get('network', {})
+        for group in groups:
+            for device in (original.get(group) or {}):
+                network.setdefault(group, {})[device] = {"renderer": "NetworkManager"}
+output.write_text(yaml.safe_dump({"network": network}, sort_keys=False))
+PY
+	then
+		rm -f "$temporary"
+		return 1
+	fi
+	backup=$(mktemp) || { rm -f "$temporary"; return 1; }
+	if [[ -e "$target" ]]; then
+		cp -p "$target" "$backup" || { rm -f "$temporary" "$backup"; return 1; }
+		had_target=1
+	fi
+	chmod 600 "$temporary"
+	mv -f "$temporary" "$target" || { rm -f "$temporary" "$backup"; return 1; }
+	if ! netplan generate; then
+		if (( had_target )); then cp -p "$backup" "$target"; else rm -f "$target"; fi
+		rm -f "$backup"
+		netplan generate >/dev/null 2>&1 || true
+		return 1
+	fi
+	rm -f "$backup"
+	systemctl enable NetworkManager.service || return 1
+	# All configured devices now use NM. Do not leave the server's networkd
+	# service/socket enabled to reclaim links using initramfs fallback profiles.
+	systemctl disable systemd-networkd.service systemd-networkd.socket systemd-networkd-wait-online.service || return 1
+	if (( apply )); then
+		systemctl start NetworkManager.service && netplan apply || return 1
+		connections=$(nmcli -t -f UUID,NAME connection show --active) || return 1
+		systemctl stop 'systemd-networkd*.socket' systemd-networkd.service || return 1
+		# networkd can remove addresses shared with NM when it stops. Reactivate
+		# the generated active profiles so NM restores their addressing and routes.
+		while IFS=: read -r uuid name; do
+			[[ "$name" == netplan-* ]] || continue
+			nmcli --wait 30 connection up uuid "$uuid" || return 1
+		done <<<"$connections"
+	fi
+	write_status "Desktop networking configured for NetworkManager; original interface settings preserved."
+}
+
 system::_turn_on_gui_network_management() {
 	# Description: Configures the system to use NetworkManager for network configuration,
 	#              adapting the method based on the Linux distribution. Assumes NetworkManager
@@ -15122,64 +15206,8 @@ system::_turn_on_gui_network_management() {
 	# --- Distribution-Specific Configuration ---
 	case "$effective_distro" in
 		*ubuntu*)
-			write_status "Applying NetworkManager configuration via Netplan (Ubuntu-style)..."
-			if ! command -v netplan &> /dev/null; then
-				write_error "'netplan' command not found, but system detected as Ubuntu-based. Cannot configure."
-				return 1
-			fi
-			local netplan_config="/etc/netplan/01-network-manager-all.yaml"
-			local netplan_bak_dir="/etc/netplan/bak"
-			local netplan_content
-			# Using printf for the content to avoid heredoc issues
-			printf -v netplan_content '%s\n' \
-				'# Let NetworkManager manage all devices on this system' \
-				'network:' \
-				'  version: 2' \
-				'  renderer: NetworkManager'
-
-			# Check if config already exists and is correct
-			if [[ -f "$netplan_config" ]] && grep -q "renderer: NetworkManager" "$netplan_config"; then
-				write_status "Netplan already configured for NetworkManager in ${netplan_config}."
-				# Still ensure services are correct below (netplan apply might not fix disabled NM)
-			else
-				write_status "Creating Netplan configuration: ${netplan_config}"
-				# Backup existing configs first
-				if [[ -d /etc/netplan ]] && compgen -G "/etc/netplan/*.yaml" > /dev/null; then
-					write_status "Backing up existing *.yaml files from /etc/netplan to ${netplan_bak_dir}..."
-					if ! sudo mkdir -p "${netplan_bak_dir}"; then
-						write_error "Failed to create backup directory ${netplan_bak_dir}."
-						overall_success=false
-					elif ! sudo mv /etc/netplan/*.yaml "${netplan_bak_dir}/"; then
-						write_error "Failed to move existing .yaml files to backup directory."
-						# Proceed with caution - might overwrite something if mv failed partially
-						overall_success=false
-					fi
-				fi
-
-				# Create the new config file
-				if [[ "$overall_success" == "true" ]]; then
-					echo "$netplan_content" | sudo tee "$netplan_config" > /dev/null || {
-						write_error "Failed to create ${netplan_config}.";
-						overall_success=false;
-					}
-					sudo chmod 644 "$netplan_config" # Ensure correct permissions
-				fi
-			fi
-
-			# Apply netplan configuration (regardless of file creation, ensures state)
-			if [[ "$overall_success" == "true" ]]; then
-				write_status "Applying netplan configuration..."
-				if ! sudo netplan apply; then
-					write_error "netplan apply failed. Network configuration may be inconsistent."
-					overall_success=false
-				fi
-			fi
-			# Netplan apply should handle starting/stopping relevant services, but we ensure NM is enabled.
-			system::_enable_service "NetworkManager.service" || overall_success=false
-			# Explicitly disable systemd-networkd just in case netplan apply doesn't
-			system::_disable_service "systemd-networkd.service" # Don't fail overall if this fails (might not exist)
-
-			;; # End Ubuntu case
+			system::prepare_ubuntu_desktop_networking --apply || overall_success=false
+			;;
 
 		*debian*)
 			write_status "Configuring NetworkManager directly (Debian-style)..."
@@ -15284,8 +15312,8 @@ add_gnome3_favorite_app() {
 
 kde::set_wallpaper() {
 	# Description: Sets the KDE Plasma wallpaper for all current desktops using the Plasma shell D-Bus scripting interface.
-	# Globals: SUDO_UID (r), _qdbus (w)
-	# Dependencies: realpath, file, qdbus or qdbus-qt5, kwriteconfig5, plasmashell D-Bus service.
+	# Globals: XDG_RUNTIME_DIR (r).
+	# Dependencies: realpath, file, Qt 6 or Qt 5 qdbus/kwriteconfig, plasmashell D-Bus service.
 	# Arguments:
 	#   $1 - Full path to an image or video wallpaper file. Supported types include webm, mp4, png, jpeg, jpg, gif, and webp.
 	#   $2 - Optional Plasma wallpaper plugin type override.
@@ -15296,13 +15324,15 @@ kde::set_wallpaper() {
 	# End of documentation
 
 	echo "Setting wallpaper $1"
-	full_image_path=$(realpath "$1")
-	ext=$(file -b --mime-type "$full_image_path")
-	XDG_RUNTIME_DIR="/run/user/${SUDO_UID}"
+	local full_image_path ext type write wallpaper_set_script _qdbus candidate kwc
+	full_image_path=$(realpath "$1") || return 1
+	ext=$(file -b --mime-type "$full_image_path") || return 1
+	local XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+	export XDG_RUNTIME_DIR
 
 	if [ -z "$2" ]; then
 		# Identify filetype and make changes
-		case $(echo $ext | cut -d'/' -f2) in
+		case "${ext#*/}" in
 		"mp4" | "webm")
 			type='VideoWallpaper'
 			write='VideoWallpaperBackgroundVideo'
@@ -15332,10 +15362,16 @@ kde::set_wallpaper() {
 		d.writeConfig('$write', 'file://${full_image_path}')
 	}"
 
-	# have to put in these stupid fixes because distros can't agree where to but stuff!
-	hash qdbus || ${_qdbus="/usr/bin/qdbus-qt5"} && ${_qdbus="qdbus"}
-	${_qdbus} org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "${wallpaper_set_script}"
-	kwriteconfig5 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key Image "file://$full_image_path"
+	for candidate in qdbus6 qdbus-qt6 /usr/lib/qt6/bin/qdbus qdbus qdbus-qt5; do
+		if command -v "$candidate" >/dev/null 2>&1; then
+			_qdbus="$candidate"
+			break
+		fi
+	done
+	[[ -n "$_qdbus" ]] || { write_error "Qt D-Bus tools are unavailable; cannot set the Plasma wallpaper."; return 1; }
+	kwc="$(kde::_kwriteconfig_cmd)" || { write_error "KDE configuration tools are unavailable."; return 1; }
+	"${_qdbus}" org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "${wallpaper_set_script}" || return 1
+	"$kwc" --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key Image "file://$full_image_path"
 }
 
 
@@ -15349,13 +15385,15 @@ kde::_kwriteconfig_cmd() {
 	# Dependencies: kwriteconfig6 or kwriteconfig5.
 	# Arguments: None
 	# Outputs: Prints the command name to stdout.
-	# Returns: 0.
+	# Returns: 0 when a writer is available, 1 otherwise.
 	# Usage: kwc="$(kde::_kwriteconfig_cmd)"
 	# End of documentation
 	if command -v kwriteconfig6 >/dev/null 2>&1; then
 		printf '%s' "kwriteconfig6"
-	else
+	elif command -v kwriteconfig5 >/dev/null 2>&1; then
 		printf '%s' "kwriteconfig5"
+	else
+		return 1
 	fi
 }
 
@@ -15470,70 +15508,73 @@ kde::_reload_shell() {
 }
 
 kde::set_global_look_and_feel() {
-	# Description: Applies a KDE Plasma desktop theme for the current user.
-	# Globals: BRANDING (r)
-	# Dependencies: plasma-apply-desktoptheme, write_status, write_error; optionally dialog.
-	# Arguments:
-	#   --package <id> - Desktop theme id. Defaults to breeze-dark when available.
-	#   --theme <id>   - Alias for --package.
-	#   --interactive  - Prompt with dialog for theme selection when dialog is available.
-	# Outputs: Writes status/error messages and applies KDE desktop theme settings.
-	# Returns: 0 on success, non-zero on failure.
-	# Usage: kde::set_global_look_and_feel [--package <id>|--theme <id>] [--interactive]
-	# End of documentation
-	local theme=""
-	local interactive=0
-	local choices=() available_theme selected_theme
-
+	# Description: Apply an installed Plasma global theme using Qt 6 or Qt 5 tools.
+	# Globals: _KDE_DEFAULT_THEME (optional).
+	# Arguments: --package or --theme followed by a package ID; --interactive
+	# offers installed packages when explicitly requested outside unattended setup.
+	# Outputs: Applies the global theme without resetting the desktop layout.
+	# Returns: 0 on success, non-zero if tools or the requested package are absent.
+	# Usage: kde::set_global_look_and_feel --package org.kde.breezedark.desktop
+	local theme="${_KDE_DEFAULT_THEME:-org.kde.breezedark.desktop}" apply_cmd available interactive=0 item
+	local -a choices=()
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
-		--package|--theme) theme="$2"; shift 2 ;;
+		--package|--theme) [[ -n "${2:-}" ]] || return 2; theme="$2"; shift 2 ;;
 		--interactive) interactive=1; shift ;;
-		*) shift ;;
+		*) write_error "Unsupported global theme option: $1"; return 2 ;;
 		esac
 	done
-
-	if ! command -v plasma-apply-desktoptheme >/dev/null 2>&1; then
-		write_error "KDE desktop theme utility not found: plasma-apply-desktoptheme"
+	case "$theme" in
+	Breeze-Dark|breeze-dark) theme=org.kde.breezedark.desktop ;;
+	Breeze|breeze) theme=org.kde.breeze.desktop ;;
+	esac
+	if command -v plasma-apply-lookandfeel >/dev/null 2>&1; then
+		apply_cmd=plasma-apply-lookandfeel
+	elif command -v lookandfeeltool >/dev/null 2>&1; then
+		apply_cmd=lookandfeeltool
+	else
+		write_error "No Plasma global theme utility is installed."
 		return 1
 	fi
-
-	if [[ $interactive -eq 1 ]] && dependency::command_exists dialog; then
-		while IFS= read -r available_theme; do
-			choices+=("$available_theme" "$available_theme")
-		done < <(kde::_list_desktop_themes)
-		((${#choices[@]} > 0)) || {
-			write_error "No KDE desktop themes were listed by plasma-apply-desktoptheme."
-			return 1
-		}
-		exec 3>&1
-		selected_theme=$(dialog --backtitle "${BRANDING:-RTD Power Tools}" \
-			--title "KDE Desktop Theme" \
-			--menu "Select a KDE desktop theme" 15 70 5 "${choices[@]}" 2>&1 1>&3)
-		exec 3>&-
-		[[ -n "$selected_theme" ]] && theme="$selected_theme"
+	available=$("$apply_cmd" --list) || return 1
+	if (( interactive )) && [[ "${RTD_NONINTERACTIVE:-0}" != 1 && "${DEBIAN_FRONTEND:-}" != noninteractive ]]; then
+		command -v dialog >/dev/null 2>&1 || return 1
+		while IFS= read -r item; do [[ -n "$item" ]] && choices+=("$item" "$item"); done <<<"$available"
+		theme=$(dialog --stdout --title "Plasma Global Theme" --menu "Select an installed theme" 20 80 10 "${choices[@]}") || return 1
 	fi
-
-	if [[ -z "$theme" ]]; then
-		theme="$(kde::_default_desktop_theme)" || {
-			write_error "No KDE desktop theme default could be selected."
-			return 1
-		}
-	fi
-
-	if ! kde::_desktop_theme_exists "$theme"; then
-		write_error "KDE desktop theme is not available: $theme"
-		write_information "Available KDE desktop themes:"
-		kde::_list_desktop_themes | sed 's/^/  - /'
+	if ! grep -Fxq "$theme" <<<"$available"; then
+		write_error "Global theme package is not installed: $theme"
 		return 1
 	fi
+	"$apply_cmd" --apply "$theme"
+}
 
-	write_status "Applying KDE desktop theme: $theme"
-	plasma-apply-desktoptheme "$theme" || {
-		write_error "Failed to apply KDE desktop theme: $theme"
+kde::set_font_preferences() {
+	# Description: Set Plasma UI/fixed fonts and create a usable Konsole default
+	# profile even on fresh installations without any saved profiles.
+	# Globals: HOME; RTD_KDE_TERMINAL_FONT/RTD_KDE_UI_FONT (optional family names).
+	# Arguments: None. Run as the desktop user after global themes are applied.
+	# Outputs: kdeglobals, RTD.profile, and Konsole's default-profile selection.
+	# Returns: 0 on success; non-zero if fonts/tools or configuration writes fail.
+	# Usage: kde::set_font_preferences
+	local kwc font="${RTD_KDE_TERMINAL_FONT:-SauceCodePro Nerd Font}" ui_font="${RTD_KDE_UI_FONT:-Noto Sans}"
+	local profile_dir="${XDG_DATA_HOME:-$HOME/.local/share}/konsole" key families
+	kwc="$(kde::_kwriteconfig_cmd)" || return 1
+	command -v fc-list >/dev/null 2>&1 || return 1
+	families=$(fc-list --format '%{family}\n') || return 1
+	if ! grep -Fq "$font" <<<"$families"; then
+		write_error "Requested terminal font is not installed: $font"
 		return 1
-	}
-	return 0
+	fi
+	mkdir -p "$profile_dir" || return 1
+	for key in font menuFont toolBarFont taskbarFont; do
+		"$kwc" --file kdeglobals --group General --key "$key" "$ui_font,10,-1,5,50,0,0,0,0,0" || return 1
+	done
+	"$kwc" --file kdeglobals --group General --key fixed "$font,12,-1,5,50,0,0,0,0,0" || return 1
+	"$kwc" --file "$profile_dir/RTD.profile" --group General --key Name RTD || return 1
+	"$kwc" --file "$profile_dir/RTD.profile" --group General --key Parent 'FALLBACK/' || return 1
+	"$kwc" --file "$profile_dir/RTD.profile" --group Appearance --key Font "$font,12,-1,5,50,0,0,0,0,0" || return 1
+	"$kwc" --file konsolerc --group 'Desktop Entry' --key DefaultProfile RTD.profile
 }
 
 kde::set_color_scheme() {
@@ -15574,7 +15615,7 @@ kde::set_color_scheme() {
 		[[ -n "$sel" ]] && scheme="$sel"
 	fi
 
-	if dependency::command_exists "$apply_cmd"; then
+	if command -v "$apply_cmd" >/dev/null 2>&1; then
 		write_status "Applying KDE color scheme: $scheme"
 		"$apply_cmd" "$scheme" || { write_error "Failed to apply color scheme: $scheme"; return 1; }
 	else
@@ -15623,7 +15664,7 @@ kde::set_icon_theme() {
 		[[ -n "$sel" ]] && theme="$sel"
 	fi
 
-	if dependency::command_exists plasma-apply-icon-theme; then
+	if command -v plasma-apply-icon-theme >/dev/null 2>&1; then
 		write_status "Applying KDE icon theme: $theme"
 		plasma-apply-icon-theme "$theme" || { write_error "Failed to apply icon theme: $theme"; return 1; }
 	else
@@ -34568,7 +34609,7 @@ template::cloud_config() {
 	case "${server_app}" in
 		kubuntu-desktop|lubuntu-desktop)
 			vdi_dm_autologin_config=$(cat <<EOF
-        - ${in_target} /bin/bash -c 'printf "%s\n" "[Autologin]" "User=${Preference_InitialUser}" "Session=${vdi_autologin_session}" > /etc/sddm.conf.d/10-rtd-autologin.conf ; exit 0'
+        - ${in_target} /bin/bash -c 'printf "%s\n" "[Autologin]" "User=${Preference_InitialUser}" "Session=${vdi_autologin_session}" > /etc/sddm.conf.d/99-rtd-autologin.conf ; exit 0'
 EOF
 )
 			;;

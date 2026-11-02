@@ -10,6 +10,9 @@
 
 set -o pipefail
 
+# Set policy before loading the library and preserve it across workers/sudo.
+export RTD_NONINTERACTIVE=1 DEBIAN_FRONTEND=noninteractive GIT_TERMINAL_PROMPT=0
+
 : "${_SCRIPT_PATH:=$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || realpath "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")}"
 : "${_SCRIPT_DIR:=$(cd "$(dirname "${_SCRIPT_PATH}")" && pwd)}"
 : "${_OEM_DIR:=$(cd "${_SCRIPT_DIR}/.." && pwd)}"
@@ -192,6 +195,7 @@ rtd_template_finalize::scrub_oem_autologin() {
 	local -a autologin_files=(
 		/etc/xdg/autostart/oem-run.desktop
 		/etc/sddm.conf.d/10-rtd-autologin.conf
+		/etc/sddm.conf.d/99-rtd-autologin.conf
 		/etc/lightdm/lightdm.conf.d/10-rtd-autologin.conf
 		/etc/systemd/system/getty@tty1.service.d/override.conf
 	)

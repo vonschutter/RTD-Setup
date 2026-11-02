@@ -96,6 +96,13 @@ EOF
 
 	write_status "🚀 Preparing system for automated OEM post-build tasks..."
 
+	# Server-media desktop builds otherwise retain networkd, leaving the desktop
+	# network applet offline. Stage the renderer for next boot; keep installer SSH up.
+	if [[ "$(system::distribution_type)" == ubuntu ]] && \
+		{ compgen -G '/usr/share/wayland-sessions/*.desktop' >/dev/null || compgen -G '/usr/share/xsessions/*.desktop' >/dev/null; }; then
+		system::prepare_ubuntu_desktop_networking || exit 1
+	fi
+
 	wisdom_quotes_setup || {
 		system::log_item "⛔ ERROR: Failed to set up wisdom quotes. MOTD may not function as expected."
 	}
