@@ -11703,10 +11703,40 @@ system::rtd_oem_reseal::_prepare_ubuntu_graphical() {
 		return 1
 	}
 	printf 'oem-config oem-config/remove boolean true\n' | debconf-set-selections || return 1
+	# Ubiquity switches effective IDs while retaining real/saved root IDs.
+	# Glycin's Bubblewrap loader rejects that setuid context. Normalize IDs in
+	# the sandbox child only; keep the native sandbox enabled and scoped to OEM.
+	mkdir -p /usr/lib/rtd/oem-bin || return 1
+	cat >/usr/lib/rtd/oem-bin/bwrap <<'PY'
+#!/usr/bin/python3
+import os
+import sys
+gid = os.getegid()
+uid = os.geteuid()
+os.setresgid(gid, gid, gid)
+os.setresuid(uid, uid, uid)
+os.execv('/usr/bin/bwrap', ['/usr/bin/bwrap', *sys.argv[1:]])
+PY
+	chmod 755 /usr/lib/rtd/oem-bin/bwrap || return 1
+	# PAM replaces PATH in ubiquity-dm. Set it again only in the subsequent
+	# OEM greeter, without modifying the system Bubblewrap binary or PAM config.
+	mkdir -p /usr/lib/rtd/oem-python || return 1
+	cat >/usr/lib/rtd/oem-python/sitecustomize.py <<'PY'
+import os
+import sys
+if os.path.basename(sys.argv[0]) == 'oem-config':
+    os.environ['PATH'] = '/usr/lib/rtd/oem-bin:' + os.environ.get('PATH', '/usr/bin:/bin')
+PY
+	chmod 644 /usr/lib/rtd/oem-python/sitecustomize.py || return 1
 	mkdir -p /etc/systemd/system/oem-config.service.d || return 1
 	cat >/etc/systemd/system/oem-config.service.d/10-rtd-frontend.conf <<'EOF'
 [Service]
 Environment=FRONTEND=gtk_ui
+Environment=PATH=/usr/lib/rtd/oem-bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=PYTHONPATH=/usr/lib/rtd/oem-python
+Environment=XDG_CACHE_HOME=/var/cache/rtd-oem-config
+CacheDirectory=rtd-oem-config
+CacheDirectoryMode=0755
 EOF
 	systemctl daemon-reload || return 1
 	oem-config-prepare --quiet >>"${_LOGFILE}" 2>&1 || return 1

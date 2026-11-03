@@ -156,3 +156,12 @@ the one-time restart from installer to installed disk. Final OEM shutdown remain
 a power-off. Unattended update checks (`RTD_NONINTERACTIVE=1` or
 `DEBIAN_FRONTEND=noninteractive`) log and defer required reboots to the calling
 workflow; interactive update commands retain their reboot confirmation.
+
+On current Kubuntu, the legacy OEM GTK greeter temporarily switches effective
+user IDs while retaining saved root privileges. Glycin image decoding launches
+Bubblewrap, which rejects that mixed-ID context. RTD supplies an adapter visible
+only to the OEM greeter: the image-loader child permanently adopts its effective
+UID/GID before executing the system Bubblewrap. Sandboxing remains enabled. A
+private Python startup hook restores the adapter path after PAM rebuilds PATH;
+other Python programs retain their normal path. The OEM service also uses a
+system-managed cache outside the temporary user's restricted home directory.

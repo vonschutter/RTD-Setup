@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import os
 import pty
+import runpy
 import signal
 import time
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch, call
 
 from test_oem_themes import library_function
 
@@ -156,7 +158,7 @@ system::rtd_oem_reseal::_finalize_shutdown() { echo poweroff >> "$RECORD"; }
                 binary.touch()
                 binary.chmod(0o755)
             function = library_function('system::rtd_oem_reseal::_prepare_ubuntu_graphical')
-            for path in ('/etc/systemd', '/var/lib/oem-config', '/usr/lib/ubiquity', '/usr/bin'):
+            for path in ('/etc/systemd', '/var/lib/oem-config', '/usr/lib/ubiquity', '/usr/lib/rtd', '/usr/bin'):
                 function = function.replace(path, f'{root}{path}')
             script = '''
 write_error() { echo "$*" >&2; }
@@ -181,6 +183,31 @@ system::rtd_oem_reseal::_install_guest_additions() { echo guest-tools; }
             self.assertIn('Environment=FRONTEND=gtk_ui', (
                 root / 'etc/systemd/system/oem-config.service.d/10-rtd-frontend.conf'
             ).read_text())
+            config = (root / 'etc/systemd/system/oem-config.service.d/10-rtd-frontend.conf').read_text()
+            self.assertIn('Environment=PYTHONPATH=', config)
+            self.assertIn('CacheDirectory=rtd-oem-config', config)
+            self.assertNotIn('GLYCIN_DISABLE_SANDBOX', config)
+            # Image-loader children must discard saved root privileges before
+            # executing real Bubblewrap; the OEM parent retains its own IDs.
+            with patch('os.geteuid', return_value=29999), patch('os.getegid', return_value=100), \
+                    patch('os.setresgid') as setgid, patch('os.setresuid') as setuid, \
+                    patch('os.execv') as execute:
+                events = unittest.mock.Mock()
+                events.attach_mock(setgid, 'gid')
+                events.attach_mock(setuid, 'uid')
+                events.attach_mock(execute, 'execute')
+                runpy.run_path(str(root / 'usr/lib/rtd/oem-bin/bwrap'))
+                self.assertEqual(events.mock_calls[:2], [call.gid(100, 100, 100), call.uid(29999, 29999, 29999)])
+                self.assertEqual(events.mock_calls[2][0], 'execute')
+            hook = root / 'usr/lib/rtd/oem-python/sitecustomize.py'
+            for program in ('oem-config', 'another-program'):
+                with self.subTest(program=program), patch('sys.argv', [program]), \
+                        patch.dict(os.environ, {'PATH': '/usr/bin:/bin'}):
+                    exec(compile(hook.read_text(), str(hook), 'exec'), {})
+                    if program == 'oem-config':
+                        self.assertTrue(os.environ['PATH'].startswith(str(root / 'usr/lib/rtd/oem-bin') + ':'))
+                    else:
+                        self.assertEqual(os.environ['PATH'], '/usr/bin:/bin')
             # A Wayland-only image must not be marked ready if the X server
             # dependency was unavailable, even when package installation returned 0.
             (root / 'usr/bin/X').unlink()
