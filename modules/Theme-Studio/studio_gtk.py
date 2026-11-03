@@ -4,6 +4,21 @@ import threading
 from studio import ACCENTS, StudioError, catalog, looks, read_json
 
 
+def thumbnail_texture(path):
+    """Rasterize at card resolution before allocating a GTK texture.
+
+    A Picture's layout size does not bound decoding: loading thirty 4K SVGs
+    directly retains hundreds of MiB of pixels, plus renderer copies. A 2x
+    card preview keeps HiDPI detail without decoding desktop-size images.
+    """
+    import gi
+    gi.require_version('Gdk', '4.0')
+    gi.require_version('GdkPixbuf', '2.0')
+    from gi.repository import Gdk, GdkPixbuf
+    pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(str(path), 560, 315, True)
+    return Gdk.Texture.new_for_pixbuf(pixbuf)
+
+
 def create_application(studio):
     try:
         import gi
@@ -53,7 +68,7 @@ def create_application(studio):
                               margin_top=8, margin_bottom=8, margin_start=8, margin_end=8)
                 box.add_css_class('card')
                 box.add_css_class('studio-card')
-                picture = Thumbnail(file=Gio.File.new_for_path(str(studio.wallpaper(look))))
+                picture = Thumbnail(paintable=thumbnail_texture(studio.wallpaper(look)))
                 picture.set_can_shrink(True)
                 box.append(picture)
                 title = Gtk.Label(label=look['name'], xalign=0)

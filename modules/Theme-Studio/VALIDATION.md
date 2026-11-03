@@ -77,3 +77,22 @@ The catalog smoke test downloads large archives and needs build prerequisites, d
 - Actual GNOME Shell/GTK application rendering and logout/login behavior were not tested by changing a live desktop. Compatibility remains dependent on GNOME version and upstream theme quality.
 - Native accent behavior on pre-GNOME-47 systems is covered through simulated schema absence, not a second installed GNOME version.
 - The paid product's exact 1,057-variant inventory and original assets are not public and are not reproduced. The module exposes independently sourced families and supported build profiles; it does not claim exact paid-product parity.
+
+
+## Gallery memory regression (2026-11-03)
+
+Opening the real GTK gallery on the development desktop with temporary assets
+and in-memory GSettings reproduced excessive memory use. With the same renderer
+and five-second observation window, resident memory fell from 1,883,900 KiB to
+283,444 KiB; peak resident memory fell from 2,271,552 KiB to 290,292 KiB after
+replacing full-resolution image loads with bounded thumbnails. These are
+host measurements; a 2 GiB VM stress test has not been performed.
+
+Two additional native GTK tests verify that all thirty previews are 560×315,
+the original 3840×2160 SVGs remain unchanged, and a rendered gallery stays below
+a 768 MiB peak budget with the Cairo renderer. Run with:
+
+    PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -m unittest discover -s modules/Theme-Studio/tests -v
+
+The gallery test skips without a graphical display; both tests require the
+GTK4/Libadwaita Python bindings.

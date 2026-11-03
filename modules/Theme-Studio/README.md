@@ -37,6 +37,10 @@ Run as your logged-in GNOME desktop user, without sudo. At startup, Theme Studio
 
 The paid product advertises exactly 1,057 variants. Its manifest is unavailable publicly; this module does **not** claim that count. Catalog families and build profiles are real upstream integrations, and installed variant totals are measured from disk. Some dark-only families retain their dark artwork even when GNOME's application appearance preference is light.
 
+Gallery previews are rasterized at 560×315 before creating GTK textures.
+Applying a look still uses the original 4K wallpaper. Preview layout dimensions
+alone do not limit decoded image memory.
+
 ## Requirements
 
 - Linux with GNOME; Python 3.10+ and Python GObject bindings (`gi`, Gio/GLib).
