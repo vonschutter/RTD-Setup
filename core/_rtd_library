@@ -416,7 +416,7 @@ system:
 280  system::rtd_oem_reseal                                      ;           Function to reseal a newly installed system for delivery to end user.
 281  system::rtd_oem_reseal::_finalize_shutdown                  ;           Logs the shutdown context and powers the system off.
 282  system::rtd_oem_reseal::_install_guest_additions            ;           Ensures guest integration packages are installed regardless of distro.
-283  system::rtd_oem_reseal::_prepare_debian                     ;           Performs Debian-specific reseal tasks (cloud-init cleanup, host keys, etc.).
+283  system::rtd_oem_reseal::_prepare_debian                     ;           Prepares Debian GNOME first-user setup and cleans clone identities.
 284  system::rtd_oem_reseal::_prepare_fedora                     ;           Enables the Fedora/RHEL initial-setup workflow and guest tools.
 285  system::rtd_oem_reseal::_prepare_suse                       ;           Enables YaST firstboot and guest tools on SUSE-based distributions.
 286  system::rtd_oem_reseal::_prepare_ubuntu_like                ;           Runs OEM reseal prep for Ubuntu-like distributions.
@@ -11636,7 +11636,9 @@ system::rtd_oem_reseal::_install_guest_additions() {
 			fi
 			chmod 644 "${_spice_autostart}" 2>/dev/null || true
 		fi
-		systemctl --global enable spice-vdagent.service >>"${_LOGFILE}" 2>&1 || true
+		# Debian's static user unit has no [Install] section. Explicitly attach
+		# it to the graphical session instead of silently failing enable.
+		systemctl --global add-wants graphical-session.target spice-vdagent.service >>"${_LOGFILE}" 2>&1 || return 1
 	elif [[ -n "${_spice_agent_bin}" ]]; then
 		# Older/non-systemd desktops need the XDG launcher. Rewrite it deliberately
 		# so a stale Hidden=true override from a previous package is reversible.
@@ -11678,27 +11680,33 @@ EOF
 		systemctl --user start spice-vdagent.service >>"${_LOGFILE}" 2>&1 || true
 }
 
-system::rtd_oem_reseal::_prepare_ubuntu_text() {
-	# Description: Prepare Ubuntu's packaged text-mode first-user setup for
-	# Plasma/other desktops. This preserves their display manager and needs no X server.
+system::rtd_oem_reseal::_prepare_ubuntu_graphical() {
+	# Description: Prepare Ubuntu's packaged graphical OEM wizard for Plasma
+	# and other non-GDM desktops, retaining their normal display manager.
 	# Globals: _LOGFILE. Caller verifies the build account and reserves UID 1000.
 	# Arguments: Build/recovery username; virtualization context.
 	# Outputs: OEM first-boot target and frontend selection. Does not start the wizard.
 	# Returns: 0 only when native OEM preparation is enabled and verified.
-	# Usage: system::rtd_oem_reseal::_prepare_ubuntu_text builduser virtual
+	# Usage: system::rtd_oem_reseal::_prepare_ubuntu_graphical builduser virtual
 	local build_user="${1}" virt="${2}"
 	[[ "$build_user" =~ ^[a-z_][a-z0-9_-]*[$]?$ ]] || return 1
 	command -v debconf-set-selections >/dev/null 2>&1 || return 1
 	# Preserve recovery access through reseal; remove it only after the deployed
 	# UID 1000 user's first desktop login (the existing RTD post-OOBE action).
-	software::add_native_package oem-config-debconf oem-config-prepare || return 1
+	# ubiquity-dm launches the OEM wizard on its own X server. Wayland-only
+	# Plasma installations do not include that server, so install it explicitly.
+	software::add_native_package oem-config-gtk oem-config-prepare xserver-xorg || return 1
 	command -v oem-config-prepare >/dev/null 2>&1 || return 1
-	[[ -f /usr/lib/ubiquity/ubiquity/frontend/debconf_ui.py ]] || return 1
+	[[ -f /usr/lib/ubiquity/ubiquity/frontend/gtk_ui.py ]] || return 1
+	[[ -x /usr/bin/ubiquity-dm && -x /usr/bin/X ]] || {
+		write_error "The graphical OEM wizard requires ubiquity-dm and an Xorg server."
+		return 1
+	}
 	printf 'oem-config oem-config/remove boolean true\n' | debconf-set-selections || return 1
 	mkdir -p /etc/systemd/system/oem-config.service.d || return 1
 	cat >/etc/systemd/system/oem-config.service.d/10-rtd-frontend.conf <<'EOF'
 [Service]
-Environment=FRONTEND=debconf_ui
+Environment=FRONTEND=gtk_ui
 EOF
 	systemctl daemon-reload || return 1
 	oem-config-prepare --quiet >>"${_LOGFILE}" 2>&1 || return 1
@@ -11713,9 +11721,9 @@ EOF
 	return 0
 }
 
-system::rtd_oem_reseal::_prepare_ubuntu_like() {
+system::rtd_oem_reseal::_prepare_gdm_first_user() {
 	# Description:
-	#   Runs OEM reseal prep for Ubuntu-like distributions.
+	#   Prepares GDM native graphical first-user setup for Ubuntu or Debian.
 	# Globals:
 	#   None
 	# Arguments:
@@ -11725,7 +11733,7 @@ system::rtd_oem_reseal::_prepare_ubuntu_like() {
 	# Returns:
 	#   0 on success.
 	# Usage:
-	#   system::rtd_oem_reseal::_prepare_ubuntu_like "$(system::rtd_oem_reseal::_virtualization_context)"
+	#   system::rtd_oem_reseal::_prepare_gdm_first_user "$(system::rtd_oem_reseal::_virtualization_context)"
 	# End of documentation
 
 	local _virt="${1}"
@@ -11739,7 +11747,7 @@ system::rtd_oem_reseal::_prepare_ubuntu_like() {
 		_temporary_user="$(getent passwd 29998 2>/dev/null | cut -d: -f1)"
 	fi
 	if [[ -z "${_temporary_user}" || ! "${_temporary_user}" =~ ^[a-z_][a-z0-9_-]*[$]?$ ]] || ! id "${_temporary_user}" >/dev/null 2>&1; then
-		write_error "Unable to identify RTD's temporary Ubuntu recovery account; refusing to reseal without SSH recovery access."
+		write_error "Unable to identify RTD's temporary recovery account; refusing to reseal without SSH recovery access."
 		return 1
 	fi
 	_temporary_uid="$(id -u "${_temporary_user}")"
@@ -11754,18 +11762,11 @@ system::rtd_oem_reseal::_prepare_ubuntu_like() {
 		return 1
 	fi
 
-	# Modern Ubuntu's supported OEM flow is GDM's native GNOME Initial Setup
-	# session. It is a Wayland GNOME session and creates the first real account
-	# when AccountsService reports that the machine has no non-system users.
-	# The legacy oem-config GTK frontend starts ubiquity-dm, which hard-codes an
-	# X server and cannot work on Ubuntu images that only ship Xwayland.
-	if [[ ! -x /usr/sbin/gdm3 && ! -x /usr/sbin/gdm ]]; then
-		system::rtd_oem_reseal::_prepare_ubuntu_text "${_temporary_user}" "${_virt}"
-		return $?
-	fi
+	# GDM starts its native new-user session when AccountsService reports
+	# no non-system users. Keep the recovery account hidden until first login.
 	software::add_native_package "gnome-initial-setup" || return 1
 	[[ -x /usr/libexec/gnome-initial-setup ]] || {
-		write_error "GNOME Initial Setup is unavailable after installing the native Ubuntu package."
+		write_error "GNOME Initial Setup is unavailable after installing the native package."
 		return 1
 	}
 	[[ -f /usr/share/gnome-session/sessions/gnome-initial-setup.session ]] || {
@@ -11788,7 +11789,7 @@ system::rtd_oem_reseal::_prepare_ubuntu_like() {
 	# Remove remnants from an image that was previously prepared with the legacy
 	# Ubiquity OEM path. They must not override GDM at the next boot.
 	systemctl disable oem-config.service >>"${_LOGFILE}" 2>&1 || true
-	rm -f /var/lib/oem-config/run /run/gdm/gdm.ran-initial-setup
+	rm -f /var/lib/oem-config/run /run/gdm/gdm.ran-initial-setup /run/gdm3/gdm.ran-initial-setup
 	if [[ "$(id -u oem 2>/dev/null || true)" == "29999" ]]; then
 		userdel --force --remove oem >>"${_LOGFILE}" 2>&1 || {
 			write_error "Unable to remove the obsolete legacy OEM account."
@@ -11821,7 +11822,7 @@ system::rtd_oem_reseal::_prepare_ubuntu_like() {
 	fi
 
 	systemctl enable gdm3.service >>"${_LOGFILE}" 2>&1 || systemctl enable gdm.service >>"${_LOGFILE}" 2>&1 || {
-		write_error "Unable to enable GDM for Ubuntu's native first-user setup."
+		write_error "Unable to enable GDM for native first-user setup."
 		return 1
 	}
 	systemctl set-default graphical.target >>"${_LOGFILE}" 2>&1 || return 1
@@ -11831,9 +11832,23 @@ system::rtd_oem_reseal::_prepare_ubuntu_like() {
 	fi
 }
 
+system::rtd_oem_reseal::_prepare_ubuntu_like() {
+	if [[ -x /usr/sbin/gdm3 || -x /usr/sbin/gdm ]]; then
+		system::rtd_oem_reseal::_prepare_gdm_first_user "$1"
+	else
+		local recovery_user="${SUDO_USER:-}"
+		if [[ -z "${recovery_user}" || "${recovery_user}" == root ]]; then
+			recovery_user="$(getent passwd 29998 | cut -d: -f1)"
+		fi
+		[[ -n "${recovery_user}" && "$(id -u "${recovery_user}")" == 29998 ]] || return 1
+		[[ -z "$(getent passwd 1000)" ]] || return 1
+		system::rtd_oem_reseal::_prepare_ubuntu_graphical "${recovery_user}" "$1"
+	fi
+}
+
 system::rtd_oem_reseal::_prepare_debian() {
 	# Description:
-	#   Performs Debian-specific reseal tasks (cloud-init cleanup, host keys, etc.).
+	#   Prepares Debian GNOME first-user setup and cleans clone identities.
 	# Globals:
 	#   None
 	# Arguments:
@@ -11848,6 +11863,9 @@ system::rtd_oem_reseal::_prepare_debian() {
 
 	local _virt="${1}"
 	write_status "🧹 Preparing Debian-based system for reseal"
+	if [[ -x /usr/sbin/gdm3 || -x /usr/sbin/gdm ]]; then
+		system::rtd_oem_reseal::_prepare_gdm_first_user "${_virt}" || return 1
+	fi
 	software::add_native_package cloud-init || true
 	cloud-init clean --logs >>"${_LOGFILE}" 2>&1 || cloud-init clean >>"${_LOGFILE}" 2>&1 || true
 	truncate -s 0 /etc/machine-id 2>/dev/null || true
@@ -29660,14 +29678,24 @@ kvm::make_vm_now_from_debian_org() {
 		write_error "❌ Failed to create VM disk image. Aborting VM creation."
 		return 1
 	}
+	local _debian_support="install-automated-reseal-not-user-oobe"
+	local _debian_automation="manual-finalization-required"
+	local _debian_notes="Graphical first-user setup is supported for Debian GNOME templates; other desktops require manual finalization."
+	case "${_role,,}:${_UserDesktopEnvironmentSelection,,}" in
+		desktop:*gnome*|vdi:*gnome*|workstation:*gnome*)
+			_debian_support="fully-automated-guest-finalizer"
+			_debian_automation="auto-finalizer-pending"
+			_debian_notes="Wait for default bundles, GNOME first-user preparation and shutdown before cloning."
+			;;
+	esac
 	kvm::template_metadata_write \
 		--vm "$vm_name" \
 		--os-family "debian" \
 		--role "${_role:-${vm_usecase:-unknown}}" \
-		--support-level "install-automated-reseal-not-user-oobe" \
-		--automation-status "manual-finalization-required" \
+		--support-level "${_debian_support}" \
+		--automation-status "${_debian_automation}" \
 		--ready-to-clone "false" \
-		--notes "Debian install is automated, but current reseal path uses cloud-init cleanup rather than a full graphical end-user OOBE prompt." || true
+		--notes "${_debian_notes}" || true
 
 	_summary_message="
 	The virtual machine (${vm_name}) \n
@@ -29692,6 +29720,7 @@ kvm::make_vm_now_from_debian_org() {
 			--location="${source_url}" \
 			--os-variant="debian10" \
 			--video "virtio" --channel "spicevmc" \
+			--channel "unix,target.type=virtio,target.name=org.qemu.guest_agent.0" \
 			--initrd-inject="${PRESEED_FILE}" \
 			--install kernel="${vm_kernel}",initrd="${vm_initrd}" \
 			--extra-args="auto=true priority=critical preseed/file=/$(basename ${PRESEED_FILE}) ${ui_diplay_style}" \
@@ -32533,6 +32562,15 @@ template::preseed_cfg::main() {
 		return 1
 	}; fi
 
+	# Keep UID 1000 available for GDM's deployed-user wizard. Other desktop
+	# and server builds keep the installer's normal account allocation.
+	local _build_uid_preseed=""
+	case "${_role,,}:${_task,,}" in
+		desktop:*gnome*|vdi:*gnome*|workstation:*gnome*)
+			_build_uid_preseed="d-i passwd/user-uid string 29998"
+			;;
+	esac
+
 	cat >>${1} <<-EOF
 
 		# --------------------------------------------------- #
@@ -32595,6 +32633,7 @@ template::preseed_cfg::main() {
 		d-i passwd/root-login boolean false
 		d-i passwd/user-fullname string RTD User
 		d-i passwd/username string ${Preference_InitialUser}
+		${_build_uid_preseed}
 		d-i passwd/user-password seen true
 		d-i user-setup/allow-password-weak boolean true
 		d-i passwd/user-password-crypted password ${Preference_InitialUserPassword}
@@ -32987,7 +33026,7 @@ template::preseed_cfg::late_command() {
 			in-target apt-get -y install git ; \
 			in-target apt-get -y install ansible ; \
 			in-target apt-get -y install dialog p7zip-full virt-what curl wget ; \
-			in-target apt-get -y install spice-vdagent qemu-guest-agent ; \
+			in-target env DEBIAN_FRONTEND=noninteractive apt-get -y install openssh-server spice-vdagent qemu-guest-agent ; \
 			in-target apt-get -y install neofetch ; \
 			in-target /bin/sh -c echo "LC_ALL=${Preference_InitialLanguage}.UTF-8" >> /etc/default/locale ; \
 			in-target locale-gen en_US.UTF-8; in-target update-locale LANG=en_US.UTF-8; \

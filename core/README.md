@@ -111,7 +111,25 @@ off only after reseal succeeds. A failed bundle install or reseal leaves the VM
 running for diagnosis and retains the stage-two marker.
 
 Ubuntu GNOME builds use GDM's native first-user setup. Kubuntu and other Ubuntu
-desktops without GDM use Ubuntu's packaged `oem-config-debconf` frontend, selected
-through the native OEM service. Their delivery boot asks for first-user details
-on the console before returning to the existing desktop display manager; the
-wizard does not run during automated template finalization.
+desktops without GDM use Ubuntu's packaged graphical `oem-config-gtk` wizard,
+selected through the native OEM service. Stage two also installs Xorg, which
+the OEM wizard requires even when Plasma normally runs on Wayland. The delivery
+boot opens the graphical wizard before returning to the existing desktop display
+manager; the wizard does not run during automated template finalization.
+
+Debian GNOME desktop templates use the same native GDM first-user handoff.
+Preseed creates the temporary build/recovery account at UID 29998, leaving UID
+1000 free for the deployed user. After the installer reboot, the existing RTD
+finalizer installs default bundles, hides the recovery account from
+AccountsService, enables GNOME Initial Setup, and shuts down after reseal.
+Other Debian desktops retain manual finalization. Existing images whose build
+account occupies UID 1000 must be rebuilt or have that account migrated while
+logged out before resealing; RTD refuses to reseal them as ready for first-user
+setup.
+
+Debian VM definitions include both SPICE and QEMU guest-agent channels, and
+installation explicitly includes the SSH server and guest agents. RTD attaches
+the SPICE user service to `graphical-session.target`, including Debian's static
+unit without an `[Install]` section. The legacy desktop launcher stays disabled
+so only one session agent runs. A running daemon alone is insufficient for
+clipboard and display integration; the graphical session needs its user agent.

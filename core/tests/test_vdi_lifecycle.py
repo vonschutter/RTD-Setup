@@ -59,16 +59,22 @@ system::rtd_oem_reseal::_finalize_shutdown() { echo poweroff >> "$RECORD"; }
                     self.assertLess(events.index('reseal:ready'), events.index('poweroff'))
                     self.assertEqual(events.count('poweroff'), 1)
 
-    def test_kubuntu_reseal_arms_packaged_text_frontend_without_starting_it(self):
+    def test_kubuntu_reseal_arms_graphical_frontend_without_starting_it(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            frontend = root / 'usr/lib/ubiquity/ubiquity/frontend/debconf_ui.py'
+            frontend = root / 'usr/lib/ubiquity/ubiquity/frontend/gtk_ui.py'
             frontend.parent.mkdir(parents=True)
             frontend.touch()
-            function = library_function('system::rtd_oem_reseal::_prepare_ubuntu_text')
-            for path in ('/etc/systemd', '/var/lib/oem-config', '/usr/lib/ubiquity'):
+            for command in ('X', 'ubiquity-dm'):
+                binary = root / 'usr/bin' / command
+                binary.parent.mkdir(parents=True, exist_ok=True)
+                binary.touch()
+                binary.chmod(0o755)
+            function = library_function('system::rtd_oem_reseal::_prepare_ubuntu_graphical')
+            for path in ('/etc/systemd', '/var/lib/oem-config', '/usr/lib/ubiquity', '/usr/bin'):
                 function = function.replace(path, f'{root}{path}')
             script = '''
+write_error() { echo "$*" >&2; }
 software::add_native_package() { echo "packages:$*"; }
 debconf-set-selections() { cat >/dev/null; }
 systemctl() {
@@ -78,18 +84,29 @@ systemctl() {
 oem-config-prepare() { echo "prepare:$*"; }
 oem-config-firstboot() { echo UNEXPECTED-WIZARD; return 1; }
 system::rtd_oem_reseal::_install_guest_additions() { echo guest-tools; }
-''' + function + '\nsystem::rtd_oem_reseal::_prepare_ubuntu_text builder virtual\n'
+''' + function + '\nsystem::rtd_oem_reseal::_prepare_ubuntu_graphical builder virtual\n'
             result = subprocess.run(
                 ['bash', '-c', script], text=True, capture_output=True, timeout=5,
                 env={**os.environ, '_LOGFILE': str(root / 'log')}, check=False,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn('packages:oem-config-debconf oem-config-prepare', result.stdout)
+            self.assertIn('packages:oem-config-gtk oem-config-prepare xserver-xorg', result.stdout)
             self.assertNotIn('UNEXPECTED-WIZARD', result.stdout)
             self.assertTrue((root / 'var/lib/oem-config/run').exists())
-            self.assertIn('Environment=FRONTEND=debconf_ui', (
+            self.assertIn('Environment=FRONTEND=gtk_ui', (
                 root / 'etc/systemd/system/oem-config.service.d/10-rtd-frontend.conf'
             ).read_text())
+            # A Wayland-only image must not be marked ready if the X server
+            # dependency was unavailable, even when package installation returned 0.
+            (root / 'usr/bin/X').unlink()
+            (root / 'var/lib/oem-config/run').unlink()
+            failed = subprocess.run(
+                ['bash', '-c', script], text=True, capture_output=True, timeout=5,
+                env={**os.environ, '_LOGFILE': str(root / 'log')}, check=False,
+            )
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertIn('requires ubiquity-dm and an Xorg server', failed.stderr)
+            self.assertFalse((root / 'var/lib/oem-config/run').exists())
 
 
 if __name__ == '__main__':

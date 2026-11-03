@@ -183,6 +183,11 @@ rtd_oem_enable::template_workflow_supported() {
 	distro_type="$(system::distribution_type 2>/dev/null || printf 'unknown')"
 
 	case "$distro_type" in
+		debian)
+			# Only GDM desktops have a supported native first-user wizard.
+			[[ -x /usr/sbin/gdm3 || -x /usr/sbin/gdm ]]
+			return $?
+			;;
 		ubuntu|fedora|redhat|suse)
 			return 0
 			;;
