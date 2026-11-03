@@ -11695,7 +11695,7 @@ system::rtd_oem_reseal::_prepare_ubuntu_graphical() {
 	# UID 1000 user's first desktop login (the existing RTD post-OOBE action).
 	# ubiquity-dm launches the OEM wizard on its own X server. Wayland-only
 	# Plasma installations do not include that server, so install it explicitly.
-	software::add_native_package oem-config-gtk oem-config-prepare xserver-xorg || return 1
+	software::check_native_package_dependency oem-config-gtk oem-config-prepare xserver-xorg || return 1
 	command -v oem-config-prepare >/dev/null 2>&1 || return 1
 	[[ -f /usr/lib/ubiquity/ubiquity/frontend/gtk_ui.py ]] || return 1
 	[[ -x /usr/bin/ubiquity-dm && -x /usr/bin/X ]] || {
@@ -11764,7 +11764,7 @@ system::rtd_oem_reseal::_prepare_gdm_first_user() {
 
 	# GDM starts its native new-user session when AccountsService reports
 	# no non-system users. Keep the recovery account hidden until first login.
-	software::add_native_package "gnome-initial-setup" || return 1
+	software::check_native_package_dependency "gnome-initial-setup" || return 1
 	[[ -x /usr/libexec/gnome-initial-setup ]] || {
 		write_error "GNOME Initial Setup is unavailable after installing the native package."
 		return 1
@@ -11871,6 +11871,26 @@ system::rtd_oem_reseal::_prepare_debian() {
 	truncate -s 0 /etc/machine-id 2>/dev/null || true
 	rm -f /var/lib/dbus/machine-id
 	ln -sf /etc/machine-id /var/lib/dbus/machine-id
+	# Debian's ssh.service validates host keys without creating missing ones.
+	# Generate fresh keys on the clone before SSH starts, retaining recovery access.
+	if [[ -x /usr/bin/ssh-keygen ]]; then
+		mkdir -p /etc/systemd/system || return 1
+		cat >/etc/systemd/system/rtd-ssh-host-keys.service <<'EOF'
+[Unit]
+Description=Generate missing SSH host keys after RTD reseal
+Before=ssh.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/ssh-keygen -A
+
+[Install]
+RequiredBy=ssh.service
+EOF
+		systemctl daemon-reload >>"${_LOGFILE}" 2>&1 || return 1
+		systemctl enable rtd-ssh-host-keys.service >>"${_LOGFILE}" 2>&1 || return 1
+	fi
 	rm -f /etc/ssh/ssh_host_* 2>/dev/null || true
 	if [[ "${_virt}" == "virtual" ]]; then
 		system::rtd_oem_reseal::_install_guest_additions
@@ -12710,7 +12730,7 @@ oem::distro_release_upgrade() {
 
 			if ! command -v do-release-upgrade &>/dev/null; then
 				write_status "Installing 'do-release-upgrade' support tools..."
-				software::add_native_package update-manager-core || return 1
+				software::check_native_package_dependency update-manager-core || return 1
 			fi
 
 			if [[ "$interactive" == "interactive" ]]; then
@@ -22317,7 +22337,7 @@ software::determine_package_name_from_cmd() {
 software::add_native_package() {
 	# Description:
 	# Installs one or more native packages individually using the system's package manager.
-	# Supports apt, dnf, zypper, and pkcon. Logs any failures while allowing others to proceed.
+	# Supports apt, dnf, zypper, and pkcon. Warns about unavailable packages and installation failures while continuing.
 	# This is a global install command for portability and convenience. This function
 	# allows for scripts to add software across many systems.
 	# Primarily for Linux: this function will look for the common package managers
@@ -22337,7 +22357,9 @@ software::add_native_package() {
 	#   STDERR: Detailed errors
 	#
 	# Returns:
-	#   0 if all packages are installed successfully, 1 if any package failed
+	#   0 after best-effort package requests, including unavailable/failed packages.
+	#   1 for invalid requests/platform or privilege failure; 3 for no package manager.
+	#   Use software::check_native_package_dependency for required packages.
 	#
 	# Usage:
 	#   software::add_native_package curl git htop
@@ -22345,7 +22367,7 @@ software::add_native_package() {
 	#   software::add_native_package pattern:kvm_server pattern:kvm_tools
 	# End of documentation
 
-	security::ensure_admin
+	security::ensure_admin || return 1
 
 	local pkgmgr distro
 	local -a raw_packages filtered_packages failed_packages
@@ -22433,7 +22455,7 @@ software::add_native_package() {
 		fi
 
 		if ! software::is_native_package_available "$pkg"; then
-			write_error "Package '$pkg' is not available in the repositories."
+			write_warning "Package '$pkg' is not available in the repositories; skipping."
 			system::log_item "Package availability check failed: manager=${pkgmgr}, request=${pkg}, type=${request_type}. Verify enabled repositories and refresh package metadata."
 			failed_packages+=("$pkg")
 			continue
@@ -22451,12 +22473,12 @@ software::add_native_package() {
 			APT:package) sudo apt-get -y install "$name" || install_status=$? ;;
 			PKCON:package) pkcon install -y "$name" || install_status=$? ;;
 			*)
-				write_error "${request_type^} requests are not supported by ${pkgmgr}: ${pkg}"
+				write_warning "${request_type^} requests are not supported by ${pkgmgr}: ${pkg}"
 				install_status=1
 				;;
 		esac
 		if [[ $install_status -ne 0 ]]; then
-			write_error "❌ Failed to install: ${pkg}"
+			write_warning "Failed to install package request: ${pkg}"
 			system::log_item "Installation failed: manager=${pkgmgr}, request=${pkg}, type=${request_type}, exit_status=${install_status}. Check repository configuration, package-manager locks, subscription/registration, and the preceding package-manager output."
 			failed_packages+=("$pkg")
 			continue
@@ -22466,11 +22488,10 @@ software::add_native_package() {
 	done
 
 	if [[ ${#failed_packages[@]} -gt 0 ]]; then
-		write_error "Some packages failed to install:"
+		write_warning "Some package requests were skipped or failed:"
 		for pkg in "${failed_packages[@]}"; do
-			write_error "  - $pkg"
+			write_warning "  - $pkg"
 		done
-		return 1
 	fi
 
 	return 0
@@ -23050,16 +23071,23 @@ software::check_native_package_dependency() {
 	#   - write_warning
 	#   - write_error
 	#   - software::is_native_package_installed
+	#   - software::is_native_package_available
 	#   - software::add_native_package
 	#
 	# Returns:
 	#   0 if all packages are installed or successfully installed
-	#   1 if any package could not be installed
+	#   1 if a dependency is unavailable, remains uninstalled, or no dependencies are specified.
+	#   Callers must propagate failure (for example, with || return 1).
 	#
 	# Usage:
 	#   software::check_native_package_dependency curl git htop
 	#
 	# End of documentation
+
+	if [[ -z "${*//[[:space:]]/}" ]]; then
+		write_error "No package dependencies specified."
+		return 1
+	fi
 
 	local all_installed=true
 	local pkg
@@ -23088,8 +23116,13 @@ software::check_native_package_dependency() {
 		if software::is_native_package_installed "$pkg"; then
 			write_information "📦 Dependency is already installed: ${pkg_installed}..."
 		else
+			if ! software::is_native_package_available "$pkg"; then
+				write_error "Required package dependency '$pkg' is unavailable in the repositories."
+				all_installed=false
+				continue
+			fi
 			write_warning "❗📦 Dependency ${pkg_missing} is missing. Attempting to install..."
-			if software::add_native_package "$pkg"; then
+			if software::add_native_package "$pkg" && software::is_native_package_installed "$pkg"; then
 				write_status "📦 Installed successfully: ${pkg_status}..."
 			else
 				write_error "❌ 📦Failed to install ${pkg_failed}. Please install it manually."

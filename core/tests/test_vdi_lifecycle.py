@@ -160,7 +160,7 @@ system::rtd_oem_reseal::_finalize_shutdown() { echo poweroff >> "$RECORD"; }
                 function = function.replace(path, f'{root}{path}')
             script = '''
 write_error() { echo "$*" >&2; }
-software::add_native_package() { echo "packages:$*"; }
+software::check_native_package_dependency() { echo "packages:$*"; }
 debconf-set-selections() { cat >/dev/null; }
 systemctl() {
     if [[ "$1" == get-default ]]; then echo oem-config.target;

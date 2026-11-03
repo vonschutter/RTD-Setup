@@ -669,21 +669,25 @@ recipe:_ADM:_Compression_Tools () {
 	# been compressed. The ZIP file format permits a number of compression 
 	# algorithms, though DEFLATE is the most common.
 
+	# OEM extraction requires 7z; ZIP creation is a convenience tool.
 	local status=0
 
-	software::from_flathub.org io.github.peazip.PeaZip $1
+	software::from_flathub.org io.github.peazip.PeaZip "$@" || status=1
 
 	
 	if hash dnf &>/dev/null ; then
 		write_information "Fedora based software management found, assuming fedora based distribution..."
-		software::add_native_package p7zip p7zip-plugins zip || status=1
+		software::check_native_package_dependency p7zip p7zip-plugins || status=1
+		software::add_native_package zip
 	elif hash zypper &>/dev/null ; then
 		write_information "OpenSUSE based software management found, assuming OpenSUSE based distribution..."
-		software::add_native_package 7zip rar zip || status=1
+		software::check_native_package_dependency 7zip || status=1
+		software::add_native_package zip rar
 	elif hash apt &>/dev/null ; then
 		write_information "Debian based software management found, assuming Debian based distribution..."
-		software::add_native_package 7zip rar zip || status=1
-		software::add_native_package 7zip-rar || write_warning "Optional 7zip RAR plugin is not available or failed to install."
+		software::check_native_package_dependency 7zip || status=1
+		# Repository-dependent extras use the best-effort installer.
+		software::add_native_package zip rar 7zip-rar
 	else
 		write_error "No supported software management found, assuming unsupported distribution..."
 		status=1

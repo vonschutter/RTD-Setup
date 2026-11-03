@@ -31,7 +31,7 @@ class UbuntuOemHandoffTests(unittest.TestCase):
 
     def test_uses_gdm_gnome_initial_setup_not_legacy_ubiquity(self):
         self.assertIn(
-            'software::add_native_package "gnome-initial-setup"',
+            'software::check_native_package_dependency "gnome-initial-setup"',
             self.library,
         )
         self.assertIn("/usr/share/gnome-session/sessions/gnome-initial-setup.session", self.library)

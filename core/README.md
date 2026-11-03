@@ -23,6 +23,22 @@ This document is for module authors and maintainers. Users looking for commands 
 
 Linux modules source `_rtd_library` to reuse package-management, UI, logging, system, desktop, network, security, media, and virtualization routines. This prevents individual tools from reimplementing distro detection, dependency installation, dialog handling, and standard logging.
 
+Native package requests use `software::add_native_package` as a best-effort
+operation. It checks repository availability, warns about skipped or failed
+requests, and continues with the remaining packages. Its success status does
+not guarantee installation. Invalid arguments, privilege failures, and unsupported
+package managers still return errors.
+
+Use `software::check_native_package_dependency` for required packages. It checks
+availability and verifies the installed state after attempting installation,
+returning nonzero if any dependency cannot be satisfied. Propagate that failure
+before running code that needs the dependency:
+
+```bash
+software::add_native_package rar 7zip-rar
+software::check_native_package_dependency curl git || return 1
+```
+
 Major function namespaces include:
 
 | Namespace | Responsibility |
