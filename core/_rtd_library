@@ -20936,7 +20936,7 @@ software::enable_extra_repos() {
 
 software::offer_reboot_if_required() {
 	# Description: Checks supported package-manager reboot indicators and interactively offers to reboot when required.
-	# Globals: PUBLICATION (r), BRANDING (r)
+	# Globals: PUBLICATION (r), BRANDING (r), RTD_NONINTERACTIVE (r), DEBIAN_FRONTEND (r)
 	# Dependencies: write_information, write_warning, write_status, system::log_item, dialog::prompt_yes_no; optionally reboot, zypper, needs-restarting, dnf.
 	# Arguments:
 	#   $1 - Optional "--dialog" to display the reboot confirmation through dialog.
@@ -21018,6 +21018,12 @@ software::offer_reboot_if_required() {
 	fi
 
 	write_warning "$reboot_reason"
+	# Unattended callers own their power transition. Never read from a hidden
+	# terminal or reboot in the middle of template bundle installation/reseal.
+	if [[ "${RTD_NONINTERACTIVE:-0}" == 1 || "${DEBIAN_FRONTEND:-}" == noninteractive ]]; then
+		write_information "Reboot required; deferred to the automated workflow."
+		return 0
+	fi
 	if [[ "$prompt_mode" == "--dialog" ]]; then
 		if dialog::prompt_yes_no --back-title "${PUBLICATION:-$BRANDING}" --title "Reboot Required" \
 			--message "$reboot_reason\n\nReboot the system now?"; then
@@ -21528,7 +21534,7 @@ software::update_system_txt() {
 	fi
 	write_information "All updates have been processed.\n"
 
-	software::report_updates_installed_today | tee -a "$LOGFILE"
+	software::report_updates_installed_today | tee -a "$_LOGFILE"
 
 	software::offer_reboot_if_required
 }
@@ -29711,28 +29717,28 @@ kvm::make_vm_now_from_debian_org() {
 	      After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
 
 	write_status "🔧 - Creating the VM... Please Wait..."
-	{
-		"${bin_virt_install}" --name "${vm_name}" \
-			--vcpus "${_cpu}" \
-			--memory "${_mem}" \
-			--network "${virt_net}" \
-			--disk path="${disk_path},format=qcow2" \
-			--location="${source_url}" \
-			--os-variant="debian10" \
-			--video "virtio" --channel "spicevmc" \
-			--channel "unix,target.type=virtio,target.name=org.qemu.guest_agent.0" \
-			--initrd-inject="${PRESEED_FILE}" \
-			--install kernel="${vm_kernel}",initrd="${vm_initrd}" \
-			--extra-args="auto=true priority=critical preseed/file=/$(basename ${PRESEED_FILE}) ${ui_diplay_style}" \
-			--wait --noautoconsole \
-			|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-	} >>"${_LOGFILE}" 2>&1 &
+	# virt-install temporarily uses on_reboot=destroy for the installer and
+	# must survive the launching terminal to start the persistent disk once.
+	# Keep final OEM poweroff as destroy; never restart every guest shutdown.
+	local virt_pid
+	nohup "${bin_virt_install}" --connect qemu:///system --name "${vm_name}" \
+		--vcpus "${_cpu}" \
+		--memory "${_mem}" \
+		--network "${virt_net}" \
+		--disk path="${disk_path},format=qcow2" \
+		--location="${source_url}" \
+		--os-variant="debian10" \
+		--video "virtio" --channel "spicevmc" \
+		--channel "unix,target.type=virtio,target.name=org.qemu.guest_agent.0" \
+		--initrd-inject="${PRESEED_FILE}" \
+		--install kernel="${vm_kernel}",initrd="${vm_initrd}" \
+		--extra-args="auto=true priority=critical preseed/file=/$(basename ${PRESEED_FILE}) ${ui_diplay_style}" \
+		--wait=-1 --noautoconsole \
+		>>"${_LOGFILE}" 2>&1 </dev/null &
 	virt_pid=$!
 	disown "${virt_pid}"
 
 	kvm::wait_for_domain_definition "${vm_name}" 60 20 || true
-	# virsh set-lifecycle-action "${vm_name}" reboot restart --config --live || true
-	# virsh set-lifecycle-action "${vm_name}" poweroff restart --config --live || true  # Debian installer now powers off after build; restart instead
 
 	if ! kvm::wait_for_domain_start --domain "${vm_name}"; then
 		write_warning "Domain '${vm_name}' did not emit a start event within the expected window."

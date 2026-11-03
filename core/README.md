@@ -133,3 +133,10 @@ the SPICE user service to `graphical-session.target`, including Debian's static
 unit without an `[Install]` section. The legacy desktop launcher stays disabled
 so only one session agent runs. A running daemon alone is insufficient for
 clipboard and display integration; the graphical session needs its user agent.
+
+Debian's `virt-install` watcher runs under `nohup` with detached stdin and an
+explicit unlimited install wait, so closing the build launcher does not interrupt
+the one-time restart from installer to installed disk. Final OEM shutdown remains
+a power-off. Unattended update checks (`RTD_NONINTERACTIVE=1` or
+`DEBIAN_FRONTEND=noninteractive`) log and defer required reboots to the calling
+workflow; interactive update commands retain their reboot confirmation.

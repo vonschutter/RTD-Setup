@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 import os
+import pty
+import signal
+import time
 import subprocess
 import tempfile
 import unittest
@@ -16,6 +19,88 @@ CORE = Path(__file__).resolve().parents[1]
 
 
 class VdiLifecycleTests(unittest.TestCase):
+    def test_unattended_reboot_check_never_prompts_even_with_terminal(self):
+        for policy, mode in (
+            ({'RTD_NONINTERACTIVE': '1'}, ''),
+            ({'DEBIAN_FRONTEND': 'noninteractive'}, ''),
+            ({'RTD_NONINTERACTIVE': '1'}, '--dialog'),
+            ({'DEBIAN_FRONTEND': 'noninteractive'}, '--dialog'),
+            ({}, '--dialog'),
+        ):
+            with self.subTest(policy=policy, mode=mode), tempfile.TemporaryDirectory() as directory:
+                required = Path(directory) / 'reboot-required'
+                required.touch()
+                function = library_function('software::offer_reboot_if_required').replace(
+                    '/var/run/reboot-required', str(required)
+                )
+                script = """
+write_information() { echo "$*"; }
+write_warning() { :; }
+write_status() { :; }
+dialog::prompt_yes_no() { echo PROMPT; return 1; }
+reboot() { echo UNEXPECTED-REBOOT; return 1; }
+""" + function + '\nsoftware::offer_reboot_if_required ' + mode
+                primary, terminal = pty.openpty()
+                try:
+                    result = subprocess.run(
+                        ['bash', '-c', script], stdin=terminal, capture_output=True,
+                        text=True, timeout=3,
+                        env={**os.environ, 'RTD_NONINTERACTIVE': '0',
+                             'DEBIAN_FRONTEND': '', **policy},
+                    )
+                finally:
+                    os.close(primary)
+                    os.close(terminal)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertNotIn('UNEXPECTED-REBOOT', result.stdout)
+                self.assertEqual('PROMPT' in result.stdout, not bool(policy))
+                if policy:
+                    self.assertIn('deferred to the automated workflow', result.stdout)
+
+    def test_debian_install_watcher_survives_launcher_hangup(self):
+        builder = library_function('kvm::make_vm_now_from_debian_org')
+        launch = builder[builder.index('\tnohup '):builder.index(
+            '\n\tkvm::wait_for_domain_definition'
+        )]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            worker = root / 'virt-install'
+            # Model virt-install's two phases: installer followed by disk boot.
+            worker.write_text(
+                '#!/bin/bash\nprintf "%s\\n" "$@" > "$RECORD.args"\n'
+                'echo installer > "$RECORD"\nsleep .3\necho disk-boot >> "$RECORD"\n'
+            )
+            worker.chmod(0o755)
+            record = root / 'events'
+            process = subprocess.Popen(
+                ['bash', '-c', launch + '\nsleep 5'],
+                env={**os.environ, 'bin_virt_install': str(worker),
+                     '_LOGFILE': str(root / 'log'), 'RECORD': str(record)},
+                start_new_session=True, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            try:
+                for _ in range(100):
+                    if record.exists():
+                        break
+                    time.sleep(.01)
+                self.assertTrue(record.exists())
+                os.killpg(process.pid, signal.SIGHUP)
+                process.wait(timeout=2)
+                for _ in range(100):
+                    if 'disk-boot' in record.read_text():
+                        break
+                    time.sleep(.01)
+                self.assertEqual(record.read_text().splitlines(), ['installer', 'disk-boot'])
+                args = (root / 'events.args').read_text().splitlines()
+                self.assertIn('--wait=-1', args)
+                self.assertIn('qemu:///system', args)
+                self.assertNotIn('--noreboot', args)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait()
+
     def test_shutdown_requires_successful_bundles_and_reseal(self):
         name = 'rtd_template_finalize::run_finalization_tasks'
         function = name + '() {' + (CORE / 'rtd-vm-template-finalize-linux.sh').read_text().split(
