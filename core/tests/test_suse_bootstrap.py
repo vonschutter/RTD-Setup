@@ -38,7 +38,7 @@ class SuseBootstrapTests(unittest.TestCase):
             self.assertEqual(subprocess.run(['bash', '-n'], input=code, text=True).returncode, 0)
             packages = [item.text for item in doc.findall('y:software/y:packages/y:package', ns)]
             self.assertIn('openssh-server', packages)
-            self.assertIn('yad', packages)
+            self.assertNotIn('yad', packages)
             self.assertIn('sudo', packages)
             self.assertIn('gzip', packages)
             self.assertIn('yast2-firstboot', packages)

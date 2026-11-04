@@ -201,3 +201,9 @@ package or service fails preparation instead of producing a ready template.
 Native behavior references: [AutoYaST script stages](https://doc.opensuse.org/documentation/leap/autoyast/html/book-autoyast/cha-configuration-installation-options.html),
 [GDM initial-setup selection](https://github.com/GNOME/gdm/blob/main/daemon/gdm-display.c),
 and [Kickstart user UID options](https://pykickstart.readthedocs.io/en/latest/commands.html).
+
+Verify package availability for the target distribution, release, and configured
+installation repositories before adding packages to generated installer profiles.
+AutoYaST's base package list excludes `yad`: it is available through Packman
+Extra, which is configured later. GUI helpers may resolve it through the shared
+dependency checker after those repositories are enabled and refreshed.
