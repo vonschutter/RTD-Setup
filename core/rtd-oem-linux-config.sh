@@ -289,6 +289,7 @@ oem_first_login_bundle_manager() {
 	local deployed_user="${SUDO_USER:-}"
 	local recovery_user=""
 	if [[ -n "${deployed_user}" && "$(id -u "${deployed_user}" 2>/dev/null || true)" == "1000" ]]; then
+		system::rtd_oem_reseal::_complete_gdm_first_user || return 1
 		recovery_user="$(getent passwd 29998 2>/dev/null | cut -d: -f1)"
 		if [[ -n "${recovery_user}" && "${recovery_user}" != "${deployed_user}" ]]; then
 			write_information "🧹 Removing completed-build recovery account ${recovery_user}..."

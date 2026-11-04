@@ -165,3 +165,39 @@ UID/GID before executing the system Bubblewrap. Sandboxing remains enabled. A
 private Python startup hook restores the adapter path after PAM rebuilds PATH;
 other Python programs retain their normal path. The OEM service also uses a
 system-managed cache outside the temporary user's restricted home directory.
+
+SUSE AutoYaST profiles stage RTD through a chroot script with `chrooted=true`
+before the installer reboot. Init scripts depend on the installed AutoYaST
+runner and can remain queued when that runner is absent. The profile explicitly
+installs the SSH server, sudo, and the GUI prerequisites, and records bootstrap
+output in `/var/log/rtd/rtd-install-bootstrap.log`. The installer owns the first
+reboot; the bootstrap script does not issue another reboot itself.
+
+Fedora and SUSE installer watchers use the same detached `nohup`/unlimited-wait
+handoff as Debian. Closing the build launcher therefore preserves the one-time
+restart from installer to installed disk. Successful final OEM reseal still
+powers off the template. Fedora compression dependencies resolve the `7z`
+command instead of requiring obsolete `p7zip` package names.
+
+Fedora GNOME uses GDM's native GNOME Initial Setup session. Workstation Kickstart
+reserves UID 29998 for the build/recovery account, leaving UID 1000 for the
+end user. Reseal hides the recovery account and creates or updates Fedora's
+`/etc/gdm/custom.conf`, including when temporary autologin cleanup removed that
+file. Other Fedora desktops require the native `initial-setup` packages and a
+working initial-setup service; unavailable tools fail reseal instead of reporting
+readiness. The existing SSH recovery account is retained until first-user login.
+
+Fedora GNOME delivery boot uses GDM's native `gnome.initial-setup=1` kernel
+option. RTD removes it from all kernel entries through grubby only after the
+new UID 1000 user's first login; a marker preserves recovery if cleanup fails.
+This is separate from the installer reboot and final reseal power-off.
+
+SUSE profiles install GNU gzip and YaST Firstboot together, avoiding the
+BusyBox gzip conflict observed on Tumbleweed. Reseal requires the package and
+native `YaST2-Firstboot.service`, then creates
+`/var/lib/YaST2/reconfig_system` to activate the delivery wizard. A missing
+package or service fails preparation instead of producing a ready template.
+
+Native behavior references: [AutoYaST script stages](https://doc.opensuse.org/documentation/leap/autoyast/html/book-autoyast/cha-configuration-installation-options.html),
+[GDM initial-setup selection](https://github.com/GNOME/gdm/blob/main/daemon/gdm-display.c),
+and [Kickstart user UID options](https://pykickstart.readthedocs.io/en/latest/commands.html).

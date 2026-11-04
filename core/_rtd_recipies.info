@@ -677,7 +677,8 @@ recipe:_ADM:_Compression_Tools () {
 	
 	if hash dnf &>/dev/null ; then
 		write_information "Fedora based software management found, assuming fedora based distribution..."
-		software::check_native_package_dependency p7zip p7zip-plugins || status=1
+		# Current Fedora provides 7zip; older releases used p7zip.
+		# The shared command dependency resolves the appropriate provider.
 		software::add_native_package zip
 	elif hash zypper &>/dev/null ; then
 		write_information "OpenSUSE based software management found, assuming OpenSUSE based distribution..."

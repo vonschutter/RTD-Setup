@@ -11753,7 +11753,7 @@ EOF
 
 system::rtd_oem_reseal::_prepare_gdm_first_user() {
 	# Description:
-	#   Prepares GDM native graphical first-user setup for Ubuntu or Debian.
+	#   Prepares GDM native graphical first-user setup for Ubuntu, Debian or Fedora.
 	# Globals:
 	#   None
 	# Arguments:
@@ -11831,15 +11831,22 @@ system::rtd_oem_reseal::_prepare_gdm_first_user() {
 	# Explicitly enable the native GDM initial-setup integration. Autologin has
 	# already been scrubbed by the finalizer, but enforce that invariant here so
 	# this function is also safe when called directly.
-	if [[ -f /etc/gdm3/custom.conf ]]; then
+	if [[ -d /etc/gdm && ! -x /usr/sbin/gdm3 ]]; then
+		# Disabling temporary autologin may have removed custom.conf.
+		# Recreate Fedora's native file rather than an unused gdm3 path.
+		_gdm_config=/etc/gdm/custom.conf
+	elif [[ -f /etc/gdm3/custom.conf ]]; then
 		_gdm_config=/etc/gdm3/custom.conf
 	elif [[ -f /etc/gdm3/daemon.conf ]]; then
 		_gdm_config=/etc/gdm3/daemon.conf
+	elif [[ -f /etc/gdm/custom.conf ]]; then
+		_gdm_config=/etc/gdm/custom.conf
 	else
 		mkdir -p /etc/gdm3
 		_gdm_config=/etc/gdm3/custom.conf
 		printf '[daemon]\n' >"${_gdm_config}"
 	fi
+	[[ -f "${_gdm_config}" ]] || printf '[daemon]\n' >"${_gdm_config}" || return 1
 	sed -i \
 		-e '/^[[:space:]]*InitialSetupEnable[[:space:]]*=/d' \
 		-e 's/^[[:space:]]*AutomaticLoginEnable[[:space:]]*=.*/AutomaticLoginEnable=False/' \
@@ -11944,12 +11951,31 @@ system::rtd_oem_reseal::_prepare_fedora() {
 
 	local _virt="${1}"
 	write_status "🤞 Preparing Fedora/RedHat-based system for reseal"
-	software::add_native_package initial-setup initial-setup-gui || true
+	if [[ -x /usr/sbin/gdm ]]; then
+		system::rtd_oem_reseal::_prepare_gdm_first_user "${_virt}" || return 1
+		# Fedora's native GDM delivery-boot switch. Remove it only after the
+		# deployed UID 1000 user logs in through the existing first-login hook.
+		command -v grubby >/dev/null 2>&1 || return 1
+		grubby --update-kernel=ALL --args=gnome.initial-setup=1 >>"${_LOGFILE}" 2>&1 || return 1
+		mkdir -p /var/lib/rtd || return 1
+		touch /var/lib/rtd/gnome-initial-setup-boot-arg || return 1
+		return 0
+	fi
+	software::check_native_package_dependency initial-setup initial-setup-gui || return 1
 	systemctl enable initial-setup-graphical.service >>"${_LOGFILE}" 2>&1 || \
-		systemctl enable initial-setup-text.service >>"${_LOGFILE}" 2>&1 || true
+		systemctl enable initial-setup-text.service >>"${_LOGFILE}" 2>&1 || return 1
 	if [[ "${_virt}" == "virtual" ]]; then
 		system::rtd_oem_reseal::_install_guest_additions
 	fi
+}
+
+system::rtd_oem_reseal::_complete_gdm_first_user() {
+	local marker=/var/lib/rtd/gnome-initial-setup-boot-arg
+	[[ -e "$marker" ]] || return 0
+	[[ -n "${SUDO_USER:-}" && "$(id -u "$SUDO_USER")" == 1000 ]] || return 1
+	command -v grubby >/dev/null 2>&1 || return 1
+	grubby --update-kernel=ALL --remove-args=gnome.initial-setup >>"${_LOGFILE}" 2>&1 || return 1
+	rm -f "$marker"
 }
 
 system::rtd_oem_reseal::_prepare_suse() {
@@ -11969,8 +11995,19 @@ system::rtd_oem_reseal::_prepare_suse() {
 
 	local _virt="${1}"
 	write_status "👽 Preparing SUSE-based system for reseal"
-	software::add_native_package yast2-firstboot || true
-	systemctl enable yast2-firstboot.service >>"${_LOGFILE}" 2>&1 || true
+	software::check_native_package_dependency yast2-firstboot || return 1
+	local firstboot_unit
+	if systemctl cat YaST2-Firstboot.service >/dev/null 2>&1; then
+		firstboot_unit=YaST2-Firstboot.service
+	elif systemctl cat yast2-firstboot.service >/dev/null 2>&1; then
+		firstboot_unit=yast2-firstboot.service
+	else
+		write_error "YaST Firstboot service is unavailable; refusing to mark reseal ready."
+		return 1
+	fi
+	mkdir -p /var/lib/YaST2 || return 1
+	touch /var/lib/YaST2/reconfig_system || return 1
+	systemctl enable "$firstboot_unit" >>"${_LOGFILE}" 2>&1 || return 1
 	if [[ "${_virt}" == "virtual" ]]; then
 		system::rtd_oem_reseal::_install_guest_additions
 	fi
@@ -29305,8 +29342,8 @@ kvm::make_vm_now_from_fedora_org() {
 	write_information "Creating VM: ${vm_name}..."
 	local fedora_extra_args
 	fedora_extra_args="inst.ks=file:/$(basename "${_preseed_file}") inst.text inst.repo=${_source_url} ip=dhcp rd.neednet=1"
-	{
-		"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
+	# Keep the installer watcher alive after the launching terminal closes.
+	nohup "${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
 			--vcpus "${_cpu}" \
 			--memory "${_mem}" \
 			--network "${virt_net:=default}" \
@@ -29318,9 +29355,9 @@ kvm::make_vm_now_from_fedora_org() {
 			--graphics spice,listen=127.0.0.1 \
 			--controller type=virtio-serial \
 			--extra-args "${fedora_extra_args}" \
-			--wait --noautoconsole \
-			|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-	} >>"${_LOGFILE}" 2>&1 & disown
+			--wait=-1 --noautoconsole \
+			>>"${_LOGFILE}" 2>&1 </dev/null &
+	disown "$!"
 
 	kvm::wait_for_domain_definition "${vm_name}" 60 1 || true
 
@@ -29541,13 +29578,13 @@ kvm::make_vm_now_from_opensuse_org() {
 	: ${CONFIG:="VDI"}
 	: ${_autoyast_filename:="$(mktemp -d)/autoyast.xml"}
 	# Check that virtualization is supported on the host
-	dependency::virtualization
+	dependency::virtualization || return 1
 
 	# Set default values for VM T-Shirts sizes, overriding defaults if so instructed...
 	kvm::util::read_common_options ${*}
 
 	# Generate the AutoYaST file based on parameters provided...
-	system::generate_autoyast_file ${*}
+	system::generate_autoyast_file "${@}" || return 1
 
 	# Lookup specific binaries: use full path since they may just have been added and not in $PATH yet.
 	: "${BIN_VIRT_INSTALL:=$(type -p virt-install)}"
@@ -29603,8 +29640,8 @@ kvm::make_vm_now_from_opensuse_org() {
 	      After the build is complete you may reseal the VM and use it as a template for future VMs. \n"
 
 	write_status "Creating virtual machine (${vm_name})"
-	{
-		"${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
+	# Keep the installer watcher alive after the launching terminal closes.
+	nohup "${BIN_VIRT_INSTALL}" --connect qemu:///system --name "${vm_name}" \
 			--vcpus "${_cpu}" \
 			--memory "${_mem}" \
 			--network "${virt_net}" \
@@ -29613,9 +29650,9 @@ kvm::make_vm_now_from_opensuse_org() {
 			--initrd-inject="${_autoyast_filename}" \
 			--location="${source_url}" \
 			--extra-args "AutoYaST=file:///$(basename ${_autoyast_filename})" \
-			--wait --noautoconsole \
-			|| (read -p "💥 - An ERROR has occurred. Please press [ENTER] to continue..." && return 1)
-	} >>"${_LOGFILE}" 2>&1 & disown
+			--wait=-1 --noautoconsole \
+			>>"${_LOGFILE}" 2>&1 </dev/null &
+	disown "$!"
 
 	kvm::wait_for_domain_definition "${vm_name}" 60 1 || true
 
@@ -33320,7 +33357,7 @@ template::kickstart_cfg() {
 			timezone ${Preference_InitialTimeZone:-"Etc/UTC"} --utc
 			network --onboot=yes --bootproto=dhcp
 			rootpw ${_kickstart_password_flag} ${_kickstart_password_value}
-			user --groups=wheel --name=tangarora --password=${_kickstart_password_value} ${_kickstart_password_flag}
+			user --groups=wheel --uid=29998 --name=tangarora --password=${_kickstart_password_value} ${_kickstart_password_flag}
 			zerombr
 			clearpart --all
 			autopart --nohome ${Preference_DiskEncryption_RH}
@@ -33347,7 +33384,7 @@ template::kickstart_cfg() {
 				git clone --depth 1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}
 				chmod 755 ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
 				bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
-				# systemctl enable sshd
+				systemctl enable sshd
 				# restorecon -Rv /usr/share/wayland-sessions /usr/share/xsessions
 				${_kickstart_display_manager_enable}
 				systemctl set-default graphical.target
@@ -34259,6 +34296,11 @@ template::AutoYast_xml() {
 			<package>vim</package>
 			<package>spice-vdagent</package>
 			<package>git</package>
+			<package>openssh-server</package>
+			<package>sudo</package>
+			<package>gzip</package>
+			<package>yast2-firstboot</package>
+			<package>yad</package>
 			<package>ansible</package>
 			<package>pkexec</package>
 			<package>zip</package>
@@ -34323,24 +34365,33 @@ template::AutoYast_xml() {
 		</services-manager>
 
 		<scripts>
-			<init-scripts config:type="list">
+			<chroot-scripts config:type="list">
 			<script>
+			<filename>rtd-bootstrap.sh</filename>
+			<interpreter>shell</interpreter>
+			<chrooted config:type="boolean">true</chrooted>
 			<source><![CDATA[
 		#!/bin/bash
-		git clone ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"}
+		set -e
+		export RTD_NONINTERACTIVE=1 DEBIAN_FRONTEND=noninteractive GIT_TERMINAL_PROMPT=0
+		mkdir -p /var/log/rtd
+		exec >>/var/log/rtd/rtd-install-bootstrap.log 2>&1
+		for attempt in 1 2 3 4 5; do
+			git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} && break
+			sleep 10
+		done
+		test -f ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
 		chmod 755 ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
-		${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
-		cp *.xml ${_OEM_DIR:-"/opt/rtd"}/
+		bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
+		systemctl enable sshd
+		if command -v firewall-offline-cmd >/dev/null 2>&1; then
+			firewall-offline-cmd --add-service=ssh
+		fi
 		$(printf "%s" "$repo_lines")
-		zypper --gpg-auto-import-keys refresh
-		# zypper dup --from packman -y --force-resolution
-		zypper in -y ansible
-		zypper in -y yad
-		reboot
 		]]>
 			</source>
 			</script>
-			</init-scripts>
+			</chroot-scripts>
 		</scripts>
 
 		<security>

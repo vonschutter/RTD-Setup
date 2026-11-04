@@ -59,8 +59,8 @@ reboot() { echo UNEXPECTED-REBOOT; return 1; }
                 if policy:
                     self.assertIn('deferred to the automated workflow', result.stdout)
 
-    def test_debian_install_watcher_survives_launcher_hangup(self):
-        builder = library_function('kvm::make_vm_now_from_debian_org')
+    def check_install_watcher_survives_launcher_hangup(self, function):
+        builder = library_function(function)
         launch = builder[builder.index('\tnohup '):builder.index(
             '\n\tkvm::wait_for_domain_definition'
         )]
@@ -76,7 +76,8 @@ reboot() { echo UNEXPECTED-REBOOT; return 1; }
             record = root / 'events'
             process = subprocess.Popen(
                 ['bash', '-c', launch + '\nsleep 5'],
-                env={**os.environ, 'bin_virt_install': str(worker),
+                env={**os.environ, 'bin_virt_install': str(worker), 'BIN_VIRT_INSTALL': str(worker),
+                     '_autoyast_filename': str(root / 'autoyast.xml'),
                      '_LOGFILE': str(root / 'log'), 'RECORD': str(record)},
                 start_new_session=True, stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
@@ -102,6 +103,15 @@ reboot() { echo UNEXPECTED-REBOOT; return 1; }
                 if process.poll() is None:
                     process.kill()
                     process.wait()
+
+    def test_debian_install_watcher_survives_launcher_hangup(self):
+        self.check_install_watcher_survives_launcher_hangup('kvm::make_vm_now_from_debian_org')
+
+    def test_fedora_install_watcher_survives_launcher_hangup(self):
+        self.check_install_watcher_survives_launcher_hangup('kvm::make_vm_now_from_fedora_org')
+
+    def test_suse_install_watcher_survives_launcher_hangup(self):
+        self.check_install_watcher_survives_launcher_hangup('kvm::make_vm_now_from_opensuse_org')
 
     def test_shutdown_requires_successful_bundles_and_reseal(self):
         name = 'rtd_template_finalize::run_finalization_tasks'

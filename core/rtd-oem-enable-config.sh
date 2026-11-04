@@ -96,6 +96,9 @@ EOF
 	# --- OEM Auto-Configuration Tasks (Relying on Library Functions) ---
 
 	write_status "🚀 Preparing system for automated OEM post-build tasks..."
+	# The desktop login launcher uses sudo even when registration runs as root.
+	# Minimal desktop images must satisfy this before we advertise stage-two setup.
+	dependency::command_exists --silent sudo visudo || exit 1
 
 	# Server-media desktop builds otherwise retain networkd, leaving the desktop
 	# network applet offline. Stage the renderer for next boot; keep installer SSH up.

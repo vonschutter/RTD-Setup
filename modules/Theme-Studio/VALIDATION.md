@@ -96,3 +96,19 @@ a 768 MiB peak budget with the Cairo renderer. Run with:
 
 The gallery test skips without a graphical display; both tests require the
 GTK4/Libadwaita Python bindings.
+
+
+## Fedora dependency validation (2026-11-04)
+
+Fedora 45 repository metadata identifies glib2-devel as the provider of
+/usr/bin/glib-compile-resources. Added that package to the launcher dependencies.
+The User Themes capability check now accepts the distribution's global schema
+layout, while still detecting an unreadable extension or an uncompiled local
+schema directory. The shared repair helper continues removing empty local schema
+directories and compiling extensions which ship local XML.
+
+Four launcher regression tests and the two existing native GTK preview tests
+pass. On the Fedora VM, the logged-in user's missing-capabilities check is empty,
+Gio resolves the User Themes schema globally, and the normal launcher opens the
+real gallery. Its systemd service used about 267 MiB during the check. No theme
+was applied or built during this validation.

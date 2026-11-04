@@ -45,7 +45,7 @@ theme_studio::packages() {
 			;;
 		fedora|redhat)
 			printf '%s\n' python3 python3-gobject gtk4 libadwaita bubblewrap sassc \
-				glib2 libxml2 gtk-murrine-engine gnome-themes-extra gnome-shell-extension-user-theme
+				glib2 glib2-devel libxml2 gtk-murrine-engine gnome-themes-extra gnome-shell-extension-user-theme
 			;;
 		suse)
 			printf '%s\n' python3 python3-gobject-Gdk typelib-1_0-Gtk-4_0 \
@@ -57,16 +57,18 @@ theme_studio::packages() {
 }
 
 theme_studio::user_theme_schema_needs_repair() {
-	local extension schema_dir global_schema
+	local extension schema_dir
 	for extension in \
 		"/usr/share/gnome-shell/extensions/user-theme@gnome-shell-extensions.gcampax.github.com" \
 		"/usr/local/share/gnome-shell/extensions/user-theme@gnome-shell-extensions.gcampax.github.com"; do
 		[[ -d "$extension" ]] || continue
-		[[ -r "$extension/metadata.json" ]] || return 0
+		[[ -x "$extension" && -r "$extension/metadata.json" ]] || return 0
 		schema_dir="$extension/schemas"
-		global_schema="/usr/share/glib-2.0/schemas/org.gnome.shell.extensions.user-theme.gschema.xml"
-		if [[ -f "$global_schema" || -n "$(compgen -G "$schema_dir/*.gschema.xml" 2>/dev/null)" ]]; then
-			[[ -r "$schema_dir/gschemas.compiled" ]] || return 0
+		# GNOME uses the global schema source when this directory is absent.
+		# Fedora deliberately packages User Themes that way. If a local source
+		# exists it must be traversable and compiled (an empty one needs removal).
+		if [[ -d "$schema_dir" ]]; then
+			[[ -x "$schema_dir" && -r "$schema_dir/gschemas.compiled" ]] || return 0
 		fi
 	done
 	return 1
