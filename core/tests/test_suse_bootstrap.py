@@ -43,6 +43,7 @@ class SuseBootstrapTests(unittest.TestCase):
             self.assertIn('sudo', packages)
             self.assertIn('gzip', packages)
             self.assertIn('yast2-firstboot', packages)
+            self.assertIn('xorg-x11-server', packages)
 
     def test_offline_staging_then_clone_failure_retry_and_registration(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -113,11 +114,17 @@ REGISTER
                 config.write_text(f'FIRSTBOOT_CONTROL_FILE="{control}"\n')
                 function = library_function('system::rtd_oem_reseal::_prepare_suse').replace(
                     '/var/lib/YaST2', str(marker.parent)
-                ).replace('/etc/sysconfig/firstboot', str(config))
+                ).replace('/etc/sysconfig/firstboot', str(config)).replace(
+                    '/etc/sddm.conf.d', str(Path(directory) / 'sddm.conf.d')).replace(
+                    '/etc/systemd/system', str(Path(directory) / 'systemd'))
                 result = subprocess.run(['bash', '-c', """
 write_status() { :; }
 write_error() { echo "$*" >&2; }
-software::check_native_package_dependency() { return "$PACKAGE_RESULT"; }
+command() { [[ "$*" == '-v kwin_wayland' || "$*" == '-v sddm' ]]; }
+software::check_native_package_dependency() {
+    [[ "$*" == 'yast2-firstboot xorg-x11-server' ]] || return 91
+    return "$PACKAGE_RESULT"
+}
 systemctl() {
     if [[ "$1" == cat ]]; then [[ "$2" == "$UNIT" ]];
     else echo "$*"; fi
@@ -131,6 +138,14 @@ systemctl() {
                 self.assertEqual(marker.exists(), success)
                 if success:
                     self.assertIn('enable YaST2-Firstboot.service', (Path(directory) / 'log').read_text())
+                    wayland = (Path(directory) / 'sddm.conf.d/90-rtd-wayland.conf').read_text()
+                    self.assertIn('DisplayServer=wayland', wayland)
+                    self.assertIn('CompositorCommand=kwin_wayland', wayland)
+                    self.assertNotIn('[Autologin]', wayland)
+                    for manager in ('display-manager.service', 'display-manager-legacy.service'):
+                        dropin = (Path(directory) / f'systemd/{manager}.d/90-rtd-wayland.conf').read_text()
+                        self.assertIn('Conflicts=getty@tty1.service', dropin)
+                        self.assertIn('After=getty@tty1.service', dropin)
 
 
 if __name__ == '__main__':

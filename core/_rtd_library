@@ -12012,7 +12012,9 @@ system::rtd_oem_reseal::_prepare_suse() {
 
 	local _virt="${1}"
 	write_status "👽 Preparing SUSE-based system for reseal"
-	software::check_native_package_dependency yast2-firstboot || return 1
+	# YaST's native graphical firstboot needs its own Xorg server even when
+	# Plasma and the login greeter run on Wayland.
+	software::check_native_package_dependency yast2-firstboot xorg-x11-server || return 1
 	local firstboot_unit
 	if systemctl cat YaST2-Firstboot.service >/dev/null 2>&1; then
 		firstboot_unit=YaST2-Firstboot.service
@@ -12053,6 +12055,29 @@ RTD_SUSE_FIRSTBOOT_CHECK
 	then
 		write_error "YaST firstboot must include user creation; refusing to mark reseal ready."
 		return 1
+	fi
+	if command -v kwin_wayland >/dev/null 2>&1 && command -v sddm >/dev/null 2>&1; then
+		# Keep this independent of temporary OEM autologin files, which reseal
+		# removes. Without DisplayServer, SDDM defaults to an X11 greeter.
+		mkdir -p /etc/sddm.conf.d || return 1
+		cat >/etc/sddm.conf.d/90-rtd-wayland.conf <<'RTD_SUSE_WAYLAND'
+[General]
+DisplayServer=wayland
+
+[Wayland]
+CompositorCommand=kwin_wayland --no-global-shortcuts --no-lockscreen --locale1
+RTD_SUSE_WAYLAND
+		# SUSE's legacy DM wrapper lacks SDDM's native tty1 exclusion. The
+		# Wayland greeter needs that VT after YaST releases the console.
+		local manager
+		for manager in display-manager.service display-manager-legacy.service; do
+			mkdir -p "/etc/systemd/system/$manager.d" || return 1
+			cat >"/etc/systemd/system/$manager.d/90-rtd-wayland.conf" <<'RTD_SUSE_WAYLAND_VT'
+[Unit]
+Conflicts=getty@tty1.service
+After=getty@tty1.service
+RTD_SUSE_WAYLAND_VT
+		done
 	fi
 	mkdir -p /var/lib/YaST2 || return 1
 	touch /var/lib/YaST2/reconfig_system || return 1
@@ -34435,6 +34460,7 @@ template::AutoYast_xml() {
 			<package>sudo</package>
 			<package>gzip</package>
 			<package>yast2-firstboot</package>
+			<package>xorg-x11-server</package>
 			<package>ansible</package>
 			<package>pkexec</package>
 			<package>zip</package>
