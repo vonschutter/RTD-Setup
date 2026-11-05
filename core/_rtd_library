@@ -34174,6 +34174,97 @@ EOF
 	esac
 }
 
+template::suse_bootstrap_stage() {
+	# AutoYaST's target chroot can lack DNS. Only stage files there; download
+	# and register RTD after boot, before allowing the build user's desktop.
+	cat <<'RTD_STAGE_HEAD'
+#!/bin/bash
+set -euo pipefail
+install -d -m 755 /usr/local/sbin /var/log/rtd /var/lib/rtd
+exec >>/var/log/rtd/rtd-install-bootstrap.log 2>&1
+cat >/etc/rtd-bootstrap.conf <<'RTD_BOOTSTRAP_CONFIG'
+RTD_STAGE_HEAD
+	printf 'RTD_BOOTSTRAP_GIT_URL=%q\n' "${GIT_RTD_SRC_URL}"
+	printf 'RTD_BOOTSTRAP_DIR=%q\n' "${_OEM_DIR:-/opt/rtd}"
+	printf 'RTD_BOOTSTRAP_NON_OSS=%q\n' "${1:-}"
+	printf 'RTD_BOOTSTRAP_PACKMAN=%q\n' "${2:-}"
+	cat <<'RTD_STAGE_BODY'
+RTD_BOOTSTRAP_CONFIG
+chmod 600 /etc/rtd-bootstrap.conf
+cat >/usr/local/sbin/rtd-firstboot-bootstrap <<'RTD_BOOTSTRAP_SCRIPT'
+#!/bin/bash
+set -euo pipefail
+source /etc/rtd-bootstrap.conf
+export RTD_NONINTERACTIVE=1 DEBIAN_FRONTEND=noninteractive GIT_TERMINAL_PROMPT=0
+export TERM="${TERM:-dumb}"
+exec >>/var/log/rtd/rtd-install-bootstrap.log 2>&1
+echo "$(date -Is): Starting installed-system RTD bootstrap"
+stage=''
+trap 'if [[ -n "$stage" ]]; then rm -rf -- "$stage"; fi' EXIT
+if [[ ! -f "$RTD_BOOTSTRAP_DIR/core/rtd-oem-enable-config.sh" ]]; then
+    if [[ -e "$RTD_BOOTSTRAP_DIR" ]]; then
+        echo "ERROR: Refusing to overwrite incomplete RTD directory: $RTD_BOOTSTRAP_DIR" >&2
+        exit 1
+    fi
+    mkdir -p -- "$(dirname "$RTD_BOOTSTRAP_DIR")"
+    stage=$(mktemp -d "$(dirname "$RTD_BOOTSTRAP_DIR")/.rtd-bootstrap.XXXXXX")
+    for attempt in 1 2 3 4 5; do
+        echo "RTD clone attempt $attempt"
+        if timeout 180 git clone --depth=1 "$RTD_BOOTSTRAP_GIT_URL" "$stage/checkout"; then
+            break
+        fi
+        rm -rf -- "$stage/checkout"
+        sleep 10
+    done
+    test -f "$stage/checkout/core/rtd-oem-enable-config.sh"
+    mv -- "$stage/checkout" "$RTD_BOOTSTRAP_DIR"
+fi
+# Optional repositories are configured only once installed-system DNS is active.
+if [[ -n "$RTD_BOOTSTRAP_NON_OSS" && ! -f /etc/zypp/repos.d/non-oss.repo ]]; then
+    zypper --non-interactive ar -cfp 85 "$RTD_BOOTSTRAP_NON_OSS" non-oss || echo 'WARNING: Could not add non-oss repository'
+fi
+if [[ -n "$RTD_BOOTSTRAP_PACKMAN" && ! -f /etc/zypp/repos.d/packman.repo ]]; then
+    zypper --non-interactive ar -cfp 90 "$RTD_BOOTSTRAP_PACKMAN" packman || echo 'WARNING: Could not add Packman repository'
+fi
+bash "$RTD_BOOTSTRAP_DIR/core/rtd-oem-enable-config.sh"
+test -f /var/lib/rtd/template-autofinalize
+touch /var/lib/rtd/bootstrap-complete
+echo "$(date -Is): RTD bootstrap completed; starting the desktop configuration stage"
+RTD_BOOTSTRAP_SCRIPT
+chmod 755 /usr/local/sbin/rtd-firstboot-bootstrap
+cat >/etc/systemd/system/rtd-firstboot-bootstrap.service <<'RTD_BOOTSTRAP_UNIT'
+[Unit]
+Description=Download RTD and register the VDI configuration stage
+Wants=network-online.target
+After=network-online.target nss-lookup.target
+Before=display-manager.service display-manager-legacy.service
+ConditionPathExists=!/var/lib/rtd/bootstrap-complete
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/rtd-firstboot-bootstrap
+RemainAfterExit=yes
+TimeoutStartSec=20min
+
+[Install]
+WantedBy=multi-user.target
+RTD_BOOTSTRAP_UNIT
+for unit in display-manager.service display-manager-legacy.service; do
+    mkdir -p "/etc/systemd/system/$unit.d"
+    cat >"/etc/systemd/system/$unit.d/rtd-bootstrap.conf" <<'RTD_BOOTSTRAP_DEPENDENCY'
+[Unit]
+Requires=rtd-firstboot-bootstrap.service
+After=rtd-firstboot-bootstrap.service
+RTD_BOOTSTRAP_DEPENDENCY
+done
+systemctl enable rtd-firstboot-bootstrap.service sshd
+if command -v firewall-offline-cmd >/dev/null 2>&1; then
+    firewall-offline-cmd --add-service=ssh
+fi
+echo 'RTD bootstrap staged for the first installed-system boot'
+RTD_STAGE_BODY
+}
+
 template::AutoYast_xml() {
 	# Description:
 	#   Generates an AutoYaST XML file for automated SUSE Linux installation.
@@ -34239,13 +34330,8 @@ template::AutoYast_xml() {
 			;;
 	esac
 
-	local repo_lines=""
-	if [[ -n ${non_oss_repo} ]]; then
-		repo_lines+=$'\t\tsudo zypper ar -cfp 85 '"${non_oss_repo}"$' non-oss\n'
-	fi
-	if [[ -n ${packman_repo} ]]; then
-		repo_lines+=$'\t\tsudo zypper ar -cfp 90 '"${packman_repo}"$' packman\n'
-	fi
+	local bootstrap_source
+	bootstrap_source=$(template::suse_bootstrap_stage "$non_oss_repo" "$packman_repo") || return 1
 
 	cat >>${_autoyast_filename} <<-AUTOYAST_EOF
 		<?xml version="1.0"?>
@@ -34370,23 +34456,7 @@ template::AutoYast_xml() {
 			<interpreter>shell</interpreter>
 			<chrooted config:type="boolean">true</chrooted>
 			<source><![CDATA[
-		#!/bin/bash
-		set -e
-		export RTD_NONINTERACTIVE=1 DEBIAN_FRONTEND=noninteractive GIT_TERMINAL_PROMPT=0
-		mkdir -p /var/log/rtd
-		exec >>/var/log/rtd/rtd-install-bootstrap.log 2>&1
-		for attempt in 1 2 3 4 5; do
-			git clone --depth=1 ${GIT_RTD_SRC_URL} ${_OEM_DIR:-"/opt/rtd"} && break
-			sleep 10
-		done
-		test -f ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
-		chmod 755 ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
-		bash ${_OEM_DIR:-"/opt/rtd"}/core/rtd-oem-enable-config.sh
-		systemctl enable sshd
-		if command -v firewall-offline-cmd >/dev/null 2>&1; then
-			firewall-offline-cmd --add-service=ssh
-		fi
-		$(printf "%s" "$repo_lines")
+		${bootstrap_source}
 		]]>
 			</source>
 			</script>
