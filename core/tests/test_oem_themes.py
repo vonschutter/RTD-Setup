@@ -124,6 +124,26 @@ system::run_command_in_gnome_user_session() {
             self.assertNotIn("register_wallpapers", user_script.read_text())
             self.assertNotIn("plus-themes.sh", user_script.read_text())
 
+    def test_user_session_recovers_plasma_authorization_from_user_manager(self):
+        script = r'''
+id() { echo 500; }
+sudo() {
+    shift 4
+    if [[ "$*" == *'systemctl --user show-environment' ]]; then
+        printf '%s\n' 'DISPLAY=:2' 'XAUTHORITY=/run/user/500/xauth_desktop' 'UNSAFE=ignored'
+    else
+        "$@"
+    fi
+}
+SUDO_USER=builder
+XAUTHORITY=/root/wrong-auth
+''' + library_function("system::run_command_in_gnome_user_session") + r'''
+system::run_command_in_gnome_user_session /bin/bash -c '
+[[ "$DISPLAY" == :2 && "$XAUTHORITY" == /run/user/500/xauth_desktop && -z "${UNSAFE:-}" ]]'
+'''
+        result = subprocess.run(['bash', '-c', script], text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_user_session_preserves_arguments_and_returns_sudo_failure(self):
         script = """
 sudo() { printf '%s\\n' "$@"; return 37; }

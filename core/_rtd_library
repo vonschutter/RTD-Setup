@@ -11526,10 +11526,27 @@ system::run_command_in_gnome_user_session() {
 	echo -------------------------- Begin as user: 🪪 $SUDO_USER ---------------------
 	echo "$*"
 	local rc=0
+	# Plasma/SDDM stores Xauthority in the runtime directory, not ~/.Xauthority.
+	# Recover the desktop's environment after sudo has filtered it. Only accept
+	# these known variables; never evaluate session-manager output as shell code.
+	local session_uid session_environment key value
+	session_uid=$(id -u "$SUDO_USER") || return 1
+	local -a graphical_environment=("DISPLAY=${DISPLAY:-}"
+		"XAUTHORITY=${XAUTHORITY:-}" "WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-}")
+	session_environment=$(sudo -n -H -u "$SUDO_USER" env \
+		XDG_RUNTIME_DIR="/run/user/$session_uid" \
+		DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$session_uid/bus" \
+		systemctl --user show-environment 2>/dev/null) || session_environment=""
+	while IFS='=' read -r key value; do
+		case "$key" in
+			DISPLAY|XAUTHORITY|WAYLAND_DISPLAY|XDG_SESSION_TYPE)
+				graphical_environment+=("$key=$value") ;;
+		esac
+	done <<<"$session_environment"
 	sudo -n -H -u "$SUDO_USER" env DISPLAY="${DISPLAY:-}" \
 		RTD_NONINTERACTIVE="${RTD_NONINTERACTIVE:-0}" DEBIAN_FRONTEND="${DEBIAN_FRONTEND:-}" \
-		DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u "$SUDO_USER")/bus" \
-		XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" "$@" || rc=$?
+		DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$session_uid/bus" \
+		XDG_RUNTIME_DIR="/run/user/$session_uid" "${graphical_environment[@]}" "$@" || rc=$?
 	echo " "
 	echo -------------------------- End as user: 🪪 $SUDO_USER ---------------------
 	return "$rc"
@@ -12003,6 +12020,38 @@ system::rtd_oem_reseal::_prepare_suse() {
 		firstboot_unit=yast2-firstboot.service
 	else
 		write_error "YaST Firstboot service is unavailable; refusing to mark reseal ready."
+		return 1
+	fi
+	# A running firstboot service alone is insufficient: custom workflows may
+	# omit user creation. Respect the configured control file and verify it.
+	if ! python3 - /etc/sysconfig/firstboot /etc/YaST2/firstboot.xml <<'RTD_SUSE_FIRSTBOOT_CHECK'
+import pathlib
+import shlex
+import sys
+import xml.etree.ElementTree as ET
+
+config, control = sys.argv[1:]
+try:
+    if pathlib.Path(config).exists():
+        for line in pathlib.Path(config).read_text().splitlines():
+            key, sep, value = line.partition('=')
+            if sep and key.strip() == 'FIRSTBOOT_CONTROL_FILE':
+                values = shlex.split(value, comments=True)
+                if values:
+                    control = values[0]
+    root = ET.parse(control).getroot()
+    ns = {'y': 'http://www.suse.com/1.0/yast2ns'}
+    enabled = any(module.findtext('y:name', namespaces=ns) == 'firstboot_user'
+                  and module.findtext('y:enabled', default='true', namespaces=ns).strip() == 'true'
+                  for module in root.findall('.//y:module', ns))
+    if not enabled:
+        raise ValueError('firstboot_user is absent or disabled')
+except (OSError, ValueError, ET.ParseError) as error:
+    print(f'Cannot prepare SUSE first-user setup: {error}', file=sys.stderr)
+    sys.exit(1)
+RTD_SUSE_FIRSTBOOT_CHECK
+	then
+		write_error "YaST firstboot must include user creation; refusing to mark reseal ready."
 		return 1
 	fi
 	mkdir -p /var/lib/YaST2 || return 1

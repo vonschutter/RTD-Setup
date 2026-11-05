@@ -1159,6 +1159,7 @@ recipe:_OEM:_Themes_and_Tweaks () {
 	if  ps -e |grep "plasmashell" ; then
 		# -------------------------------------------------------------------------------------------------------
 		write_information "Detected KDE UI on this system! Adding OEM customizations..."
+		mkdir -p /etc/skel/.config || return 1
 		if [[ -e ${_THEME_DIR}/plus-themes.sh ]] ; then 
 			bash "${_THEME_DIR}/plus-themes.sh" </dev/null || return 1
 		else 
@@ -1170,9 +1171,7 @@ recipe:_OEM:_Themes_and_Tweaks () {
 
 		# Apply system assets as the desktop user using current Plasma tools. Apply
 		# fonts last: global theme packages can change kdeglobals font settings.
-		sudo -n -H -u "$SUDO_USER" env RTD_NONINTERACTIVE=1 DEBIAN_FRONTEND=noninteractive \
-			DISPLAY="${DISPLAY:-}" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u "$SUDO_USER")/bus" \
-			XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" /bin/bash -c '
+		system::run_command_in_gnome_user_session /bin/bash -c '
 				source "$1" "" || exit 1
 				kde::set_global_look_and_feel --package "$4" &&
 				kde::set_wallpaper "$2" &&

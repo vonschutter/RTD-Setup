@@ -98,12 +98,22 @@ REGISTER
                              'registration retry must reuse the successful clone')
 
     def test_reseal_arms_native_unit_and_rejects_missing_prerequisites(self):
-        for packages, unit in ((0, 'YaST2-Firstboot.service'), (1, 'YaST2-Firstboot.service'), (0, 'missing')):
-            with self.subTest(packages=packages, unit=unit), tempfile.TemporaryDirectory() as directory:
+        for packages, unit, user_step in ((0, 'YaST2-Firstboot.service', 'true'),
+                                           (1, 'YaST2-Firstboot.service', 'true'),
+                                           (0, 'missing', 'true'),
+                                           (0, 'YaST2-Firstboot.service', 'false'),
+                                           (0, 'YaST2-Firstboot.service', 'missing')):
+            with self.subTest(packages=packages, unit=unit, user_step=user_step), tempfile.TemporaryDirectory() as directory:
                 marker = Path(directory) / 'YaST2/reconfig_system'
+                control = Path(directory) / 'custom-firstboot.xml'
+                control.write_text('<productDefines xmlns="http://www.suse.com/1.0/yast2ns">'
+                                   f'<module><name>{"other" if user_step == "missing" else "firstboot_user"}</name>'
+                                   f'<enabled>{user_step}</enabled></module></productDefines>')
+                config = Path(directory) / 'firstboot.conf'
+                config.write_text(f'FIRSTBOOT_CONTROL_FILE="{control}"\n')
                 function = library_function('system::rtd_oem_reseal::_prepare_suse').replace(
                     '/var/lib/YaST2', str(marker.parent)
-                )
+                ).replace('/etc/sysconfig/firstboot', str(config))
                 result = subprocess.run(['bash', '-c', """
 write_status() { :; }
 write_error() { echo "$*" >&2; }
@@ -116,7 +126,7 @@ systemctl() {
                                         capture_output=True, text=True,
                                         env={**os.environ, 'PACKAGE_RESULT': str(packages),
                                              'UNIT': unit, '_LOGFILE': str(Path(directory) / 'log')})
-                success = packages == 0 and unit != 'missing'
+                success = packages == 0 and unit != 'missing' and user_step == 'true'
                 self.assertEqual(result.returncode == 0, success, result.stderr)
                 self.assertEqual(marker.exists(), success)
                 if success:
